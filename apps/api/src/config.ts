@@ -111,6 +111,12 @@ const envSchema = z.object({
   // when active, env validation emits a structured warning so the
   // override remains visible in telemetry. Default: 'false' (gate on).
   ALLOW_MISSING_IDEMPOTENCY_KV: z.enum(['true', 'false']).default('false'),
+
+  // [OPT-C] Adult-owner gate — server-side enforcement of the 18+ requirement
+  // for a parent creating a child profile. Paired with the mobile-side
+  // ADULT_OWNER_GATE_ENABLED feature flag (apps/mobile/src/lib/feature-flags.ts).
+  // Default: true. Flip to 'false' via Doppler to disable without redeploying.
+  ADULT_OWNER_GATE_ENABLED: z.enum(['true', 'false']).default('true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -13,6 +13,11 @@ import {
   rememberPendingAuthRedirect,
   peekPendingAuthRedirect,
 } from '../../lib/pending-auth-redirect';
+import {
+  setPreviewState,
+  clearPreviewState,
+  getPreviewState,
+} from '../../lib/preview-onboarding-state';
 import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 
 const mockFetch = createRoutedMockFetch();
@@ -274,10 +279,12 @@ describe('AppLayout', () => {
     jest.useRealTimers();
   });
 
-  it('renders guardian tab shell for accounts with linked children', () => {
+  it('renders guardian tab shell for accounts with linked children', async () => {
     renderLayout();
 
-    screen.getByTestId('tabs');
+    // await: probe-state effect (getPreviewState Promise) must resolve before
+    // the gate logic falls through to the Tabs. findByTestId polls until found.
+    await screen.findByTestId('tabs');
     expect(screen.queryByTestId('redirect')).toBeNull();
 
     const shape = resolveTabShape({
@@ -484,7 +491,7 @@ describe('AppLayout', () => {
   // parent is wrong copy and indicates a misclassified state. Pre-fix, the
   // landing showed for any CONSENTED profile with no subjects, including
   // parents.
-  it('does not show post-approval landing for parent (owner) profiles (BUG-914)', () => {
+  it('does not show post-approval landing for parent (owner) profiles (BUG-914)', async () => {
     mockUseProfile.mockReturnValue({
       profiles: [
         {
@@ -522,9 +529,10 @@ describe('AppLayout', () => {
 
     renderLayout();
 
+    // await: probe-state effect must resolve before the tabs render.
+    await screen.findByTestId('tabs');
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
     expect(screen.queryByText("You're approved!")).toBeNull();
-    screen.getByTestId('tabs');
   });
 
   // [BUG-61] A teen-owner (under-18 with their own account) who just
@@ -575,7 +583,7 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('post-approval-continue'));
   });
 
-  it('does not show post-approval landing when user already has subjects (BUG-544)', () => {
+  it('does not show post-approval landing when user already has subjects (BUG-544)', async () => {
     mockUseProfile.mockReturnValue({
       profiles: [
         {
@@ -622,11 +630,12 @@ describe('AppLayout', () => {
 
     renderLayout();
 
+    // await: probe-state effect must resolve before the tabs render.
+    await screen.findByTestId('tabs');
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
-    screen.getByTestId('tabs');
   });
 
-  it('renders in-app toast instead of native alert when profile was removed (BUG-548)', () => {
+  it('renders in-app toast instead of native alert when profile was removed (BUG-548)', async () => {
     const acknowledgeProfileRemoval = jest.fn();
     mockUseProfile.mockReturnValue({
       profiles: [
@@ -646,12 +655,13 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    screen.getByTestId('profile-switched-toast');
+    // await: probe-state effect must resolve before the tabs+toast render.
+    await screen.findByTestId('profile-switched-toast');
     screen.getByText('Profile switched');
     screen.getByText('The profile you were viewing has been removed.');
   });
 
-  it('shows proxy banner and switches back to the owner profile', () => {
+  it('shows proxy banner and switches back to the owner profile', async () => {
     const switchProfile = jest.fn();
     mockUseProfile.mockReturnValue({
       profiles: [
@@ -673,7 +683,8 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    screen.getByTestId('proxy-banner');
+    // await: probe-state effect must resolve before the tabs+banner render.
+    await screen.findByTestId('proxy-banner');
     // Exact match — a regression that breaks the {{name}} interpolation
     // ("Viewing as " with an empty/literal name) would slip past the broader
     // /Viewing as/ regex. test-setup.ts initializes i18next synchronously
@@ -686,7 +697,7 @@ describe('AppLayout', () => {
     expect(switchProfile).toHaveBeenCalledWith('p1');
   });
 
-  it('tells waiting learners that consent is checked automatically', () => {
+  it('tells waiting learners that consent is checked automatically', async () => {
     mockUseProfile.mockReturnValue({
       profiles: [
         {
@@ -722,7 +733,8 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    screen.getByTestId('consent-pending-gate');
+    // await: probe-state effect must resolve before the consent gate renders.
+    await screen.findByTestId('consent-pending-gate');
     expect(screen.getByText('Checking automatically…'));
   });
 
@@ -749,6 +761,257 @@ describe('AppLayout', () => {
       screen.getByTestId('tabs');
     });
     expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AppLayout no-profile gate — preview branch
+// Tests for the SaveWizardGate inline gate (Task 11 / [CRITICAL-A2]).
+// ---------------------------------------------------------------------------
+
+describe('AppLayout no-profile gate — preview branch', () => {
+  let testQueryClient: QueryClient;
+
+  // Minimal route handlers needed to prevent fetch errors in the layout hooks.
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+  }
+
+  // Render the layout with no active profile and no loading state.
+  // Returns the render result plus a simulateProfileCreated helper.
+  function renderAppLayoutWithNoProfile() {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    const AppLayout = require('./_layout').default;
+    const result = render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+
+    function simulateProfileCreated(profile: { id: string; isOwner: boolean }) {
+      mockUseProfile.mockReturnValue({
+        profiles: [profile],
+        activeProfile: profile,
+        isLoading: false,
+        profileWasRemoved: false,
+        acknowledgeProfileRemoval: jest.fn(),
+        switchProfile: jest.fn(),
+      });
+      act(() => {
+        result.rerender(<AppLayout />);
+      });
+    }
+
+    return { ...result, simulateProfileCreated };
+  }
+
+  // Render the layout with an active profile already set (no-profile gate skipped).
+  function renderAppLayoutWithActiveProfile() {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
+      ],
+      activeProfile: {
+        id: 'p1',
+        isOwner: true,
+        consentStatus: null,
+        birthYear: 1990,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    // Also clear the in-memory preview state between tests.
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    // Restore any spies (e.g. getPreviewState spy in the loading test) so
+    // they don't leak into subsequent tests. clearAllMocks() in beforeEach
+    // clears call counts but not spy implementations.
+    jest.restoreAllMocks();
+  });
+
+  it('renders the SaveWizardGate when preview state exists and flag is on', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+
+    const { findByTestId, queryByTestId } = renderAppLayoutWithNoProfile();
+
+    // [CRITICAL-A2] The wizard is INLINE — no route navigation; assert the
+    // SaveWizardGate testID is present in the same render tree.
+    expect(await findByTestId('save-wizard-gate')).toBeTruthy();
+    expect(queryByTestId('create-profile-gate')).toBeNull();
+  });
+
+  // [MEDIUM-D2 / CJS constraint] The ideal approach is jest.doMock +
+  // jest.isolateModulesAsync, but @testing-library/react-native registers
+  // afterAll hooks at import time, which Jest forbids inside isolateModules
+  // callbacks. jest.isolateModulesAsync with dynamic import() also requires
+  // --experimental-vm-modules (not enabled in this Babel/CJS preset).
+  //
+  // Safe alternative in CJS: patch the shared FEATURE_FLAGS object for the
+  // duration of the test and restore it in a finally block. Jest runs tests
+  // within a file sequentially (never in parallel within the same worker), so
+  // the mutation does not race with other tests in this file. Cross-worker
+  // isolation is already guaranteed by Jest's separate-process-per-file model.
+  it('falls through to CreateProfileGate when flag is off, even with stale preview state', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { PREVIEW_ONBOARDING_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { PREVIEW_ONBOARDING_ENABLED: boolean }
+      ).PREVIEW_ONBOARDING_ENABLED = false;
+      const { findByTestId, queryByTestId } = renderAppLayoutWithNoProfile();
+      expect(await findByTestId('create-profile-gate')).toBeTruthy();
+      expect(queryByTestId('save-wizard-gate')).toBeNull();
+    } finally {
+      (
+        flags.FEATURE_FLAGS as {
+          PREVIEW_ONBOARDING_ENABLED: boolean;
+        }
+      ).PREVIEW_ONBOARDING_ENABLED = original;
+    }
+  });
+
+  it('renders loading state during preview-state async probe', async () => {
+    // Spy getPreviewState to return a pending promise. Assert loading testID
+    // is rendered; assert neither gate nor wizard is in the tree.
+    let resolve!: (v: null) => void;
+    jest
+      .spyOn(require('../../lib/preview-onboarding-state'), 'getPreviewState')
+      .mockReturnValue(
+        new Promise<null>((r) => {
+          resolve = r;
+        }),
+      );
+
+    const { getByTestId, queryByTestId } = renderAppLayoutWithNoProfile();
+    expect(getByTestId('preview-state-loading')).toBeTruthy();
+    expect(queryByTestId('create-profile-gate')).toBeNull();
+    expect(queryByTestId('save-wizard-gate')).toBeNull();
+
+    // Resolve the promise so the effect completes and doesn't cause warnings.
+    await act(async () => {
+      resolve(null);
+    });
+  });
+
+  // [CRITICAL-A2 / HIGH-A2] Wizard outlives the auto-activation transition.
+  it('keeps SaveWizardGate mounted after ProfileProvider auto-activates the first profile', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    const { findByTestId, simulateProfileCreated } =
+      renderAppLayoutWithNoProfile();
+    await findByTestId('save-wizard-gate');
+    // Drive the harness to inject a created profile and let the provider
+    // auto-activate it (mirrors what happens at runtime after the owner POST
+    // resolves and the cache is updated).
+    simulateProfileCreated({ id: 'p1', isOwner: true });
+    // Wizard MUST still be mounted; we have NOT signalled wizardDone yet.
+    expect(await findByTestId('save-wizard-gate')).toBeTruthy();
+  });
+
+  // [CRITICAL-B2] Verify the layout does NOT install the auto-cleanup effect.
+  it('does NOT clear preview state automatically when activeProfile becomes truthy', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    renderAppLayoutWithActiveProfile();
+    await Promise.resolve();
+    // The layout must leave the key intact; cleanup is the wizard's job (or TTL/sign-out).
+    expect(await getPreviewState()).not.toBeNull();
   });
 });
 
@@ -879,6 +1142,741 @@ describe('resolveHomeTabPresentation', () => {
       accessibilityLabelKey: 'tabs.myLearningLabel',
       iconName: 'School',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SaveWizard — Step 1 (Where to Save)
+// Tests for the multi-step save-wizard skeleton + Step 1 target selection.
+// [CRITICAL-A2] The wizard is INLINE — rendered by AppLayout's gate ordering
+// when preview state is present and wizardDone is false. Tests render the
+// full layout; SaveWizardGate is NOT exported from _layout.tsx.
+// ---------------------------------------------------------------------------
+
+describe('SaveWizard — Step 1', () => {
+  let testQueryClient: QueryClient;
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+  }
+
+  function renderWizardLayout() {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  // [CRITICAL-3] No dead-end when wizard mounts with expired/missing state.
+  // Simulates the TTL-expiry race: layout's probe sees state as 'present'
+  // (first call), then the TTL expires before the wizard's own internal probe
+  // runs (second call returns null). The wizard must call onComplete + navigate
+  // home rather than rendering a blank dead-end screen.
+  it('redirects to /(app)/home when wizard mounts but state has expired', async () => {
+    // First call (layout probe) returns a valid state so the wizard branch is entered.
+    // Second call (wizard's internal probe) returns null to simulate TTL expiry.
+    const previewModule = require('../../lib/preview-onboarding-state');
+    let callCount = 0;
+    jest
+      .spyOn(previewModule, 'getPreviewState')
+      .mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            intent: 'self',
+            path: 'learner_value_prop',
+            createdAt: new Date().toISOString(),
+          };
+        }
+        return null;
+      });
+
+    renderWizardLayout();
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
+    expect(screen.queryByTestId('save-wizard-step-1')).toBeNull();
+  });
+
+  it('preselects "My learning" when intent was self', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 't',
+      createdAt: new Date().toISOString(),
+    });
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    expect(
+      screen.getByTestId('save-target-self').props.accessibilityState?.selected,
+    ).toBe(true);
+  });
+
+  it('preselects "My child" when intent was child', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    expect(
+      screen.getByTestId('save-target-child').props.accessibilityState
+        ?.selected,
+    ).toBe(true);
+  });
+
+  it('overrides intent when user picks a different target', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-target-self'));
+    expect(
+      screen.getByTestId('save-target-self').props.accessibilityState?.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('save-target-child').props.accessibilityState
+        ?.selected,
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SaveWizard — Step 2 (Profile Basics)
+// [HIGH-A3 / HIGH-B2] Adult-age gate + form field tests.
+// ---------------------------------------------------------------------------
+
+describe('SaveWizard — Step 2 (Profile Basics)', () => {
+  let testQueryClient: QueryClient;
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+  }
+
+  function renderWizardLayout() {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  // [HIGH-A3 / HIGH-B2] Under-18 parent with target=child: Continue must be
+  // disabled and the adult-required warning view must be visible.
+  it('under-18 parent (target=child) cannot submit; Continue stays disabled', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+    // 2013 → age 13 in 2026 — computeAgeBracket returns 'adolescent'/'child'.
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-name'),
+      'TooYoung',
+    );
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      '2013',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+
+    const cta = screen.getByTestId('save-basics-continue');
+    expect(cta.props.accessibilityState?.disabled).toBe(true);
+    expect(screen.getByTestId('save-basics-adult-required')).toBeTruthy();
+  });
+
+  // [HIGH-A3] Boundary: exactly 18 (birthYear 2008 in 2026) must pass the gate.
+  it('parent aged exactly 18 (target=child) is allowed to submit', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+    // Stub profiles POST so submit doesn't fail on network.
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Pat',
+              birthYear: 2008,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+    // computeAgeBracket(2008, 2026) → age 18 → 'adult'. Boundary must pass.
+    fireEvent.changeText(screen.getByTestId('save-basics-parent-name'), 'Pat');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      '2008',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+
+    const cta = screen.getByTestId('save-basics-continue');
+    expect(cta.props.accessibilityState?.disabled).toBe(false);
+    expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+  });
+
+  // [OPT-C] target=self: the adult-age gate must NOT apply regardless of age.
+  // Server's 11+ floor covers this case; wizard has no age gate for self.
+  it('self target skips the adult gate (any age ≥ 11 allowed)', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'algebra',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Solo',
+              birthYear: 2013,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+    // 13-year-old solo learner — gate must NOT apply.
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-display-name'),
+      'Solo',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2013');
+
+    const cta = screen.getByTestId('save-basics-continue');
+    expect(cta.props.accessibilityState?.disabled).toBe(false);
+    expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+  });
+
+  // [OPT-C / MEDIUM-D2] Flag-off: when ADULT_OWNER_GATE_ENABLED is false, the
+  // adult-age gate is bypassed. Uses the established mutation pattern from
+  // SaveWizardGate flag-off test (line ~936 of this file) — safe in CJS because
+  // Jest runs tests within a file sequentially; the mutation is restored in
+  // a finally block.
+  it('underage parent allowed through when ADULT_OWNER_GATE_ENABLED is false [OPT-C]', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'TooYoung',
+              birthYear: 2013,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { ADULT_OWNER_GATE_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { ADULT_OWNER_GATE_ENABLED: boolean }
+      ).ADULT_OWNER_GATE_ENABLED = false;
+
+      renderWizardLayout();
+      await screen.findByTestId('save-wizard-step-1');
+      fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+      // 13-year-old parent — would be blocked by gate but flag is off.
+      fireEvent.changeText(
+        screen.getByTestId('save-basics-parent-name'),
+        'TooYoung',
+      );
+      fireEvent.changeText(
+        screen.getByTestId('save-basics-parent-birth-year'),
+        '2013',
+      );
+      fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+      fireEvent.changeText(
+        screen.getByTestId('save-basics-child-birth-year'),
+        '2014',
+      );
+
+      const cta = screen.getByTestId('save-basics-continue');
+      expect(cta.props.accessibilityState?.disabled).toBe(false);
+      expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { ADULT_OWNER_GATE_ENABLED: boolean }
+      ).ADULT_OWNER_GATE_ENABLED = original;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SaveWizard — Step 3 (Confirm + Landing)
+// Task 14: Replace ConfirmStep placeholder with real implementation.
+// [Task 0 resolution] Dual landing keyed off the wizard's `target` flag:
+//   - self (or both+self_first): router.replace to /(app)/session with rawInput
+//   - child (or both+child_first): router.replace to /(app)/home
+// ---------------------------------------------------------------------------
+
+describe('SaveWizard — Step 3 (Confirm + Landing)', () => {
+  let testQueryClient: QueryClient;
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    // /profiles POST — returns a minimal owner profile for step 2 submission.
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Solo',
+              birthYear: 2000,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+  }
+
+  /** Render the full layout with no active profile (triggers SaveWizardGate). */
+  function renderWizardLayout(
+    switchProfileImpl?: () => Promise<{ success: boolean; error?: string }>,
+  ) {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile:
+        switchProfileImpl ?? jest.fn().mockResolvedValue({ success: true }),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  /**
+   * Drive from step 1 through step 2 (self target) and reach step 3.
+   * Returns once the "save-confirm-land" CTA is visible.
+   */
+  async function driveToStep3Self() {
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    // Step 2 — solo learner form
+    await screen.findByTestId('save-basics-display-name');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-display-name'),
+      'Solo',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2000');
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+    await screen.findByTestId('save-confirm-land');
+  }
+
+  /**
+   * Drive from step 1 through step 2 (child target) and reach step 3.
+   * Returns once the "save-confirm-land" CTA is visible.
+   */
+  async function driveToStep3Child() {
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    // Override to child target
+    fireEvent.press(screen.getByTestId('save-target-child'));
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    // Step 2 — parent + child form
+    await screen.findByTestId('save-basics-parent-name');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-name'),
+      'Parent',
+    );
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      '1985',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Kid');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+    await screen.findByTestId('save-confirm-land');
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockReplace.mockReset();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('self target: replaces history with session route on CTA press', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'algebra',
+      createdAt: new Date().toISOString(),
+    });
+
+    await driveToStep3Self();
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(() => {
+      const call = mockReplace.mock.calls.find(
+        (c) =>
+          typeof c[0] === 'object' &&
+          (c[0] as { pathname?: string }).pathname === '/(app)/session',
+      );
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('child target: replaces history with /(app)/home on CTA press', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+
+    await driveToStep3Child();
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
+  });
+
+  it('clears preview state on save completion', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'fractions',
+      createdAt: new Date().toISOString(),
+    });
+
+    await driveToStep3Self();
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(async () => {
+      expect(await getPreviewState()).toBeNull();
+    });
+  });
+
+  it('switchProfile failure surfaces error in landing error block', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'history',
+      createdAt: new Date().toISOString(),
+    });
+
+    // Re-render with a failing switchProfile
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    const switchProfileMock = jest
+      .fn()
+      .mockResolvedValue({ success: false, error: 'profile switch failed' });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: switchProfileMock,
+    });
+
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Solo',
+              birthYear: 2000,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    const AppLayout = require('./_layout').default;
+    render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    await screen.findByTestId('save-basics-display-name');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-display-name'),
+      'Solo',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2000');
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+    await screen.findByTestId('save-confirm-land');
+
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(() => {
+      expect(screen.getByText('profile switch failed')).toBeTruthy();
+    });
+    // Must NOT navigate on failure
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/session' }),
+    );
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
   });
 });
 

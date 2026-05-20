@@ -267,11 +267,32 @@ jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
 }));
 
-jest.mock('expo-secure-store', () => ({
-  getItemAsync: jest.fn().mockResolvedValue(null),
-  setItemAsync: jest.fn().mockResolvedValue(undefined),
-  deleteItemAsync: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('expo-secure-store', () => {
+  const store = new Map<string, string>();
+  const mock = {
+    // Matches the real expo-secure-store keychain-accessible constant used by
+    // production code (e.g. preview-onboarding-state.ts). Value matches the
+    // native SDK string so any test that reads the constant gets a truthy string.
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
+    getItemAsync: jest.fn(async (key: string) => store.get(key) ?? null),
+    setItemAsync: jest.fn(async (key: string, value: string) => {
+      store.set(key, value);
+    }),
+    deleteItemAsync: jest.fn(async (key: string) => {
+      store.delete(key);
+    }),
+    __store: store,
+  };
+  return mock;
+});
+
+// Reset the SecureStore Map between tests to prevent cross-test pollution.
+beforeEach(() => {
+  const secureStoreMock = jest.requireMock('expo-secure-store') as {
+    __store: Map<string, string>;
+  };
+  secureStoreMock.__store.clear();
+});
 
 // expo-crypto loads a native module on import; mock to Node's randomUUID so
 // the outbox dedup-id path works under jest. The runtime app uses

@@ -27,6 +27,9 @@ type GetOptions = Parameters<typeof ExpoSecureStore.getItemAsync>[1];
 type SetOptions = Parameters<typeof ExpoSecureStore.setItemAsync>[2];
 type DeleteOptions = Parameters<typeof ExpoSecureStore.deleteItemAsync>[1];
 
+export const WHEN_UNLOCKED_THIS_DEVICE_ONLY =
+  ExpoSecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY;
+
 const memoryStorage = new Map<string, string>();
 
 // One-shot warning so the web fallback is visible in dev consoles but never

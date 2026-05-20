@@ -204,6 +204,9 @@ describe('POST /v1/profiles', () => {
       expect.anything(),
       ACCOUNT_ID,
       expect.objectContaining({ displayName: 'First Owner' }),
+      // [OPT-C] Route now threads the kill-switch from c.env; assertion needs
+      // to accept the opts arg added by the adult-owner-gate wiring.
+      expect.objectContaining({ adultOwnerGateEnabled: expect.any(Boolean) }),
     );
     const body = await res.json();
     expect(body).toMatchObject({

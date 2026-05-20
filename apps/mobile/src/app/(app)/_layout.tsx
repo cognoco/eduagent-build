@@ -17,7 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, isGuardianProfile } from '../../lib/profile';
-import { computeAgeBracket } from '@eduagent/schemas';
+import { computeAgeBracket, type Profile } from '@eduagent/schemas';
 import {
   useThemeColors,
   useTokenVars,
@@ -54,6 +54,18 @@ import {
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import {
+  getPreviewState,
+  setPreviewState,
+  clearPreviewState,
+  type PreviewOnboardingStateV0,
+  type SaveTarget,
+} from '../../lib/preview-onboarding-state';
+// [CRITICAL-B2] clearPreviewState is now imported here — ownership is
+// Task 14's Step-3 success path (this file) and sign-out.
+import { useApiClient } from '../../lib/api-client';
+import { assertOk } from '../../lib/assert-ok';
 
 initNotificationHandler();
 
@@ -710,6 +722,565 @@ function CreateProfileGate(): React.ReactElement {
         </Pressable>
       </GateContent>
     </View>
+  );
+}
+
+// ─── Save Wizard types and constants ─────────────────────────────────────────
+
+type WizardStep = 1 | 2 | 3;
+
+interface TargetOption {
+  target: SaveTarget;
+  label: string;
+  testID: string;
+}
+
+const SAVE_TARGETS: ReadonlyArray<TargetOption> = [
+  { target: 'self', label: 'My learning', testID: 'save-target-self' },
+  {
+    target: 'child',
+    label: "My child's learning",
+    testID: 'save-target-child',
+  },
+  { target: 'both', label: 'Both', testID: 'save-target-both' },
+];
+
+function defaultTargetFor(
+  state: PreviewOnboardingStateV0 | null,
+): SaveTarget | null {
+  if (!state) return null;
+  switch (state.intent) {
+    case 'self':
+      return 'self';
+    case 'child':
+      return 'child';
+    case 'both':
+      return 'both';
+    case 'not_sure':
+      return null; // ask explicitly per spec Routing And Landing Rules
+  }
+}
+
+// ─── Step 2: Profile Basics (Task 13) ────────────────────────────────────────
+
+function ProfileBasicsStep({
+  target,
+  previewState,
+  onComplete,
+}: {
+  target: SaveTarget;
+  previewState: PreviewOnboardingStateV0;
+  onComplete: (created: { parent: Profile; child?: Profile }) => void;
+}): React.ReactElement {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  const [parentName, setParentName] = React.useState('');
+  const [parentBirthYear, setParentBirthYear] = React.useState('');
+  const [childName, setChildName] = React.useState('');
+  const [childBirthYear, setChildBirthYear] = React.useState('');
+  const [createdParent, setCreatedParent] = React.useState<Profile | null>(
+    null,
+  );
+  const [error, setError] = React.useState<string | null>(null);
+  const [childError, setChildError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const needsChild = target === 'child' || target === 'both';
+  const needsOwner = true; // all targets require an owner profile
+
+  const isValidYear = (s: string) =>
+    /^\d{4}$/.test(s) &&
+    Number(s) > 1900 &&
+    Number(s) <= new Date().getFullYear();
+
+  // [HIGH-A3 / HIGH-B2] Client-side adult-age gate. Server has NO 18+ rule
+  // (apps/api/src/services/profile.ts:184-191 only enforces 11+), so without
+  // this gate a minor could complete the wizard as isOwner=true with a child
+  // linked underneath. Skipped entirely when target === 'self' — server's 11+
+  // floor covers that case.
+  //
+  // [OPT-C] Gated by FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED. When OFF,
+  // adultGateRequired is false and adultGatePasses is trivially true, so
+  // canSubmit falls back to today's behaviour (field validations only).
+  const parentIsAdult =
+    isValidYear(parentBirthYear) &&
+    computeAgeBracket(Number(parentBirthYear)) === 'adult';
+  const adultGateRequired =
+    FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED && needsChild;
+  const adultGatePasses = !adultGateRequired || parentIsAdult;
+
+  const canSubmit =
+    !loading &&
+    parentName.trim().length > 0 &&
+    isValidYear(parentBirthYear) &&
+    (needsChild
+      ? childName.trim().length > 0 && isValidYear(childBirthYear)
+      : true) &&
+    adultGatePasses;
+
+  const submit = React.useCallback(async () => {
+    setError(null);
+    setChildError(null);
+    setLoading(true);
+    try {
+      let parent = createdParent;
+
+      // [HIGH-4] Resume guard: if the preview state already records a created
+      // owner profile id and that profile is in the cache, skip the owner POST
+      // to prevent double-creation on wizard remount mid-flight.
+      if (!parent && previewState.createdOwnerProfileId) {
+        const cached = queryClient.getQueriesData<Profile[]>({
+          predicate: (q) => String(q.queryKey[0]) === 'profiles',
+        });
+        for (const [, list] of cached) {
+          const match = list?.find(
+            (p) => p.id === previewState.createdOwnerProfileId,
+          );
+          if (match) {
+            parent = match;
+            setCreatedParent(match);
+            break;
+          }
+        }
+      }
+
+      if (!parent) {
+        const res = await client.profiles.$post({
+          json: {
+            displayName: parentName.trim(),
+            birthYear: Number(parentBirthYear),
+          },
+        });
+        await assertOk(res);
+        const data = (await res.json()) as { profile: Profile };
+        parent = data.profile;
+        setCreatedParent(parent);
+
+        // [HIGH-4] Persist owner id BEFORE the second POST so a crash between
+        // the two calls can resume without double-creating the owner.
+        await setPreviewState({
+          ...previewState,
+          createdOwnerProfileId: parent.id,
+        });
+
+        queryClient.setQueriesData<Profile[]>(
+          { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
+          (old) => (old ? [...old, parent!] : [parent!]),
+        );
+      }
+
+      let child: Profile | undefined;
+      if (needsChild) {
+        try {
+          // [CRITICAL-1] No `forChild` field. profileCreateSchema rejects it;
+          // server auto-classifies non-first POST as child via
+          // createProfileWithLimitCheck (apps/api/src/services/profile.ts:253).
+          const res = await client.profiles.$post({
+            json: {
+              displayName: childName.trim(),
+              birthYear: Number(childBirthYear),
+            },
+          });
+          await assertOk(res);
+          const data = (await res.json()) as { profile: Profile };
+          child = data.profile;
+
+          queryClient.setQueriesData<Profile[]>(
+            { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
+            (old) => (old ? [...old, child!] : [child!]),
+          );
+        } catch (childErr) {
+          // [AC 9] Keep parent. Surface retryable child error inline.
+          setChildError(formatApiError(childErr));
+          setLoading(false);
+          return;
+        }
+      }
+
+      await queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0]) === 'profiles',
+      });
+
+      if (parent) {
+        onComplete({ parent, child });
+      }
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    client,
+    queryClient,
+    createdParent,
+    needsChild,
+    parentName,
+    parentBirthYear,
+    childName,
+    childBirthYear,
+    previewState,
+    onComplete,
+  ]);
+
+  return (
+    <View>
+      {needsOwner && (
+        <View className="mb-6">
+          <Text className="text-h3 font-semibold text-text-primary mb-3">
+            {target === 'self' ? 'Tell us about you' : 'About you (the parent)'}
+          </Text>
+          <TextInput
+            placeholder="Your name"
+            value={parentName}
+            onChangeText={setParentName}
+            className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
+            testID={
+              target === 'self'
+                ? 'save-basics-display-name'
+                : 'save-basics-parent-name'
+            }
+          />
+          <TextInput
+            placeholder="Birth year (e.g. 1985)"
+            value={parentBirthYear}
+            onChangeText={setParentBirthYear}
+            keyboardType="number-pad"
+            maxLength={4}
+            className="bg-surface text-text-primary rounded-input px-4 py-3"
+            testID={
+              target === 'self'
+                ? 'save-basics-birth-year'
+                : 'save-basics-parent-birth-year'
+            }
+          />
+        </View>
+      )}
+
+      {needsChild && (
+        <View className="mb-6">
+          <Text className="text-h3 font-semibold text-text-primary mb-3">
+            About your child
+          </Text>
+          <TextInput
+            placeholder="Their name or nickname"
+            value={childName}
+            onChangeText={setChildName}
+            className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
+            testID="save-basics-child-name"
+          />
+          <TextInput
+            placeholder="Birth year"
+            value={childBirthYear}
+            onChangeText={setChildBirthYear}
+            keyboardType="number-pad"
+            maxLength={4}
+            className="bg-surface text-text-primary rounded-input px-4 py-3"
+            testID="save-basics-child-birth-year"
+          />
+        </View>
+      )}
+
+      {/* [HIGH-A3] Adult-age gate inline message. Visible only when the parent
+          has entered a valid 4-digit year that resolves to under-18, while the
+          flow needs a child profile. Empty / partial input shows nothing.
+          Copy matches plan spec exactly. */}
+      {adultGateRequired && isValidYear(parentBirthYear) && !parentIsAdult && (
+        <View
+          className="bg-warning/10 rounded-card px-4 py-3 mb-3"
+          testID="save-basics-adult-required"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <Text className="text-warning text-body-sm">
+            To set up a child&apos;s learning, the account holder must be 18 or
+            older. You can still set up your own learning instead — pick
+            &quot;My learning&quot; on the previous step.
+          </Text>
+        </View>
+      )}
+      {error && (
+        <View
+          className="bg-danger/10 rounded-card px-4 py-3 mb-3"
+          testID="save-basics-error"
+        >
+          <Text className="text-danger text-body-sm">{error}</Text>
+        </View>
+      )}
+      {childError && (
+        <View
+          className="bg-danger/10 rounded-card px-4 py-3 mb-3"
+          testID="save-basics-child-error"
+        >
+          <Text className="text-danger text-body-sm mb-2">
+            We saved your account, but couldn&apos;t add your child yet:{' '}
+            {childError}
+          </Text>
+          <Pressable
+            onPress={() => void submit()}
+            testID="save-basics-retry-child"
+            accessibilityRole="button"
+          >
+            <Text className="text-primary font-semibold">Retry</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <Pressable
+        onPress={() => void submit()}
+        disabled={!canSubmit}
+        className={`rounded-button py-3.5 items-center ${canSubmit ? 'bg-primary' : 'bg-primary/40'}`}
+        testID="save-basics-continue"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canSubmit }}
+      >
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="text-body font-semibold text-text-inverse">
+            Continue
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Step 3 of the save wizard: confirmation screen + landing handoff.
+ *
+ * Dual landing keyed off the wizard's `target` flag (Task 0 resolution):
+ * - self / both+self_first → navigate to /(app)/session with rawInput so the
+ *   session screen handles subject creation and streams the opening message.
+ * - child / both+child_first → navigate to /(app)/home where the "Add child"
+ *   CTA closes the loop and the saved topic surfaces as a card.
+ *
+ * Always calls onComplete() after successful landing so the layout's wizard
+ * branch exits cleanly ([HIGH-A2]).
+ */
+function ConfirmStep({
+  target,
+  previewState,
+  created,
+  router,
+  onComplete,
+}: {
+  target: SaveTarget;
+  previewState: PreviewOnboardingStateV0;
+  created: { parent: Profile; child?: Profile };
+  router: ReturnType<typeof useRouter>;
+  onComplete: () => void; // [HIGH-A2] layout-level wizard-done signal
+}): React.ReactElement {
+  const { switchProfile } = useProfile();
+  const [landing, setLanding] = React.useState(false);
+  const [landingError, setLandingError] = React.useState<string | null>(null);
+
+  const isSelfBranch =
+    target === 'self' ||
+    (target === 'both' && previewState.bothPriority === 'self_first');
+
+  const cta = isSelfBranch ? 'Start lesson' : 'Open parent home';
+
+  const onLand = React.useCallback(async () => {
+    if (landing) return;
+    setLanding(true);
+    try {
+      const sw = await switchProfile(created.parent.id);
+      if (!sw.success) {
+        setLandingError(sw.error ?? 'Could not switch profile.');
+        return;
+      }
+
+      await clearPreviewState();
+      onComplete(); // [HIGH-A2] signal wizard done before navigating
+
+      if (isSelfBranch) {
+        // Land in a session for the saved topic. Pass rawInput so the session
+        // screen handles subject creation and opens the chat directly.
+        router.replace({
+          pathname: '/(app)/session',
+          params: {
+            mode: 'freeform',
+            ...(previewState.topicText
+              ? { rawInput: previewState.topicText }
+              : {}),
+          },
+        } as import('expo-router').Href);
+      } else {
+        // Parent branch: "Add child" CTA on home closes the loop.
+        router.replace('/(app)/home' as import('expo-router').Href);
+      }
+    } catch (err) {
+      setLandingError(formatApiError(err));
+    } finally {
+      setLanding(false);
+    }
+  }, [
+    landing,
+    switchProfile,
+    created.parent.id,
+    isSelfBranch,
+    previewState.topicText,
+    onComplete,
+    router,
+  ]);
+
+  return (
+    <View>
+      <Text className="text-h3 font-semibold text-text-primary mb-2">
+        {isSelfBranch
+          ? `Your first lesson is ready${previewState.topicText ? `: ${previewState.topicText}` : ''}.`
+          : "Your child's profile is set up. Let's open parent home."}
+      </Text>
+      {landingError && (
+        <View className="bg-danger/10 rounded-card px-4 py-3 mb-3">
+          <Text className="text-danger text-body-sm">{landingError}</Text>
+        </View>
+      )}
+      <Pressable
+        onPress={() => void onLand()}
+        disabled={landing}
+        className={`rounded-button py-3.5 items-center ${landing ? 'bg-primary/40' : 'bg-primary'}`}
+        testID="save-confirm-land"
+        accessibilityRole="button"
+      >
+        {landing ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="text-body font-semibold text-text-inverse">
+            {cta}
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * [CRITICAL-A2] Save-wizard gate — shown when a user arrives post-OAuth with
+ * a valid preview-onboarding state (they previewed the app before signing up).
+ * Renders INLINE (not as a nested Expo Router route) so it stays mounted across
+ * the profile-creation transition (ProfileProvider auto-activates the first
+ * profile; a nested route would unmount mid-wizard at that point).
+ *
+ * Multi-step controller: Step 1 = target selection, Step 2 = profile basics
+ * (Task 13), Step 3 = confirm + landing (Task 14).
+ */
+function SaveWizardGate({
+  onComplete,
+}: {
+  onComplete: () => void;
+}): React.ReactElement {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [previewState, setLocalPreviewState] =
+    React.useState<PreviewOnboardingStateV0 | null>(null);
+  const [probeDone, setProbeDone] = React.useState(false);
+  const [target, setTarget] = React.useState<SaveTarget | null>(null);
+  const [step, setStep] = React.useState<WizardStep>(1);
+  const [created, setCreated] = React.useState<{
+    parent: Profile;
+    child?: Profile;
+  } | null>(null);
+
+  React.useEffect(() => {
+    void getPreviewState().then((s) => {
+      setLocalPreviewState(s);
+      setTarget(defaultTargetFor(s));
+      setProbeDone(true);
+    });
+  }, []);
+
+  // [CRITICAL-3] Recovery path for "wizard mounted with no state" — happens
+  // when the 1h TTL expires between the layout's initial probe and this
+  // component's second probe, or when SecureStore is wiped externally
+  // (sign-out race). Without this, the wizard renders null and traps the user.
+  // [HIGH-A2] Signal completion to the layout BEFORE navigating, so the wizard
+  // branch in AppLayout exits cleanly and falls through to the next gate.
+  React.useEffect(() => {
+    if (probeDone && !previewState) {
+      onComplete();
+      router.replace('/(app)/home');
+    }
+  }, [probeDone, previewState, router, onComplete]);
+
+  if (!previewState) {
+    return <View testID="save-wizard-gate" className="flex-1 bg-background" />;
+  }
+
+  return (
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{
+        paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 24,
+        paddingHorizontal: 24,
+      }}
+      testID="save-wizard-gate"
+    >
+      <View testID={`save-wizard-step-${step}`} />
+      <Text className="text-h1 font-bold text-text-primary mb-2">
+        Great, let&apos;s save this and get you started.
+      </Text>
+
+      {step === 1 && (
+        <View>
+          <Text className="text-body text-text-secondary mb-6">
+            Where should we save this?
+          </Text>
+          {SAVE_TARGETS.map((opt) => {
+            const selected = target === opt.target;
+            return (
+              <Pressable
+                key={opt.target}
+                onPress={() => setTarget(opt.target)}
+                className={`rounded-card px-4 py-4 mb-3 ${selected ? 'bg-primary/10 border border-primary' : 'bg-surface'}`}
+                testID={opt.testID}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={() => target && setStep(2)}
+            disabled={!target}
+            className={`rounded-button py-3.5 items-center mt-4 ${target ? 'bg-primary' : 'bg-primary/40'}`}
+            testID="save-wizard-step-1-continue"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !target }}
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Continue
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {step === 2 && (
+        <ProfileBasicsStep
+          target={target!}
+          previewState={previewState}
+          onComplete={(c) => {
+            setCreated(c);
+            setStep(3);
+          }}
+        />
+      )}
+
+      {step === 3 && created && (
+        <ConfirmStep
+          target={target!}
+          previewState={previewState}
+          created={created}
+          router={router}
+          onComplete={onComplete} // [HIGH-A2] forwarded from layout
+        />
+      )}
+    </ScrollView>
   );
 }
 
@@ -1530,6 +2101,42 @@ export default function AppLayout() {
     }
   }, [isLoaded, isSignedIn]);
 
+  // [CRITICAL-A2] Preview-state probe — async, resolves once on mount.
+  // Determines whether to show the SaveWizardGate (inline gate, not a route).
+  // Initial state is 'loading' to hold rendering until the probe settles,
+  // preventing a transient CreateProfileGate flash while the async read runs.
+  const [previewProbeState, setPreviewProbeState] = React.useState<
+    'loading' | 'present' | 'absent'
+  >('loading');
+  // [HIGH-A2] Wizard completion sentinel. previewProbeState alone never flips
+  // back to 'absent' after mount; the wizard signals completion via onComplete.
+  const [wizardDone, setWizardDone] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED) {
+      setPreviewProbeState('absent');
+      return;
+    }
+    let cancelled = false;
+    void getPreviewState().then((s) => {
+      if (cancelled) return;
+      setPreviewProbeState(s ? 'present' : 'absent');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // [CRITICAL-B2] DELIBERATELY no auto-cleanup effect here. A previous
+  // iteration had:
+  //   useEffect(() => { if (activeProfile && profiles.length > 0) clearPreviewState() })
+  // — that races the wizard's owner-POST → child-POST sequence and wipes
+  // `createdOwnerProfileId` between the two calls, destroying the [HIGH-4]
+  // resume guard. Cleanup is owned by:
+  //   (a) TTL inside getPreviewState (1h)
+  //   (b) sign-out-cleanup (Task 4)
+  //   (c) wizard's explicit clearPreviewState() on Step-3 success (Task 14)
+
   if (!isLoaded)
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -1660,6 +2267,48 @@ export default function AppLayout() {
   //
   // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
   // NativeWind vars() style updates propagate without remounting.
+
+  // [CRITICAL-A2] Gate ordering — preview probe + wizard branch.
+  // These sit ABOVE !activeProfile so the wizard stays mounted when
+  // ProfileProvider auto-activates the first profile mid-wizard
+  // (profile.ts:154-174). Without this ordering the wizard would unmount
+  // after Step 2's POST succeeds.
+  //
+  // [CRITICAL-A3] Ordering guarantees (non-negotiable):
+  //   1. !isLoaded → spinner  (auth not loaded; do not render any app UI)
+  //   2. !isSignedIn → Redirect  (signed-out user must not see the wizard)
+  //   3. pendingAuthRedirect spinner  (OAuth-return redirect-replay)
+  //   4. isProfileLoading spinner  (profile query in flight)
+  //   5. profileLoadError fallback  (independent of preview state)
+  //   6. preview-probe-loading spinner  ← HERE
+  //   7. SaveWizardGate branch  ← HERE
+  //   8. !activeProfile → CreateProfileGate  (existing)
+  //   9. consent gates → Tabs  (existing)
+  if (
+    FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
+    previewProbeState === 'loading'
+  ) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="preview-state-loading"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (
+    FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
+    previewProbeState === 'present' &&
+    !wizardDone
+  ) {
+    return (
+      <FeedbackProvider>
+        <SaveWizardGate onComplete={() => setWizardDone(true)} />
+      </FeedbackProvider>
+    );
+  }
 
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) {

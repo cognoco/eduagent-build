@@ -35,6 +35,29 @@ export function isGuardianProfile(
   return allProfiles.some((p) => !p.isOwner);
 }
 
+/**
+ * Family-capable profile predicate. Shared verbatim with Study/Family v0 spec.
+ * True iff active profile is an owner with at least one linked non-owner.
+ *
+ * [CRITICAL-4] Deliberately NO age check — CLAUDE.md forbids using
+ * computeAgeBracket() for feature gating. Adult-only affordances (e.g.
+ * "Add child") keep their own age checks at their own call sites.
+ *
+ * Shape is identical to isGuardianProfile() above; the alternate name
+ * exists so sibling-spec readers find the term they expect.
+ *
+ * Spec: docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md §Implementation step 1
+ * Sibling: docs/specs/2026-05-19-study-and-family-mode-navigation-v0.md §Implementation step 1
+ */
+export function isFamilyCapableProfile(
+  activeProfile: Profile | null | undefined,
+  profiles: ReadonlyArray<Profile>,
+): boolean {
+  if (!activeProfile) return false;
+  if (!activeProfile.isOwner) return false;
+  return profiles.some((p) => p.id !== activeProfile.id && !p.isOwner);
+}
+
 export interface SwitchProfileResult {
   success: boolean;
   error?: string;

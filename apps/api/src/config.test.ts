@@ -37,6 +37,7 @@ describe('validateProductionKeys', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '0',
     MATCHER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
+    ADULT_OWNER_GATE_ENABLED: 'true',
   });
 
   it('returns empty array for development environment', () => {
@@ -564,6 +565,7 @@ describe('validateProductionBindings', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
+    ADULT_OWNER_GATE_ENABLED: 'true',
   };
 
   const fakeKv = {} as unknown;

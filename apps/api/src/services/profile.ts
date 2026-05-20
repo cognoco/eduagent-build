@@ -14,7 +14,7 @@ import type {
   ProfileUpdateInput,
   Profile,
 } from '@eduagent/schemas';
-import { computeAgeBracket } from '@eduagent/schemas';
+import { computeAgeBracket, ForbiddenError } from '@eduagent/schemas';
 export type ProfileValidationCode = 'CHILD_AGE_VIOLATION';
 
 export class ProfileValidationError extends Error {
@@ -254,7 +254,18 @@ export async function createProfileWithLimitCheck(
   db: Database,
   accountId: string,
   input: ProfileCreateInput,
+  opts?: {
+    /**
+     * [OPT-C] Adult-owner gate. When true (default), adding a child profile
+     * (non-first profile) requires the existing owner to be ≥18. Set to false
+     * to disable the rule without code changes — matches config.ADULT_OWNER_GATE_ENABLED.
+     * Callers should read `config.ADULT_OWNER_GATE_ENABLED === 'true'` and pass it here.
+     * Defaults to true (safe default — matches the config's default of 'true').
+     */
+    adultOwnerGateEnabled?: boolean;
+  },
 ): Promise<Profile> {
+  const adultOwnerGateEnabled = opts?.adultOwnerGateEnabled ?? true;
   return db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
 
@@ -281,6 +292,35 @@ export async function createProfileWithLimitCheck(
       const subscription = await getSubscriptionByAccountId(txDb, accountId);
       if (!subscription || !(await canAddProfile(txDb, subscription.id))) {
         throw new ProfileLimitError();
+      }
+    }
+
+    // [OPT-C] Adult-owner gate. When adding a CHILD (non-first profile),
+    // require the account's existing owner to be ≥18. Gated by flag so the
+    // rule can be toggled off without code changes (kill switch).
+    // Defense-in-depth: client-side gate (Task 13 / HIGH-A3) is the primary
+    // UX barrier; this is the server-side enforcement fallback.
+    if (adultOwnerGateEnabled && !isFirstProfile) {
+      const ownerRow = await txDb
+        .select({ birthYear: profiles.birthYear })
+        .from(profiles)
+        .where(
+          and(
+            eq(profiles.accountId, accountId),
+            eq(profiles.isOwner, true),
+            isNull(profiles.archivedAt),
+          ),
+        )
+        .limit(1);
+      const ownerBirthYear = ownerRow[0]?.birthYear;
+      if (
+        ownerBirthYear == null ||
+        computeAgeBracket(ownerBirthYear) !== 'adult'
+      ) {
+        throw new ForbiddenError(
+          'Account holder must be 18 or older to add a child profile.',
+          'ADULT_OWNER_REQUIRED',
+        );
       }
     }
 

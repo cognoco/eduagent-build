@@ -85,6 +85,11 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   // [CR-SECURESTORE-REGISTRY-11] Previously-unregistered. BYOK waitlist is
   // account-scoped (see BUG-399 comment in subscription.tsx) — clears on sign-out.
   'byok-waitlist-joined',
+  // preview-onboarding-state.ts — pre-signup intent + topic (1h TTL).
+  // Spec: docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md
+  // Unconditional: cleanup is harmless when key absent; prevents cross-account
+  // leak if feature flag is off but the key was written in a prior session.
+  'mentomate_preview_intent',
 ];
 
 // [CR-SECURESTORE-REGISTRY-11] Documented exceptions — specific callsites that
@@ -106,19 +111,19 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
 }> = [
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 94,
+    line: 97,
     reason:
       'Wrapper module — this is the setItemAsync function definition, not a callsite. The scanner matches the function signature; the key parameter is caller-supplied.',
   },
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 106,
+    line: 109,
     reason:
       'Wrapper module — delegates to ExpoSecureStore.setItemAsync (with options). Not a callsite that writes app data; caller-supplied key.',
   },
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 108,
+    line: 111,
     reason:
       'Wrapper module — delegates to ExpoSecureStore.setItemAsync (without options). Not a callsite that writes app data; caller-supplied key.',
   },
