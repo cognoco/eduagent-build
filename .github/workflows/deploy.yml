@@ -239,38 +239,44 @@ jobs:
           echo "Deploying API to ${DEPLOY_ENV}"
           pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
 
-      # [BUG-238] When DOPPLER_TOKEN is missing the sync step previously
+      # [BUG-238] When the Doppler token is missing the sync step previously
       # degraded to a GitHub Actions warning and exited 0, leaving Worker
       # secrets stale — any value set in Doppler since the gap opened never
       # reached production. Silent stale-secret deploys are how billing
       # webhooks start failing in production without anyone knowing.
       #
-      # New posture: missing DOPPLER_TOKEN is a hard fail. Either add the
-      # repo/org secret `DOPPLER_TOKEN` (a Doppler service-account token
-      # scoped to the project) or explicitly opt out of sync for this run by
+      # New posture: a missing per-env token is a hard fail. Add the repo
+      # secrets `DOPPLER_TOKEN_STG` and `DOPPLER_TOKEN_PRD` (config-scoped
+      # Doppler service tokens — Developer plan does not have project-scoped
+      # service accounts), or explicitly opt out of sync for this run by
       # setting the workflow secret `SKIP_DOPPLER_SYNC=true` AND running
       # `pnpm secrets:sync stg|prd` locally before triggering the deploy.
       - name: Sync secrets from Doppler to Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          DOPPLER_TOKEN_STG: ${{ secrets.DOPPLER_TOKEN_STG }}
+          DOPPLER_TOKEN_PRD: ${{ secrets.DOPPLER_TOKEN_PRD }}
           SKIP_DOPPLER_SYNC: ${{ secrets.SKIP_DOPPLER_SYNC }}
         run: |
           if [ "${SKIP_DOPPLER_SYNC:-false}" = "true" ]; then
             echo "::warning title=Doppler→Worker sync explicitly skipped::SKIP_DOPPLER_SYNC=true was set as a workflow secret. Worker secrets were NOT synced — operator must have run \`pnpm secrets:sync\` locally for this deploy."
             exit 0
           fi
+          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
+          # Map wrangler env names to Doppler config short names + pick the per-config token.
+          # Doppler Developer plan uses config-scoped service tokens (not project-scoped service
+          # accounts), so each env carries its own secret. Production deploys will hard-fail until
+          # DOPPLER_TOKEN_PRD is added — leaving that explicit so the gap surfaces at deploy time.
+          case "$DEPLOY_ENV" in
+            staging)    SYNC_TARGET="stg"; DOPPLER_TOKEN="${DOPPLER_TOKEN_STG:-}" ;;
+            production) SYNC_TARGET="prd"; DOPPLER_TOKEN="${DOPPLER_TOKEN_PRD:-}" ;;
+            *)          SYNC_TARGET="dev"; DOPPLER_TOKEN="" ;;
+          esac
           if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            echo "::error title=Doppler→Worker sync FAILED::DOPPLER_TOKEN is not set as a GitHub Actions secret. Worker secrets cannot be synced from Doppler, so this deploy would ship with stale secrets. Either add DOPPLER_TOKEN to repo secrets (Doppler service-account token scoped to the mentomate project), or set SKIP_DOPPLER_SYNC=true workflow secret after running \`pnpm secrets:sync stg|prd\` locally."
+            echo "::error title=Doppler→Worker sync FAILED::DOPPLER_TOKEN_$(echo $SYNC_TARGET | tr a-z A-Z) is not set as a GitHub Actions secret. Worker secrets cannot be synced from Doppler (${SYNC_TARGET}), so this deploy would ship with stale secrets. Add the per-env service token to repo secrets, or set SKIP_DOPPLER_SYNC=true workflow secret after running \`pnpm secrets:sync ${SYNC_TARGET}\` locally."
             exit 1
           fi
-          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
-          # Map wrangler env names to Doppler config short names
-          case "$DEPLOY_ENV" in
-            staging)    SYNC_TARGET="stg" ;;
-            production) SYNC_TARGET="prd" ;;
-            *)          SYNC_TARGET="dev" ;;
-          esac
+          export DOPPLER_TOKEN
           echo "Syncing Doppler secrets (${SYNC_TARGET}) → Worker (${DEPLOY_ENV})"
           curl -sL https://cli.doppler.com/install.sh | sh
           pnpm secrets:sync "$SYNC_TARGET"
