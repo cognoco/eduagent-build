@@ -258,9 +258,9 @@ export async function createProfileWithLimitCheck(
     /**
      * [OPT-C] Adult-owner gate. When true (default), adding a child profile
      * (non-first profile) requires the existing owner to be ≥18. Set to false
-     * to disable the rule without code changes — matches config.ADULT_OWNER_GATE_ENABLED.
-     * Callers should read `config.ADULT_OWNER_GATE_ENABLED === 'true'` and pass it here.
-     * Defaults to true (safe default — matches the config's default of 'true').
+     * to disable the rule without code changes — controlled by the `ADULT_OWNER_GATE_ENABLED`
+     * env var. Callers should read `(c.env?.ADULT_OWNER_GATE_ENABLED ?? 'true') !== 'false'`
+     * and pass the result here. Defaults to true (safe default — gate ON when unset).
      */
     adultOwnerGateEnabled?: boolean;
   },

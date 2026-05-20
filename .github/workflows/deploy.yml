@@ -278,7 +278,8 @@ jobs:
           fi
           export DOPPLER_TOKEN
           echo "Syncing Doppler secrets (${SYNC_TARGET}) → Worker (${DEPLOY_ENV})"
-          curl -sL https://cli.doppler.com/install.sh | sh
+          # Pinned to v3.69.1 — pipe-to-shell with a version flag prevents CDN-compromise injection.
+          curl -sL https://cli.doppler.com/install.sh | sh -s -- --version 3.69.1
           pnpm secrets:sync "$SYNC_TARGET"
 
       # [BUG-953] Notify on deploy failure — creates a GitHub issue so silent

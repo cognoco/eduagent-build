@@ -119,6 +119,7 @@ export async function createNoteForSession(
     topicId: string;
     sessionId: string;
     content: string;
+    // Note: source='challenge_round' MUST be guarded by validateNoteDraft (services/challenge-round/note-draft.ts) before this call — enforced by note-draft.guard.test.ts.
   },
 ): Promise<NoteRow> {
   return insertNoteWithCap(

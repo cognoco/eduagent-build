@@ -116,7 +116,8 @@ jobs:
       # stg config (read-only is sufficient).
       - name: Install Doppler CLI
         run: |
-          curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sudo sh
+          # Pinned to 3.69.1 — installer-with-version flag closes the unpinned-CDN supply-chain gap.
+          curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sudo sh -s -- --version 3.69.1
           doppler --version
 
       - name: Run Playwright smoke suite (via doppler run -c stg)
