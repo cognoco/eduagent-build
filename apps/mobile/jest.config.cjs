@@ -67,6 +67,15 @@ module.exports = {
     // Mapping the bare specifier to a shim prevents the resolution failure without
     // affecting any test that manually mocks 'nativewind' via jest.mock().
     '^nativewind$': '<rootDir>/apps/mobile/jest.nativewind-mock.js',
+    // NativeWind's Babel plugin rewrites JSX to react-native-css-interop's
+    // runtime. In Jest, use React's plain JSX runtime so screen tests do not
+    // load css-interop's native styling runtime through Babel.
+    '^react-native-css-interop$':
+      '<rootDir>/apps/mobile/jest.css-interop-jsx-runtime-mock.cjs',
+    '^react-native-css-interop/jsx-runtime$':
+      '<rootDir>/apps/mobile/jest.css-interop-jsx-runtime-mock.cjs',
+    '^react-native-css-interop/jsx-dev-runtime$':
+      '<rootDir>/apps/mobile/jest.css-interop-jsx-runtime-mock.cjs',
     // react-native-fit-image pnpm haste-map resolution fix — see jest.fit-image-mock.js.
     // react-native-markdown-display depends on react-native-fit-image, which pnpm places
     // under a hashed path where Jest cannot resolve 'react' without native transforms.
