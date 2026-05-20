@@ -157,10 +157,38 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 
 const AppLayout = require('./_layout').default;
 const {
+  computeModeVisibleTabs,
   computeVisibleTabs,
   resolveHomeTabPresentation,
   resolveTabShape,
 } = require('./_layout');
+
+describe('mode tab helpers', () => {
+  it('returns Study tabs for study mode', () => {
+    expect([...computeModeVisibleTabs('study')].sort()).toEqual([
+      'home',
+      'library',
+      'more',
+      'progress',
+    ]);
+  });
+
+  it('returns Family tabs for family mode', () => {
+    expect([...computeModeVisibleTabs('family')].sort()).toEqual([
+      'home',
+      'more',
+      'progress',
+    ]);
+  });
+
+  it('keeps proxy home presentation independent of mode', () => {
+    expect(resolveHomeTabPresentation('guardian', true, 'family')).toEqual({
+      titleKey: 'tabs.myLearning',
+      accessibilityLabelKey: 'tabs.myLearningLabel',
+      iconName: 'School',
+    });
+  });
+});
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;

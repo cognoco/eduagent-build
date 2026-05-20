@@ -48,6 +48,7 @@ import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
 import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
+import type { AppMode } from '../../lib/app-context';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
@@ -102,6 +103,7 @@ export interface LearnerScreenProps {
   now?: Date;
   showParentHome?: boolean;
   returnToTab?: string;
+  mode?: AppMode | null;
 }
 
 export function LearnerScreen({
@@ -110,6 +112,7 @@ export function LearnerScreen({
   now,
   showParentHome = true,
   returnToTab = LEARNER_HOME_RETURN_TO,
+  mode = null,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -464,7 +467,9 @@ export function LearnerScreen({
   if (
     showParentHome &&
     !isParentProxy &&
-    (hasLinkedChildren || isFamilyPlanOwner)
+    (FEATURE_FLAGS.MODE_NAV_V0_ENABLED
+      ? mode === 'family'
+      : hasLinkedChildren || isFamilyPlanOwner)
   ) {
     return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
   }

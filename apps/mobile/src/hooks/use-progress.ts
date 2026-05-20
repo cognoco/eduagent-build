@@ -38,6 +38,7 @@ import {
   weeklyReportsResponseSchema,
 } from '@eduagent/schemas';
 import { useApiClient, ForbiddenError, NotFoundError } from '../lib/api-client';
+import { useAppContext } from '../lib/app-context';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
@@ -50,7 +51,6 @@ export interface NextReviewTopic {
   subjectName: string;
   topicTitle: string;
 }
-
 export interface ReviewSummary {
   totalOverdue: number;
   nextReviewTopic: NextReviewTopic | null;
@@ -64,9 +64,10 @@ export function useSubjectProgress(
 ): UseQueryResult<SubjectProgress> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.subject(subjectId, activeProfile?.id),
+    queryKey: queryKeys.progress.subject(mode, subjectId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -105,9 +106,10 @@ export interface OverallProgressResponse {
 export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery<OverallProgressResponse>({
-    queryKey: queryKeys.progress.overview(activeProfile?.id),
+    queryKey: queryKeys.progress.overview(mode, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -128,9 +130,10 @@ export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
 export function useContinueSuggestion() {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.continue(activeProfile?.id),
+    queryKey: queryKeys.progress.continue(mode, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -184,9 +187,10 @@ export function useLearningResumeTarget(
 ): UseQueryResult<LearningResumeTarget | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.resumeTarget(activeProfile?.id, scope),
+    queryKey: queryKeys.progress.resumeTarget(mode, activeProfile?.id, scope),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -234,9 +238,11 @@ export function useResumeNudge() {
 export function useActiveSessionForTopic(topicId: string | undefined) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.progress.activeSessionForTopic(
+      mode,
       topicId,
       activeProfile?.id,
     ),
@@ -260,9 +266,11 @@ export function useActiveSessionForTopic(topicId: string | undefined) {
 export function useResolveTopicSubject(topicId: string | undefined) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.progress.resolveTopicSubject(
+      mode,
       topicId,
       activeProfile?.id,
     ),
@@ -290,9 +298,10 @@ export function useResolveTopicSubject(topicId: string | undefined) {
 export function useReviewSummary(): UseQueryResult<ReviewSummary> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.reviewSummary(activeProfile?.id),
+    queryKey: queryKeys.progress.reviewSummary(mode, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -313,9 +322,10 @@ export function useReviewSummary(): UseQueryResult<ReviewSummary> {
 export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.overdueTopics(activeProfile?.id),
+    queryKey: queryKeys.progress.overdueTopics(mode, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -339,9 +349,11 @@ export function useTopicProgress(
 ): UseQueryResult<TopicProgress> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.progress.topicProgress(
+      mode,
       subjectId,
       topicId,
       activeProfile?.id,
@@ -369,9 +381,10 @@ export function useTopicProgress(
 export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.inventory(activeProfile?.id),
+    queryKey: queryKeys.progress.inventory(mode, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -396,9 +409,10 @@ export function useProgressMilestones(
 ): UseQueryResult<MilestoneRecord[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.milestones(activeProfile?.id, limit),
+    queryKey: queryKeys.progress.milestones(mode, activeProfile?.id, limit),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -424,9 +438,14 @@ export function useProfileSessions(
 ): UseQueryResult<ChildSession[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.profileSessions(profileId, activeProfile?.id),
+    queryKey: queryKeys.progress.profileSessions(
+      mode,
+      profileId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -450,7 +469,9 @@ export function useProfileSessions(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id || activeProfile.isOwner === true),
+      (profileId === activeProfile.id ||
+        ((mode === null || mode === 'family') &&
+          activeProfile.isOwner === true)),
   });
 }
 
@@ -460,10 +481,11 @@ export function useProfileSessionsArchive(
 ): UseInfiniteQueryResult<InfiniteData<ChildSessionsPageResponse>, Error> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useInfiniteQuery({
     queryKey: [
-      ...queryKeys.progress.profileSessions(profileId, activeProfile?.id),
+      ...queryKeys.progress.profileSessions(mode, profileId, activeProfile?.id),
       'archive',
     ],
     initialPageParam: undefined as string | undefined,
@@ -486,7 +508,10 @@ export function useProfileSessionsArchive(
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !!activeProfile && !!profileId && profileId === activeProfile.id,
+    enabled:
+      !!activeProfile &&
+      !!profileId &&
+      profileId === activeProfile.id,
   });
 }
 
@@ -495,9 +520,14 @@ export function useProfileReports(
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.progress.profileReports(profileId, activeProfile?.id),
+    queryKey: queryKeys.progress.profileReports(
+      mode,
+      profileId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -518,7 +548,9 @@ export function useProfileReports(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id || activeProfile.isOwner === true),
+      (profileId === activeProfile.id ||
+        ((mode === null || mode === 'family') &&
+          activeProfile.isOwner === true)),
   });
 }
 
@@ -527,9 +559,11 @@ export function useProfileWeeklyReports(
 ): UseQueryResult<WeeklyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.progress.profileWeeklyReports(
+      mode,
       profileId,
       activeProfile?.id,
     ),
@@ -558,7 +592,9 @@ export function useProfileWeeklyReports(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id || activeProfile.isOwner === true),
+      (profileId === activeProfile.id ||
+        ((mode === null || mode === 'family') &&
+          activeProfile.isOwner === true)),
   });
 }
 
@@ -587,6 +623,7 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { mode } = useAppContext();
   const { activeProfile } = useProfile();
 
   return useMutation({
@@ -607,9 +644,10 @@ export function useChildInventory(
 ): UseQueryResult<KnowledgeInventory | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childInventory(childProfileId),
+    queryKey: queryKeys.dashboard.childInventory(mode, childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -630,6 +668,7 @@ export function useChildInventory(
     },
     enabled:
       (options?.enabled ?? true) &&
+      mode !== 'study' &&
       !!activeProfile &&
       activeProfile.isOwner === true &&
       !!childProfileId,
@@ -642,9 +681,10 @@ export function useChildProgressSummary(
 ): UseQueryResult<ProgressSummary | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childProgressSummary(childProfileId),
+    queryKey: queryKeys.dashboard.childProgressSummary(mode, childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -672,6 +712,7 @@ export function useChildProgressSummary(
     },
     enabled:
       (options?.enabled ?? true) &&
+      mode !== 'study' &&
       !!activeProfile &&
       activeProfile.isOwner === true &&
       !!childProfileId,
@@ -683,9 +724,10 @@ export function useChildReports(
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childReports(childProfileId),
+    queryKey: queryKeys.dashboard.childReports(mode, childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -701,7 +743,10 @@ export function useChildReports(
       }
     },
     enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+      mode !== 'study' &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
   });
 }
 
@@ -711,9 +756,14 @@ export function useChildReportDetail(
 ): UseQueryResult<MonthlyReportRecord | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childReportDetail(childProfileId, reportId),
+    queryKey: queryKeys.dashboard.childReportDetail(
+      mode,
+      childProfileId,
+      reportId,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -738,6 +788,7 @@ export function useChildReportDetail(
       }
     },
     enabled:
+      mode !== 'study' &&
       !!activeProfile &&
       activeProfile.isOwner === true &&
       !!childProfileId &&
@@ -750,9 +801,11 @@ export function useProfileReportDetail(
 ): UseQueryResult<MonthlyReportRecord | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.progress.profileReportDetail(
+      mode,
       activeProfile?.id,
       reportId,
     ),
@@ -806,10 +859,14 @@ export function useMarkChildReportViewed(): UseMutationResult<
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.childReports(variables.childProfileId),
+        queryKey: queryKeys.dashboard.childReports(
+          mode,
+          variables.childProfileId,
+        ),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.childReportDetail(
+          mode,
           variables.childProfileId,
           variables.reportId,
         ),
@@ -827,9 +884,10 @@ export function useChildWeeklyReports(
 ): UseQueryResult<WeeklyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childWeeklyReports(childProfileId),
+    queryKey: queryKeys.dashboard.childWeeklyReports(mode, childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -873,7 +931,10 @@ export function useChildWeeklyReports(
       }
     },
     enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+      mode !== 'study' &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
   });
 }
 
@@ -887,9 +948,11 @@ export function useChildWeeklyReportDetail(
 ): UseQueryResult<WeeklyReportRecord | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childWeeklyReportDetail(
+      mode,
       childProfileId,
       reportId,
     ),
@@ -917,6 +980,7 @@ export function useChildWeeklyReportDetail(
       }
     },
     enabled:
+      mode !== 'study' &&
       !!activeProfile &&
       activeProfile.isOwner === true &&
       !!childProfileId &&
@@ -929,9 +993,11 @@ export function useProfileWeeklyReportDetail(
 ): UseQueryResult<WeeklyReportRecord | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.progress.profileWeeklyReportDetail(
+      mode,
       activeProfile?.id,
       reportId,
     ),
@@ -970,6 +1036,7 @@ export function useMarkWeeklyReportViewed(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { mode } = useAppContext();
 
   return useMutation({
     // [SUGG-4] Best-effort tracking — never retry on failure
@@ -986,11 +1053,13 @@ export function useMarkWeeklyReportViewed(): UseMutationResult<
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.childWeeklyReports(
+          mode,
           variables.childProfileId,
         ),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.childWeeklyReportDetail(
+          mode,
           variables.childProfileId,
           variables.reportId,
         ),
@@ -1011,6 +1080,7 @@ export function useMarkProfileReportViewed(): UseMutationResult<
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useMutation({
     retry: 0,
@@ -1034,10 +1104,11 @@ export function useMarkProfileReportViewed(): UseMutationResult<
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: ['progress', 'profile', activeProfile?.id, 'reports'],
+        queryKey: ['progress', mode, 'profile', activeProfile?.id, 'reports'],
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.progress.profileReportDetail(
+          mode,
           activeProfile?.id,
           variables.reportId,
         ),
@@ -1054,6 +1125,7 @@ export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useMutation({
     retry: 0,
@@ -1077,10 +1149,17 @@ export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: ['progress', 'profile', activeProfile?.id, 'weekly-reports'],
+        queryKey: [
+          'progress',
+          mode,
+          'profile',
+          activeProfile?.id,
+          'weekly-reports',
+        ],
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.progress.profileWeeklyReportDetail(
+          mode,
           activeProfile?.id,
           variables.reportId,
         ),

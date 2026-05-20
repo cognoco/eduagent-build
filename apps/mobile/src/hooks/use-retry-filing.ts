@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LearningSession } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 export function useRetryFiling() {
   const client = useApiClient();
@@ -24,9 +25,13 @@ export function useRetryFiling() {
       return (await okRes.json()) as { session: LearningSession };
     },
     onSuccess: (_data, { sessionId }) => {
-      void queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
       void queryClient.invalidateQueries({
-        queryKey: ['session-transcript', sessionId],
+        predicate: (query) =>
+          queryKeys.sessions.matchAnyMode(sessionId)(query.queryKey),
+      });
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          queryKeys.sessions.matchTranscriptAnyMode(sessionId)(query.queryKey),
       });
     },
   });

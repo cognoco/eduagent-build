@@ -479,9 +479,9 @@ describe('useSetSessionInputMode', () => {
     });
 
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['sessions'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['session-transcript', 'session-1'],
-    });
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ predicate: expect.any(Function) }),
+    );
   });
 });
 
@@ -598,9 +598,9 @@ describe('useSubmitSummary', () => {
       });
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['session-summary', 'session-1'],
-    });
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ predicate: expect.any(Function) }),
+    );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
   });
 
@@ -684,9 +684,9 @@ describe('useSkipSummary', () => {
       await result.current.mutateAsync();
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['session-summary', 'session-1'],
-    });
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ predicate: expect.any(Function) }),
+    );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
   });
 });
@@ -1185,7 +1185,11 @@ describe('useAddParkingLotItem (profile-scoped invalidation)', () => {
     // Active profile's parking-lot key MUST be the invalidated key.
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: queryKeys.sessions.parkingLot('session-1', 'test-profile-id'),
+        queryKey: queryKeys.sessions.parkingLot(
+          'study',
+          'session-1',
+          'test-profile-id',
+        ),
       }),
     );
     // The pre-fix shape ['parking-lot', sessionId] would prefix-match every
@@ -1224,28 +1228,49 @@ describe('computeFilingRefetchInterval', () => {
 
 describe('profile-switch cache isolation', () => {
   it('sessions.detail — same session ID, different profiles produce different keys', () => {
-    const keyA = queryKeys.sessions.detail('sess-1', 'profile-A');
-    const keyB = queryKeys.sessions.detail('sess-1', 'profile-B');
+    const keyA = queryKeys.sessions.detail('study', 'sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.detail('study', 'sess-1', 'profile-B');
     expect(keyA).not.toEqual(keyB);
-    expect(keyA).toEqual(['session', 'sess-1', 'profile-A']);
+    expect(keyA).toEqual(['session', 'study', 'sess-1', 'profile-A']);
   });
 
   it('sessions.transcript — same session, different profiles are isolated', () => {
-    const keyA = queryKeys.sessions.transcript('sess-1', 'profile-A');
-    const keyB = queryKeys.sessions.transcript('sess-1', 'profile-B');
+    const keyA = queryKeys.sessions.transcript(
+      'study',
+      'sess-1',
+      'profile-A',
+    );
+    const keyB = queryKeys.sessions.transcript(
+      'study',
+      'sess-1',
+      'profile-B',
+    );
     expect(keyA).not.toEqual(keyB);
-    expect(keyA).toEqual(['session-transcript', 'sess-1', 'profile-A']);
+    expect(keyA).toEqual([
+      'session-transcript',
+      'study',
+      'sess-1',
+      'profile-A',
+    ]);
   });
 
   it('sessions.summary — same session, different profiles are isolated', () => {
-    const keyA = queryKeys.sessions.summary('sess-1', 'profile-A');
-    const keyB = queryKeys.sessions.summary('sess-1', 'profile-B');
+    const keyA = queryKeys.sessions.summary('study', 'sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.summary('study', 'sess-1', 'profile-B');
     expect(keyA).not.toEqual(keyB);
   });
 
   it('sessions.parkingLot — same session, undefined profile is isolated from defined', () => {
-    const keyDefined = queryKeys.sessions.parkingLot('sess-1', 'profile-A');
-    const keyUndefined = queryKeys.sessions.parkingLot('sess-1', undefined);
+    const keyDefined = queryKeys.sessions.parkingLot(
+      'study',
+      'sess-1',
+      'profile-A',
+    );
+    const keyUndefined = queryKeys.sessions.parkingLot(
+      'study',
+      'sess-1',
+      undefined,
+    );
     expect(keyDefined).not.toEqual(keyUndefined);
   });
 });

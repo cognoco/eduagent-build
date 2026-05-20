@@ -15,6 +15,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { useAppContext } from '../lib/app-context';
 import { queryKeys } from '../lib/query-keys';
 
 // Mirror of api/services/dashboard.ts:ChildSession used by the
@@ -49,13 +50,13 @@ interface ChildSessionDetail {
     | 'scattered'
     | null;
 }
-
 export function useDashboard(): UseQueryResult<DashboardData> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.root(activeProfile?.id),
+    queryKey: queryKeys.dashboard.root(mode, activeProfile?.id),
     queryFn: async ({ signal: querySignal }): Promise<DashboardData> => {
       // Bug #7 fix: combine TanStack Query's cancellation signal with a
       // 10s timeout so the request aborts if the API is unreachable,
@@ -103,6 +104,7 @@ export function useAckNotice(): UseMutationResult<
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
@@ -114,7 +116,7 @@ export function useAckNotice(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.root(activeProfile?.id),
+        queryKey: queryKeys.dashboard.root(mode, activeProfile?.id),
       });
     },
   });
@@ -125,9 +127,10 @@ export function useChildDetail(
 ): UseQueryResult<DashboardChild | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childDetail(childProfileId),
+    queryKey: queryKeys.dashboard.childDetail(mode, childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -144,7 +147,10 @@ export function useChildDetail(
       }
     },
     enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+      mode !== 'study' &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
   });
 }
 
@@ -154,9 +160,10 @@ export function useChildSubjectTopics(
 ): UseQueryResult<TopicProgress[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childSubject(childProfileId, subjectId),
+    queryKey: queryKeys.dashboard.childSubject(mode, childProfileId, subjectId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       if (!subjectId) throw new Error('subjectId is required');
@@ -176,6 +183,7 @@ export function useChildSubjectTopics(
       }
     },
     enabled:
+      mode !== 'study' &&
       !!activeProfile &&
       activeProfile.isOwner === true &&
       !!childProfileId &&
@@ -186,9 +194,10 @@ export function useChildSubjectTopics(
 export function useChildSessions(childProfileId: string | undefined) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childSessions(childProfileId),
+    queryKey: queryKeys.dashboard.childSessions(mode, childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -205,7 +214,10 @@ export function useChildSessions(childProfileId: string | undefined) {
       }
     },
     enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+      mode !== 'study' &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
   });
 }
 
@@ -215,9 +227,14 @@ export function useChildSessionDetail(
 ) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childSessionDetail(childProfileId, sessionId),
+    queryKey: queryKeys.dashboard.childSessionDetail(
+      mode,
+      childProfileId,
+      sessionId,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       if (!sessionId) throw new Error('sessionId is required');
@@ -243,6 +260,7 @@ export function useChildSessionDetail(
       }
     },
     enabled:
+      mode !== 'study' &&
       !!activeProfile &&
       activeProfile.isOwner === true &&
       !!childProfileId &&
@@ -253,9 +271,10 @@ export function useChildSessionDetail(
 export function useChildMemory(childProfileId: string | undefined) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.childMemory(childProfileId),
+    queryKey: queryKeys.dashboard.childMemory(mode, childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -272,6 +291,9 @@ export function useChildMemory(childProfileId: string | undefined) {
       }
     },
     enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+      mode !== 'study' &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
   });
 }
