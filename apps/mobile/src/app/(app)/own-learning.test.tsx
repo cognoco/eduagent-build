@@ -26,7 +26,9 @@ jest.mock(
     // resolveTabShape() pulls in isGuardianProfile through _layout — mirror
     // the contract here so the screen's guard sees a stable shape.
     isGuardianProfile: () => mockIsGuardianProfile,
-    isFamilyCapableProfile: () => mockIsGuardianProfile,
+    isFamilyCapableProfile: (
+      profile: { isOwner: boolean } | null | undefined,
+    ) => Boolean(profile && mockIsGuardianProfile),
   }),
 );
 

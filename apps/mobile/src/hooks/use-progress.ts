@@ -623,7 +623,6 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { mode } = useAppContext();
   const { activeProfile } = useProfile();
 
   return useMutation({
@@ -844,6 +843,7 @@ export function useMarkChildReportViewed(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { mode } = useAppContext();
 
   return useMutation({
     // [BUG-550] Best-effort tracking — never retry on failure

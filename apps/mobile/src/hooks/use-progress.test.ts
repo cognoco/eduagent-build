@@ -25,6 +25,14 @@ import {
 } from './use-progress';
 import { queryKeys } from '../lib/query-keys';
 
+jest.mock('../lib/app-context' /* gc1-allow: progress hooks need deterministic mode state without AppContextProvider */, () => ({
+  useAppContext: () => ({
+    mode: null,
+    setMode: jest.fn(),
+    familyCapable: false,
+  }),
+}));
+
 // [CR-2026-05-19-H27] Mock the external Sentry boundary so the break test
 // below can assert captureException was called (not console.warn).
 jest.mock('@sentry/react-native', () => ({

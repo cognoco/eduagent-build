@@ -325,7 +325,9 @@ export function ProfileProvider({
       // app layout, blanking the entire screen (blank-screen bug).
       await queryClient.resetQueries({
         predicate: (query) =>
-          PROFILE_SCOPED_KEYS.includes(String(query.queryKey[0])),
+          PROFILE_SCOPED_KEYS.includes(
+            String(query.queryKey[0]) as (typeof PROFILE_SCOPED_KEYS)[number],
+          ),
       });
       return persistenceFailed
         ? { success: true, persistenceFailed: true }

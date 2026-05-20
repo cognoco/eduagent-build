@@ -299,7 +299,11 @@ jest.mock('../../lib/api-client', () => ({
 }));
 jest.mock('../../lib/app-context' /* gc1-allow: progress screen tests need deterministic study/family mode without provider side effects */, () => ({
   useAppContext: () => ({
-    mode: mockLinkedChildren.length > 0 ? 'family' : 'study',
+    mode:
+      mockSearchParams.profileId &&
+      mockLinkedChildren.some((child) => child.id === mockSearchParams.profileId)
+        ? 'family'
+        : 'study',
     setMode: jest.fn(),
     familyCapable: mockLinkedChildren.length > 0,
   }),
