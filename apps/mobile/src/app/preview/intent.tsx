@@ -5,6 +5,7 @@ import {
   setPreviewState,
   type PreviewIntent,
 } from '../../lib/preview-onboarding-state';
+import { goBackOrReplace } from '../../lib/navigation';
 
 interface Option {
   intent: PreviewIntent;
@@ -96,6 +97,17 @@ export default function PreviewIntentScreen() {
       style={{ paddingTop: insets.top + 32, paddingBottom: insets.bottom }}
       testID="preview-intent"
     >
+      <Pressable
+        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        className="self-start min-h-[44px] justify-center mb-2"
+        testID="preview-intent-back"
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Text className="text-body-sm font-semibold text-primary">
+          Back to sign in
+        </Text>
+      </Pressable>
       <Text className="text-h1 font-bold text-text-primary mb-2 text-center">
         Who are you setting this up for?
       </Text>

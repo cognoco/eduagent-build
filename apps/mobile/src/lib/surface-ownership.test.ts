@@ -57,6 +57,22 @@ const KNOWN_BARRELS = [
 // ---------------------------------------------------------------------------
 
 const barrelMap = buildBarrelMap(REPO_ROOT, KNOWN_BARRELS);
+const TEMP_ROOT = path.join(REPO_ROOT, '.tmp/surface-ownership-tests');
+
+function cleanupTempPath(tempPath: string): void {
+  try {
+    fs.rmSync(tempPath, {
+      force: true,
+      maxRetries: 3,
+      recursive: true,
+      retryDelay: 100,
+    });
+  } catch {
+    /* best-effort cleanup for Windows file-lock races */
+  }
+}
+
+cleanupTempPath(TEMP_ROOT);
 
 // ---------------------------------------------------------------------------
 // Guard tests — one describe per surface rule
@@ -225,9 +241,10 @@ describe('Surface ownership self-check: guard is not always-green', () => {
     // Create a synthetic TS source string and verify collectImports reads it.
     // We write a temp file so collectImports (which reads from disk) can parse it.
     const tmpPath = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/lib/_surface-ownership-selfcheck.tmp.ts',
     );
+    fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
     const tmpSource = `
 import { useProgressInventory, useOverallProgress } from '../../hooks/use-progress';
 import type { SomeType } from '@eduagent/schemas';
@@ -265,7 +282,7 @@ export function Foo() { return null; }
       expect(namespaceImport).toBeDefined();
       expect(namespaceImport!.namespace).toBe('AllFromLib');
     } finally {
-      fs.unlinkSync(tmpPath);
+      cleanupTempPath(tmpPath);
     }
   });
 });
@@ -310,14 +327,14 @@ describe('Surface ownership: namespace-import bypass (Bug A)', () => {
   afterAll(() => {
     for (const f of tmpFiles) {
       try {
-        fs.unlinkSync(f);
+        cleanupTempPath(f);
       } catch {
         /* ignore */
       }
     }
     for (const d of tmpDirs) {
       try {
-        fs.rmdirSync(d);
+        cleanupTempPath(d);
       } catch {
         /* ignore */
       }
@@ -327,7 +344,7 @@ describe('Surface ownership: namespace-import bypass (Bug A)', () => {
   it('flags `import * as P; P.useProgressInventory` on a session surface', () => {
     // Write a synthetic file under the session surface and verify checkFile flags it.
     const tmpDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/app/(app)/session/_namespace_bypass_test',
     );
     fs.mkdirSync(tmpDir, { recursive: true });
@@ -357,7 +374,7 @@ export function Foo() {
 
   it('does NOT flag namespace imports that never access a forbidden member', () => {
     const tmpDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/app/(app)/session/_namespace_clean_test',
     );
     fs.mkdirSync(tmpDir, { recursive: true });
@@ -383,9 +400,10 @@ export function Foo() {
 
   it('collectImports captures namespace member accesses', () => {
     const tmpPath = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/lib/_surface-ownership-ns-accesses.tmp.ts',
     );
+    fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
     tmpFiles.push(tmpPath);
 
     const tmpSource = `
@@ -407,7 +425,7 @@ export const b = Lib.someOtherSymbol();
   // is functionally identical to `Hooks.useProgressInventory` and must be flagged.
   it('flags `const { forbiddenName } = NamespaceImport` on a session surface', () => {
     const tmpDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/app/(app)/session/_namespace_destructure_test',
     );
     fs.mkdirSync(tmpDir, { recursive: true });
@@ -439,9 +457,10 @@ export function Foo() {
 
   it('collectImports captures namespace accesses from destructuring', () => {
     const tmpPath = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/lib/_surface-ownership-ns-destructure.tmp.ts',
     );
+    fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
     tmpFiles.push(tmpPath);
 
     const tmpSource = `
@@ -459,7 +478,7 @@ const { useProgressInventory, someOtherSymbol } = Lib;
 
   it('flags destructuring with rename (`const { forbiddenName: alias } = Ns`)', () => {
     const tmpDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/app/(app)/session/_namespace_destructure_rename_test',
     );
     fs.mkdirSync(tmpDir, { recursive: true });
@@ -491,7 +510,7 @@ export function Foo() {
 
   it('does NOT flag destructuring of non-forbidden members from namespace import', () => {
     const tmpDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/app/(app)/session/_namespace_destructure_clean_test',
     );
     fs.mkdirSync(tmpDir, { recursive: true });
@@ -527,14 +546,14 @@ describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
   afterAll(() => {
     for (const f of tmpFiles) {
       try {
-        fs.unlinkSync(f);
+        cleanupTempPath(f);
       } catch {
         /* ignore */
       }
     }
     for (const d of tmpDirs) {
       try {
-        fs.rmdirSync(d);
+        cleanupTempPath(d);
       } catch {
         /* ignore */
       }
@@ -546,11 +565,11 @@ describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
     // A consumer that imports the benign name from the barrel must still be flagged
     // because the underlying symbol is on the forbid list.
     const fakeOriginDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/lib/_barrel_test_origin',
     );
     const fakeBarrelDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/lib/_barrel_test_barrel',
     );
     fs.mkdirSync(fakeOriginDir, { recursive: true });
@@ -560,7 +579,7 @@ describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
     const originPath = path.join(fakeOriginDir, 'use-progress.ts');
     const barrelPath = path.join(fakeBarrelDir, 'index.ts');
     const consumerDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/app/(app)/session/_barrel_consumer_test',
     );
     fs.mkdirSync(consumerDir, { recursive: true });
@@ -588,7 +607,7 @@ describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
     // Build a barrel map that includes our synthetic barrel.
     const augmentedMap = buildBarrelMap(REPO_ROOT, [
       ...KNOWN_BARRELS,
-      'apps/mobile/src/lib/_barrel_test_barrel/index.ts',
+      path.relative(REPO_ROOT, barrelPath).replace(/\\/g, '/'),
     ]);
 
     const sessionRule = SURFACE_RULES.find(
@@ -609,11 +628,11 @@ describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
 
   it('barrel-resolved happy path: clean re-export with no forbidden underlying symbol is not flagged', () => {
     const fakeOriginDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/lib/_barrel_test_origin_clean',
     );
     const fakeBarrelDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/lib/_barrel_test_barrel_clean',
     );
     fs.mkdirSync(fakeOriginDir, { recursive: true });
@@ -623,7 +642,7 @@ describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
     const originPath = path.join(fakeOriginDir, 'helpers.ts');
     const barrelPath = path.join(fakeBarrelDir, 'index.ts');
     const consumerDir = path.join(
-      REPO_ROOT,
+      TEMP_ROOT,
       'apps/mobile/src/app/(app)/session/_barrel_consumer_clean_test',
     );
     fs.mkdirSync(consumerDir, { recursive: true });
@@ -649,7 +668,7 @@ describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
 
     const augmentedMap = buildBarrelMap(REPO_ROOT, [
       ...KNOWN_BARRELS,
-      'apps/mobile/src/lib/_barrel_test_barrel_clean/index.ts',
+      path.relative(REPO_ROOT, barrelPath).replace(/\\/g, '/'),
     ]);
     const sessionRule = SURFACE_RULES.find(
       (r: SurfaceRule) => r.label === 'Session screens',

@@ -2,6 +2,7 @@ import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MentomateLogo } from '../../components/MentomateLogo';
+import { goBackOrReplace } from '../../lib/navigation';
 
 export default function PreviewLandingScreen() {
   const router = useRouter();
@@ -13,6 +14,17 @@ export default function PreviewLandingScreen() {
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="preview-landing"
     >
+      <Pressable
+        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        className="self-start min-h-[44px] justify-center mb-4"
+        testID="preview-landing-back"
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Text className="text-body-sm font-semibold text-primary">
+          Back to sign in
+        </Text>
+      </Pressable>
       <MentomateLogo size="lg" />
       <Text className="text-h1 font-bold text-text-primary mt-8 mb-3 text-center">
         Try MentoMate

@@ -6,6 +6,7 @@ import {
   getPreviewState,
   type PreviewOnboardingStateV0,
 } from '../../lib/preview-onboarding-state';
+import { goBackOrReplace } from '../../lib/navigation';
 
 type Variant = 'learner' | 'parent';
 
@@ -40,6 +41,17 @@ export default function ValuePropScreen() {
           : 'preview-value-prop-parent'
       }
     >
+      <Pressable
+        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        className="self-start min-h-[44px] justify-center mb-2"
+        testID="preview-value-prop-back"
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Text className="text-body-sm font-semibold text-primary">
+          Back to sign in
+        </Text>
+      </Pressable>
       {variant === 'learner' ? (
         <LearnerVariant topic={topic} />
       ) : (
@@ -69,9 +81,7 @@ function SampleMarker() {
       className="self-start bg-surface rounded-full px-3 py-1 mb-4"
       testID="preview-sample-marker"
     >
-      <Text className="text-caption text-text-muted uppercase tracking-wider">
-        Sample
-      </Text>
+      <Text className="text-caption text-text-muted">Sample</Text>
     </View>
   );
 }

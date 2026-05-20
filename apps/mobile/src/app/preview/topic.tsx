@@ -8,6 +8,7 @@ import {
   setPreviewState,
   type PreviewOnboardingStateV0,
 } from '../../lib/preview-onboarding-state';
+import { goBackOrReplace } from '../../lib/navigation';
 
 // [MEDIUM-5] Single-line topic cap. The value is persisted to SecureStore for
 // up to 1h pre-signup, so it WILL outlive the screen. Keeping the field short
@@ -54,6 +55,17 @@ export default function PreviewTopicScreen() {
       style={{ paddingTop: insets.top + 32, paddingBottom: insets.bottom + 16 }}
       testID="preview-topic"
     >
+      <Pressable
+        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        className="self-start min-h-[44px] justify-center mb-2"
+        testID="preview-topic-back"
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Text className="text-body-sm font-semibold text-primary">
+          Back to sign in
+        </Text>
+      </Pressable>
       <Text className="text-h1 font-bold text-text-primary mb-2 text-center">
         What should we help with?
       </Text>

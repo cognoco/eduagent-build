@@ -1,8 +1,4 @@
 import * as SecureStore from './secure-storage';
-// [MEDIUM-4] Import the keychain-accessible constant directly from the
-// native module. The wrapper passes options through unchanged
-// (secure-storage.ts:106), so a typed value works without `as never` casts.
-import { WHEN_UNLOCKED_THIS_DEVICE_ONLY } from 'expo-secure-store';
 
 export const PREVIEW_INTENT_KEY = 'mentomate_preview_intent';
 export const PREVIEW_TTL_MS = 60 * 60_000; // 1 hour
@@ -80,7 +76,7 @@ export async function setPreviewState(
     // and device-to-device backups; bounds the topic-text leak surface to
     // the originating device. Spec §Preview State (Minimal).
     await SecureStore.setItemAsync(PREVIEW_INTENT_KEY, JSON.stringify(record), {
-      keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
   } catch {
     // Non-fatal; in-memory state still survives the warm session.
@@ -117,6 +113,6 @@ export async function seedPreviewStateForTesting(
   memoryState = state;
   const record: StoredRecord = { ...state, savedAt: Date.now() - staleMs };
   await SecureStore.setItemAsync(PREVIEW_INTENT_KEY, JSON.stringify(record), {
-    keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
 }
