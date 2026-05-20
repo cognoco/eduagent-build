@@ -8,6 +8,7 @@ import type {
 import { BadRequestError } from '@eduagent/schemas';
 import {
   assertAnswerInOptions,
+  buildMasterySm2Input,
   buildMissedItemText,
   calculateScore,
   calculateXp,
@@ -97,7 +98,7 @@ describe('buildMissedItemText', () => {
         distractors: ['Berlin', 'Madrid', 'Rome'],
         funFact: '',
         isLibraryItem: false,
-      })
+      }),
     ).toBe('What is the capital of France?');
   });
 
@@ -112,7 +113,7 @@ describe('buildMissedItemText', () => {
         funFact: '',
         cefrLevel: 'A1',
         isLibraryItem: false,
-      })
+      }),
     ).toBe('Translate: der Hund');
   });
 });
@@ -216,44 +217,44 @@ describe('assertAnswerInOptions [BUG-STALE-OPTIONS]', () => {
       assertAnswerInOptions(
         vocabQuestion,
         'dog_from_old_question',
-        'multiple_choice'
-      )
+        'multiple_choice',
+      ),
     ).toThrow(BadRequestError);
   });
 
   it('[BREAK] throws BadRequestError when MC capitals answer is not in options', () => {
     expect(() =>
-      assertAnswerInOptions(capitalsQuestion, 'Berlin', 'multiple_choice')
+      assertAnswerInOptions(capitalsQuestion, 'Berlin', 'multiple_choice'),
     ).toThrow(BadRequestError);
   });
 
   it('accepts a valid MC answer that is in distractors', () => {
     expect(() =>
-      assertAnswerInOptions(vocabQuestion, 'dog', 'multiple_choice')
+      assertAnswerInOptions(vocabQuestion, 'dog', 'multiple_choice'),
     ).not.toThrow();
   });
 
   it('accepts a valid MC answer that is the correctAnswer', () => {
     expect(() =>
-      assertAnswerInOptions(vocabQuestion, 'cat', 'multiple_choice')
+      assertAnswerInOptions(vocabQuestion, 'cat', 'multiple_choice'),
     ).not.toThrow();
   });
 
   it('is a no-op for free_text mode (accepts any answer)', () => {
     expect(() =>
-      assertAnswerInOptions(vocabQuestion, 'completely_stale', 'free_text')
+      assertAnswerInOptions(vocabQuestion, 'completely_stale', 'free_text'),
     ).not.toThrow();
   });
 
   it('is a no-op when answerMode is undefined (backward compat)', () => {
     expect(() =>
-      assertAnswerInOptions(vocabQuestion, 'completely_stale', undefined)
+      assertAnswerInOptions(vocabQuestion, 'completely_stale', undefined),
     ).not.toThrow();
   });
 
   it('is case-insensitive for MC matching', () => {
     expect(() =>
-      assertAnswerInOptions(vocabQuestion, 'CAT', 'multiple_choice')
+      assertAnswerInOptions(vocabQuestion, 'CAT', 'multiple_choice'),
     ).not.toThrow();
   });
 });
@@ -459,7 +460,7 @@ describe('buildMissedItemText — guess_who', () => {
         mcFallbackOptions: ['Curie', 'Darwin', 'Tesla', 'Pasteur'],
         funFact: 'Fact.',
         isLibraryItem: false,
-      })
+      }),
     ).toBe('Who is this person? Nobel Prize for radioactivity');
   });
 });
@@ -589,5 +590,89 @@ describe('getGuessWhoSm2Quality', () => {
   it('returns 1 for missed entirely', () => {
     expect(getGuessWhoSm2Quality(false, 5, 'free_text')).toBe(1);
     expect(getGuessWhoSm2Quality(false, 5, 'multiple_choice')).toBe(1);
+  });
+});
+
+/**
+ * [CR-2026-05-19-H9] SM-2 retention scheduling MUST be driven by the
+ * dedicated `last_reviewed_at` column, NOT `updated_at`.
+ *
+ * Background: MC-streak writes (incrementMcSuccessCount / resetMcSuccessCount)
+ * touch `updated_at` on every multiple-choice answer between real reviews.
+ * Previously, complete-round.ts fed `existing.updatedAt` into `applyQuizSm2`
+ * as the `lastReviewedAt`, which shrank the inter-review interval and made
+ * mastery items resurface sooner than the SM-2 algorithm intends.
+ *
+ * These are break tests: they will FAIL if the regression is reintroduced
+ * (i.e. if `buildMasterySm2Input` ever returns `updatedAt` instead of the
+ * real `lastReviewedAt`).
+ */
+describe('buildMasterySm2Input [CR-2026-05-19-H9 break test]', () => {
+  const baseRow = {
+    easeFactor: 2.5,
+    interval: 6,
+    repetitions: 2,
+    nextReviewAt: new Date('2026-05-20T10:00:00Z'),
+  };
+
+  it('[BREAK] reads lastReviewedAt from the dedicated column, NOT updatedAt', () => {
+    const realReviewTime = new Date('2026-04-20T10:00:00Z');
+    // Simulate the bug scenario: MC-streak writes happened 1 second ago, so
+    // updatedAt is "now"-ish, but the user's last REAL review was 30 days
+    // ago. The retention scheduler must see the 30-day-old timestamp.
+    const mcStreakDirtiedUpdatedAt = new Date('2026-05-19T23:59:59Z');
+
+    const input = buildMasterySm2Input({
+      ...baseRow,
+      lastReviewedAt: realReviewTime,
+      updatedAt: mcStreakDirtiedUpdatedAt,
+    });
+
+    expect(input.lastReviewedAt).toEqual(realReviewTime);
+    // Explicit assertion that we did NOT pick up the dirtied timestamp.
+    expect(input.lastReviewedAt).not.toEqual(mcStreakDirtiedUpdatedAt);
+  });
+
+  it('[BREAK] when updatedAt and lastReviewedAt diverge, the SM-2 input carries the real review time', () => {
+    // The exact pre-fix bug: complete-round.ts read `existing.updatedAt`
+    // into the SM-2 `lastReviewedAt` slot. MC-streak counter writes
+    // (incrementMcSuccessCount / resetMcSuccessCount) dirty `updatedAt` on
+    // every multiple-choice answer between real reviews, so the SM-2 input
+    // arrived with a "just now" lastReviewedAt instead of the real (older)
+    // review time. This test pins the field mapping.
+    const realReviewTime = new Date('2026-04-20T10:00:00Z');
+    const mcStreakDirtiedUpdatedAt = new Date('2026-05-19T23:59:59Z');
+
+    const input = buildMasterySm2Input({
+      ...baseRow,
+      lastReviewedAt: realReviewTime,
+      updatedAt: mcStreakDirtiedUpdatedAt,
+    });
+
+    // The SM-2 input must reflect the real review time, not the
+    // MC-dirtied updatedAt. If buildMasterySm2Input ever reverts to reading
+    // `updatedAt`, this assertion fails immediately — applyQuizSm2 is then
+    // free to use the real timestamp (current sm2() doesn't, but the
+    // contract is preserved so future algorithm changes get correct input).
+    expect(input.lastReviewedAt.getTime()).toBe(realReviewTime.getTime());
+    expect(input.lastReviewedAt.getTime()).toBeLessThan(
+      mcStreakDirtiedUpdatedAt.getTime(),
+    );
+  });
+
+  it('passes through SM-2 state fields unchanged', () => {
+    const input = buildMasterySm2Input({
+      easeFactor: 2.3,
+      interval: 14,
+      repetitions: 4,
+      lastReviewedAt: new Date('2026-04-01T10:00:00Z'),
+      nextReviewAt: new Date('2026-04-15T10:00:00Z'),
+      updatedAt: new Date('2026-05-01T10:00:00Z'),
+    });
+
+    expect(input.easeFactor).toBe(2.3);
+    expect(input.interval).toBe(14);
+    expect(input.repetitions).toBe(4);
+    expect(input.nextReviewAt).toEqual(new Date('2026-04-15T10:00:00Z'));
   });
 });

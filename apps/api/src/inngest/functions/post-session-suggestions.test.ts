@@ -72,6 +72,12 @@ async function runHandler(eventData: Record<string, unknown>) {
   return handler({ event: { data: eventData }, step });
 }
 
+afterEach(() => {
+  // BUG-298: clear captured Inngest events between tests so transport
+  // assertions in one test cannot bleed into the next.
+  mockInngestTransport.clear();
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockDb.query.curriculumBooks.findFirst.mockResolvedValue({

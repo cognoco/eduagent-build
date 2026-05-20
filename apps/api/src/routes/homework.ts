@@ -54,6 +54,46 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
   .post('/ocr', async (c) => {
     requireProfileId(c.get('profileId'));
 
+    // [BUG-283] Reject oversize requests BEFORE parseBody() pulls the whole
+    // multipart body into memory. Multipart boundary + headers add overhead
+    // on top of the file bytes, so allow up to 2x the file cap before the
+    // header-level reject; the per-file size check later still enforces the
+    // exact maxFileSizeBytes limit on the parsed File.
+    //
+    // [ACCEPTED LIMITATION] This guard only fires when the client sends a
+    // Content-Length header. HTTP/1.1 chunked-transfer-encoding requests omit
+    // the header and bypass this check — the body is not buffered until
+    // parseBody() is called, so there is no header to read upfront. We accept
+    // this limitation because:
+    //   1. Cloudflare Workers enforce a platform-level 100MB request body limit
+    //      regardless of transfer encoding, so oversized chunked requests are
+    //      still rejected at the edge before reaching application code.
+    //   2. The React Native fetch client used by the mobile app sends
+    //      Content-Length on form-data uploads, so the common path is covered.
+    //   3. Enforcing chunked-body buffering at the framework level (buffering
+    //      the entire stream before checking size) would add latency and memory
+    //      pressure for all requests to gain a guard that Cloudflare already
+    //      provides at the platform level.
+    // If this endpoint ever needs a tighter application-level cap on chunked
+    // bodies, buffer the stream manually before parseBody() and check .size.
+    const contentLengthHeader = c.req.header('content-length');
+    if (contentLengthHeader) {
+      const contentLength = Number.parseInt(contentLengthHeader, 10);
+      if (
+        Number.isFinite(contentLength) &&
+        contentLength > OCR_CONSTRAINTS.maxFileSizeBytes * 2
+      ) {
+        return apiError(
+          c,
+          413,
+          ERROR_CODES.VALIDATION_ERROR,
+          `Request body too large: ${contentLength} bytes. Maximum: ${
+            OCR_CONSTRAINTS.maxFileSizeBytes * 2
+          } bytes (~10MB including multipart envelope).`,
+        );
+      }
+    }
+
     const body = await c.req.parseBody();
     const file = body['image'];
 
@@ -63,21 +103,21 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
 
     if (
       !OCR_CONSTRAINTS.acceptedMimeTypes.includes(
-        file.type as (typeof OCR_CONSTRAINTS.acceptedMimeTypes)[number]
+        file.type as (typeof OCR_CONSTRAINTS.acceptedMimeTypes)[number],
       )
     ) {
       return validationError(
         c,
         `Unsupported file type: ${
           file.type
-        }. Accepted: ${OCR_CONSTRAINTS.acceptedMimeTypes.join(', ')}`
+        }. Accepted: ${OCR_CONSTRAINTS.acceptedMimeTypes.join(', ')}`,
       );
     }
 
     if (file.size > OCR_CONSTRAINTS.maxFileSizeBytes) {
       return validationError(
         c,
-        `File too large: ${file.size} bytes. Maximum: ${OCR_CONSTRAINTS.maxFileSizeBytes} bytes (5MB)`
+        `File too large: ${file.size} bytes. Maximum: ${OCR_CONSTRAINTS.maxFileSizeBytes} bytes (5MB)`,
       );
     }
 
@@ -97,7 +137,7 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
         c,
         500,
         ERROR_CODES.INTERNAL_ERROR,
-        'OCR service is not configured. Please contact support.'
+        'OCR service is not configured. Please contact support.',
       );
     }
     const result = await provider.extractText(imageBuffer, file.type);
@@ -118,7 +158,7 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
         c,
         502,
         ERROR_CODES.INTERNAL_ERROR,
-        'OCR provider returned a malformed result. Please try again.'
+        'OCR provider returned a malformed result. Please try again.',
       );
     }
     return c.json(parsed.data);

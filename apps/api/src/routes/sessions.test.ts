@@ -716,6 +716,66 @@ describe('session routes', () => {
       const body = await res.json();
       expect(body.code).toBe('EXCHANGE_LIMIT_EXCEEDED');
     });
+
+    // [BUG-92 / CR-2026-05-19-C4] processMessage now surfaces `readyToFinish`
+    // through the route so the mobile client can close an interview /
+    // onboarding session deterministically when either (a) the LLM emitted
+    // `signals.ready_to_finish` or (b) the server-side hard cap
+    // MAX_INTERVIEW_EXCHANGES was reached. The route MUST forward the flag
+    // verbatim — stripping it would re-introduce the unbounded-interview bug.
+    it('[BUG-92] forwards readyToFinish=true from processMessage in the response body', async () => {
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Sounds like we covered enough — ready to wrap up?',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 3,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+        readyToFinish: true,
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/messages`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'I think I get it now' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.readyToFinish).toBe(true);
+      // sourceAudit is stripped (private provenance) — readyToFinish is not.
+      expect(body.sourceAudit).toBeUndefined();
+    });
+
+    it('[BUG-92] forwards readyToFinish=false when neither LLM nor hard cap triggered', async () => {
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Tell me more about what you want to learn.',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 1,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+        readyToFinish: false,
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/messages`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Still thinking' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.readyToFinish).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------

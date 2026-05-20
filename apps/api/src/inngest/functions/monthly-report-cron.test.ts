@@ -240,6 +240,8 @@ jest.mock(
 import {
   monthlyReportCron,
   monthlyReportGenerate,
+  type MonthlyReportCronResult,
+  type MonthlyReportGenerateResult,
 } from './monthly-report-cron';
 
 // ---------------------------------------------------------------------------
@@ -292,20 +294,10 @@ const SAMPLE_METRICS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-interface MonthlyReportCronResult {
-  status: string;
-  queuedPairs: number;
-  totalPairs?: number;
-  queuedBatches?: number;
-  failedBatches?: number;
-}
-
-interface MonthlyReportGenerateResult {
-  status: string;
-  parentId?: string;
-  childId?: string;
-  reason?: string;
-}
+// [bug #293] MonthlyReportCronResult / MonthlyReportGenerateResult are now
+// imported from the implementation module. Tests assert against the same
+// types the handler actually returns, instead of duplicating a local copy
+// that could drift.
 
 async function executeCronSteps(
   stepOptions?: InngestStepRunnerOptions,

@@ -59,6 +59,36 @@ function safeParseMetrics(raw: unknown) {
   return result.success ? result.data : null;
 }
 
+// ---------------------------------------------------------------------------
+// Result type contracts — exported so tests (and any future caller of the
+// inngest handler shape) can import them instead of duplicating local
+// interfaces or reaching for bare `as` casts. [bug #293]
+//
+// `status` uses widened string unions; the cron returns a literal union
+// across two paths, and Generate has separate completed/skipped/failed
+// branches. Keeping these as a single readable shape per handler matches
+// the actual runtime returns above.
+// ---------------------------------------------------------------------------
+
+export interface MonthlyReportCronResult {
+  status: 'completed' | 'partial';
+  queuedPairs: number;
+  totalPairs?: number;
+  queuedBatches?: number;
+  failedBatches?: number;
+}
+
+export type MonthlyReportGenerateStatus = 'completed' | 'skipped' | 'failed';
+
+export interface MonthlyReportGenerateResult {
+  status: MonthlyReportGenerateStatus;
+  parentId?: string;
+  childId?: string;
+  // Skip reason — populated when status === 'skipped' (consent_not_granted,
+  // child_missing, no_snapshot, metrics_shape_mismatch, self_display_name_missing).
+  reason?: string;
+}
+
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }

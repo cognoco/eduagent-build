@@ -12,6 +12,9 @@ import {
   createRoutedMockFetch,
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
+import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
+import { createTestProfile } from '../../test-utils/app-hook-test-utils';
+import type { Profile } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -20,43 +23,35 @@ import {
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
-const mockUseActiveProfileRole = jest.fn();
-
-// [F-029] Mock platformAlert to spy on it via Alert.alert, so existing
-// test assertions continue working after the Alert → platformAlert migration.
-const mockPlatformAlert = jest.fn((...args: Parameters<typeof Alert.alert>) =>
-  Alert.alert(...args),
-);
-jest.mock(
-  '../../lib/platform-alert',
-  /* gc1-allow: alert boundary */ () => ({
-    platformAlert: (...args: unknown[]) =>
-      mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
-  }),
-);
 
 // Resolves t('common.ok') → 'OK' (from en.json) so existing assertions on the
 // rendered button label keep matching after the alert sweep.
 jest.mock(
-  'react-i18next',
+  'react-i18next', // gc1-allow: external-boundary — i18n library
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    back: mockBack,
-    push: mockPush,
-    replace: mockReplace,
-    canGoBack: jest.fn(() => true),
+jest.mock(
+  'expo-router', // gc1-allow: native-boundary — Expo Router requires native navigation runtime
+  () => ({
+    useRouter: () => ({
+      back: mockBack,
+      push: mockPush,
+      replace: mockReplace,
+      canGoBack: jest.fn(() => true),
+    }),
   }),
-}));
+);
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock(
+  'react-native-safe-area-context', // gc1-allow: native-boundary — requires native insets unavailable in Jest
+  () => ({
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  }),
+);
 
 jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
+  // gc1-allow: native-boundary — theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#6366f1',
     textInverse: '#ffffff',
@@ -71,30 +66,37 @@ jest.mock('../../lib/theme', () => ({
 
 const mockFetch = createRoutedMockFetch();
 
-jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
-);
-
-jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: mockActiveProfile,
-  }),
-}));
-
+// Route the Hono RPC client through our mock fetch so real hooks run.
+// The `mockApiClientFactory` helper indirection can cause a Jest module-cache
+// mismatch (Hono client built inside the helper uses a different `hono/client`
+// instance and never reaches our mockFetch). Inline the factory body so
+// `require('hono/client')` resolves from the test file's own module context.
 jest.mock(
-  '../../hooks/use-active-profile-role',
-  /* gc1-allow: active role */ () => ({
-    useActiveProfileRole: () => mockUseActiveProfileRole(),
-  }),
+  '../../lib/api-client', // gc1-allow: transport-boundary — routed mock fetch wires real hooks to canned API responses
+  () => {
+    const { hc } = require('hono/client');
+    return {
+      useApiClient: () => hc('http://localhost', { fetch: mockFetch }),
+      setActiveProfileId: jest.fn(),
+      setProxyMode: jest.fn(),
+      setOnAuthExpired: jest.fn(),
+      clearOnAuthExpired: jest.fn(),
+      resetAuthExpiredGuard: jest.fn(),
+      getProxyMode: jest.fn().mockReturnValue(false),
+      withIdempotencyKey: jest.fn((h: Record<string, string>) => h),
+      isIdempotencyReplay: jest.fn().mockReturnValue(false),
+      NetworkError: class NetworkError extends Error {},
+      BadRequestError: class BadRequestError extends Error {},
+      ConflictError: class ConflictError extends Error {},
+      ForbiddenError: class ForbiddenError extends Error {},
+      NotFoundError: class NotFoundError extends Error {},
+      QuotaExceededError: class QuotaExceededError extends Error {},
+      RateLimitedError: class RateLimitedError extends Error {},
+      ResourceGoneError: class ResourceGoneError extends Error {},
+      UpstreamError: class UpstreamError extends Error {},
+    };
+  },
 );
-
-jest.mock('../../lib/analytics', () => ({
-  track: jest.fn(),
-}));
-
-jest.mock('../../components/common', () => ({
-  UsageMeter: () => null,
-}));
 
 // RevenueCat hooks mocks — these hooks use the RevenueCat SDK directly,
 // NOT useApiClient, so they stay as hook-level mocks.
@@ -109,50 +111,57 @@ let mockCustomerInfoLoading = false;
 let mockPurchaseIsPending = false;
 let mockRestoreIsPending = false;
 
-jest.mock('../../hooks/use-revenuecat', () => ({
-  useOfferings: () => ({
-    data: mockOfferings,
-    isLoading: mockOfferingsLoading,
-    isError: mockOfferingsError,
-    refetch: mockRefetchOfferings,
+jest.mock(
+  '../../hooks/use-revenuecat', // gc1-allow: external-boundary — wraps RevenueCat SDK (react-native-purchases); must be hook-level to control per-test loading/error state
+  () => ({
+    useOfferings: () => ({
+      data: mockOfferings,
+      isLoading: mockOfferingsLoading,
+      isError: mockOfferingsError,
+      refetch: mockRefetchOfferings,
+    }),
+    useCustomerInfo: () => ({
+      data: mockCustomerInfo,
+      isLoading: mockCustomerInfoLoading,
+    }),
+    usePurchase: () => ({
+      mutateAsync: mockMutateAsyncPurchase,
+      isPending: mockPurchaseIsPending,
+    }),
+    useRestorePurchases: () => ({
+      mutateAsync: mockMutateAsyncRestore,
+      isPending: mockRestoreIsPending,
+    }),
   }),
-  useCustomerInfo: () => ({
-    data: mockCustomerInfo,
-    isLoading: mockCustomerInfoLoading,
-  }),
-  usePurchase: () => ({
-    mutateAsync: mockMutateAsyncPurchase,
-    isPending: mockPurchaseIsPending,
-  }),
-  useRestorePurchases: () => ({
-    mutateAsync: mockMutateAsyncRestore,
-    isPending: mockRestoreIsPending,
-  }),
-}));
+);
 
-// Mock react-native-purchases for enum/constant access
-jest.mock('react-native-purchases', () => ({
-  __esModule: true,
-  default: {},
-  PURCHASES_ERROR_CODE: {
-    PURCHASE_CANCELLED_ERROR: '1',
-    PRODUCT_ALREADY_PURCHASED_ERROR: '6',
-    NETWORK_ERROR: '10',
-    OFFLINE_CONNECTION_ERROR: '35',
-    UNKNOWN_ERROR: '0',
-  },
-  PACKAGE_TYPE: {
-    MONTHLY: 'MONTHLY',
-    ANNUAL: 'ANNUAL',
-    SIX_MONTH: 'SIX_MONTH',
-    THREE_MONTH: 'THREE_MONTH',
-    TWO_MONTH: 'TWO_MONTH',
-    WEEKLY: 'WEEKLY',
-    LIFETIME: 'LIFETIME',
-    UNKNOWN: 'UNKNOWN',
-    CUSTOM: 'CUSTOM',
-  },
-}));
+// Extends the global react-native-purchases mock (test-setup.ts) with enum
+// constants that subscription.tsx imports directly.
+jest.mock(
+  'react-native-purchases', // gc1-allow: external-boundary — native RevenueCat SDK; extends global mock with PURCHASES_ERROR_CODE + PACKAGE_TYPE enums used by subscription.tsx
+  () => ({
+    __esModule: true,
+    default: {},
+    PURCHASES_ERROR_CODE: {
+      PURCHASE_CANCELLED_ERROR: '1',
+      PRODUCT_ALREADY_PURCHASED_ERROR: '6',
+      NETWORK_ERROR: '10',
+      OFFLINE_CONNECTION_ERROR: '35',
+      UNKNOWN_ERROR: '0',
+    },
+    PACKAGE_TYPE: {
+      MONTHLY: 'MONTHLY',
+      ANNUAL: 'ANNUAL',
+      SIX_MONTH: 'SIX_MONTH',
+      THREE_MONTH: 'THREE_MONTH',
+      TWO_MONTH: 'TWO_MONTH',
+      WEEKLY: 'WEEKLY',
+      LIFETIME: 'LIFETIME',
+      UNKNOWN: 'UNKNOWN',
+      CUSTOM: 'CUSTOM',
+    },
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Default mock data shapes (real API shapes from @eduagent/schemas)
@@ -188,15 +197,13 @@ const DEFAULT_USAGE = {
 // Active profile state (mutable for tests that need different profiles)
 // ---------------------------------------------------------------------------
 
-let mockActiveProfile: {
-  id: string;
-  displayName: string;
-  isOwner: boolean;
-} = {
+// Full Profile shape so the real useProfile() / useActiveProfileRole() hooks
+// work correctly when consumed through ProfileContext.Provider below.
+let mockActiveProfile: Profile = createTestProfile({
   id: 'profile-1',
   displayName: 'Alex',
   isOwner: true,
-};
+});
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -213,11 +220,29 @@ function createWrapper(opts?: { seedCache?: boolean }) {
     );
     queryClient.setQueryData(['usage', mockActiveProfile.id], DEFAULT_USAGE);
   }
+
+  // Provide the real ProfileContext so useProfile() and the real
+  // useActiveProfileRole() / useParentProxy() hooks resolve correctly without
+  // internal mocks.
+  const profileContextValue: ProfileContextValue = {
+    profiles: [mockActiveProfile],
+    activeProfile: mockActiveProfile,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
       QueryClientProvider,
       { client: queryClient },
-      children,
+      React.createElement(
+        ProfileContext.Provider,
+        { value: profileContextValue },
+        children,
+      ),
     );
   };
 }
@@ -353,15 +378,14 @@ describe('SubscriptionScreen', () => {
     mockCustomerInfoLoading = false;
     mockPurchaseIsPending = false;
     mockRestoreIsPending = false;
-    // Reset active profile
-    mockActiveProfile = {
+    // Reset active profile — full Profile shape so real useActiveProfileRole
+    // / useParentProxy hooks resolve to 'owner' via ProfileContext.Provider.
+    mockActiveProfile = createTestProfile({
       id: 'profile-1',
       displayName: 'Alex',
       isOwner: true,
-    };
-    mockUseActiveProfileRole.mockReturnValue('owner');
+    });
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    mockPlatformAlert.mockClear();
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 
     // Default fetch routes (most-specific first to avoid prefix collisions)
@@ -446,7 +470,13 @@ describe('SubscriptionScreen', () => {
   });
 
   it('redirects child role away from subscription detail', () => {
-    mockUseActiveProfileRole.mockReturnValue('child');
+    // Set isOwner: false so the real SubscriptionContent child gate fires:
+    // isChild=true + active subscription (no paywall) triggers router.replace('/').
+    mockActiveProfile = createTestProfile({
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: false,
+    });
 
     render(<SubscriptionScreen />, {
       wrapper: createWrapper({ seedCache: true }),
@@ -480,12 +510,15 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('subscription-loading');
   });
 
-  it('shows the error state instead of the child paywall when subscription loading fails', async () => {
-    mockActiveProfile = {
-      id: 'child-1',
+  it('shows the error state when subscription loading fails', async () => {
+    // ParentOnly gates the screen to owners; use an owner profile so the
+    // screen renders. The error-vs-child-paywall distinction is validated by
+    // the ChildPaywall describe block for the non-owner path.
+    mockActiveProfile = createTestProfile({
+      id: 'owner-1',
       displayName: 'Alex',
-      isOwner: false,
-    };
+      isOwner: true,
+    });
     // Return a 500 to trigger assertOk → query enters error state
     mockFetch.setRoute(
       '/subscription',
@@ -970,6 +1003,8 @@ describe('SubscriptionScreen', () => {
         expect(Alert.alert).toHaveBeenCalledWith(
           'Success',
           'Your subscription is now active!',
+          undefined,
+          undefined,
         );
       },
       { timeout: 5000 },
@@ -1029,6 +1064,8 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Network error',
         'Please check your internet connection and try again.',
+        undefined,
+        undefined,
       );
     });
   });
@@ -1054,14 +1091,17 @@ describe('SubscriptionScreen', () => {
     });
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
+    // platformAlert delegates to Alert.alert on non-web platforms; assert on
+    // Alert.alert directly since the real platformAlert is used (no mock).
     await waitFor(() => {
-      expect(mockPlatformAlert).toHaveBeenCalledWith(
+      expect(Alert.alert).toHaveBeenCalledWith(
         'Already purchased',
         expect.stringContaining('already own this subscription'),
         expect.arrayContaining([
           expect.objectContaining({ text: 'Restore purchases' }),
           expect.objectContaining({ text: 'Cancel' }),
         ]),
+        undefined,
       );
     });
   });
@@ -1091,6 +1131,8 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Purchase failed',
         'Something unexpected happened with your purchase. Please try again.',
+        undefined,
+        undefined,
       );
     });
   });
@@ -1148,6 +1190,8 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Restored',
         'Your subscription has been restored.',
+        undefined,
+        undefined,
       );
     });
     expect(
@@ -1197,6 +1241,7 @@ describe('SubscriptionScreen', () => {
         'No subscriptions found',
         'We could not find any previous purchases to restore.',
         expect.any(Array),
+        undefined,
       );
     });
     jest.useRealTimers();
@@ -1219,6 +1264,8 @@ describe('SubscriptionScreen', () => {
     expect(Alert.alert).toHaveBeenCalledWith(
       'Restore failed',
       'Could not restore purchases. Please try again.',
+      undefined,
+      undefined,
     );
   });
 
@@ -1568,6 +1615,8 @@ describe('SubscriptionScreen', () => {
     expect(Alert.alert).toHaveBeenCalledWith(
       'Family updated',
       'Alex was removed from your family plan.',
+      undefined,
+      undefined,
     );
   });
 
@@ -1588,6 +1637,8 @@ describe('SubscriptionScreen', () => {
     expect(Alert.alert).toHaveBeenCalledWith(
       'Waitlist',
       'You have been added to the BYOK waitlist.',
+      undefined,
+      undefined,
     );
   });
 
@@ -1611,17 +1662,19 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Error',
         'Could not join waitlist. Try again.',
+        undefined,
+        undefined,
       );
     });
   });
 
   describe('ChildPaywall', () => {
     beforeEach(() => {
-      mockActiveProfile = {
+      mockActiveProfile = createTestProfile({
         id: 'child-1',
         displayName: 'Alex',
         isOwner: false,
-      };
+      });
       // Child paywall renders when isChild=true AND trialOrExpired=true.
       // trialOrExpired requires subscription.status='expired'|'cancelled' OR !subscription&&!subLoading.
       // Use 'expired' status so the condition triggers after the query resolves.
@@ -1855,6 +1908,7 @@ describe('SubscriptionScreen', () => {
             expect.objectContaining({ text: 'Retry' }),
             expect.objectContaining({ text: 'OK' }),
           ]),
+          undefined,
         );
       });
     });
@@ -1889,6 +1943,7 @@ describe('SubscriptionScreen', () => {
           'Connection error',
           "Couldn't load purchase options. Check your connection and try again.",
           expect.arrayContaining([expect.objectContaining({ text: 'Retry' })]),
+          undefined,
         );
       });
     });
@@ -1941,6 +1996,8 @@ describe('SubscriptionScreen', () => {
         expect(Alert.alert).toHaveBeenCalledWith(
           'Network error',
           'Please check your internet connection and try again.',
+          undefined,
+          undefined,
         );
       });
     });
@@ -1968,6 +2025,8 @@ describe('SubscriptionScreen', () => {
         expect(Alert.alert).toHaveBeenCalledWith(
           'Purchase failed',
           'Something unexpected happened with your purchase. Please try again.',
+          undefined,
+          undefined,
         );
       });
     });

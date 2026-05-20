@@ -355,8 +355,22 @@ flowchart LR
   <strong>Human-review-required (don't auto-merge):</strong> none remaining — <code>PR-25</code>'s human-decision-per-file scope was satisfied during the closure-PR's plan-narrative review.
 </div>
 
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+<!--
+  [BUG-274] Mermaid pinned to a specific version + SRI hash so a compromised
+  CDN or a malicious republish under the floating @11 tag can't inject script
+  into this static audit page. UMD build (not ESM) is used so the standard
+  `<script integrity=...>` attribute is honoured by browsers — SRI on module
+  imports is not yet broadly supported. SHA-384 computed from the upstream
+  artefact:
+    curl -sL https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js \
+      | openssl dgst -sha384 -binary | openssl base64 -A
+-->
+<script
+  src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"
+  integrity="sha384-rbtjAdnIQE/aQJGEgXrVUlMibdfTSa4PQju4HDhN3sR2PmaKFzhEafuePsl9H/9I"
+  crossorigin="anonymous"
+></script>
+<script>
   mermaid.initialize({
     startOnLoad: true,
     theme: "dark",

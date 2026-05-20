@@ -29,7 +29,14 @@ git diff --name-only "${base}...HEAD"
 # Cache the full patch on first call so the rg pipeline below doesn't re-run git.
 # If this script is invoked again in the same run (e.g. by multiple review agents),
 # subsequent callers skip the git invocation entirely.
-_diff_cache="${artifacts_dir}/.diff"
+#
+# [BUG-289] The cache key must include the current HEAD SHA. Without it, a
+# force-pushed branch (same artifacts_dir, different tip commit) reuses the
+# prior run's diff verbatim — silent stale-review with no signal that the
+# patch under review is actually a different commit. With the SHA suffix,
+# a force-push falls back to a fresh `git diff` for the new tip.
+head_sha="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+_diff_cache="${artifacts_dir}/.diff.${head_sha}"
 if [[ ! -f "$_diff_cache" ]]; then
     git diff "${base}...HEAD" > "$_diff_cache"
 fi

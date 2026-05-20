@@ -1,10 +1,30 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { tokens } from '../../lib/design-tokens';
+import type { ColorScheme } from '../../lib/design-tokens';
+import { ThemeContext, type ThemeContextValue } from '../../lib/theme';
 import { TopicPickerSheet } from './TopicPickerSheet';
 
 // ---------------------------------------------------------------------------
-// Mocks
+// Test harness — wrap in an explicit ThemeContext.Provider so token-derived
+// style assertions don't silently depend on the default ('light') context
+// value. Each test that asserts colors parameterises the scheme so dark-mode
+// regressions are caught alongside light-mode (bug #317).
 // ---------------------------------------------------------------------------
+
+function renderWithScheme(
+  ui: Parameters<typeof render>[0],
+  scheme: ColorScheme,
+) {
+  const value: ThemeContextValue = {
+    colorScheme: scheme,
+    setColorScheme: jest.fn(),
+    accentPresetId: null,
+    setAccentPresetId: jest.fn(),
+  };
+  return render(
+    <ThemeContext.Provider value={value}>{ui}</ThemeContext.Provider>,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -57,21 +77,33 @@ describe('TopicPickerSheet', () => {
     expect(chapterTexts).toHaveLength(2);
   });
 
-  it('highlights the default topic with primarySoft background', () => {
-    render(<TopicPickerSheet {...defaultProps} defaultTopicId="topic-2" />);
-    const selectedRow = screen.getByTestId('topic-picker-topic-2');
-    expect(selectedRow.props.style).toMatchObject({
-      backgroundColor: tokens.light.colors.primarySoft,
-    });
-  });
+  it.each(['light', 'dark'] as const)(
+    'highlights the default topic with the scheme-specific primarySoft background (%s)',
+    (scheme) => {
+      renderWithScheme(
+        <TopicPickerSheet {...defaultProps} defaultTopicId="topic-2" />,
+        scheme,
+      );
+      const selectedRow = screen.getByTestId('topic-picker-topic-2');
+      expect(selectedRow.props.style).toMatchObject({
+        backgroundColor: tokens[scheme].colors.primarySoft,
+      });
+    },
+  );
 
-  it('uses surface background for non-selected topics', () => {
-    render(<TopicPickerSheet {...defaultProps} defaultTopicId="topic-2" />);
-    const unselectedRow = screen.getByTestId('topic-picker-topic-1');
-    expect(unselectedRow.props.style).toMatchObject({
-      backgroundColor: tokens.light.colors.surface,
-    });
-  });
+  it.each(['light', 'dark'] as const)(
+    'uses the scheme-specific surface background for non-selected topics (%s)',
+    (scheme) => {
+      renderWithScheme(
+        <TopicPickerSheet {...defaultProps} defaultTopicId="topic-2" />,
+        scheme,
+      );
+      const unselectedRow = screen.getByTestId('topic-picker-topic-1');
+      expect(unselectedRow.props.style).toMatchObject({
+        backgroundColor: tokens[scheme].colors.surface,
+      });
+    },
+  );
 
   it('calls onSelect with topicId when a topic row is pressed', () => {
     const onSelect = jest.fn();

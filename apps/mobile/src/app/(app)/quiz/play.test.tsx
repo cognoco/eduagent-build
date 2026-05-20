@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -33,48 +34,52 @@ jest.mock('expo-haptics', () => ({
   },
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    textPrimary: '#111827',
-    textSecondary: '#6b7280',
-    textInverse: '#ffffff',
-    danger: '#ef4444',
-    success: '#22c55e',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#00b4d8',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+      textInverse: '#ffffff',
+      danger: '#ef4444',
+      success: '#22c55e',
+    }),
   }),
-}));
+);
 
-jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
-  // gc1-allow: GuessWhoQuestion uses native ColorScheme via useThemeColors
-  GuessWhoQuestion: ({
-    onResolved,
-  }: {
-    onResolved: (result: {
-      correct: boolean;
-      answerGiven: string;
-      cluesUsed: number;
-      answerMode: 'free_text' | 'multiple_choice';
-    }) => void;
-  }) => {
-    const { Pressable, Text } = require('react-native');
-    return (
-      <Pressable
-        onPress={() =>
-          onResolved({
-            correct: true,
-            answerGiven: 'Nikola Tesla',
-            cluesUsed: 3,
-            answerMode: 'free_text',
-          })
-        }
-        testID="guess-who-resolve-correct"
-      >
-        <Text>Resolve Guess Who</Text>
-      </Pressable>
-    );
-  },
-}));
+jest.mock(
+  '../../../components/quiz/GuessWhoQuestion' /* gc1-allow: GuessWhoQuestion uses native ColorScheme via useThemeColors */,
+  () => ({
+    GuessWhoQuestion: ({
+      onResolved,
+    }: {
+      onResolved: (result: {
+        correct: boolean;
+        answerGiven: string;
+        cluesUsed: number;
+        answerMode: 'free_text' | 'multiple_choice';
+      }) => void;
+    }) => {
+      const { Pressable, Text } = require('react-native');
+      return (
+        <Pressable
+          onPress={() =>
+            onResolved({
+              correct: true,
+              answerGiven: 'Nikola Tesla',
+              cluesUsed: 3,
+              answerMode: 'free_text',
+            })
+          }
+          testID="guess-who-resolve-correct"
+        >
+          <Text>Resolve Guess Who</Text>
+        </Pressable>
+      );
+    },
+  }),
+);
 
 jest.mock(
   '../../../components/common/celebrations/PolarStar' /* gc1-allow: PolarStar is native-animated celebration component; stub prevents native module crash */,
@@ -105,13 +110,15 @@ jest.mock('../../../lib/platform-alert', () => ({
   platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
 }));
 
-jest.mock('../../../lib/sentry', () => ({
-  // gc1-allow: @sentry/react-native external boundary
-  Sentry: {
-    captureException: (...args: unknown[]) => mockSentryCapture(...args),
-    addBreadcrumb: jest.fn(),
-  },
-}));
+jest.mock(
+  '../../../lib/sentry' /* gc1-allow: @sentry/react-native external boundary */,
+  () => ({
+    Sentry: {
+      captureException: (...args: unknown[]) => mockSentryCapture(...args),
+      addBreadcrumb: jest.fn(),
+    },
+  }),
+);
 
 let mockRound: object | null = {
   id: 'round-1',
@@ -1270,6 +1277,161 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     expect(mockDismissTo).toHaveBeenCalledWith('/(app)/quiz');
     expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz');
     expect(screen.queryByTestId('quiz-quit-confirm')).toBeNull();
+  });
+
+  // [BUG-269 / CCR PR #230] The "cancel" button on the hasAnsweredQuestions
+  // branch of the quit modal previously rendered `quiz.play.oneMore`
+  // ("Wait, just one more!"), which is the post-completion start-another-round
+  // string used outside this modal. The semantically correct key for keeping
+  // the user in the current round is `quiz.play.keepPlaying`.
+  it('[BUG-269] pause modal cancel uses keepPlaying copy, not oneMore', async () => {
+    mockRound = {
+      id: 'round-269',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => screen.getByText('Correct'));
+
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    screen.getByText('Pause here?');
+
+    // The cancel button must render "Keep playing" (the keepPlaying key),
+    // not "Wait, just one more!" (the oneMore key) — they map to different
+    // copy in the en locale and conflating them is the bug.
+    const cancelBtn = screen.getByTestId('quiz-quit-cancel');
+    expect(cancelBtn.props.accessibilityLabel).toBe('Keep playing');
+    expect(screen.getByText('Keep playing')).toBeTruthy();
+    // The post-completion start-another-round string must NOT appear inside
+    // the pause modal; "Wait, just one more!" only belongs on the final
+    // results-ready screen.
+    expect(screen.queryByText('Wait, just one more!')).toBeNull();
+  });
+
+  // [BUG-268 / CCR PR #230] handleSaveAndQuit must NOT silently no-op when the
+  // round was already auto-submitted in the background (final-question path).
+  // Per CLAUDE.md "Silent recovery without escalation is banned" — when the
+  // submission is complete we navigate the user to results; when it's still
+  // in-flight we queue navigation for the in-flight onSuccess.
+  it('[BUG-268] save-and-quit navigates to results when round already auto-saved', async () => {
+    mockRound = {
+      id: 'round-268-a',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    // Default beforeEach implementation calls onSuccess synchronously, so the
+    // round auto-saves the moment the user answers question 1 of 1.
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => screen.getByText('Saved. Ready when you are.'));
+
+    // Open the quit modal (pause branch is hasAnsweredQuestions=true).
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    screen.getByText('Pause here?');
+
+    // Save-and-quit must NOT be a silent no-op even though the round is
+    // already submitted — it must produce a visible navigation effect.
+    mockReplace.mockClear();
+    fireEvent.press(screen.getByTestId('quiz-quit-save'));
+
+    // Round was already auto-saved → user lands on results.
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/results');
+    // Critically: a second completeRound dispatch is NOT triggered (submission
+    // is already done; double-dispatch would double-count XP).
+    expect(mockCompleteRoundMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('[BUG-268] save-and-quit while submission is in-flight queues navigation', async () => {
+    mockRound = {
+      id: 'round-268-b',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    let pendingOnSuccess:
+      | ((r: {
+          score: number;
+          total: number;
+          xpEarned: number;
+          celebrationTier: string;
+          questionResults: unknown[];
+        }) => void)
+      | undefined;
+    mockCompleteRoundMutate.mockImplementation((_input, opts) => {
+      // Capture but do NOT call onSuccess yet — simulates in-flight save.
+      pendingOnSuccess = opts.onSuccess;
+    });
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => screen.getByText('Saving your round...'));
+
+    // Open the quit modal and tap Save-and-quit while submission is in-flight.
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    fireEvent.press(screen.getByTestId('quiz-quit-save'));
+
+    // Navigation should be deferred — not fired yet.
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz/results');
+
+    // Resolve the pending submission wrapped in act() so React flushes the
+    // navigation effect within the test's synchronous frame.
+    await act(async () => {
+      pendingOnSuccess?.({
+        score: 1,
+        total: 1,
+        xpEarned: 10,
+        celebrationTier: 'perfect',
+        questionResults: [],
+      });
+    });
+
+    // Once the in-flight save lands, the queued navigation fires.
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/results');
+    });
   });
 
   it('saves answered progress from the quit modal', async () => {

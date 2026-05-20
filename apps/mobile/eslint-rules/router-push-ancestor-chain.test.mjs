@@ -129,5 +129,30 @@ router.push('/(app)/shelf/[subjectId]/book/[bookId]');`,
       ...fileUnderLibrary,
       errors: [{ messageId: 'missingParentPush' }],
     },
+    // Regression (bug #328): a parent push inside a nested arrow callback
+    // (e.g. .forEach) runs in a separate scope, so it must NOT satisfy the
+    // outer ancestor check. The old walk descended into the arrow body and
+    // silently accepted the push.
+    {
+      code: `function f(items) {
+        items.forEach((it) => {
+          router.push({ pathname: '/(app)/shelf/[subjectId]', params: { subjectId: it.id } });
+        });
+        router.push({ pathname: '/(app)/shelf/[subjectId]/book/[bookId]', params: { subjectId: 's', bookId: 'b' } });
+      }`,
+      ...fileUnderLibrary,
+      errors: [{ messageId: 'missingParentPush' }],
+    },
+    // Same regression with a nested function expression.
+    {
+      code: `function f() {
+        const handler = function () {
+          router.push({ pathname: '/(app)/shelf/[subjectId]', params: { subjectId: 's' } });
+        };
+        router.push({ pathname: '/(app)/shelf/[subjectId]/book/[bookId]', params: { subjectId: 's', bookId: 'b' } });
+      }`,
+      ...fileUnderLibrary,
+      errors: [{ messageId: 'missingParentPush' }],
+    },
   ],
 });

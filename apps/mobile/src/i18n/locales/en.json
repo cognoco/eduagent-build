@@ -730,7 +730,13 @@
       "keepPlaying": "Keep playing",
       "saveAndFinish": "Save and finish",
       "leaveWithoutSaving": "Leave without saving",
-      "leaveQuizButton": "Leave quiz"
+      "leaveQuizButton": "Leave quiz",
+      "seeResultsLabel": "See quiz results",
+      "oneMoreLabel": "Start one more quiz",
+      "nextQuestionLabel": "Next question",
+      "disputeLabel": "Dispute this answer",
+      "dismissLabel": "Dismiss",
+      "saveAndFinishLabel": "Save progress and finish round"
     },
     "round": {
       "goBack": "Go back",
@@ -1387,7 +1393,14 @@
     "listening": "Listening...",
     "voiceHint": "Say the homework problem out loud.",
     "stopDictatingProblemLabel": "Stop dictating problem",
-    "dictateProblemLabel": "Dictate problem"
+    "dictateProblemLabel": "Dictate problem",
+    "ocrError": {
+      "NOT_HOMEWORK": "We couldn't find a clear homework problem in this photo. Try a closer shot or type it in.",
+      "LOW_QUALITY": "We couldn't read this photo clearly. Try again with better lighting or a steadier hand.",
+      "NO_TEXT": "We couldn't find any text in this photo. Make sure the homework is visible and well-lit.",
+      "ML_KIT_UNAVAILABLE": "Photo reading isn't available in this version. A quick app update will bring it back.",
+      "CACHE_FAILED": "We had trouble preparing the photo. Try again or type the problem in."
+    }
   },
   "progress": {
     "pageTitle": "My Learning Journey",

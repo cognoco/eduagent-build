@@ -14,7 +14,13 @@ import type { Env } from './config';
 // ---------------------------------------------------------------------------
 
 describe('validateProductionKeys', () => {
-  const BASE_ENV: Env = {
+  // [BUG-279] Zod-coerced numeric env vars (MEMORY_FACTS_DEDUP_THRESHOLD,
+  // MAX_DEDUP_LLM_CALLS_PER_SESSION, MEMORY_FACTS_DEDUP_ROLLOUT_PCT) are
+  // string-typed at the Cloudflare Workers boundary — we route this base
+  // fixture through validateEnv() so the coerce path is exercised the same
+  // way production env construction does it, instead of hand-crafting a
+  // post-parse Env literal that hides string→number coercion gaps.
+  const BASE_ENV: Env = validateEnv({
     ENVIRONMENT: 'development',
     DATABASE_URL: 'postgresql://localhost/test',
     APP_URL: 'https://www.mentomate.com',
@@ -26,12 +32,12 @@ describe('validateProductionKeys', () => {
     MEMORY_FACTS_READ_ENABLED: 'false',
     MEMORY_FACTS_RELEVANCE_RETRIEVAL: 'false',
     MEMORY_FACTS_DEDUP_ENABLED: 'false',
-    MEMORY_FACTS_DEDUP_THRESHOLD: 0.15,
-    MAX_DEDUP_LLM_CALLS_PER_SESSION: 10,
-    MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
+    MEMORY_FACTS_DEDUP_THRESHOLD: '0.15',
+    MAX_DEDUP_LLM_CALLS_PER_SESSION: '10',
+    MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '0',
     MATCHER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
-  };
+  });
 
   it('returns empty array for development environment', () => {
     expect(

@@ -24,6 +24,9 @@ export * from './retention-status';
 export * from './struggle-status';
 export * from './snapshots';
 
+// Observer event payload schemas — shared contract between Inngest senders and observer terminus functions
+export * from './observers';
+
 // Subscription & Billing (Epic 5)
 export * from './billing';
 

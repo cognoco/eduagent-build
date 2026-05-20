@@ -100,19 +100,20 @@ function isInsideTryBlock(node: ts.Node): boolean {
   let cur: ts.Node | undefined = node.parent;
   while (cur) {
     if (ts.isTryStatement(cur)) return true;
-    // Stop at function boundaries — a try in an outer function doesn't count.
+    // Stop at function boundaries — a try in an outer (caller) function
+    // doesn't catch errors thrown synchronously from this function body's
+    // own statements at the moment the try block actually runs. If the
+    // enclosing function is invoked later (e.g. assigned to a callback and
+    // called asynchronously), a try in an outer scope is gone by then.
+    // The only "real" try that counts is one in the SAME function as the
+    // dispatch site.
     if (
       ts.isFunctionDeclaration(cur) ||
       ts.isFunctionExpression(cur) ||
       ts.isArrowFunction(cur) ||
       ts.isMethodDeclaration(cur)
     ) {
-      // Keep walking — the try might be in an outer function body containing
-      // this one if it's an immediately-invoked lambda. But for the typical
-      // shape we want (try inside a route handler containing the call), the
-      // call's enclosing function IS the handler, and the try-statement
-      // sits inside that function. So we DO continue past function boundaries
-      // — but only the nearest enclosing try counts.
+      return false;
     }
     cur = cur.parent;
   }
@@ -300,6 +301,47 @@ describe('safe-non-core ratchet', () => {
     };
     visit(sf);
     expect(bareCount).toBe(0);
+  });
+
+  // Self-check (bug #330): a try-block in an OUTER caller function does NOT
+  // shield a bare inngest.send in an inner callee — only a try inside the
+  // same function as the dispatch site counts. Prevents regression of the
+  // empty-if-block where the walk would cross function boundaries.
+  it('self-check: outer-function try-block does not satisfy try-catch classification', () => {
+    const bareInInnerFn = `
+      import { inngest } from './client';
+      export async function caller() {
+        try {
+          await inner();
+        } catch {}
+        async function inner() {
+          await inngest.send({ name: 'app/x', data: {} });
+        }
+      }
+    `;
+    const sf = ts.createSourceFile(
+      'bare-in-inner.ts',
+      bareInInnerFn,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    let bareCount = 0;
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === 'inngest' &&
+        node.expression.name.text === 'send' &&
+        classifySite(sf, node) === 'bare'
+      ) {
+        bareCount += 1;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    expect(bareCount).toBe(1);
   });
 
   // Self-check: scanner recognises a core-send comment.

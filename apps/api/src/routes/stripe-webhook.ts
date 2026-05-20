@@ -8,22 +8,19 @@ import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
 import { verifyWebhookSignature } from '../services/stripe';
-import { writeSubscriptionStatus } from '../services/kv';
 import {
   updateSubscriptionFromWebhook,
-  getSubscriptionByAccountId,
-  getQuotaPool,
   activateSubscriptionFromCheckout,
   updateQuotaPoolLimit,
 } from '../services/billing';
 import { getTierConfig } from '../services/subscription';
+import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
 
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
-import type { CachedSubscriptionStatus } from '../services/kv';
 import type { WebhookSubscriptionUpdate } from '../services/billing';
 
 const logger = createLogger();
@@ -96,35 +93,6 @@ function mapStripeStatus(
   }
 }
 
-/**
- * After a subscription DB update, refresh the KV cache.
- * Silently skips if KV namespace is not bound (dev/test).
- */
-async function refreshKvCache(
-  kv: KVNamespace | undefined,
-  db: Database,
-  accountId: string,
-): Promise<void> {
-  if (!kv) return;
-
-  const sub = await getSubscriptionByAccountId(db, accountId);
-  if (!sub) return;
-
-  const quota = await getQuotaPool(db, sub.id);
-
-  const cached: CachedSubscriptionStatus = {
-    subscriptionId: sub.id,
-    tier: sub.tier,
-    status: sub.status,
-    monthlyLimit: quota?.monthlyLimit ?? 0,
-    usedThisMonth: quota?.usedThisMonth ?? 0,
-    dailyLimit: quota?.dailyLimit ?? null,
-    usedToday: quota?.usedToday ?? 0,
-  };
-
-  await writeSubscriptionStatus(kv, accountId, cached);
-}
-
 // ---------------------------------------------------------------------------
 // Webhook event handlers
 // ---------------------------------------------------------------------------
@@ -195,7 +163,15 @@ async function handleSubscriptionEvent(
         tierConfig.dailyLimit,
       );
     }
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'stripe.webhook.handleSubscriptionEvent',
+      {
+        stripeSubscriptionId: stripeSubscription.id,
+      },
+    );
   }
 }
 
@@ -226,7 +202,15 @@ async function handleSubscriptionDeleted(
       freeTier.monthlyQuota,
       freeTier.dailyLimit,
     );
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'stripe.webhook.handleSubscriptionDeleted',
+      {
+        stripeSubscriptionId: stripeSubscription.id,
+      },
+    );
   }
 }
 
@@ -283,7 +267,16 @@ async function handleCheckoutCompleted(
   );
 
   if (activated) {
-    await refreshKvCache(kv, db, activated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      activated.accountId,
+      'stripe.webhook.handleCheckoutCompleted',
+      {
+        stripeSessionId: session.id,
+        stripeSubscriptionId,
+      },
+    );
   }
 }
 
@@ -335,7 +328,16 @@ async function handlePaymentFailed(
   );
 
   if (updated) {
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'stripe.webhook.handlePaymentFailed',
+      {
+        stripeSubscriptionId,
+        invoiceId: invoice.id,
+      },
+    );
 
     // core-send: payment-failed alert — observed by payment-failed-observe.ts.
     // Kept direct so a dispatch failure throws to the Stripe webhook handler,
@@ -401,7 +403,16 @@ async function handlePaymentSucceeded(
   );
 
   if (updated) {
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'stripe.webhook.handlePaymentSucceeded',
+      {
+        stripeSubscriptionId,
+        invoiceId: invoice.id,
+      },
+    );
   }
 }
 

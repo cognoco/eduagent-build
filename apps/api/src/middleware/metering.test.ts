@@ -196,25 +196,33 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
 // [T-11 / BUG-753] Spy on logger so we can assert KV-failure observability.
 // safeReadKV/safeWriteKV must emit structured warns when they swallow an
 // error — silent recovery is banned by project policy.
-const mockLoggerWarn = jest.fn();
-const mockLoggerInfo = jest.fn();
-const mockLoggerError = jest.fn();
-const mockLoggerDebug = jest.fn();
-
-jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/logger',
-  ) as typeof import('../services/logger');
-  return {
-    ...actual,
-    createLogger: () => ({
-      info: mockLoggerInfo,
-      warn: mockLoggerWarn,
-      error: mockLoggerError,
-      debug: mockLoggerDebug,
-    }),
-  };
-});
+//
+// NOTE: This mock factory is hoisted before ALL imports (including the
+// llm-provider-fixtures import that transitively loads services/llm/router.ts
+// which calls createLogger() at module level). The factory therefore must NOT
+// close over any module-scope `const`/`let` variables — those are in the
+// temporal dead zone when the factory first fires. Instead, the factory stores
+// the spy fns on a stable object keyed off __spies so they can be retrieved
+// later via jest.requireMock().
+jest.mock(
+  '../services/logger' /* gc1-allow: metering unit test — logger spy is the assertion mechanism for KV observability (BUG-753) */,
+  () => {
+    const spies = {
+      warn: jest.fn(),
+      info: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    };
+    const actual = jest.requireActual(
+      '../services/logger',
+    ) as typeof import('../services/logger');
+    return {
+      ...actual,
+      createLogger: () => spies,
+      __spies: spies,
+    };
+  },
+);
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
@@ -222,6 +230,21 @@ import {
   installTestJwksInterceptor,
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
+
+// Retrieve logger spies from the mock module. The spies were created inside the
+// jest.mock factory (above) to avoid TDZ issues with module-level const vars.
+// Only mockLoggerWarn is used in assertions (KV observability); info/error/debug
+// are stored in the __spies object but not destructured here to avoid TS6133.
+const {
+  __spies: { warn: mockLoggerWarn },
+} = jest.requireMock('../services/logger') as {
+  __spies: {
+    warn: jest.Mock;
+    info: jest.Mock;
+    error: jest.Mock;
+    debug: jest.Mock;
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Fake KV — in-memory Map that exercises real services/kv Zod parsing

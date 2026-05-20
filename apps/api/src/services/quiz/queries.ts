@@ -276,8 +276,12 @@ export async function getGuessWhoRoundContext(
 }
 
 /**
- * Fetch the most recent rounds for a given activity type, used for the
- * difficulty bump check. Returns all statuses (caller filters to 'completed').
+ * Fetch the most recent COMPLETED rounds for a given activity type, used for
+ * the difficulty-bump check. The status filter is enforced in SQL so
+ * abandoned (prefetched-but-never-played) rounds never occupy slots in the
+ * `limit` window — otherwise the bump silently fails to fire for learners
+ * whose most-recent N rows include abandoned rounds.
+ * [CR-2026-05-19-H10]
  */
 export async function getRecentCompletedByActivity(
   db: Database,
@@ -286,7 +290,7 @@ export async function getRecentCompletedByActivity(
   limit: number,
 ) {
   const repo = createScopedRepository(db, profileId);
-  return repo.quizRounds.findRecentByActivity(activityType, limit);
+  return repo.quizRounds.findRecentCompletedByActivity(activityType, limit);
 }
 
 /**

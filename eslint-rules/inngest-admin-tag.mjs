@@ -39,6 +39,11 @@ const RAW_DB_METHODS = new Set([
   'delete',
   'query',
   'transaction',
+  // [bug #329] `db.execute(sql\`...\`)` is the drizzle escape hatch for raw
+  // SQL UPDATE/INSERT/DELETE/SELECT. It bypasses scoped-repo just like the
+  // typed methods above — the WHERE clause is the only scoping. Inngest
+  // functions reaching for execute must declare the intent explicitly.
+  'execute',
 ]);
 
 // KNOWN LIMITATION: only the literal `db` identifier name is detected.

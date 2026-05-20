@@ -13,7 +13,11 @@ const mockDbUpdate = jest.fn().mockReturnValue({
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
 
-const mockQuotaResetDb = {
+// [CR-2026-05-19-C7] quota-reset now wraps both helpers in a single
+// `db.transaction(...)` so they observe a consistent snapshot of usedToday.
+// The mock must therefore forward `db.transaction(cb)` → `cb(tx)` where
+// `tx` exposes the same surface as `db`.
+const mockQuotaResetDb: Record<string, unknown> = {
   query: {
     quotaPools: { findMany: mockFindManyQuotaPools },
     subscriptions: { findFirst: mockFindFirstSubscription },
@@ -32,6 +36,8 @@ const mockQuotaResetDb = {
     };
   },
 };
+mockQuotaResetDb['transaction'] = (cb: (tx: unknown) => unknown) =>
+  cb(mockQuotaResetDb);
 
 const mockDatabaseModule = createDatabaseModuleMock({
   db: mockQuotaResetDb,
@@ -131,13 +137,14 @@ describe('quotaReset', () => {
     });
   });
 
-  it('runs daily reset step before monthly reset step', async () => {
+  // [CR-2026-05-19-C7] Both resets now run inside ONE Inngest step (and one
+  // DB transaction) so they share a consistent snapshot of `usedToday`.
+  // The previous two-step layout could let a step retry double-zero a column
+  // the other step had already committed.
+  it('runs daily and cycle resets inside a single Inngest step', async () => {
     const { runner } = await executeSteps();
 
-    expect(runner.runNames()).toEqual([
-      'reset-daily-quotas',
-      'reset-expired-cycles',
-    ]);
+    expect(runner.runNames()).toEqual(['reset-daily-and-cycles']);
   });
 
   it('resets quota pools whose cycle has elapsed', async () => {

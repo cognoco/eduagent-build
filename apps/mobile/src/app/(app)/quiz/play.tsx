@@ -265,6 +265,22 @@ export default function QuizPlayScreen(): React.ReactElement {
   const handleSaveAndQuit = () => {
     if (resultsRef.current.length === 0) return;
     setQuitConfirmVisible(false);
+    // [BUG-268 / CCR PR #230] If the round was already submitted in the
+    // background (auto-save on final question) submitRound() would silently
+    // no-op via roundSubmittedRef. Per CLAUDE.md "Silent recovery without
+    // escalation is banned": when the save already happened, route the user
+    // to results (the save-and-quit intent is satisfied — they wanted their
+    // answers persisted and to leave the play screen). If completion is
+    // still pending, queue a navigation for the in-flight submission's
+    // onSuccess so the user is not stranded.
+    if (roundSubmittedRef.current) {
+      if (roundAutoSaved) {
+        router.replace('/(app)/quiz/results' as Href);
+      } else {
+        pendingResultsNavigateRef.current = true;
+      }
+      return;
+    }
     submitRound();
   };
   const handleSeeResults = () => {
@@ -961,7 +977,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                   }}
                   className="min-h-[48px] items-center justify-center rounded-button bg-primary px-5 py-3"
                   accessibilityRole="button"
-                  accessibilityLabel="See quiz results"
+                  accessibilityLabel={t('quiz.play.seeResultsLabel')}
                   testID="quiz-final-see-results"
                 >
                   <Text className="text-body font-semibold text-text-inverse">
@@ -975,7 +991,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                   }}
                   className="min-h-[48px] items-center justify-center rounded-button bg-surface px-5 py-3"
                   accessibilityRole="button"
-                  accessibilityLabel="Start one more quiz"
+                  accessibilityLabel={t('quiz.play.oneMoreLabel')}
                   testID="quiz-final-one-more"
                 >
                   <Text className="text-body font-semibold text-text-primary">
@@ -1005,7 +1021,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 className="mt-2 items-center py-1"
                 testID="quiz-dispute-button"
                 accessibilityRole="button"
-                accessibilityLabel="Dispute this answer"
+                accessibilityLabel={t('quiz.play.disputeLabel')}
               >
                 <Text className="text-caption text-text-secondary underline">
                   {t('quiz.play.notQuiteRight')}
@@ -1103,7 +1119,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           className="flex-1 bg-black/40 justify-center items-center px-6"
           onPress={() => setQuitConfirmVisible(false)}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss"
+          accessibilityLabel={t('quiz.play.dismissLabel')}
           testID="quiz-quit-modal-backdrop"
         >
           <Pressable
@@ -1125,17 +1141,11 @@ export default function QuizPlayScreen(): React.ReactElement {
                 onPress={() => setQuitConfirmVisible(false)}
                 className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel={
-                  hasAnsweredQuestions
-                    ? t('quiz.play.oneMore')
-                    : t('quiz.play.keepPlaying')
-                }
+                accessibilityLabel={t('quiz.play.keepPlaying')}
                 testID="quiz-quit-cancel"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  {hasAnsweredQuestions
-                    ? t('quiz.play.oneMore')
-                    : t('quiz.play.keepPlaying')}
+                  {t('quiz.play.keepPlaying')}
                 </Text>
               </Pressable>
               {hasAnsweredQuestions ? (
@@ -1143,7 +1153,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                   onPress={handleSaveAndQuit}
                   className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
                   accessibilityRole="button"
-                  accessibilityLabel="Save progress and finish round"
+                  accessibilityLabel={t('quiz.play.saveAndFinishLabel')}
                   testID="quiz-quit-save"
                 >
                   <Text className="text-body font-semibold text-text-primary">

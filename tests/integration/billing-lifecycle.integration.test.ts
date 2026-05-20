@@ -10,7 +10,12 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { accounts, quotaPools, subscriptions } from '@eduagent/database';
+import {
+  accounts,
+  profiles,
+  quotaPools,
+  subscriptions,
+} from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -86,6 +91,13 @@ async function seedAccount() {
       email: AUTH_EMAIL,
     })
     .returning();
+
+  await db.insert(profiles).values({
+    accountId: account!.id,
+    displayName: 'Billing Owner',
+    birthYear: 1990,
+    isOwner: true,
+  });
 
   return account!;
 }

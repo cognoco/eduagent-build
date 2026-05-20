@@ -21,6 +21,7 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import type { ProfileMeta } from '../middleware/profile-scope';
 import {
   getChildrenForParent,
   getChildInventory,
@@ -41,7 +42,7 @@ import {
   getWeeklyReportForParentChild,
   markWeeklyReportViewed,
 } from '../services/weekly-report';
-import { assertParentAccess } from '../services/family-access';
+import { assertOwnerAndParentAccess } from '../services/family-access';
 import { notFound } from '../errors';
 import { isMemoryFactsReadEnabled } from '../config';
 import {
@@ -60,6 +61,7 @@ type DashboardRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -88,11 +90,14 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
 
-    // [BUG-834] Defense-in-depth: assert parent→child link at route entry.
-    // Service-layer guard exists, but a route-entry guard guarantees that
-    // any future refactor (or a service that forgets the check) cannot
-    // become an IDOR. 404 vs 403 are no longer indistinguishable.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [BUG-834] Defense-in-depth: assert parent->child link at route entry.
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     // [BUG-62] No consent-visibility gate here. The mobile child-detail screen
     // renders a dedicated consent-restricted panel for PENDING / REQUESTED /
@@ -102,7 +107,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // the parent gets a generic "Try Again / Back to dashboard" error fallback.
     // Sub-routes (inventory, progress-history, sessions, memory, reports) keep
     // their own assertChildDashboardDataVisible guards because they don't have
-    // a "restricted view" — they should not return data at all.
+    // a "restricted view" -- they should not return data at all.
     const child = await getChildDetail(db, parentProfileId, childProfileId);
     return c.json(childDetailResponseSchema.parse({ child }));
   })
@@ -113,7 +118,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     const inventory = await getChildInventory(
       db,
@@ -128,7 +139,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
 
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const summary = await getProgressSummary(db, childProfileId);
@@ -145,7 +162,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       const query = c.req.valid('query');
 
       // [BUG-834] Defense-in-depth at route entry.
-      await assertParentAccess(db, parentProfileId, childProfileId);
+      // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+      await assertOwnerAndParentAccess(
+        c.get('profileMeta'),
+        db,
+        parentProfileId,
+        childProfileId,
+      );
 
       const history = await getChildProgressHistory(
         db,
@@ -165,7 +188,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const subjectId = c.req.param('subjectId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     const topics = await getChildSubjectTopics(
       db,
@@ -183,7 +212,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     const sessions = await getChildSessions(
       db,
@@ -200,10 +235,14 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
     const sessionId = c.req.param('sessionId');
 
-    // [BUG-834] Defense-in-depth at route entry. Without this, getChildSessionDetail
-    // returning null for "not found" is indistinguishable from "forbidden" — a future
-    // refactor of the service could leak cross-family session IDs as 404 (enumeration).
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [BUG-834] Defense-in-depth at route entry.
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     const session = await getChildSessionDetail(
       db,
@@ -223,7 +262,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
 
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const projection = await getMemoryProjection(db, childProfileId, {
@@ -261,7 +306,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     const reports = await getChildReports(db, parentProfileId, childProfileId);
     return c.json(childReportsResponseSchema.parse({ reports }));
@@ -274,7 +325,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const reportId = c.req.param('reportId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     const report = await getChildReportDetail(
       db,
@@ -295,7 +352,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const reportId = c.req.param('reportId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
 
     await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
     return c.json(reportViewedResponseSchema.parse({ viewed: true }));
@@ -308,7 +371,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const reports = await listWeeklyReportsForParentChild(
@@ -326,7 +395,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const reportId = c.req.param('reportId');
 
     // [BUG-834] Defense-in-depth at route entry.
-    await assertParentAccess(db, parentProfileId, childProfileId);
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    await assertOwnerAndParentAccess(
+      c.get('profileMeta'),
+      db,
+      parentProfileId,
+      childProfileId,
+    );
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const report = await getWeeklyReportForParentChild(
@@ -350,7 +425,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       const reportId = c.req.param('reportId');
 
       // [BUG-834] Defense-in-depth at route entry.
-      await assertParentAccess(db, parentProfileId, childProfileId);
+      // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+      await assertOwnerAndParentAccess(
+        c.get('profileMeta'),
+        db,
+        parentProfileId,
+        childProfileId,
+      );
       await assertChildDashboardDataVisible(db, childProfileId);
 
       await markWeeklyReportViewed(

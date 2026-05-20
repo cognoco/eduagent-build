@@ -594,16 +594,22 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('navigates to homework camera on Homework action', async () => {
+  // [CR-2026-05-19-H29] Break test: the Homework action must push the camera
+  // route exactly once. Prior implementation pushed `homeHref` then `camera`,
+  // duplicating the Home stack entry (back from camera → home → home again)
+  // because LearnerScreen IS the Home tab — there's no need to seed it.
+  it('navigates to homework camera on Homework action (single push, no home pre-seed)', async () => {
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => screen.getByTestId('home-action-homework'));
     fireEvent.press(screen.getByTestId('home-action-homework'));
-    expect(mockPush).toHaveBeenNthCalledWith(1, LEARNER_HOME_HREF);
-    expect(mockPush).toHaveBeenNthCalledWith(2, {
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/homework/camera',
       params: HOME_RETURN_PARAMS,
     });
+    // Guard against regression: home href must NOT be pushed before camera.
+    expect(mockPush).not.toHaveBeenCalledWith(LEARNER_HOME_HREF);
   });
 
   it('shows coach band from resume target', async () => {

@@ -53,6 +53,8 @@ const PROFILE_ID_B = 'a0000000-0000-4000-a000-000000000011';
 // Test app factory — bypasses auth, injects known account + db
 // ---------------------------------------------------------------------------
 
+import type { ProfileMeta } from '../middleware/profile-scope';
+
 type TestEnv = {
   Bindings: { DATABASE_URL: string };
   Variables: {
@@ -60,10 +62,15 @@ type TestEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
-function makeApp(overrides?: { accountId?: string }) {
+function makeApp(overrides?: {
+  accountId?: string;
+  isOwner?: boolean;
+  profileMeta?: ProfileMeta | null;
+}) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
@@ -75,6 +82,20 @@ function makeApp(overrides?: { accountId?: string }) {
       updatedAt: new Date().toISOString(),
     } as Account);
     c.set('profileId', undefined);
+    // [CR-2026-05-19-H1] Inject profileMeta so isOwner gate can evaluate.
+    // Default isOwner:true for happy-path tests; override for break tests.
+    const profileMeta =
+      overrides?.profileMeta === null
+        ? undefined
+        : (overrides?.profileMeta ??
+          ({
+            isOwner: overrides?.isOwner ?? true,
+            birthYear: 2000,
+            location: null,
+            consentStatus: null,
+            hasPremiumLlm: false,
+          } as ProfileMeta));
+    c.set('profileMeta', profileMeta);
     await next();
   });
   app.onError((err, c) =>
@@ -160,6 +181,36 @@ describe('POST /v1/profiles', () => {
     });
   });
 
+  it('allows first profile creation when no owner profile exists yet', async () => {
+    const profile = makeProfileRow({
+      id: PROFILE_ID_A,
+      displayName: 'First Owner',
+      isOwner: true,
+    });
+    createProfileWithLimitCheckMock.mockResolvedValue(profile);
+
+    const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'First Owner',
+        birthYear: 2000,
+        location: 'EU',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(createProfileWithLimitCheckMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+      expect.objectContaining({ displayName: 'First Owner' }),
+    );
+    const body = await res.json();
+    expect(body).toMatchObject({
+      profile: { id: PROFILE_ID_A, isOwner: true },
+    });
+  });
+
   it('returns 400 when required fields are missing', async () => {
     const res = await makeApp().request('/v1/profiles', {
       method: 'POST',
@@ -242,6 +293,25 @@ describe('POST /v1/profiles', () => {
     });
 
     expect(res.status).toBe(500);
+  });
+
+  // [CR-2026-05-19-H1] Break test — non-owner profile must not create profiles.
+  it('[BREAK][CR-2026-05-19-H1] returns 403 when active profile is not the account owner', async () => {
+    const res = await makeApp({ isOwner: false }).request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'Alex',
+        birthYear: 2000,
+        location: 'EU',
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    // Service must not be called — the gate fired at route entry.
+    expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
   });
 });
 

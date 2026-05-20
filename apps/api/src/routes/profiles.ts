@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+﻿import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   profileCreateSchema,
@@ -12,6 +12,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
+import type { ProfileMeta } from '../middleware/profile-scope';
 import { notFound, forbidden, validationError, apiError } from '../errors';
 import {
   listProfiles,
@@ -30,6 +31,7 @@ type ProfileEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -45,6 +47,20 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const account = c.get('account');
     const input = c.req.valid('json');
 
+    // [CR-2026-05-19-H1] Only the account owner can create additional profiles.
+    // A brand-new account has no owner profile for profileScopeMiddleware to
+    // auto-resolve yet; let that first-profile path reach the service, where
+    // it is marked as the owner profile.
+    const activeProfileMetaCreate = c.get('profileMeta');
+    if (activeProfileMetaCreate && activeProfileMetaCreate.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the account owner can create additional profiles.',
+      );
+    }
+
     try {
       const profile = await createProfileWithLimitCheck(db, account.id, input);
 
@@ -58,7 +74,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
           c,
           402,
           ERROR_CODES.PROFILE_LIMIT_EXCEEDED,
-          'Your subscription does not support additional profiles. Please upgrade to Family or Pro.'
+          'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
         );
       }
       if (err instanceof ProfileValidationError) {
@@ -85,11 +101,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
         db,
         c.req.param('id'),
         account.id,
-        input
+        input,
       );
       if (!profile) return notFound(c, 'Profile not found');
       return c.json(profileResponseSchema.parse({ profile }));
-    }
+    },
   )
   .post(
     '/profiles/switch',
@@ -105,7 +121,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
         profileSwitchResponseSchema.parse({
           message: 'Profile switched',
           profileId,
-        })
+        }),
       );
-    }
+    },
   );

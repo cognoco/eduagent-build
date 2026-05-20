@@ -17,22 +17,27 @@ describe('buildGuessWhoPrompt', () => {
     });
 
     expect(prompt).toContain('4');
-    // AgeBracket 'adolescent' describes 13-17 in the three-way bracket.
-    expect(prompt).toContain('13-17');
+    // [CR-2026-05-19-H11] AgeBracket 'adolescent' spans 11-17 in the strictly-11+
+    // product (11-12 were reclassified out of the 'child' bracket).
+    expect(prompt).toContain('11-17');
     expect(prompt).toContain('Isaac Newton');
     expect(prompt).toContain('Classical mechanics');
     expect(prompt).toContain('History and science');
   });
 
-  it('includes age description for child bracket', () => {
-    const prompt = buildGuessWhoPrompt({
-      discoveryCount: 4,
-      ageBracket: 'child',
-      recentAnswers: [],
-      topicTitles: ['Animals'],
-    });
-
-    expect(prompt).toContain('under 13');
+  it('[CR-2026-05-19-H11] never emits kid-flavored "under 13" framing for any bracket', () => {
+    // Product is strictly 11+. The 'child' bracket is unreachable for real
+    // birth years and the prompt copy must not steer the LLM toward a
+    // simplified, age-inappropriate register for the 11-12 cohort.
+    for (const ageBracket of ['child', 'adolescent', 'adult'] as const) {
+      const prompt = buildGuessWhoPrompt({
+        discoveryCount: 4,
+        ageBracket,
+        recentAnswers: [],
+        topicTitles: ['Animals'],
+      });
+      expect(prompt).not.toContain('under 13');
+    }
   });
 
   it('uses generic fallback when no topics are available', () => {

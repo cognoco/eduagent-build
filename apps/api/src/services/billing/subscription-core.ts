@@ -503,17 +503,71 @@ export async function activateSubscriptionFromCheckout(
   // Sentry + Inngest so we can triage. Same-ID retries no-op silently.
   if (existing.stripeSubscriptionId) {
     if (existing.stripeSubscriptionId !== stripeSubscriptionId) {
+      if (existing.lastStripeEventTimestamp === null) {
+        logger.warn(
+          '[billing] checkout activation rejected — cannot determine event order (NULL lastStripeEventTimestamp)',
+          {
+            event: 'billing.activate_checkout.divergent_sub',
+            resolution: 'rejected_indeterminate_order',
+            accountId,
+            existingStripeSubscriptionId: existing.stripeSubscriptionId,
+            incomingStripeSubscriptionId: stripeSubscriptionId,
+            existingTier: existing.tier,
+            incomingTier: tier,
+            existingEventTimestamp: existing.lastStripeEventTimestamp,
+            incomingEventTimestamp: eventTimestamp,
+          },
+        );
+        captureException(
+          new Error(
+            'activateSubscriptionFromCheckout: divergent Stripe sub — rejected (indeterminate order, null lastStripeEventTimestamp)',
+          ),
+          {
+            extra: {
+              context: 'billing.activate_checkout.divergent_sub',
+              resolution: 'rejected_indeterminate_order',
+              accountId,
+              existingStripeSubscriptionId: existing.stripeSubscriptionId,
+              incomingStripeSubscriptionId: stripeSubscriptionId,
+              existingTier: existing.tier,
+              incomingTier: tier,
+              existingEventTimestamp: existing.lastStripeEventTimestamp,
+              incomingEventTimestamp: eventTimestamp,
+            },
+          },
+        );
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/billing.activate_checkout.divergent_sub',
+              data: {
+                resolution: 'rejected_indeterminate_order',
+                accountId,
+                existingStripeSubscriptionId: existing.stripeSubscriptionId,
+                incomingStripeSubscriptionId: stripeSubscriptionId,
+                existingTier: existing.tier,
+                incomingTier: tier,
+                existingEventTimestamp: existing.lastStripeEventTimestamp,
+                incomingEventTimestamp: eventTimestamp,
+                timestamp: new Date().toISOString(),
+              },
+            }),
+          'billing.activate_checkout.divergent_sub',
+          { accountId },
+        );
+        return existing;
+      }
+
       const incomingTs = new Date(eventTimestamp).getTime();
-      const existingTs = existing.lastStripeEventTimestamp
-        ? new Date(existing.lastStripeEventTimestamp).getTime()
-        : 0;
+      const existingTs = new Date(existing.lastStripeEventTimestamp).getTime();
       const incomingIsNewer = incomingTs > existingTs;
+      const resolution = incomingIsNewer
+        ? 'updated_to_incoming'
+        : 'kept_existing_dropped_incoming';
 
       logger.warn('[billing] checkout activation with divergent Stripe sub', {
         event: 'billing.activate_checkout.divergent_sub',
-        resolution: incomingIsNewer
-          ? 'updated_to_incoming'
-          : 'kept_existing_dropped_incoming',
+        resolution,
         accountId,
         existingStripeSubscriptionId: existing.stripeSubscriptionId,
         incomingStripeSubscriptionId: stripeSubscriptionId,
@@ -531,9 +585,7 @@ export async function activateSubscriptionFromCheckout(
         {
           extra: {
             context: 'billing.activate_checkout.divergent_sub',
-            resolution: incomingIsNewer
-              ? 'updated_to_incoming'
-              : 'kept_existing_dropped_incoming',
+            resolution,
             accountId,
             existingStripeSubscriptionId: existing.stripeSubscriptionId,
             incomingStripeSubscriptionId: stripeSubscriptionId,
@@ -543,30 +595,6 @@ export async function activateSubscriptionFromCheckout(
             incomingEventTimestamp: eventTimestamp,
           },
         },
-      );
-      // Non-core observability dispatch — must never throw, must always
-      // surface failures (CLAUDE.md "Silent recovery without escalation is
-      // banned"). Sentry alone is not queryable as a time-series metric.
-      await safeSend(
-        () =>
-          inngest.send({
-            name: 'app/billing.activate_checkout.divergent_sub',
-            data: {
-              resolution: incomingIsNewer
-                ? 'updated_to_incoming'
-                : 'kept_existing_dropped_incoming',
-              accountId,
-              existingStripeSubscriptionId: existing.stripeSubscriptionId,
-              incomingStripeSubscriptionId: stripeSubscriptionId,
-              existingTier: existing.tier,
-              incomingTier: tier,
-              existingEventTimestamp: existing.lastStripeEventTimestamp,
-              incomingEventTimestamp: eventTimestamp,
-              timestamp: new Date().toISOString(),
-            },
-          }),
-        'billing.activate_checkout.divergent_sub',
-        { accountId },
       );
 
       if (incomingIsNewer) {
@@ -595,9 +623,47 @@ export async function activateSubscriptionFromCheckout(
           throw new Error(
             'Divergent-sub activation update did not return a row',
           );
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/billing.activate_checkout.divergent_sub',
+              data: {
+                resolution,
+                accountId,
+                existingStripeSubscriptionId: existing.stripeSubscriptionId,
+                incomingStripeSubscriptionId: stripeSubscriptionId,
+                existingTier: existing.tier,
+                incomingTier: tier,
+                existingEventTimestamp: existing.lastStripeEventTimestamp,
+                incomingEventTimestamp: eventTimestamp,
+                timestamp: new Date().toISOString(),
+              },
+            }),
+          'billing.activate_checkout.divergent_sub',
+          { accountId },
+        );
         return mapSubscriptionRow(updatedDivergent);
       }
       // Incoming is older — stale replay. Keep existing, no-op.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/billing.activate_checkout.divergent_sub',
+            data: {
+              resolution,
+              accountId,
+              existingStripeSubscriptionId: existing.stripeSubscriptionId,
+              incomingStripeSubscriptionId: stripeSubscriptionId,
+              existingTier: existing.tier,
+              incomingTier: tier,
+              existingEventTimestamp: existing.lastStripeEventTimestamp,
+              incomingEventTimestamp: eventTimestamp,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'billing.activate_checkout.divergent_sub',
+        { accountId },
+      );
       return existing;
     }
     // Same Stripe sub ID → genuine idempotent retry, OK to no-op silently.

@@ -146,6 +146,10 @@ type SessionRouteEnv = {
     subscriptionId: string;
     subscriptionTier: SubscriptionTier | undefined;
     llmTier: LLMTier;
+    /** [CR-2026-05-19-C6] Set by metering middleware; used to refund to the correct pool. */
+    quotaDecrementSource: 'monthly' | 'top_up' | undefined;
+    /** [CR-2026-05-19-C6] Set by metering middleware when source is top_up. */
+    quotaDecrementTopUpCreditId: string | undefined;
   };
 };
 
@@ -357,6 +361,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           flow: 'session',
           key: clientId,
         });
+        // [BUG-92 / CR-2026-05-19-C4] processMessage surfaces `readyToFinish`
+        // (LLM `signals.ready_to_finish` OR server-side hard cap
+        // MAX_INTERVIEW_EXCHANGES) — it flows through `clientResult` to the
+        // mobile client, which uses it to close an interview/onboarding
+        // session deterministically. Do NOT strip readyToFinish here.
         const { sourceAudit: privateSourceAudit, ...clientResult } = result;
         void privateSourceAudit;
         return c.json(clientResult);
@@ -372,10 +381,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
+        // [CR-2026-05-19-C6] Thread source/topUpCreditId so top-up refunds
+        // credit the original batch instead of inflating monthly quota.
         if (subscriptionId) {
           await safeRefundQuota(db, subscriptionId, {
             route: 'sessions.message',
             profileId,
+            source: c.get('quotaDecrementSource'),
+            topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
           });
         }
         throw err;
@@ -638,6 +651,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   route: 'sessions.stream.llm_error',
                   profileId,
                   sessionId,
+                  // [CR-2026-05-19-C6] Refund to the same pool the decrement
+                  // consumed; otherwise top-up consumptions silently inflate
+                  // monthly quota on every LLM failure.
+                  source: c.get('quotaDecrementSource'),
+                  topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
                 });
               } catch (refundErr) {
                 captureException(refundErr, {
@@ -730,6 +748,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     route: 'sessions.stream.fallback',
                     profileId,
                     sessionId,
+                    // [CR-2026-05-19-C6] See sessions.stream.llm_error.
+                    source: c.get('quotaDecrementSource'),
+                    topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
                   });
                 } catch (refundErr) {
                   captureException(refundErr, {
@@ -831,6 +852,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   route: 'sessions.stream.onComplete',
                   profileId,
                   sessionId,
+                  // [CR-2026-05-19-C6] See sessions.stream.llm_error.
+                  source: c.get('quotaDecrementSource'),
+                  topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
                 });
               } catch (refundErr) {
                 captureException(refundErr, {
@@ -969,11 +993,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
+        // [CR-2026-05-19-C6] See sessions.stream.llm_error for pool-routing
+        // rationale.
         if (subscriptionId) {
           await safeRefundQuota(db, subscriptionId, {
             route: 'sessions.stream',
             profileId,
             sessionId,
+            source: c.get('quotaDecrementSource'),
+            topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
           });
         }
         throw err;

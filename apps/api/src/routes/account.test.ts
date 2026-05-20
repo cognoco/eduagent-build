@@ -81,6 +81,28 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [CR-2026-05-19-H1] Mock findOwnerProfile so profileScopeMiddleware auto-resolve
+// path sets isOwner:true on profileMeta, allowing owner-gated routes to pass.
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue({
+      id: 'owner-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Owner',
+      birthYear: 1990,
+      location: null,
+      consentStatus: null,
+      isOwner: true,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+    }),
+  };
+});
+
 jest.mock('../services/deletion' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/deletion',
@@ -127,6 +149,8 @@ import { captureException } from '../services/sentry';
 import { getDeletionStatus, scheduleDeletion } from '../services/deletion';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError } from '../errors';
+import { findOwnerProfile } from '../services/profile';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -360,6 +384,76 @@ describe('account routes', () => {
       const res = await app.request('/v1/account/export', {}, TEST_ENV);
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [CR-2026-05-19-H1] Break tests — non-owner profile must be rejected from
+  // all owner-gated account routes. Uses X-Profile-Id to exercise the explicit
+  // path in profileScopeMiddleware (which reads isOwner from DB / mock).
+  // -------------------------------------------------------------------------
+
+  describe('[CR-2026-05-19-H1] non-owner profile is rejected from owner-gated account routes', () => {
+    const NON_OWNER_PROFILE_ID = 'b0000000-0000-4000-b000-000000000001';
+
+    beforeEach(() => {
+      // Override getProfile so X-Profile-Id resolves to a non-owner profile.
+      (findOwnerProfile as jest.Mock).mockResolvedValue(null);
+      // Also override via getProfile path for X-Profile-Id header.
+      const profileServiceMock = jest.requireMock(
+        '../services/profile',
+      ) as Record<string, jest.Mock>;
+      profileServiceMock.getProfile = jest.fn().mockResolvedValue({
+        id: NON_OWNER_PROFILE_ID,
+        accountId: 'test-account-id',
+        displayName: 'Child',
+        birthYear: 2012,
+        location: null,
+        consentStatus: null,
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+      });
+    });
+
+    const nonOwnerHeaders = makeAuthHeaders({
+      'X-Profile-Id': NON_OWNER_PROFILE_ID,
+    });
+
+    it('[BREAK] POST /v1/account/delete returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/account/delete',
+        { method: 'POST', headers: nonOwnerHeaders },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    });
+
+    it('[BREAK] POST /v1/account/cancel-deletion returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/account/cancel-deletion',
+        { method: 'POST', headers: nonOwnerHeaders },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    });
+
+    it('[BREAK] GET /v1/account/export returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/account/export',
+        { headers: nonOwnerHeaders },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     });
   });
 });

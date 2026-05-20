@@ -120,7 +120,13 @@ export function seedPendingAuthRedirectForTesting(
     process.env.NODE_ENV === 'production' ||
     process.env.EXPO_PUBLIC_E2E !== 'true'
   ) {
-    throw new Error('seedPendingAuthRedirectForTesting is dev-only');
+    // [BUG-324] Spell out the required flag so the developer/CI operator
+    // hitting this guard knows exactly what's missing — the original
+    // 'dev-only' message left them guessing whether to flip NODE_ENV,
+    // an Expo public flag, or something else entirely.
+    throw new Error(
+      'seedPendingAuthRedirectForTesting is dev-only — requires NODE_ENV !== "production" AND EXPO_PUBLIC_E2E=true',
+    );
   }
 
   const record: PendingAuthRedirectRecord = {

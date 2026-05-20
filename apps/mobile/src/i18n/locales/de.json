@@ -765,7 +765,13 @@
       "keepPlaying": "Weiterspielen",
       "saveAndFinish": "Speichern und beenden",
       "leaveWithoutSaving": "Ohne Speichern verlassen",
-      "leaveQuizButton": "Quiz verlassen"
+      "leaveQuizButton": "Quiz verlassen",
+      "seeResultsLabel": "Quiz-Ergebnisse ansehen",
+      "oneMoreLabel": "Noch ein Quiz starten",
+      "nextQuestionLabel": "Nächste Frage",
+      "disputeLabel": "Diese Antwort anfechten",
+      "dismissLabel": "Schließen",
+      "saveAndFinishLabel": "Fortschritt speichern und Runde beenden"
     }
   },
   "dictation": {
@@ -1316,7 +1322,14 @@
     "listening": "Höre zu...",
     "voiceHint": "Sag die Hausaufgabe laut.",
     "stopDictatingProblemLabel": "Diktat der Aufgabe stoppen",
-    "dictateProblemLabel": "Aufgabe diktieren"
+    "dictateProblemLabel": "Aufgabe diktieren",
+    "ocrError": {
+      "NOT_HOMEWORK": "Wir konnten keine klare Aufgabe in diesem Foto finden. Versuche ein näheres Foto oder tippe die Aufgabe ein.",
+      "LOW_QUALITY": "Wir konnten dieses Foto nicht klar lesen. Versuche es mit besserer Beleuchtung oder einer ruhigeren Hand.",
+      "NO_TEXT": "Wir konnten keinen Text in diesem Foto finden. Stelle sicher, dass die Hausaufgabe sichtbar und gut beleuchtet ist.",
+      "ML_KIT_UNAVAILABLE": "Fotolesen ist in dieser Version nicht verfügbar. Ein schnelles App-Update bringt es zurück.",
+      "CACHE_FAILED": "Wir hatten Probleme beim Vorbereiten des Fotos. Versuche es erneut oder tippe die Aufgabe ein."
+    }
   },
   "progress": {
     "pageTitle": "Meine Lernreise",

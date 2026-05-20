@@ -38,47 +38,17 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 
-jest.mock('../../../../components/common', () => {
-  const RN = jest.requireActual('react-native');
-  const ErrorFallback = ({
-    message,
-    primaryAction,
-    secondaryAction,
-    testID,
-  }: any) => (
-    <RN.View testID={testID}>
-      <RN.Text>{message}</RN.Text>
-      {primaryAction ? (
-        <RN.Pressable
-          onPress={primaryAction.onPress}
-          testID={primaryAction.testID}
-        >
-          <RN.Text>{primaryAction.label}</RN.Text>
-        </RN.Pressable>
-      ) : null}
-      {secondaryAction ? (
-        <RN.Pressable
-          onPress={secondaryAction.onPress}
-          testID={secondaryAction.testID}
-        >
-          <RN.Text>{secondaryAction.label}</RN.Text>
-        </RN.Pressable>
-      ) : null}
-    </RN.View>
-  );
-  return { ErrorFallback };
-});
+// components/common — real implementation: ErrorFallback uses only React
+// Native primitives + useTranslation (mocked per-file above). The testIDs
+// are forwarded through primaryAction.testID / secondaryAction.testID
+// exactly as in the real component so no behaviour is lost.
 
-jest.mock('../../../../lib/format-relative-date', () => ({
-  formatRelativeDate: (iso: string) => `formatted(${iso})`,
-}));
+// lib/format-relative-date — real implementation: pure date-math, no native
+// or network dependency.
 
-jest.mock('../../../../lib/format-api-error', () => ({
-  classifyApiError: () => ({
-    kind: 'network',
-    message: 'Network error',
-  }),
-}));
+// lib/format-api-error — real implementation: classifyApiError calls
+// i18next.t() which is initialised with the full en.json catalog in
+// test-setup.ts so it returns real English strings in every test worker.
 
 jest.mock(
   '../../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
@@ -88,14 +58,20 @@ jest.mock(
 );
 
 const mockUseSubjectSessions = jest.fn();
-jest.mock('../../../../hooks/use-subject-sessions', () => ({
-  useSubjectSessions: (...args: unknown[]) => mockUseSubjectSessions(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-subject-sessions' /* gc1-allow: transport-boundary — hook wraps useApiClient Hono RPC; requires mock fetch in unit tests */,
+  () => ({
+    useSubjectSessions: (...args: unknown[]) => mockUseSubjectSessions(...args),
+  }),
+);
 
 const mockUseProgressInventory = jest.fn();
-jest.mock('../../../../hooks/use-progress', () => ({
-  useProgressInventory: () => mockUseProgressInventory(),
-}));
+jest.mock(
+  '../../../../hooks/use-progress' /* gc1-allow: transport-boundary — hook wraps useApiClient Hono RPC; requires mock fetch in unit tests */,
+  () => ({
+    useProgressInventory: () => mockUseProgressInventory(),
+  }),
+);
 
 const SAMPLE_SESSIONS = [
   {

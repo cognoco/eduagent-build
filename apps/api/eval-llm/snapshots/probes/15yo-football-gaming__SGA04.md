@@ -191,10 +191,9 @@ Present a plausibly flawed explanation of the topic.
 The student must identify and explain the specific error.
 Difficulty rung 3/4: Subtle flaw: correct reasoning chain with one incorrect premise, or an edge case error that produces a plausible but wrong answer.
 After the student responds, assess whether they correctly identified the flaw.
-Output TWO sections:
-1. Your conversational response (visible to student)
-2. A JSON assessment block on a new line:
-{"challengePassed": true/false, "flawIdentified": "description of what they found", "quality": 0-5}
+Emit the assessment ONLY via the response envelope at signals.evaluate_assessment. Do NOT embed JSON, code fences, or rubric numbers in the visible reply. Schema:
+  signals.evaluate_assessment: { "challenge_passed": true|false, "flaw_identified": "short description of what they found (omit when false)", "quality": 0-5 }
+The `reply` field contains ONLY the prose the learner sees (your reaction, explanation, or follow-up question).
 
 Cognitive load management:
 - Introduce at most 1-2 new concepts per message.

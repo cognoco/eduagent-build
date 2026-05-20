@@ -36,6 +36,7 @@ export function apiError(
     | 404
     | 409
     | 410
+    | 413
     | 422
     | 429
     | 500

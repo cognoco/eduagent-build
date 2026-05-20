@@ -6,6 +6,7 @@
 import { eq } from 'drizzle-orm';
 import {
   quotaPools,
+  subscriptions,
   type Database,
   findSubscriptionById,
   findQuotaPool,
@@ -55,7 +56,7 @@ export interface UpgradePrompt {
 export async function handleTierChange(
   db: Database,
   subscriptionId: string,
-  newTier: SubscriptionTier
+  newTier: SubscriptionTier,
 ): Promise<TierChangeResult | null> {
   const sub = await findSubscriptionById(db, subscriptionId);
 
@@ -74,15 +75,32 @@ export async function handleTierChange(
   const newMonthlyLimit = newConfig.monthlyQuota;
   const remainingQuestions = Math.max(0, newMonthlyLimit - usedThisCycle);
 
-  // Update quota pool limit (preserves usedThisMonth)
-  await db
-    .update(quotaPools)
-    .set({
-      monthlyLimit: newMonthlyLimit,
-      dailyLimit: newConfig.dailyLimit,
-      updatedAt: new Date(),
-    })
-    .where(eq(quotaPools.subscriptionId, subscriptionId));
+  // [CR-2026-05-19-H22] Persist the new tier on the subscription row alongside
+  // the quota-pool limit update. Without this, downstream readers (KV cache,
+  // metering middleware, getSubscriptionByAccountId) continue to see the OLD
+  // tier — silently diverging tier and quota. Both writes share a transaction
+  // so the pair is atomic: either both land or neither does, never a state
+  // where the quota pool reflects the new tier while subscriptions.tier lags.
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(subscriptions)
+      .set({
+        tier: newTier,
+        updatedAt: now,
+      })
+      .where(eq(subscriptions.id, subscriptionId));
+
+    // Update quota pool limit (preserves usedThisMonth)
+    await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit: newMonthlyLimit,
+        dailyLimit: newConfig.dailyLimit,
+        updatedAt: now,
+      })
+      .where(eq(quotaPools.subscriptionId, subscriptionId));
+  });
 
   return {
     previousTier: sub.tier,

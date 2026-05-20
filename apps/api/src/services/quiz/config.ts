@@ -60,12 +60,22 @@ export function formatActivityLabel(activityType: string): string {
 import type { AgeBracket } from '@eduagent/schemas';
 export type { AgeBracket };
 
+/**
+ * Human-readable description of an age bracket for LLM prompt injection.
+ *
+ * [CR-2026-05-19-H11] Product is strictly 11+; `computeAgeBracket` only ever
+ * returns 'child' for impossibly-low birth years. The 'child' branch is kept
+ * as a defensive fallback but must NOT emit kid-flavored framing ("under 13",
+ * "young child") that would steer the LLM into simplified, age-inappropriate
+ * register for the actual 11-12 cohort. We treat it as the lowest in-range
+ * label ("11-12") so any leak still produces in-product framing.
+ */
 export function describeAgeBracket(ageBracket: AgeBracket): string {
   switch (ageBracket) {
     case 'child':
-      return 'under 13';
+      return '11-12';
     case 'adolescent':
-      return '13-17';
+      return '11-17';
     case 'adult':
       return '18+';
     default: {

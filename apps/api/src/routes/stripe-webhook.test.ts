@@ -1284,3 +1284,78 @@ describe('unknown event types', () => {
     expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// KV outage tolerance [CR-2026-05-19-H6]
+//
+// refreshKvCache is observability/optimization only. A KV outage must NOT
+// propagate to the webhook response — a 5xx response triggers a 72h retry
+// storm from Stripe and corrupts downstream idempotency assumptions.
+// ---------------------------------------------------------------------------
+
+describe('KV outage tolerance [CR-2026-05-19-H6]', () => {
+  it('returns 200 and captures to Sentry when KV write throws during refreshKvCache', async () => {
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', makeSubscription()),
+    );
+    (writeSubscriptionStatus as jest.Mock).mockRejectedValueOnce(
+      new Error('KV namespace unavailable'),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    // Webhook MUST return 2xx so Stripe does not retry for 72h.
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ received: true });
+
+    // Core DB update still happened — only the cache refresh failed.
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalled();
+
+    // The failure must be captured to Sentry.
+    const captureCalls = (captureException as jest.Mock).mock.calls;
+    expect(captureCalls.length).toBeGreaterThan(0);
+    const sentryCall = captureCalls.find(
+      ([, ctx]) =>
+        (ctx as { extra?: { kind?: string } } | undefined)?.extra?.kind ===
+        'kv-cache-refresh',
+    );
+    expect(sentryCall).toBeDefined();
+    expect(
+      (sentryCall?.[1] as { extra: Record<string, unknown> }).extra,
+    ).toMatchObject({
+      kind: 'kv-cache-refresh',
+      surface: expect.stringContaining('stripe.webhook'),
+    });
+  });
+
+  it('returns 200 when KV write throws during checkout.session.completed', async () => {
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('checkout.session.completed', makeCheckoutSession()),
+    );
+    (writeSubscriptionStatus as jest.Mock).mockRejectedValueOnce(
+      new Error('KV namespace unavailable'),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalled();
+  });
+});

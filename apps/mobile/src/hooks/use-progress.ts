@@ -37,11 +37,12 @@ import {
   weeklyReportDetailResponseSchema,
   weeklyReportsResponseSchema,
 } from '@eduagent/schemas';
-import { useApiClient } from '../lib/api-client';
+import { useApiClient, ForbiddenError, NotFoundError } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { Sentry } from '../lib/sentry';
 
 export interface NextReviewTopic {
   topicId: string;
@@ -832,25 +833,41 @@ export function useChildWeeklyReports(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.dashboard.children[':profileId'][
-          'weekly-reports'
-        ].$get(
-          { param: { profileId: childProfileId ?? '' } },
-          { init: { signal } },
-        );
-        // [BUG-549] New child profiles may return 403 (no family link yet)
-        // or 404. Treat these as "no data yet" rather than a hard error so
-        // the UI shows a friendly empty state instead of an error card.
-        // [IMP-7] Log the status so silent 403s don't mask real ACL bugs.
-        if (res.status === 403 || res.status === 404) {
-          console.warn(
-            `[useChildWeeklyReports] ${res.status} for child ${childProfileId} — returning empty`,
+        try {
+          const res = await client.dashboard.children[':profileId'][
+            'weekly-reports'
+          ].$get(
+            { param: { profileId: childProfileId ?? '' } },
+            { init: { signal } },
           );
-          return [];
+          await assertOk(res);
+          const data = (await res.json()) as {
+            reports: WeeklyReportSummary[];
+          };
+          return data.reports;
+        } catch (err) {
+          // [CR-2026-05-19-H27] Escalate family-link ACL failures to Sentry
+          // with the queryable tag so a broken or revoked family link is not
+          // invisible in production. Previously this was a console.warn-only
+          // swallow that returned [], which violated CLAUDE.md "Silent
+          // recovery without escalation is banned" — and also masked a real
+          // IDOR/ACL regression behind an empty-state UI. The typed error
+          // (ForbiddenError / NotFoundError already classified by the API
+          // client middleware) is rethrown so React Query surfaces isError
+          // and the consuming screen renders its standard error fallback
+          // (retry + back) per the UX Resilience Rules.
+          if (err instanceof ForbiddenError || err instanceof NotFoundError) {
+            Sentry.captureException(err, {
+              tags: {
+                hook: 'useChildWeeklyReports',
+                error_kind:
+                  err instanceof ForbiddenError ? 'forbidden' : 'not_found',
+              },
+              extra: { childProfileId },
+            });
+          }
+          throw err;
         }
-        await assertOk(res);
-        const data = (await res.json()) as { reports: WeeklyReportSummary[] };
-        return data.reports;
       } finally {
         cleanup();
       }

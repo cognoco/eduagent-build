@@ -116,7 +116,7 @@ async function seedSubscriptionWithQuota(input: {
       usedThisMonth: input.usedThisMonth ?? 0,
       dailyLimit:
         input.dailyLimit === undefined
-          ? tierConfig.dailyLimit ?? null
+          ? (tierConfig.dailyLimit ?? null)
           : input.dailyLimit,
       usedToday: input.usedToday ?? 0,
       cycleResetAt: new Date('2026-05-01T00:00:00.000Z'),
@@ -202,7 +202,7 @@ describe('Integration: billing service', () => {
         status: 'trial',
         stripeCustomerId: 'cus_real_suite',
         stripeSubscriptionId: 'sub_real_suite',
-      }
+      },
     );
 
     const savedSubscription = await loadSubscriptionByAccountId(account.id);
@@ -235,7 +235,7 @@ describe('Integration: billing service', () => {
     expect(savedSubscription!.tier).toBe('free');
     expect(savedSubscription!.status).toBe('active');
     expect(savedQuotaPool!.monthlyLimit).toBe(
-      getTierConfig('free').monthlyQuota
+      getTierConfig('free').monthlyQuota,
     );
     expect(savedQuotaPool!.dailyLimit).toBe(getTierConfig('free').dailyLimit);
     expect(allSubscriptions).toHaveLength(1);
@@ -254,7 +254,7 @@ describe('Integration: billing service', () => {
 
     const result = await decrementQuota(
       createIntegrationDb(),
-      seeded.subscription.id
+      seeded.subscription.id,
     );
 
     const updatedQuotaPool = await loadQuotaPool(seeded.subscription.id);
@@ -281,7 +281,7 @@ describe('Integration: billing service', () => {
       usedToday: 4,
     });
 
-    await seedTopUpCredit({
+    const oldestTopUp = await seedTopUpCredit({
       subscriptionId: seeded.subscription.id,
       amount: 5,
       remaining: 5,
@@ -298,7 +298,7 @@ describe('Integration: billing service', () => {
 
     const result = await decrementQuota(
       createIntegrationDb(),
-      seeded.subscription.id
+      seeded.subscription.id,
     );
 
     const updatedQuotaPool = await loadQuotaPool(seeded.subscription.id);
@@ -306,7 +306,7 @@ describe('Integration: billing service', () => {
     const remainingTopUps = await getTopUpCreditsRemaining(
       createIntegrationDb(),
       seeded.subscription.id,
-      new Date('2026-06-01T00:00:00.000Z')
+      new Date('2026-06-01T00:00:00.000Z'),
     );
 
     expect(result).toEqual({
@@ -315,6 +315,7 @@ describe('Integration: billing service', () => {
       remainingMonthly: 0,
       remainingTopUp: 4,
       remainingDaily: null,
+      topUpCreditId: oldestTopUp.id,
     });
     expect(updatedQuotaPool!.usedThisMonth).toBe(700);
     expect(updatedQuotaPool!.usedToday).toBe(5);
@@ -336,7 +337,7 @@ describe('Integration: billing service', () => {
 
     const result = await decrementQuota(
       createIntegrationDb(),
-      seeded.subscription.id
+      seeded.subscription.id,
     );
 
     const updatedQuotaPool = await loadQuotaPool(seeded.subscription.id);
@@ -365,21 +366,21 @@ describe('Integration: billing service', () => {
       seeded.subscription.id,
       500,
       now,
-      'rc_txn_real_001'
+      'rc_txn_real_001',
     );
     const duplicate = await purchaseTopUpCredits(
       createIntegrationDb(),
       seeded.subscription.id,
       500,
       now,
-      'rc_txn_real_001'
+      'rc_txn_real_001',
     );
 
     const topUps = await loadTopUps(seeded.subscription.id);
     const remainingCredits = await getTopUpCreditsRemaining(
       createIntegrationDb(),
       seeded.subscription.id,
-      new Date('2026-04-13T00:00:00.000Z')
+      new Date('2026-04-13T00:00:00.000Z'),
     );
 
     expect(first).not.toBeNull();
@@ -404,7 +405,7 @@ describe('Integration: billing service', () => {
         currentPeriodStart: '2026-04-01T00:00:00.000Z',
         currentPeriodEnd: '2026-05-01T00:00:00.000Z',
         eventTimestampMs: 1000,
-      }
+      },
     );
 
     const activatedSubscription = await loadSubscriptionByAccountId(account.id);
@@ -415,7 +416,7 @@ describe('Integration: billing service', () => {
     expect(activatedSubscription!.lastRevenuecatEventId).toBe('evt_1000');
     expect(activatedSubscription!.lastRevenuecatEventTimestampMs).toBe('1000');
     expect(activatedQuotaPool!.monthlyLimit).toBe(
-      getTierConfig('family').monthlyQuota
+      getTierConfig('family').monthlyQuota,
     );
 
     expect(
@@ -423,24 +424,24 @@ describe('Integration: billing service', () => {
         createIntegrationDb(),
         account.id,
         'evt_1000',
-        1000
-      )
+        1000,
+      ),
     ).toBe(true);
     expect(
       await isRevenuecatEventProcessed(
         createIntegrationDb(),
         account.id,
         'evt_0999',
-        999
-      )
+        999,
+      ),
     ).toBe(true);
     expect(
       await isRevenuecatEventProcessed(
         createIntegrationDb(),
         account.id,
         'evt_1001',
-        1001
-      )
+        1001,
+      ),
     ).toBe(false);
 
     const updated = await updateSubscriptionFromRevenuecatWebhook(
@@ -452,7 +453,7 @@ describe('Integration: billing service', () => {
         cancelledAt: null,
         eventId: 'evt_2000',
         eventTimestampMs: 2000,
-      }
+      },
     );
 
     const updatedSubscription = await loadSubscriptionByAccountId(account.id);
@@ -468,8 +469,8 @@ describe('Integration: billing service', () => {
         createIntegrationDb(),
         account.id,
         'evt_1500',
-        1500
-      )
+        1500,
+      ),
     ).toBe(true);
   });
 
@@ -487,7 +488,7 @@ describe('Integration: billing service', () => {
     const result = await handleTierChange(
       createIntegrationDb(),
       seeded.subscription.id,
-      'family'
+      'family',
     );
 
     const updatedQuotaPool = await loadQuotaPool(seeded.subscription.id);
@@ -500,7 +501,7 @@ describe('Integration: billing service', () => {
       remainingQuestions: getTierConfig('family').monthlyQuota - 123,
     });
     expect(updatedQuotaPool!.monthlyLimit).toBe(
-      getTierConfig('family').monthlyQuota
+      getTierConfig('family').monthlyQuota,
     );
     expect(updatedQuotaPool!.usedThisMonth).toBe(123);
     expect(updatedQuotaPool!.usedToday).toBe(7);

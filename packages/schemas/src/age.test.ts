@@ -6,12 +6,14 @@ import {
 } from './age.js';
 
 describe('computeAgeBracket', () => {
-  it('returns child for ages under 13', () => {
-    expect(computeAgeBracket(2015, 2026)).toBe('child'); // age 11
-    expect(computeAgeBracket(2014, 2026)).toBe('child'); // age 12
+  it('returns child only for ages under 11 (defensive fallback; product is 11+)', () => {
+    expect(computeAgeBracket(2016, 2026)).toBe('child'); // age 10
+    expect(computeAgeBracket(2020, 2026)).toBe('child'); // age 6
   });
 
-  it('returns adolescent for ages 13 to 17 inclusive', () => {
+  it('returns adolescent for ages 11 to 17 inclusive', () => {
+    expect(computeAgeBracket(2015, 2026)).toBe('adolescent'); // age 11
+    expect(computeAgeBracket(2014, 2026)).toBe('adolescent'); // age 12
     expect(computeAgeBracket(2013, 2026)).toBe('adolescent'); // age 13
     expect(computeAgeBracket(2012, 2026)).toBe('adolescent'); // age 14
     expect(computeAgeBracket(2009, 2026)).toBe('adolescent'); // age 17
@@ -26,7 +28,16 @@ describe('computeAgeBracket', () => {
     const thisYear = new Date().getFullYear();
     expect(computeAgeBracket(thisYear - 20)).toBe('adult');
     expect(computeAgeBracket(thisYear - 15)).toBe('adolescent');
-    expect(computeAgeBracket(thisYear - 10)).toBe('child');
+    expect(computeAgeBracket(thisYear - 8)).toBe('child');
+  });
+
+  it('[CR-2026-05-19-H11] no in-product age (11-17) maps to the child bracket', () => {
+    // Product is strictly 11+. 'child' must never be emitted for any real
+    // learner birth year, so kid-flavored prompt framing never reaches the LLM.
+    for (let age = 11; age <= 17; age++) {
+      const birthYear = 2026 - age;
+      expect(computeAgeBracket(birthYear, 2026)).not.toBe('child');
+    }
   });
 
   it('AgeBracket is the three-way union (D-C4-3)', () => {

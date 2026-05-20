@@ -3,12 +3,16 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
+  ConflictError,
+  ERROR_CODES,
+  RateLimitedError,
   filingRequestSchema,
   filingResultSchema,
   filingQueuedResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { notFound } from '../errors';
 import {
   buildLibraryIndex,
   fileToLibrary,
@@ -20,8 +24,10 @@ import {
   markTopicSuggestionUsed,
 } from '../services/suggestions';
 import {
+  getSession,
   getSessionTranscript,
   backfillSessionTopicId,
+  claimSessionForFilingRetry,
 } from '../services/session';
 import { routeAndCall } from '../services/llm';
 import { captureException } from '../services/sentry';
@@ -39,8 +45,14 @@ type FilingRouteEnv = {
   };
 };
 
+// [CR-2026-05-19-H34] sessionId MUST be a UUID. The handler also verifies the
+// caller owns this session (IDOR fix) and enforces an atomic per-session
+// retry-count gate via claimSessionForFilingRetry (max 3 retries, matching
+// /sessions/:sessionId/retry-filing). Without these guards any authenticated
+// user could dispatch app/filing.retry against arbitrary session IDs and
+// drain Inngest quota in a tight loop.
 const retryRequestSchema = z.object({
-  sessionId: z.string(),
+  sessionId: z.string().uuid(),
   sessionMode: z.enum(['freeform', 'homework']).default('freeform'),
 });
 
@@ -49,8 +61,45 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     '/filing/request-retry',
     zValidator('json', retryRequestSchema),
     async (c) => {
+      const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId, sessionMode } = c.req.valid('json');
+
+      // [CR-2026-05-19-H34] IDOR guard — verify the session belongs to the
+      // caller's profile BEFORE dispatching the Inngest event. getSession
+      // uses createScopedRepository(profileId) and returns null for any
+      // session owned by a different profile, so we return 404 (matching
+      // /sessions/:sessionId/retry-filing — never leak existence).
+      const session = await getSession(db, profileId, sessionId);
+      if (!session) return notFound(c, 'Session not found');
+
+      // [CR-2026-05-19-H34] Per-session retry-count rate gate — atomic
+      // UPDATE that only succeeds while filingRetryCount < 3 AND
+      // filingStatus = 'filing_failed'. Mirrors the canonical pattern in
+      // /sessions/:sessionId/retry-filing so both endpoints share the same
+      // cap. If the claim fails, re-read state to distinguish 429 (cap
+      // reached) from 409 (wrong status).
+      const claimed = await claimSessionForFilingRetry(
+        db,
+        profileId,
+        sessionId,
+      );
+      if (!claimed) {
+        const fresh = await getSession(db, profileId, sessionId);
+        if (!fresh) return notFound(c, 'Session not found');
+        if (fresh.filingRetryCount >= 3) {
+          throw new RateLimitedError(
+            'Retry limit reached for this session.',
+            ERROR_CODES.RATE_LIMITED,
+          );
+        }
+        throw new ConflictError(
+          `Session is not in a retriable state (status: ${
+            fresh.filingStatus ?? 'null'
+          })`,
+        );
+      }
+
       // core-send: user-initiated filing retry — dispatch must throw on
       // failure so the user is not told "queued" when nothing was queued.
       await inngest.send({
@@ -236,8 +285,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     // core-send: filing.completed — the session-completed chain waits 60s for
     // this event via waitForEvent. Silent dispatch loss would hang that chain
     // until timeout and leave the user with a broken post-filing flow.
-    await inngest
-      .send({
+    try {
+      await inngest.send({
         name: 'app/filing.completed',
         data: {
           bookId: result.bookId,
@@ -246,13 +295,29 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
           sessionId: body.sessionId,
           timestamp: new Date().toISOString(),
         },
-      })
-      .catch((err) => {
-        captureException(err, {
-          profileId,
-          extra: { event: 'app/filing.completed', bookId: result.bookId },
-        });
       });
+    } catch (err) {
+      // Capture context BEFORE rethrowing so Sentry has the session/profile
+      // attached. The global onError handler will also see the throw and
+      // return a 5xx to the client so it retries — exactly what we want for
+      // a CORE event whose silent drop would hang the session-completed
+      // waitForEvent chain (streaks/XP/memory extraction).
+      captureException(err, {
+        profileId,
+        extra: {
+          event: 'app/filing.completed',
+          bookId: result.bookId,
+          sessionId: body.sessionId,
+        },
+      });
+      logger.error('[filing] CORE app/filing.completed dispatch failed', {
+        profileId,
+        sessionId: body.sessionId,
+        bookId: result.bookId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     return c.json(
       filingResultSchema.parse(

@@ -3,6 +3,7 @@ import {
   generateEmbedding,
   extractSessionContent,
   storeSessionEmbedding,
+  EmbeddingDimensionMismatchError,
 } from './embeddings';
 import type { Database } from '@eduagent/database';
 
@@ -14,6 +15,10 @@ function mockDatabaseModuleFactory() {
     exports: {
       storeEmbedding: jest.fn().mockResolvedValue(undefined),
       sessionEvents: {},
+      // VECTOR_DIM is consumed by generateEmbedding() to validate the
+      // Voyage response length. It must be a real number here — leaving
+      // it undefined would defeat the dimension-mismatch guard in tests.
+      VECTOR_DIM: 1024,
     },
   }).module;
 }
@@ -149,6 +154,90 @@ describe('generateEmbedding', () => {
     await expect(generateEmbedding('Some text', TEST_API_KEY)).rejects.toThrow(
       'Voyage AI embedding request failed (429): Rate limit exceeded',
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // BREAK TEST — Voyage model/config drift returns wrong-dim vector.
+  // Without the EmbeddingDimensionMismatchError guard in generateEmbedding,
+  // the mis-sized vector would flow to storeEmbedding/pgvector and either
+  // surface as an opaque DB error or (worse) corrupt similarity search if
+  // the column width were ever changed. The typed error makes provider
+  // drift loud in Sentry and prevents the DB write entirely.
+  // -------------------------------------------------------------------------
+  describe('dimension validation against VECTOR_DIM', () => {
+    it('throws EmbeddingDimensionMismatchError when Voyage returns 512-dim instead of 1024', async () => {
+      const shortVector = Array.from({ length: 512 }, (_, i) => i * 0.001);
+      mockFetchSuccess(shortVector);
+
+      await expect(
+        generateEmbedding('Some text', TEST_API_KEY),
+      ).rejects.toBeInstanceOf(EmbeddingDimensionMismatchError);
+    });
+
+    it('error carries expected/actual/model/provider for Sentry grouping', async () => {
+      const shortVector = Array.from({ length: 512 }, (_, i) => i);
+      mockFetchSuccess(shortVector);
+
+      let caught: EmbeddingDimensionMismatchError | undefined;
+      try {
+        await generateEmbedding('Some text', TEST_API_KEY);
+      } catch (err) {
+        caught = err as EmbeddingDimensionMismatchError;
+      }
+
+      expect(caught).toBeInstanceOf(EmbeddingDimensionMismatchError);
+      expect(caught?.expected).toBe(1024);
+      expect(caught?.actual).toBe(512);
+      expect(caught?.provider).toBe('voyage');
+      expect(caught?.model).toBe('voyage-3.5');
+      expect(caught?.message).toMatch(/expected 1024, got 512/);
+    });
+
+    it('throws on oversized vector too (e.g. 2048-dim drift)', async () => {
+      const longVector = Array.from({ length: 2048 }, (_, i) => i * 0.0001);
+      mockFetchSuccess(longVector);
+
+      await expect(
+        generateEmbedding('Some text', TEST_API_KEY),
+      ).rejects.toBeInstanceOf(EmbeddingDimensionMismatchError);
+    });
+
+    it('accepts a correctly-sized 1024-dim vector without throwing', async () => {
+      const goodVector = Array.from({ length: 1024 }, (_, i) => i * 0.001);
+      mockFetchSuccess(goodVector);
+
+      const result = await generateEmbedding('Some text', TEST_API_KEY);
+      expect(result.vector).toHaveLength(1024);
+      expect(result.dimensions).toBe(1024);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // BREAK TEST — storeSessionEmbedding must NOT write when Voyage returns
+  // a wrong-dim vector. The guard lives in generateEmbedding, so the DB
+  // write should never be reached.
+  // -------------------------------------------------------------------------
+  it('storeSessionEmbedding does not write to DB on dimension mismatch', async () => {
+    const shortVector = Array.from({ length: 512 }, (_, i) => i);
+    mockFetchSuccess(shortVector);
+
+    const { storeEmbedding } = jest.requireMock('@eduagent/database') as {
+      storeEmbedding: jest.Mock;
+    };
+    storeEmbedding.mockClear();
+
+    await expect(
+      storeSessionEmbedding(
+        {} as Database,
+        'session-001',
+        'profile-001',
+        null,
+        'Test content',
+        TEST_API_KEY,
+      ),
+    ).rejects.toBeInstanceOf(EmbeddingDimensionMismatchError);
+
+    expect(storeEmbedding).not.toHaveBeenCalled();
   });
 });
 

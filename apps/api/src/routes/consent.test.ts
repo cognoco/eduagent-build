@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------------
 // Mock dependencies used by consent service and routes
 // ---------------------------------------------------------------------------
 
@@ -115,7 +115,7 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
       accountId: 'test-account-id',
       displayName: 'Test User',
       avatarUrl: null,
-      isOwner: false,
+      isOwner: true,
       consentStatus: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -896,5 +896,97 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     // Must NOT classify by string match — generic errors fall through to 500.
     expect(res.status).not.toBe(403);
     expect(res.status).toBe(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CR-2026-05-19-H1] Break tests — isOwner gate on parent-only consent routes
+// ---------------------------------------------------------------------------
+
+describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent routes', () => {
+  beforeEach(() => {
+    const profileMock = jest.requireMock('../services/profile') as {
+      getProfile: jest.Mock;
+    };
+    profileMock.getProfile.mockResolvedValue({
+      id: 'NON_OWNER_PROFILE_ID',
+      accountId: 'test-account-id',
+      displayName: 'Child User',
+      avatarUrl: null,
+      isOwner: false,
+      consentStatus: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
+  afterEach(() => {
+    const profileMock = jest.requireMock('../services/profile') as {
+      getProfile: jest.Mock;
+    };
+    profileMock.getProfile.mockResolvedValue({
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test User',
+      avatarUrl: null,
+      isOwner: true,
+      consentStatus: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
+  it('[BREAK] GET /v1/consent/:id/status returns 403 for non-owner profile', async () => {
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/status',
+      {
+        method: 'GET',
+        headers: {
+          ...makeAuthHeaders(),
+          'X-Profile-Id': 'NON_OWNER_PROFILE_ID',
+        },
+      },
+      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+  });
+
+  it('[BREAK] PUT /v1/consent/:id/revoke returns 403 for non-owner profile', async () => {
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/revoke',
+      {
+        method: 'PUT',
+        headers: {
+          ...makeAuthHeaders(),
+          'X-Profile-Id': 'NON_OWNER_PROFILE_ID',
+        },
+      },
+      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+  });
+
+  it('[BREAK] PUT /v1/consent/:id/restore returns 403 for non-owner profile', async () => {
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/restore',
+      {
+        method: 'PUT',
+        headers: {
+          ...makeAuthHeaders(),
+          'X-Profile-Id': 'NON_OWNER_PROFILE_ID',
+        },
+      },
+      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
   });
 });

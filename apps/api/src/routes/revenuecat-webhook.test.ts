@@ -1267,6 +1267,32 @@ describe('sandbox events [BUG-624 / A-8]', () => {
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
   });
 
+  // BREAK TEST [CR-2026-05-19-H6/H7]: sandbox-in-production rejection must
+  // happen BEFORE ensureFreeSubscription. If the SANDBOX guard runs after
+  // ensureFreeSubscription (the bug being fixed), a SANDBOX webhook delivered
+  // to production would auto-provision a free subscription row + quota pool
+  // for an account that should never have been touched, even though the
+  // event itself is rejected. Reverting the fix (moving ensureFreeSubscription
+  // back ABOVE the SANDBOX guard) makes this test fail.
+  it('does NOT call ensureFreeSubscription when rejecting a SANDBOX event in production', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'SANDBOX',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ reason: 'sandbox_in_production' });
+    // The break: ensureFreeSubscription must not run for a rejected sandbox
+    // event. If this fails, sandbox webhooks are mutating production state.
+    expect(ensureFreeSubscription).not.toHaveBeenCalled();
+    // Idempotency check still runs before the guard (we want sandbox replays
+    // to be deduplicated too), so isRevenuecatEventProcessed IS expected.
+    expect(isRevenuecatEventProcessed).toHaveBeenCalled();
+  });
+
   it('accepts SANDBOX events in non-production (staging/dev) so QA can drive flows', async () => {
     const payload = makeWebhookPayload('INITIAL_PURCHASE', {
       environment: 'SANDBOX',
@@ -1289,5 +1315,81 @@ describe('sandbox events [BUG-624 / A-8]', () => {
     });
     expect(res.status).toBe(200);
     expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// KV outage tolerance [CR-2026-05-19-H6]
+//
+// refreshKvCache is observability/optimization only. A KV outage must NOT
+// propagate to the webhook response — a 5xx response triggers a 72h retry
+// storm from RevenueCat (matching Stripe). The failure is captured to Sentry
+// instead.
+// ---------------------------------------------------------------------------
+
+describe('KV outage tolerance [CR-2026-05-19-H6]', () => {
+  it('returns 200 and captures to Sentry when KV write throws during INITIAL_PURCHASE refresh', async () => {
+    (writeSubscriptionStatus as jest.Mock).mockRejectedValueOnce(
+      new Error('KV namespace unavailable'),
+    );
+
+    const res = await makeRequest(makeWebhookPayload('INITIAL_PURCHASE'));
+
+    // Webhook MUST return 2xx so RevenueCat does not retry for 72h.
+    expect(res.status).toBe(200);
+
+    // Core DB activation still happened — only the cache refresh failed.
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+
+    // The failure must be captured to Sentry.
+    const sentryCall = mockCaptureException.mock.calls.find(
+      ([, ctx]: [unknown, unknown]) =>
+        (ctx as { extra?: { kind?: string } } | undefined)?.extra?.kind ===
+        'kv-cache-refresh',
+    );
+    expect(sentryCall).toBeDefined();
+    expect(
+      (sentryCall?.[1] as { extra: Record<string, unknown> }).extra,
+    ).toMatchObject({
+      kind: 'kv-cache-refresh',
+      surface: expect.stringContaining('revenuecat.webhook'),
+    });
+  });
+
+  it('returns 200 when KV write throws during RENEWAL refresh', async () => {
+    (writeSubscriptionStatus as jest.Mock).mockRejectedValueOnce(
+      new Error('KV namespace unavailable'),
+    );
+
+    const res = await makeRequest(makeWebhookPayload('RENEWAL'));
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalled();
+  });
+
+  it('returns 200 when getSubscriptionByAccountId throws during cache refresh (downstream DB outage)', async () => {
+    // The cache-refresh path also queries the DB for the subscription row.
+    // A failure there must be caught too — otherwise a DB blip during the
+    // refresh step would propagate as a 5xx and trigger the same retry storm.
+    //
+    // We need handleRenewal's *first* call (in handleRenewal itself there
+    // isn't one) — handleInitialPurchase calls activate first, then refresh.
+    // Use UNCANCELLATION which goes update → refresh, with no other
+    // getSubscriptionByAccountId call to worry about.
+    (getSubscriptionByAccountId as jest.Mock).mockRejectedValueOnce(
+      new Error('DB connection lost during cache refresh'),
+    );
+
+    const res = await makeRequest(makeWebhookPayload('UNCANCELLATION'));
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    const sentryCall = mockCaptureException.mock.calls.find(
+      ([, ctx]: [unknown, unknown]) =>
+        (ctx as { extra?: { kind?: string } } | undefined)?.extra?.kind ===
+        'kv-cache-refresh',
+    );
+    expect(sentryCall).toBeDefined();
   });
 });

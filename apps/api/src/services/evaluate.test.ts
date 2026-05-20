@@ -4,7 +4,33 @@ import {
   mapEvaluateQualityToSm2,
   handleEvaluateFailure,
   parseEvaluateAssessment,
+  evaluateAssessmentFromEnvelopeSignal,
 } from './evaluate';
+
+// Build a session-event-shaped row whose metadata carries the canonical
+// envelope signal — the post-migration path. Centralised here so every test
+// has the same shape and a future signal-name change updates in one place.
+function eventWithEnvelopeSignal(signal: Record<string, unknown> | null): {
+  content: string;
+  metadata: unknown;
+} {
+  return {
+    content: 'Quick check — let me try to trip you up. [prose only]',
+    metadata: signal ? { signals: { evaluate_assessment: signal } } : null,
+  };
+}
+
+// Build a session-event row whose content still carries the raw LLM envelope
+// JSON — the transition path during rollout.
+function eventWithRawEnvelopeContent(envelope: Record<string, unknown>): {
+  content: string;
+  metadata: unknown;
+} {
+  return {
+    content: JSON.stringify(envelope),
+    metadata: null,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // shouldTriggerEvaluate
@@ -42,12 +68,12 @@ describe('getEvaluateRungDescription', () => {
       const desc = getEvaluateRungDescription(rung);
       expect(desc).toBeTruthy();
       expect(typeof desc).toBe('string');
-    }
+    },
   );
 
   it('returns different descriptions for different rungs', () => {
     const descriptions = new Set(
-      ([1, 2, 3, 4] as const).map(getEvaluateRungDescription)
+      ([1, 2, 3, 4] as const).map(getEvaluateRungDescription),
     );
     expect(descriptions.size).toBe(4);
   });
@@ -134,10 +160,13 @@ describe('handleEvaluateFailure', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseEvaluateAssessment', () => {
-  it('parses valid JSON assessment', () => {
-    const response =
-      'Great attempt!\n{"challengePassed": true, "flawIdentified": "wrong formula", "quality": 4}';
-    const result = parseEvaluateAssessment(response);
+  it('parses assessment from envelope signal in metadata (canonical path)', () => {
+    const event = eventWithEnvelopeSignal({
+      challenge_passed: true,
+      flaw_identified: 'wrong formula',
+      quality: 4,
+    });
+    const result = parseEvaluateAssessment(event);
     expect(result).toEqual({
       challengePassed: true,
       flawIdentified: 'wrong formula',
@@ -145,9 +174,12 @@ describe('parseEvaluateAssessment', () => {
     });
   });
 
-  it('parses failed assessment', () => {
-    const response = 'Not quite.\n{"challengePassed": false, "quality": 1}';
-    const result = parseEvaluateAssessment(response);
+  it('parses failed assessment from envelope signal', () => {
+    const event = eventWithEnvelopeSignal({
+      challenge_passed: false,
+      quality: 1,
+    });
+    const result = parseEvaluateAssessment(event);
     expect(result).toEqual({
       challengePassed: false,
       flawIdentified: undefined,
@@ -155,33 +187,112 @@ describe('parseEvaluateAssessment', () => {
     });
   });
 
-  it('returns null when no JSON found', () => {
-    expect(parseEvaluateAssessment('Just a plain response')).toBeNull();
+  it('parses assessment from raw envelope JSON in content (transition path)', () => {
+    const event = eventWithRawEnvelopeContent({
+      reply: 'Quick check — was that right?',
+      signals: {
+        evaluate_assessment: {
+          challenge_passed: true,
+          flaw_identified: 'inverted cause-effect',
+          quality: 5,
+        },
+      },
+    });
+    const result = parseEvaluateAssessment(event);
+    expect(result).toEqual({
+      challengePassed: true,
+      flawIdentified: 'inverted cause-effect',
+      quality: 5,
+    });
   });
 
-  it('returns null for malformed JSON', () => {
+  it('returns null when content is plain prose with no envelope and no metadata', () => {
     expect(
-      parseEvaluateAssessment('Response\n{challengePassed: invalid}')
+      parseEvaluateAssessment({
+        content: 'Just a plain response with no JSON anywhere.',
+        metadata: null,
+      }),
     ).toBeNull();
   });
 
-  it('clamps quality to 0-5 range', () => {
-    const response = '{"challengePassed": true, "quality": 10}';
-    const result = parseEvaluateAssessment(response);
-    expect(result?.quality).toBe(5);
-
-    const response2 = '{"challengePassed": false, "quality": -3}';
-    const result2 = parseEvaluateAssessment(response2);
-    expect(result2?.quality).toBe(0);
+  it('returns null when raw envelope JSON content is malformed', () => {
+    // Looks like JSON but is malformed — the envelope parser should reject it
+    // and the function returns null rather than throwing.
+    expect(
+      parseEvaluateAssessment({
+        content: '{challenge_passed: invalid_unquoted}',
+        metadata: null,
+      }),
+    ).toBeNull();
   });
 
-  it('defaults quality when missing', () => {
-    const passedResponse = '{"challengePassed": true}';
-    const result = parseEvaluateAssessment(passedResponse);
-    expect(result?.quality).toBe(4);
+  it('returns null when legacy free-text JSON blob is embedded in prose (post-migration contract)', () => {
+    // [CR-2026-05-19-C5] After the envelope migration, free-text JSON blobs
+    // embedded in prose violate the contract and MUST NOT be parseable —
+    // otherwise the LLM keeps drifting into that shape because the parser
+    // tolerates it. The envelope signal in metadata is now the only path.
+    const response =
+      'Great attempt!\n{"challengePassed": true, "flawIdentified": "wrong formula", "quality": 4}';
+    expect(parseEvaluateAssessment(response)).toBeNull();
+  });
 
-    const failedResponse = '{"challengePassed": false}';
-    const result2 = parseEvaluateAssessment(failedResponse);
-    expect(result2?.quality).toBe(2);
+  it('clamps quality to 0-5 range when envelope signal is out of bounds', () => {
+    const high = parseEvaluateAssessment(
+      eventWithEnvelopeSignal({ challenge_passed: true, quality: 10 }),
+    );
+    expect(high?.quality).toBe(5);
+
+    const low = parseEvaluateAssessment(
+      eventWithEnvelopeSignal({ challenge_passed: false, quality: -3 }),
+    );
+    expect(low?.quality).toBe(0);
+  });
+
+  it('defaults quality when missing from envelope signal', () => {
+    const passed = parseEvaluateAssessment(
+      eventWithEnvelopeSignal({ challenge_passed: true }),
+    );
+    expect(passed?.quality).toBe(4);
+
+    const failed = parseEvaluateAssessment(
+      eventWithEnvelopeSignal({ challenge_passed: false }),
+    );
+    expect(failed?.quality).toBe(2);
+  });
+
+  it('returns null when envelope signal is missing the required challenge_passed field', () => {
+    // Without the required boolean, the assessment is unusable — the function
+    // must not silently default to false (which would corrupt SM-2 retention).
+    const event = eventWithEnvelopeSignal({ quality: 4 });
+    expect(parseEvaluateAssessment(event)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateAssessmentFromEnvelopeSignal — direct mapping helper
+// ---------------------------------------------------------------------------
+
+describe('evaluateAssessmentFromEnvelopeSignal', () => {
+  it('maps a complete envelope signal to consumer shape', () => {
+    const result = evaluateAssessmentFromEnvelopeSignal({
+      challenge_passed: true,
+      flaw_identified: 'misread base case',
+      quality: 4,
+    });
+    expect(result).toEqual({
+      challengePassed: true,
+      flawIdentified: 'misread base case',
+      quality: 4,
+    });
+  });
+
+  it('returns null when challenge_passed is missing', () => {
+    // Type assertion to bypass compile-time check — testing runtime guard.
+    const result = evaluateAssessmentFromEnvelopeSignal({
+      quality: 3,
+    } as unknown as {
+      challenge_passed: boolean;
+    });
+    expect(result).toBeNull();
   });
 });

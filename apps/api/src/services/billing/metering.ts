@@ -64,6 +64,13 @@ export interface DecrementResult {
   remainingMonthly: number;
   remainingTopUp: number;
   remainingDaily: number | null;
+  /**
+   * [CR-2026-05-19-C6] Set only when `source === 'top_up'`. Callers (refund
+   * path) must thread this back into `incrementQuota` so the refund credits
+   * the original top-up batch instead of decrementing the monthly pool,
+   * which would inflate monthly quota by 1 per LLM failure.
+   */
+  topUpCreditId?: string;
 }
 
 async function verifyProfileInSubscriptionAccount(
@@ -285,6 +292,7 @@ export async function decrementQuota(
         updatedPool.dailyLimit !== null
           ? updatedPool.dailyLimit - updatedPool.usedToday
           : null,
+      topUpCreditId: updatedTopUp.id,
     };
   });
 
@@ -313,18 +321,33 @@ export async function decrementQuota(
  * Refunds 1 exchange back to the quota pool.
  * Used when an LLM call fails after decrement — avoids charging for failed work.
  *
- * Refunds always go to the monthly pool (simpler, avoids FIFO complications).
- * Also refunds the daily counter to keep both in sync.
+ * [CR-2026-05-19-C6] Refunds route to the SAME pool that the original
+ * decrement consumed from:
+ *   - source = 'monthly' (default for back-compat): decrement usedThisMonth
+ *     and usedToday.
+ *   - source = 'top_up': increment the original topUpCredits row's remaining
+ *     by 1, and decrement usedToday only. Without this routing every LLM
+ *     failure on a top-up consumption inflates the monthly quota by 1.
+ *
+ * Callers SHOULD pass `source` (and `topUpCreditId` when source is 'top_up')
+ * from the original `DecrementResult`. When omitted, falls back to the
+ * legacy monthly-pool refund.
  */
 export interface IncrementResult {
   success: boolean;
   reason?: 'profile_mismatch';
 }
 
+export interface IncrementQuotaOptions {
+  source?: 'monthly' | 'top_up';
+  topUpCreditId?: string;
+}
+
 export async function incrementQuota(
   db: Database,
   subscriptionId: string,
   profileId?: string,
+  options?: IncrementQuotaOptions,
 ): Promise<IncrementResult> {
   if (profileId) {
     const ownsProfile = await verifyProfileInSubscriptionAccount(
@@ -348,15 +371,53 @@ export async function incrementQuota(
     }
   }
 
+  const source = options?.source ?? 'monthly';
+
   await db.transaction(async (tx) => {
-    await tx
-      .update(quotaPools)
-      .set({
-        usedThisMonth: sql`GREATEST(${quotaPools.usedThisMonth} - 1, 0)`,
-        usedToday: sql`GREATEST(${quotaPools.usedToday} - 1, 0)`,
-        updatedAt: new Date(),
-      })
-      .where(eq(quotaPools.subscriptionId, subscriptionId));
+    if (source === 'top_up' && options?.topUpCreditId) {
+      // [CR-2026-05-19-C6] Refund the original top-up batch, not monthly.
+      // Daily counter still rolls back because the decrement consumed a
+      // daily slot regardless of which pool funded the request.
+      await tx
+        .update(topUpCredits)
+        .set({
+          remaining: sql`${topUpCredits.remaining} + 1`,
+        })
+        .where(eq(topUpCredits.id, options.topUpCreditId));
+
+      await tx
+        .update(quotaPools)
+        .set({
+          usedToday: sql`GREATEST(${quotaPools.usedToday} - 1, 0)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(quotaPools.subscriptionId, subscriptionId));
+    } else {
+      // Monthly refund (legacy path): decrement both usedThisMonth and
+      // usedToday. GREATEST guard prevents underflow if counters are
+      // already at 0 (e.g. a duplicate refund).
+      if (source === 'top_up') {
+        // Source was top_up but we lost the credit id — log so we can detect
+        // callers that didn't thread the id through. We still refund the
+        // monthly pool as a fallback so the user isn't silently overcharged.
+        logger.warn(
+          '[metering] incrementQuota top_up refund missing topUpCreditId — falling back to monthly refund',
+          {
+            event: 'metering.refund.missing_topup_id',
+            subscriptionId,
+            profileId,
+          },
+        );
+      }
+      await tx
+        .update(quotaPools)
+        .set({
+          usedThisMonth: sql`GREATEST(${quotaPools.usedThisMonth} - 1, 0)`,
+          usedToday: sql`GREATEST(${quotaPools.usedToday} - 1, 0)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(quotaPools.subscriptionId, subscriptionId));
+    }
     if (profileId) {
       await recordUsageEvent(tx, subscriptionId, profileId, -1);
     }
@@ -386,10 +447,25 @@ export async function incrementQuota(
 export async function safeRefundQuota(
   db: Database,
   subscriptionId: string,
-  context: { route: string; profileId?: string; sessionId?: string },
+  context: {
+    route: string;
+    profileId?: string;
+    sessionId?: string;
+    /**
+     * [CR-2026-05-19-C6] Set from the original `DecrementResult.source` so
+     * the refund credits the correct pool (top-up vs monthly). Omit for
+     * legacy callers — they fall back to a monthly refund.
+     */
+    source?: 'monthly' | 'top_up';
+    /** Required when source === 'top_up'. From `DecrementResult.topUpCreditId`. */
+    topUpCreditId?: string;
+  },
 ): Promise<{ refunded: boolean }> {
   try {
-    const result = await incrementQuota(db, subscriptionId, context.profileId);
+    const result = await incrementQuota(db, subscriptionId, context.profileId, {
+      source: context.source,
+      topUpCreditId: context.topUpCreditId,
+    });
     if (!result.success) {
       // Structured non-error path: a profile/subscription mismatch is a caller
       // bug or a stale request, not an unexpected runtime failure. Log it but

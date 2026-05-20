@@ -373,6 +373,13 @@ export default function SessionSummaryScreen() {
     if (filedSubjectId && filedBookId) {
       router.replace('/(app)/library' as Href);
       InteractionManager.runAfterInteractions(() => {
+        // Push full ancestor chain so back-button restores shelf context.
+        // See CLAUDE.md "Cross-tab / cross-stack router.push" rule and
+        // library.tsx handleBookPress for the canonical two-push pattern.
+        router.push({
+          pathname: '/(app)/shelf/[subjectId]',
+          params: { subjectId: filedSubjectId },
+        } as Href);
         router.push({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
           params: { subjectId: filedSubjectId, bookId: filedBookId },

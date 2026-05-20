@@ -79,6 +79,16 @@ const fn = async () => { await someService(); };`,
       code: `const fn = async () => { await dbClient.query.foo.findFirst({}); };`,
       ...inngestFile,
     },
+    // Inngest file using db.execute with the file-level @inngest-admin: tag — allowed.
+    // db.execute is the drizzle raw-SQL escape hatch (bug #329); the tag is the
+    // only mechanism that satisfies the rule for execute, same as for typed methods.
+    {
+      code: `// @inngest-admin: cross-profile
+const fn = async () => {
+  await db.execute(sql\`UPDATE x SET y = 1 WHERE id = \${id}\`);
+};`,
+      ...inngestFile,
+    },
   ],
   invalid: [
     // Raw db.query, no tag, no scoped import
@@ -101,6 +111,16 @@ const fn = async () => { await someService(); };`,
     {
       code: `const fn = async () => {
   await db.insert(profiles).values({ id: 'x' });
+};`,
+      ...inngestFile,
+      errors: [{ messageId: 'missingAdminTag' }],
+    },
+    // Raw db.execute — drizzle raw-SQL escape hatch. Without coverage here
+    // an Inngest file can issue arbitrary UPDATE/INSERT/DELETE SQL with no
+    // profile-scoping declaration. Regression test for bug #329.
+    {
+      code: `const fn = async () => {
+  await db.execute(sql\`UPDATE x SET y = 1\`);
 };`,
       ...inngestFile,
       errors: [{ messageId: 'missingAdminTag' }],

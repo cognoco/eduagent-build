@@ -765,7 +765,13 @@
       "keepPlaying": "Seguir jugando",
       "saveAndFinish": "Guardar y terminar",
       "leaveWithoutSaving": "Salir sin guardar",
-      "leaveQuizButton": "Salir del quiz"
+      "leaveQuizButton": "Salir del quiz",
+      "seeResultsLabel": "Ver resultados del quiz",
+      "oneMoreLabel": "Empezar otro quiz",
+      "nextQuestionLabel": "Siguiente pregunta",
+      "disputeLabel": "Disputar esta respuesta",
+      "dismissLabel": "Cerrar",
+      "saveAndFinishLabel": "Guardar progreso y terminar la ronda"
     }
   },
   "dictation": {
@@ -1316,7 +1322,14 @@
     "listening": "Escuchando...",
     "voiceHint": "Di el problema de la tarea en voz alta.",
     "stopDictatingProblemLabel": "Dejar de dictar el problema",
-    "dictateProblemLabel": "Dictar problema"
+    "dictateProblemLabel": "Dictar problema",
+    "ocrError": {
+      "NOT_HOMEWORK": "No encontramos un problema de tarea claro en esta foto. Intenta acercarte más o escríbelo.",
+      "LOW_QUALITY": "No pudimos leer esta foto con claridad. Intenta con mejor iluminación o manteniendo el teléfono más firme.",
+      "NO_TEXT": "No encontramos ningún texto en esta foto. Asegúrate de que la tarea esté visible y bien iluminada.",
+      "ML_KIT_UNAVAILABLE": "La lectura de fotos no está disponible en esta versión. Una actualización rápida de la app lo traerá de vuelta.",
+      "CACHE_FAILED": "Tuvimos problemas para preparar la foto. Intenta de nuevo o escribe el problema."
+    }
   },
   "progress": {
     "pageTitle": "Mi Viaje de Aprendizaje",

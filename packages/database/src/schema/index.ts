@@ -10,7 +10,7 @@ export * from './billing';
 export * from './embeddings';
 export * from './memory-facts';
 export * from './memory-dedup-decisions';
-export { vectorToDriver } from './_pgvector';
+export { vectorToDriver, VECTOR_DIM } from './_pgvector';
 export * from './language';
 export * from './notes';
 export * from './learning-profiles';

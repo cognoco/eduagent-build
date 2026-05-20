@@ -9,6 +9,7 @@ import { eq, and } from 'drizzle-orm';
 import {
   storeEmbedding,
   sessionEvents,
+  VECTOR_DIM,
   type Database,
 } from '@eduagent/database';
 
@@ -23,6 +24,44 @@ export interface EmbeddingConfig {
   model: string;
   provider: string;
   dimensions: number;
+}
+
+/**
+ * Thrown when the Voyage AI response vector length does not match
+ * `VECTOR_DIM` (the canonical pgvector column width). This is a typed
+ * error so callers can distinguish provider/config drift from generic
+ * transport failures, and Sentry can group these incidents under a single
+ * fingerprint instead of opaque pgvector error strings.
+ *
+ * NEVER swallow this error and never coerce/truncate the vector — a
+ * dimension mismatch means the model or config drifted and writing the
+ * mis-sized vector would either fail at pgvector (loud) or silently
+ * corrupt similarity search if the DB column width were ever changed
+ * to match the bad response.
+ */
+export class EmbeddingDimensionMismatchError extends Error {
+  readonly expected: number;
+  readonly actual: number;
+  readonly model: string;
+  readonly provider: string;
+
+  constructor(params: {
+    expected: number;
+    actual: number;
+    model: string;
+    provider: string;
+  }) {
+    super(
+      `Voyage AI embedding dimension mismatch: expected ${params.expected}, ` +
+        `got ${params.actual} (model=${params.model}, provider=${params.provider}). ` +
+        `Provider config drift — refusing to write mis-sized vector.`,
+    );
+    this.name = 'EmbeddingDimensionMismatchError';
+    this.expected = params.expected;
+    this.actual = params.actual;
+    this.model = params.model;
+    this.provider = params.provider;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +107,7 @@ interface VoyageEmbeddingResponse {
  */
 export async function generateEmbedding(
   text: string,
-  apiKey: string
+  apiKey: string,
 ): Promise<EmbeddingResult> {
   const config = getEmbeddingConfig();
 
@@ -88,7 +127,7 @@ export async function generateEmbedding(
   if (!response.ok) {
     const body = await response.text();
     throw new Error(
-      `Voyage AI embedding request failed (${response.status}): ${body}`
+      `Voyage AI embedding request failed (${response.status}): ${body}`,
     );
   }
 
@@ -98,6 +137,21 @@ export async function generateEmbedding(
   if (!firstEmbedding)
     throw new Error('Voyage AI response contained no embedding data');
   const vector = firstEmbedding.embedding;
+
+  // Validate dimension against the canonical pgvector column width
+  // (`VECTOR_DIM` from @eduagent/database). If the Voyage model or config
+  // drifts and returns a different-length vector, throw a typed error so
+  // the failure is loud in logs/Sentry and we NEVER silently write a
+  // mis-sized vector that pgvector would reject with an opaque message
+  // or — worse — that downstream code would truncate/pad.
+  if (vector.length !== VECTOR_DIM) {
+    throw new EmbeddingDimensionMismatchError({
+      expected: VECTOR_DIM,
+      actual: vector.length,
+      model: json.model ?? config.model,
+      provider: config.provider,
+    });
+  }
 
   return {
     vector,
@@ -128,18 +182,18 @@ const CONVERSATION_EVENT_TYPES = ['user_message', 'ai_response'] as const;
 export async function extractSessionContent(
   db: Database,
   sessionId: string,
-  profileId: string
+  profileId: string,
 ): Promise<string> {
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.profileId, profileId)
+      eq(sessionEvents.profileId, profileId),
     ),
     orderBy: (table, { asc }) => [asc(table.createdAt)],
   });
 
   const conversationEvents = events.filter((e) =>
-    (CONVERSATION_EVENT_TYPES as readonly string[]).includes(e.eventType)
+    (CONVERSATION_EVENT_TYPES as readonly string[]).includes(e.eventType),
   );
 
   if (conversationEvents.length === 0) {
@@ -168,7 +222,7 @@ export async function storeSessionEmbedding(
   profileId: string,
   topicId: string | null,
   content: string,
-  apiKey: string
+  apiKey: string,
 ): Promise<void> {
   const result = await generateEmbedding(content, apiKey);
   await storeEmbedding(db, {

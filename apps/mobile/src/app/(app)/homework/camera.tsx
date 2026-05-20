@@ -181,10 +181,16 @@ export default function CameraScreen(): React.ReactNode {
       setDraftProblems(splitResult.problems);
       setDroppedProblems(splitResult.droppedProblems);
     } else if (ocr.status === 'error' && ocr.error) {
-      dispatch({ type: 'OCR_ERROR', message: ocr.error });
+      // Use the typed errorCode for localised, user-facing copy when available.
+      // Retain the raw ocr.error string for Sentry/log breadcrumbs only — it
+      // must never be surfaced directly to the user.
+      const userMessage = ocr.errorCode
+        ? t(`homework.ocrError.${ocr.errorCode}`)
+        : t('homework.ocrDefaultError');
+      dispatch({ type: 'OCR_ERROR', message: userMessage });
       setDroppedProblems([]);
     }
-  }, [ocr.status, ocr.text, ocr.error]);
+  }, [ocr.status, ocr.text, ocr.error, ocr.errorCode, t]);
 
   // [BUG-689 / M-9] UI-level safety timeout. The hook itself caps the
   // on-device pass at 20s and the server fallback at 15s, but a hung
