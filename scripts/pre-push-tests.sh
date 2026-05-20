@@ -22,6 +22,7 @@
 set -euo pipefail
 
 WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
+source "$WORKSPACE_ROOT/scripts/lib/i18n-change-detection.sh"
 
 # ── Configuration ───────────────────────────────────────────────────────
 PREPUSH_SKIP_BRANCHES="${PREPUSH_SKIP_BRANCHES:-main}"
@@ -256,10 +257,15 @@ if [[ -n "$EVAL_CODE" ]] && [[ "$EVAL_RAN" -eq 0 ]]; then
   fi
 fi
 
-# check:i18n — i18n files changed
-if echo "$FILES" | grep -qE '^apps/mobile/src/i18n/'; then
+# check:i18n — mobile source or locale files changed
+if i18n_delta_needs_checks "$FILES"; then
   echo ""
-  echo "── check:i18n (i18n files in delta) ───────────────────────────"
+  echo "── check:i18n (mobile source or i18n files in delta) ───────────"
+  if ! pnpm check:i18n:orphans; then
+    echo ""
+    echo "pre-push: FAILED — orphan i18n key check failed"
+    exit 1
+  fi
   if ! pnpm check:i18n; then
     echo ""
     echo "pre-push: FAILED — i18n staleness check failed"

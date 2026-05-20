@@ -14,6 +14,9 @@
 
 set -euo pipefail
 
+WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
+source "$WORKSPACE_ROOT/scripts/lib/i18n-change-detection.sh"
+
 # ── Config ───────────────────────────────────────────────────────────────
 MODE="advisory"
 SOURCE="auto"
@@ -205,11 +208,11 @@ if [[ -n "$MOBILE_SRC" ]]; then
 fi
 
 # ── i18n ─────────────────────────────────────────────────────────────────
-if hit '^apps/mobile/src/i18n/'; then
+if i18n_delta_needs_checks "$FILES"; then
   CLASSES+=("i18n")
-  add_cmd fast  "pnpm check:i18n"            "i18n staleness check"
   add_cmd fast  "pnpm check:i18n:orphans"    "Orphan i18n key check"
-  note "i18n: Pre-commit enforces en.json staleness automatically"
+  add_cmd fast  "pnpm check:i18n"            "i18n staleness check"
+  note "i18n: Runs for mobile source changes because new t() calls can stale locale files"
 fi
 
 # ── Shared Schemas (@eduagent/schemas) ───────────────────────────────────
