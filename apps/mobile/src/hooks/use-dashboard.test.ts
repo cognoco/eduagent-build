@@ -15,7 +15,7 @@ import { queryKeys } from '../lib/query-keys';
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
-jest.mock('../lib/app-context', () => ({
+jest.mock('../lib/app-context' /* gc1-allow: dashboard child hooks are family-mode only; test controls mode boundary */, () => ({
   useAppContext: () => ({
     mode: 'family',
     setMode: jest.fn(),

@@ -297,7 +297,7 @@ jest.mock('../../lib/api-client', () => ({
   ...jest.requireActual('../../lib/api-client'),
   useApiClient: () => ({}),
 }));
-jest.mock('../../lib/app-context', () => ({
+jest.mock('../../lib/app-context' /* gc1-allow: progress screen tests need deterministic study/family mode without provider side effects */, () => ({
   useAppContext: () => ({
     mode: mockLinkedChildren.length > 0 ? 'family' : 'study',
     setMode: jest.fn(),

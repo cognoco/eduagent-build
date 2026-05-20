@@ -78,7 +78,7 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('../../lib/app-context', () => ({
+jest.mock('../../lib/app-context' /* gc1-allow: screen guard test controls mode state without mounting AppContextProvider */, () => ({
   useAppContext: () => ({
     mode: 'study',
     setMode: jest.fn(),

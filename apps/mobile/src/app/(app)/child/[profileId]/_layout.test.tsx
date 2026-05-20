@@ -30,7 +30,7 @@ jest.mock('expo-router', () => {
   };
 });
 
-jest.mock('../../../../components/guards/RequireFamilyContext', () => ({
+jest.mock('../../../../components/guards/RequireFamilyContext' /* gc1-allow: layout unit test isolates Stack wiring from family route guard context */, () => ({
   RequireFamilyContext: ({ children }: { children: React.ReactNode }) =>
     children,
 }));
