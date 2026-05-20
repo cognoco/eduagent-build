@@ -643,6 +643,13 @@ describe('billing routes', () => {
     it('returns real usage data when subscription exists', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
+      mockGetUsageBreakdownForProfile.mockResolvedValue({
+        byProfile: [],
+        familyAggregate: null,
+        isOwnerBreakdownViewer: false,
+        selfUsedToday: 1,
+        selfUsedThisMonth: 12,
+      });
 
       const res = await app.request(
         '/v1/usage',
@@ -657,6 +664,7 @@ describe('billing routes', () => {
       expect(body.usage.usedThisMonth).toBe(450);
       expect(body.usage.remainingQuestions).toBe(50);
       expect(body.usage.warningLevel).toBe('soft');
+      expect(mockGetUsageBreakdownForProfile).not.toHaveBeenCalled();
     });
 
     it('returns child-visible usage from their profile breakdown', async () => {
@@ -675,7 +683,9 @@ describe('billing routes', () => {
         createdAt: new Date('2025-01-01T00:00:00.000Z'),
         updatedAt: new Date('2025-01-01T00:00:00.000Z'),
       });
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' }),
+      );
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
       mockGetUsageBreakdownForProfile.mockResolvedValue({
         byProfile: [],

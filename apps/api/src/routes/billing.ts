@@ -514,15 +514,18 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         ).toISOString();
       }
     })();
-    const usageBreakdown = activeProfileId
-      ? await getUsageBreakdownForProfile(db, {
-          subscriptionId: subscription.id,
-          activeProfileId,
-          monthlyLimit,
-          cycleStartAt,
-          dayStartAt,
-        })
-      : null;
+    const supportsProfileBreakdown =
+      subscription.tier === 'family' || subscription.tier === 'pro';
+    const usageBreakdown =
+      activeProfileId && supportsProfileBreakdown
+        ? await getUsageBreakdownForProfile(db, {
+            subscriptionId: subscription.id,
+            activeProfileId,
+            monthlyLimit,
+            cycleStartAt,
+            dayStartAt,
+          })
+        : null;
     const visibleUsedThisMonth =
       usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer
         ? (usageBreakdown.selfUsedThisMonth ?? 0)
