@@ -1,31 +1,26 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import { useProfiles, useUpdateProfileName } from './use-profiles';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
+const originalFetch = globalThis.fetch;
+
+const mockGetToken = jest.fn().mockResolvedValue('mock-token');
+type MockAuthState = {
+  isSignedIn: boolean;
+  userId: string | undefined;
+  getToken: typeof mockGetToken;
+};
+const mockUseAuth = jest.fn<MockAuthState, []>(() => ({
+  isSignedIn: true,
+  userId: 'user-1',
+  getToken: mockGetToken,
 }));
-
-jest.mock('../lib/profile', () => ({}));
-
-const mockUseAuth = jest.fn(() => ({ isSignedIn: true }));
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => mockUseAuth(),
 }));
@@ -33,21 +28,38 @@ jest.mock('@clerk/clerk-expo', () => ({
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  mockGetToken.mockReset();
+  mockGetToken.mockResolvedValue('mock-token');
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({
+    isSignedIn: true,
+    userId: 'user-1',
+    getToken: mockGetToken,
+  });
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
 describe('useProfiles', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('returns profiles from API', async () => {
     const profiles = [
       {
@@ -121,7 +133,11 @@ describe('useProfiles', () => {
   });
 
   it('does not fetch when user is not signed in', async () => {
-    mockUseAuth.mockReturnValue({ isSignedIn: false });
+    mockUseAuth.mockReturnValue({
+      isSignedIn: false,
+      userId: undefined,
+      getToken: mockGetToken,
+    });
 
     const { result } = renderHook(() => useProfiles(), {
       wrapper: createWrapper(),
@@ -135,15 +151,6 @@ describe('useProfiles', () => {
 });
 
 describe('useUpdateProfileName', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('sends PATCH with displayName and invalidates profiles', async () => {
     const updatedProfile = {
       id: 'p1',

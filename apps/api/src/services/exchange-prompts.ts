@@ -5,6 +5,11 @@ import {
   type HomeworkMode,
 } from '@eduagent/schemas';
 import { buildAppHelpPromptBlock } from './app-help-map';
+import {
+  challengeOfferPrompt,
+  challengeRoundActivePrompt,
+  challengeRoundDraftingPrompt,
+} from './challenge-round/prompts';
 import { getEscalationPromptGuidance } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
@@ -1153,6 +1158,19 @@ export function buildSystemPrompt(
         '- Do not introduce brick, building-block, wall, organ, membrane, grow, reproduce, respond, molecule, atom, protein, virus, "processes of life", "function on its own", "can do on its own", "all by itself", "fundamental piece", or "main job" examples unless those exact words are in the source pack.',
     );
   }
+
+  // Challenge Round prompt block — state → prompt mapping (canonical).
+  // See docs/plans/2026-05-18-challenge-round-into-note.md Task 7 Step 3.
+  const cr = context.challengeRound;
+  const challengeEligible = context.challengeEligible ?? false;
+  if (cr?.state === 'offered' || (!cr && challengeEligible)) {
+    sections.push(challengeOfferPrompt);
+  } else if (cr?.state === 'accepted' || cr?.state === 'active') {
+    sections.push(challengeRoundActivePrompt);
+  } else if (cr?.state === 'drafting') {
+    sections.push(challengeRoundDraftingPrompt);
+  }
+  // complete | declined | aborted | (undefined && !eligible) → no challenge block
 
   sections.push(
     'FINAL OUTPUT FILTER:\n' +

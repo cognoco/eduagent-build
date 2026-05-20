@@ -72,6 +72,9 @@ export const assessments = pgTable(
       .default('recall'),
     status: assessmentStatusEnum('status').notNull().default('in_progress'),
     masteryScore: numericAsNumber('mastery_score', { precision: 3, scale: 2 }),
+    masteryChallengeVerifiedAt: timestamp('mastery_challenge_verified_at', {
+      withTimezone: true,
+    }),
     qualityRating: integer('quality_rating'),
     exchangeHistory: jsonb('exchange_history').notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -153,6 +156,10 @@ export const needsDeepeningTopics = pgTable(
     consecutiveSuccessCount: integer('consecutive_success_count')
       .notNull()
       .default(0),
+    source: text('source').notNull().default('system_signal'),
+    concept: text('concept'),
+    misconception: text('misconception'),
+    correction: text('correction'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

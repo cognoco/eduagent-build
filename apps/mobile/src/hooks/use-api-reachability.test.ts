@@ -2,9 +2,10 @@ import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { Platform, AppState, type AppStateStatus } from 'react-native';
 import { useApiReachability } from './use-api-reachability';
 
-jest.mock('../lib/api', () => ({
-  getApiUrl: () => 'https://api-test.example.com',
-}));
+// Ensure getApiUrl() resolves via env var rather than expo-constants native module.
+// test-utils/app-hook-test-utils sets EXPO_PUBLIC_API_URL, but this test does not
+// import that module, so we set the var directly here.
+process.env.EXPO_PUBLIC_API_URL ??= 'http://localhost:8787';
 
 const mockFetch = jest.fn();
 beforeAll(() => {

@@ -243,6 +243,7 @@ export const topicProgressSchema = z.object({
   daysSinceLastReview: z.number().int().min(0).nullable(),
   struggleStatus: struggleStatusSchema,
   masteryScore: z.number().min(0).max(1).nullable(),
+  masteryChallengeVerifiedAt: z.string().datetime().nullable().optional(),
   summaryExcerpt: z.string().nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']).nullable(),
   totalSessions: z.number().int().min(0),

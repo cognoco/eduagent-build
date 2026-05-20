@@ -1,6 +1,10 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import {
   useVocabulary,
   useCreateVocabulary,
@@ -9,37 +13,35 @@ import {
 import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
 describe('useVocabulary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('fetches vocabulary list for a subject', async () => {
     const vocabularyData = {
       vocabulary: [
@@ -123,15 +125,6 @@ describe('useVocabulary', () => {
 });
 
 describe('useCreateVocabulary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('creates a vocabulary item', async () => {
     const createdVocab = {
       vocabulary: {
@@ -200,15 +193,6 @@ describe('useCreateVocabulary', () => {
 });
 
 describe('useReviewVocabulary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('submits a vocabulary review', async () => {
     const reviewResult = { success: true };
     mockFetch.mockResolvedValueOnce(

@@ -208,6 +208,23 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 ---
 
+## Challenge Round
+
+Challenge Round is the assessment mode where the tutor proposes a timed retrieval challenge after sufficient practice. All code lives under `apps/api/src/services/challenge-round/` and `apps/mobile/src/components/challenge-round/`.
+
+- **Trigger:** `apps/api/src/services/challenge-round/trigger.ts` — `evaluateChallengeReadiness()` runs in `prepareExchangeContext()` before each exchange. Hard-gates homework/review/quiz/freeform/practice/recall/dictation, struggling status, short streaks, in-flight round, decline cooldown (24h per profile+topic), and insufficient remaining-turn budget (`MIN_CHALLENGE_REMAINING_TURNS = 5`).
+- **State machine:** `apps/api/src/services/challenge-round/state.ts` — `transitionChallengeState()` enforces legal transitions; lives in `sessionMetadata.challengeRound` and is parsed via `challengeRoundSessionStateSchema` from `@eduagent/schemas`.
+- **Prompt blocks:** `apps/api/src/services/challenge-round/prompts.ts` exports `challengeOfferPrompt`, `challengeRoundActivePrompt`, `challengeRoundDraftingPrompt`. Injected by `exchange-prompts.ts` based on `challengeRound.state` + `challengeEligible`.
+- **Envelope signals:** `signals.challenge_round_offer: boolean` and `signals.challenge_round_evaluation: ChallengeRoundEvaluationItem[]` (each item has `concept`, `result ∈ {solid, partial, missing, misconception}`, `evidence`, `answerEventId`, `learnerQuote`, optional `correction`). UI hints: `ui_hints.challenge_round` (active/index/total) and `ui_hints.note_draft` (content + source_concepts + source_answer_event_ids). All defined in `packages/schemas/src/llm-envelope.ts`.
+- **Mastery decision:** `decideMasteryAndReview()` in `apps/api/src/services/challenge-round/evaluation.ts`. Server-owned and conservative — mastery only when every evaluation is `solid`; mixed outcomes write `needs_deepening_topics` rows with `source = 'challenge_round'` and never mark mastery; empty evaluation returns `outcome: 'invalid'` (CRIT-9).
+- **Note-draft guard:** `apps/api/src/services/challenge-round/note-draft.ts` — `validateNoteDraft()` requires ≥40% lexical overlap with `solidAnswerQuotes` (Unicode-aware tokenizer with character n-gram fallback for non-spaced scripts). Drafter is fed ONLY solid quotes, never the full transcript or partial/misconception text.
+- **Routes:** `POST /challenge-round/{maybe-offer,accept,decline,abort}` — all profile-scoped via `createScopedRepository`. "Too easy" mobile chip calls `/maybe-offer`; if eligible, the offer card renders, otherwise the chip falls through to today's `too_easy` system-prompt dispatch.
+- **Mobile components:** `ChallengeOfferCard`, `ChallengeRoundBanner`, `DraftedNoteReview`, `use-challenge-round` hook. Streaming hook (`use-session-streaming.ts`) consumes typed `done`-frame fields only — never parses raw envelope JSON from chat text.
+- **Cooldowns:** `challenge_round_cooldowns` table (profile_id × topic_id unique) records 24h cooldown after decline.
+- **Routing:** Challenge Round never bypasses commercial policy. Offer turns route normally; `accepted|active|drafting` turns set `ExchangeContext.llmRoutingRung = max(escalationRung, 4)` and feed it through `resolveExchangeLlmRouting()`. Family standard stays Gemini-only; OpenAI advanced candidate stays rung 5+.
+
+---
+
 ## Usage Guidelines
 
 **For AI Agents:**

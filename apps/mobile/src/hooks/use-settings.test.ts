@@ -1,6 +1,10 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import {
   useNotificationSettings,
   useCelebrationLevel,
@@ -12,49 +16,35 @@ import {
 } from './use-settings';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id', isOwner: true },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id', isOwner: true }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
 describe('useNotificationSettings', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches notification settings from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -111,15 +101,6 @@ describe('useNotificationSettings', () => {
 });
 
 describe('useCelebrationLevel', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches celebration level from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ celebrationLevel: 'big_only' }), {
@@ -140,15 +121,6 @@ describe('useCelebrationLevel', () => {
 });
 
 describe('useFamilyPoolBreakdownSharing', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches family pool breakdown sharing from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ value: true }), { status: 200 }),
@@ -167,15 +139,6 @@ describe('useFamilyPoolBreakdownSharing', () => {
 });
 
 describe('useUpdateNotificationSettings', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls PUT with notification preferences', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -213,15 +176,6 @@ describe('useUpdateNotificationSettings', () => {
 });
 
 describe('useRegisterPushToken', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST with push token', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ registered: true }), { status: 200 }),
@@ -240,15 +194,6 @@ describe('useRegisterPushToken', () => {
 });
 
 describe('useUpdateCelebrationLevel', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls PUT with celebration level', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ celebrationLevel: 'off' }), {
@@ -269,15 +214,6 @@ describe('useUpdateCelebrationLevel', () => {
 });
 
 describe('useUpdateFamilyPoolBreakdownSharing', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls PUT with the sharing value', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ value: true }), { status: 200 }),

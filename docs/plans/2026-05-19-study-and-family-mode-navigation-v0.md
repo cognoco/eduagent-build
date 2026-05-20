@@ -37,7 +37,7 @@
 
 ### Modified files
 
-- `apps/mobile/src/lib/profile.ts` — add `isFamilyCapableProfile()`; **move** the inline `PROFILE_SCOPED_KEYS` (currently inside `switchProfile`, `profile.ts:252-307`) to a module-level `const` and export it. **No prefix additions needed** — `'session'` (line 262), `'session-summary'` (264), `'session-transcript'` (265), and `'parking-lot'` (294) are already present (Adversarial Review Pass 2 CRITICAL-1).
+- `apps/mobile/src/lib/profile.ts` — add `isFamilyCapableProfile()`; **move** the inline `PROFILE_SCOPED_KEYS` (currently inside `switchProfile`, `profile.ts:275-330`) to a module-level `const` and export it. **No prefix additions needed** — `'session'` (line 285), `'session-summary'` (287), `'session-transcript'` (288), and `'parking-lot'` (317) are already present (Adversarial Review Pass 2 CRITICAL-1, lines re-verified in Pass 3 CRITICAL-1).
 - `apps/mobile/src/lib/profile.test.tsx` — `isFamilyCapableProfile` cases; `MODE_SCOPED_KEYS ⊆ PROFILE_SCOPED_KEYS` guard.
 - `apps/mobile/src/lib/query-keys.ts` — add `mode` segment to mode-scoped factories per §Task 8 table.
 - `apps/mobile/src/lib/query-keys.test.ts` — update expected key shapes.
@@ -173,6 +173,11 @@ Stage `apps/mobile/src/lib/feature-flags.ts`, `apps/mobile/src/lib/feature-flags
 ---
 
 ## Flip workflow (operator runbook)
+
+**Pass 3 MEDIUM-4 — prerequisite.** The flag value is statically inlined by Metro at OTA-bundle time (`process.env.EXPO_PUBLIC_*` is a build-time replacement). The OTA flip only works if the binary on the device is at a build that **already includes the v0 code** (Tasks 0-16 merged + an EAS Build cut). Before the first flip:
+- Verify the device's runtime version matches the EAS update branch (`eas update --branch production` only delivers to compatible binaries).
+- If the user is on an older binary, no OTA bundle will land — the flip silently does nothing. Cut a new EAS Build first.
+- After the first build is on the device, every subsequent flip is ~5 min via OTA.
 
 When you (the operator) want to turn the feature **on** or **off** after the build is on a device:
 
@@ -475,6 +480,11 @@ export type AppMode = 'study' | 'family';
 export interface AppContextValue {
   mode: AppMode | null;
   setMode: (next: AppMode) => void;
+  // Pass 3 HIGH-3: expose the capability derived in the provider so Task 4.4's
+  // tab composition does not call `isFamilyCapableProfile()` a second time
+  // (drift risk if the provider's `useProfile()` snapshot ever diverges from
+  // the layout's snapshot via memoization or a future wrapper provider).
+  familyCapable: boolean;
 }
 
 const AppContext = createContext<AppContextValue>({
@@ -482,6 +492,7 @@ const AppContext = createContext<AppContextValue>({
   setMode: () => {
     // no-op default; real provider supplies the setter
   },
+  familyCapable: false,
 });
 
 export function useAppContext(): AppContextValue {
@@ -524,9 +535,16 @@ export function AppContextProvider({
     linkedNonOwnerCount,
   ]);
 
+  // Pass 3 HIGH-3: also publish `familyCapable` so Task 4.4 can read it from
+  // context instead of re-deriving via a second `isFamilyCapableProfile()`
+  // call. This keeps tab composition and mode derivation in lockstep.
+  const familyCapable = activeProfile
+    ? isFamilyCapableProfile(activeProfile, profiles)
+    : false;
+
   const value = useMemo<AppContextValue>(
-    () => ({ mode, setMode: (next) => setMode(next) }),
-    [mode],
+    () => ({ mode, setMode: (next) => setMode(next), familyCapable }),
+    [mode, familyCapable],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -558,11 +576,20 @@ const derivedMode = useMemo<AppMode | null>(() => {
 }, [isLoading, activeProfile?.id, activeProfile?.isOwner, activeProfile?.birthYear, linkedNonOwnerCount]);
 // Override is cleared whenever the derivation key (identity) changes.
 useEffect(() => { setModeOverride(null); }, [activeProfile?.id]);
-const mode = modeOverride ?? derivedMode;
+// Pass 3 HIGH-1: also clear the override if it points at a mode the user
+// can no longer be in (e.g. user explicitly chose Family, then unlinked the
+// last child → capability collapses to study-only, but the 'family' override
+// would otherwise stick and render Family tabs against empty data).
+// `family` requires family-capability; `study` is always permitted.
+const overrideAllowed =
+  modeOverride === null ||
+  modeOverride === 'study' ||
+  (modeOverride === 'family' && derivedMode === 'family');
+const mode = overrideAllowed ? (modeOverride ?? derivedMode) : derivedMode;
 const setMode = useCallback((next: AppMode) => setModeOverride(next), []);
 ```
 
-This keeps Route Survival (Task 5) and the chip switch (Task 6) working — they call `setMode(next)` which pins an override until identity changes. The identity-loss reset (AC #27) still fires because `derivedMode` collapses to `null` synchronously when `activeProfile === null`, and the override-clear effect runs the moment `activeProfile?.id` swaps. The cross-account safety test (Task 15.2) verifies this. **Add a Task 4 / Task 15 assertion that `computeModeVisibleTabs` is never called with `null` once profiles have resolved.**
+This keeps Route Survival (Task 5) and the chip switch (Task 6) working — they call `setMode(next)` which pins an override until identity changes OR the override mode becomes invalid for the current capability. The identity-loss reset (AC #27) still fires because `derivedMode` collapses to `null` synchronously when `activeProfile === null`, and the override-clear effect runs the moment `activeProfile?.id` swaps. The cross-account safety test (Task 15.2) verifies this. **Add a Task 4 / Task 15 assertion that `computeModeVisibleTabs` is never called with `null` once profiles have resolved.**
 
 - **Fallback option (only if the synchronous derivation above is rejected in review).** Fall back to the legacy `computeVisibleTabs(tabShape, isParentProxy)` whenever `mode === null` (Task 4.4 below) instead of returning ∅. This preserves the existing tab set during the boot frame. Pick one path; do not ship both.
 
@@ -722,8 +749,11 @@ import { isFamilyCapableProfile } from '../../lib/profile';
 
 // inside AppLayoutInner, alongside the existing useProfile() / useParentProxy()
 // reads (around _layout.tsx:1407):
-const { mode } = useAppContext();
-const familyCapable = isFamilyCapableProfile(activeProfile, profiles);
+// Pass 3 HIGH-3: read `familyCapable` from context — do NOT call
+// isFamilyCapableProfile() here. The provider already computed it from the
+// same useProfile() snapshot; calling it again would risk drift if a future
+// wrapper provider memoizes or throttles between the two reads.
+const { mode, familyCapable } = useAppContext();
 
 // Replace the existing useMemo at _layout.tsx:1411-1414 with this composition.
 // Hard Rule #10 precedence: proxy > boot-null > family-capable mode > legacy.
@@ -953,35 +983,25 @@ Implementation tip: do not jest.mock the analytics module — read the breadcrum
 In `apps/mobile/src/app/(app)/home.tsx`:
 
 ```tsx
-import { useRef } from 'react';
+// Pass 3 HIGH-2: use the shared useModeSwitch hook (defined in Task 7) so
+// the chip and the activation card share one reentrancy guard, one analytics
+// site, and one mode-scoped invalidation. Do NOT inline a copy here — drift
+// risk between this site and the activation card is the entire motivation for
+// the shared hook.
 import { useAppContext } from '../../lib/app-context';
-import { isFamilyCapableProfile } from '../../lib/profile';
-import { bucketAccountAge, hashProfileId, track } from '../../lib/analytics';
+import { useModeSwitch } from '../../lib/use-mode-switch';
 
 // inside HomeScreen, after celebration setup:
-const { mode, setMode } = useAppContext();
-const familyCapable = isFamilyCapableProfile(activeProfile, profiles);
-const switchingRef = useRef(false);
+const { mode, familyCapable } = useAppContext();
+const { switchTo } = useModeSwitch();
 
 const onModeSwitch = () => {
-  if (!mode || !activeProfile) return;
-  if (switchingRef.current) return; // reentrancy guard
-  switchingRef.current = true;
-  const next = mode === 'family' ? 'study' : 'family';
-  track('mode_switched', {
-    from: mode,
-    to: next,
-    profileIdHash: hashProfileId(activeProfile.id),
-    accountAgeBucket: bucketAccountAge(activeProfile.createdAt),
-  });
-  setMode(next);
-  router.replace('/(app)/home');
-  // Release the guard on next tick so navigation can settle.
-  setTimeout(() => {
-    switchingRef.current = false;
-  }, 0);
+  if (!mode) return;
+  switchTo(mode === 'family' ? 'study' : 'family');
 };
 ```
+
+Note: Task 7 defines `useModeSwitch` — if Task 7 has not yet been merged when Task 6 lands, either (a) sequence Task 7 before Task 6, or (b) inline the body of `useModeSwitch.switchTo` in `home.tsx` and refactor when Task 7 lands. The plan's task ordering can absorb either choice; the coordinator picks.
 
 Render the chip above `<LearnerScreen>` inside the existing return JSX, only when `familyCapable && mode !== null`. Pass `mode` to `<LearnerScreen mode={mode}>` as a new prop.
 
@@ -1047,6 +1067,55 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/app/\(app\)/home.tsx src
 **Files:**
 - Modify: `apps/mobile/src/components/home/ParentHomeScreen.tsx`
 - Modify: its co-located test file (or create)
+- Create: `apps/mobile/src/lib/use-mode-switch.ts` (Pass 3 HIGH-2 shared helper)
+
+**Pass 3 HIGH-2 — extract `useModeSwitch()` shared helper.** The chip (Task 6), the activation card (Task 7), and Task 12's mode-switch invalidation all share the same semantics: reentrancy guard, analytics, `setMode`, `queryClient.invalidateQueries(MODE_SCOPED_KEYS predicate)`, `router.replace('/(app)/home')`. Originally the plan inlined these in two places and deferred invalidation to Task 12. A subagent executing Task 7 in isolation would ship the activation card WITHOUT invalidation (Task 12 not yet run). Fix: extract the entire handler into `useModeSwitch()` and reuse from both call sites in Task 6 and Task 7. Then Task 12 only needs to add invalidation to the single hook implementation.
+
+Create `apps/mobile/src/lib/use-mode-switch.ts`:
+
+```ts
+import { useCallback, useRef } from 'react';
+import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAppContext } from './app-context';
+import { useProfile } from './profile';
+import { bucketAccountAge, hashProfileId, track } from './analytics';
+import { MODE_SCOPED_KEYS } from './mode-scoped-keys';
+
+export function useModeSwitch(): { switchTo: (target: 'study' | 'family') => void } {
+  const { mode, setMode } = useAppContext();
+  const { activeProfile } = useProfile();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const switchingRef = useRef(false);
+
+  const switchTo = useCallback((target: 'study' | 'family') => {
+    if (!mode || !activeProfile) return;
+    if (mode === target) return;
+    if (switchingRef.current) return; // reentrancy guard
+    switchingRef.current = true;
+    track('mode_switched', {
+      from: mode,
+      to: target,
+      profileIdHash: hashProfileId(activeProfile.id),
+      accountAgeBucket: bucketAccountAge(activeProfile.createdAt),
+    });
+    setMode(target);
+    void queryClient.invalidateQueries({
+      predicate: (q) =>
+        MODE_SCOPED_KEYS.includes(
+          String(q.queryKey[0]) as (typeof MODE_SCOPED_KEYS)[number],
+        ),
+    });
+    router.replace('/(app)/home');
+    setTimeout(() => { switchingRef.current = false; }, 0);
+  }, [mode, activeProfile, setMode, queryClient, router]);
+
+  return { switchTo };
+}
+```
+
+The chip (Task 6) and the activation card both call `useModeSwitch().switchTo('study')` or `switchTo('family')`. Task 12 collapses to "verify the hook performs the invalidation" — no double-edit risk.
 
 - [ ] **Step 7.1: Write failing test.**
 
@@ -1067,10 +1136,12 @@ import { useAppContext } from '../../lib/app-context';
 const { mode, setMode } = useAppContext();
 const router = useRouter();
 
-const onGoToMyLearning = () => {
-  setMode('study');
-  router.replace('/(app)/home');
-};
+// Pass 3 HIGH-2: reuse the shared mode-switch hook so the activation card
+// gets the same reentrancy guard, analytics, and Task 12 invalidation as the
+// chip. Do NOT inline a one-liner setMode + router.replace here — it would
+// ship the activation card without invalidation if Task 12 runs late.
+const { switchTo } = useModeSwitch();
+const onGoToMyLearning = () => switchTo('study');
 
 {mode === 'family' && !isParentProxy ? (
   <View className="mx-5 mt-4 p-4 bg-surface rounded-card border border-border">
@@ -1278,7 +1349,7 @@ Add a defense-in-depth gate to the fetch hooks themselves (see Task 11b update b
 **Files:**
 - Create: `apps/mobile/src/lib/mode-scoped-keys.ts`
 - Create: `apps/mobile/src/lib/mode-scoped-keys.test.ts`
-- Modify: `apps/mobile/src/lib/profile.ts` (move inline `PROFILE_SCOPED_KEYS` to module-level `const` and export it — see Adversarial Review Pass 2 CRITICAL-1: the four mode-scoped prefixes are **already present** in the existing list at `profile.ts:262, 264, 265, 294`. No additions needed. Earlier review-pass note "forward-only bug fix" was stale.)
+- Modify: `apps/mobile/src/lib/profile.ts` (move inline `PROFILE_SCOPED_KEYS` to module-level `const` and export it — see Adversarial Review Pass 2 CRITICAL-1: the four mode-scoped prefixes are **already present** in the existing list. Re-verified in Pass 3 CRITICAL-1: actual line numbers are `'session'` 285, `'session-summary'` 287, `'session-transcript'` 288, `'parking-lot'` 317. Pass 2's cited lines 262/264/265/294 were wrong — those lines contain `pushProfileIdToApiClient(...)`, comments, and `'streak'` respectively. No additions needed. Re-read the file before moving.)
 - Modify: `apps/mobile/src/lib/profile.test.tsx` (guard test)
 
 - [ ] **Step 10.1: Write the guard test.**
@@ -1342,7 +1413,7 @@ export type ModeScopedKey = (typeof MODE_SCOPED_KEYS)[number];
 
 In `apps/mobile/src/lib/profile.ts`:
 
-1. **Copy the existing array verbatim** from `profile.ts:252-307` to module-level. Do not retype, trim, or reorder — the live list has 52 entries. **Do not add anything** — the four mode-scoped prefixes (`'session'`, `'session-summary'`, `'session-transcript'`, `'parking-lot'`) are already in the list (lines 262, 264, 265, 294). The plan revision history previously claimed they needed to be added; that claim was based on an out-of-date read of the file (Adversarial Review Pass 2 CRITICAL-1 / CRITICAL-2). Re-read the file before the move.
+1. **Copy the existing array verbatim** from `profile.ts:275-330` to module-level. Do not retype, trim, or reorder — the live list has ~55 entries. **Do not add anything** — the four mode-scoped prefixes are already in the list at: `'session'` line 285, `'session-summary'` line 287, `'session-transcript'` line 288, `'parking-lot'` line 317 (Pass 3 CRITICAL-1 re-verified citations; Pass 2's lines 262/264/265/294 were wrong). The plan revision history previously claimed they needed to be added; that claim was based on an out-of-date read of the file (Adversarial Review Pass 2 CRITICAL-1 / CRITICAL-2). Re-read the file before the move.
 
 ```ts
 // Module-level so the test guard and consumers can import.
@@ -1510,6 +1581,8 @@ The following hooks accept a `profileId` argument that can refer to a non-self p
 
 This is **defense in depth**: Task 9's `selectedProfileId` reset is the primary fix; this gate stops a future refactor that misses the reset from leaking data anyway. Add a test that primes `selectedProfileId=childId`, sets `mode='study'`, and asserts no call to `client.dashboard.children[':profileId'].*` is observed.
 
+**Pass 3 MEDIUM-3 — `useProfileSessionsArchive` (`use-progress.ts:457-489`).** This hook builds its key by spreading `queryKeys.progress.profileSessions(profileId, activeProfile?.id)` then appending `'archive'`. After Task 11a inserts `mode` into the `profileSessions` factory, the archive key auto-becomes `['progress', mode, 'profile', profileId, 'sessions', activeProfileId, 'archive']` — mode-segmented for free, no Task 11b edit needed. **No leak risk** (existing `enabled: profileId === activeProfile.id` is self-only) but the cold-refetch cost (Pass 2 MEDIUM-3) does apply on mode toggle. List in PR description for completeness; no code change in this hook.
+
 - [ ] **Step 11b.3: Run hook tests and typecheck.**
 
 ```bash
@@ -1621,9 +1694,12 @@ When all three are green, commit via `/commit` with a message that lists all thr
 
 ## Task 12: Mode-switch query invalidation
 
+**Pass 3 HIGH-2 update:** If Task 7 introduced the shared `useModeSwitch()` hook (`apps/mobile/src/lib/use-mode-switch.ts`), the invalidation is already wired there — both the chip and the activation card pick it up for free. In that case Task 12 collapses to "(a) write the regression test, (b) verify the predicate path in the hook is correct." If for some reason the shared hook was NOT extracted, fall back to the original Task 12 wording below: extend both `onModeSwitch` (Task 6) and `onGoToMyLearning` (Task 7) handlers in place.
+
 **Files:**
-- Modify: `apps/mobile/src/app/(app)/home.tsx` (extend the existing `onModeSwitch` handler from Task 6)
-- Modify: `apps/mobile/src/components/home/ParentHomeScreen.tsx` (extend the activation-card handler from Task 7)
+- Modify: `apps/mobile/src/lib/use-mode-switch.ts` (verify / add the predicate invalidation; this is where it should live in the Pass 3 design)
+- (Fallback only) Modify: `apps/mobile/src/app/(app)/home.tsx` (extend the existing `onModeSwitch` handler from Task 6)
+- (Fallback only) Modify: `apps/mobile/src/components/home/ParentHomeScreen.tsx` (extend the activation-card handler from Task 7)
 
 - [ ] **Step 12.1: Write failing test in `home.test.tsx`.**
 
@@ -1669,8 +1745,10 @@ Apply the same call in the activation-card handler in `ParentHomeScreen.tsx`.
 
 ## Task 13: Proxy normal-path hide-out
 
+**Pass 3 MEDIUM-1 — expected scope: zero production call sites.** A pre-plan grep of `apps/mobile/src/**` for `setProxyMode(true)` returns only 4 matches and ALL are test files (`api-client.test.tsx:102`, `use-parent-proxy.test.ts:66`, `use-sessions.test.ts:854, 887`). There are no user-facing production callers today — the user-facing affordance was already removed in a prior pass. Step 13.4 ("delete the identified user-facing call sites") is expected to be a **no-op**. The task's real deliverable is Step 13.3's forward-only guard test, which prevents regressions. Do NOT hunt for ghost affordances; if Step 13.1's grep also returns zero production hits, jump directly to Step 13.3 + Step 13.5.
+
 **Files:**
-- Identify and remove user-facing `setProxyMode(true)` call sites.
+- (Likely no production edits) Identify and remove user-facing `setProxyMode(true)` call sites if any exist beyond the 4 known test files.
 - Preserve: the `setProxyMode` function itself, `signOutWithCleanup`'s `setProxyMode(false)`, `PARENT_PROXY_KEY` SecureStore handling, `PARENT_PROXY_TABS`, and `onSwitchBack` in `_layout.tsx:1685`.
 
 - [ ] **Step 13.1: Enumerate call sites.**
@@ -1770,9 +1848,15 @@ export function RequireFamilyContext({
     }
   }, [mode, capable, setMode]);
 
-  if (mode === null) return null; // boot — defer
+  // Pass 3 MEDIUM-2: do NOT return bare `null` in the boot / mid-switch path —
+  // it paints a blank screen for one or more frames, the same flicker class
+  // spec AC #15 bans. Render a minimal loading shim that matches the rest of
+  // the app's loading pattern (background-colored View, no content). Match
+  // whatever the nearest co-located loading state looks like
+  // (e.g. `<View className="flex-1 bg-background" />`).
+  if (mode === null) return <View className="flex-1 bg-background" testID="require-family-loading" />; // boot — defer
   if (mode === 'family') return <>{children}</>;
-  if (capable) return null; // mid-switch; next render renders children
+  if (capable) return <View className="flex-1 bg-background" testID="require-family-switching" />; // mid-switch; next render renders children
   // Non-capable user reached this route via deep link or notification:
   return (
     <View className="flex-1 items-center justify-center bg-background px-6" testID="require-family-fallback">
@@ -2106,3 +2190,26 @@ Second adversarial pass — challenged Pass 1's output against current code. Fin
 | LOW-1 | Task 14.5 said "three distinct nested routes" but didn't distinguish static vs dynamic; static routes (`index`, `mentor-memory`, `reports`) aren't in the `<Stack.Screen>` children — explicit wrap-each-screen regression would leave them unguarded | `apps/(app)/child/[profileId]/_layout.tsx` lists only 5 dynamic screens; filesystem shows 3 static routes | Updated Step 14.5 to require at least one static + one dynamic route, with rationale |
 
 **Carry-forward to the spec.** Pass 2 CRITICAL-1 (stale "add four prefixes" claim) and CRITICAL-3 (`selectedProfileId` reset + foreign-profile `enabled` gate) also affect the spec source-of-truth (`docs/specs/2026-05-19-study-and-family-mode-navigation-v0.md` §Hard Rule #7 last sentence and §Step 7). Surface to the spec owner; per the plan preamble "when this plan and the spec disagree, the spec wins — pause and amend." The plan's Pass 2 edits are the implementation-side hardening; the spec should also drop the "forward-only bug fix" sentence in §Hard Rule #7 and add the `selectedProfileId` reset + foreign-profile `enabled` rules to §Hard Rule #2 / §Step 7.
+
+---
+
+## Adversarial Review Pass 3 (2026-05-19)
+
+Third adversarial pass — challenged Pass 1 + Pass 2's output against current code; verified cited line numbers; looked for class-of-bug gaps Pass 2 missed.
+
+| ID (Pass 3) | Severity | Issue | Evidence | Resolution |
+|---|---|---|---|---|
+| CRITICAL-1 | CRITICAL | Pass 2 CRITICAL-1's resolution cites lines 262/264/265/294 for the four mode-scoped keys — those lines contain `pushProfileIdToApiClient(...)`, comments, and `'streak'`. Actual locations are 285, 287, 288, 317. A subagent who reads the cited lines will conclude the keys are missing and "add" them, causing duplicates that break the `MODE_SCOPED_KEYS ⊆ PROFILE_SCOPED_KEYS` invariant test. | `apps/mobile/src/lib/profile.ts:275-330` (verified by direct file read 2026-05-19) | Re-cited correct line numbers in (a) File Inventory profile.ts entry, (b) Task 10 header, (c) Task 10 Step 10.4 |
+| HIGH-1 | HIGH | `setMode` override survives capability loss — e.g. user `setMode('family')`, then unlinks last child → `derivedMode` collapses to `'study'`, but the `'family'` override sticks via `modeOverride ?? derivedMode`. User stays in Family mode with no children → Recent-child-activity empty state, Progress picker empty, broken UX. | Plan Task 2 Step 2.3 mode resolver — `modeOverride ?? derivedMode` has no capability gate | Added `overrideAllowed` guard to the mode resolver — `'family'` override only honored when `derivedMode === 'family'`; `'study'` override always allowed |
+| HIGH-2 | HIGH | Task 7's activation-card handler is shown WITHOUT `MODE_SCOPED_KEYS` invalidation — invalidation is deferred to Task 12, which says "apply the same call". A subagent doing Task 7 in isolation (per `superpowers:subagent-driven-development`, the plan's recommended path) ships the activation card without invalidation; Task 12 then double-edits one site and misses the other if the executor reads "extend the handler" literally. Same risk for Task 6 chip → Task 12. | Plan Task 7 Step 7.3 (no invalidation in sample) vs Task 12 ("extend ... apply the same call") | Extracted `useModeSwitch()` shared hook (`apps/mobile/src/lib/use-mode-switch.ts`) carrying reentrancy guard + analytics + invalidation + router.replace. Task 6 chip + Task 7 activation card both consume it. Task 12 collapses to "verify hook + write regression test" |
+| HIGH-3 | HIGH | `isFamilyCapableProfile()` computed twice — once in `AppContextProvider` (drives `derivedMode`), once in `AppLayoutInner` Task 4.4 (gates the mode-vs-legacy composition). Both reads work off the same `useProfile()` snapshot today, but a future wrapper provider that memoizes/throttles between the two reads could desync them, leading to mode='family' but composition path = legacy. | Plan Task 2 + Task 4.4 both call `isFamilyCapableProfile(activeProfile, profiles)` independently | Exposed `familyCapable` from `AppContextValue`; Task 4.4 now reads `const { mode, familyCapable } = useAppContext()` |
+| MEDIUM-1 | MEDIUM | Task 13 ("proxy normal-path hide-out") expects to find production `setProxyMode(true)` call sites and delete them — but a grep across `apps/mobile/src/**` returns ZERO production hits (4 matches, all test files). Task wording sends an implementer hunting for ghost affordances. | `setProxyMode(true)` grep: `api-client.test.tsx:102`, `use-parent-proxy.test.ts:66`, `use-sessions.test.ts:854, 887` — all tests | Added explicit "expected scope: zero production call sites" header to Task 13; the forward-only guard test (Step 13.3) is the real deliverable |
+| MEDIUM-2 | MEDIUM | `RequireFamilyContext` returns bare `null` in the boot frame and mid-switch frame → blank screen for at least one render. Same flicker class spec AC #15 prohibits at the tab-shell level. | Plan Task 14 Step 14.3 — `if (mode === null) return null; ... if (capable) return null` | Replaced both bare-null returns with a minimal background-colored View shim that matches the existing app loading pattern; added testIDs |
+| MEDIUM-3 | MEDIUM | `useProfileSessionsArchive` (`use-progress.ts:457-489`) builds its key by spreading `queryKeys.progress.profileSessions(profileId, activeProfile?.id)` and appending `'archive'`. After Task 11a inserts `mode` into the factory, the archive key auto-becomes mode-segmented — Task 11b's hook table doesn't list it, so a reviewer might think it was missed. | `use-progress.ts:457-489` | Added Pass 3 MEDIUM-3 note in Task 11b.2a clarifying that this hook is auto-segmented (no edit needed) and is self-only (no foreign-profile leak risk); cold-refetch cost from Pass 2 MEDIUM-3 applies |
+| MEDIUM-4 | MEDIUM | Task 0 "flip workflow" claims an OTA flip ships in ~5 min. True ONLY if the binary on the device already includes the v0 code. EAS Update only delivers to compatible runtime-version binaries — on a stale binary the flip silently does nothing. The runbook doesn't document this prerequisite. | Plan Task 0 "Flip workflow (operator runbook)" | Added "Pass 3 MEDIUM-4 — prerequisite" block before step 1 of the flip workflow; explicit: cut a new EAS Build first, verify runtime version match |
+| LOW-1 | LOW | Plan Task 4.4 sample uses `React.useMemo` while existing `_layout.tsx` likely uses bare `useMemo` — a subagent copy-paste introduces inconsistent import style. | Plan Step 4.4 sample code | Acknowledged; cosmetic. Resolution: implementer matches the file's existing import style (read top of `_layout.tsx` first). No plan edit. |
+| LOW-2 | LOW | Activation-card lacked reentrancy guard (chip had one via `useRef`). | Plan Task 7 vs Task 6 | Resolved by HIGH-2's shared `useModeSwitch()` hook — the guard now lives in the hook and applies to both call sites automatically. |
+
+**Process note on cascading citation errors.** Pass 3 CRITICAL-1 demonstrates a class of error worth naming: **Pass 2 cited line numbers without re-reading the file**. The cited lines 262/264/265/294 came from an earlier mental model of the file; the actual move target was at 275-330. Future review passes must `Read` the cited lines, not infer them from prior-pass notes — particularly when the prior pass labels the issue "resolved." A resolved-but-mis-cited finding is as dangerous as an unresolved one.
+
+**Carry-forward to the spec.** Pass 3 HIGH-2 (shared `useModeSwitch()` hook) and HIGH-3 (`familyCapable` exposed via context) are implementation refinements that the spec does not need to mandate — they're how, not what. Pass 3 HIGH-1 (override-vs-capability guard) is also implementation-level. No spec amendment required for Pass 3 findings.

@@ -417,6 +417,21 @@
     "appVersion": "MentoMate v1.0.0"
   },
   "session": {
+    "challenge": {
+      "offerTitle": "Up for a challenge round?",
+      "tryIt": "Try it",
+      "notNow": "Not now",
+      "dontAskAgain": "Don't ask again",
+      "banner": {
+        "question": "Question {{index}} of {{total}}"
+      },
+      "draft": {
+        "title": "Here's what you know now",
+        "save": "Save note",
+        "edit": "Edit",
+        "skip": "Skip"
+      }
+    },
     "mentorMemory": {
       "title": "Help your mentor learn how to teach you",
       "subtitle": "Add what helps, fix what feels wrong, and choose what your mentor can use.",

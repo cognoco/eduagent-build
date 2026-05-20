@@ -1,6 +1,10 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import {
   useRetentionTopics,
   useTopicRetention,
@@ -12,37 +16,35 @@ import {
 import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
 describe('useRetentionTopics', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches retention topics for a subject', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -93,15 +95,6 @@ describe('useRetentionTopics', () => {
 });
 
 describe('useTopicRetention', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches topic retention card', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -151,15 +144,6 @@ describe('useTopicRetention', () => {
 
 // FR128-129: Evaluate eligibility
 describe('useEvaluateEligibility', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches evaluate eligibility for a topic', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -217,15 +201,6 @@ describe('useEvaluateEligibility', () => {
 });
 
 describe('useSubmitRecallTest', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('submits a dont_remember recall attempt without an answer', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -266,15 +241,6 @@ describe('useSubmitRecallTest', () => {
 });
 
 describe('useTeachingPreference', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches the preferred teaching method for a subject', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -307,15 +273,6 @@ describe('useTeachingPreference', () => {
 // ---------------------------------------------------------------------------
 
 describe('useStartRelearn — no-op ["sessions"] removal (PR-10)', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   // [PR-10 guard] The old ['sessions'] invalidation in useStartRelearn was a
   // no-op (top segment 'sessions' matches no registered key; session keys use
   // 'session', 'session-transcript', etc.). Confirm it was removed.

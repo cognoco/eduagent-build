@@ -364,6 +364,65 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     },
     appliesTo: () => true,
   },
+  {
+    id: 'S20-challenge-offered',
+    purpose:
+      'Challenge Round offered — challengeEligible true, no active round; prompt should include offer block',
+    history: HISTORY_S1_RUNG1,
+    contextOverrides: {
+      escalationRung: 3,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 5,
+      retentionStatus: { status: 'strong' },
+      challengeEligible: true,
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S21-challenge-active',
+    purpose:
+      'Challenge Round active — state machine in "active"; prompt should include active-round instruction block',
+    history: HISTORY_S3_RUNG3,
+    contextOverrides: {
+      escalationRung: 3,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 6,
+      retentionStatus: { status: 'strong' },
+      challengeRound: {
+        state: 'active',
+        questionIndex: 1,
+        totalQuestions: 3,
+        offerCount: 1,
+        declinedDontAskAgain: false,
+        evaluations: [],
+      },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S22-challenge-drafting',
+    purpose:
+      'Challenge Round drafting — state machine in "drafting"; prompt should include note-draft instruction block',
+    history: HISTORY_S3_RUNG3,
+    contextOverrides: {
+      escalationRung: 3,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 9,
+      retentionStatus: { status: 'strong' },
+      challengeRound: {
+        state: 'drafting',
+        questionIndex: 3,
+        totalQuestions: 3,
+        offerCount: 1,
+        declinedDontAskAgain: false,
+        evaluations: [],
+      },
+    },
+    appliesTo: () => true,
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,10 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import {
   useCurriculum,
   useSkipTopic,
@@ -11,38 +15,33 @@ import {
 } from './use-curriculum';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
 
 const mockCurriculum = {
   id: 'curr-1',
@@ -72,15 +71,6 @@ const mockCurriculum = {
 };
 
 describe('useCurriculum', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('returns curriculum from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ curriculum: mockCurriculum }), {
@@ -142,15 +132,6 @@ describe('useCurriculum', () => {
 });
 
 describe('useSkipTopic', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   // [BREAK] [BUG-161] All 5 curriculum mutations (skip/unskip/challenge/
   // add-topic/adapt) invalidate the curriculum cache. Before the fix, the
   // invalidation key was ['curriculum', subjectId] — missing profileId.
@@ -211,15 +192,6 @@ describe('useSkipTopic', () => {
 });
 
 describe('useUnskipTopic', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST to unskip (restore) a topic', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Topic restored' }), {
@@ -244,15 +216,6 @@ describe('useUnskipTopic', () => {
 });
 
 describe('useChallengeCurriculum', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST to challenge curriculum with feedback', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ curriculum: mockCurriculum }), {
@@ -277,15 +240,6 @@ describe('useChallengeCurriculum', () => {
 });
 
 describe('useAddCurriculumTopic', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('previews a normalized topic draft', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -325,15 +279,6 @@ describe('useAddCurriculumTopic', () => {
 });
 
 describe('useExplainTopic', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls GET to explain a topic', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ explanation: 'This topic covers...' }), {

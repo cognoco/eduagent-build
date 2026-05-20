@@ -1,6 +1,12 @@
+import { createElement, type ReactNode } from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react-native';
-import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
+import { ProfileContext, type ProfileContextValue } from '../lib/profile';
 import {
   checkConsentRequirement,
   useRequestConsent,
@@ -12,27 +18,69 @@ import {
 const CURRENT_YEAR = new Date().getFullYear();
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
-  },
-}));
-
-const mockUseProfile = jest.fn(() => ({
-  activeProfile: { id: 'test-profile-id', isOwner: true },
-}));
-jest.mock('../lib/profile', () => ({
-  useProfile: () => mockUseProfile(),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
-function createWrapper() {
-  const w = createQueryWrapper();
+function createWrapper(profileId = 'test-profile-id', isOwner = true) {
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: profileId, isOwner }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
+
+/**
+ * Creates a wrapper that shares an existing QueryClient but uses a different
+ * active profile. Used in the [BREAK] cross-account cache isolation test to
+ * render two hooks on the same QueryClient with different profile identities.
+ */
+function createWrapperWithSharedQueryClient(
+  sharedQueryClient: QueryClient,
+  profileId: string,
+  isOwner = true,
+) {
+  const profile = createTestProfile({ id: profileId, isOwner });
+  const profileContextValue: ProfileContextValue = {
+    profiles: [profile],
+    activeProfile: profile,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: sharedQueryClient },
+      createElement(
+        ProfileContext.Provider,
+        { value: profileContextValue },
+        children,
+      ),
+    );
+  }
+
+  return Wrapper;
+}
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
 
 describe('checkConsentRequirement', () => {
   it('returns not required when birthYear is null', () => {
@@ -73,15 +121,6 @@ describe('checkConsentRequirement', () => {
 });
 
 describe('useRequestConsent', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('calls POST /consent/request with input', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -110,15 +149,6 @@ describe('useRequestConsent', () => {
 });
 
 describe('useChildConsentStatus', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('fetches consent status for a child profile', async () => {
     const statusData = {
       consentStatus: 'CONSENTED',
@@ -158,10 +188,12 @@ describe('useChildConsentStatus', () => {
   // (parent) profile id in the key so caches are partitioned per parent.
   it('[BREAK] does not serve parent A child consent status to parent B (cross-account leak)', async () => {
     const childId = '550e8400-e29b-41d4-a716-446655440000';
-
-    mockUseProfile.mockReturnValue({
-      activeProfile: { id: 'parent-A', isOwner: true },
+    // Create a shared QueryClient so both hooks operate on the same cache.
+    const sharedQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
+
+    setActiveProfileId('parent-A');
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -173,9 +205,12 @@ describe('useChildConsentStatus', () => {
       ),
     );
 
-    const wrapper = createWrapper();
+    const wrapperA = createWrapperWithSharedQueryClient(
+      sharedQueryClient,
+      'parent-A',
+    );
     const parentA = renderHook(() => useChildConsentStatus(childId), {
-      wrapper,
+      wrapper: wrapperA,
     });
 
     await waitFor(() => {
@@ -185,9 +220,7 @@ describe('useChildConsentStatus', () => {
 
     // Switch to parent B WITHOUT clearing the QueryClient — simulates the
     // shared-device leak window.
-    mockUseProfile.mockReturnValue({
-      activeProfile: { id: 'parent-B', isOwner: true },
-    });
+    setActiveProfileId('parent-B');
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -199,8 +232,12 @@ describe('useChildConsentStatus', () => {
       ),
     );
 
+    const wrapperB = createWrapperWithSharedQueryClient(
+      sharedQueryClient,
+      'parent-B',
+    );
     const parentB = renderHook(() => useChildConsentStatus(childId), {
-      wrapper,
+      wrapper: wrapperB,
     });
 
     await waitFor(() => {
@@ -210,19 +247,12 @@ describe('useChildConsentStatus', () => {
     // Parent B must get their own fetched data, not parent A's cached one.
     expect(parentB.result.current.data?.consentStatus).toBe('WITHDRAWN');
     expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    sharedQueryClient.clear();
   });
 });
 
 describe('useRevokeConsent', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('calls PUT /consent/:childProfileId/revoke', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -251,15 +281,6 @@ describe('useRevokeConsent', () => {
 });
 
 describe('useRestoreConsent', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('calls PUT /consent/:childProfileId/restore', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
