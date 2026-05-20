@@ -57,11 +57,14 @@ import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import {
   getPreviewState,
+  setPreviewState,
   type PreviewOnboardingStateV0,
   type SaveTarget,
 } from '../../lib/preview-onboarding-state';
 // Note: clearPreviewState is NOT imported here. [CRITICAL-B2] cleanup is
 // owned by the wizard's Step-3 success path (Task 14) and by sign-out.
+import { useApiClient } from '../../lib/api-client';
+import { assertOk } from '../../lib/assert-ok';
 
 initNotificationHandler();
 
@@ -757,15 +760,289 @@ function defaultTargetFor(
   }
 }
 
-// ─── Step placeholder components (Tasks 13 and 14) ───────────────────────────
+// ─── Step 2: Profile Basics (Task 13) ────────────────────────────────────────
 
-function ProfileBasicsStep(_props: {
+function ProfileBasicsStep({
+  target,
+  previewState,
+  onComplete,
+}: {
   target: SaveTarget;
   previewState: PreviewOnboardingStateV0;
   onComplete: (created: { parent: Profile; child?: Profile }) => void;
 }): React.ReactElement {
-  // Implemented in Task 13.
-  return <Text>TODO step 2</Text>;
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  const [parentName, setParentName] = React.useState('');
+  const [parentBirthYear, setParentBirthYear] = React.useState('');
+  const [childName, setChildName] = React.useState('');
+  const [childBirthYear, setChildBirthYear] = React.useState('');
+  const [createdParent, setCreatedParent] = React.useState<Profile | null>(
+    null,
+  );
+  const [error, setError] = React.useState<string | null>(null);
+  const [childError, setChildError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const needsChild = target === 'child' || target === 'both';
+  const needsOwner = true; // all targets require an owner profile
+
+  const isValidYear = (s: string) =>
+    /^\d{4}$/.test(s) &&
+    Number(s) > 1900 &&
+    Number(s) <= new Date().getFullYear();
+
+  // [HIGH-A3 / HIGH-B2] Client-side adult-age gate. Server has NO 18+ rule
+  // (apps/api/src/services/profile.ts:184-191 only enforces 11+), so without
+  // this gate a minor could complete the wizard as isOwner=true with a child
+  // linked underneath. Skipped entirely when target === 'self' — server's 11+
+  // floor covers that case.
+  //
+  // [OPT-C] Gated by FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED. When OFF,
+  // adultGateRequired is false and adultGatePasses is trivially true, so
+  // canSubmit falls back to today's behaviour (field validations only).
+  const parentIsAdult =
+    isValidYear(parentBirthYear) &&
+    computeAgeBracket(Number(parentBirthYear)) === 'adult';
+  const adultGateRequired =
+    FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED && needsChild;
+  const adultGatePasses = !adultGateRequired || parentIsAdult;
+
+  const canSubmit =
+    !loading &&
+    parentName.trim().length > 0 &&
+    isValidYear(parentBirthYear) &&
+    (needsChild
+      ? childName.trim().length > 0 && isValidYear(childBirthYear)
+      : true) &&
+    adultGatePasses;
+
+  const submit = React.useCallback(async () => {
+    setError(null);
+    setChildError(null);
+    setLoading(true);
+    try {
+      let parent = createdParent;
+
+      // [HIGH-4] Resume guard: if the preview state already records a created
+      // owner profile id and that profile is in the cache, skip the owner POST
+      // to prevent double-creation on wizard remount mid-flight.
+      if (!parent && previewState.createdOwnerProfileId) {
+        const cached = queryClient.getQueriesData<Profile[]>({
+          predicate: (q) => String(q.queryKey[0]) === 'profiles',
+        });
+        for (const [, list] of cached) {
+          const match = list?.find(
+            (p) => p.id === previewState.createdOwnerProfileId,
+          );
+          if (match) {
+            parent = match;
+            setCreatedParent(match);
+            break;
+          }
+        }
+      }
+
+      if (!parent) {
+        const res = await client.profiles.$post({
+          json: {
+            displayName: parentName.trim(),
+            birthYear: Number(parentBirthYear),
+          },
+        });
+        await assertOk(res);
+        const data = (await res.json()) as { profile: Profile };
+        parent = data.profile;
+        setCreatedParent(parent);
+
+        // [HIGH-4] Persist owner id BEFORE the second POST so a crash between
+        // the two calls can resume without double-creating the owner.
+        await setPreviewState({
+          ...previewState,
+          createdOwnerProfileId: parent.id,
+        });
+
+        queryClient.setQueriesData<Profile[]>(
+          { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
+          (old) => (old ? [...old, parent!] : [parent!]),
+        );
+      }
+
+      let child: Profile | undefined;
+      if (needsChild) {
+        try {
+          // [CRITICAL-1] No `forChild` field. profileCreateSchema rejects it;
+          // server auto-classifies non-first POST as child via
+          // createProfileWithLimitCheck (apps/api/src/services/profile.ts:253).
+          const res = await client.profiles.$post({
+            json: {
+              displayName: childName.trim(),
+              birthYear: Number(childBirthYear),
+            },
+          });
+          await assertOk(res);
+          const data = (await res.json()) as { profile: Profile };
+          child = data.profile;
+
+          queryClient.setQueriesData<Profile[]>(
+            { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
+            (old) => (old ? [...old, child!] : [child!]),
+          );
+        } catch (childErr) {
+          // [AC 9] Keep parent. Surface retryable child error inline.
+          setChildError(formatApiError(childErr));
+          setLoading(false);
+          return;
+        }
+      }
+
+      await queryClient.invalidateQueries({
+        predicate: (q) => String(q.queryKey[0]) === 'profiles',
+      });
+
+      if (parent) {
+        onComplete({ parent, child });
+      }
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    client,
+    queryClient,
+    createdParent,
+    needsChild,
+    parentName,
+    parentBirthYear,
+    childName,
+    childBirthYear,
+    previewState,
+    onComplete,
+  ]);
+
+  return (
+    <View>
+      {needsOwner && (
+        <View className="mb-6">
+          <Text className="text-h3 font-semibold text-text-primary mb-3">
+            {target === 'self' ? 'Tell us about you' : 'About you (the parent)'}
+          </Text>
+          <TextInput
+            placeholder="Your name"
+            value={parentName}
+            onChangeText={setParentName}
+            className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
+            testID={
+              target === 'self'
+                ? 'save-basics-display-name'
+                : 'save-basics-parent-name'
+            }
+          />
+          <TextInput
+            placeholder="Birth year (e.g. 1985)"
+            value={parentBirthYear}
+            onChangeText={setParentBirthYear}
+            keyboardType="number-pad"
+            maxLength={4}
+            className="bg-surface text-text-primary rounded-input px-4 py-3"
+            testID={
+              target === 'self'
+                ? 'save-basics-birth-year'
+                : 'save-basics-parent-birth-year'
+            }
+          />
+        </View>
+      )}
+
+      {needsChild && (
+        <View className="mb-6">
+          <Text className="text-h3 font-semibold text-text-primary mb-3">
+            About your child
+          </Text>
+          <TextInput
+            placeholder="Their name or nickname"
+            value={childName}
+            onChangeText={setChildName}
+            className="bg-surface text-text-primary rounded-input px-4 py-3 mb-3"
+            testID="save-basics-child-name"
+          />
+          <TextInput
+            placeholder="Birth year"
+            value={childBirthYear}
+            onChangeText={setChildBirthYear}
+            keyboardType="number-pad"
+            maxLength={4}
+            className="bg-surface text-text-primary rounded-input px-4 py-3"
+            testID="save-basics-child-birth-year"
+          />
+        </View>
+      )}
+
+      {/* [HIGH-A3] Adult-age gate inline message. Visible only when the parent
+          has entered a valid 4-digit year that resolves to under-18, while the
+          flow needs a child profile. Empty / partial input shows nothing.
+          Copy matches plan spec exactly. */}
+      {adultGateRequired && isValidYear(parentBirthYear) && !parentIsAdult && (
+        <View
+          className="bg-warning/10 rounded-card px-4 py-3 mb-3"
+          testID="save-basics-adult-required"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <Text className="text-warning text-body-sm">
+            To set up a child&apos;s learning, the account holder must be 18 or
+            older. You can still set up your own learning instead — pick
+            &quot;My learning&quot; on the previous step.
+          </Text>
+        </View>
+      )}
+      {error && (
+        <View
+          className="bg-danger/10 rounded-card px-4 py-3 mb-3"
+          testID="save-basics-error"
+        >
+          <Text className="text-danger text-body-sm">{error}</Text>
+        </View>
+      )}
+      {childError && (
+        <View
+          className="bg-danger/10 rounded-card px-4 py-3 mb-3"
+          testID="save-basics-child-error"
+        >
+          <Text className="text-danger text-body-sm mb-2">
+            We saved your account, but couldn&apos;t add your child yet:{' '}
+            {childError}
+          </Text>
+          <Pressable
+            onPress={() => void submit()}
+            testID="save-basics-retry-child"
+            accessibilityRole="button"
+          >
+            <Text className="text-primary font-semibold">Retry</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <Pressable
+        onPress={() => void submit()}
+        disabled={!canSubmit}
+        className={`rounded-button py-3.5 items-center ${canSubmit ? 'bg-primary' : 'bg-primary/40'}`}
+        testID="save-basics-continue"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canSubmit }}
+      >
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="text-body font-semibold text-text-inverse">
+            Continue
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
 }
 
 function ConfirmStep(_props: {
@@ -800,6 +1077,10 @@ function SaveWizardGate({
   const [probeDone, setProbeDone] = React.useState(false);
   const [target, setTarget] = React.useState<SaveTarget | null>(null);
   const [step, setStep] = React.useState<WizardStep>(1);
+  const [created, setCreated] = React.useState<{
+    parent: Profile;
+    child?: Profile;
+  } | null>(null);
 
   React.useEffect(() => {
     void getPreviewState().then((s) => {
@@ -882,7 +1163,10 @@ function SaveWizardGate({
         <ProfileBasicsStep
           target={target!}
           previewState={previewState}
-          onComplete={() => setStep(3)}
+          onComplete={(c) => {
+            setCreated(c);
+            setStep(3);
+          }}
         />
       )}
 

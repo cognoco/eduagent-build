@@ -1316,6 +1316,284 @@ describe('SaveWizard — Step 1', () => {
 });
 
 // ---------------------------------------------------------------------------
+// SaveWizard — Step 2 (Profile Basics)
+// [HIGH-A3 / HIGH-B2] Adult-age gate + form field tests.
+// ---------------------------------------------------------------------------
+
+describe('SaveWizard — Step 2 (Profile Basics)', () => {
+  let testQueryClient: QueryClient;
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+  }
+
+  function renderWizardLayout() {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  // [HIGH-A3 / HIGH-B2] Under-18 parent with target=child: Continue must be
+  // disabled and the adult-required warning view must be visible.
+  it('under-18 parent (target=child) cannot submit; Continue stays disabled', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+    // 2013 → age 13 in 2026 — computeAgeBracket returns 'adolescent'/'child'.
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-name'),
+      'TooYoung',
+    );
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      '2013',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+
+    const cta = screen.getByTestId('save-basics-continue');
+    expect(cta.props.accessibilityState?.disabled).toBe(true);
+    expect(screen.getByTestId('save-basics-adult-required')).toBeTruthy();
+  });
+
+  // [HIGH-A3] Boundary: exactly 18 (birthYear 2008 in 2026) must pass the gate.
+  it('parent aged exactly 18 (target=child) is allowed to submit', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+    // Stub profiles POST so submit doesn't fail on network.
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Pat',
+              birthYear: 2008,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+    // computeAgeBracket(2008, 2026) → age 18 → 'adult'. Boundary must pass.
+    fireEvent.changeText(screen.getByTestId('save-basics-parent-name'), 'Pat');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      '2008',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+
+    const cta = screen.getByTestId('save-basics-continue');
+    expect(cta.props.accessibilityState?.disabled).toBe(false);
+    expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+  });
+
+  // [OPT-C] target=self: the adult-age gate must NOT apply regardless of age.
+  // Server's 11+ floor covers this case; wizard has no age gate for self.
+  it('self target skips the adult gate (any age ≥ 11 allowed)', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'algebra',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Solo',
+              birthYear: 2013,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+    // 13-year-old solo learner — gate must NOT apply.
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-display-name'),
+      'Solo',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2013');
+
+    const cta = screen.getByTestId('save-basics-continue');
+    expect(cta.props.accessibilityState?.disabled).toBe(false);
+    expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+  });
+
+  // [OPT-C / MEDIUM-D2] Flag-off: when ADULT_OWNER_GATE_ENABLED is false, the
+  // adult-age gate is bypassed. Uses the established mutation pattern from
+  // SaveWizardGate flag-off test (line ~936 of this file) — safe in CJS because
+  // Jest runs tests within a file sequentially; the mutation is restored in
+  // a finally block.
+  it('underage parent allowed through when ADULT_OWNER_GATE_ENABLED is false [OPT-C]', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'TooYoung',
+              birthYear: 2013,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { ADULT_OWNER_GATE_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { ADULT_OWNER_GATE_ENABLED: boolean }
+      ).ADULT_OWNER_GATE_ENABLED = false;
+
+      renderWizardLayout();
+      await screen.findByTestId('save-wizard-step-1');
+      fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+      // 13-year-old parent — would be blocked by gate but flag is off.
+      fireEvent.changeText(
+        screen.getByTestId('save-basics-parent-name'),
+        'TooYoung',
+      );
+      fireEvent.changeText(
+        screen.getByTestId('save-basics-parent-birth-year'),
+        '2013',
+      );
+      fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+      fireEvent.changeText(
+        screen.getByTestId('save-basics-child-birth-year'),
+        '2014',
+      );
+
+      const cta = screen.getByTestId('save-basics-continue');
+      expect(cta.props.accessibilityState?.disabled).toBe(false);
+      expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { ADULT_OWNER_GATE_ENABLED: boolean }
+      ).ADULT_OWNER_GATE_ENABLED = original;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [BUG-776 / M-14] buildSwitchProfileConfirmation
 // ---------------------------------------------------------------------------
 // Pre-fix the consent-gate "Switch profile" handler silently picked the
