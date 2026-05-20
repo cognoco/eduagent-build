@@ -31,6 +31,7 @@ import {
   type IdempotencyReplayBody,
 } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { useAppContext } from '../lib/app-context';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
@@ -215,7 +216,8 @@ export function useSetSessionInputMode(
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['session-transcript', sessionId],
+        predicate: (query) =>
+          queryKeys.sessions.matchTranscriptAnyMode(sessionId)(query.queryKey),
       });
       // Input mode changes only mutate the session row/transcript metadata.
       // Progress, dashboard, retention, language-progress, and resume-nudge
@@ -244,7 +246,10 @@ export function useClearContinuationDepth(
       return (await res.json()) as SessionStartResult;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          queryKeys.sessions.matchAnyMode(sessionId)(query.queryKey),
+      });
       invalidateSessionDerivedQueries(queryClient);
     },
   });
@@ -525,9 +530,10 @@ export function useSessionTranscript(
 ): UseQueryResult<TranscriptResponse | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.sessions.transcript(sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.transcript(mode, sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -558,9 +564,10 @@ export function useSession(
 ): UseQueryResult<LearningSession | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.sessions.detail(sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.detail(mode, sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -652,9 +659,10 @@ export function useParkingLot(
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.sessions.parkingLot(sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.parkingLot(mode, sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -679,9 +687,11 @@ export function useTopicParkingLot(
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
     queryKey: queryKeys.sessions.topicParkingLot(
+      mode,
       subjectId,
       topicId,
       activeProfile?.id,
@@ -709,6 +719,7 @@ export function useAddParkingLotItem(
   const client = useApiClient();
   const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
+  const { mode } = useAppContext();
 
   return useMutation({
     mutationFn: async (input: { question: string }) => {
@@ -724,7 +735,11 @@ export function useAddParkingLotItem(
       // this profile cannot touch another profile's parking-lot cache on a
       // shared device. Mirrors the queryKeys.sessions.parkingLot factory.
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.sessions.parkingLot(sessionId, activeProfile?.id),
+        queryKey: queryKeys.sessions.parkingLot(
+          mode,
+          sessionId,
+          activeProfile?.id,
+        ),
       });
     },
   });
@@ -740,9 +755,10 @@ export function useSessionSummary(
 ): UseQueryResult<SessionSummary | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { mode } = useAppContext();
 
   return useQuery({
-    queryKey: queryKeys.sessions.summary(sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.summary(mode, sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -781,7 +797,8 @@ export function useSubmitSummary(
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['session-summary', sessionId],
+        predicate: (query) =>
+          queryKeys.sessions.matchSummaryAnyMode(sessionId)(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
     },
@@ -804,7 +821,8 @@ export function useSkipSummary(
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['session-summary', sessionId],
+        predicate: (query) =>
+          queryKeys.sessions.matchSummaryAnyMode(sessionId)(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
     },

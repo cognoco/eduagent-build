@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { LearnerScreen } from '../../components/home';
@@ -12,11 +13,45 @@ import { useCelebrationLevel } from '../../hooks/use-settings';
 import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useAckNotice, useDashboard } from '../../hooks/use-dashboard';
 import { useProfile } from '../../lib/profile';
+import { useAppContext } from '../../lib/app-context';
+import { useModeSwitch } from '../../lib/use-mode-switch';
+
+function ModeChip(): React.ReactElement | null {
+  const { familyCapable, mode } = useAppContext();
+  const { switchMode } = useModeSwitch();
+
+  if (!familyCapable || mode === null) return null;
+  const nextMode = mode === 'family' ? 'study' : 'family';
+  const label = mode === 'family' ? 'Family' : 'My Learning';
+  const action = mode === 'family' ? 'My Learning' : 'Family';
+
+  return (
+    <View className="px-5 pt-3 bg-background">
+      <Pressable
+        onPress={() => switchMode(nextMode)}
+        className="self-start flex-row items-center rounded-full border border-border bg-surface px-3 py-2"
+        accessibilityRole="button"
+        accessibilityLabel={`Current mode: ${label}. Switch to ${action}`}
+        testID="home-mode-chip"
+      >
+        <Text className="text-body-sm font-semibold text-text-primary">
+          {label}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mx-2">/</Text>
+        <Text className="text-body-sm font-semibold text-primary">
+          {action}
+        </Text>
+        <Ionicons name="swap-horizontal" size={16} className="text-primary ms-2" />
+      </Pressable>
+    </View>
+  );
+}
 
 export default function HomeScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { profiles, activeProfile, isLoading } = useProfile();
+  const { mode } = useAppContext();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
   const { data: pendingCelebrations } = usePendingCelebrations();
@@ -130,7 +165,12 @@ export default function HomeScreen(): React.ReactElement {
 
   return (
     <View className="flex-1" testID="home-screen">
-      <LearnerScreen profiles={profiles} activeProfile={activeProfile} />
+      <ModeChip />
+      <LearnerScreen
+        profiles={profiles}
+        activeProfile={activeProfile}
+        mode={mode}
+      />
       {CelebrationOverlay}
       {firstNotice && visibleNoticeId === firstNotice.id ? (
         <View

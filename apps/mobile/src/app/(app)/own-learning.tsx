@@ -1,15 +1,25 @@
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import { Redirect } from 'expo-router';
 
 import { LearnerScreen } from '../../components/home';
 import { OWN_LEARNING_RETURN_TO } from '../../lib/navigation';
-import { useProfile } from '../../lib/profile';
+import { useAppContext } from '../../lib/app-context';
+import { isFamilyCapableProfile, useProfile } from '../../lib/profile';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { resolveTabShape } from './_layout';
 
 export default function OwnLearningScreen(): React.ReactElement {
   const { activeProfile, profiles } = useProfile();
   const { isParentProxy } = useParentProxy();
+  const { mode, setMode } = useAppContext();
+  const familyCapable = isFamilyCapableProfile(activeProfile, profiles);
+
+  useEffect(() => {
+    if (familyCapable && mode === 'family') {
+      setMode('study');
+    }
+  }, [familyCapable, mode, setMode]);
 
   // [BUG-135] The (app)/_layout.tsx whitelist hides the own-learning TAB
   // BUTTON for the learner tab shape (solo owner or child-on-parent-account),
@@ -20,7 +30,7 @@ export default function OwnLearningScreen(): React.ReactElement {
   // for that shape. resolveTabShape() is the single source of truth for the
   // shape decision (see CLAUDE.md > Profile Shapes).
   const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
-  if (tabShape !== 'guardian') {
+  if (!familyCapable && tabShape !== 'guardian') {
     return <Redirect href="/(app)/home" />;
   }
 

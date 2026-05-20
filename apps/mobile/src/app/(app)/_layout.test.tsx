@@ -157,10 +157,38 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 
 const AppLayout = require('./_layout').default;
 const {
+  computeModeVisibleTabs,
   computeVisibleTabs,
   resolveHomeTabPresentation,
   resolveTabShape,
 } = require('./_layout');
+
+describe('mode tab helpers', () => {
+  it('returns Study tabs for study mode', () => {
+    expect([...computeModeVisibleTabs('study')].sort()).toEqual([
+      'home',
+      'library',
+      'more',
+      'progress',
+    ]);
+  });
+
+  it('returns Family tabs for family mode', () => {
+    expect([...computeModeVisibleTabs('family')].sort()).toEqual([
+      'home',
+      'more',
+      'progress',
+    ]);
+  });
+
+  it('keeps proxy home presentation independent of mode', () => {
+    expect(resolveHomeTabPresentation('guardian', true, 'family')).toEqual({
+      titleKey: 'tabs.myLearning',
+      accessibilityLabelKey: 'tabs.myLearningLabel',
+      iconName: 'School',
+    });
+  });
+});
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;
@@ -1120,8 +1148,8 @@ describe('resolveTabShape', () => {
 });
 
 describe('resolveHomeTabPresentation', () => {
-  it('names the guardian home tab Family Hub', () => {
-    expect(resolveHomeTabPresentation('guardian')).toEqual({
+  it('names the guardian home tab Family Hub in family mode', () => {
+    expect(resolveHomeTabPresentation('guardian', false, 'family')).toEqual({
       titleKey: 'tabs.familyHub',
       accessibilityLabelKey: 'tabs.familyHubLabel',
       iconName: 'Home',
@@ -1137,7 +1165,7 @@ describe('resolveHomeTabPresentation', () => {
   });
 
   it('keeps parent preview on the learner label', () => {
-    expect(resolveHomeTabPresentation('guardian', true)).toEqual({
+    expect(resolveHomeTabPresentation('guardian', true, 'family')).toEqual({
       titleKey: 'tabs.myLearning',
       accessibilityLabelKey: 'tabs.myLearningLabel',
       iconName: 'School',

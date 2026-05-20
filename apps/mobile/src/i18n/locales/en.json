@@ -200,6 +200,14 @@
       "encouragementNote": "Nudges are gentle one-way encouragements.",
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
       "transitionNoticeBody": "Try one of these check-in questions tonight.",
+      "recentActivity": {
+        "title": "Recent child activity"
+      },
+      "studyActivation": {
+        "title": "Want to study too?",
+        "body": "Switch to My Learning when this is your study time.",
+        "action": "Go to My Learning"
+      },
       "cards": {
         "checkChild": "See how {{childName}} is doing",
         "checkChildFallback": "Tap to see this week's progress",

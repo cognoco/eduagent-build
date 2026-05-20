@@ -181,6 +181,14 @@
       "encouragementNote": "Los nudges son ánimos suaves de una sola dirección.",
       "transitionNoticeTitle": "Ahora guías a {{childNames}}",
       "transitionNoticeBody": "Prueba esta noche una de estas preguntas para iniciar la conversación.",
+      "recentActivity": {
+        "title": "Actividad reciente de tus hijos"
+      },
+      "studyActivation": {
+        "title": "¿También quieres estudiar?",
+        "body": "Cambia a Mi aprendizaje cuando sea tu momento de estudiar.",
+        "action": "Ir a Mi aprendizaje"
+      },
       "cards": {
         "checkChild": "Ver cómo le va a {{childName}}",
         "checkChildFallback": "Toca para ver el progreso de esta semana",

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, type Href } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
@@ -48,6 +48,7 @@ import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
 import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
+import type { AppMode } from '../../lib/app-context';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
@@ -102,6 +103,7 @@ export interface LearnerScreenProps {
   now?: Date;
   showParentHome?: boolean;
   returnToTab?: string;
+  mode?: AppMode | null;
 }
 
 export function LearnerScreen({
@@ -110,8 +112,10 @@ export function LearnerScreen({
   now,
   showParentHome = true,
   returnToTab = LEARNER_HOME_RETURN_TO,
+  mode = null,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { colorScheme } = useTheme();
@@ -464,7 +468,9 @@ export function LearnerScreen({
   if (
     showParentHome &&
     !isParentProxy &&
-    (hasLinkedChildren || isFamilyPlanOwner)
+    (FEATURE_FLAGS.MODE_NAV_V0_ENABLED
+      ? mode === 'family'
+      : hasLinkedChildren || isFamilyPlanOwner)
   ) {
     return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
   }

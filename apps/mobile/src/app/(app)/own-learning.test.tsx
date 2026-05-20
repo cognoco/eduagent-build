@@ -26,6 +26,9 @@ jest.mock(
     // resolveTabShape() pulls in isGuardianProfile through _layout — mirror
     // the contract here so the screen's guard sees a stable shape.
     isGuardianProfile: () => mockIsGuardianProfile,
+    isFamilyCapableProfile: (
+      profile: { isOwner: boolean } | null | undefined,
+    ) => Boolean(profile && mockIsGuardianProfile),
   }),
 );
 
@@ -75,6 +78,14 @@ jest.mock('expo-router', () => ({
     const { Text } = require('react-native');
     return <Text testID={`mock-redirect-${href}`}>redirect:{href}</Text>;
   },
+}));
+
+jest.mock('../../lib/app-context' /* gc1-allow: screen guard test controls mode state without mounting AppContextProvider */, () => ({
+  useAppContext: () => ({
+    mode: 'study',
+    setMode: jest.fn(),
+    familyCapable: mockIsGuardianProfile,
+  }),
 }));
 
 let capturedProps: Record<string, unknown> = {};

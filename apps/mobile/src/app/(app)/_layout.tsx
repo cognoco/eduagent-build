@@ -16,6 +16,7 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
+import { useAppContext, type AppMode } from '../../lib/app-context';
 import { useProfile, isGuardianProfile } from '../../lib/profile';
 import { computeAgeBracket, type Profile } from '@eduagent/schemas';
 import {
@@ -100,6 +101,19 @@ const PARENT_PROXY_TABS: ReadonlySet<string> = new Set([
   'progress',
 ]);
 
+const FAMILY_MODE_TABS: ReadonlySet<string> = new Set([
+  'home',
+  'progress',
+  'more',
+]);
+
+const STUDY_MODE_TABS: ReadonlySet<string> = new Set([
+  'home',
+  'library',
+  'progress',
+  'more',
+]);
+
 export type TabShape = 'guardian' | 'learner';
 
 export function resolveTabShape({
@@ -137,15 +151,22 @@ export function computeVisibleTabs(
   }
 }
 
+export function computeModeVisibleTabs(mode: AppMode | null): Set<string> {
+  if (mode === 'family') return new Set(FAMILY_MODE_TABS);
+  if (mode === 'study') return new Set(STUDY_MODE_TABS);
+  return new Set();
+}
+
 export function resolveHomeTabPresentation(
   shape: TabShape,
   isParentProxy = false,
+  mode: AppMode | null = null,
 ): {
   titleKey: 'tabs.familyHub' | 'tabs.myLearning';
   accessibilityLabelKey: 'tabs.familyHubLabel' | 'tabs.myLearningLabel';
   iconName: 'Home' | 'School';
 } {
-  if (shape === 'guardian' && !isParentProxy) {
+  if (!isParentProxy && mode === 'family') {
     return {
       titleKey: 'tabs.familyHub',
       accessibilityLabelKey: 'tabs.familyHubLabel',
@@ -1976,16 +1997,19 @@ export default function AppLayout() {
   } = useProfile();
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
+  const { mode, familyCapable } = useAppContext();
   const proxyColors = getProxyChromeColors(colors);
   const role = useActiveProfileRole();
   const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
-  const visibleTabs = React.useMemo(
-    () => computeVisibleTabs(tabShape, isParentProxy),
-    [isParentProxy, tabShape],
-  );
+  const visibleTabs = React.useMemo(() => {
+    if (isParentProxy) return computeVisibleTabs(tabShape, true);
+    if (familyCapable && mode !== null) return computeModeVisibleTabs(mode);
+    return computeVisibleTabs(tabShape, false);
+  }, [familyCapable, isParentProxy, mode, tabShape]);
   const homeTabPresentation = resolveHomeTabPresentation(
     tabShape,
     isParentProxy,
+    familyCapable ? mode : null,
   );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)

@@ -35,15 +35,12 @@ describe('isFamilyCapableProfile', () => {
     expect(isFamilyCapableProfile(null, [owner, child])).toBe(false);
   });
 
-  // [CRITICAL-4] Explicit anti-test: this predicate must NOT consider age.
-  // Age-based gating ("add child" button visibility) lives at its own
-  // call sites, never inside the family-capable check.
-  it('returns true for a minor owner with a linked non-owner (age is NOT part of this predicate)', () => {
+  it('returns false for a minor owner with a linked non-owner', () => {
     const minorOwner = makeProfile({
       id: 'p1',
       isOwner: true,
       birthYear: 2015,
     });
-    expect(isFamilyCapableProfile(minorOwner, [minorOwner, child])).toBe(true);
+    expect(isFamilyCapableProfile(minorOwner, [minorOwner, child])).toBe(false);
   });
 });

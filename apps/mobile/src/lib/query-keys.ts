@@ -13,32 +13,41 @@
  */
 
 // Shared type for the progress-history query parameter
+import type { AppMode } from './app-context';
+
 interface ProgressHistoryQuery {
   from?: string;
   to?: string;
   granularity?: 'daily' | 'weekly';
 }
 
+type ModeSegment = AppMode | null | undefined;
+
 export const queryKeys = {
   // ------------------------------------------------------------------
   // progress domain
   // ------------------------------------------------------------------
   progress: {
-    subject: (subjectId: string, profileId: string | undefined) =>
-      ['progress', 'subject', subjectId, profileId] as const,
+    subject: (
+      mode: ModeSegment,
+      subjectId: string,
+      profileId: string | undefined,
+    ) => ['progress', mode, 'subject', subjectId, profileId] as const,
 
-    overview: (profileId: string | undefined) =>
-      ['progress', 'overview', profileId] as const,
+    overview: (mode: ModeSegment, profileId: string | undefined) =>
+      ['progress', mode, 'overview', profileId] as const,
 
-    continue: (profileId: string | undefined) =>
-      ['progress', 'continue', profileId] as const,
+    continue: (mode: ModeSegment, profileId: string | undefined) =>
+      ['progress', mode, 'continue', profileId] as const,
 
     resumeTarget: (
+      mode: ModeSegment,
       profileId: string | undefined,
       scope: { subjectId?: string; bookId?: string; topicId?: string },
     ) =>
       [
         'progress',
+        mode,
         'resume-target',
         profileId,
         scope.subjectId ?? null,
@@ -47,56 +56,75 @@ export const queryKeys = {
       ] as const,
 
     activeSessionForTopic: (
+      mode: ModeSegment,
       topicId: string | undefined,
       profileId: string | undefined,
-    ) => ['progress', 'topic', topicId, 'active-session', profileId] as const,
+    ) =>
+      ['progress', mode, 'topic', topicId, 'active-session', profileId] as const,
 
     resolveTopicSubject: (
+      mode: ModeSegment,
       topicId: string | undefined,
       profileId: string | undefined,
-    ) => ['progress', 'topic', topicId, 'resolve', profileId] as const,
+    ) => ['progress', mode, 'topic', topicId, 'resolve', profileId] as const,
 
-    reviewSummary: (profileId: string | undefined) =>
-      ['progress', 'review-summary', profileId] as const,
+    reviewSummary: (mode: ModeSegment, profileId: string | undefined) =>
+      ['progress', mode, 'review-summary', profileId] as const,
 
-    overdueTopics: (profileId: string | undefined) =>
-      ['progress', 'overdue-topics', profileId] as const,
+    overdueTopics: (mode: ModeSegment, profileId: string | undefined) =>
+      ['progress', mode, 'overdue-topics', profileId] as const,
 
     topicProgress: (
+      mode: ModeSegment,
       subjectId: string,
       topicId: string,
       profileId: string | undefined,
-    ) => ['progress', 'topic', subjectId, topicId, profileId] as const,
+    ) => ['progress', mode, 'topic', subjectId, topicId, profileId] as const,
 
-    inventory: (profileId: string | undefined) =>
-      ['progress', 'inventory', profileId] as const,
+    inventory: (mode: ModeSegment, profileId: string | undefined) =>
+      ['progress', mode, 'inventory', profileId] as const,
 
     history: (
+      mode: ModeSegment,
       profileId: string | undefined,
       query: ProgressHistoryQuery | undefined,
-    ) => ['progress', 'history', profileId, query] as const,
+    ) => ['progress', mode, 'history', profileId, query] as const,
 
-    milestones: (profileId: string | undefined, limit: number) =>
-      ['progress', 'milestones', profileId, limit] as const,
+    milestones: (
+      mode: ModeSegment,
+      profileId: string | undefined,
+      limit: number,
+    ) => ['progress', mode, 'milestones', profileId, limit] as const,
 
     profileSessions: (
-      profileId: string | undefined,
-      activeProfileId: string | undefined,
-    ) =>
-      ['progress', 'profile', profileId, 'sessions', activeProfileId] as const,
-
-    profileReports: (
-      profileId: string | undefined,
-      activeProfileId: string | undefined,
-    ) =>
-      ['progress', 'profile', profileId, 'reports', activeProfileId] as const,
-
-    profileWeeklyReports: (
+      mode: ModeSegment,
       profileId: string | undefined,
       activeProfileId: string | undefined,
     ) =>
       [
         'progress',
+        mode,
+        'profile',
+        profileId,
+        'sessions',
+        activeProfileId,
+      ] as const,
+
+    profileReports: (
+      mode: ModeSegment,
+      profileId: string | undefined,
+      activeProfileId: string | undefined,
+    ) =>
+      ['progress', mode, 'profile', profileId, 'reports', activeProfileId] as const,
+
+    profileWeeklyReports: (
+      mode: ModeSegment,
+      profileId: string | undefined,
+      activeProfileId: string | undefined,
+    ) =>
+      [
+        'progress',
+        mode,
         'profile',
         profileId,
         'weekly-reports',
@@ -104,16 +132,19 @@ export const queryKeys = {
       ] as const,
 
     profileReportDetail: (
+      mode: ModeSegment,
       activeProfileId: string | undefined,
       reportId: string | undefined,
-    ) => ['progress', 'profile', activeProfileId, 'report', reportId] as const,
+    ) => ['progress', mode, 'profile', activeProfileId, 'report', reportId] as const,
 
     profileWeeklyReportDetail: (
+      mode: ModeSegment,
       activeProfileId: string | undefined,
       reportId: string | undefined,
     ) =>
       [
         'progress',
+        mode,
         'profile',
         activeProfileId,
         'weekly-report',
@@ -130,55 +161,68 @@ export const queryKeys = {
   // invalidation still covers these; no targeted invalidation was skipped.
   // ------------------------------------------------------------------
   dashboard: {
-    root: (profileId: string | undefined) => ['dashboard', profileId] as const,
+    root: (mode: ModeSegment, profileId: string | undefined) =>
+      ['dashboard', mode, profileId] as const,
 
-    childDetail: (childProfileId: string | undefined) =>
-      ['dashboard', 'child', childProfileId] as const,
+    childDetail: (mode: ModeSegment, childProfileId: string | undefined) =>
+      ['dashboard', mode, 'child', childProfileId] as const,
 
     childSubject: (
+      mode: ModeSegment,
       childProfileId: string | undefined,
       subjectId: string | undefined,
-    ) => ['dashboard', 'child', childProfileId, 'subject', subjectId] as const,
+    ) =>
+      ['dashboard', mode, 'child', childProfileId, 'subject', subjectId] as const,
 
-    childSessions: (childProfileId: string | undefined) =>
-      ['dashboard', 'child', childProfileId, 'sessions'] as const,
+    childSessions: (mode: ModeSegment, childProfileId: string | undefined) =>
+      ['dashboard', mode, 'child', childProfileId, 'sessions'] as const,
 
     childSessionDetail: (
+      mode: ModeSegment,
       childProfileId: string | undefined,
       sessionId: string | undefined,
-    ) => ['dashboard', 'child', childProfileId, 'session', sessionId] as const,
+    ) =>
+      ['dashboard', mode, 'child', childProfileId, 'session', sessionId] as const,
 
-    childMemory: (childProfileId: string | undefined) =>
-      ['dashboard', 'child', childProfileId, 'memory'] as const,
+    childMemory: (mode: ModeSegment, childProfileId: string | undefined) =>
+      ['dashboard', mode, 'child', childProfileId, 'memory'] as const,
 
-    childInventory: (childProfileId: string | undefined) =>
-      ['dashboard', 'child', childProfileId, 'inventory'] as const,
+    childInventory: (mode: ModeSegment, childProfileId: string | undefined) =>
+      ['dashboard', mode, 'child', childProfileId, 'inventory'] as const,
 
     childHistory: (
+      mode: ModeSegment,
       childProfileId: string | undefined,
       query: ProgressHistoryQuery | undefined,
-    ) => ['dashboard', 'child', childProfileId, 'history', query] as const,
+    ) => ['dashboard', mode, 'child', childProfileId, 'history', query] as const,
 
-    childProgressSummary: (childProfileId: string | undefined) =>
-      ['dashboard', 'child', childProfileId, 'progress-summary'] as const,
+    childProgressSummary: (
+      mode: ModeSegment,
+      childProfileId: string | undefined,
+    ) => ['dashboard', mode, 'child', childProfileId, 'progress-summary'] as const,
 
-    childReports: (childProfileId: string | undefined) =>
-      ['dashboard', 'child', childProfileId, 'reports'] as const,
+    childReports: (mode: ModeSegment, childProfileId: string | undefined) =>
+      ['dashboard', mode, 'child', childProfileId, 'reports'] as const,
 
     childReportDetail: (
+      mode: ModeSegment,
       childProfileId: string | undefined,
       reportId: string | undefined,
-    ) => ['dashboard', 'child', childProfileId, 'report', reportId] as const,
+    ) => ['dashboard', mode, 'child', childProfileId, 'report', reportId] as const,
 
-    childWeeklyReports: (childProfileId: string | undefined) =>
-      ['dashboard', 'child', childProfileId, 'weekly-reports'] as const,
+    childWeeklyReports: (
+      mode: ModeSegment,
+      childProfileId: string | undefined,
+    ) => ['dashboard', mode, 'child', childProfileId, 'weekly-reports'] as const,
 
     childWeeklyReportDetail: (
+      mode: ModeSegment,
       childProfileId: string | undefined,
       reportId: string | undefined,
     ) =>
       [
         'dashboard',
+        mode,
         'child',
         childProfileId,
         'weekly-report',
@@ -190,23 +234,42 @@ export const queryKeys = {
   // sessions domain
   // ------------------------------------------------------------------
   sessions: {
-    detail: (sessionId: string, profileId: string | undefined) =>
-      ['session', sessionId, profileId] as const,
+    detail: (mode: ModeSegment, sessionId: string, profileId: string | undefined) =>
+      ['session', mode, sessionId, profileId] as const,
 
-    transcript: (sessionId: string, profileId: string | undefined) =>
-      ['session-transcript', sessionId, profileId] as const,
+    transcript: (
+      mode: ModeSegment,
+      sessionId: string,
+      profileId: string | undefined,
+    ) => ['session-transcript', mode, sessionId, profileId] as const,
 
-    summary: (sessionId: string, profileId: string | undefined) =>
-      ['session-summary', sessionId, profileId] as const,
+    summary: (
+      mode: ModeSegment,
+      sessionId: string,
+      profileId: string | undefined,
+    ) => ['session-summary', mode, sessionId, profileId] as const,
 
-    parkingLot: (sessionId: string, profileId: string | undefined) =>
-      ['parking-lot', sessionId, profileId] as const,
+    parkingLot: (
+      mode: ModeSegment,
+      sessionId: string,
+      profileId: string | undefined,
+    ) => ['parking-lot', mode, sessionId, profileId] as const,
 
     topicParkingLot: (
+      mode: ModeSegment,
       subjectId: string,
       topicId: string,
       profileId: string | undefined,
-    ) => ['parking-lot', 'topic', subjectId, topicId, profileId] as const,
+    ) => ['parking-lot', mode, 'topic', subjectId, topicId, profileId] as const,
+
+    matchAnyMode: (sessionId: string) => (queryKey: readonly unknown[]) =>
+      queryKey[0] === 'session' && queryKey[2] === sessionId,
+
+    matchTranscriptAnyMode: (sessionId: string) => (queryKey: readonly unknown[]) =>
+      queryKey[0] === 'session-transcript' && queryKey[2] === sessionId,
+
+    matchSummaryAnyMode: (sessionId: string) => (queryKey: readonly unknown[]) =>
+      queryKey[0] === 'session-summary' && queryKey[2] === sessionId,
   },
 
   // ------------------------------------------------------------------

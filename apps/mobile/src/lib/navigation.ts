@@ -1,5 +1,9 @@
 import type { Href, Router } from 'expo-router';
 import type { LearningResumeTarget } from '@eduagent/schemas';
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
+
+import { useAppContext } from './app-context';
 
 export const FAMILY_HOME_PATH = '/(app)/home';
 export const LEARNER_HOME_RETURN_TO = 'learner-home';
@@ -63,4 +67,26 @@ export function pushLearningResumeTarget(
       ...(returnTo ? { returnTo } : {}),
     },
   } as Href);
+}
+
+export function useGuardFamilyRoute(): {
+  canRenderFamilyRoute: boolean;
+  mode: ReturnType<typeof useAppContext>['mode'];
+  familyCapable: boolean;
+} {
+  const router = useRouter();
+  const { mode, setMode, familyCapable } = useAppContext();
+
+  useEffect(() => {
+    if (mode === 'family') return;
+    if (!familyCapable) return;
+    setMode('family');
+    router.replace(FAMILY_HOME_PATH as Href);
+  }, [familyCapable, mode, router, setMode]);
+
+  return {
+    canRenderFamilyRoute: mode === 'family',
+    mode,
+    familyCapable,
+  };
 }

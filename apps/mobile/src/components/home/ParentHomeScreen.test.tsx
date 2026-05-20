@@ -57,6 +57,16 @@ jest.mock(
 );
 
 jest.mock(
+  '../../lib/use-mode-switch' /* gc1-allow: mode switch invalidates TanStack queries; tests assert home routing only */,
+  () => ({
+    useModeSwitch: () => ({
+      switchMode: jest.fn(),
+      isSwitchingRef: { current: false },
+    }),
+  }),
+);
+
+jest.mock(
   '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
     useSubscription: () => ({ data: { tier: 'family' } }),
@@ -373,7 +383,8 @@ describe('ParentHomeScreen', () => {
         lineHeight: 21,
       }),
     );
-    screen.getByText('Fractions · 18 min this week');
+    expect(screen.getAllByText('Fractions · 18 min this week').length)
+      .toBeGreaterThan(0);
     screen.getByText('Emma · 18 min this week');
     screen.getByText('2 of 5 profiles used');
   });

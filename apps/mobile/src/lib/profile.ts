@@ -12,7 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
 import { Sentry } from './sentry';
-import type { Profile } from '@eduagent/schemas';
+import { computeAgeBracket, type Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import {
   useApiClient,
@@ -36,26 +36,20 @@ export function isGuardianProfile(
 }
 
 /**
- * Family-capable profile predicate. Shared verbatim with Study/Family v0 spec.
- * True iff active profile is an owner with at least one linked non-owner.
- *
- * [CRITICAL-4] Deliberately NO age check — CLAUDE.md forbids using
- * computeAgeBracket() for feature gating. Adult-only affordances (e.g.
- * "Add child") keep their own age checks at their own call sites.
- *
- * Shape is identical to isGuardianProfile() above; the alternate name
- * exists so sibling-spec readers find the term they expect.
- *
- * Spec: docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md §Implementation step 1
- * Sibling: docs/specs/2026-05-19-study-and-family-mode-navigation-v0.md §Implementation step 1
+ * Family-capable profile predicate for Study/Family mode navigation.
+ * Capability is linkage-driven, but the active owner must be an adult.
  */
 export function isFamilyCapableProfile(
-  activeProfile: Profile | null | undefined,
-  profiles: ReadonlyArray<Profile>,
+  activeProfile:
+    | Pick<Profile, 'id' | 'isOwner' | 'birthYear'>
+    | null
+    | undefined,
+  profiles: ReadonlyArray<Pick<Profile, 'id' | 'isOwner'>>,
 ): boolean {
   if (!activeProfile) return false;
   if (!activeProfile.isOwner) return false;
-  return profiles.some((p) => p.id !== activeProfile.id && !p.isOwner);
+  if (computeAgeBracket(activeProfile.birthYear) !== 'adult') return false;
+  return profiles.some((p) => p.id !== activeProfile.id && p.isOwner === false);
 }
 
 export interface SwitchProfileResult {
@@ -90,6 +84,63 @@ const ACTIVE_PROFILE_KEY = sanitizeSecureStoreKey(
   'mentomate_active_profile_id',
 );
 const PARENT_PROXY_KEY = sanitizeSecureStoreKey('parent-proxy-active');
+
+export const PROFILE_SCOPED_KEYS = [
+  'all-notes',
+  'book-notes',
+  'book-sessions',
+  'bookmarks',
+  'celebrations',
+  'consent',
+  'subjects',
+  'progress',
+  'sessions',
+  'session',
+  'session-bookmarks',
+  'session-summary',
+  'session-transcript',
+  'curriculum',
+  'assessment',
+  'consent-status',
+  'dashboard',
+  'streaks',
+  'streak',
+  'xp',
+  'settings',
+  'subscription',
+  'subscription-family',
+  'subscription-status',
+  'usage',
+  'retention',
+  'coaching-card',
+  'topic',
+  'topic-note',
+  'topic-notes',
+  'topic-sessions',
+  'topic-suggestions',
+  'subject-sessions',
+  'learning-modes',
+  'language-progress',
+  'vocabulary',
+  'learner-profile',
+  'library',
+  'library-search',
+  'notification-preferences',
+  'note-topic-ids',
+  'parking-lot',
+  'profile',
+  'quiz-recent',
+  'quiz-round',
+  'quiz-round-detail',
+  'quiz-stats',
+  'resume-nudge',
+  'teaching-preferences',
+  'books',
+  'book',
+  'book-suggestions',
+  'all-books',
+  'nudges',
+] as const;
 
 export const ProfileContext = createContext<ProfileContextValue>({
   profiles: [],
@@ -272,65 +323,11 @@ export function ProfileProvider({
       // belongs to the account (not the individual profile) — resetting it
       // causes isProfileLoading→true which triggers `return null` in the
       // app layout, blanking the entire screen (blank-screen bug).
-      const PROFILE_SCOPED_KEYS = [
-        'all-notes',
-        'book-notes',
-        'book-sessions',
-        'bookmarks',
-        'celebrations',
-        'consent',
-        'subjects',
-        'progress',
-        'sessions',
-        'session',
-        'session-bookmarks',
-        'session-summary',
-        'session-transcript',
-        'curriculum',
-        'assessment',
-        'consent-status',
-        'dashboard',
-        'streaks',
-        'streak',
-        'xp',
-        'settings',
-        'subscription',
-        'subscription-family',
-        'subscription-status',
-        'usage',
-        'retention',
-        'coaching-card',
-        'topic',
-        'topic-note',
-        'topic-notes',
-        'topic-sessions',
-        'topic-suggestions',
-        'subject-sessions',
-        'learning-modes',
-        'language-progress',
-        'vocabulary',
-        'learner-profile',
-        'library',
-        'library-search',
-        'notification-preferences',
-        'note-topic-ids',
-        'parking-lot',
-        'profile',
-        'quiz-recent',
-        'quiz-round',
-        'quiz-round-detail',
-        'quiz-stats',
-        'resume-nudge',
-        'teaching-preferences',
-        'books',
-        'book',
-        'book-suggestions',
-        'all-books',
-        'nudges',
-      ];
       await queryClient.resetQueries({
         predicate: (query) =>
-          PROFILE_SCOPED_KEYS.includes(String(query.queryKey[0])),
+          PROFILE_SCOPED_KEYS.includes(
+            String(query.queryKey[0]) as (typeof PROFILE_SCOPED_KEYS)[number],
+          ),
       });
       return persistenceFailed
         ? { success: true, persistenceFailed: true }

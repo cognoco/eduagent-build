@@ -106,7 +106,7 @@ const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: mockPush, replace: jest.fn() },
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -409,7 +409,8 @@ describe('LearnerScreen', () => {
       screen.getByTestId('parent-home-screen');
       screen.getByTestId('parent-home-check-child-child-id');
       screen.getByText('Children');
-      screen.getByText('Ready to start · 24 min this week');
+      expect(screen.getAllByText('Ready to start · 24 min this week').length)
+        .toBeGreaterThan(0);
     });
   });
 

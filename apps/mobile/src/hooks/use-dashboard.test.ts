@@ -1,6 +1,10 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import {
   useDashboard,
   useChildDetail,
@@ -9,49 +13,43 @@ import {
 import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
+const originalFetch = globalThis.fetch;
 
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id', isOwner: true },
+jest.mock('../lib/app-context' /* gc1-allow: dashboard child hooks are family-mode only; test controls mode boundary */, () => ({
+  useAppContext: () => ({
+    mode: 'family',
+    setMode: jest.fn(),
+    familyCapable: true,
   }),
 }));
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id', isOwner: true }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
 describe('useDashboard', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('returns dashboard data when children exist', async () => {
     const dashboardData = {
       children: [
@@ -134,15 +132,6 @@ describe('useDashboard', () => {
 });
 
 describe('useChildDetail', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('returns child detail data', async () => {
     const childData = {
       child: {
@@ -186,40 +175,31 @@ describe('useChildDetail', () => {
 
 describe('profile-switch cache isolation', () => {
   it('useDashboard — profile A and B have different query keys', () => {
-    const keyA = queryKeys.dashboard.root('profile-A');
-    const keyB = queryKeys.dashboard.root('profile-B');
+    const keyA = queryKeys.dashboard.root('family', 'profile-A');
+    const keyB = queryKeys.dashboard.root('family', 'profile-B');
     expect(keyA).not.toEqual(keyB);
-    expect(keyA).toEqual(['dashboard', 'profile-A']);
-    expect(keyB).toEqual(['dashboard', 'profile-B']);
+    expect(keyA).toEqual(['dashboard', 'family', 'profile-A']);
+    expect(keyB).toEqual(['dashboard', 'family', 'profile-B']);
   });
 
   it('useChildDetail — same child, different active profiles produce different keys', () => {
     // childDetail key is only the child's profileId — no active viewer slot —
     // so two different children produce different keys but the same child seen
     // by different parents produces the SAME key (dashboard.children are owner-gated).
-    const keyChild1 = queryKeys.dashboard.childDetail('child-1');
-    const keyChild2 = queryKeys.dashboard.childDetail('child-2');
+    const keyChild1 = queryKeys.dashboard.childDetail('family', 'child-1');
+    const keyChild2 = queryKeys.dashboard.childDetail('family', 'child-2');
     expect(keyChild1).not.toEqual(keyChild2);
-    expect(keyChild1).toEqual(['dashboard', 'child', 'child-1']);
+    expect(keyChild1).toEqual(['dashboard', 'family', 'child', 'child-1']);
   });
 
   it('useChildInventory — different children never share cache slots', () => {
-    const key1 = queryKeys.dashboard.childInventory('child-1');
-    const key2 = queryKeys.dashboard.childInventory('child-2');
+    const key1 = queryKeys.dashboard.childInventory('family', 'child-1');
+    const key2 = queryKeys.dashboard.childInventory('family', 'child-2');
     expect(key1).not.toEqual(key2);
   });
 });
 
 describe('useChildSubjectTopics', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('returns topic progress data', async () => {
     const topicData = {
       topics: [

@@ -29,6 +29,7 @@ import { useLinkedChildren } from '../../lib/profile';
 import { useTheme, useThemeColors } from '../../lib/theme';
 import { getSubjectTintMap } from '../../lib/subject-tints';
 import { type SubjectTint } from '../../lib/design-tokens';
+import { useModeSwitch } from '../../lib/use-mode-switch';
 import { MentomateLogo } from '../MentomateLogo';
 import {
   WithdrawalCountdownBanner,
@@ -643,6 +644,84 @@ function ChildCommandCard({
   );
 }
 
+function RecentChildActivitySection({
+  childrenProfiles,
+  dashboard,
+  onOpenChild,
+  t,
+}: {
+  childrenProfiles: Profile[];
+  dashboard: DashboardData | undefined;
+  onOpenChild: (childProfileId: string) => void;
+  t: Translate;
+}): React.ReactElement | null {
+  const colors = useThemeColors();
+  const rows = childrenProfiles
+    .map((child) => ({
+      child,
+      dashboardChild: findDashboardChild(dashboard, child.id),
+    }))
+    .sort((a, b) => {
+      const sessionDelta =
+        (b.dashboardChild?.sessionsThisWeek ?? 0) -
+        (a.dashboardChild?.sessionsThisWeek ?? 0);
+      if (sessionDelta !== 0) return sessionDelta;
+      return (
+        (b.dashboardChild?.totalTimeThisWeek ?? 0) -
+        (a.dashboardChild?.totalTimeThisWeek ?? 0)
+      );
+    });
+
+  if (rows.length === 0) return null;
+
+  return (
+    <View className="mt-5" testID="parent-home-recent-child-activity">
+      <Text className="text-h3 font-bold text-text-primary mb-3">
+        {t('home.parent.recentActivity.title', {
+          defaultValue: 'Recent child activity',
+        })}
+      </Text>
+      <View style={{ gap: 8 }}>
+        {rows.map(({ child, dashboardChild }) => (
+          <Pressable
+            key={child.id}
+            onPress={() => onOpenChild(child.id)}
+            className="rounded-card bg-surface px-4 py-3 flex-row items-center"
+            accessibilityRole="button"
+            accessibilityLabel={`${child.displayName}. ${formatChildSnapshot(
+              dashboardChild,
+              t,
+            )}`}
+            testID={`parent-home-recent-child-${child.id}`}
+          >
+            <View
+              className="w-9 h-9 rounded-full items-center justify-center me-3"
+              style={{ backgroundColor: colors.primarySoft }}
+            >
+              <Text className="text-body font-bold text-primary">
+                {initialOf(child.displayName)}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-body font-semibold text-text-primary">
+                {child.displayName}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-0.5">
+                {formatChildSnapshot(dashboardChild, t)}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.textSecondary}
+            />
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 interface FamilySummaryRow {
   key: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -768,6 +847,7 @@ export function ParentHomeScreen({
 }: ParentHomeScreenProps): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { switchMode } = useModeSwitch();
   const insets = useSafeAreaInsets();
   const { colorScheme } = useTheme();
   const role = useActiveProfileRole();
@@ -1067,6 +1147,44 @@ export function ParentHomeScreen({
             </View>
           </View>
         ) : null}
+
+        <RecentChildActivitySection
+          childrenProfiles={linkedChildren}
+          dashboard={dashboard}
+          onOpenChild={pushChildProfile}
+          t={t}
+        />
+
+        <View
+          className="bg-surface rounded-card px-4 py-4 mt-5"
+          testID="parent-home-study-activation"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            {t('home.parent.studyActivation.title', {
+              defaultValue: 'Want to study too?',
+            })}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {t('home.parent.studyActivation.body', {
+              defaultValue: 'Switch to My Learning when this is your study time.',
+            })}
+          </Text>
+          <Pressable
+            onPress={() => switchMode('study')}
+            className="self-start bg-primary rounded-button px-4 py-3 mt-3"
+            accessibilityRole="button"
+            accessibilityLabel={t('home.parent.studyActivation.action', {
+              defaultValue: 'Go to My Learning',
+            })}
+            testID="parent-home-study-activation-action"
+          >
+            <Text className="text-body-sm font-semibold text-text-inverse">
+              {t('home.parent.studyActivation.action', {
+                defaultValue: 'Go to My Learning',
+              })}
+            </Text>
+          </Pressable>
+        </View>
 
         <Text className="text-h3 font-bold text-text-primary mt-5 mb-3">
           {t('home.parent.childrenHeader')}

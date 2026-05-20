@@ -37,6 +37,7 @@ import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
 import { tokens } from '../lib/design-tokens';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
+import { AppContextProvider } from '../lib/app-context';
 import {
   setOnAuthExpired,
   clearOnAuthExpired,
@@ -568,11 +569,13 @@ export default function RootLayout() {
               }}
             >
               <ProfileProvider>
-                <OutboxDrainProvider>
-                  <ErrorBoundary>
-                    <ThemedApp />
-                  </ErrorBoundary>
-                </OutboxDrainProvider>
+                <AppContextProvider>
+                  <OutboxDrainProvider>
+                    <ErrorBoundary>
+                      <ThemedApp />
+                    </ErrorBoundary>
+                  </OutboxDrainProvider>
+                </AppContextProvider>
               </ProfileProvider>
             </PersistQueryClientProvider>
           </ClerkGate>

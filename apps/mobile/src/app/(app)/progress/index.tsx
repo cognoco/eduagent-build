@@ -56,6 +56,7 @@ import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
 import { getSubjectTintMap } from '../../../lib/subject-tints';
+import { useAppContext } from '../../../lib/app-context';
 import { useTheme } from '../../../lib/theme';
 
 function heroCopy(
@@ -503,6 +504,7 @@ export default function ProgressScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
+  const { mode } = useAppContext();
   const hasLinked = linkedChildren.length > 0;
   const { colorScheme } = useTheme();
   const requestedProfileId = Array.isArray(rawRequestedProfileId)
@@ -510,8 +512,10 @@ export default function ProgressScreen(): React.ReactElement {
     : rawRequestedProfileId;
 
   const [selectedProfileId, setSelectedProfileId] = useState<string>(() => {
+    if (mode === 'family') return linkedChildren[0]?.id ?? '';
     const knownRequestedProfileId =
       requestedProfileId &&
+      (mode !== 'study' || requestedProfileId === activeProfile?.id) &&
       (requestedProfileId === activeProfile?.id ||
         linkedChildren.some((child) => child.id === requestedProfileId));
     if (knownRequestedProfileId) return requestedProfileId;
@@ -523,12 +527,27 @@ export default function ProgressScreen(): React.ReactElement {
   useEffect(() => {
     if (!requestedProfileId) return;
     const knownTarget =
-      requestedProfileId === activeProfile?.id ||
-      linkedChildren.some((child) => child.id === requestedProfileId);
+      ((mode !== 'study' || requestedProfileId === activeProfile?.id) &&
+        requestedProfileId === activeProfile?.id) ||
+      (mode === 'family' &&
+        linkedChildren.some((child) => child.id === requestedProfileId));
     if (knownTarget) {
       setSelectedProfileId(requestedProfileId);
     }
-  }, [requestedProfileId, activeProfile?.id, linkedChildren]);
+  }, [requestedProfileId, activeProfile?.id, linkedChildren, mode]);
+
+  useEffect(() => {
+    if (mode === 'study' && activeProfile?.id) {
+      setSelectedProfileId(activeProfile.id);
+    }
+    if (
+      mode === 'family' &&
+      selectedProfileId === activeProfile?.id &&
+      linkedChildren[0]
+    ) {
+      setSelectedProfileId(linkedChildren[0].id);
+    }
+  }, [activeProfile?.id, linkedChildren, mode, selectedProfileId]);
 
   // Re-seed when activeProfile loads after mount.
   useEffect(() => {
@@ -545,7 +564,7 @@ export default function ProgressScreen(): React.ReactElement {
   const ownInventoryQuery = useProgressInventory();
   const childInventoryQuery = useChildInventory(
     isViewingSelf ? undefined : selectedProfileId,
-    { enabled: !isViewingSelf },
+    { enabled: mode !== 'study' && !isViewingSelf },
   );
   const inventoryQuery = isViewingSelf
     ? ownInventoryQuery
@@ -553,7 +572,7 @@ export default function ProgressScreen(): React.ReactElement {
 
   const childSummaryQuery = useChildProgressSummary(
     isViewingSelf ? undefined : selectedProfileId,
-    { enabled: !isViewingSelf },
+    { enabled: mode !== 'study' && !isViewingSelf },
   );
   const overallProgressQuery = useOverallProgress();
 
@@ -857,7 +876,7 @@ export default function ProgressScreen(): React.ReactElement {
           {t('progress.pageSubtitle')}
         </Text>
 
-        {hasLinked ? (
+        {hasLinked && mode !== 'study' ? (
           <ProgressPillRow
             childrenProfiles={linkedChildren}
             selectedProfileId={selectedProfileId}

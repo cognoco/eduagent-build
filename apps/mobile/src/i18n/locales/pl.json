@@ -181,6 +181,14 @@
       "encouragementNote": "Zachęty to krótkie, łagodne wiadomości w jedną stronę.",
       "transitionNoticeTitle": "Teraz mentorujesz {{childNames}}",
       "transitionNoticeBody": "Wypróbuj dziś wieczorem jedno z tych pytań na początek rozmowy.",
+      "recentActivity": {
+        "title": "Ostatnia aktywność dzieci"
+      },
+      "studyActivation": {
+        "title": "Też chcesz się uczyć?",
+        "body": "Przełącz na Moja nauka, gdy to jest twój czas na naukę.",
+        "action": "Przejdź do Moja nauka"
+      },
       "cards": {
         "checkChild": "Sprawdź, jak idzie {{childName}}",
         "checkChildFallback": "Dotknij, aby zobaczyć postępy z tego tygodnia",
