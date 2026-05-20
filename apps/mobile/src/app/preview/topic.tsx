@@ -9,6 +9,7 @@ import {
   type PreviewOnboardingStateV0,
 } from '../../lib/preview-onboarding-state';
 import { goBackOrReplace } from '../../lib/navigation';
+import { track } from '../../lib/analytics';
 
 // [MEDIUM-5] Single-line topic cap. The value is persisted to SecureStore for
 // up to 1h pre-signup, so it WILL outlive the screen. Keeping the field short
@@ -43,6 +44,11 @@ export default function PreviewTopicScreen() {
     const s = current ?? (await getPreviewState());
     if (!s) return;
     await setPreviewState({ ...s, topicText: trimmed });
+    track('preview_topic_submitted', {
+      intent: s.intent,
+      path: s.path,
+      topicLength: trimmed.length,
+    });
     router.push({
       pathname: '/preview/value-prop',
       params: { variant: 'learner' },

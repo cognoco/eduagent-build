@@ -48,6 +48,7 @@ import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback, GateContent } from '../../components/common';
 import { goBackOrReplace } from '../../lib/navigation';
+import { track } from '../../lib/analytics';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import {
@@ -1113,6 +1114,12 @@ function ConfirmStep({
       }
 
       await clearPreviewState();
+      track('save_wizard_completed', {
+        target,
+        intent: previewState.intent,
+        childCreated: Boolean(created.child),
+        landing: isSelfBranch ? 'session' : 'home',
+      });
       onComplete(); // [HIGH-A2] signal wizard done before navigating
 
       if (isSelfBranch) {
@@ -1140,6 +1147,9 @@ function ConfirmStep({
     landing,
     switchProfile,
     created.parent.id,
+    created.child,
+    target,
+    previewState.intent,
     isSelfBranch,
     previewState.topicText,
     onComplete,
@@ -1189,8 +1199,10 @@ function ConfirmStep({
  */
 function SaveWizardGate({
   onComplete,
+  onStart,
 }: {
   onComplete: () => void;
+  onStart: () => void;
 }): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -1205,12 +1217,22 @@ function SaveWizardGate({
   } | null>(null);
 
   React.useEffect(() => {
+    onStart();
     void getPreviewState().then((s) => {
       setLocalPreviewState(s);
       setTarget(defaultTargetFor(s));
       setProbeDone(true);
     });
-  }, []);
+  }, [onStart]);
+
+  React.useEffect(() => {
+    if (!previewState) return;
+    track('save_wizard_step_started', {
+      step,
+      target: target ?? 'unset',
+      intent: previewState.intent,
+    });
+  }, [step, target, previewState]);
 
   // [CRITICAL-3] Recovery path for "wizard mounted with no state" — happens
   // when the 1h TTL expires between the layout's initial probe and this
@@ -2135,6 +2157,10 @@ export default function AppLayout() {
   // [HIGH-A2] Wizard completion sentinel. previewProbeState alone never flips
   // back to 'absent' after mount; the wizard signals completion via onComplete.
   const [wizardDone, setWizardDone] = React.useState(false);
+  // The preview wizard may outlive first-profile auto-activation once it has
+  // actually started, but stale preview state must not hijack existing users
+  // who already have an active profile when the layout first loads.
+  const [wizardStarted, setWizardStarted] = React.useState(false);
 
   React.useEffect(() => {
     if (!FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED) {
@@ -2160,6 +2186,28 @@ export default function AppLayout() {
   //   (a) TTL inside getPreviewState (1h)
   //   (b) sign-out-cleanup (Task 4)
   //   (c) wizard's explicit clearPreviewState() on Step-3 success (Task 14)
+
+  React.useEffect(() => {
+    if (
+      !FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED ||
+      previewProbeState !== 'present' ||
+      !activeProfile ||
+      wizardStarted ||
+      wizardDone
+    ) {
+      return;
+    }
+    setPreviewProbeState('absent');
+    void clearPreviewState();
+  }, [activeProfile, previewProbeState, wizardDone, wizardStarted]);
+
+  const markWizardStarted = React.useCallback(() => {
+    setWizardStarted(true);
+  }, []);
+
+  const markWizardDone = React.useCallback(() => {
+    setWizardDone(true);
+  }, []);
 
   if (!isLoaded)
     return (
@@ -2325,11 +2373,15 @@ export default function AppLayout() {
   if (
     FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
     previewProbeState === 'present' &&
-    !wizardDone
+    !wizardDone &&
+    (!activeProfile || wizardStarted)
   ) {
     return (
       <FeedbackProvider>
-        <SaveWizardGate onComplete={() => setWizardDone(true)} />
+        <SaveWizardGate
+          onStart={markWizardStarted}
+          onComplete={markWizardDone}
+        />
       </FeedbackProvider>
     );
   }

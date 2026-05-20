@@ -7,6 +7,7 @@ import {
   type PreviewOnboardingStateV0,
 } from '../../lib/preview-onboarding-state';
 import { goBackOrReplace } from '../../lib/navigation';
+import { track } from '../../lib/analytics';
 
 type Variant = 'learner' | 'parent';
 
@@ -26,6 +27,14 @@ export default function ValuePropScreen() {
 
   const variant: Variant = params.variant === 'parent' ? 'parent' : 'learner';
   const topic = previewState?.topicText ?? '';
+
+  useEffect(() => {
+    track('preview_value_prop_shown', {
+      variant,
+      intent: previewState?.intent,
+      hasTopic: Boolean(previewState?.topicText),
+    });
+  }, [variant, previewState?.intent, previewState?.topicText]);
 
   return (
     <ScrollView
@@ -58,7 +67,14 @@ export default function ValuePropScreen() {
         <ParentVariant />
       )}
       <Pressable
-        onPress={() => router.push('/sign-up')}
+        onPress={() => {
+          track('preview_signup_cta_tapped', {
+            variant,
+            intent: previewState?.intent,
+            hasTopic: Boolean(previewState?.topicText),
+          });
+          router.push('/sign-up');
+        }}
         className="bg-primary rounded-button py-3.5 px-8 items-center w-full mt-8"
         testID="preview-signup-cta"
         accessibilityRole="button"

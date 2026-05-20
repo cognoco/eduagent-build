@@ -59,11 +59,26 @@ describe('preview-onboarding-state', () => {
     expect(await getPreviewState()).toBeNull();
   });
 
+  it('treats warm in-memory state as expired after the TTL', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-05-20T12:00:00.000Z'));
+    await setPreviewState(baseState);
+
+    jest.setSystemTime(Date.now() + PREVIEW_TTL_MS + 1000);
+
+    await expect(getPreviewState()).resolves.toBeNull();
+    expect(await SecureStore.getItemAsync(PREVIEW_INTENT_KEY)).toBeNull();
+  });
+
   it('clearPreviewState wipes memory AND SecureStore', async () => {
     await setPreviewState(baseState);
     await clearPreviewState();
 
     expect(await getPreviewState()).toBeNull();
     expect(await SecureStore.getItemAsync(PREVIEW_INTENT_KEY)).toBeNull();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 });

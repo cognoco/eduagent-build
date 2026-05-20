@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +7,7 @@ import {
   type PreviewIntent,
 } from '../../lib/preview-onboarding-state';
 import { goBackOrReplace } from '../../lib/navigation';
+import { track } from '../../lib/analytics';
 
 interface Option {
   intent: PreviewIntent;
@@ -45,8 +47,13 @@ export default function PreviewIntentScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  useEffect(() => {
+    track('preview_intent_seen');
+  }, []);
+
   const onSelect = async (intent: PreviewIntent) => {
     const createdAt = new Date().toISOString();
+    track('preview_intent_selected', { intent });
 
     if (intent === 'self') {
       await setPreviewState({
