@@ -4,45 +4,43 @@
 
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import { useLibrarySearch } from './use-library-search';
 
 const mockFetch = jest.fn();
-
-// prettier-ignore
-jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-// prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: hook tests need a fixed active profile without provider setup
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
-function createWrapper() {
-  const w = createQueryWrapper();
+function createWrapper(options: { activeProfileNull?: boolean } = {}) {
+  const w = createHookWrapper({
+    activeProfile: options.activeProfileNull
+      ? null
+      : createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -72,15 +70,6 @@ const mockSearchResult = {
 // ---------------------------------------------------------------------------
 
 describe('useLibrarySearch', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches and returns search results for a non-empty query', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(mockSearchResult), { status: 200 }),
@@ -122,24 +111,13 @@ describe('useLibrarySearch', () => {
   });
 
   it('is disabled when there is no active profile — no fetch fires', async () => {
-    // Override the profile mock to return null activeProfile for this test
-    const profileMod = require('../lib/profile') as {
-      useProfile: () => { activeProfile: null | { id: string } };
-    };
-    const original = profileMod.useProfile;
-    profileMod.useProfile = () => ({ activeProfile: null });
+    const { result } = renderHook(() => useLibrarySearch('egypt'), {
+      wrapper: createWrapper({ activeProfileNull: true }),
+    });
 
-    try {
-      const { result } = renderHook(() => useLibrarySearch('egypt'), {
-        wrapper: createWrapper(),
-      });
-
-      await new Promise((r) => setTimeout(r, 50));
-      expect(result.current.fetchStatus).toBe('idle');
-      expect(mockFetch).not.toHaveBeenCalled();
-    } finally {
-      profileMod.useProfile = original;
-    }
+    await new Promise((r) => setTimeout(r, 50));
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('propagates API errors into error state', async () => {
