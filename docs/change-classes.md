@@ -24,7 +24,7 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 | **api-services** | `apps/api/src/services/**` (non-prompt) | `test:api:unit` | — | |
 | **mobile-routes** | `apps/mobile/src/app/**` | `test:mobile:unit` | — | `unstable_settings`; push ancestor chain |
 | **mobile-src** | `apps/mobile/src/**` (non-route, non-i18n) | `test:mobile:unit` | — | |
-| **i18n** | `apps/mobile/src/i18n/**` | `check:i18n`, `check:i18n:orphans` | — | Pre-commit enforces en.json staleness |
+| **i18n** | `apps/mobile/src/i18n/**`, `apps/mobile/src/**/*.{ts,tsx}` | `check:i18n:orphans`, `check:i18n` | — | Shared detector catches new `t()` calls outside locale files |
 | **shared-schemas** | `packages/schemas/src/**` | `test:api:unit`, `test:mobile:unit` | `test:api:integration`, `test:integration` | Never redefine types locally |
 | **shared-database** | `packages/database/src/**` (non-schema) | `test:api:unit` | `test:api:integration` | |
 | **security-sensitive** | `**/billing/**`, `**/auth/**`, `**/clerk*` | — | `test:api:integration` | Break tests required; no silent recovery |
@@ -65,7 +65,7 @@ The hook (`scripts/pre-push-tests.sh` + `.husky/pre-push`) runs automatically on
 - **tsc --build** — incremental typecheck on push delta (catches cross-commit type breakage)
 - **Surgical jest** — `--findRelatedTests` per project on the delta (same pattern as pre-commit, but on the cumulative push range)
 - **eval:llm** — when prompt files or eval harness code are in the delta
-- **check:i18n** — when i18n files are in the delta
+- **check:i18n:orphans** + **check:i18n** — when mobile source or i18n files are in the delta, using `scripts/lib/i18n-change-detection.sh`
 
 Skip with `git push --no-verify` or `SKIP_PRE_PUSH=1`. Skipped automatically on protected branches (`main` by default; configure via `PREPUSH_SKIP_BRANCHES`).
 
