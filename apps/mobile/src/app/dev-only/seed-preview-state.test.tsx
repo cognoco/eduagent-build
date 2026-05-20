@@ -20,6 +20,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
+const previousE2E = process.env.EXPO_PUBLIC_E2E;
 process.env.EXPO_PUBLIC_E2E = 'true';
 
 const SeedPreviewStateScreen = require('./seed-preview-state')
@@ -39,6 +40,14 @@ describe('SeedPreviewStateScreen', () => {
 
   afterEach(async () => {
     await clearPreviewState();
+  });
+
+  afterAll(() => {
+    if (previousE2E === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E;
+      return;
+    }
+    process.env.EXPO_PUBLIC_E2E = previousE2E;
   });
 
   it('seeds fresh preview state and returns to the preview intent screen', async () => {
@@ -68,6 +77,28 @@ describe('SeedPreviewStateScreen', () => {
 
     await waitFor(async () => {
       await expect(getPreviewState()).resolves.toBeNull();
+    });
+    expect(mockReplace).toHaveBeenCalledWith('/preview/intent');
+  });
+
+  it('falls back to the intent default when the requested path is invalid', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      intent: 'child',
+      path: 'not_a_preview_path',
+      topicText: 'geometry',
+      staleMs: '0',
+    });
+
+    render(<SeedPreviewStateScreen />);
+
+    await waitFor(async () => {
+      await expect(getPreviewState()).resolves.toEqual(
+        expect.objectContaining({
+          intent: 'child',
+          path: 'parent_value_prop',
+          topicText: 'geometry',
+        }),
+      );
     });
     expect(mockReplace).toHaveBeenCalledWith('/preview/intent');
   });
