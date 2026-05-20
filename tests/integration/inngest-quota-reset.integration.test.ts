@@ -151,15 +151,12 @@ describe('Integration: quota-reset Inngest function', () => {
 
     const { result, executionOrder } = await executeQuotaReset();
 
-    expect(executionOrder).toEqual([
-      'reset-daily-quotas',
-      'reset-expired-cycles',
-    ]);
+    expect(executionOrder).toEqual(['reset-daily-and-cycles']);
     expect(result).toEqual(
       expect.objectContaining({
         status: 'completed',
         timestamp: expect.any(String),
-      })
+      }),
     );
     // resetDailyQuotas/resetExpiredQuotaCycles operate on ALL pools in the DB
     // (they're daily crons, not scoped to our seed). With parallel Jest workers,
@@ -180,7 +177,7 @@ describe('Integration: quota-reset Inngest function', () => {
     expect(reloadedPlusPool!.monthlyLimit).toBe(plusTier.monthlyQuota);
     expect(reloadedPlusPool!.dailyLimit).toBeNull();
     expect(reloadedPlusPool!.cycleResetAt.getTime()).toBeGreaterThan(
-      plusPool.quotaPool.cycleResetAt.getTime()
+      plusPool.quotaPool.cycleResetAt.getTime(),
     );
 
     const reloadedFamilyPool = await loadQuotaPool(familyPool.quotaPool.id);
