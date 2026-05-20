@@ -10,4 +10,5 @@ CREATE TABLE "challenge_round_cooldowns" (
 );
 --> statement-breakpoint
 ALTER TABLE "challenge_round_cooldowns" ADD CONSTRAINT "challenge_round_cooldowns_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "challenge_round_cooldowns" ADD CONSTRAINT "challenge_round_cooldowns_topic_id_curriculum_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."curriculum_topics"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "challenge_round_cooldowns" ADD CONSTRAINT "challenge_round_cooldowns_topic_id_curriculum_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."curriculum_topics"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "challenge_round_cooldowns" ENABLE ROW LEVEL SECURITY;

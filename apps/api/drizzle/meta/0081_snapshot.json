@@ -1,6 +1,6 @@
 {
-  "id": "ddd2ea60-c609-411a-a23c-3119fa38fe8d",
-  "prevId": "831b880d-bc95-43c6-8b0e-d4a086bb7a43",
+  "id": "ba3e8bd1-e3e1-4d1c-a74e-a4ff842cfaf7",
+  "prevId": "ddd2ea60-c609-411a-a23c-3119fa38fe8d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6522,6 +6522,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "last_reviewed_at": {
+          "notNull": true,
+          "default": "now()",
+          "name": "last_reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false
         }
       },
       "indexes": {
