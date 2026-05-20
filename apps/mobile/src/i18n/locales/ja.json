@@ -659,6 +659,29 @@
       "currentTopic": "トピック：",
       "changeTopicLabel": "トピックを{{topic}}から変更",
       "changeTopic": "変更"
+    },
+    "challenge": {
+      "offerTitle": "Up for a challenge round?",
+      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
+      "tryIt": "Try it",
+      "notNow": "Not now",
+      "dontAskAgain": "Don't ask again",
+      "banner": {
+        "active": "Challenge round in progress",
+        "question": "Question {{index}} of {{total}}"
+      },
+      "draft": {
+        "title": "Here's what you know now",
+        "save": "Save note",
+        "edit": "Edit first",
+        "skip": "Skip"
+      },
+      "partial": {
+        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
+      },
+      "allMissing": {
+        "body": "Let's revisit this together first."
+      }
     }
   },
   "quiz": {

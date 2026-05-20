@@ -222,6 +222,7 @@ function makeAssessmentRow(
     verificationDepth: 'recall',
     status: 'passed',
     masteryScore: null,
+    masteryChallengeVerifiedAt: null,
     qualityRating: null,
     exchangeHistory: [],
     masteryChallengeVerifiedAt: null,

@@ -10,24 +10,19 @@ let mockActiveProfile: { id: string; conversationLanguage: string } | null = {
   conversationLanguage: 'en',
 };
 
-const mockUseUpdateConversationLanguage = jest.fn(() => ({
-  mutate: mockMutate,
-  isPending: mockIsPending,
-}));
-const mockUseProfile = jest.fn(() => ({
-  activeProfile: mockActiveProfile,
-}));
-
 jest.mock('./use-onboarding-dimensions', () => ({
-  get useUpdateConversationLanguage() {
-    return mockUseUpdateConversationLanguage;
-  },
+  ...jest.requireActual('./use-onboarding-dimensions'),
+  useUpdateConversationLanguage: () => ({
+    mutate: mockMutate,
+    isPending: mockIsPending,
+  }),
 }));
 
 jest.mock('../lib/profile', () => ({
-  get useProfile() {
-    return mockUseProfile;
-  },
+  ...jest.requireActual('../lib/profile'),
+  useProfile: () => ({
+    activeProfile: mockActiveProfile,
+  }),
 }));
 
 describe('useMentorLanguageSync', () => {
