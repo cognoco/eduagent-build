@@ -2866,26 +2866,34 @@ Walk: sign-in → Try MentoMate → Me → topic "algebra" → learner value-pro
 - Re-read: `docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md` §Acceptance Criteria
 - All tests added in Tasks 1-14.
 
-- [ ] **Step 1: Map every AC to a test (or note "covered by E2E in Task 16").**
+- [x] **Step 1: Map every AC to a test (or note "covered by E2E in Task 16").**
 
-Open the spec. For each numbered AC, list the test name covering it. AC list:
+**Verified mapping (2026-05-20).** Wizard tests live in `(app)/_layout.test.tsx` because per `[CRITICAL-A2]` the wizard ships inline in the layout (not as a nested `preview/save.tsx` route — the plan's earlier wording predates the inline decision).
 
-1. Intent screen renders 4 options + no chat shell → `preview/intent.test.tsx`
-2. Self → learner value-prop with sample marker, no LLM → `value-prop.test.tsx`
-3. Child → parent value-prop, CTA copy → `value-prop.test.tsx`
-4. Auth returns to save wizard → `(app)/_layout.test.tsx` preview branch
-5. Wizard child→self override → `save.test.tsx`
-6. Wizard self→child override → `save.test.tsx`
-7. Parent lands on parent home + `isFamilyCapableProfile` true → `save.test.tsx` (parent target landing)
-8. Solo owner lands on learner home → `_layout.test.tsx` (resolveTabShape) + `save.test.tsx` (self target landing)
-9. Parent ok, child fails, no rollback → `save.test.tsx` (child failure case)
-10. 1-hour expiry → `preview-onboarding-state.test.tsx`
-11. Sign-out clears key → `sign-out-cleanup.test.ts`
-12. No preview state → CreateProfileGate unchanged → `_layout.test.tsx`
-13. `router.replace` on landing → `save.test.tsx`
-14. Back returns to topic/intent + topic preserved → manual + E2E (Task 16)
-15. Flag off: no CTA, no route, gate falls through → `sign-in.test.tsx` + `_layout.test.tsx`
-16. Navigation discipline: push for hops, replace for landing → grep assertion test (see step 2)
+| AC | What it asserts | Test (file → describe → it) | Status |
+|---|---|---|---|
+| 1 | Intent renders 4 options, no chat shell | `preview/intent.test.tsx` → `Preview IntentScreen` → 4 routing tests cover all options. The screen is a pure `View` with no chat surface; "no chat shell" is structurally guaranteed and verified by `value-prop.test.tsx`'s explicit `does not render a chat shell or any LLM-driven element`. | ✅ |
+| 2 | Me + topic → static learner value-prop, sample marker, no LLM | `preview/value-prop.test.tsx` → `learner variant renders sample dialogue marked as sample` + `does not render a chat shell or any LLM-driven element` | ✅ |
+| 3 | My child → parent value-prop + CTA copy | `preview/value-prop.test.tsx` → `parent variant renders sample weekly insight marked as sample` + `CTA routes to sign-up` | ✅ (CTA destination asserted; exact CTA copy not pinned by string — variant prop selects copy) |
+| 4 | Auth returns to save wizard, not CreateProfileGate | `(app)/_layout.test.tsx` → `AppLayout no-profile gate — preview branch` → `renders the SaveWizardGate when preview state exists and flag is on` | ✅ |
+| 5 | Wizard child→self override (only owner created) | `(app)/_layout.test.tsx` → `SaveWizard — Step 1` → `overrides intent when user picks a different target` (generic; covers both directions) | ✅ |
+| 6 | Wizard self→child override | Same generic test as AC 5 — `overrides intent when user picks a different target` | ✅ |
+| 7 | Parent lands on parent home + `isFamilyCapableProfile` true | Landing → `(app)/_layout.test.tsx` → `SaveWizard — Step 3` → `child target: replaces history with /(app)/home on CTA press`. Helper → `profile.test.ts` → `isFamilyCapableProfile` (5 cases). Composition coverage; the test does not chain these into a single assertion. | ✅ (composition) |
+| 8 | Solo owner lands on learner home | Landing → `SaveWizard — Step 3` → `self target: replaces history with session route on CTA press` lands at `/(app)/session`, and `resolveTabShape` → `returns learner for a solo owner with no linked profiles` proves the tab shape. (Self-branch lands in *session* per Task 0 resolution — stronger than the spec's "learner home" claim; tab shell remains learner.) | ✅ (composition) |
+| 9 | Parent ok, child fails, no rollback | Step 3 `switchProfile failure surfaces error in landing error block` covers landing-time failure. The specific scenario — owner POST succeeds + child POST fails mid-Step-2 with the `[HIGH-4]` resume guard skipping re-creation of the owner on retry — has implementation in `_layout.tsx` (`createdOwnerProfileId` cache check) but **no dedicated test**. | ⚠️ **Gap — see follow-up below** |
+| 10 | 1-hour TTL expiry | `preview-onboarding-state.test.ts` → `treats expired key as absent` | ✅ |
+| 11 | Sign-out clears key | `sign-out-cleanup.test.ts` → `clears mentomate_preview_intent on sign-out` | ✅ |
+| 12 | No preview state → CreateProfileGate unchanged | Pre-existing `AppLayout` describe block covers no-profile fallback to `CreateProfileGate`. The new preview branch only activates when state is present (gated by `previewProbeState === 'present'` in `_layout.tsx`), so a missing state preserves the original behaviour by construction. | ✅ (structural) |
+| 13 | `router.replace` on landing | `SaveWizard — Step 3` → both `self target …` and `child target …` tests assert `router.replace`, not `router.push` | ✅ |
+| 14 | Back returns to topic/intent + topic preserved | Deferred to E2E (Task 16). Topic preservation is exercised structurally by `preview-onboarding-state.test.ts` (`writes in-memory and to SecureStore`); the Back-button stack behaviour is platform-level and verified end-to-end. | ⏸ E2E deferred |
+| 15 | Flag off: no CTA, no route, gate falls through | `sign-in.test.tsx` → `SignInScreen — Try MentoMate CTA` → `hides the CTA when flag is off`; `(app)/_layout.test.tsx` → `falls through to CreateProfileGate when flag is off, even with stale preview state` | ✅ |
+| 16 | Navigation discipline (push for hops, replace for landing) | Hops: `preview/intent.test.tsx`, `preview/topic.test.tsx`, `preview/value-prop.test.tsx` all assert `push`. Landing: `_layout.test.tsx` Step 3 tests assert `replace`. Behavioural; no grep-over-source test. | ✅ |
+
+**Gap follow-up (AC 9 — open after this PR lands):**
+- Add a Step 2 test to `(app)/_layout.test.tsx` → `SaveWizard — Step 2 (Profile Basics)`: scenario `[HIGH-4] resumes from createdOwnerProfileId on retry after child POST fails`. Drive Step 2 once with success for the parent POST + failure for the child POST → assert error surfaced + parent profile present in cache + retry skips the re-create-parent call.
+- File: `apps/mobile/src/app/(app)/_layout.test.tsx`.
+- Estimate: ~30 min — the resume guard implementation already exists; this is test-only.
+- Why deferred from this PR: the audit caught it after wave 5b shipped; surfacing it here without ballooning Task 15's scope keeps the audit honest. Per CLAUDE.md "Sweep when you fix": this is the only gap, so a single follow-up issue (not a new lint guard) is the proportionate response.
 
 - [ ] **Step 2: Cover AC 16 behaviorally inside existing route tests.** [MEDIUM-1]
 
