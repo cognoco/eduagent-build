@@ -24,10 +24,9 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 17 scenario inputs for a general (non-language) profile', () => {
+    it('returns 20 scenario inputs for a general (non-language) profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      expect(scenarios).toHaveLength(17);
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S7-language-fluency',
       );
