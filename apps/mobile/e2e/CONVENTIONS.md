@@ -106,7 +106,7 @@ Tag tokens below are wrapped in backticks so the validator's parser can extract 
 
 ### Domain tags
 
-`account`, `assessment`, `auth`, `billing`, `chat`, `consent`, `dictation`, `edge`, `homework`, `learning`, `library`, `navigation`, `onboarding`, `parent`, `practice`, `progress`, `quiz`, `regression`, `retention`, `session`, `settings`, `subjects`, `summary`
+`account`, `assessment`, `auth`, `billing`, `chat`, `consent`, `dictation`, `edge`, `homework`, `learning`, `library`, `navigation`, `onboarding`, `parent`, `practice`, `preview`, `progress`, `quiz`, `regression`, `retention`, `session`, `settings`, `subjects`, `summary`
 
 ### Special tags
 
