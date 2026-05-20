@@ -27,6 +27,11 @@ const VALID_INTENTS = new Set<PreviewIntent>([
   'not_sure',
 ]);
 
+const VALID_PATHS = new Set<PreviewPath>([
+  'learner_value_prop',
+  'parent_value_prop',
+]);
+
 function parseIntent(value: string | undefined): PreviewIntent {
   return value && VALID_INTENTS.has(value as PreviewIntent)
     ? (value as PreviewIntent)
@@ -37,6 +42,15 @@ function defaultPathForIntent(intent: PreviewIntent): PreviewPath {
   return intent === 'child' || intent === 'both'
     ? 'parent_value_prop'
     : 'learner_value_prop';
+}
+
+function parsePath(
+  value: string | undefined,
+  intent: PreviewIntent,
+): PreviewPath {
+  return value && VALID_PATHS.has(value as PreviewPath)
+    ? (value as PreviewPath)
+    : defaultPathForIntent(intent);
 }
 
 export default function SeedPreviewStateScreen(): React.ReactElement | null {
@@ -54,13 +68,12 @@ export default function SeedPreviewStateScreen(): React.ReactElement | null {
 
     const run = async () => {
       const parsedIntent = parseIntent(intent);
+      const parsedPath = parsePath(path, parsedIntent);
       const parsedStaleMs = parseInt(staleMs ?? '0', 10);
       await seedPreviewStateForTesting(
         {
           intent: parsedIntent,
-          path:
-            (path as PreviewPath | undefined) ??
-            defaultPathForIntent(parsedIntent),
+          path: parsedPath,
           topicText,
           bothPriority: parsedIntent === 'both' ? 'child_first' : undefined,
           createdAt: new Date().toISOString(),
