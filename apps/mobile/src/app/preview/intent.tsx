@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+// TODO(telemetry): preview_intent_seen / preview_intent_selected / preview_topic_seen / preview_topic_entered / preview_value_prop_seen / preview_value_prop_cta — see docs/plans/2026-05-19-trial-intent-save-onboarding-v0.md MEDIUM-C3
+import { useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,56 +47,63 @@ const OPTIONS: ReadonlyArray<Option> = [
 export default function PreviewIntentScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     track('preview_intent_seen');
   }, []);
 
   const onSelect = async (intent: PreviewIntent) => {
-    const createdAt = new Date().toISOString();
-    track('preview_intent_selected', { intent });
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const createdAt = new Date().toISOString();
+      track('preview_intent_selected', { intent });
 
-    if (intent === 'self') {
+      if (intent === 'self') {
+        await setPreviewState({
+          intent: 'self',
+          path: 'learner_value_prop',
+          createdAt,
+        });
+        router.push('/preview/topic');
+        return;
+      }
+      if (intent === 'child') {
+        await setPreviewState({
+          intent: 'child',
+          path: 'parent_value_prop',
+          createdAt,
+        });
+        router.push({
+          pathname: '/preview/value-prop',
+          params: { variant: 'parent' },
+        });
+        return;
+      }
+      if (intent === 'both') {
+        await setPreviewState({
+          intent: 'both',
+          path: 'parent_value_prop',
+          bothPriority: 'child_first',
+          createdAt,
+        });
+        router.push({
+          pathname: '/preview/value-prop',
+          params: { variant: 'parent' },
+        });
+        return;
+      }
+      // not_sure → lesson fork (v0: same as self)
       await setPreviewState({
-        intent: 'self',
+        intent: 'not_sure',
         path: 'learner_value_prop',
         createdAt,
       });
       router.push('/preview/topic');
-      return;
+    } catch {
+      setSubmitting(false);
     }
-    if (intent === 'child') {
-      await setPreviewState({
-        intent: 'child',
-        path: 'parent_value_prop',
-        createdAt,
-      });
-      router.push({
-        pathname: '/preview/value-prop',
-        params: { variant: 'parent' },
-      });
-      return;
-    }
-    if (intent === 'both') {
-      await setPreviewState({
-        intent: 'both',
-        path: 'parent_value_prop',
-        bothPriority: 'child_first',
-        createdAt,
-      });
-      router.push({
-        pathname: '/preview/value-prop',
-        params: { variant: 'parent' },
-      });
-      return;
-    }
-    // not_sure → lesson fork (v0: same as self)
-    await setPreviewState({
-      intent: 'not_sure',
-      path: 'learner_value_prop',
-      createdAt,
-    });
-    router.push('/preview/topic');
   };
 
   return (
@@ -125,7 +133,9 @@ export default function PreviewIntentScreen() {
         <Pressable
           key={opt.intent}
           onPress={() => void onSelect(opt.intent)}
+          disabled={submitting}
           className="bg-surface rounded-card px-4 py-4 mb-3"
+          style={{ opacity: submitting ? 0.6 : 1 }}
           testID={opt.testID}
           accessibilityRole="button"
           accessibilityLabel={opt.label}

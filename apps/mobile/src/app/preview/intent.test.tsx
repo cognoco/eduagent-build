@@ -68,4 +68,14 @@ describe('Preview IntentScreen', () => {
     );
     expect(push).toHaveBeenCalledWith('/preview/topic');
   });
+
+  it('double-tap guard: option buttons are disabled immediately after the first press', () => {
+    render(<IntentScreen />);
+    fireEvent.press(screen.getByTestId('intent-self'));
+    // All option buttons must become disabled immediately so the OS cannot
+    // deliver a second tap event before the screen unmounts.
+    for (const testID of ['intent-self', 'intent-child', 'intent-both', 'intent-not-sure']) {
+      expect(screen.getByTestId(testID).props.accessibilityState?.disabled).toBe(true);
+    }
+  });
 });
