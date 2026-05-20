@@ -86,7 +86,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -105,7 +105,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -144,7 +144,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -178,7 +178,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -210,7 +210,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -251,7 +251,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -297,7 +297,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -338,7 +338,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -371,7 +371,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -409,7 +409,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -450,7 +450,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,

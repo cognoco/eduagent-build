@@ -1,4 +1,4 @@
-﻿// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Family Access Service
 // ---------------------------------------------------------------------------
 // Shared helper for "can parent X manage child Y?" guards used by routes
@@ -8,6 +8,7 @@
 import { and, eq } from 'drizzle-orm';
 import { familyLinks, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
+import type { Context } from 'hono';
 import type { ProfileMeta } from '../middleware/profile-scope';
 
 /**
@@ -46,19 +47,31 @@ export async function assertParentAccess(
 }
 
 /**
- * [CR-2026-05-19-H1] Combined owner + IDOR guard for parent-administrative
- * actions on child profiles.
+ * [CR-2026-05-19-H1] Combined owner + parent-access guard for routes that
+ * perform parent-administrative actions on a child profile.
  *
- * Checks isOwner FIRST so a non-owner profile (child on a parent's account)
- * cannot perform administrative actions even if the family link exists.
- * Delegates to assertParentAccess for the IDOR check after the owner check.
+ * 1. Checks that the active profile is the account owner (isOwner === true).
+ *    A non-owner profile (child on a parent's account) cannot perform
+ *    administrative actions even if a family link exists.
+ * 2. Then delegates to assertParentAccess to verify the parent->child link
+ *    (IDOR protection -- the owner cannot touch an unrelated child).
+ *
+ * Use this instead of bare assertParentAccess on all parent-admin routes so
+ * that both guards fire at every call site without callers remembering to
+ * add the isOwner check manually.
+ *
+ * The `c` parameter accepts any Hono Context that exposes `profileMeta` via
+ * `c.get(...)`. The loose `Context` type is intentional -- each route file
+ * declares its own env type, and asserting the narrowest common shape here
+ * would require a shared env union that buys nothing over this pattern.
  */
 export async function assertOwnerAndParentAccess(
-  profileMeta: ProfileMeta | undefined,
+  c: Context & { get(key: 'profileMeta'): ProfileMeta | undefined },
   db: Database,
   parentProfileId: string,
-  childProfileId: string,
+  childProfileId: string
 ): Promise<void> {
+  const profileMeta = c.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
     throw new ForbiddenError(
       'Only the account owner can perform administrative actions on child profiles.',
