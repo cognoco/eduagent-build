@@ -1,7 +1,10 @@
 import { fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
-import { renderScreen, cleanupScreen } from '../../../test-utils/screen-render';
+import {
+  renderScreen,
+  cleanupScreen,
+} from '../../../../test-utils/screen-render';
 import PickBookScreen from './[subjectId]';
 
 // ---------------------------------------------------------------------------
