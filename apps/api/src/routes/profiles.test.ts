@@ -66,7 +66,11 @@ type TestEnv = {
   };
 };
 
-function makeApp(overrides?: { accountId?: string; isOwner?: boolean }) {
+function makeApp(overrides?: {
+  accountId?: string;
+  isOwner?: boolean;
+  profileMeta?: ProfileMeta | null;
+}) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
@@ -80,13 +84,18 @@ function makeApp(overrides?: { accountId?: string; isOwner?: boolean }) {
     c.set('profileId', undefined);
     // [CR-2026-05-19-H1] Inject profileMeta so isOwner gate can evaluate.
     // Default isOwner:true for happy-path tests; override for break tests.
-    c.set('profileMeta', {
-      isOwner: overrides?.isOwner ?? true,
-      birthYear: 2000,
-      location: null,
-      consentStatus: null,
-      hasPremiumLlm: false,
-    } as ProfileMeta);
+    const profileMeta =
+      overrides?.profileMeta === null
+        ? undefined
+        : (overrides?.profileMeta ??
+          ({
+            isOwner: overrides?.isOwner ?? true,
+            birthYear: 2000,
+            location: null,
+            consentStatus: null,
+            hasPremiumLlm: false,
+          } as ProfileMeta));
+    c.set('profileMeta', profileMeta);
     await next();
   });
   app.onError((err, c) =>
@@ -169,6 +178,36 @@ describe('POST /v1/profiles', () => {
     const body = await res.json();
     expect(body).toMatchObject({
       profile: { id: PROFILE_ID_A, displayName: 'Alex' },
+    });
+  });
+
+  it('allows first profile creation when no owner profile exists yet', async () => {
+    const profile = makeProfileRow({
+      id: PROFILE_ID_A,
+      displayName: 'First Owner',
+      isOwner: true,
+    });
+    createProfileWithLimitCheckMock.mockResolvedValue(profile);
+
+    const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'First Owner',
+        birthYear: 2000,
+        location: 'EU',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(createProfileWithLimitCheckMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT_ID,
+      expect.objectContaining({ displayName: 'First Owner' }),
+    );
+    const body = await res.json();
+    expect(body).toMatchObject({
+      profile: { id: PROFILE_ID_A, isOwner: true },
     });
   });
 

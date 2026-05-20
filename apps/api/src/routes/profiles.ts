@@ -48,8 +48,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const input = c.req.valid('json');
 
     // [CR-2026-05-19-H1] Only the account owner can create additional profiles.
+    // A brand-new account has no owner profile for profileScopeMiddleware to
+    // auto-resolve yet; let that first-profile path reach the service, where
+    // it is marked as the owner profile.
     const activeProfileMetaCreate = c.get('profileMeta');
-    if (activeProfileMetaCreate?.isOwner !== true) {
+    if (activeProfileMetaCreate && activeProfileMetaCreate.isOwner !== true) {
       return apiError(
         c,
         403,
