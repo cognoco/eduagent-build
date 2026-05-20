@@ -29,7 +29,7 @@ export default function ValuePropScreen() {
   const topic = previewState?.topicText ?? '';
 
   useEffect(() => {
-    track('preview_value_prop_shown', {
+    track('preview_value_prop_seen', {
       variant,
       intent: previewState?.intent,
       hasTopic: Boolean(previewState?.topicText),
@@ -68,7 +68,7 @@ export default function ValuePropScreen() {
       )}
       <Pressable
         onPress={() => {
-          track('preview_signup_cta_tapped', {
+          track('preview_signup_started', {
             variant,
             intent: previewState?.intent,
             hasTopic: Boolean(previewState?.topicText),

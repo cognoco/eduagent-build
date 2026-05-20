@@ -3,7 +3,7 @@
  *
  * Test-only exports — symbols whose name ends in `ForTesting` or starts with
  * `__test` — must not be imported from production code. The dev-only Expo
- * Router screen at `apps/mobile/src/app/dev-only/seed-pending-redirect.tsx` and
+ * Router screens under `apps/mobile/src/app/dev-only/seed-*.tsx` and
  * co-located `*.test.{ts,tsx}` files are the only allowed call sites.
  *
  * Mirrors GC1's structure: scan source for forbidden patterns, fail CI if any
@@ -32,6 +32,11 @@ const ALLOWLIST = new Set([
     'dev-only',
     'seed-pending-redirect.tsx',
   ].join(sep),
+  // Same runtime gate pattern as the pending redirect seeder, but for preview
+  // onboarding TTL scenarios.
+  ['apps', 'mobile', 'src', 'app', 'dev-only', 'seed-preview-state.tsx'].join(
+    sep,
+  ),
 ]);
 
 function isAllowed(relPath: string): boolean {

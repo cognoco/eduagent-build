@@ -1215,12 +1215,21 @@ function SaveWizardGate({
     parent: Profile;
     child?: Profile;
   } | null>(null);
+  const signupCompletionTrackedRef = React.useRef(false);
 
   React.useEffect(() => {
     onStart();
     void getPreviewState().then((s) => {
       setLocalPreviewState(s);
       setTarget(defaultTargetFor(s));
+      if (s && !signupCompletionTrackedRef.current) {
+        signupCompletionTrackedRef.current = true;
+        track('preview_signup_completed', {
+          intent: s.intent,
+          path: s.path,
+          hasTopic: Boolean(s.topicText),
+        });
+      }
       setProbeDone(true);
     });
   }, [onStart]);
@@ -1229,6 +1238,10 @@ function SaveWizardGate({
     if (!previewState) return;
     track('save_wizard_step_started', {
       step,
+      target: target ?? 'unset',
+      intent: previewState.intent,
+    });
+    track(`save_wizard_step_${step}`, {
       target: target ?? 'unset',
       intent: previewState.intent,
     });
