@@ -181,6 +181,14 @@
       "encouragementNote": "Nudges sind sanfte Ermutigungen in eine Richtung.",
       "transitionNoticeTitle": "Du begleitest jetzt {{childNames}}",
       "transitionNoticeBody": "Probiere heute Abend eine dieser Einstiegsfragen aus.",
+      "recentActivity": {
+        "title": "Aktuelle Aktivität der Kinder"
+      },
+      "studyActivation": {
+        "title": "Möchtest du auch lernen?",
+        "body": "Wechsle zu Mein Lernen, wenn jetzt deine Lernzeit ist.",
+        "action": "Zu Mein Lernen"
+      },
       "cards": {
         "checkChild": "Schau nach, wie es {{childName}} geht",
         "checkChildFallback": "Tippe, um den Fortschritt dieser Woche zu sehen",
