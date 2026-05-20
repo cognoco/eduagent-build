@@ -1594,6 +1594,293 @@ describe('SaveWizard — Step 2 (Profile Basics)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// SaveWizard — Step 3 (Confirm + Landing)
+// Task 14: Replace ConfirmStep placeholder with real implementation.
+// [Task 0 resolution] Dual landing keyed off the wizard's `target` flag:
+//   - self (or both+self_first): router.replace to /(app)/session with rawInput
+//   - child (or both+child_first): router.replace to /(app)/home
+// ---------------------------------------------------------------------------
+
+describe('SaveWizard — Step 3 (Confirm + Landing)', () => {
+  let testQueryClient: QueryClient;
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    // /profiles POST — returns a minimal owner profile for step 2 submission.
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Solo',
+              birthYear: 2000,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+  }
+
+  /** Render the full layout with no active profile (triggers SaveWizardGate). */
+  function renderWizardLayout(
+    switchProfileImpl?: () => Promise<{ success: boolean; error?: string }>,
+  ) {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile:
+        switchProfileImpl ?? jest.fn().mockResolvedValue({ success: true }),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  /**
+   * Drive from step 1 through step 2 (self target) and reach step 3.
+   * Returns once the "save-confirm-land" CTA is visible.
+   */
+  async function driveToStep3Self() {
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    // Step 2 — solo learner form
+    await screen.findByTestId('save-basics-display-name');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-display-name'),
+      'Solo',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2000');
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+    await screen.findByTestId('save-confirm-land');
+  }
+
+  /**
+   * Drive from step 1 through step 2 (child target) and reach step 3.
+   * Returns once the "save-confirm-land" CTA is visible.
+   */
+  async function driveToStep3Child() {
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    // Override to child target
+    fireEvent.press(screen.getByTestId('save-target-child'));
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    // Step 2 — parent + child form
+    await screen.findByTestId('save-basics-parent-name');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-name'),
+      'Parent',
+    );
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      '1985',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Kid');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+    await screen.findByTestId('save-confirm-land');
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockReplace.mockReset();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('self target: replaces history with session route on CTA press', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'algebra',
+      createdAt: new Date().toISOString(),
+    });
+
+    await driveToStep3Self();
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(() => {
+      const call = mockReplace.mock.calls.find(
+        (c) =>
+          typeof c[0] === 'object' &&
+          (c[0] as { pathname?: string }).pathname === '/(app)/session',
+      );
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('child target: replaces history with /(app)/home on CTA press', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+
+    await driveToStep3Child();
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
+  });
+
+  it('clears preview state on save completion', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'fractions',
+      createdAt: new Date().toISOString(),
+    });
+
+    await driveToStep3Self();
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(async () => {
+      expect(await getPreviewState()).toBeNull();
+    });
+  });
+
+  it('switchProfile failure surfaces error in landing error block', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'history',
+      createdAt: new Date().toISOString(),
+    });
+
+    // Re-render with a failing switchProfile
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    const switchProfileMock = jest
+      .fn()
+      .mockResolvedValue({ success: false, error: 'profile switch failed' });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: switchProfileMock,
+    });
+
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Solo',
+              birthYear: 2000,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    const AppLayout = require('./_layout').default;
+    render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    await screen.findByTestId('save-basics-display-name');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-display-name'),
+      'Solo',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2000');
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+    await screen.findByTestId('save-confirm-land');
+
+    fireEvent.press(screen.getByTestId('save-confirm-land'));
+
+    await waitFor(() => {
+      expect(screen.getByText('profile switch failed')).toBeTruthy();
+    });
+    // Must NOT navigate on failure
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/session' }),
+    );
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [BUG-776 / M-14] buildSwitchProfileConfirmation
 // ---------------------------------------------------------------------------
 // Pre-fix the consent-gate "Switch profile" handler silently picked the
