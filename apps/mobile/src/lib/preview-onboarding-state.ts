@@ -25,14 +25,24 @@ interface StoredRecord extends PreviewOnboardingStateV0 {
   savedAt: number;
 }
 
-let memoryState: PreviewOnboardingStateV0 | null = null;
+let memoryRecord: StoredRecord | null = null;
 
 function isFresh(savedAt: number): boolean {
   return Date.now() - savedAt < PREVIEW_TTL_MS;
 }
 
 export async function getPreviewState(): Promise<PreviewOnboardingStateV0 | null> {
-  if (memoryState) return memoryState;
+  if (memoryRecord) {
+    if (isFresh(memoryRecord.savedAt)) {
+      const { savedAt: _ignored, ...state } = memoryRecord;
+      return state;
+    }
+    memoryRecord = null;
+    await SecureStore.deleteItemAsync(PREVIEW_INTENT_KEY).catch(
+      () => undefined,
+    );
+    return null;
+  }
 
   try {
     const raw = await SecureStore.getItemAsync(PREVIEW_INTENT_KEY);
@@ -59,8 +69,8 @@ export async function getPreviewState(): Promise<PreviewOnboardingStateV0 | null
     }
 
     const { savedAt: _ignored, ...state } = parsed as StoredRecord;
-    memoryState = state as PreviewOnboardingStateV0;
-    return memoryState;
+    memoryRecord = parsed as StoredRecord;
+    return state as PreviewOnboardingStateV0;
   } catch {
     return null;
   }
@@ -69,8 +79,8 @@ export async function getPreviewState(): Promise<PreviewOnboardingStateV0 | null
 export async function setPreviewState(
   state: PreviewOnboardingStateV0,
 ): Promise<void> {
-  memoryState = state;
   const record: StoredRecord = { ...state, savedAt: Date.now() };
+  memoryRecord = record;
   try {
     // [SEC] WHEN_UNLOCKED_THIS_DEVICE_ONLY excludes from iCloud Keychain sync
     // and device-to-device backups; bounds the topic-text leak surface to
@@ -84,7 +94,7 @@ export async function setPreviewState(
 }
 
 export async function clearPreviewState(): Promise<void> {
-  memoryState = null;
+  memoryRecord = null;
   try {
     await SecureStore.deleteItemAsync(PREVIEW_INTENT_KEY);
   } catch {
@@ -110,8 +120,8 @@ export async function seedPreviewStateForTesting(
   ) {
     throw new Error('seedPreviewStateForTesting is dev-only');
   }
-  memoryState = state;
   const record: StoredRecord = { ...state, savedAt: Date.now() - staleMs };
+  memoryRecord = record;
   await SecureStore.setItemAsync(PREVIEW_INTENT_KEY, JSON.stringify(record), {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });

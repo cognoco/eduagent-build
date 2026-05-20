@@ -1029,15 +1029,36 @@ describe('AppLayout no-profile gate — preview branch', () => {
     expect(await findByTestId('save-wizard-gate')).toBeTruthy();
   });
 
-  // [CRITICAL-B2] Verify the layout does NOT install the auto-cleanup effect.
-  it('does NOT clear preview state automatically when activeProfile becomes truthy', async () => {
+  it('ignores and clears stale preview state for an already-profiled account', async () => {
     await setPreviewState({
       intent: 'self',
       path: 'learner_value_prop',
       createdAt: new Date().toISOString(),
     });
-    renderAppLayoutWithActiveProfile();
-    await Promise.resolve();
+
+    const { queryByTestId } = renderAppLayoutWithActiveProfile();
+
+    await waitFor(() => {
+      expect(queryByTestId('save-wizard-gate')).toBeNull();
+    });
+    await waitFor(async () => {
+      expect(await getPreviewState()).toBeNull();
+    });
+  });
+
+  // [CRITICAL-B2] Once the wizard has genuinely started, the layout must not
+  // clear preview state when ProfileProvider auto-activates the first profile.
+  it('does NOT clear preview state after the wizard has started and activeProfile becomes truthy', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    const { findByTestId, simulateProfileCreated } =
+      renderAppLayoutWithNoProfile();
+    await findByTestId('save-wizard-gate');
+    simulateProfileCreated({ id: 'p1', isOwner: true });
+
     // The layout must leave the key intact; cleanup is the wizard's job (or TTL/sign-out).
     expect(await getPreviewState()).not.toBeNull();
   });
