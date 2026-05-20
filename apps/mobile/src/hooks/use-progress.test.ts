@@ -20,9 +20,21 @@ import {
   useOverdueTopics,
   useTopicProgress,
   useProfileWeeklyReports,
+  useChildWeeklyReports,
   useRefreshProgressSnapshot,
 } from './use-progress';
 import { queryKeys } from '../lib/query-keys';
+
+// [CR-2026-05-19-H27] Mock the external Sentry boundary so the break test
+// below can assert captureException was called (not console.warn).
+jest.mock('@sentry/react-native', () => ({
+  captureMessage: jest.fn(),
+  captureException: jest.fn(),
+  init: jest.fn(),
+  getCurrentScope: jest.fn(() => ({ clear: jest.fn() })),
+  setUser: jest.fn(),
+  getClient: jest.fn(),
+}));
 
 const mockFetch = jest.fn();
 
@@ -456,6 +468,65 @@ describe('useProfileWeeklyReports', () => {
       '/dashboard/children/child-profile-id/weekly-reports',
     );
     expect(result.current.data).toEqual([]);
+  });
+});
+
+// [CR-2026-05-19-H27] Break tests for the silent-403 escalation fix.
+// Before the fix, useChildWeeklyReports caught a 403 from the weekly-reports
+// endpoint, console.warn'd it, and returned []. A revoked or broken
+// family-link ACL was therefore invisible in production. After the fix the
+// hook surfaces the typed ForbiddenError via React Query AND captures it to
+// Sentry with hook + childProfileId tags so the rate of fallback firings is
+// queryable per the CLAUDE.md "Silent recovery without escalation is banned"
+// rule. The screen renders its existing error fallback (retry + back).
+describe('useChildWeeklyReports — silent-403 escalation [CR-2026-05-19-H27]', () => {
+  it('surfaces ForbiddenError AND captures to Sentry on 403 (does not return [])', async () => {
+    const sentry = jest.requireMock('@sentry/react-native') as {
+      captureException: jest.Mock;
+    };
+    sentry.captureException.mockClear();
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'FORBIDDEN',
+          message: 'Family link not found',
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const ownerProfile = createTestProfile({
+      id: 'owner-profile-id',
+      isOwner: true,
+    });
+    const { result } = renderHook(
+      () => useChildWeeklyReports('child-profile-id'),
+      {
+        wrapper: createHookWrapper({ activeProfile: ownerProfile }).wrapper,
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    // Typed error returned via React Query — screen can branch on instanceof
+    expect(result.current.error).toBeInstanceOf(ForbiddenError);
+    // Hook must not silently swallow to []
+    expect(result.current.data).toBeUndefined();
+    // Sentry capture with queryable tags — this is the "escalation" the
+    // CLAUDE.md silent-recovery rule requires (console.warn alone is banned).
+    expect(sentry.captureException).toHaveBeenCalledWith(
+      expect.any(ForbiddenError),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          hook: 'useChildWeeklyReports',
+          error_kind: 'forbidden',
+        }),
+        extra: expect.objectContaining({ childProfileId: 'child-profile-id' }),
+      }),
+    );
   });
 });
 

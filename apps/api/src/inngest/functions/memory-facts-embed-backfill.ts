@@ -26,7 +26,23 @@ interface BackfillBatchResult {
   failed: number;
   lastId: string | null;
   scanned: number;
+  // [BUG-366] When a batch hits a retryable failure (rate_limited, transient,
+  // invalid_input) we deliberately leave the cursor BEFORE that row so the next
+  // batch within the same run re-attempts it instead of stranding it until the
+  // next hourly cron tick. We surface this flag so the outer loop can detect
+  // "no forward progress" and break to avoid spinning on a persistently-failing
+  // row (e.g. ongoing Voyage outage). `dimension_mismatch` is non-retryable
+  // (provider/config drift will produce the same wrong-sized vector); we
+  // advance past it, log, and emit a metric.
+  haltedByRetryableFailure: boolean;
 }
+
+// Classes that should NOT block cursor advancement — retrying produces the
+// same outcome, so we skip the row and surface it via metrics for ops triage.
+const NON_RETRYABLE_FAILURE_CLASSES = new Set([
+  'dimension_mismatch',
+  'empty_text',
+]);
 
 export const memoryFactsEmbedBackfill = inngest.createFunction(
   {
@@ -100,6 +116,14 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
             vector: number[];
           }> = [];
           let failed = 0;
+          // [BUG-366] Track the id of the row JUST BEFORE the first retryable
+          // failure encountered in this batch. If we hit one, we cap the
+          // advancing cursor there so the next batch (within the same run)
+          // retries the failed row. Non-retryable failures (dimension_mismatch,
+          // empty_text) are skipped and DO advance the cursor — retrying would
+          // produce the same outcome.
+          let lastSafeAdvanceId: string | null = cursor;
+          let haltedByRetryableFailure = false;
           for (const row of rows) {
             logger.info('[memory_facts.embed_backfill] row attempted', {
               event: 'memory_facts.embed_backfill.row_attempted',
@@ -112,13 +136,34 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
             );
             if (!result.ok) {
               failed += 1;
+              const isNonRetryable = NON_RETRYABLE_FAILURE_CLASSES.has(
+                result.class,
+              );
               logger.warn('[memory_facts.embed_backfill] row failed', {
                 event: 'memory_facts.embed_backfill.row_failed',
                 profileId: row.profileId,
                 factId: row.id,
                 category: row.category,
                 reason: result.reason,
+                failureClass: result.class,
+                retryable: !isNonRetryable,
               });
+              if (isNonRetryable) {
+                // Provider/config drift or malformed row — skip and advance.
+                // The non-NULL embedding column constraint stays satisfied
+                // because we simply don't UPDATE this row; it remains NULL
+                // and will be picked up again next tick, where it will fail
+                // the same way — so the metric above is the surfacing signal
+                // for ops, not the cursor.
+                lastSafeAdvanceId = row.id;
+                continue;
+              }
+              // Retryable failure: stop advancing cursor at this row so the
+              // next batch re-fetches it (and everything after). Continue
+              // processing the rest of this batch — successful UPDATEs are
+              // idempotent thanks to `embedding IS NULL` in the WHERE clause,
+              // and we want the throughput when only a subset of rows fails.
+              haltedByRetryableFailure = true;
               continue;
             }
             updates.push({
@@ -126,6 +171,12 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
               profileId: row.profileId,
               vector: result.vector,
             });
+            // Only advance the safe cursor when we haven't yet hit a retryable
+            // failure. Once we have, successive successes within this batch
+            // still get written (idempotent UPDATE) but the cursor stays put.
+            if (!haltedByRetryableFailure) {
+              lastSafeAdvanceId = row.id;
+            }
           }
 
           if (updates.length > 0) {
@@ -151,16 +202,45 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
           return {
             embedded: updates.length,
             failed,
-            lastId: rows.at(-1)?.id ?? cursor,
+            // [BUG-366] `lastSafeAdvanceId` is the id of the last row we are
+            // confident has been resolved (embedded or non-retryably skipped).
+            // It is the original `cursor` if the very first row failed
+            // retryably and nothing advanced it.
+            lastId: lastSafeAdvanceId,
             scanned: rows.length,
+            haltedByRetryableFailure,
           };
         },
       );
 
       totalEmbedded += batch.embedded;
       totalFailed += batch.failed;
+      const previousLastId: string | null = lastId;
       lastId = batch.lastId ?? lastId;
       if (batch.scanned < BATCH_SIZE) break;
+      // [BUG-366] If a retryable failure halted cursor advancement AND we made
+      // no forward progress this batch (no embeds, cursor unchanged — e.g.
+      // Voyage is fully down so the first row fails and every subsequent row
+      // also fails), break out instead of looping forever on the same rows.
+      // The next hourly cron tick will re-attempt. When `embedded > 0` we
+      // allow one more batch: the just-embedded rows are no longer NULL so
+      // the next query starts with the failing row and either succeeds (real
+      // progress) or fails and triggers this halt on the next pass.
+      if (
+        batch.haltedByRetryableFailure &&
+        lastId === previousLastId &&
+        batch.embedded === 0
+      ) {
+        logger.warn(
+          '[memory_facts.embed_backfill] halted — no forward progress',
+          {
+            event: 'memory_facts.embed_backfill.halted_no_progress',
+            cursor: lastId,
+            batchIndex,
+          },
+        );
+        break;
+      }
     }
 
     const summary = {

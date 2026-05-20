@@ -379,10 +379,14 @@ export function LearnerScreen({
 
   const openIntentAction = useCallback(
     (route: HomeIntentAction['route']): void => {
-      if (route === '/(app)/homework/camera') {
-        router.push(homeHref as Href);
-      }
-
+      // [CR-2026-05-19-H29] Previously this seeded the back stack by pushing
+      // `homeHref` before the camera route. That logic was load-bearing when
+      // openIntentAction could be called from somewhere other than Home, but
+      // LearnerScreen IS the Home tab — the user is already on Home when this
+      // fires, so the extra push created a duplicate stack entry (back from
+      // camera → home → home again). Just push the leaf; Expo Router's tab
+      // navigator already falls back to the first tab route on `router.back()`
+      // for cross-stack pushes (see CLAUDE.md "cross-tab router.push" rules).
       router.push({
         pathname: route,
         params:
@@ -391,7 +395,7 @@ export function LearnerScreen({
             : returnParams,
       } as Href);
     },
-    [homeHref, returnParams],
+    [returnParams],
   );
 
   if (isLoading) {

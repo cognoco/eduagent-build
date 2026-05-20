@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   buildRecapPrompt,
   buildRecapTranscriptText,
@@ -181,5 +183,37 @@ describe('buildRecapTranscriptText', () => {
     expect(text).toContain('Mentor: hi');
     expect(text).not.toContain('"signals"');
     expect(text).not.toContain('"ui_hints"');
+  });
+});
+
+// [CR-2026-05-19-M15] Forward-only guard: session-recap does NOT go through
+// parseEnvelope (no envelope signals drive any state machine here), so its
+// JSON parse failures must NOT emit `llm.envelope.parse_failed`. Reusing
+// that tag inflates the envelope-failure dashboard with a different
+// failure mode and blinds ops to true envelope-contract regressions.
+// The recap path emits `llm.recap.parse_failed` instead.
+describe('[CR-2026-05-19-M15] session-recap parse-failed metric tag', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, 'session-recap.ts'),
+    'utf8',
+  );
+
+  it("does not emit 'llm.envelope.parse_failed' from logger.warn", () => {
+    // Strip line comments so the documentation references to the
+    // envelope tag inside `//` comments don't trip this check.
+    const codeOnly = source.replace(/\/\/[^\n]*/g, '');
+    expect(codeOnly).not.toMatch(
+      /logger\.warn\(\s*['"]llm\.envelope\.parse_failed['"]/,
+    );
+  });
+
+  it("emits the dedicated 'llm.recap.parse_failed' tag instead", () => {
+    const matches = source.match(
+      /logger\.warn\(\s*['"]llm\.recap\.parse_failed['"]/g,
+    );
+    // Three failure branches: no_json_object, json_parse_error,
+    // schema_validation_failed — all must use the dedicated tag.
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBe(3);
   });
 });

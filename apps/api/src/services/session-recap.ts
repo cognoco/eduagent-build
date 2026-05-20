@@ -346,10 +346,13 @@ export async function generateLearnerRecap(
   // any state machine here — session termination already happened. We therefore
   // validate against learnerRecapLlmOutputSchema directly instead of parseEnvelope.
   //
-  // [BUG-123] Each failure branch below emits a structured
-  // `llm.envelope.parse_failed` log so this surface is queryable in
-  // production alongside the other LLM parse surfaces (see envelope.ts:242).
-  // Tag is `recap.learner` so dashboards can split failures per call site.
+  // [BUG-123 / CR-2026-05-19-M15] Each failure branch below emits a
+  // structured `llm.recap.parse_failed` log so this surface is queryable
+  // in production. We deliberately do NOT use the
+  // `llm.envelope.parse_failed` tag because this call site never goes
+  // through `parseEnvelope` (see comment above) — reusing that tag would
+  // inflate the envelope-failure dashboard with a different failure mode
+  // and blind ops to true envelope-contract regressions.
   // Without the explicit emission these failures were silent — only
   // observable as missing recap UI for the learner.
   const result = await routeAndCall(
@@ -374,9 +377,11 @@ export async function generateLearnerRecap(
 
   const jsonObject = extractFirstJsonObject(result.response);
   if (!jsonObject) {
-    // [BUG-123] Structured parse-failed metric so this surface joins the
-    // unified `llm.envelope.parse_failed` dashboard.
-    logger.warn('llm.envelope.parse_failed', {
+    // [BUG-123 / CR-2026-05-19-M15] Structured parse-failed metric on a
+    // dedicated `llm.recap.parse_failed` tag — must NOT collide with
+    // `llm.envelope.parse_failed`, which is reserved for the
+    // parseEnvelope() code path (see envelope.ts:242).
+    logger.warn('llm.recap.parse_failed', {
       surface: 'recap.learner',
       reason: 'no_json_object_in_response',
       sessionId: input.sessionId,
@@ -391,7 +396,7 @@ export async function generateLearnerRecap(
   try {
     parsed = JSON.parse(jsonObject);
   } catch (error) {
-    logger.warn('llm.envelope.parse_failed', {
+    logger.warn('llm.recap.parse_failed', {
       surface: 'recap.learner',
       reason: 'json_parse_error',
       sessionId: input.sessionId,
@@ -403,7 +408,7 @@ export async function generateLearnerRecap(
 
   const validated = learnerRecapLlmOutputSchema.safeParse(parsed);
   if (!validated.success) {
-    logger.warn('llm.envelope.parse_failed', {
+    logger.warn('llm.recap.parse_failed', {
       surface: 'recap.learner',
       reason: 'schema_validation_failed',
       sessionId: input.sessionId,

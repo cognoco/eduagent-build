@@ -9,10 +9,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
-import { writeSubscriptionStatus } from '../services/kv';
 import {
   getSubscriptionByAccountId,
-  getQuotaPool,
   ensureFreeSubscription,
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
@@ -23,6 +21,7 @@ import {
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
+import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
@@ -30,7 +29,6 @@ const logger = createLogger();
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
-import type { CachedSubscriptionStatus } from '../services/kv';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -176,35 +174,6 @@ function extractTierFromProductId(
 // ---------------------------------------------------------------------------
 
 /**
- * After a subscription DB update, refresh the KV cache.
- * Silently skips if KV namespace is not bound (dev/test).
- */
-async function refreshKvCache(
-  kv: KVNamespace | undefined,
-  db: Database,
-  accountId: string,
-): Promise<void> {
-  if (!kv) return;
-
-  const sub = await getSubscriptionByAccountId(db, accountId);
-  if (!sub) return;
-
-  const quota = await getQuotaPool(db, sub.id);
-
-  const cached: CachedSubscriptionStatus = {
-    subscriptionId: sub.id,
-    tier: sub.tier,
-    status: sub.status,
-    monthlyLimit: quota?.monthlyLimit ?? 0,
-    usedThisMonth: quota?.usedThisMonth ?? 0,
-    dailyLimit: quota?.dailyLimit ?? null,
-    usedToday: quota?.usedToday ?? 0,
-  };
-
-  await writeSubscriptionStatus(kv, accountId, cached);
-}
-
-/**
  * Resolves a RevenueCat app_user_id to an internal account ID.
  * RevenueCat app_user_id is set to the Clerk user ID via Purchases.logIn().
  */
@@ -270,7 +239,15 @@ async function handleInitialPurchase(
     },
   );
 
-  await refreshKvCache(kv, db, sub.accountId);
+  await safeRefreshKvCache(
+    kv,
+    db,
+    sub.accountId,
+    'revenuecat.webhook.handleInitialPurchase',
+    {
+      eventId: event.id,
+    },
+  );
 }
 
 async function handleRenewal(
@@ -311,7 +288,15 @@ async function handleRenewal(
   }
 
   if (updated) {
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleRenewal',
+      {
+        eventId: event.id,
+      },
+    );
   }
 }
 
@@ -333,7 +318,15 @@ async function handleCancellation(
   });
 
   if (updated) {
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleCancellation',
+      {
+        eventId: event.id,
+      },
+    );
   }
 }
 
@@ -371,7 +364,15 @@ async function handleExpiration(
       // but we need to record the eventId without overwriting those values
     });
 
-    await refreshKvCache(kv, db, accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      accountId,
+      'revenuecat.webhook.handleExpiration.trial',
+      {
+        eventId: event.id,
+      },
+    );
     return;
   }
 
@@ -392,7 +393,15 @@ async function handleExpiration(
       freeConfig.monthlyQuota,
       freeConfig.dailyLimit,
     );
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleExpiration',
+      {
+        eventId: event.id,
+      },
+    );
   }
 }
 
@@ -411,7 +420,15 @@ async function handleBillingIssue(
   });
 
   if (updated) {
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleBillingIssue',
+      {
+        eventId: event.id,
+      },
+    );
 
     // core-send: payment-failed alert — billing observability cannot be silent.
     // A swallowed dispatch leaves the failed payment unobserved by alerting.
@@ -480,7 +497,15 @@ async function handleProductChange(
       tierConfig.monthlyQuota,
       tierConfig.dailyLimit,
     );
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleProductChange',
+      {
+        eventId: event.id,
+      },
+    );
   }
 }
 
@@ -546,7 +571,16 @@ async function handleNonRenewingPurchase(
     return null;
   }
 
-  await refreshKvCache(kv, db, accountId);
+  await safeRefreshKvCache(
+    kv,
+    db,
+    accountId,
+    'revenuecat.webhook.handleNonRenewingPurchase',
+    {
+      eventId: event.id,
+      transactionId,
+    },
+  );
 
   return null;
 }
@@ -567,7 +601,15 @@ async function handleUncancellation(
   });
 
   if (updated) {
-    await refreshKvCache(kv, db, updated.accountId);
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleUncancellation',
+      {
+        eventId: event.id,
+      },
+    );
   }
 }
 
