@@ -1,4 +1,4 @@
-﻿// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Family Access Service
 // ---------------------------------------------------------------------------
 // Shared helper for "can parent X manage child Y?" guards used by routes
@@ -8,7 +8,14 @@
 import { and, eq } from 'drizzle-orm';
 import { familyLinks, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
+import type { Context, Env, Input } from 'hono';
 import type { ProfileMeta } from '../middleware/profile-scope';
+
+type ProfileMetaContextEnv = Env & {
+  Variables: {
+    profileMeta: ProfileMeta | undefined;
+  };
+};
 
 /**
  * Returns true if the authenticated parent profile has a family link to the
@@ -46,19 +53,34 @@ export async function assertParentAccess(
 }
 
 /**
- * [CR-2026-05-19-H1] Combined owner + IDOR guard for parent-administrative
- * actions on child profiles.
+ * [CR-2026-05-19-H1] Combined owner + parent-access guard for routes that
+ * perform parent-administrative actions on a child profile.
  *
- * Checks isOwner FIRST so a non-owner profile (child on a parent's account)
- * cannot perform administrative actions even if the family link exists.
- * Delegates to assertParentAccess for the IDOR check after the owner check.
+ * 1. Checks that the active profile is the account owner (isOwner === true).
+ *    A non-owner profile (child on a parent's account) cannot perform
+ *    administrative actions even if a family link exists.
+ * 2. Then delegates to assertParentAccess to verify the parent->child link
+ *    (IDOR protection -- the owner cannot touch an unrelated child).
+ *
+ * Use this instead of bare assertParentAccess on all parent-admin routes so
+ * that both guards fire at every call site without callers remembering to
+ * add the isOwner check manually.
+ *
+ * The `c` parameter accepts any Hono Context whose route env exposes
+ * `profileMeta`. Each route file keeps its own env type while this helper
+ * preserves the concrete Bindings/Variables/Input shape at the call site.
  */
-export async function assertOwnerAndParentAccess(
-  profileMeta: ProfileMeta | undefined,
+export async function assertOwnerAndParentAccess<
+  E extends ProfileMetaContextEnv,
+  P extends string,
+  I extends Input,
+>(
+  c: Context<E, P, I>,
   db: Database,
   parentProfileId: string,
   childProfileId: string,
 ): Promise<void> {
+  const profileMeta = c.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
     throw new ForbiddenError(
       'Only the account owner can perform administrative actions on child profiles.',

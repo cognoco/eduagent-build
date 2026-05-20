@@ -93,7 +93,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth: assert parent->child link at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -120,7 +120,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -141,7 +141,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -164,7 +164,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
@@ -190,7 +190,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -214,7 +214,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -238,7 +238,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -264,7 +264,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -308,7 +308,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -327,7 +327,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -354,7 +354,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -373,7 +373,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -397,7 +397,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(
-      c.get('profileMeta'),
+      c,
       db,
       parentProfileId,
       childProfileId,
@@ -427,7 +427,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(
-        c.get('profileMeta'),
+        c,
         db,
         parentProfileId,
         childProfileId,
