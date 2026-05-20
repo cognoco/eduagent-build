@@ -8,8 +8,14 @@
 import { and, eq } from 'drizzle-orm';
 import { familyLinks, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
-import type { Context } from 'hono';
+import type { Context, Env, Input } from 'hono';
 import type { ProfileMeta } from '../middleware/profile-scope';
+
+type ProfileMetaContextEnv = Env & {
+  Variables: {
+    profileMeta: ProfileMeta | undefined;
+  };
+};
 
 /**
  * Returns true if the authenticated parent profile has a family link to the
@@ -60,16 +66,19 @@ export async function assertParentAccess(
  * that both guards fire at every call site without callers remembering to
  * add the isOwner check manually.
  *
- * The `c` parameter accepts any Hono Context that exposes `profileMeta` via
- * `c.get(...)`. The loose `Context` type is intentional -- each route file
- * declares its own env type, and asserting the narrowest common shape here
- * would require a shared env union that buys nothing over this pattern.
+ * The `c` parameter accepts any Hono Context whose route env exposes
+ * `profileMeta`. Each route file keeps its own env type while this helper
+ * preserves the concrete Bindings/Variables/Input shape at the call site.
  */
-export async function assertOwnerAndParentAccess(
-  c: Context & { get(key: 'profileMeta'): ProfileMeta | undefined },
+export async function assertOwnerAndParentAccess<
+  E extends ProfileMetaContextEnv,
+  P extends string,
+  I extends Input,
+>(
+  c: Context<E, P, I>,
   db: Database,
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<void> {
   const profileMeta = c.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
