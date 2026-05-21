@@ -32,8 +32,8 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
     expect(prompt).toMatch(/Do NOT invent or imply learner background/i);
     expect(prompt).toMatch(/pen pals/i);
     expect(prompt).toMatch(/I am a complete beginner/i);
-    expect(prompt).toContain('LANGUAGE SOURCE OVERRIDE');
-    expect(prompt).toContain('do not teach a grammar rule from memory');
+    expect(prompt).toContain('LANGUAGE FACTUALITY');
+    expect(prompt).toContain('at least 0.88 confident');
   });
 
   it('includes the ANTI-FABRICATION block in non-language sessions too', () => {
@@ -192,7 +192,7 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain('write `+5` or plus 5, not "+5"');
   });
 
-  it('requires private source provenance in the envelope', () => {
+  it('requires private factuality provenance in the envelope', () => {
     const prompt = buildSystemPrompt(
       makeContext({
         topicTitle: 'Photosynthesis',
@@ -200,49 +200,27 @@ describe('buildSystemPrompt — response envelope contract', () => {
       }),
     );
 
-    expect(prompt).toContain('PRIVATE SOURCE CONTRACT');
+    expect(prompt).toContain('PRIVATE FACTUALITY CONTRACT');
     expect(prompt).toContain('private_sources');
     expect(prompt).toContain('relied_on');
     expect(prompt).toContain('current_topic');
-    expect(prompt).toContain('applies to every subject, session mode');
+    expect(prompt).toContain('general_knowledge');
+    expect(prompt).toContain('factual_confidence');
+    expect(prompt).toContain('0.88');
     expect(prompt).toContain('reliable_for_facts="true"');
     expect(prompt).toContain('never show it, source IDs');
-    expect(prompt).toContain('Treat each source excerpt as a boundary');
     expect(prompt).toContain(
-      'answer only the supported part and set private_sources.insufficient=true',
+      'ordinary low-stakes general knowledge questions at rungs 1-3',
     );
     expect(prompt).toContain(
-      'do not confirm it as true. Acknowledge it as their idea',
+      'Do NOT use "general_knowledge" for homework answers',
     );
-    expect(prompt).toContain('Unsupported learner claims need neutral');
-    expect(prompt).toContain('a good observation');
-    expect(prompt).toContain('interesting idea');
-    expect(prompt).toContain('good point');
-    expect(prompt).toContain('definitely');
-    expect(prompt).toContain('The part our source supports is X');
-    expect(prompt).toContain('FINAL GROUNDING CHECK');
-    expect(prompt).toContain(
-      'does not support extra claims like conquering land',
-    );
-    expect(prompt).toContain(
-      'If the source says "made trade easier", you may say trade was easier',
-    );
-    expect(prompt).toContain('do not broaden it to "made things easier');
-    expect(prompt).toContain('It does not license unstated causes');
-    expect(prompt).toContain(
-      'private_sources.insufficient must be true even when you give a narrower supported answer',
-    );
-    expect(prompt).toContain('empire growth');
-    expect(prompt).toContain('do not invent examples or analogies');
-    expect(prompt).toContain('If the source says "sediment", say sediment');
-    expect(prompt).toContain('Delete risky words');
-    expect(prompt).toContain('sand');
-    expect(prompt).toContain('yummy');
+    expect(prompt).toContain('FINAL FACT CHECK');
+    expect(prompt).toContain('Do not invent citations');
     expect(prompt).toContain('FINAL OUTPUT FILTER');
     expect(prompt).toContain('Do not start with "Yes"');
-    expect(prompt).toContain('do not add analogies');
     expect(prompt).toContain('excellent idea');
-    expect(prompt).toContain('include that exact reliable source ID');
+    expect(prompt).toContain('include that exact source ID');
     expect(prompt).toContain(
       'For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic"',
     );
@@ -262,7 +240,7 @@ describe('buildSystemPrompt — response envelope contract', () => {
 
     expect(prompt).toContain('first teaching turn');
     expect(prompt).toContain(
-      'at least two source-supported facts or relationships',
+      'at least two facts or relationships from current_topic or 0.88+ general knowledge',
     );
     expect(prompt).toContain('Do not reduce the opener to "X is important"');
   });
@@ -345,9 +323,9 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('cite current_topic privately');
     expect(prompt).toContain('concrete task they can do in one sentence');
     expect(prompt).toContain('Practice by');
-    expect(prompt).toContain('source-supported part');
+    expect(prompt).toContain('supported or high-confidence part');
     expect(prompt).toContain('do not affirm the whole answer');
-    expect(prompt).toContain('do not send them to a future topic title');
+    expect(prompt).toContain('Do not suggest future topic titles');
     expect(prompt).toContain(
       'Do not end with a vague "what are your thoughts?"',
     );
@@ -412,7 +390,7 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain("Use the learner's partial answer as the anchor");
     expect(prompt).toContain('what they got and what is still missing');
     expect(prompt).toContain('REVIEW SOURCE DISCIPLINE');
-    expect(prompt).toContain('cloze-style prompt from the source wording');
+    expect(prompt).toContain('prefer source wording for hints');
     expect(prompt).toContain('molecule, atom, protein');
     expect(prompt).toContain('"can do on its own"');
     expect(prompt).toContain('REVIEW OVERRIDE');

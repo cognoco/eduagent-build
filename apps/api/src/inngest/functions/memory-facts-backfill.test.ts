@@ -66,6 +66,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
       id: col('id'),
       profileId: col('profileId'),
       memoryFactsBackfilledAt: col('memoryFactsBackfilledAt'),
+      memoryFactsAnalysedAt: col('memoryFactsAnalysedAt'),
       createdAt: col('createdAt'),
       updatedAt: col('updatedAt'),
     },
@@ -197,6 +198,71 @@ describe('memoryFactsBackfill [BUG-148] self-reinvoke pagination', () => {
         expect.objectContaining({ name: 'backfill-cooldown' }),
       ]),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-365] Marker split — the cron must stamp memoryFactsBackfilledAt and
+// MUST NOT stamp memoryFactsAnalysedAt (that column is owned by the runtime
+// applyAnalysis path).
+// ---------------------------------------------------------------------------
+describe('memoryFactsBackfill [BUG-365] marker split', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDb.query.learningProfiles.findMany.mockReset().mockResolvedValue([]);
+    mockDb.transaction.mockReset();
+  });
+
+  it('cron stamps memoryFactsBackfilledAt and NOT memoryFactsAnalysedAt', async () => {
+    const rows = [
+      { profileId: 'p-1', createdAt: new Date('2026-01-01T00:00:00Z') },
+    ];
+    mockDb.query.learningProfiles.findMany.mockResolvedValue(rows);
+
+    const setCalls: Array<Record<string, unknown>> = [];
+
+    mockDb.transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) => {
+        const fakeTx = {
+          select: jest.fn().mockReturnValue({
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                for: jest.fn().mockReturnValue({
+                  limit: jest.fn().mockResolvedValue([
+                    {
+                      profileId: 'p-1',
+                      memoryFactsBackfilledAt: null,
+                      memoryFactsAnalysedAt: null,
+                    },
+                  ]),
+                }),
+              }),
+            }),
+          }),
+          delete: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+          insert: jest.fn().mockReturnValue({
+            values: jest.fn().mockResolvedValue(undefined),
+          }),
+          update: jest.fn().mockReturnValue({
+            set: (values: Record<string, unknown>) => {
+              setCalls.push(values);
+              return { where: jest.fn().mockResolvedValue(undefined) };
+            },
+          }),
+        };
+        return cb(fakeTx);
+      },
+    );
+
+    await execute();
+
+    expect(setCalls).toHaveLength(1);
+    const values = setCalls[0]!;
+    expect(values).toHaveProperty('memoryFactsBackfilledAt');
+    expect(values['memoryFactsBackfilledAt']).toBeInstanceOf(Date);
+    expect(values).not.toHaveProperty('memoryFactsAnalysedAt');
   });
 });
 

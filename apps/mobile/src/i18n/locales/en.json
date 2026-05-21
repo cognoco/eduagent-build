@@ -419,17 +419,25 @@
   "session": {
     "challenge": {
       "offerTitle": "Up for a challenge round?",
+      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
       "tryIt": "Try it",
       "notNow": "Not now",
       "dontAskAgain": "Don't ask again",
       "banner": {
+        "active": "Challenge round in progress",
         "question": "Question {{index}} of {{total}}"
       },
       "draft": {
         "title": "Here's what you know now",
         "save": "Save note",
-        "edit": "Edit",
+        "edit": "Edit first",
         "skip": "Skip"
+      },
+      "partial": {
+        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
+      },
+      "allMissing": {
+        "body": "Let's revisit this together first."
       }
     },
     "mentorMemory": {
@@ -542,8 +550,7 @@
       "typeSubjectPlaceholder": "Type a subject",
       "typeSubjectLabel": "Type a subject",
       "useTypedSubject": "Use",
-      "useTypedSubjectLabel": "Use typed subject",
-      "addNote": "Add note"
+      "useTypedSubjectLabel": "Use typed subject"
     },
     "quota": {
       "dailyLimitReached": "Daily limit reached",
@@ -660,29 +667,6 @@
       "currentTopic": "Topic:",
       "changeTopicLabel": "Change topic from {{topic}}",
       "changeTopic": "Change"
-    },
-    "challenge": {
-      "offerTitle": "Up for a challenge round?",
-      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
-      "tryIt": "Try it",
-      "notNow": "Not now",
-      "dontAskAgain": "Don't ask again",
-      "banner": {
-        "active": "Challenge round in progress",
-        "question": "Question {{index}} of {{total}}"
-      },
-      "draft": {
-        "title": "Here's what you know now",
-        "save": "Save note",
-        "edit": "Edit first",
-        "skip": "Skip"
-      },
-      "partial": {
-        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
-      },
-      "allMissing": {
-        "body": "Let's revisit this together first."
-      }
     }
   },
   "quiz": {
@@ -1086,7 +1070,8 @@
       "shelfFinishedSuffix": ", finished",
       "shelfActionExpand": "expand",
       "shelfActionCollapse": "collapse",
-      "shelfActionOpen": "open"
+      "shelfActionOpen": "open",
+      "urgencyBadge": "Soon: {{reason}}"
     },
     "shelf": {
       "missingParam": "Missing subject. Please go back and try again.",
@@ -1125,10 +1110,20 @@
         "savedFromChat": "Saved from chat",
         "emptyShort": "No saved chat for this topic yet",
         "emptyLong": "No saved explanations for this topic yet."
+      },
+      "challengeVerifiedBadge": "Challenge verified",
+      "practicedOftenHint": "You practice this topic often — keep it up!",
+      "relatedRail": {
+        "label": "Related topics"
       }
     }
   },
   "topic": {
+    "relevance": {
+      "recommended": "Recommended",
+      "contemporary": "Contemporary",
+      "emerging": "Emerging"
+    },
     "recallTest": {
       "title": "Recall Check",
       "subtitle": "Test your memory",
@@ -1366,7 +1361,10 @@
     "studiedToday": "Studied today",
     "studiedYesterday": "Studied yesterday",
     "studiedDaysAgo": "Studied {{count}} days ago",
-    "topicPassedNote": "Nice work - this topic is marked as passed, and weak spots will come back through review when they need attention."
+    "topicPassedNote": "Nice work - this topic is marked as passed, and weak spots will come back through review when they need attention.",
+    "qualityRating": "Quality: {{rating}}/5",
+    "depthTransfer": "Applied understanding",
+    "depthExplain": "Explained in own words"
   },
   "homework": {
     "permissionTitle": "Camera Access Needed",
@@ -1621,7 +1619,20 @@
       "viewVocabCount": "View {{count}} vocabulary words",
       "viewVocab": "View vocabulary",
       "wordsLink": "{{count}} words →",
-      "vocabularyLink": "Vocabulary →"
+      "vocabularyLink": "Vocabulary →",
+      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
+    },
+    "thisWeek": {
+      "title": "This week"
+    },
+    "recallQueue": {
+      "title": "Recall queue",
+      "due_one": "{{count}} due",
+      "due_other": "{{count}} due",
+      "strong_one": "{{count}} strong",
+      "strong_other": "{{count}} strong",
+      "fading_one": "{{count}} fading",
+      "fading_other": "{{count}} fading"
     },
     "weeklyDelta": {
       "topicsMastered": "+{{count}} topic this week",
@@ -2519,6 +2530,16 @@
       "message": "We can send a gentle reminder so you don't lose your streak. You can turn it off anytime in Settings.",
       "allow": "Allow",
       "notNow": "Not now"
+    },
+    "masteredRow": {
+      "title": "You mastered:"
+    },
+    "topicSuggestions": {
+      "title": "Try this next"
+    },
+    "transcriptPurged": {
+      "badge": "Transcript archived",
+      "notice": "This session was summarised; the original transcript was archived."
     }
   },
   "sessionTranscript": {

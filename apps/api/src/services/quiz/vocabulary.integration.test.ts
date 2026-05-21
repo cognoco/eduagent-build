@@ -432,3 +432,55 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     ).toBe(true);
   }, 15_000);
 });
+
+describe('[BUG-403] vocabulary mastery pool gate', () => {
+  it('[BUG-403] returns due mastery items when distinctTranslationCount < 4', async () => {
+    const { db, profile, subject } = await seedProfileAndSubject();
+
+    // Seed 2 vocabulary words that share the same translation → distinctTranslationCount = 1
+    const dueDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // yesterday
+    const lastReviewedAt = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+    const words = [
+      { term: 'der Hund', translation: 'dog', cefrLevel: 'A1' },
+      { term: 'der Hund (alt)', translation: 'dog', cefrLevel: 'A1' }, // duplicate translation
+    ] as const;
+
+    const insertedWords = [];
+    for (const word of words) {
+      const [row] = await db
+        .insert(vocabulary)
+        .values({
+          profileId: profile.id,
+          subjectId: subject.id,
+          term: word.term,
+          termNormalized: word.term.toLowerCase(),
+          translation: word.translation,
+          type: 'word',
+          cefrLevel: word.cefrLevel,
+        })
+        .returning();
+      insertedWords.push(row!);
+
+      // Mark both as due for review
+      await db.insert(vocabularyRetentionCards).values({
+        profileId: profile.id,
+        vocabularyId: row!.id,
+        easeFactor: 2.5,
+        intervalDays: 6,
+        repetitions: 3,
+        lastReviewedAt,
+        nextReviewAt: dueDate,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+      });
+    }
+
+    const context = await getVocabularyRoundContext(db, profile.id, subject.id);
+
+    // The pool-wide gate (distinctTranslationCount < 4 → []) was removed in BUG-403.
+    // Both words are due, so libraryItems must contain them regardless of the
+    // distinctTranslationCount. Per-item distractor insufficiency is handled
+    // downstream in buildVocabularyMasteryQuestion / generate-round.ts.
+    expect(context.libraryItems).toHaveLength(2);
+  }, 15_000);
+});

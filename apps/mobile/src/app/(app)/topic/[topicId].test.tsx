@@ -230,6 +230,27 @@ function setupRoutes(opts: SetupOptions = {}) {
 
   // GET /bookmarks?topicId=t1 → { bookmarks, nextCursor: null }
   mockFetch.setRoute('/bookmarks', { bookmarks, nextCursor: null });
+
+  // GET /subjects/s1/books/:bookId → BookWithTopics (empty connections — used
+  // by relatedTopics rail). Registered unconditionally so any test that passes
+  // bookId in search params receives a settled query rather than a pending
+  // request that completes after unmount and triggers an act() warning.
+  mockFetch.setRoute('/books/book-1', {
+    book: {
+      id: 'book-1',
+      subjectId: 's1',
+      title: 'Test Book',
+      description: null,
+      emoji: null,
+      sortOrder: 0,
+      topicsGenerated: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    topics: [],
+    connections: [],
+    status: 'NOT_STARTED',
+  });
 }
 
 // ---------------------------------------------------------------------------

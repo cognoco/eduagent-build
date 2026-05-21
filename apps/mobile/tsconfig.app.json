@@ -30,7 +30,8 @@
     "eslint.config.cjs",
     "eslint.config.mjs",
     "e2e-web/**",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "scripts/**"
   ],
   "include": [
     "**/*.ts",

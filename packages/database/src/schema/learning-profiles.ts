@@ -58,7 +58,17 @@ export const learningProfiles = pgTable(
     recentlyResolvedTopics: jsonb('recently_resolved_topics')
       .notNull()
       .default([]),
+    // [BUG-365] Two distinct markers — never collapse into a single column.
+    //   memoryFactsBackfilledAt → set ONLY by the one-time backfill cron
+    //     (apps/api/src/inngest/functions/memory-facts-backfill.ts).
+    //   memoryFactsAnalysedAt   → set ONLY by the runtime applyAnalysis path
+    //     (apps/api/src/services/memory/memory-facts.ts).
+    // The "do we have facts populated?" semantic is "either is non-null"
+    // (see hasMemoryFactsMarker in memory-facts.ts).
     memoryFactsBackfilledAt: timestamp('memory_facts_backfilled_at', {
+      withTimezone: true,
+    }),
+    memoryFactsAnalysedAt: timestamp('memory_facts_analysed_at', {
       withTimezone: true,
     }),
     version: integer('version').notNull().default(1),

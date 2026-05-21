@@ -170,10 +170,10 @@ describe('buildSystemPrompt', () => {
       sessionType: 'learning',
     });
     expect(prompt).toContain(
-      'Teach the concept clearly using a source-supported relationship',
+      'Teach the concept clearly, then ask one question',
     );
     expect(prompt).toContain(
-      'Use a concrete example only when it is present in a reliable source',
+      'use confidence-gated general knowledge only when factual_confidence is at least 0.88',
     );
     expect(prompt).toContain('explain → verify → next concept');
     // Old guidance should be gone
@@ -925,6 +925,58 @@ describe('processExchange', () => {
     expect(systemPrompts[1]).toContain('APP HELP');
     expect(systemPrompts[1]).toContain('Mentor memory');
   });
+
+  it('answers ordinary freeform facts from 0.88+ general knowledge', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify({
+            reply:
+              'Yucca palms are drought-tolerant plants with stiff, sword-like leaves. Many are grown as ornamentals, and they usually prefer bright light and well-draining soil.',
+            signals: { understanding_check: false },
+            private_sources: {
+              relied_on: ['general_knowledge'],
+              insufficient: false,
+              factual_confidence: 0.92,
+              reason: 'Common botany and houseplant-care facts.',
+            },
+            confidence: 'high',
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(provider);
+
+    try {
+      const result = await processExchange(
+        {
+          ...baseContext,
+          topicTitle: undefined,
+          topicDescription: undefined,
+          effectiveMode: 'freeform',
+          escalationRung: 1,
+        },
+        'Tell me about yucca palms',
+      );
+
+      expect(result.response).toContain('Yucca palms');
+      expect(result.response).not.toMatch(/reliable source material/i);
+      expect(result.sourceAudit?.status).toBe('ok');
+      expect(result.sourceAudit?.reliableReliedOnSourceIds).toEqual([
+        'general_knowledge',
+      ]);
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1586,6 +1638,152 @@ describe('source provenance audit', () => {
     expect(audit.reliableReliedOnSourceIds).toEqual([]);
   });
 
+  it('allows 0.88+ general knowledge for ordinary rung 1-3 questions', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: undefined,
+        topicDescription: undefined,
+        escalationRung: 1,
+        effectiveMode: 'freeform',
+      },
+      'Tell me about yucca palms',
+    );
+
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.91,
+        reason: 'Common plant facts.',
+      },
+      sourceEvidence,
+    );
+
+    expect(audit.status).toBe('ok');
+    expect(audit.reliableReliedOnSourceIds).toEqual(['general_knowledge']);
+
+    const safe = applySourceAuditSafetyFallback(
+      'Yucca palms are drought-tolerant plants with spiky leaves.',
+      audit,
+    );
+
+    expect(safe.response).toContain('drought-tolerant');
+  });
+
+  it('requires 0.88 factual confidence before using general knowledge', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: undefined,
+        topicDescription: undefined,
+        escalationRung: 2,
+        effectiveMode: 'freeform',
+      },
+      'Tell me about yucca palms',
+    );
+
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.87,
+        reason: 'Not quite sure.',
+      },
+      sourceEvidence,
+    );
+    const safe = applySourceAuditSafetyFallback(
+      'Yucca palms are definitely safe for every home.',
+      audit,
+    );
+
+    expect(audit.status).toBe('insufficient_reliable_sources');
+    expect(safe.response).toMatch(/reliable source material/i);
+    expect(safe.sourceAudit.reason).toMatch(/below 0.88/i);
+  });
+
+  it('rejects general knowledge for source-bound, ranking, or main-idea questions', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: undefined,
+        topicDescription: undefined,
+        escalationRung: 2,
+        effectiveMode: 'freeform',
+      },
+      'Which Roman trade good was most important according to the source?',
+    );
+
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.95,
+        reason: 'Trying to answer from general history.',
+      },
+      sourceEvidence,
+    );
+
+    expect(audit.status).toBe('insufficient_reliable_sources');
+    expect(audit.reason).toMatch(/source-bound/i);
+  });
+
+  it('does not let general knowledge bypass current-topic source-bound scrubbing', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      },
+      'Tell me one useful thing about this topic.',
+    );
+
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['current_topic', 'general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.93,
+        reason: 'Current topic plus common background.',
+      },
+      sourceEvidence,
+    );
+    const safe = applySourceAuditSafetyFallback(
+      'Roman roads connected towns. They also helped the empire conquer land and grow strong.',
+      audit,
+    );
+
+    expect(audit.status).toBe('ok');
+    expect(safe.response).toContain('connected towns');
+    expect(safe.response).not.toMatch(/conquer|grow strong/i);
+    expect(safe.sourceAudit.reason).toMatch(/conquest\/empire growth/i);
+  });
+
+  it('rejects general knowledge for unsupported main-idea confirmations', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      },
+      'I think empires grow mostly by conquering land. Is that the main idea?',
+    );
+
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['current_topic', 'general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.95,
+        reason: 'Trying to use broad history.',
+      },
+      sourceEvidence,
+    );
+
+    expect(audit.status).toBe('insufficient_reliable_sources');
+    expect(audit.reason).toMatch(/source-bound/i);
+  });
+
   it('infers current_topic for audit when a setup reply explicitly names the loaded topic', () => {
     const sourceEvidence = buildExchangeSourceEvidence(
       {
@@ -1786,14 +1984,15 @@ describe('source provenance audit', () => {
     );
 
     const safe = applySourceAuditSafetyFallback(
-      'Fossils form when remains are buried by sediment. Think of sediment like sand or mud settling down. Over a really long time, minerals preserve the shape.',
+      'Fossils form when remains are buried by sediment. Think of sediment like sand or mud settling down. Over a really long time, minerals make a stone copy of the original bone. Minerals preserve the shape.',
       audit,
     );
 
     expect(safe.response).toContain(
       'Fossils form when remains are buried by sediment.',
     );
-    expect(safe.response).not.toMatch(/sand|mud|really long time/i);
+    expect(safe.response).not.toMatch(/sand|mud|really long time|stone copy/i);
+    expect(safe.response).toContain('Minerals preserve the shape.');
     expect(safe.sourceAudit.reason).toMatch(/unsupported sediment definition/i);
   });
 

@@ -13,6 +13,7 @@ import type {
   ProgressSummary,
   WeeklyReportSummary,
 } from '@eduagent/schemas';
+import type { ProgressMetrics } from '../../../hooks/use-progress';
 import type { Translate } from '../../../i18n';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
@@ -523,6 +524,8 @@ export default function ProgressScreen(): React.ReactElement {
   });
   const [showProgressNudge, setShowProgressNudge] = useState(false);
   const [showAllSessions, setShowAllSessions] = useState(false);
+  const [progressMetrics, setProgressMetrics] =
+    useState<ProgressMetrics | null>(null);
 
   useEffect(() => {
     if (!requestedProfileId) return;
@@ -622,7 +625,10 @@ export default function ProgressScreen(): React.ReactElement {
     async (options?: { alertOnError?: boolean }) => {
       if (isViewingSelf) {
         try {
-          await refreshProgressSnapshot();
+          const result = await refreshProgressSnapshot();
+          if (result?.metrics) {
+            setProgressMetrics(result.metrics);
+          }
         } catch (err) {
           if (options?.alertOnError !== false) {
             const message =
@@ -1018,9 +1024,139 @@ export default function ProgressScreen(): React.ReactElement {
                       </Text>
                     </Pressable>
                   ) : null}
+                  {inventory.global.topicsMastered > 0 ||
+                  inventory.global.topicsAttempted > 0 ? (
+                    <View
+                      testID="progress-topics-mastered-chip"
+                      className="bg-background rounded-full px-3 py-1.5"
+                    >
+                      <Text className="text-caption font-semibold text-text-primary">
+                        {t('progress.stats.topicsMasteredOfAttempted', {
+                          mastered: inventory.global.topicsMastered,
+                          attempted: inventory.global.topicsAttempted,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Weekly delta chips */}
+              {inventory ? (
+                <View
+                  testID="progress-weekly-delta-chip"
+                  className="flex-row flex-wrap gap-2 mt-2"
+                >
+                  {(inventory.global.weeklyDeltaTopicsMastered ?? 0) > 0 ? (
+                    <View className="bg-background rounded-full px-3 py-1.5">
+                      <Text className="text-caption font-semibold text-text-secondary">
+                        {t('progress.weeklyDelta.topicsMastered', {
+                          count: inventory.global.weeklyDeltaTopicsMastered,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(inventory.global.weeklyDeltaVocabularyTotal ?? 0) > 0 ? (
+                    <View className="bg-background rounded-full px-3 py-1.5">
+                      <Text className="text-caption font-semibold text-text-secondary">
+                        {t('progress.weeklyDelta.vocabularyTotal', {
+                          count: inventory.global.weeklyDeltaVocabularyTotal,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(inventory.global.weeklyDeltaTopicsExplored ?? 0) > 0 ? (
+                    <View className="bg-background rounded-full px-3 py-1.5">
+                      <Text className="text-caption font-semibold text-text-secondary">
+                        {t('progress.weeklyDelta.topicsExplored', {
+                          count: inventory.global.weeklyDeltaTopicsExplored,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
             </View>
+
+            {/* This week at a glance chip */}
+            {inventory &&
+            ((inventory.thisWeekMini?.sessions ?? 0) > 0 ||
+              (inventory.thisWeekMini?.wordsLearned ?? 0) > 0 ||
+              (inventory.thisWeekMini?.topicsTouched ?? 0) > 0) ? (
+              <View
+                testID="progress-this-week-chip"
+                className="bg-surface rounded-card p-4 mt-4"
+              >
+                <Text className="text-caption font-bold text-text-secondary mb-2">
+                  {t('progress.thisWeek.title')}
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {(inventory.thisWeekMini?.sessions ?? 0) > 0 ? (
+                    <View className="bg-background rounded-full px-3 py-1.5">
+                      <Text className="text-caption font-semibold text-text-primary">
+                        {t('progress.weeklyReport.mini.sessions', {
+                          count: inventory.thisWeekMini?.sessions,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(inventory.thisWeekMini?.wordsLearned ?? 0) > 0 ? (
+                    <View className="bg-background rounded-full px-3 py-1.5">
+                      <Text className="text-caption font-semibold text-text-primary">
+                        {t('progress.weeklyReport.mini.words', {
+                          count: inventory.thisWeekMini?.wordsLearned,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(inventory.thisWeekMini?.topicsTouched ?? 0) > 0 ? (
+                    <View className="bg-background rounded-full px-3 py-1.5">
+                      <Text className="text-caption font-semibold text-text-primary">
+                        {t('progress.weeklyReport.mini.topics', {
+                          count: inventory.thisWeekMini?.topicsTouched,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            {/* Recall queue chip — populated after first refresh */}
+            {progressMetrics &&
+            (progressMetrics.retentionCardsDue > 0 ||
+              progressMetrics.retentionCardsStrong > 0 ||
+              progressMetrics.retentionCardsFading > 0) ? (
+              <View
+                testID="progress-recall-queue-chip"
+                className="bg-surface rounded-card p-4 mt-4"
+              >
+                <Text className="text-caption font-bold text-text-secondary mb-2">
+                  {t('progress.recallQueue.title')}
+                </Text>
+                <Text className="text-caption font-semibold text-text-primary">
+                  {[
+                    progressMetrics.retentionCardsDue > 0
+                      ? t('progress.recallQueue.due', {
+                          count: progressMetrics.retentionCardsDue,
+                        })
+                      : null,
+                    progressMetrics.retentionCardsStrong > 0
+                      ? t('progress.recallQueue.strong', {
+                          count: progressMetrics.retentionCardsStrong,
+                        })
+                      : null,
+                    progressMetrics.retentionCardsFading > 0
+                      ? t('progress.recallQueue.fading', {
+                          count: progressMetrics.retentionCardsFading,
+                        })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')}
+                </Text>
+              </View>
+            ) : null}
 
             <LatestReportCard
               latestReport={latestReport}

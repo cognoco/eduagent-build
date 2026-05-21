@@ -2,7 +2,6 @@ import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MentomateLogo } from '../../components/MentomateLogo';
-import { goBackOrReplace } from '../../lib/navigation';
 
 export default function PreviewLandingScreen() {
   const router = useRouter();
@@ -15,7 +14,7 @@ export default function PreviewLandingScreen() {
       testID="preview-landing"
     >
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        onPress={() => router.replace('/(auth)/sign-in')}
         className="self-start min-h-[44px] justify-center mb-4"
         testID="preview-landing-back"
         accessibilityRole="button"

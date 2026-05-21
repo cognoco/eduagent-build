@@ -16,5 +16,8 @@ test('J-03 seeded parent lands on parent home @smoke', async ({ page }) => {
   await expect(
     page.getByTestId(/^parent-home-send-nudge-/).first(),
   ).toBeVisible();
-  await expect(page.getByTestId('tab-my-learning')).toBeVisible();
+  await expect(
+    page.getByTestId('parent-home-study-activation-action'),
+  ).toBeVisible();
+  await expect(page.getByTestId('tab-my-learning')).toBeHidden();
 });

@@ -18,6 +18,10 @@ interface ShelfRowProps {
   isPaused?: boolean;
   status?: SubjectStatus;
   tint?: LearningSubjectTint;
+  /** ISO timestamp: show urgency badge when this is in the future */
+  urgencyBoostUntil?: string | null;
+  /** Human-readable reason, used as chip label */
+  urgencyBoostReason?: string | null;
   onPress: (subjectId: string) => void;
   testID?: string;
 }
@@ -147,6 +151,8 @@ export function ShelfRow({
   isPaused = false,
   status,
   tint: providedTint,
+  urgencyBoostUntil,
+  urgencyBoostReason,
   onPress,
   testID,
 }: ShelfRowProps): React.ReactElement {
@@ -179,6 +185,17 @@ export function ShelfRow({
           }
         : null;
 
+  const isUrgent =
+    !!urgencyBoostUntil && new Date(urgencyBoostUntil).getTime() > Date.now();
+  const urgencyChip = isUrgent
+    ? {
+        testID: `subject-urgency-badge-${subjectId}`,
+        label: urgencyBoostReason
+          ? t('library.row.urgencyBadge', { reason: urgencyBoostReason })
+          : t('library.row.urgencyBadge', { reason: '!' }),
+      }
+    : null;
+
   const isUnstarted = bookCount === 0;
   const subtitle = isUnstarted
     ? t('library.row.shelfSubtitleUnstarted')
@@ -189,6 +206,7 @@ export function ShelfRow({
 
   const needsReview = reviewDueCount > 0;
   const showFinished = isFinished && !needsReview;
+  const hasChips = needsReview || showFinished || !!statusChip || !!urgencyChip;
   const progressRatio = getProgressRatio(topicProgress);
   return (
     <View
@@ -325,7 +343,7 @@ export function ShelfRow({
             <View
               style={{
                 marginTop: 6,
-                minHeight: needsReview || showFinished || statusChip ? 18 : 0,
+                minHeight: hasChips ? 18 : 0,
               }}
             >
               <View
@@ -337,6 +355,29 @@ export function ShelfRow({
                   gap: 6,
                 }}
               >
+                {urgencyChip ? (
+                  <View
+                    testID={urgencyChip.testID}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 10,
+                      backgroundColor: withOpacity(colors.warning, 0.133),
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '500',
+                        color: colors.warning,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {urgencyChip.label}
+                    </Text>
+                  </View>
+                ) : null}
+
                 {statusChip ? (
                   <View
                     testID={statusChip.testID}
@@ -429,7 +470,7 @@ export function ShelfRow({
                 backgroundColor: 'rgba(255,255,255,0.86)',
                 overflow: 'hidden',
                 width: '100%',
-                marginTop: needsReview || showFinished || statusChip ? 4 : 14,
+                marginTop: hasChips ? 4 : 14,
               }}
             >
               <View

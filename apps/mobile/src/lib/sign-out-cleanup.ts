@@ -71,6 +71,12 @@ export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
   // Legacy per-user dismissal from removed mentor-language suggestion UI.
   // Keep clearing it so existing devices don't retain the orphaned key.
   'i18n-auto-suggest-dismissed',
+  // [BUG-357] Legacy un-scoped react-query persister blob. Post-fix the
+  // persister key is identity-scoped (`eduagent-query-cache::<userId>`),
+  // but devices that wrote to the pre-fix key would otherwise leave the
+  // orphan behind forever. Defense-in-depth on top of the primary
+  // identity-scoped key fix in query-persister.ts.
+  'eduagent-query-cache',
 ];
 
 // Global keys that should reset when no one is signed in. Excludes onboarding

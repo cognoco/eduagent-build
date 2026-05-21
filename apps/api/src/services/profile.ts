@@ -257,7 +257,7 @@ export async function createProfileWithLimitCheck(
   opts?: {
     /**
      * [OPT-C] Adult-owner gate. When true (default), adding a child profile
-     * (non-first profile) requires the existing owner to be ≥18. Set to false
+     * (non-first profile) requires the existing owner to be >=18. Set to false
      * to disable the rule without code changes — controlled by the `ADULT_OWNER_GATE_ENABLED`
      * env var. Callers should read `(c.env?.ADULT_OWNER_GATE_ENABLED ?? 'true') !== 'false'`
      * and pass the result here. Defaults to true (safe default — gate ON when unset).
@@ -296,7 +296,7 @@ export async function createProfileWithLimitCheck(
     }
 
     // [OPT-C] Adult-owner gate. When adding a CHILD (non-first profile),
-    // require the account's existing owner to be ≥18. Gated by flag so the
+    // require the account's existing owner to be >=18. Gated by flag so the
     // rule can be toggled off without code changes (kill switch).
     // Defense-in-depth: client-side gate (Task 13 / HIGH-A3) is the primary
     // UX barrier; this is the server-side enforcement fallback.
@@ -359,7 +359,7 @@ export async function createProfileWithLimitCheck(
 /**
  * Fetches a single profile by ID with ownership verification.
  *
- * Returns null if the profile doesn't exist or doesn't belong to the
+ * Returns null if the profile does not exist or does not belong to the
  * caller's account — callers should treat null as 404.
  */
 export async function getProfile(
@@ -382,7 +382,8 @@ export async function getProfile(
 /**
  * Updates a profile after verifying ownership.
  *
- * Returns null if the profile doesn't exist or isn't owned by the account.
+ * Returns null if the profile does not exist or is not owned by the account.
+ * BUG-352: isNull(profiles.archivedAt) prevents writes to GDPR-pending archived profiles.
  */
 export async function updateProfile(
   db: Database,
@@ -396,7 +397,13 @@ export async function updateProfile(
       ...input,
       updatedAt: new Date(),
     })
-    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)))
+    .where(
+      and(
+        eq(profiles.id, profileId),
+        eq(profiles.accountId, accountId),
+        isNull(profiles.archivedAt),
+      ),
+    )
     .returning();
   if (!rows[0]) return null;
   const status = await getConsentStatus(db, rows[0].id);
@@ -406,7 +413,7 @@ export async function updateProfile(
 /**
  * Verifies a profile belongs to the account for profile switching.
  *
- * Returns null if the profile isn't owned — caller returns 403.
+ * Returns null if the profile is not owned — caller returns 403.
  */
 export async function switchProfile(
   db: Database,
@@ -426,13 +433,14 @@ export async function switchProfile(
 /**
  * Returns the learner's age derived from birthYear. Falls back to 12 if
  * birthYear is not set. Minimum returned age is 5.
+ * BUG-352: isNull(profiles.archivedAt) prevents reads of GDPR-pending archived profiles.
  */
 export async function getProfileAge(
   db: Database,
   profileId: string,
 ): Promise<number> {
   const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
+    where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
   });
   const currentYear = new Date().getUTCFullYear();
   return profile?.birthYear ? Math.max(5, currentYear - profile.birthYear) : 12;
@@ -442,30 +450,32 @@ export async function getProfileAge(
  * Loads the raw profile row by ID. Self-keyed lookup — caller is asking for the
  * exact row that defines the scope, not a child resource, so no parent-chain
  * check is needed. Centralised here so `db.select().from(profiles)` and
- * `db.query.profiles.findFirst({ where: eq(profiles.id, ...) })` aren't sprinkled
+ * `db.query.profiles.findFirst({ where: eq(profiles.id, ...) })` are not sprinkled
  * across services. If scoping ever needs to tighten, this is the single migration
  * point.
+ * BUG-352: isNull(profiles.archivedAt) prevents reads of GDPR-pending archived profiles.
  */
 export async function loadProfileRowById(
   db: Database,
   profileId: string,
 ): Promise<typeof profiles.$inferSelect | null> {
   const row = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
+    where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
   });
   return row ?? null;
 }
 
 /**
  * Returns the learner's display name. Used to personalise LLM prompts.
- * Returns undefined if the profile doesn't exist.
+ * Returns undefined if the profile does not exist.
+ * BUG-352: isNull(profiles.archivedAt) prevents reads of GDPR-pending archived profiles.
  */
 export async function getProfileDisplayName(
   db: Database,
   profileId: string,
 ): Promise<string | undefined> {
   const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
+    where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
     columns: { displayName: true },
   });
   return profile?.displayName;
@@ -473,14 +483,15 @@ export async function getProfileDisplayName(
 
 /**
  * Resolves a profile's AgeBracket for passing to LLM safety-preamble calls.
- * Returns `'adult'` (the conservative minor-safe default) if birthYear is unset.
+ * Returns 'adult' (the conservative minor-safe default) if birthYear is unset.
+ * BUG-352: isNull(profiles.archivedAt) prevents reads of GDPR-pending archived profiles.
  */
 export async function getProfileAgeBracket(
   db: Database,
   profileId: string,
 ): Promise<AgeBracket> {
   const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
+    where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
     columns: { birthYear: true },
   });
   return profile?.birthYear ? computeAgeBracket(profile.birthYear) : 'adult';

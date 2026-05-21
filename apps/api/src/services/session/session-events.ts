@@ -24,7 +24,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 export function mapSessionRow(
-  row: typeof learningSessions.$inferSelect
+  row: typeof learningSessions.$inferSelect,
 ): LearningSession {
   const metadata =
     row.metadata &&
@@ -60,7 +60,7 @@ export function mapSessionRow(
 }
 
 export function mapSummaryRow(
-  row: typeof sessionSummaries.$inferSelect
+  row: typeof sessionSummaries.$inferSelect,
 ): SessionSummary {
   return {
     id: row.id,
@@ -73,17 +73,18 @@ export function mapSummaryRow(
     nextTopicId: row.nextTopicId ?? null,
     nextTopicTitle: null,
     nextTopicReason: row.nextTopicReason ?? null,
+    purgedAt: row.purgedAt?.toISOString() ?? null,
   };
 }
 
 export async function findSessionSummaryRow(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<typeof sessionSummaries.$inferSelect | undefined> {
   const repo = createScopedRepository(db, profileId);
   return repo.sessionSummaries.findFirst(
-    eq(sessionSummaries.sessionId, sessionId)
+    eq(sessionSummaries.sessionId, sessionId),
   );
 }
 
@@ -107,7 +108,7 @@ export async function insertSessionEvent(
     content: string;
     metadata?: Record<string, unknown>;
     touchSession?: boolean;
-  }
+  },
 ): Promise<void> {
   // Write: raw drizzle with profileId bound in values / WHERE clause is correct —
   // createScopedRepository only provides read methods (findFirst/findMany).
@@ -134,8 +135,8 @@ export async function insertSessionEvent(
     .where(
       and(
         eq(learningSessions.id, input.sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     );
 }
 
@@ -143,7 +144,7 @@ export async function setSessionInputMode(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SessionInputModeInput
+  input: SessionInputModeInput,
 ): Promise<LearningSession> {
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
@@ -171,8 +172,8 @@ export async function setSessionInputMode(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     )
     .returning();
 

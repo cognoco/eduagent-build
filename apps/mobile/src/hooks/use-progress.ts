@@ -19,7 +19,9 @@ import type {
   OverdueSubject,
   OverdueTopic,
   OverdueTopicsResponse,
+  ProgressMetrics,
   ProgressSummary,
+  RefreshProgressResponse,
   ReportPracticeSummary,
   ChildSessionsPageResponse,
   ChildSession,
@@ -508,10 +510,7 @@ export function useProfileSessionsArchive(
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled:
-      !!activeProfile &&
-      !!profileId &&
-      profileId === activeProfile.id,
+    enabled: !!activeProfile && !!profileId && profileId === activeProfile.id,
   });
 }
 
@@ -616,8 +615,10 @@ export function invalidateProgressSnapshotQueries(
   });
 }
 
+export type { ProgressMetrics };
+
 export function useRefreshProgressSnapshot(): UseMutationResult<
-  unknown,
+  RefreshProgressResponse,
   Error,
   void
 > {
@@ -625,11 +626,11 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
 
-  return useMutation({
+  return useMutation<RefreshProgressResponse, Error, void>({
     mutationFn: async () => {
       const res = await client.progress.refresh.$post();
       await assertOk(res);
-      return await res.json();
+      return (await res.json()) as RefreshProgressResponse;
     },
     onSuccess: () => {
       invalidateProgressSnapshotQueries(queryClient, activeProfile?.id);

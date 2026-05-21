@@ -39,6 +39,10 @@ import {
   updateProfile,
   switchProfile,
   resolveProfileRole,
+  getProfileAge,
+  loadProfileRowById,
+  getProfileAgeBracket,
+  getProfileDisplayName,
 } from './profile';
 import {
   getConsentStatus,
@@ -394,6 +398,26 @@ describe('updateProfile', () => {
     expect(result).not.toBeNull();
     expect(result!.displayName).toBe('Updated Name');
   });
+
+  it('[BREAK-BUG-352] WHERE clause includes archived_at IS NULL guard', async () => {
+    let capturedWhere: unknown;
+    const db = {
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation((condition: unknown) => {
+            capturedWhere = condition;
+            return { returning: jest.fn().mockResolvedValue([]) };
+          }),
+        }),
+      }),
+    } as unknown as Database;
+
+    await updateProfile(db, 'profile-1', 'account-1', { displayName: 'X' });
+
+    const sqlText = drizzleConditionToText(capturedWhere);
+    expect(sqlText).toContain('archived_at');
+    expect(sqlText).toContain('is null');
+  });
 });
 
 describe('switchProfile', () => {
@@ -446,5 +470,152 @@ describe('resolveProfileRole', () => {
 
     const result = await resolveProfileRole(db, 'user-1');
     expect(result).toBe('self_learner');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BREAK-BUG-352] archived-profile guard tests
+// Verify isNull(profiles.archivedAt) is present in WHERE clauses for the 5
+// helpers that previously lacked the guard.
+// ---------------------------------------------------------------------------
+
+/**
+ * Walks a drizzle SQL condition node and returns all text fragments joined.
+ * Handles drizzle's internal structure:
+ *   - { name: string }          — column reference (e.g. "archived_at")
+ *   - { value: string[] }       — SQL literal array (e.g. [" is null"])
+ *   - { queryChunks: unknown[] }— recursive condition node
+ *   - string                    — raw string chunk
+ * Uses a visited set to avoid circular reference stack overflows.
+ */
+function drizzleConditionToText(
+  node: unknown,
+  visited = new Set<object>(),
+  depth = 0,
+): string {
+  if (depth > 20) return '';
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string') return node.toLowerCase();
+  if (typeof node !== 'object') return '';
+  if (visited.has(node as object)) return '';
+  visited.add(node as object);
+
+  const obj = node as Record<string, unknown>;
+
+  // Column reference: { name: "archived_at", ... }
+  if (typeof obj['name'] === 'string') {
+    return obj['name'].toLowerCase();
+  }
+
+  // SQL literal fragment: { value: [" is null"] }
+  if (Array.isArray(obj['value'])) {
+    return (obj['value'] as unknown[])
+      .map((v) => (typeof v === 'string' ? v.toLowerCase() : ''))
+      .join('');
+  }
+
+  // Recursive condition: { queryChunks: [...] }
+  if (Array.isArray(obj['queryChunks'])) {
+    return (obj['queryChunks'] as unknown[])
+      .map((chunk) => drizzleConditionToText(chunk, visited, depth + 1))
+      .join(' ');
+  }
+
+  return '';
+}
+
+describe('getProfileAge — archived-profile guard', () => {
+  it('[BREAK-BUG-352]', async () => {
+    let capturedWhere: unknown;
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest
+            .fn()
+            .mockImplementation(({ where }: { where: unknown }) => {
+              capturedWhere = where;
+              return Promise.resolve(undefined);
+            }),
+        },
+      },
+    } as unknown as Database;
+
+    await getProfileAge(db, 'profile-1');
+
+    const sqlText = drizzleConditionToText(capturedWhere);
+    expect(sqlText).toContain('archived_at');
+    expect(sqlText).toContain('is null');
+  });
+});
+
+describe('loadProfileRowById — archived-profile guard', () => {
+  it('[BREAK-BUG-352]', async () => {
+    let capturedWhere: unknown;
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest
+            .fn()
+            .mockImplementation(({ where }: { where: unknown }) => {
+              capturedWhere = where;
+              return Promise.resolve(undefined);
+            }),
+        },
+      },
+    } as unknown as Database;
+
+    await loadProfileRowById(db, 'profile-1');
+
+    const sqlText = drizzleConditionToText(capturedWhere);
+    expect(sqlText).toContain('archived_at');
+    expect(sqlText).toContain('is null');
+  });
+});
+
+describe('getProfileAgeBracket — archived-profile guard', () => {
+  it('[BREAK-BUG-352]', async () => {
+    let capturedWhere: unknown;
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest
+            .fn()
+            .mockImplementation(({ where }: { where: unknown }) => {
+              capturedWhere = where;
+              return Promise.resolve(undefined);
+            }),
+        },
+      },
+    } as unknown as Database;
+
+    await getProfileAgeBracket(db, 'profile-1');
+
+    const sqlText = drizzleConditionToText(capturedWhere);
+    expect(sqlText).toContain('archived_at');
+    expect(sqlText).toContain('is null');
+  });
+});
+
+describe('getProfileDisplayName — archived-profile guard', () => {
+  it('[BREAK-BUG-352]', async () => {
+    let capturedWhere: unknown;
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest
+            .fn()
+            .mockImplementation(({ where }: { where: unknown }) => {
+              capturedWhere = where;
+              return Promise.resolve(undefined);
+            }),
+        },
+      },
+    } as unknown as Database;
+
+    await getProfileDisplayName(db, 'profile-1');
+
+    const sqlText = drizzleConditionToText(capturedWhere);
+    expect(sqlText).toContain('archived_at');
+    expect(sqlText).toContain('is null');
   });
 });

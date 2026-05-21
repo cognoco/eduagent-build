@@ -12,10 +12,10 @@ test('J-15 family-plan parent with no children sees add-first-child CTA', async 
     landingPath: '/home',
   });
 
-  await expect(page.getByTestId('add-first-child-cta')).toBeVisible({
+  await expect(page.getByTestId('add-first-child-screen-primary')).toBeVisible({
     timeout: 30_000,
   });
-  await pressableClick(page.getByTestId('add-first-child-cta'));
+  await pressableClick(page.getByTestId('add-first-child-screen-primary'));
   await expect(page.getByTestId('create-profile-name')).toBeVisible({
     timeout: 30_000,
   });

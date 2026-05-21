@@ -138,9 +138,11 @@ function extractMaestroIds(yamlFiles: string[]): Map<string, string[]> {
 function extractSourceTestIds(tsxFiles: string[]): {
   staticIds: Set<string>;
   dynamicPrefixes: string[];
+  derivedSuffixes: string[];
 } {
   const staticIds = new Set<string>();
   const dynamicPrefixes: string[] = [];
+  const derivedSuffixes: string[] = [];
 
   // Static: testID="value", testID='value', testID: 'value', testID: "value"
   // Also: tabBarButtonTestID: 'value' (Expo Router tab config)
@@ -155,6 +157,9 @@ function extractSourceTestIds(tsxFiles: string[]): {
 
   // Dynamic template: testID={`prefix-${...}`} — extract the prefix before ${
   const dynamicPattern = /testID=\{`([^$`]+)\$\{/g;
+  // Derived suffix: testID={testID ? `${testID}-primary` : undefined}
+  const derivedSuffixPattern =
+    /testID=\{[^`]*`\$\{[^}]+\}([^`$]+)`\s*:\s*undefined\s*\}/g;
 
   // String literals inside JSX expression bodies. Skips template literals
   // (handled separately by dynamicPattern).
@@ -176,6 +181,11 @@ function extractSourceTestIds(tsxFiles: string[]): {
     let match;
     while ((match = dynamicPattern.exec(source)) !== null) {
       dynamicPrefixes.push(match[1]!);
+    }
+
+    derivedSuffixPattern.lastIndex = 0;
+    while ((match = derivedSuffixPattern.exec(source)) !== null) {
+      derivedSuffixes.push(match[1]!);
     }
 
     // Walk every `testID={...}` expression body with balanced-brace tracking
@@ -219,7 +229,7 @@ function extractSourceTestIds(tsxFiles: string[]): {
     }
   }
 
-  return { staticIds, dynamicPrefixes };
+  return { staticIds, dynamicPrefixes, derivedSuffixes };
 }
 
 function isExternalId(id: string): boolean {
@@ -235,7 +245,15 @@ describe('E2E testID integrity', () => {
   const yamlFiles = collectFiles(E2E_FLOWS_DIR, '.yaml');
   const tsxFiles = collectFiles(SOURCE_DIR, '.tsx');
   const maestroIds = extractMaestroIds(yamlFiles);
-  const { staticIds, dynamicPrefixes } = extractSourceTestIds(tsxFiles);
+  const { staticIds, dynamicPrefixes, derivedSuffixes } =
+    extractSourceTestIds(tsxFiles);
+
+  function hasMatchingDerivedSuffix(id: string): boolean {
+    return derivedSuffixes.some(
+      (suffix) =>
+        id.endsWith(suffix) && staticIds.has(id.slice(0, -suffix.length)),
+    );
+  }
 
   it('should find Maestro flow files', () => {
     expect(yamlFiles.length).toBeGreaterThan(0);
@@ -254,6 +272,7 @@ describe('E2E testID integrity', () => {
     if (KNOWN_DRIFT.has(id)) continue;
     if (staticIds.has(id)) continue;
     if (dynamicPrefixes.some((prefix) => id.startsWith(prefix))) continue;
+    if (hasMatchingDerivedSuffix(id)) continue;
     missingIds.push({ id, files });
   }
 
@@ -274,7 +293,10 @@ describe('E2E testID integrity', () => {
   // Shrink-wrap: alert when a KNOWN_DRIFT entry is fixed (testID re-added)
   // so the entry can be removed from the allowlist.
   const resolvedDrift = [...KNOWN_DRIFT].filter(
-    (id) => staticIds.has(id) || dynamicPrefixes.some((p) => id.startsWith(p)),
+    (id) =>
+      staticIds.has(id) ||
+      dynamicPrefixes.some((p) => id.startsWith(p)) ||
+      hasMatchingDerivedSuffix(id),
   );
 
   it('KNOWN_DRIFT entries should be removed once fixed', () => {

@@ -741,6 +741,8 @@ export default function LibraryScreen() {
                       isFinished={isFinished}
                       status={subject.status}
                       tint={subjectTintsById.get(subject.id)}
+                      urgencyBoostUntil={subject.urgencyBoostUntil}
+                      urgencyBoostReason={subject.urgencyBoostReason}
                       onPress={handleShelfPress}
                     />
                   );
@@ -994,6 +996,8 @@ export default function LibraryScreen() {
                   isFinished={isFinished}
                   status={subject.status}
                   tint={subjectTintsById.get(subject.id)}
+                  urgencyBoostUntil={subject.urgencyBoostUntil}
+                  urgencyBoostReason={subject.urgencyBoostReason}
                   onPress={handleShelfPress}
                 />
               );

@@ -35,6 +35,8 @@ import {
 } from '../../hooks/use-sessions';
 import { useSessionBookmarks } from '../../hooks/use-bookmarks';
 import { useTotalSessionCount } from '../../hooks/use-session-context';
+import { useLearnerProfile } from '../../hooks/use-learner-profile';
+import { useTopicSuggestions } from '../../hooks/use-topic-suggestions';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
@@ -136,6 +138,11 @@ export default function SessionSummaryScreen() {
       : 'adolescent';
   const recallBridge = useRecallBridge(sessionId ?? '');
   const totalSessionCount = useTotalSessionCount();
+  const learnerProfile = useLearnerProfile();
+  const topicSuggestions = useTopicSuggestions(
+    filedSubjectId ?? subjectId ?? undefined,
+    filedBookId ?? undefined,
+  );
   // JIT notification permission ask — fires once after the user has
   // completed at least one session (the post-value moment). Skipped in
   // parent-proxy mode and dedup'd via SecureStore inside the hook.
@@ -831,6 +838,19 @@ export default function SessionSummaryScreen() {
     (sessionBookmarks.data?.length ?? 0) === 0 &&
     totalSessionCount <= 3;
 
+  // Feature 1: "You mastered these" row
+  const resolvedTopics: string[] =
+    learnerProfile.data?.recentlyResolvedTopics ?? [];
+  const shouldShowMasteredRow = resolvedTopics.length > 0 && !isParentProxy;
+
+  // Feature 2: "Try this next" topic suggestions rail
+  const suggestionItems = (topicSuggestions.data ?? []).slice(0, 3);
+  const shouldShowSuggestionsRail = suggestionItems.length > 0;
+
+  // Feature 3: Purged-transcript badge
+  const transcriptPurgedAt = persisted?.purgedAt ?? null;
+  const isTranscriptPurged = !!transcriptPurgedAt;
+
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
@@ -905,6 +925,28 @@ export default function SessionSummaryScreen() {
           </Text>
         </View>
 
+        {/* Feature 1: "You mastered these" moment */}
+        {shouldShowMasteredRow ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="session-summary-mastered-row"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              {t('sessionSummary.masteredRow.title')}
+            </Text>
+            {resolvedTopics.map((topic) => (
+              <View key={topic} className="flex-row items-start mt-1">
+                <Text className="text-body text-text-secondary me-2">
+                  {'•'}
+                </Text>
+                <Text className="text-body text-text-primary flex-1">
+                  {topic}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {/*
           Resume-this-session entry point. When the learner revisits a past
           session from Library \u2192 Book \u2192 past conversation, they expect to be
@@ -945,32 +987,51 @@ export default function SessionSummaryScreen() {
             link surfaces it in a read-only screen so the learner can scroll
             back through what was discussed.
             [CR-PR129-M5] Hide transcript in parent-proxy mode: parents have
-            read-only summary access only and must not see the full chat log. */}
+            read-only summary access only and must not see the full chat log.
+            Feature 3: When the transcript has been purged (retention policy),
+            show an archived notice instead of the "View full transcript" CTA. */}
         {!isParentProxy && sessionId ? (
-          <Pressable
-            onPress={() => {
-              // [M-8] session-transcript is a sibling fullScreenModal in the
-              // root stack (see _layout.tsx), not a child of session-summary.
-              // Both are presented as fullScreenModal, so Expo Router pushes
-              // transcript on top of summary — router.back() inside the
-              // transcript screen returns here correctly via goBackOrReplace.
-              // No ancestor-chain push needed; the cast to `as never` was
-              // masking a false-positive — the object already satisfies
-              // HrefObject (pathname: string, params?: UnknownInputParams).
-              router.push({
-                pathname: '/session-transcript/[sessionId]',
-                params: { sessionId },
-              });
-            }}
-            className="bg-surface rounded-button py-3 items-center mb-4"
-            accessibilityRole="button"
-            accessibilityLabel="View full transcript"
-            testID="view-transcript-cta"
-          >
-            <Text className="text-text-primary text-body font-semibold">
-              View full transcript
-            </Text>
-          </Pressable>
+          isTranscriptPurged ? (
+            <View
+              className="bg-surface rounded-card p-4 mb-4"
+              testID="transcript-purged-badge"
+            >
+              <Text
+                className="text-body font-semibold text-text-primary mb-1"
+                testID="transcript-purged-badge-label"
+              >
+                {t('sessionSummary.transcriptPurged.badge')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                {t('sessionSummary.transcriptPurged.notice')}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                // [M-8] session-transcript is a sibling fullScreenModal in the
+                // root stack (see _layout.tsx), not a child of session-summary.
+                // Both are presented as fullScreenModal, so Expo Router pushes
+                // transcript on top of summary — router.back() inside the
+                // transcript screen returns here correctly via goBackOrReplace.
+                // No ancestor-chain push needed; the cast to `as never` was
+                // masking a false-positive — the object already satisfies
+                // HrefObject (pathname: string, params?: UnknownInputParams).
+                router.push({
+                  pathname: '/session-transcript/[sessionId]',
+                  params: { sessionId },
+                });
+              }}
+              className="bg-surface rounded-button py-3 items-center mb-4"
+              accessibilityRole="button"
+              accessibilityLabel="View full transcript"
+              testID="view-transcript-cta"
+            >
+              <Text className="text-text-primary text-body font-semibold">
+                View full transcript
+              </Text>
+            </Pressable>
+          )
         ) : null}
 
         {persisted?.learnerRecap ? (
@@ -1103,6 +1164,42 @@ export default function SessionSummaryScreen() {
                 </Text>
               </Pressable>
             ) : null}
+          </View>
+        ) : null}
+
+        {/* Feature 2: "Try this next" topic suggestions rail */}
+        {shouldShowSuggestionsRail ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="topic-suggestions-rail"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-3">
+              {t('sessionSummary.topicSuggestions.title')}
+            </Text>
+            {suggestionItems.map((suggestion) => (
+              <Pressable
+                key={suggestion.id}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/topic/[topicId]',
+                    params: { topicId: suggestion.id },
+                  } as Href)
+                }
+                className="flex-row items-center py-3 border-b border-surface-elevated"
+                testID="topic-suggestion-card"
+                accessibilityRole="button"
+                accessibilityLabel={suggestion.title}
+              >
+                <Text className="text-body text-text-primary flex-1">
+                  {suggestion.title}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+            ))}
           </View>
         ) : null}
 

@@ -208,20 +208,33 @@ export const curriculumTopics = pgTable(
   ],
 );
 
-export const topicConnections = pgTable('topic_connections', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  topicAId: uuid('topic_a_id')
-    .notNull()
-    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
-  topicBId: uuid('topic_b_id')
-    .notNull()
-    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const topicConnections = pgTable(
+  'topic_connections',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    topicAId: uuid('topic_a_id')
+      .notNull()
+      .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+    topicBId: uuid('topic_b_id')
+      .notNull()
+      .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // [BUG-393] FK indexes — `topic_a_id` and `topic_b_id` are used in the
+  // hot-path read at `services/curriculum.ts:1095-1096` (resolving
+  // connection edges by either side via `inArray`). Without indexes the
+  // planner falls back to a sequential scan whose cost grows with TOTAL
+  // table size, not per-profile. Both directions are queried so both
+  // columns need their own index.
+  (table) => [
+    index('topic_connections_topic_a_id_idx').on(table.topicAId),
+    index('topic_connections_topic_b_id_idx').on(table.topicBId),
+  ],
+);
 
 // [BUG-226 / P3] topic_connections has NO profileId column and no RLS policy.
 // Ownership today is enforced TRANSITIVELY via the parent chain:
@@ -263,28 +276,41 @@ export const topicConnections = pgTable('topic_connections', {
 //   5. CREATE POLICY topic_connections_profile_isolation ON topic_connections
 //        USING (profile_id = NULLIF(current_setting('app.profile_id', true), '')::uuid);
 
-export const curriculumAdaptations = pgTable('curriculum_adaptations', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id')
-    .notNull()
-    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
-  sortOrder: integer('sort_order').notNull(),
-  skipReason: text('skip_reason'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const curriculumAdaptations = pgTable(
+  'curriculum_adaptations',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+    sortOrder: integer('sort_order').notNull(),
+    skipReason: text('skip_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // [BUG-393] FK indexes — `profile_id` is the scoped-repo read predicate
+  // (`packages/database/src/repository.ts:353-361`). `subject_id` and
+  // `topic_id` carry FK constraints that fire cascade deletes when the
+  // parent row is removed — without indexes each cascade probe is a
+  // sequential scan over the full adaptations table.
+  (table) => [
+    index('curriculum_adaptations_profile_id_idx').on(table.profileId),
+    index('curriculum_adaptations_subject_id_idx').on(table.subjectId),
+    index('curriculum_adaptations_topic_id_idx').on(table.topicId),
+  ],
+);
 
 export const bookSuggestionCategoryEnum = pgEnum('book_suggestion_category', [
   'related',

@@ -1748,6 +1748,7 @@ export default function BookScreen() {
                         : undefined
                     }
                     title={topic.title}
+                    relevance={topic.relevance}
                     sessionCount={
                       state === 'continue-now' || state === 'started'
                         ? count

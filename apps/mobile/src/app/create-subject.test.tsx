@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/clerk-expo';
 import {
   render,
   screen,
@@ -82,6 +83,11 @@ jest.mock('expo-router', () => ({
     canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => mockSearchParams,
+  // [BUG-375] Redirect stub so auth-gate tests can assert the redirect path.
+  Redirect: ({ href }: { href: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID={`mock-redirect-${href}`}>redirect:{href}</Text>;
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -220,6 +226,12 @@ describe('CreateSubjectScreen', () => {
     );
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
     Wrapper = createWrapper();
+    // [BUG-375] Default to signed-in so existing tests are unaffected by the
+    // new auth guard; auth-gate break tests override below.
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
   });
 
   afterEach(() => {
@@ -1495,6 +1507,12 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
     Wrapper = createWrapper();
+    // [BUG-375] Default to signed-in so existing tests are unaffected by the
+    // new auth guard; auth-gate break tests override below.
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
   });
 
   afterEach(() => {
@@ -1529,5 +1547,47 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
     expect(kavBlock?.[0]).toMatch(/Platform\.select/);
     expect(kavBlock?.[0]).toMatch(/ios:\s*['"]padding['"]/);
     expect(kavBlock?.[0]).toMatch(/android:\s*['"]height['"]/);
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-375] Auth gate — deep-link entry to root-level screen
+  // ---------------------------------------------------------------------------
+  describe('auth gate [BUG-375]', () => {
+    it('redirects to /sign-in when an unauthenticated user opens a create-subject deep-link', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: false,
+      });
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('mock-redirect-/sign-in');
+      expect(screen.queryByTestId('create-subject-name')).toBeNull();
+      expect(screen.queryByTestId('create-subject-submit')).toBeNull();
+    });
+
+    it('shows a spinner (not redirect) while Clerk is still hydrating', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: false,
+        isSignedIn: false,
+      });
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('create-subject-auth-loading');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
+
+    it('renders the form when the user is signed in', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: true,
+      });
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('create-subject-name');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
   });
 });

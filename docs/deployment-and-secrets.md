@@ -383,18 +383,64 @@ GitHub:    deploy.yml ──▶ approval ──▶ EAS Build servers ──▶ A
 
 ### What gets baked into the build
 
-Mobile builds contain **no server secrets**. Only public config is included, synced from Doppler into `eas.json` by `scripts/setup-env.js`:
+Mobile builds contain **no server secrets**. Public config splits between two sinks: non-secret identifiers live in the committed `eas.json`, while client-side secrets (publishable keys, DSNs, store API keys) live in **EAS Environment Variables** and are injected at build time by EAS Build.
+
+> **BUG-235 / BUG-345 (2026-05-20):** Until 2026-05-20, the Clerk publishable key and Sentry DSN were hardcoded in committed `eas.json` — including the **production** `pk_live_*` Clerk key and prod Sentry DSN. They have been removed from the committed file, and `scripts/setup-env.js` now strips them on every sync via `EAS_JSON_DENYLIST`. **The leaked production Clerk publishable key and Sentry DSN must be rotated before the next production build.** See the "Rotating leaked client secrets" section below.
+
+#### Sink 1 — Committed `eas.json` (non-secret identifiers only)
 
 | Variable | Purpose |
 |----------|---------|
-| `EXPO_PUBLIC_API_URL` | Which backend the app talks to |
-| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Auth (safe to expose — publishable key) |
-| `EXPO_PUBLIC_SENTRY_DSN` | Error reporting (safe to expose) |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat iOS (safe to expose — public API key) |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | RevenueCat Android (safe to expose — public API key) |
+| `EXPO_PUBLIC_API_URL` | Which backend the app talks to (public URL) |
 | `SENTRY_DISABLE_AUTO_UPLOAD` | Build-time flag (disables Sentry source map upload) |
 
-These values are synced from Doppler (dev/stg/prd configs) into the corresponding `eas.json` build profiles (development/preview/production) by `pnpm env:sync`. Since `eas.json` is committed, run `pnpm env:sync` and commit the result after changing values in Doppler.
+These are synced from Doppler (`stg` → development/preview, `prd` → production) into `eas.json` by `pnpm env:sync`. Since `eas.json` is committed, run `pnpm env:sync` and commit the result after changing values in Doppler. `scripts/setup-env.js` filters out any key in `EAS_JSON_DENYLIST` (see Sink 2), so legacy secret entries get stripped on the next run.
+
+#### Sink 2 — EAS Environment Variables (client-side secrets)
+
+These are **not** in the committed `eas.json`. They are stored as EAS Environment Variables on the Expo project and injected by EAS Build at build time. They are still publishable (mobile bundles are reverse-engineerable), but keeping them out of git avoids accidental rotation pain and limits blast radius if a fork or leak occurs.
+
+| Variable | Purpose |
+|----------|---------|
+| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Auth (publishable key — still public, but rotated independently of git history) |
+| `EXPO_PUBLIC_SENTRY_DSN` | Error reporting (DSN is public but quota-bearing) |
+| `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat iOS (public API key) |
+| `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | RevenueCat Android (public API key) |
+
+##### Setting EAS Environment Variables
+
+Run these commands once per project (or after rotating a secret). They cover 4 secrets × 3 environments = 12 entries:
+
+```bash
+# Production
+eas env:create --environment production --name EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY --value '<pk_live_…>' --visibility plaintext
+eas env:create --environment production --name EXPO_PUBLIC_SENTRY_DSN --value '<https://…sentry.io/…>' --visibility plaintext
+eas env:create --environment production --name EXPO_PUBLIC_REVENUECAT_API_KEY_IOS --value '<appl_…>' --visibility plaintext
+eas env:create --environment production --name EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID --value '<goog_…>' --visibility plaintext
+
+# Preview (staging builds)
+eas env:create --environment preview --name EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY --value '<pk_test_…>' --visibility plaintext
+eas env:create --environment preview --name EXPO_PUBLIC_SENTRY_DSN --value '<https://…sentry.io/…>' --visibility plaintext
+eas env:create --environment preview --name EXPO_PUBLIC_REVENUECAT_API_KEY_IOS --value '<appl_…>' --visibility plaintext
+eas env:create --environment preview --name EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID --value '<goog_…>' --visibility plaintext
+
+# Development (dev client builds)
+eas env:create --environment development --name EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY --value '<pk_test_…>' --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_SENTRY_DSN --value '<https://…sentry.io/…>' --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_REVENUECAT_API_KEY_IOS --value '<appl_…>' --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID --value '<goog_…>' --visibility plaintext
+```
+
+To update an existing value, use `eas env:update` (or delete + create). Run `eas env:list --environment <env>` to confirm all four are present before the next build.
+
+#### Rotating leaked client secrets (BUG-235 / BUG-345)
+
+The production Clerk `pk_live_*` key and Sentry DSN previously committed to `eas.json` are in git history forever. Both are technically "publishable" (mobile bundles expose them), but treat them as compromised and rotate before the next production build:
+
+1. **Clerk:** In the Clerk dashboard → API Keys, rotate the production Frontend API key. Update the value in Doppler `prd` AND run `eas env:update --environment production --name EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY --value '<new pk_live_…>'`.
+2. **Sentry:** In Sentry → Project Settings → Client Keys (DSN), rotate the DSN for the production project. Update the value in Doppler `prd` AND run `eas env:update --environment production --name EXPO_PUBLIC_SENTRY_DSN --value '<new DSN>'`.
+3. Rebuild the production AAB and IPA. The first build after rotation must come from EAS (so the new EAS env vars are picked up).
+4. Repeat steps 1-3 with `--environment preview` for the staging keys (`pk_test_*`) if you also want to invalidate them.
 
 The only GitHub secret needed for CI-triggered builds is `EXPO_TOKEN` (authenticates `eas build`).
 

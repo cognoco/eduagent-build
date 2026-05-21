@@ -102,6 +102,7 @@ export type ExchangeSourceReliability =
   | 'learner_provided'
   | 'conversation_only'
   | 'memory_only'
+  | 'model_general_knowledge'
   | 'reasoning';
 
 export type ExchangeSourceEvidenceKind =
@@ -116,7 +117,11 @@ export type ExchangeSourceEvidenceKind =
   | 'conversation_history'
   | 'prior_learning'
   | 'mentor_memory'
-  | 'accommodation';
+  | 'accommodation'
+  | 'general_knowledge';
+
+export const GENERAL_KNOWLEDGE_SOURCE_ID = 'general_knowledge';
+export const GENERAL_KNOWLEDGE_CONFIDENCE_FLOOR = 0.88;
 
 export interface ExchangeSourceEvidence {
   /** Stable ID the model must use in private_sources.relied_on. */
@@ -133,6 +138,7 @@ export interface ExchangePrivateSources {
   relied_on?: string[];
   insufficient?: boolean;
   reason?: string;
+  factual_confidence?: number;
 }
 
 export type ExchangeSourceAuditStatus =
@@ -150,6 +156,7 @@ export interface ExchangeSourceAudit {
   unsupportedSourceIds: string[];
   availableReliableSourceIds: string[];
   insufficient: boolean;
+  factualConfidence?: number;
   reason?: string;
   evidence: ExchangeSourceEvidence[];
 }
@@ -445,6 +452,20 @@ function addSourceEvidence(
   });
 }
 
+function allowsGeneralKnowledgeSource(context: ExchangeContext): boolean {
+  const mode = context.effectiveMode;
+  return (
+    context.sessionType === 'learning' &&
+    context.escalationRung <= 3 &&
+    context.pedagogyMode !== 'four_strands' &&
+    mode !== 'review' &&
+    mode !== 'practice' &&
+    mode !== 'recitation' &&
+    context.verificationType !== 'evaluate' &&
+    context.verificationType !== 'teach_back'
+  );
+}
+
 function looksLikeDeterministicProblem(text: string): boolean {
   return (
     /(?:^|\s)[-+]?\d+(?:\.\d+)?\s*(?:[+\-*/=]|x\s*[+\-=]|\bpercent\b)/i.test(
@@ -571,6 +592,18 @@ export function buildExchangeSourceEvidence(
     });
   }
 
+  if (allowsGeneralKnowledgeSource(context)) {
+    addSourceEvidence(evidence, {
+      id: GENERAL_KNOWLEDGE_SOURCE_ID,
+      kind: 'general_knowledge',
+      reliability: 'model_general_knowledge',
+      label: 'Confidence-gated general knowledge',
+      excerpt:
+        'Allowed for ordinary low-stakes general knowledge in rung 1-3 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims.',
+      reliableForFacts: true,
+    });
+  }
+
   if (recentHistory) {
     addSourceEvidence(evidence, {
       id: 'conversation_history',
@@ -646,6 +679,61 @@ function uniqueSourceIds(ids: string[] | undefined): string[] {
   return unique;
 }
 
+function appendAuditReason(
+  existingReason: string | undefined,
+  addition: string,
+): string {
+  if (!existingReason) return addition.slice(0, 1000);
+  return `${existingReason} ${addition}`.slice(0, 1000);
+}
+
+function getLearnerQuestionFromEvidence(
+  evidence: ExchangeSourceEvidence[],
+): string {
+  return (
+    evidence
+      .find((item) => item.id === 'learner_message')
+      ?.excerpt?.replace(/\s+/g, ' ')
+      .trim() ?? ''
+  );
+}
+
+function isSourceBoundOrHighRiskGeneralKnowledgeQuestion(
+  question: string,
+): boolean {
+  const lower = question.toLowerCase();
+  return [
+    /\b(source|textbook|worksheet|passage|photo|image|according to|based on|from this|from the text|quote|cite|citation|evidence)\b/,
+    /\b(exact|precise|statistics?|percentage|percent|what year|when did|how many|rank|ranking|most important|best|worst|main reasons?|main idea|main point|key idea|important part|primary cause|prove)\b/,
+    /\b(medical|medicine|diagnos|dose|symptom|legal|lawyer|lawsuit|tax|financial|investment|stock|crypto|self-harm|suicide|emergency)\b/,
+  ].some((pattern) => pattern.test(lower));
+}
+
+function getGeneralKnowledgeRelianceIssue(input: {
+  reliedOnSourceIds: string[];
+  factualConfidence: number | undefined;
+  evidence: ExchangeSourceEvidence[];
+}): string | undefined {
+  if (!input.reliedOnSourceIds.includes(GENERAL_KNOWLEDGE_SOURCE_ID)) {
+    return undefined;
+  }
+
+  if (input.factualConfidence == null) {
+    return `Server rejected general_knowledge because private_sources.factual_confidence was missing; it must be at least ${GENERAL_KNOWLEDGE_CONFIDENCE_FLOOR}.`;
+  }
+
+  if (input.factualConfidence < GENERAL_KNOWLEDGE_CONFIDENCE_FLOOR) {
+    return `Server rejected general_knowledge because factual confidence ${input.factualConfidence.toFixed(2)} was below ${GENERAL_KNOWLEDGE_CONFIDENCE_FLOOR}.`;
+  }
+
+  const question = getLearnerQuestionFromEvidence(input.evidence);
+  if (isSourceBoundOrHighRiskGeneralKnowledgeQuestion(question)) {
+    return 'Server rejected general_knowledge because the learner asked a source-bound, precise/ranking, or high-stakes question.';
+  }
+
+  return undefined;
+}
+
 export function auditExchangeSources(
   privateSources: ExchangePrivateSources | undefined,
   evidence: ExchangeSourceEvidence[],
@@ -663,6 +751,13 @@ export function auditExchangeSources(
     (id) => evidenceById.get(id)?.reliableForFacts === true,
   );
   const insufficient = privateSources?.insufficient === true;
+  const factualConfidence = privateSources?.factual_confidence;
+  const generalKnowledgeIssue = getGeneralKnowledgeRelianceIssue({
+    reliedOnSourceIds,
+    factualConfidence,
+    evidence,
+  });
+  let reason = privateSources?.reason;
 
   let status: ExchangeSourceAuditStatus = 'ok';
   if (options.envelopeParseFailed === true) {
@@ -673,6 +768,9 @@ export function auditExchangeSources(
     status = 'unsupported_sources';
   } else if (insufficient) {
     status = 'insufficient_reliable_sources';
+  } else if (generalKnowledgeIssue) {
+    status = 'insufficient_reliable_sources';
+    reason = appendAuditReason(reason, generalKnowledgeIssue);
   } else if (
     availableReliableSourceIds.length === 0 ||
     reliableReliedOnSourceIds.length === 0
@@ -686,8 +784,9 @@ export function auditExchangeSources(
     reliableReliedOnSourceIds,
     unsupportedSourceIds,
     availableReliableSourceIds,
-    insufficient,
-    reason: privateSources?.reason,
+    insufficient: insufficient || Boolean(generalKnowledgeIssue),
+    factualConfidence,
+    reason,
     evidence,
   };
 }
@@ -846,9 +945,9 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
   {
     label: 'unsupported sediment definition',
     response:
-      /\bsand\b|\bmud\b|\blayers? of rock\b|\bmillions of years\b|\breally long time\b|\btiny bits?\b/i,
+      /\bsand\b|\bmud\b|\blayers? of rock\b|\bmillions of years\b|\breally long time\b|\btiny bits?\b|\bstone copy\b|\bcopy of the original\b|\bcopy of an? original\b/i,
     source:
-      /\bsand\b|\bmud\b|\blayers? of rock\b|\bmillions of years\b|\breally long time\b|\btiny bits?\b/i,
+      /\bsand\b|\bmud\b|\blayers? of rock\b|\bmillions of years\b|\breally long time\b|\btiny bits?\b|\bstone copy\b|\bcopy of the original\b|\bcopy of an? original\b/i,
   },
   {
     label: 'unsupported soft validation',
@@ -864,14 +963,6 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
     source: /\bexcellent idea\b|\bgreat idea\b|\bgreat question\b|\bawesome\b/i,
   },
 ];
-
-function appendAuditReason(
-  existingReason: string | undefined,
-  addition: string,
-): string {
-  if (!existingReason) return addition.slice(0, 1000);
-  return `${existingReason} ${addition}`.slice(0, 1000);
-}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1009,13 +1100,34 @@ export function applySourceAuditSafetyFallback(
   response: string,
   sourceAudit: ExchangeSourceAudit,
 ): { response: string; sourceAudit: ExchangeSourceAudit } {
+  const reliedOnGeneralKnowledge =
+    sourceAudit.reliableReliedOnSourceIds.includes(GENERAL_KNOWLEDGE_SOURCE_ID);
+  const onlyGeneralKnowledgeAvailable =
+    sourceAudit.availableReliableSourceIds.length > 0 &&
+    sourceAudit.availableReliableSourceIds.every(
+      (id) => id === GENERAL_KNOWLEDGE_SOURCE_ID,
+    );
+  const needsGeneralKnowledgeFallback =
+    reliedOnGeneralKnowledge &&
+    sourceAudit.status === 'insufficient_reliable_sources';
+  const onlyReliedOnGeneralKnowledge =
+    sourceAudit.reliableReliedOnSourceIds.length > 0 &&
+    sourceAudit.reliableReliedOnSourceIds.every(
+      (id) => id === GENERAL_KNOWLEDGE_SOURCE_ID,
+    );
   const needsNoSourceFallback =
-    sourceAudit.availableReliableSourceIds.length === 0 &&
+    (sourceAudit.availableReliableSourceIds.length === 0 ||
+      onlyGeneralKnowledgeAvailable ||
+      needsGeneralKnowledgeFallback) &&
     (sourceAudit.status === 'missing_reliable_source' ||
       sourceAudit.status === 'insufficient_reliable_sources' ||
       sourceAudit.status === 'unsupported_sources');
 
   if (!needsNoSourceFallback) {
+    if (onlyReliedOnGeneralKnowledge) {
+      return { response, sourceAudit };
+    }
+
     const scrubbed = stripUnsupportedSourceBoundSentences(
       response,
       sourceAudit,

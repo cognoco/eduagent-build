@@ -158,8 +158,17 @@ let mockSessionSummaryData: {
   content: string;
   aiFeedback: string | null;
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
+  purgedAt?: string | null;
 } | null = null;
 let mockTotalSessions = 0;
+let mockRecentlyResolvedTopics: string[] = [];
+let mockTopicSuggestionsData: Array<{
+  id: string;
+  bookId: string;
+  title: string;
+  createdAt: string;
+  usedAt: string | null;
+}> = [];
 
 // Per-test mutation result containers — default to success shapes; override
 // with setRoute() for tests that need rejections or custom shapes.
@@ -246,6 +255,36 @@ const mockFetch = createRoutedMockFetch({
   },
   // PUT /settings/learning-mode
   'learning-mode': () => ({ mode: 'casual' }),
+  // GET /learner-profile — useLearnerProfile needs { profile: { recentlyResolvedTopics: [] } }
+  // so the hook queryFn returns defined data. The default {} shape causes React Query
+  // to throw "Query data cannot be undefined" because data.profile is undefined.
+  // Closes over mockRecentlyResolvedTopics so per-test overrides are reflected.
+  'learner-profile': () => ({
+    profile: {
+      id: 'test-profile-id',
+      profileId: 'test-profile-id',
+      learningStyle: null,
+      interests: [],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      suppressedInferences: [],
+      interestTimestamps: {},
+      effectivenessSessionCount: 0,
+      memoryEnabled: false,
+      memoryConsentStatus: 'pending',
+      memoryCollectionEnabled: false,
+      memoryInjectionEnabled: true,
+      accommodationMode: 'none',
+      recentlyResolvedTopics: mockRecentlyResolvedTopics,
+      version: 1,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  }),
+  // GET /subjects/:id/books/:id/topic-suggestions — useTopicSuggestions.
+  // Closes over mockTopicSuggestionsData so per-test overrides are reflected.
+  'topic-suggestions': () => mockTopicSuggestionsData,
 });
 
 jest.mock('../../lib/api-client', () =>
@@ -348,9 +387,13 @@ describe('SessionSummaryScreen', () => {
     mockParams.sessionType = undefined;
     mockParams.subjectId = undefined;
     mockParams.topicId = undefined;
+    mockParams.filedSubjectId = undefined;
+    mockParams.filedBookId = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockTotalSessions = 0;
+    mockRecentlyResolvedTopics = [];
+    mockTopicSuggestionsData = [];
     mockBack.mockClear();
     mockCanGoBack.mockReset();
     mockCanGoBack.mockReturnValue(false);
@@ -363,6 +406,13 @@ describe('SessionSummaryScreen', () => {
           status: 404,
         }),
     );
+    // Reset transcript route — the [BUG-139] expired-session test overrides this to 404.
+    // Without resetting here, the 404 override bleeds into subsequent tests that set
+    // mockTranscriptData = validTranscriptData but still see "session expired" UI.
+    mockFetch.setRoute('transcript', () => {
+      if (mockTranscriptData === null) return null;
+      return mockTranscriptData;
+    });
     // Reset sessions route to default — tests like [BUG-800] call setRoute('sessions', ...)
     // to inject error responses. Without resetting, the override bleeds into subsequent
     // tests and the submit/summary routes return wrong shapes, causing waitFor timeouts.
@@ -1442,6 +1492,258 @@ describe('SessionSummaryScreen', () => {
       // It must NOT fall through to the generic "Session not found"
       // catch-all — that branch is for non-404 errors.
       expect(screen.queryByTestId('session-not-found-go-home')).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Feature 1: "You mastered these" row
+  // ---------------------------------------------------------------------------
+
+  // Minimal valid transcript — needed in tests that use waitFor so the
+  // ZodError from parsing a null transcript response doesn't race and replace
+  // the main content before our assertion fires.
+  const validTranscriptData = {
+    archived: false,
+    session: {
+      sessionId: '660e8400-e29b-41d4-a716-446655440000',
+      subjectId: '550e8400-e29b-41d4-a716-446655440000',
+      topicId: null,
+      sessionType: 'learning',
+      verificationType: null,
+      status: 'completed',
+      escalationRung: 1,
+      exchangeCount: 5,
+      startedAt: '2026-05-01T10:00:00.000Z',
+      lastActivityAt: '2026-05-01T10:15:00.000Z',
+      endedAt: '2026-05-01T10:15:00.000Z',
+      durationSeconds: 900,
+      wallClockSeconds: 900,
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      inputMode: 'text',
+      milestonesReached: [],
+    },
+    exchanges: [],
+  };
+
+  describe('"You mastered" row', () => {
+    it('shows mastered row when recentlyResolvedTopics is non-empty', async () => {
+      mockRecentlyResolvedTopics = ['Quadratic equations', 'Factoring'];
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('session-summary-mastered-row');
+      });
+      screen.getByText(/You mastered:/);
+      screen.getByText(/Quadratic equations/);
+      screen.getByText(/Factoring/);
+    });
+
+    it('hides mastered row when recentlyResolvedTopics is empty', async () => {
+      mockRecentlyResolvedTopics = [];
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await flushAsyncEffects();
+
+      expect(screen.queryByTestId('session-summary-mastered-row')).toBeNull();
+    });
+
+    it('hides mastered row in parent-proxy mode', async () => {
+      mockRecentlyResolvedTopics = ['Algebra'];
+      mockTranscriptData = validTranscriptData as never;
+      mockUseParentProxy.mockReturnValue({
+        isParentProxy: true,
+        childProfile: { id: 'child-id', birthYear: 2012 } as never,
+        parentProfile: { id: 'parent-1', isOwner: true } as never,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await flushAsyncEffects();
+
+      expect(screen.queryByTestId('session-summary-mastered-row')).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Feature 2: "Try this next" topic suggestions rail
+  // ---------------------------------------------------------------------------
+  describe('"Try this next" suggestions rail', () => {
+    it('shows up to 3 suggestion cards when suggestions are available', async () => {
+      mockTopicSuggestionsData = [
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          bookId: '22222222-2222-2222-2222-222222222222',
+          title: 'Quadratic Functions',
+          createdAt: '2026-05-01T10:00:00.000Z',
+          usedAt: null,
+        },
+        {
+          id: '33333333-3333-3333-3333-333333333333',
+          bookId: '22222222-2222-2222-2222-222222222222',
+          title: 'Polynomial Division',
+          createdAt: '2026-05-01T10:00:00.000Z',
+          usedAt: null,
+        },
+        {
+          id: '44444444-4444-4444-4444-444444444444',
+          bookId: '22222222-2222-2222-2222-222222222222',
+          title: 'Complex Numbers',
+          createdAt: '2026-05-01T10:00:00.000Z',
+          usedAt: null,
+        },
+        {
+          id: '55555555-5555-5555-5555-555555555555',
+          bookId: '22222222-2222-2222-2222-222222222222',
+          title: 'Should not appear — 4th item',
+          createdAt: '2026-05-01T10:00:00.000Z',
+          usedAt: null,
+        },
+      ];
+      mockParams.filedSubjectId = 'subject-uuid-1';
+      mockParams.filedBookId = '22222222-2222-2222-2222-222222222222';
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('topic-suggestions-rail');
+      });
+      screen.getByText('Try this next');
+      screen.getByText('Quadratic Functions');
+      screen.getByText('Polynomial Division');
+      screen.getByText('Complex Numbers');
+      expect(screen.queryByText('Should not appear — 4th item')).toBeNull();
+    });
+
+    it('hides the suggestions rail when no suggestions are available', async () => {
+      mockTopicSuggestionsData = [];
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await flushAsyncEffects();
+
+      expect(screen.queryByTestId('topic-suggestions-rail')).toBeNull();
+    });
+
+    it('tapping a suggestion card navigates to the topic detail', async () => {
+      mockTopicSuggestionsData = [
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          bookId: '22222222-2222-2222-2222-222222222222',
+          title: 'Quadratic Functions',
+          createdAt: '2026-05-01T10:00:00.000Z',
+          usedAt: null,
+        },
+      ];
+      mockParams.filedSubjectId = 'subject-uuid-1';
+      mockParams.filedBookId = '22222222-2222-2222-2222-222222222222';
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const card = await screen.findByTestId('topic-suggestion-card');
+      fireEvent.press(card);
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/topic/[topicId]',
+        params: { topicId: '11111111-1111-1111-1111-111111111111' },
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Feature 3: Purged-transcript badge
+  // ---------------------------------------------------------------------------
+  describe('purged-transcript badge', () => {
+    it('shows the archived notice when purgedAt is set on the session summary', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Previously submitted summary.',
+        aiFeedback: 'Good work.',
+        status: 'submitted',
+        purgedAt: '2026-05-01T10:00:00.000Z',
+      };
+      // Provide a valid transcript so the screen renders the main content,
+      // not the "Session not found" error fallback.
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('transcript-purged-badge');
+      });
+      screen.getByTestId('transcript-purged-badge-label');
+      screen.getByText('Transcript archived');
+      screen.getByText(
+        'This session was summarised; the original transcript was archived.',
+      );
+      // The "View full transcript" button must NOT appear when purged.
+      expect(screen.queryByTestId('view-transcript-cta')).toBeNull();
+    });
+
+    it('shows the "View full transcript" button when purgedAt is null', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Previously submitted summary.',
+        aiFeedback: 'Good work.',
+        status: 'submitted',
+        purgedAt: null,
+      };
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('view-transcript-cta');
+      });
+      expect(screen.queryByTestId('transcript-purged-badge')).toBeNull();
+    });
+
+    it('shows the "View full transcript" button when purgedAt is absent', async () => {
+      // purgedAt is optional — existing sessions without the field must show
+      // the link, not the archived notice.
+      mockSessionSummaryData = null;
+      mockTranscriptData = validTranscriptData as never;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('view-transcript-cta');
+      });
+      expect(screen.queryByTestId('transcript-purged-badge')).toBeNull();
+    });
+
+    it('hides both badge and transcript button in parent-proxy mode', async () => {
+      mockSessionSummaryData = {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Previously submitted summary.',
+        aiFeedback: null,
+        status: 'submitted',
+        purgedAt: '2026-05-01T10:00:00.000Z',
+      };
+      mockUseParentProxy.mockReturnValue({
+        isParentProxy: true,
+        childProfile: { id: 'child-id', birthYear: 2012 } as never,
+        parentProfile: { id: 'parent-1', isOwner: true } as never,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await flushAsyncEffects();
+
+      expect(screen.queryByTestId('transcript-purged-badge')).toBeNull();
+      expect(screen.queryByTestId('view-transcript-cta')).toBeNull();
     });
   });
 });

@@ -178,7 +178,8 @@ export interface RenderScreenResult {
 
 function resolveProfile(profile: NamedProfile | Profile | undefined): Profile {
   if (!profile) return NAMED_PROFILES.soloLearner;
-  if (typeof profile === 'string') return NAMED_PROFILES[profile];
+  if (typeof profile === 'string')
+    return NAMED_PROFILES[profile as NamedProfile];
   return profile;
 }
 

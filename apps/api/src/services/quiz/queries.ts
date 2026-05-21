@@ -206,24 +206,21 @@ export async function getVocabularyRoundContext(
   const distinctTranslationCount = new Set(
     allVocabulary.map((entry) => entry.translation.trim().toLowerCase()),
   ).size;
-  const libraryItems =
-    distinctTranslationCount < 4
-      ? []
-      : allVocabularyRows
-          .filter((row) => {
-            const card = cardByVocabularyId.get(row.id);
-            return card?.nextReviewAt != null && card.nextReviewAt <= now;
-          })
-          .map(
-            (row) =>
-              ({
-                id: row.id,
-                question: row.term,
-                answer: row.translation,
-                vocabularyId: row.id,
-                cefrLevel: row.cefrLevel,
-              }) satisfies LibraryItem,
-          );
+  const libraryItems = allVocabularyRows
+    .filter((row) => {
+      const card = cardByVocabularyId.get(row.id);
+      return card?.nextReviewAt != null && card.nextReviewAt <= now;
+    })
+    .map(
+      (row) =>
+        ({
+          id: row.id,
+          question: row.term,
+          answer: row.translation,
+          vocabularyId: row.id,
+          cefrLevel: row.cefrLevel,
+        }) satisfies LibraryItem,
+    );
 
   if (distinctTranslationCount < 4 && allVocabularyRows.length > 0) {
     logger.warn('quiz.vocabulary.mastery_pool_too_small', {

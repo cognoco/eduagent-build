@@ -18,15 +18,21 @@
  */
 
 const mockCaptureException = jest.fn();
+const mockSetUser = jest.fn();
+const mockSetTag = jest.fn();
 
-jest.mock(
-  '../../apps/api/src/services/sentry' /* gc1-allow: external error-tracking boundary (Sentry SDK) */,
-  () => ({
-    addBreadcrumb: jest.fn(),
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-    captureMessage: jest.fn(),
-  }),
-);
+jest.mock('@sentry/cloudflare', () => ({
+  withScope: (fn) =>
+    fn({
+      setUser: (...args) => mockSetUser(...args),
+      setTag: (...args) => mockSetTag(...args),
+      setExtra: jest.fn(),
+    }),
+  captureException: (...args) => mockCaptureException(...args),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  withSentry: (_config, handler) => handler,
+}));
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
@@ -170,11 +176,15 @@ describe('Integration: POST /v1/subjects/resolve', () => {
         code: ERROR_CODES.UPSTREAM_ERROR,
         message: upstreamError.message,
       });
-      expect(mockCaptureException).toHaveBeenCalledWith(upstreamError, {
-        userId: SUBJECT_AUTH_USER_ID,
-        profileId,
-        requestPath: '/v1/subjects/resolve',
-      });
+      // The wrapper calls @sentry/cloudflare.captureException(err) with only the error;
+      // context (userId, profileId, requestPath) goes via scope.setUser/setTag, not as a 2nd arg.
+      expect(mockCaptureException).toHaveBeenCalledWith(upstreamError);
+      expect(mockSetUser).toHaveBeenCalledWith({ id: SUBJECT_AUTH_USER_ID });
+      expect(mockSetTag).toHaveBeenCalledWith('profileId', profileId);
+      expect(mockSetTag).toHaveBeenCalledWith(
+        'requestPath',
+        '/v1/subjects/resolve',
+      );
     } finally {
       subjectLlmFixture.clearChatError();
       subjectLlmFixture.setChatResponse(SUBJECT_LLM_RESPONSE);

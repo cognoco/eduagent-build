@@ -44,6 +44,7 @@ function makeProjection(
     suppressedInferences: [],
     interestTimestamps: { space: '2026-01-01T00:00:00.000Z' },
     memoryFactsBackfilledAt: null,
+    memoryFactsAnalysedAt: null,
 
     learningStyle: {
       modality: 'visual',

@@ -419,17 +419,25 @@
   "session": {
     "challenge": {
       "offerTitle": "Up for a challenge round?",
+      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
       "tryIt": "Try it",
       "notNow": "Not now",
       "dontAskAgain": "Don't ask again",
       "banner": {
+        "active": "Challenge round in progress",
         "question": "Question {{index}} of {{total}}"
       },
       "draft": {
         "title": "Here's what you know now",
         "save": "Save note",
-        "edit": "Edit",
+        "edit": "Edit first",
         "skip": "Skip"
+      },
+      "partial": {
+        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
+      },
+      "allMissing": {
+        "body": "Let's revisit this together first."
       }
     },
     "mentorMemory": {
@@ -659,29 +667,6 @@
       "currentTopic": "Thema:",
       "changeTopicLabel": "Thema von {{topic}} ändern",
       "changeTopic": "Ändern"
-    },
-    "challenge": {
-      "offerTitle": "Up for a challenge round?",
-      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
-      "tryIt": "Try it",
-      "notNow": "Not now",
-      "dontAskAgain": "Don't ask again",
-      "banner": {
-        "active": "Challenge round in progress",
-        "question": "Question {{index}} of {{total}}"
-      },
-      "draft": {
-        "title": "Here's what you know now",
-        "save": "Save note",
-        "edit": "Edit first",
-        "skip": "Skip"
-      },
-      "partial": {
-        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
-      },
-      "allMissing": {
-        "body": "Let's revisit this together first."
-      }
     }
   },
   "quiz": {
@@ -1009,7 +994,8 @@
       "shelfFinishedSuffix": ", fertig",
       "shelfActionExpand": "Erweitern",
       "shelfActionCollapse": "Zuklappen",
-      "shelfActionOpen": "Öffnen"
+      "shelfActionOpen": "Öffnen",
+      "urgencyBadge": "Soon: {{reason}}"
     },
     "shelf": {
       "missingParam": "Fehlendes Fach. Bitte gehe zurück und versuche es erneut.",
@@ -1054,10 +1040,20 @@
         "savedFromChat": "Vom Chat gespeichert",
         "emptyShort": "Noch kein gespeicherter Chat für dieses Thema",
         "emptyLong": "Noch keine gespeicherten Erklärungen für dieses Thema."
+      },
+      "challengeVerifiedBadge": "Herausforderung bestätigt",
+      "practicedOftenHint": "Du übst dieses Thema oft — weiter so!",
+      "relatedRail": {
+        "label": "Verwandte Themen"
       }
     }
   },
   "topic": {
+    "relevance": {
+      "recommended": "Recommended",
+      "contemporary": "Contemporary",
+      "emerging": "Emerging"
+    },
     "recallTest": {
       "title": "Wissens-Check",
       "subtitle": "Teste dein Gedächtnis",
@@ -1295,7 +1291,10 @@
     "languageGreetingContinuePrompt": "Füge jetzt noch eine Begrüßung auf {{language}} hinzu oder übersetze eine der Begrüßungen, die du geschrieben hast, ins Englische.",
     "loadingReview": "Gespeicherte Überprüfung wird geladen...",
     "pickerContinueForTopic": "Bewertung für {{title}} fortsetzen",
-    "pickerInProgress": "In Bearbeitung"
+    "pickerInProgress": "In Bearbeitung",
+    "qualityRating": "Qualität: {{rating}}/5",
+    "depthTransfer": "Angewandtes Verständnis",
+    "depthExplain": "Mit eigenen Worten erklärt"
   },
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",
@@ -1504,7 +1503,20 @@
       "viewVocabCount": "{{count}} Vokabeln ansehen",
       "viewVocab": "Vokabeln ansehen",
       "wordsLink": "{{count}} Wörter →",
-      "vocabularyLink": "Vokabeln →"
+      "vocabularyLink": "Vokabeln →",
+      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
+    },
+    "thisWeek": {
+      "title": "This week"
+    },
+    "recallQueue": {
+      "title": "Recall queue",
+      "due_one": "{{count}} due",
+      "due_other": "{{count}} due",
+      "strong_one": "{{count}} strong",
+      "strong_other": "{{count}} strong",
+      "fading_one": "{{count}} fading",
+      "fading_other": "{{count}} fading"
     },
     "weeklyDelta": {
       "topicsMastered": "+{{count}} topic this week",
@@ -2448,6 +2460,16 @@
       "message": "Wir können dir eine sanfte Erinnerung schicken, damit du deinen Streak nicht verlierst. Du kannst sie jederzeit in den Einstellungen deaktivieren.",
       "allow": "Erlauben",
       "notNow": "Nicht jetzt"
+    },
+    "masteredRow": {
+      "title": "Du hast gemeistert:"
+    },
+    "topicSuggestions": {
+      "title": "Das nächste Thema"
+    },
+    "transcriptPurged": {
+      "badge": "Transkript archiviert",
+      "notice": "Diese Sitzung wurde zusammengefasst; das ursprüngliche Transkript wurde archiviert."
     }
   },
   "sessionTranscript": {
