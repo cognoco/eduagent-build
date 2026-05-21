@@ -22,6 +22,7 @@
 //   • BUG-220 — coaching_card_cache.card_data jsonb without Zod validation
 //   • BUG-222 — session_summaries.llm_summary jsonb cast via $type<…>
 //   • BUG-225 — onboarding_drafts.exchange_history / extracted_signals jsonb
+//   • BUG-391 — assessments.exchange_history bare jsonb (no $type, no runtime parse)
 // ---------------------------------------------------------------------------
 
 import { z } from 'zod';
@@ -159,4 +160,33 @@ export function parseOnboardingDraftExtractedSignals(
 ): OnboardingDraftExtractedSignals | null {
   const parsed = onboardingDraftExtractedSignalsSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
+}
+
+// ---------------------------------------------------------------------------
+// [BUG-391] assessments.exchange_history
+// ---------------------------------------------------------------------------
+// The column is declared as bare jsonb() with no $type<…> cast, so Drizzle
+// types it as `unknown`. mapAssessmentRow previously cast the value with `as
+// ChatExchange[]` — a TypeScript-only cast that provides zero runtime
+// validation. A corrupted row (partial backfill, schema drift, malformed
+// legacy data) would propagate into shouldEndAssessmentForReview() and the
+// LLM prompt builder without any error.
+//
+// parseAssessmentExchangeHistory returns [] on parse failure rather than null
+// so the assessment flow degrades to an empty-history state (same as a brand-
+// new assessment) rather than throwing at the call site.
+// ---------------------------------------------------------------------------
+
+export const assessmentExchangeHistorySchema = z
+  .array(chatExchangeSchema)
+  .default([]);
+export type AssessmentExchangeHistory = z.infer<
+  typeof assessmentExchangeHistorySchema
+>;
+
+export function parseAssessmentExchangeHistory(
+  raw: unknown,
+): AssessmentExchangeHistory {
+  const parsed = assessmentExchangeHistorySchema.safeParse(raw);
+  return parsed.success ? parsed.data : [];
 }
