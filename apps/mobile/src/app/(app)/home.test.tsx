@@ -150,12 +150,15 @@ describe('HomeScreen mode switch', () => {
   const originalFlag = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       true;
   });
 
   afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       originalFlag;
   });
@@ -185,6 +188,10 @@ describe('HomeScreen mode switch', () => {
     fireEvent.press(screen.getByTestId('home-mode-chip'));
 
     screen.getByText('mode:study');
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
     expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/home');
   });
 });

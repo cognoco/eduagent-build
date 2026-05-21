@@ -37,8 +37,8 @@ export function useModeSwitch(): {
           accountAgeBucket: bucketAccountAge(activeProfile.createdAt),
         });
       }
-      router.replace('/(app)/home');
       setTimeout(() => {
+        router.replace('/(app)/home');
         isSwitchingRef.current = false;
       }, 0);
     },

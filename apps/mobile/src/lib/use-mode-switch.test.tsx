@@ -119,7 +119,40 @@ describe('useModeSwitch', () => {
     });
 
     expect(result.current.appContext.mode).toBe('study');
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('commits the next mode before navigating home', () => {
+    const { result } = renderHook(
+      () => ({
+        appContext: useAppContext(),
+        modeSwitch: useModeSwitch(),
+      }),
+      { wrapper: makeWrapper() },
+    );
+    const modeAtNavigation: Array<string | null> = [];
+    mockReplace.mockImplementation(() => {
+      modeAtNavigation.push(result.current.appContext.mode);
+    });
+
+    act(() => {
+      result.current.modeSwitch.switchMode('study');
+    });
+
+    expect(result.current.appContext.mode).toBe('study');
+    expect(modeAtNavigation).toEqual([]);
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(modeAtNavigation).toEqual(['study']);
   });
 
   it('invalidates mode-scoped queries exactly once on switch', () => {
@@ -158,10 +191,12 @@ describe('useModeSwitch', () => {
       result.current.switchMode('study');
     });
 
-    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
 
     act(() => {
       jest.runOnlyPendingTimers();
     });
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
   });
 });
