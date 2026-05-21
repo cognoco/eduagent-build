@@ -729,9 +729,33 @@ export default function ChildDetailScreen(): React.ReactElement {
     );
   }
 
+  if (profiles.length > 0 && !isOwnedProfile) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-5"
+        style={{ paddingTop: insets.top }}
+        testID="child-profile-no-access"
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          {t('parentView.index.noAccessToProfile')}
+        </Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH)}
+          className="bg-primary rounded-button px-6 py-3"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            {t('common.back')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const hasKnownChildProfile = child != null || ownedProfile != null;
   const detailUnavailable =
-    (!isLoading && childDetail === null && !child) ||
-    (isError && !child && !dashboardQuery.isLoading);
+    (!isLoading && childDetail === null && !hasKnownChildProfile) ||
+    (isError && !hasKnownChildProfile && !dashboardQuery.isLoading);
 
   if (detailUnavailable) {
     return (
@@ -768,29 +792,6 @@ export default function ChildDetailScreen(): React.ReactElement {
         >
           <Text className="text-body font-semibold text-text-primary">
             {t('parentView.index.backToDashboard')}
-          </Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (profiles.length > 0 && !isOwnedProfile) {
-    return (
-      <View
-        className="flex-1 bg-background items-center justify-center px-5"
-        style={{ paddingTop: insets.top }}
-        testID="child-profile-no-access"
-      >
-        <Text className="text-body text-text-secondary text-center mb-4">
-          {t('parentView.index.noAccessToProfile')}
-        </Text>
-        <Pressable
-          onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH)}
-          className="bg-primary rounded-button px-6 py-3"
-          accessibilityRole="button"
-        >
-          <Text className="text-text-inverse text-body font-semibold">
-            {t('common.back')}
           </Text>
         </Pressable>
       </View>

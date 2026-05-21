@@ -38,9 +38,9 @@ export function useModeSwitch(): {
         });
       }
       router.replace('/(app)/home');
-      queueMicrotask(() => {
+      setTimeout(() => {
         isSwitchingRef.current = false;
-      });
+      }, 0);
     },
     [activeProfile, mode, queryClient, router, setMode],
   );

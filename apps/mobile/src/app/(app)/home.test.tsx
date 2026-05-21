@@ -12,6 +12,8 @@ import {
   createTestProfile,
   cleanupScreen,
 } from '../../../test-utils/screen-render-harness';
+import { AppContextProvider } from '../../lib/app-context';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 
 const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
@@ -41,15 +43,29 @@ jest.mock('expo-router', () => ({
 jest.mock('../../components/home', () => {
   const { Text, View } = require('react-native');
   return {
-    LearnerScreen: () => (
+    LearnerScreen: ({ mode }: { mode?: string | null }) => (
       <View testID="learner-screen">
         <Text>LearnerScreen</Text>
+        <Text>mode:{mode ?? 'none'}</Text>
       </View>
     ),
   };
 });
 
 const HomeScreen = require('./home').default;
+
+function createModeScreenWrapper(
+  options: Parameters<typeof createScreenWrapper>[0],
+) {
+  const { wrapper: BaseWrapper, ...rest } = createScreenWrapper(options);
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <BaseWrapper>
+      <AppContextProvider>{children}</AppContextProvider>
+    </BaseWrapper>
+  );
+
+  return { wrapper: Wrapper, ...rest };
+}
 
 describe('HomeScreen intent router', () => {
   beforeEach(() => {
@@ -127,6 +143,49 @@ describe('HomeScreen intent router', () => {
     render(<HomeScreen />, { wrapper });
 
     expect(screen.queryByTestId('learner-screen')).toBeNull();
+  });
+});
+
+describe('HomeScreen mode switch', () => {
+  const originalFlag = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      true;
+  });
+
+  afterEach(() => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      originalFlag;
+  });
+
+  it('switches the Family home chip to My Learning', () => {
+    const parent = createTestProfile({
+      id: 'p1',
+      displayName: 'Maria',
+      isOwner: true,
+      birthYear: 1985,
+    });
+    const child = createTestProfile({
+      id: 'c1',
+      displayName: 'Emma',
+      isOwner: false,
+      birthYear: 2014,
+    });
+    const { wrapper } = createModeScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, child],
+    });
+
+    render(<HomeScreen />, { wrapper });
+
+    screen.getByText('mode:family');
+
+    fireEvent.press(screen.getByTestId('home-mode-chip'));
+
+    screen.getByText('mode:study');
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/home');
   });
 });
 
