@@ -8,7 +8,7 @@
 
 import { useAuth } from '@clerk/clerk-expo';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 
 import {
@@ -60,7 +60,6 @@ function parsePath(
 export default function SeedPreviewStateScreen(): React.ReactElement | null {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
-  const [seeded, setSeeded] = useState(false);
   const { intent, path, topicText, staleMs } = useLocalSearchParams<{
     intent?: string;
     path?: string;
@@ -94,7 +93,6 @@ export default function SeedPreviewStateScreen(): React.ReactElement | null {
         },
         Number.isFinite(parsedStaleMs) ? parsedStaleMs : 0,
       );
-      setSeeded(true);
 
       // Trigger lazy TTL deletion for expired-state E2E runs, then return to
       // the visible preview entry point.
@@ -109,15 +107,25 @@ export default function SeedPreviewStateScreen(): React.ReactElement | null {
     return <Redirect href="/(app)/home" />;
   }
 
-  if (!isLoaded || !isSignedIn) {
-    return null;
+  if (!isLoaded) {
+    // Clerk still hydrating — show a minimal spinner so the screen doesn't
+    // appear blank. The useEffect above will redirect once isLoaded flips.
+    return (
+      <View testID="seed-preview-auth-loading">
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!isSignedIn) {
+    // Immediate redirect mirrors the useEffect bounce for the unauthenticated
+    // case — prevents a blank-screen dead-end per UX Resilience Rules.
+    return <Redirect href="/(auth)/sign-in" />;
   }
 
   return (
     <View testID="preview-state-seeded">
-      <Text>
-        {seeded ? 'Preview state seeded' : 'Seeding preview state...'}
-      </Text>
+      <Text>Seeding preview state...</Text>
     </View>
   );
 }

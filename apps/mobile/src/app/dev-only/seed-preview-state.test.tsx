@@ -5,7 +5,7 @@
  * state, triggers lazy TTL cleanup, then returns to the preview intent screen.
  */
 
-import { render, waitFor } from '@testing-library/react-native';
+import { render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
 
 import {
@@ -91,6 +91,34 @@ describe('SeedPreviewStateScreen', () => {
       await expect(getPreviewState()).resolves.toBeNull();
     });
     expect(mockReplace).toHaveBeenCalledWith('/preview/intent');
+  });
+
+  it('[S4-H1] shows loading spinner (not blank) when Clerk has not yet hydrated', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+    });
+
+    render(<SeedPreviewStateScreen />);
+
+    // Spinner must be visible so the screen isn't blank while Clerk loads.
+    screen.getByTestId('seed-preview-auth-loading');
+    // Main content must not render.
+    expect(screen.queryByTestId('preview-state-seeded')).toBeNull();
+  });
+
+  it('[S4-H1] renders redirect (no blank screen) when loaded but unauthenticated', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    render(<SeedPreviewStateScreen />);
+
+    // The Redirect mock renders null — verify the seeded UI does NOT appear,
+    // meaning the user is bounced out rather than seeing a dead-end blank screen.
+    expect(screen.queryByTestId('preview-state-seeded')).toBeNull();
+    expect(screen.queryByTestId('seed-preview-auth-loading')).toBeNull();
   });
 
   it('falls back to the intent default when the requested path is invalid', async () => {

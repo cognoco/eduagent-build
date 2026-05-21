@@ -401,6 +401,7 @@ describe('LearnerScreen', () => {
           displayName: 'Parent',
           isOwner: true,
         }}
+        mode="family"
       />,
       { wrapper: Wrapper },
     );
@@ -426,6 +427,7 @@ describe('LearnerScreen', () => {
           displayName: 'Parent',
           isOwner: true,
         }}
+        mode="family"
       />,
       { wrapper: Wrapper },
     );

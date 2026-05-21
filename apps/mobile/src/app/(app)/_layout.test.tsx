@@ -1722,8 +1722,10 @@ describe('SaveWizard — Step 2 (Profile Basics)', () => {
 
     await screen.findByTestId('save-wizard-step-3');
     const postBodies = fetchCallsMatching(mockFetch, '/profiles')
-      .filter((call) => call.init?.method === 'POST')
-      .map((call) => extractJsonBody<{ displayName: string }>(call.init));
+      .filter((call: { init?: RequestInit }) => call.init?.method === 'POST')
+      .map((call: { init?: RequestInit }) =>
+        extractJsonBody<{ displayName: string }>(call.init),
+      );
     expect(postBodies).toEqual([
       expect.objectContaining({ displayName: 'Parent' }),
       expect.objectContaining({ displayName: 'Kid' }),

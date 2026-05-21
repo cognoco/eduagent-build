@@ -43,11 +43,7 @@ tags:
     timeout: 10000
 
 - tapOn:
-    id: 'preview-topic-input'
-- inputText: 'algebra basics'
-- hideKeyboard
-- tapOn:
-    id: 'preview-topic-continue'
+    id: 'preview-topic-sample-fractions'
 
 - extendedWaitUntil:
     visible:

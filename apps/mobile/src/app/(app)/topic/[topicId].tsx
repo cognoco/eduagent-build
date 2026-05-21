@@ -1016,7 +1016,6 @@ export default function TopicDetailScreen() {
                     fontWeight: '700',
                     lineHeight: 14,
                     color: withOpacity(colors.textSecondary, 0.8),
-                    textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     marginBottom: 10,
                   }}
