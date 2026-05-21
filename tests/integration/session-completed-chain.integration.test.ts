@@ -401,7 +401,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     expect(stepNames).toContain('update-retention');
     expect(stepNames).toContain('generate-embeddings');
     expect(stepNames).toContain('write-coaching-card');
-    expect(stepNames).toContain('update-streaks');
+    expect(stepNames).toContain('update-dashboard');
     expect(stepNames).toContain('embed-new-memory-facts');
     expect(result.outcomes).toEqual(
       expect.arrayContaining([
