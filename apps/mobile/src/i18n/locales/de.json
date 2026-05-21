@@ -995,7 +995,7 @@
       "shelfActionExpand": "Erweitern",
       "shelfActionCollapse": "Zuklappen",
       "shelfActionOpen": "Öffnen",
-      "urgencyBadge": "Soon: {{reason}}"
+      "urgencyBadge": "Bald: {{reason}}"
     },
     "shelf": {
       "missingParam": "Fehlendes Fach. Bitte gehe zurück und versuche es erneut.",
@@ -1046,8 +1046,7 @@
       "relatedRail": {
         "label": "Verwandte Themen"
       }
-    },
-    "urgencyBadge": "Bald: {{reason}}"
+    }
   },
   "topic": {
     "relevance": {
@@ -1505,7 +1504,7 @@
       "viewVocab": "Vokabeln ansehen",
       "wordsLink": "{{count}} Wörter →",
       "vocabularyLink": "Vokabeln →",
-      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
+      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} Themen gemeistert"
     },
     "thisWeek": {
       "title": "Diese Woche"
@@ -1748,8 +1747,7 @@
       "nudgeA11y": "{{name}} einen Anstupser senden",
       "viewAllReports": "Alle Berichte ansehen",
       "subjectsTitle": "Fächer"
-    },
-    "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} Themen gemeistert"
+    }
   },
   "onboarding": {
     "common": {

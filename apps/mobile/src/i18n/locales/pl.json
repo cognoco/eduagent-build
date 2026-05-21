@@ -1020,7 +1020,7 @@
       "shelfActionExpand": "rozwinąć",
       "shelfActionCollapse": "zwinąć",
       "shelfActionOpen": "otworzyć",
-      "urgencyBadge": "Soon: {{reason}}"
+      "urgencyBadge": "Wkrótce: {{reason}}"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
@@ -1071,8 +1071,7 @@
       "relatedRail": {
         "label": "Powiązane tematy"
       }
-    },
-    "urgencyBadge": "Wkrótce: {{reason}}"
+    }
   },
   "topic": {
     "relevance": {
@@ -1530,7 +1529,7 @@
       "viewVocab": "Zobacz słownictwo",
       "wordsLink": "{{count}} słów →",
       "vocabularyLink": "Słownictwo →",
-      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
+      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} tematów opanowanych"
     },
     "thisWeek": {
       "title": "W tym tygodniu"
@@ -1773,8 +1772,7 @@
       "nudgeA11y": "Wyślij {{name}} zachętę",
       "viewAllReports": "Zobacz wszystkie raporty",
       "subjectsTitle": "Przedmioty"
-    },
-    "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} tematów opanowanych"
+    }
   },
   "onboarding": {
     "common": {

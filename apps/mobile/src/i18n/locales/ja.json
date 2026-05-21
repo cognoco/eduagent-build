@@ -1024,7 +1024,7 @@
       "shelfActionExpand": "展開",
       "shelfActionCollapse": "折りたたむ",
       "shelfActionOpen": "開く",
-      "urgencyBadge": "Soon: {{reason}}"
+      "urgencyBadge": "もうすぐ: {{reason}}"
     },
     "nextAction": {
       "title": "{{subject}}を続ける",
@@ -1046,8 +1046,7 @@
       "relatedRail": {
         "label": "関連トピック"
       }
-    },
-    "urgencyBadge": "もうすぐ: {{reason}}"
+    }
   },
   "topic": {
     "relevance": {
@@ -1505,7 +1504,7 @@
       "viewVocab": "語彙を表示",
       "wordsLink": "{{count}}語 →",
       "vocabularyLink": "語彙 →",
-      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
+      "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} トピック習得済み"
     },
     "thisWeek": {
       "title": "今週"
@@ -1748,8 +1747,7 @@
       "nudgeA11y": "{{name}}さんにリマインダーを送信",
       "viewAllReports": "すべてのレポートを表示",
       "subjectsTitle": "科目"
-    },
-    "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} トピック習得済み"
+    }
   },
   "onboarding": {
     "common": {
