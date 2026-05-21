@@ -11,10 +11,14 @@ import type {
   HomeworkSummary,
   SessionMetadata,
 } from '@eduagent/schemas';
-import { routeAndCall } from './llm';
+import { routeAndCall, extractFirstJsonObject } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { projectAiResponseContent } from './llm/project-response';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 const HOMEWORK_SUMMARY_SYSTEM_PROMPT = `You are creating a short parent-facing summary of a student's homework session.
 
@@ -45,7 +49,7 @@ function getSessionMetadata(metadata: unknown): SessionMetadata {
 }
 
 function getHomeworkMetadata(
-  metadata: unknown
+  metadata: unknown,
 ): HomeworkSessionMetadata | null {
   return getSessionMetadata(metadata).homework ?? null;
 }
@@ -57,14 +61,14 @@ function countGuidedProblems(problems: HomeworkProblem[]): number {
 
 function buildFallbackSummary(
   subjectName: string,
-  homework: HomeworkSessionMetadata | null
+  homework: HomeworkSessionMetadata | null,
 ): HomeworkSummary {
   const problems = homework?.problems ?? [];
   const problemCount = homework?.problemCount ?? problems.length;
   const guidedProblemCount = countGuidedProblems(problems);
   const independentProblemCount = Math.max(
     0,
-    problemCount - guidedProblemCount
+    problemCount - guidedProblemCount,
   );
 
   return {
@@ -82,15 +86,17 @@ function buildFallbackSummary(
 
 export function parseHomeworkSummaryResponse(
   response: string,
-  fallback: HomeworkSummary
+  fallback: HomeworkSummary,
 ): HomeworkSummary {
   try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // [BUG-479] Replace greedy regex with brace-depth walker; markdown fences
+    // or appended commentary no longer silently returns the fallback.
+    const jsonStr = extractFirstJsonObject(response);
+    if (!jsonStr) {
       return fallback;
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<HomeworkSummary>;
+    const parsed = JSON.parse(jsonStr) as Partial<HomeworkSummary>;
     return {
       problemCount:
         typeof parsed.problemCount === 'number'
@@ -98,7 +104,7 @@ export function parseHomeworkSummaryResponse(
           : fallback.problemCount,
       practicedSkills: Array.isArray(parsed.practicedSkills)
         ? parsed.practicedSkills.filter(
-            (value): value is string => typeof value === 'string'
+            (value): value is string => typeof value === 'string',
           )
         : fallback.practicedSkills,
       independentProblemCount:
@@ -119,7 +125,17 @@ export function parseHomeworkSummaryResponse(
           ? parsed.displayTitle.trim()
           : fallback.displayTitle,
     };
-  } catch {
+  } catch (err) {
+    logger.error('[homework-summary] JSON parse failed, using fallback', {
+      event: 'homework_summary.parse.failed',
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      extra: {
+        site: 'parseHomeworkSummaryResponse',
+        rawResponseTrunc: response.slice(0, 200),
+      },
+    });
     return fallback;
   }
 }
@@ -127,7 +143,7 @@ export function parseHomeworkSummaryResponse(
 export async function extractHomeworkSummary(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<HomeworkSummary> {
   const [sessionRow] = await db
     .select({
@@ -138,8 +154,8 @@ export async function extractHomeworkSummary(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     )
     .limit(1);
 
@@ -154,8 +170,8 @@ export async function extractHomeworkSummary(
     .where(
       and(
         eq(subjects.id, sessionRow.subjectId),
-        eq(subjects.profileId, profileId)
-      )
+        eq(subjects.profileId, profileId),
+      ),
     )
     .limit(1);
 
@@ -166,7 +182,7 @@ export async function extractHomeworkSummary(
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.profileId, profileId)
+      eq(sessionEvents.profileId, profileId),
     ),
     // [BUG-913 sweep] Tie-break by id when created_at collides — see
     // session-crud.ts getSessionTranscript for the full rationale.
@@ -176,7 +192,7 @@ export async function extractHomeworkSummary(
   const transcript = events
     .filter(
       (event) =>
-        event.eventType === 'user_message' || event.eventType === 'ai_response'
+        event.eventType === 'user_message' || event.eventType === 'ai_response',
     )
     .map((event) => {
       const role = event.eventType === 'user_message' ? 'Student' : 'Tutor';
@@ -217,7 +233,7 @@ export async function extractHomeworkSummary(
 export async function extractAndStoreHomeworkSummary(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<HomeworkSummary> {
   const summary = await extractHomeworkSummary(db, profileId, sessionId);
 
@@ -227,8 +243,8 @@ export async function extractAndStoreHomeworkSummary(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     )
     .limit(1);
 
@@ -246,8 +262,8 @@ export async function extractAndStoreHomeworkSummary(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     );
 
   return summary;

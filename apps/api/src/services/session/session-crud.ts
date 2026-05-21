@@ -61,7 +61,7 @@ import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
 import { clearSessionStaticContext } from './session-cache';
 import { projectAiResponseContent } from '../llm/project-response';
-import { routeAndCall } from '../llm';
+import { routeAndCall, extractFirstJsonObject } from '../llm';
 import type { ChatMessage } from '../llm';
 import { escapeXml } from '../llm/sanitize';
 import { createLogger } from '../logger';
@@ -314,9 +314,10 @@ function parseTopicIntentMatcherResponse(
   response: string,
 ): z.infer<typeof topicIntentMatcherResponseSchema> | null {
   try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
+    // [BUG-461] brace-depth walker replaces greedy regex
+    const jsonStr = extractFirstJsonObject(response);
+    if (!jsonStr) return null;
+    const parsed = JSON.parse(jsonStr);
     const result = topicIntentMatcherResponseSchema.safeParse(parsed);
     return result.success ? result.data : null;
   } catch {

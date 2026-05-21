@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
@@ -259,15 +260,27 @@ async function handleRenewal(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
-  const tier = extractTierFromProductId(event.product_id);
+  const eventTier = extractTierFromProductId(event.product_id);
 
-  // RENEWAL after a trial converts status to 'active' and clears trialEndsAt.
-  // This handles both trial-to-paid conversion and regular renewal.
+  // Read existing subscription to detect tier changes and preserve trialEndsAt.
+  // [BUG-453] Only pass tier to the update when it actually changed — RC can
+  // send RENEWAL for a different product, silently changing tier without going
+  // through PRODUCT_CHANGE.
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const tierChanged = eventTier !== null && existingSub?.tier !== eventTier;
+
+  // [BUG-453] RENEWAL during a trial period (period_type === 'TRIAL') must NOT
+  // clear trialEndsAt — the trial is still active. Only wipe it on conversion
+  // (period_type !== 'TRIAL').
+  const isTrial = event.period_type === 'TRIAL';
+
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
     status: 'active',
-    tier: tier ?? undefined,
+    // Only include tier when the event actually signals a different product tier.
+    // Omitting the key entirely prevents any DB write to the tier column.
+    ...(tierChanged && eventTier ? { tier: eventTier } : {}),
     currentPeriodStart: event.purchased_at_ms
       ? new Date(event.purchased_at_ms).toISOString()
       : undefined,
@@ -275,11 +288,14 @@ async function handleRenewal(
       ? new Date(event.expiration_at_ms).toISOString()
       : undefined,
     cancelledAt: null,
-    trialEndsAt: null, // Clear trial end date on conversion / renewal
+    // Preserve trialEndsAt during trial-period renewals by omitting it;
+    // clear it on conversion to active (period_type !== 'TRIAL').
+    ...(isTrial ? {} : { trialEndsAt: null }),
   });
 
-  if (updated && tier) {
-    const tierConfig = getTierConfig(tier);
+  // Only update quota pool when the tier actually changed.
+  if (updated && tierChanged && eventTier) {
+    const tierConfig = getTierConfig(eventTier);
     await updateQuotaPoolLimit(
       db,
       updated.id,
@@ -309,12 +325,20 @@ async function handleCancellation(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
+  // [BUG-445] If the sub was already past_due when the user cancelled, DO NOT
+  // flip it back to 'active' — that would erase the payment-failure signal.
+  // Only promote to 'active' when the current status is active or trial (still
+  // entitled). past_due stays past_due; cancelledAt records the intent.
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const targetStatus: SubscriptionStatus =
+    existingSub?.status === 'past_due' ? 'past_due' : 'active';
+
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
-    // Keep the entitlement active until period end so mobile can render the
-    // correct "Cancelling" state from cancelledAt + active status.
-    status: 'active' as SubscriptionStatus,
+    // Keep the entitlement active (or past_due) until period end so mobile can
+    // render the correct "Cancelling" state from cancelledAt + status.
+    status: targetStatus,
     cancelledAt: new Date().toISOString(),
   });
 
@@ -587,17 +611,29 @@ async function handleNonRenewingPurchase(
   const transactionId =
     event.store_transaction_id ?? event.transaction_id ?? null;
 
-  // Reject if no transaction ID — without it we cannot guarantee idempotency
-  // and webhook retries would grant duplicate credits.
+  // [BUG-451] Malformed payload (no transaction ID) → 200 so RevenueCat does
+  // NOT retry. Returning 400 guarantees ~3 days of retry spam because RC
+  // treats any non-2xx as transient. The payload is permanently malformed
+  // (both fields absent simultaneously is a provider-side bug, not a
+  // transient outage), so we ack, skip, and capture to Sentry for ops review.
   if (!transactionId) {
-    // [logging sweep] structured logger so PII fields land as JSON context
     logger.error('[revenuecat] NON_RENEWING_PURCHASE missing transaction ID', {
       eventId: event.id,
       productId: event.product_id,
     });
+    captureException(
+      new Error('RevenueCat NON_RENEWING_PURCHASE missing transaction ID'),
+      {
+        extra: {
+          eventId: event.id,
+          productId: event.product_id,
+          category: 'revenuecat.malformed_payload',
+        },
+      },
+    );
     return {
-      status: 400,
-      body: { received: false, error: 'Missing transaction ID' },
+      status: 200,
+      body: { received: true, skipped: 'missing_transaction_id' },
     };
   }
 
@@ -843,7 +879,7 @@ export const revenuecatWebhookRoute = new Hono<{
     case 'NON_RENEWING_PURCHASE': {
       const result = await handleNonRenewingPurchase(db, kv, event);
       if (result) {
-        return c.json(result.body, result.status as 400 | 403);
+        return c.json(result.body, result.status as ContentfulStatusCode);
       }
       break;
     }

@@ -878,4 +878,43 @@ describe('extractBookSuggestionJson', () => {
       ],
     });
   });
+
+  // [BUG-461] BREAK TEST: extractor returns ONLY the first object when the LLM
+  // returns two JSON blocks separated by prose. Greedy /\{[\s\S]*\}/ would
+  // concatenate both blocks into an ill-formed string.
+  it('[BUG-461] returns ONLY the first JSON object when two blocks are separated by prose', () => {
+    const first = JSON.stringify({
+      suggestions: [
+        { title: 'First', description: 'A', emoji: '📚', category: 'related' },
+      ],
+    });
+    const second = JSON.stringify({
+      suggestions: [
+        { title: 'Second', description: 'B', emoji: '📖', category: 'explore' },
+      ],
+    });
+    const response = `Here are the suggestions: ${first} Additionally, an alternative set: ${second}`;
+
+    const parsed = extractBookSuggestionJson(response) as {
+      suggestions: Array<{ title: string }>;
+    };
+
+    expect(parsed.suggestions).toHaveLength(1);
+    expect(parsed.suggestions[0]?.title).toBe('First');
+  });
+
+  it('[BUG-461] handles JSON inside markdown code fences', () => {
+    const response = [
+      'Sure, here are the book suggestions:',
+      '```json',
+      '{"suggestions":[{"title":"Fenced Book","description":"Wrapped in fences.","emoji":"📚","category":"explore"}]}',
+      '```',
+    ].join('\n');
+
+    const parsed = extractBookSuggestionJson(response) as {
+      suggestions: Array<{ title: string }>;
+    };
+
+    expect(parsed.suggestions[0]?.title).toBe('Fenced Book');
+  });
 });

@@ -106,6 +106,7 @@ const VALID_TRANSITIONS = new Set([
   'past_due->active',
   'past_due->cancelled',
   'past_due->expired', // Stripe customer.subscription.deleted while past_due
+  'cancelled->active', // [BUG-443] Stripe portal uncancel (cancel_at_period_end=false) reverses cancellation; payment_succeeded on a cancelled sub re-activates it
   'cancelled->expired',
 ]);
 

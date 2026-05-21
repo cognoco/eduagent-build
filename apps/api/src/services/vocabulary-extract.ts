@@ -1,6 +1,6 @@
 import { cefrLevelSchema } from '@eduagent/schemas';
 import { getLanguageByCode } from '../data/languages';
-import { routeAndCall, type ChatMessage } from './llm';
+import { routeAndCall, extractFirstJsonObject, type ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
@@ -34,7 +34,7 @@ Rules:
 export async function extractVocabularyFromTranscript(
   transcript: Array<{ role: 'user' | 'assistant'; content: string }>,
   languageCode: string,
-  cefrLevel?: string | null
+  cefrLevel?: string | null,
 ): Promise<ExtractedVocabularyItem[]> {
   const language = getLanguageByCode(languageCode);
   if (!language || transcript.length === 0) {
@@ -53,7 +53,7 @@ export async function extractVocabularyFromTranscript(
         `<transcript>\n${transcript
           .map(
             (entry) =>
-              `${entry.role.toUpperCase()}: ${escapeXml(entry.content)}`
+              `${entry.role.toUpperCase()}: ${escapeXml(entry.content)}`,
           )
           .join('\n')}\n</transcript>`,
       ]
@@ -64,12 +64,13 @@ export async function extractVocabularyFromTranscript(
 
   try {
     const result = await routeAndCall(messages, 1);
-    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // [BUG-461] brace-depth walker replaces greedy regex
+    const jsonStr = extractFirstJsonObject(result.response);
+    if (!jsonStr) {
       return [];
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as {
+    const parsed = JSON.parse(jsonStr) as {
       items?: Array<{
         term?: unknown;
         translation?: unknown;
@@ -81,7 +82,7 @@ export async function extractVocabularyFromTranscript(
     return (parsed.items ?? [])
       .filter(
         (
-          item
+          item,
         ): item is {
           term: string;
           translation: string;
@@ -92,7 +93,7 @@ export async function extractVocabularyFromTranscript(
           item.term.trim().length > 0 &&
           typeof item.translation === 'string' &&
           item.translation.trim().length > 0 &&
-          (item.type === 'word' || item.type === 'chunk')
+          (item.type === 'word' || item.type === 'chunk'),
       )
       .slice(0, 8)
       .map((item) => {

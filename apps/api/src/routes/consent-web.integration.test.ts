@@ -511,3 +511,94 @@ describe('POST /v1/consent-page/confirm', () => {
     expect([404, 500]).toContain(res2.status);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Suite 4: Rate limiting on POST /consent-page/confirm [BUG-491]
+// ---------------------------------------------------------------------------
+
+// [BUG-491] Break test: /consent-page/confirm must apply the same 30/hr
+// IP-based rate limit as /consent/respond. Without the limit, an attacker
+// with a leaked or guessed token can hammer the destructive cascade-delete
+// denial path, causing DoS on the DB and bypassing defense-in-depth.
+//
+// This test exercises only the in-memory rate-limit guard — DB is not needed
+// because the 429 fires before any DB call. We use jest.requireActual to
+// access __resetConsentRespondRateLimit without introducing a jest.mock
+// (GC1/GC6 compliant).
+describe('POST /v1/consent-page/confirm — rate limiting [BUG-491]', () => {
+  beforeEach(() => {
+    // Reset the shared sliding-window map so counts don't bleed between tests.
+    const { __resetConsentRespondRateLimit } = jest.requireActual(
+      './consent',
+    ) as { __resetConsentRespondRateLimit: () => void };
+    __resetConsentRespondRateLimit();
+  });
+
+  it('allows the first 30 attempts and blocks the 31st with 429 + Retry-After', async () => {
+    const ip = '203.0.113.42';
+    const headers = { 'cf-connecting-ip': ip };
+
+    // First 30 attempts against a nonexistent token get 404 "Link Expired"
+    // (processConsentResponse throws → caught → 404), not 429.
+    // This proves rate limiting is NOT yet active for requests 1-30.
+    for (let i = 0; i < 30; i++) {
+      const res = await app.request(
+        '/v1/consent-page/confirm',
+        {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            token: 'nonexistent-token-for-rate-limit-test',
+            approved: 'true',
+          }).toString(),
+        },
+        ENV,
+      );
+      // Expect 404 (not 429) — rate limiter has not tripped yet
+      expect(res.status).toBe(404);
+    }
+
+    // 31st request from the same IP must be rate-limited BEFORE hitting the DB
+    const blocked = await app.request(
+      '/v1/consent-page/confirm',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          token: 'nonexistent-token-for-rate-limit-test',
+          approved: 'true',
+        }).toString(),
+      },
+      ENV,
+    );
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('3600');
+    const html = await blocked.text();
+    expect(html).toContain('Too many requests');
+
+    // A different IP must NOT be affected — limiter is per-IP
+    const otherRes = await app.request(
+      '/v1/consent-page/confirm',
+      {
+        method: 'POST',
+        headers: {
+          'cf-connecting-ip': '198.51.100.99',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          token: 'nonexistent-token-for-rate-limit-test',
+          approved: 'true',
+        }).toString(),
+      },
+      ENV,
+    );
+    // Different IP: reaches the handler → 404 (not 429)
+    expect(otherRes.status).toBe(404);
+  });
+});

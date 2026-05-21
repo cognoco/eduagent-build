@@ -4,22 +4,15 @@ import {
   profiles,
   sessionSummaries,
 } from '@eduagent/database';
-import type { LlmSummary } from '@eduagent/schemas';
+import { NonRetriableError } from 'inngest';
+import type { LlmSummary, SummaryEventPayload } from '@eduagent/schemas';
+import { summaryEventPayloadSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import { generateLearnerRecap } from '../../services/session-recap';
 import { captureException } from '../../services/sentry';
-
-interface SummaryEventPayload {
-  profileId: string;
-  sessionId: string;
-  timestamp: string;
-  subjectId?: string | null;
-  topicId?: string | null;
-  sessionSummaryId?: string;
-}
 
 function buildSummaryGeneratedEvent(
   payload: SummaryEventPayload,
@@ -145,10 +138,23 @@ export const sessionSummaryCreate = inngest.createFunction(
   {
     id: 'session-summary-create',
     name: 'Create and generate a missing session summary',
+    // [FIX-428] Idempotency: duplicate app/session.summary.create events (daily
+    // reconciliation cron re-fires, operator replay) dedup within 24 h so only
+    // one execution runs per sessionId — prevents a second LLM call burning
+    // tokens for an already-created summary.
+    idempotency: 'event.data.sessionId',
   },
   { event: 'app/session.summary.create' },
   async ({ event, step }) => {
-    const payload = event.data as SummaryEventPayload;
+    // [FIX-428] Validate payload at function entry so a malformed event throws
+    // NonRetriableError and never enters the retry queue.
+    const parsed = summaryEventPayloadSchema.safeParse(event.data);
+    if (!parsed.success) {
+      throw new NonRetriableError(
+        `[session-summary-create] invalid payload: ${parsed.error.message}`,
+      );
+    }
+    const payload: SummaryEventPayload = parsed.data;
 
     const result = await step.run('create-summary', async () => {
       const db = getStepDatabase();
@@ -205,10 +211,21 @@ export const sessionSummaryRegenerate = inngest.createFunction(
   {
     id: 'session-summary-regenerate',
     name: 'Regenerate an existing session llm summary',
+    // [SWEEP-428] Same idempotency guard applied across all three summary
+    // handlers — dedup on sessionId within 24 h prevents duplicate LLM calls
+    // from reconciliation-cron fan-out.
+    idempotency: 'event.data.sessionId',
   },
   { event: 'app/session.summary.regenerate' },
   async ({ event, step }) => {
-    const payload = event.data as SummaryEventPayload;
+    // [SWEEP-428] Validate payload at function entry.
+    const parsed = summaryEventPayloadSchema.safeParse(event.data);
+    if (!parsed.success) {
+      throw new NonRetriableError(
+        `[session-summary-regenerate] invalid payload: ${parsed.error.message}`,
+      );
+    }
+    const payload: SummaryEventPayload = parsed.data;
 
     const result = await step.run('regenerate-summary', async () => {
       const db = getStepDatabase();
@@ -255,10 +272,23 @@ export const learnerRecapRegenerate = inngest.createFunction(
     id: 'session-learner-recap-regenerate',
     name: 'Regenerate a missing learner recap',
     retries: 3,
+    // [FIX-429] Idempotency: duplicate app/session.learner-recap.regenerate
+    // events (daily reconciliation cron re-fires, operator replay) dedup within
+    // 24 h so only one execution runs per sessionId — prevents a second LLM
+    // recap call burning tokens for an already-regenerated recap.
+    idempotency: 'event.data.sessionId',
   },
   { event: 'app/session.learner-recap.regenerate' },
   async ({ event, step }) => {
-    const payload = event.data as SummaryEventPayload;
+    // [FIX-429] Validate payload at function entry so a malformed event throws
+    // NonRetriableError and never enters the retry queue.
+    const parsed = summaryEventPayloadSchema.safeParse(event.data);
+    if (!parsed.success) {
+      throw new NonRetriableError(
+        `[session-learner-recap-regenerate] invalid payload: ${parsed.error.message}`,
+      );
+    }
+    const payload: SummaryEventPayload = parsed.data;
 
     return step.run('regenerate-learner-recap', async () => {
       try {

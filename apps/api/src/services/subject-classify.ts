@@ -6,7 +6,7 @@
 
 import type { SubjectClassifyResult } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
-import { routeAndCall } from './llm';
+import { routeAndCall, extractFirstJsonObject } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { listSubjects } from './subject';
@@ -123,9 +123,10 @@ export async function classifySubject(
         ],
         1, // Rung 1 = Gemini Flash (fast/cheap)
       );
-      const jsonMatch = suggestResult.response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      // [BUG-461] brace-depth walker replaces greedy regex
+      const jsonStr = extractFirstJsonObject(suggestResult.response);
+      if (jsonStr) {
+        const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
         const suggested =
           typeof parsed.suggestedSubjectName === 'string' &&
           parsed.suggestedSubjectName.trim()
@@ -198,8 +199,9 @@ export async function classifySubject(
   try {
     const result = await routeAndCall(messages, 1); // Rung 1 = Gemini Flash (fast/cheap)
 
-    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // [BUG-461] brace-depth walker replaces greedy regex
+    const jsonStr = extractFirstJsonObject(result.response);
+    if (!jsonStr) {
       return {
         candidates: [],
         needsConfirmation: true,
@@ -207,7 +209,7 @@ export async function classifySubject(
       };
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
     const rawMatches = Array.isArray(parsed.matches) ? parsed.matches : [];
     const matches: Array<{ subjectName: string; confidence: number }> =
       rawMatches.filter(

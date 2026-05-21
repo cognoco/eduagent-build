@@ -138,6 +138,55 @@ describe('parseHomeworkSummaryResponse', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// [BUG-479] BREAK TEST: extractor handles markdown fences + JSON
+// ---------------------------------------------------------------------------
+
+describe('parseHomeworkSummaryResponse — [BUG-479] extractFirstJsonObject', () => {
+  it('succeeds when LLM returns JSON inside markdown code fences', () => {
+    const fallback = {
+      problemCount: 0,
+      practicedSkills: [],
+      independentProblemCount: 0,
+      guidedProblemCount: 0,
+      summary: 'Homework session completed.',
+      displayTitle: 'Homework',
+    };
+
+    const fencedResponse = [
+      '```json',
+      '{"problemCount":3,"practicedSkills":["fractions"],"independentProblemCount":2,"guidedProblemCount":1,"summary":"3 problems completed.","displayTitle":"Math Homework"}',
+      '```',
+    ].join('\n');
+
+    const result = parseHomeworkSummaryResponse(fencedResponse, fallback);
+    expect(result.problemCount).toBe(3);
+    expect(result.practicedSkills).toEqual(['fractions']);
+    expect(result.summary).toBe('3 problems completed.');
+  });
+
+  it('succeeds when LLM appends commentary after JSON', () => {
+    const fallback = {
+      problemCount: 0,
+      practicedSkills: [],
+      independentProblemCount: 0,
+      guidedProblemCount: 0,
+      summary: 'Homework session completed.',
+      displayTitle: 'Homework',
+    };
+
+    const responseWithCommentary =
+      '{"problemCount":2,"practicedSkills":["algebra"],"independentProblemCount":1,"guidedProblemCount":1,"summary":"2 problems.","displayTitle":"Algebra Homework"} Let me know if you need anything else!';
+
+    const result = parseHomeworkSummaryResponse(
+      responseWithCommentary,
+      fallback,
+    );
+    expect(result.problemCount).toBe(2);
+    expect(result.summary).toBe('2 problems.');
+  });
+});
+
 describe('extractHomeworkSummary', () => {
   beforeEach(() => {
     jest.clearAllMocks();

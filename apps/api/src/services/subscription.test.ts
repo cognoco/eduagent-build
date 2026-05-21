@@ -102,6 +102,17 @@ describe('isValidTransition', () => {
     expect(isValidTransition('cancelled', 'expired')).toBe(true);
   });
 
+  // [BUG-443] BREAK TEST: Stripe portal uncancel (cancel_at_period_end=false)
+  // reverses a cancellation, emitting customer.subscription.updated with
+  // status='active'. payment_succeeded on a cancelled sub also re-activates.
+  // Pre-fix, 'cancelled->active' was missing from VALID_TRANSITIONS so
+  // updateSubscriptionFromWebhook would throw, leaving the user paying but
+  // stuck in cancelled with lastStripeEventTimestamp NOT updated — the next
+  // event re-processes indefinitely. Post-fix the transition is valid.
+  it('[BUG-443] allows cancelled -> active (Stripe portal uncancel / payment_succeeded)', () => {
+    expect(isValidTransition('cancelled', 'active')).toBe(true);
+  });
+
   it('rejects expired -> anything (terminal state)', () => {
     expect(isValidTransition('expired', 'active')).toBe(false);
     expect(isValidTransition('expired', 'trial')).toBe(false);

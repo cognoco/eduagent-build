@@ -839,6 +839,51 @@ describe('invoice.payment_succeeded', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
+  // [BUG-443] BREAK TEST: payment_succeeded on a cancelled subscription must
+  // flip status to 'active' AND update lastStripeEventTimestamp. Pre-fix,
+  // 'cancelled->active' was not in VALID_TRANSITIONS so updateSubscriptionFromWebhook
+  // threw, leaving the user paying but stuck in 'cancelled' with
+  // lastStripeEventTimestamp NOT updated — every subsequent event re-processed
+  // indefinitely. Post-fix the transition is valid. Reverting the
+  // 'cancelled->active' addition to VALID_TRANSITIONS makes this test fail.
+  it('[BUG-443] payment_succeeded on cancelled sub flips to active and updates timestamp', async () => {
+    // updateSubscriptionFromWebhook uses the real isValidTransition from
+    // subscription.ts (pattern-a mock spreads requireActual). Return a
+    // cancelled subscription row so the handler encounters 'cancelled->active'.
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({ status: 'active' }),
+    );
+
+    const invoice = makeInvoice();
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('invoice.payment_succeeded', invoice),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    // updateSubscriptionFromWebhook must be called with status: 'active'
+    // and a lastStripeEventTimestamp (proves the timestamp was updated).
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'sub_stripe_123',
+      expect.objectContaining({
+        status: 'active',
+        lastStripeEventTimestamp: expect.any(String),
+      }),
+    );
+    // KV cache must also be refreshed
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
   // [ultrareview finding] If Stripe SDK v21 (or later) refactors the invoice
   // payload again, extractSubscriptionIdFromInvoice() returns undefined and
   // we silently skip re-activating the subscription — stuck in past_due with
