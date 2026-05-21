@@ -75,7 +75,7 @@ describe('Integration: CORS middleware', () => {
             'Access-Control-Request-Headers': 'Authorization, Content-Type',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBeLessThan(400);
@@ -93,7 +93,7 @@ describe('Integration: CORS middleware', () => {
             'Access-Control-Request-Headers': 'Authorization',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBeLessThan(400);
@@ -110,7 +110,7 @@ describe('Integration: CORS middleware', () => {
             'Access-Control-Request-Method': 'POST',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
@@ -126,7 +126,7 @@ describe('Integration: CORS middleware', () => {
             'Access-Control-Request-Method': 'POST',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const methods = res.headers.get('Access-Control-Allow-Methods') ?? '';
@@ -147,7 +147,7 @@ describe('Integration: CORS middleware', () => {
               'Authorization, Content-Type, X-Profile-Id',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const allowed = (
@@ -156,6 +156,29 @@ describe('Integration: CORS middleware', () => {
       expect(allowed).toContain('authorization');
       expect(allowed).toContain('content-type');
       expect(allowed).toContain('x-profile-id');
+    });
+
+    it('does not expose app mode as an API-owned request header', async () => {
+      const res = await app.request(
+        '/v1/dashboard',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'GET',
+            'Access-Control-Request-Headers':
+              'Authorization, Content-Type, X-Profile-Id, X-App-Mode',
+          },
+        },
+        TEST_ENV,
+      );
+
+      const allowed = (
+        res.headers.get('Access-Control-Allow-Headers') ?? ''
+      ).toLowerCase();
+      expect(allowed).toContain('authorization');
+      expect(allowed).toContain('x-profile-id');
+      expect(allowed).not.toContain('x-app-mode');
     });
 
     it('includes Access-Control-Allow-Credentials', async () => {
@@ -168,7 +191,7 @@ describe('Integration: CORS middleware', () => {
             'Access-Control-Request-Method': 'POST',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
@@ -188,12 +211,12 @@ describe('Integration: CORS middleware', () => {
             'Access-Control-Request-Headers': 'Authorization, Content-Type',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBeLessThan(400);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
-        'http://localhost:8081'
+        'http://localhost:8081',
       );
     });
   });
@@ -205,12 +228,12 @@ describe('Integration: CORS middleware', () => {
         {
           headers: { Origin: 'http://localhost:8081' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
-        'http://localhost:8081'
+        'http://localhost:8081',
       );
     });
   });
