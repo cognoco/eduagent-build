@@ -149,7 +149,7 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - name: Enable pgvector extension
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
@@ -201,7 +201,7 @@ jobs:
       NX_ISOLATE_PLUGINS: false
       # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
       # Clerk publishable key is needed for auth screens to render.
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -237,7 +237,7 @@ jobs:
       # same posture as ci.yml + deploy.yml. Run from the package directory
       # so drizzle-kit resolves @neondatabase/serverless via the package's
       # own node_modules (pnpm strict isolation otherwise hides it).
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - name: Enable pgvector extension
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
@@ -255,7 +255,7 @@ jobs:
 
       - name: Install (hoisted for native build)
         if: steps.apk-cache.outputs.cache-hit != 'true'
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       # Build workspace deps that the mobile app imports at prebuild time
       - name: Build schemas package

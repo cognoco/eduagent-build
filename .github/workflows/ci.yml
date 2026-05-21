@@ -96,7 +96,7 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       # Enable pgvector extension before schema push (embeddings table uses vector type)
       - name: Enable pgvector extension
