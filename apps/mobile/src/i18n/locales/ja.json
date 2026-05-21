@@ -418,26 +418,26 @@
   },
   "session": {
     "challenge": {
-      "offerTitle": "Up for a challenge round?",
-      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
-      "tryIt": "Try it",
-      "notNow": "Not now",
-      "dontAskAgain": "Don't ask again",
+      "offerTitle": "チャレンジラウンドに挑戦しますか？",
+      "offerBody": "基礎はできています — 自分の言葉で説明してノートにまとめてみましょう。",
+      "tryIt": "やってみる",
+      "notNow": "今はやめておく",
+      "dontAskAgain": "もう聞かない",
       "banner": {
-        "active": "Challenge round in progress",
+        "active": "チャレンジラウンド進行中",
         "question": "Question {{index}} of {{total}}"
       },
       "draft": {
-        "title": "Here's what you know now",
-        "save": "Save note",
-        "edit": "Edit first",
-        "skip": "Skip"
+        "title": "今わかっていること",
+        "save": "ノートを保存",
+        "edit": "まず編集する",
+        "skip": "スキップ"
       },
       "partial": {
-        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
+        "body": "しっかり理解している部分があります。それを保存しておきます — 残りは次回取り組みましょう。"
       },
       "allMissing": {
-        "body": "Let's revisit this together first."
+        "body": "まず一緒に確認しましょう。"
       }
     },
     "mentorMemory": {
@@ -1046,13 +1046,14 @@
       "relatedRail": {
         "label": "関連トピック"
       }
-    }
+    },
+    "urgencyBadge": "もうすぐ: {{reason}}"
   },
   "topic": {
     "relevance": {
-      "recommended": "Recommended",
-      "contemporary": "Contemporary",
-      "emerging": "Emerging"
+      "recommended": "おすすめ",
+      "contemporary": "現代的",
+      "emerging": "注目のトピック"
     },
     "recallTest": {
       "title": "記憶チェック",
@@ -1507,16 +1508,16 @@
       "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
     },
     "thisWeek": {
-      "title": "This week"
+      "title": "今週"
     },
     "recallQueue": {
-      "title": "Recall queue",
-      "due_one": "{{count}} due",
-      "due_other": "{{count}} due",
-      "strong_one": "{{count}} strong",
-      "strong_other": "{{count}} strong",
-      "fading_one": "{{count}} fading",
-      "fading_other": "{{count}} fading"
+      "title": "復習キュー",
+      "due_one": "{{count}}件期限",
+      "due_other": "{{count}}件期限",
+      "strong_one": "{{count}}件しっかり習得",
+      "strong_other": "{{count}}件しっかり習得",
+      "fading_one": "{{count}}件復習の準備完了",
+      "fading_other": "{{count}}件復習の準備完了"
     },
     "weeklyDelta": {
       "topicsMastered": "+{{count}} topic this week",
@@ -1747,7 +1748,8 @@
       "nudgeA11y": "{{name}}さんにリマインダーを送信",
       "viewAllReports": "すべてのレポートを表示",
       "subjectsTitle": "科目"
-    }
+    },
+    "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} トピック習得済み"
   },
   "onboarding": {
     "common": {

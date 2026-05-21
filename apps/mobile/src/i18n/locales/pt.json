@@ -443,26 +443,26 @@
   },
   "session": {
     "challenge": {
-      "offerTitle": "Up for a challenge round?",
-      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
-      "tryIt": "Try it",
-      "notNow": "Not now",
-      "dontAskAgain": "Don't ask again",
+      "offerTitle": "Pronto para uma rodada de desafio?",
+      "offerBody": "Você já tem a base — quer tentar explicar com suas próprias palavras e transformar em uma nota?",
+      "tryIt": "Tentar",
+      "notNow": "Agora não",
+      "dontAskAgain": "Não perguntar mais",
       "banner": {
-        "active": "Challenge round in progress",
+        "active": "Rodada de desafio em andamento",
         "question": "Question {{index}} of {{total}}"
       },
       "draft": {
-        "title": "Here's what you know now",
-        "save": "Save note",
-        "edit": "Edit first",
-        "skip": "Skip"
+        "title": "Isso é o que você sabe agora",
+        "save": "Salvar nota",
+        "edit": "Editar primeiro",
+        "skip": "Pular"
       },
       "partial": {
-        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
+        "body": "Você tem as partes sólidas. Vou salvá-las — trabalhamos no resto na próxima vez."
       },
       "allMissing": {
-        "body": "Let's revisit this together first."
+        "body": "Vamos revisar isso juntos primeiro."
       }
     },
     "mentorMemory": {
@@ -1071,13 +1071,14 @@
       "relatedRail": {
         "label": "Tópicos relacionados"
       }
-    }
+    },
+    "urgencyBadge": "Em breve: {{reason}}"
   },
   "topic": {
     "relevance": {
-      "recommended": "Recommended",
-      "contemporary": "Contemporary",
-      "emerging": "Emerging"
+      "recommended": "Recomendado",
+      "contemporary": "Contemporâneo",
+      "emerging": "Emergente"
     },
     "recallTest": {
       "title": "Verificação de Memória",
@@ -1532,16 +1533,16 @@
       "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
     },
     "thisWeek": {
-      "title": "This week"
+      "title": "Esta semana"
     },
     "recallQueue": {
-      "title": "Recall queue",
-      "due_one": "{{count}} due",
-      "due_other": "{{count}} due",
-      "strong_one": "{{count}} strong",
-      "strong_other": "{{count}} strong",
-      "fading_one": "{{count}} fading",
-      "fading_other": "{{count}} fading"
+      "title": "Fila de revisão",
+      "due_one": "{{count}} pendente",
+      "due_other": "{{count}} pendentes",
+      "strong_one": "{{count}} bem aprendido",
+      "strong_other": "{{count}} bem aprendidos",
+      "fading_one": "{{count}} pronto para revisar",
+      "fading_other": "{{count}} prontos para revisar"
     },
     "weeklyDelta": {
       "topicsMastered": "+{{count}} topic this week",
@@ -1772,7 +1773,8 @@
       "nudgeA11y": "Enviar um incentivo para {{name}}",
       "viewAllReports": "Ver todos os relatórios",
       "subjectsTitle": "Matérias"
-    }
+    },
+    "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} tópicos dominados"
   },
   "onboarding": {
     "common": {

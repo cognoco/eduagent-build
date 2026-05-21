@@ -443,26 +443,26 @@
   },
   "session": {
     "challenge": {
-      "offerTitle": "Up for a challenge round?",
-      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
-      "tryIt": "Try it",
-      "notNow": "Not now",
-      "dontAskAgain": "Don't ask again",
+      "offerTitle": "Gotowy na rundę wyzwań?",
+      "offerBody": "Masz już podstawy — chcesz spróbować wyjaśnić to własnymi słowami i zamienić w notatkę?",
+      "tryIt": "Spróbuj",
+      "notNow": "Nie teraz",
+      "dontAskAgain": "Nie pytaj więcej",
       "banner": {
-        "active": "Challenge round in progress",
+        "active": "Runda wyzwań w toku",
         "question": "Question {{index}} of {{total}}"
       },
       "draft": {
-        "title": "Here's what you know now",
-        "save": "Save note",
-        "edit": "Edit first",
-        "skip": "Skip"
+        "title": "To wiesz teraz",
+        "save": "Zapisz notatkę",
+        "edit": "Najpierw edytuj",
+        "skip": "Pomiń"
       },
       "partial": {
-        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
+        "body": "Masz mocne fragmenty. Zapiszę je — resztą zajmiemy się następnym razem."
       },
       "allMissing": {
-        "body": "Let's revisit this together first."
+        "body": "Najpierw przejdźmy przez to razem."
       }
     },
     "mentorMemory": {
@@ -1071,13 +1071,14 @@
       "relatedRail": {
         "label": "Powiązane tematy"
       }
-    }
+    },
+    "urgencyBadge": "Wkrótce: {{reason}}"
   },
   "topic": {
     "relevance": {
-      "recommended": "Recommended",
-      "contemporary": "Contemporary",
-      "emerging": "Emerging"
+      "recommended": "Polecane",
+      "contemporary": "Aktualne",
+      "emerging": "Wschodzące"
     },
     "recallTest": {
       "title": "Sprawdzian pamięci",
@@ -1532,16 +1533,16 @@
       "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
     },
     "thisWeek": {
-      "title": "This week"
+      "title": "W tym tygodniu"
     },
     "recallQueue": {
-      "title": "Recall queue",
-      "due_one": "{{count}} due",
-      "due_other": "{{count}} due",
-      "strong_one": "{{count}} strong",
-      "strong_other": "{{count}} strong",
-      "fading_one": "{{count}} fading",
-      "fading_other": "{{count}} fading"
+      "title": "Kolejka powtórek",
+      "due_one": "{{count}} zaległe",
+      "due_other": "{{count}} zaległych",
+      "strong_one": "{{count}} dobrze opanowany",
+      "strong_other": "{{count}} dobrze opanowanych",
+      "fading_one": "{{count}} gotowy do powtórki",
+      "fading_other": "{{count}} gotowych do powtórki"
     },
     "weeklyDelta": {
       "topicsMastered": "+{{count}} topic this week",
@@ -1772,7 +1773,8 @@
       "nudgeA11y": "Wyślij {{name}} zachętę",
       "viewAllReports": "Zobacz wszystkie raporty",
       "subjectsTitle": "Przedmioty"
-    }
+    },
+    "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} tematów opanowanych"
   },
   "onboarding": {
     "common": {

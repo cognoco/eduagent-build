@@ -418,26 +418,26 @@
   },
   "session": {
     "challenge": {
-      "offerTitle": "Up for a challenge round?",
-      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
-      "tryIt": "Try it",
-      "notNow": "Not now",
-      "dontAskAgain": "Don't ask again",
+      "offerTitle": "Bereit für eine Übungsrunde?",
+      "offerBody": "Du hast die Grundlagen — möchtest du versuchen, es mit eigenen Worten zu erklären und daraus eine Notiz zu machen?",
+      "tryIt": "Ausprobieren",
+      "notNow": "Nicht jetzt",
+      "dontAskAgain": "Nicht mehr fragen",
       "banner": {
-        "active": "Challenge round in progress",
+        "active": "Übungsrunde läuft",
         "question": "Question {{index}} of {{total}}"
       },
       "draft": {
-        "title": "Here's what you know now",
-        "save": "Save note",
-        "edit": "Edit first",
-        "skip": "Skip"
+        "title": "Das weißt du jetzt",
+        "save": "Notiz speichern",
+        "edit": "Zuerst bearbeiten",
+        "skip": "Überspringen"
       },
       "partial": {
-        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
+        "body": "Du hast die starken Teile. Ich speichere sie — wir arbeiten beim nächsten Mal am Rest."
       },
       "allMissing": {
-        "body": "Let's revisit this together first."
+        "body": "Lass uns das zuerst gemeinsam durchgehen."
       }
     },
     "mentorMemory": {
@@ -1046,13 +1046,14 @@
       "relatedRail": {
         "label": "Verwandte Themen"
       }
-    }
+    },
+    "urgencyBadge": "Bald: {{reason}}"
   },
   "topic": {
     "relevance": {
-      "recommended": "Recommended",
-      "contemporary": "Contemporary",
-      "emerging": "Emerging"
+      "recommended": "Empfohlen",
+      "contemporary": "Zeitgemäß",
+      "emerging": "Aufkommend"
     },
     "recallTest": {
       "title": "Wissens-Check",
@@ -1507,16 +1508,16 @@
       "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} topics mastered"
     },
     "thisWeek": {
-      "title": "This week"
+      "title": "Diese Woche"
     },
     "recallQueue": {
-      "title": "Recall queue",
-      "due_one": "{{count}} due",
-      "due_other": "{{count}} due",
-      "strong_one": "{{count}} strong",
-      "strong_other": "{{count}} strong",
-      "fading_one": "{{count}} fading",
-      "fading_other": "{{count}} fading"
+      "title": "Wiederholungswarteschlange",
+      "due_one": "{{count}} fällig",
+      "due_other": "{{count}} fällig",
+      "strong_one": "{{count}} gut gelernt",
+      "strong_other": "{{count}} gut gelernt",
+      "fading_one": "{{count}} bereit zur Wiederholung",
+      "fading_other": "{{count}} bereit zur Wiederholung"
     },
     "weeklyDelta": {
       "topicsMastered": "+{{count}} topic this week",
@@ -1747,7 +1748,8 @@
       "nudgeA11y": "{{name}} einen Anstupser senden",
       "viewAllReports": "Alle Berichte ansehen",
       "subjectsTitle": "Fächer"
-    }
+    },
+    "topicsMasteredOfAttempted": "{{mastered}}/{{attempted}} Themen gemeistert"
   },
   "onboarding": {
     "common": {
