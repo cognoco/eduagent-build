@@ -75,7 +75,7 @@ function isCI() {
     (v) =>
       process.env[v] === 'true' ||
       process.env[v] === '1' ||
-      (v !== 'CI' && process.env[v] !== undefined)
+      (v !== 'CI' && process.env[v] !== undefined),
   );
 }
 
@@ -94,7 +94,7 @@ function isDopplerConfigured() {
     {
       stdio: 'pipe',
       shell: true,
-    }
+    },
   );
   return result.status === 0 && result.stdout.toString().trim() !== '';
 }
@@ -107,7 +107,7 @@ function downloadSecrets(config) {
         encoding: 'utf-8',
         shell: true,
         stdio: ['pipe', 'pipe', 'pipe'],
-      }
+      },
     );
   } catch {
     return null;
@@ -118,7 +118,7 @@ function downloadSecretsJson(config) {
   try {
     const raw = execSync(
       `doppler secrets download --config ${config} --no-file --format json`,
-      { encoding: 'utf-8', shell: true, stdio: ['pipe', 'pipe', 'pipe'] }
+      { encoding: 'utf-8', shell: true, stdio: ['pipe', 'pipe', 'pipe'] },
     );
     return JSON.parse(raw);
   } catch {
@@ -146,6 +146,18 @@ const EAS_PROFILE_MAP = {
 // Non-EXPO_PUBLIC_* vars that should also be synced into eas.json env blocks
 const EAS_EXTRA_VARS = ['SENTRY_DISABLE_AUTO_UPLOAD'];
 
+// Secrets that must NEVER be written to committed eas.json (BUG-235 / BUG-345).
+// EAS Build pulls these from EAS Environment Variables at build time instead
+// (set via 'eas env:create' — see docs/deployment-and-secrets.md).
+// Filter applies to both Doppler-pulled secrets AND pre-existing entries, so
+// legacy values get stripped on next run.
+const EAS_JSON_DENYLIST = [
+  'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY',
+  'EXPO_PUBLIC_SENTRY_DSN',
+  'EXPO_PUBLIC_REVENUECAT_API_KEY_IOS',
+  'EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID',
+];
+
 /**
  * Downloads EXPO_PUBLIC_* vars from all Doppler configs (dev/stg/prd)
  * and merges them into the corresponding eas.json build profile env blocks.
@@ -157,7 +169,7 @@ function updateEasJson() {
 
   if (!fs.existsSync(easPath)) {
     console.log(
-      '\x1b[33m[Doppler]\x1b[0m Skipping eas.json update (file not found)'
+      '\x1b[33m[Doppler]\x1b[0m Skipping eas.json update (file not found)',
     );
     return;
   }
@@ -168,13 +180,13 @@ function updateEasJson() {
     easConfig = JSON.parse(raw);
   } catch (err) {
     console.log(
-      `\x1b[31m[Doppler]\x1b[0m Failed to parse eas.json: ${err.message}`
+      `\x1b[31m[Doppler]\x1b[0m Failed to parse eas.json: ${err.message}`,
     );
     return;
   }
 
   console.log(
-    '\x1b[36m[Doppler]\x1b[0m Syncing EXPO_PUBLIC_* vars to eas.json...'
+    '\x1b[36m[Doppler]\x1b[0m Syncing EXPO_PUBLIC_* vars to eas.json...',
   );
 
   if (!easConfig.build) {
@@ -192,15 +204,20 @@ function updateEasJson() {
     if (!secrets) {
       console.log(
         `\x1b[33m[Doppler]\x1b[0m   Skipping ${profiles.join(', ')} ` +
-          `(cannot access Doppler config "${envKey}")`
+          `(cannot access Doppler config "${envKey}")`,
       );
       skippedCount++;
       continue;
     }
 
-    // Filter to EXPO_PUBLIC_* + allowlisted vars, skip empty values
+    // Filter to EXPO_PUBLIC_* + allowlisted vars, skip empty values.
+    // EAS_JSON_DENYLIST keys are secrets and must NEVER be written to committed
+    // eas.json — they come from EAS Environment Variables at build time.
     const managedVars = {};
     for (const [key, value] of Object.entries(secrets)) {
+      if (EAS_JSON_DENYLIST.includes(key)) {
+        continue;
+      }
       if (key.startsWith('EXPO_PUBLIC_') || EAS_EXTRA_VARS.includes(key)) {
         if (value !== '') {
           managedVars[key] = value;
@@ -220,8 +237,12 @@ function updateEasJson() {
       const existingEnv = easConfig.build[profileName].env || {};
       const mergedEnv = {};
 
-      // Keep any vars not managed by this script
+      // Keep any vars not managed by this script, but strip denylisted
+      // secrets so legacy entries get removed on next sync (BUG-235/345).
       for (const [key, value] of Object.entries(existingEnv)) {
+        if (EAS_JSON_DENYLIST.includes(key)) {
+          continue;
+        }
         if (!key.startsWith('EXPO_PUBLIC_') && !EAS_EXTRA_VARS.includes(key)) {
           mergedEnv[key] = value;
         }
@@ -242,7 +263,7 @@ function updateEasJson() {
 
       console.log(
         `\x1b[32m[Doppler]\x1b[0m   ${profileName} \u2190 ${envKey}: ` +
-          `${varCount} vars synced`
+          `${varCount} vars synced`,
       );
       updatedCount++;
     }
@@ -251,7 +272,7 @@ function updateEasJson() {
   if (updatedCount === 0) {
     console.log(
       '\x1b[33m[Doppler]\x1b[0m   No eas.json profiles updated ' +
-        '(could not access any Doppler configs)'
+        '(could not access any Doppler configs)',
     );
     return;
   }
@@ -263,7 +284,7 @@ function updateEasJson() {
   const existing = fs.readFileSync(easPath, 'utf-8');
   if (output === existing) {
     console.log(
-      '\x1b[90m[Doppler]\x1b[0m   eas.json unchanged \u2014 no write needed'
+      '\x1b[90m[Doppler]\x1b[0m   eas.json unchanged \u2014 no write needed',
     );
     return;
   }
@@ -271,18 +292,18 @@ function updateEasJson() {
   fs.writeFileSync(easPath, output, 'utf-8');
   console.log(
     `\x1b[32m[Doppler]\x1b[0m   eas.json updated ` +
-      `(${updatedCount} profiles, ${skippedCount} skipped)`
+      `(${updatedCount} profiles, ${skippedCount} skipped)`,
   );
 }
 
 function main() {
   console.log(
-    '\n\x1b[36m\x1b[1m[Doppler]\x1b[0m Setting up local environment...\n'
+    '\n\x1b[36m\x1b[1m[Doppler]\x1b[0m Setting up local environment...\n',
   );
 
   if (isCI()) {
     console.log(
-      '\x1b[33m[Doppler]\x1b[0m Skipping env generation (CI environment)\n'
+      '\x1b[33m[Doppler]\x1b[0m Skipping env generation (CI environment)\n',
     );
     process.exit(0);
   }
@@ -293,7 +314,7 @@ function main() {
     console.log('   1. Install CLI: https://docs.doppler.com/docs/install-cli');
     console.log('   2. Run: doppler login');
     console.log(
-      '   3. Run: doppler setup  (select project: mentomate, config: dev)'
+      '   3. Run: doppler setup  (select project: mentomate, config: dev)',
     );
     console.log('   4. Run: pnpm env:sync\n');
     process.exit(0);
@@ -301,10 +322,10 @@ function main() {
 
   if (!isDopplerConfigured()) {
     console.log(
-      '\x1b[33m[Doppler]\x1b[0m Doppler not configured for this project.\n'
+      '\x1b[33m[Doppler]\x1b[0m Doppler not configured for this project.\n',
     );
     console.log(
-      '   Run: doppler setup  (select project: mentomate, config: stg)'
+      '   Run: doppler setup  (select project: mentomate, config: stg)',
     );
     console.log('   Then: pnpm env:sync\n');
     process.exit(0);
@@ -314,18 +335,18 @@ function main() {
   const primaryFile = OUTPUT_FILES[0].path;
   if (fs.existsSync(primaryFile) && checkStaleness(primaryFile)) {
     console.log(
-      `\x1b[33m[Doppler]\x1b[0m Env files are over ${STALENESS_DAYS} days old — regenerating...\n`
+      `\x1b[33m[Doppler]\x1b[0m Env files are over ${STALENESS_DAYS} days old — regenerating...\n`,
     );
   }
 
   const content = downloadSecrets(DOPPLER_CONFIG);
   if (!content) {
     console.log(
-      '\x1b[31m[Doppler]\x1b[0m Failed to download secrets from Doppler'
+      '\x1b[31m[Doppler]\x1b[0m Failed to download secrets from Doppler',
     );
     console.log('   Check your Doppler configuration and try: pnpm env:sync\n');
     console.log(
-      '\x1b[31m[Doppler]\x1b[0m Local secrets were NOT synced. API and mobile may fail at runtime.\n'
+      '\x1b[31m[Doppler]\x1b[0m Local secrets were NOT synced. API and mobile may fail at runtime.\n',
     );
     process.exit(1);
   }
@@ -339,7 +360,7 @@ function main() {
     const dir = path.dirname(output.path);
     if (!fs.existsSync(dir)) {
       console.log(
-        `\x1b[33m[Doppler]\x1b[0m Skipping ${output.description} (directory not found)`
+        `\x1b[33m[Doppler]\x1b[0m Skipping ${output.description} (directory not found)`,
       );
       continue;
     }
@@ -356,7 +377,7 @@ function main() {
   updateEasJson();
 
   console.log(
-    '\n   \x1b[90mTo regenerate after secret changes:\x1b[0m pnpm env:sync\n'
+    '\n   \x1b[90mTo regenerate after secret changes:\x1b[0m pnpm env:sync\n',
   );
 
   // Sync secrets to Cloudflare Workers (non-fatal — skips if wrangler not authenticated)
@@ -366,7 +387,7 @@ function main() {
   } catch (err) {
     console.log(
       '\x1b[33m[Doppler]\x1b[0m Cloudflare Workers sync skipped:',
-      err.message
+      err.message,
     );
     console.log('   To sync manually: pnpm secrets:sync\n');
   }
