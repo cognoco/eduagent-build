@@ -21,18 +21,23 @@ const mockFetch = createRoutedMockFetch({
   '/settings/celebration-level': { celebrationLevel: 'all' },
 });
 
-jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+jest.mock(
+  '../../lib/api-client',
+  /* gc1-allow: test boundary - avoids real Hono fetch client and network calls */ () =>
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 let mockOnAllComplete: (() => void) | null = null;
 
-jest.mock('../../hooks/use-celebration', () => ({
-  useCelebration: ({ onAllComplete }: { onAllComplete: () => void }) => {
-    mockOnAllComplete = onAllComplete;
-    return { CelebrationOverlay: null };
-  },
-}));
+jest.mock(
+  '../../hooks/use-celebration' /* gc1-allow: avoids native celebration animation timers and async side effects in render tests */,
+  () => ({
+    useCelebration: ({ onAllComplete }: { onAllComplete: () => void }) => {
+      mockOnAllComplete = onAllComplete;
+      return { CelebrationOverlay: null };
+    },
+  }),
+);
 
 const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
@@ -40,17 +45,20 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
 }));
 
-jest.mock('../../components/home', () => {
-  const { Text, View } = require('react-native');
-  return {
-    LearnerScreen: ({ mode }: { mode?: string | null }) => (
-      <View testID="learner-screen">
-        <Text>LearnerScreen</Text>
-        <Text>mode:{mode ?? 'none'}</Text>
-      </View>
-    ),
-  };
-});
+jest.mock(
+  '../../components/home' /* gc1-allow: avoids full native component tree render; home.test.tsx tests routing logic not component internals */,
+  () => {
+    const { Text, View } = require('react-native');
+    return {
+      LearnerScreen: ({ mode }: { mode?: string | null }) => (
+        <View testID="learner-screen">
+          <Text>LearnerScreen</Text>
+          <Text>mode:{mode ?? 'none'}</Text>
+        </View>
+      ),
+    };
+  },
+);
 
 const HomeScreen = require('./home').default;
 

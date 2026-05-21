@@ -68,4 +68,7 @@ tags:
 - assertVisible:
     id: 'parent-home-study-activation'
 
+- assertNotVisible:
+    id: 'learner-screen'
+
 - takeScreenshot: parent-mode-switch-03-family-returned

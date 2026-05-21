@@ -1,4 +1,4 @@
-import { useCallback, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -16,6 +16,16 @@ export function useModeSwitch(): {
   const { mode, setMode } = useAppContext();
   const { activeProfile } = useProfile();
   const isSwitchingRef = useRef(false);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pendingTimerRef.current !== null) {
+        clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const switchMode = useCallback(
     (nextMode: AppMode): void => {
@@ -37,9 +47,13 @@ export function useModeSwitch(): {
           accountAgeBucket: bucketAccountAge(activeProfile.createdAt),
         });
       }
-      setTimeout(() => {
-        router.replace('/(app)/home');
-        isSwitchingRef.current = false;
+      pendingTimerRef.current = setTimeout(() => {
+        pendingTimerRef.current = null;
+        try {
+          router.replace('/(app)/home');
+        } finally {
+          isSwitchingRef.current = false;
+        }
       }, 0);
     },
     [activeProfile, mode, queryClient, router, setMode],

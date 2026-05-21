@@ -76,7 +76,6 @@ function makeWrapper({
 
 describe('useModeSwitch', () => {
   const originalFlag = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
-  const originalQueueMicrotask = globalThis.queueMicrotask;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -90,42 +89,6 @@ describe('useModeSwitch', () => {
     jest.useRealTimers();
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       originalFlag;
-    Object.defineProperty(globalThis, 'queueMicrotask', {
-      configurable: true,
-      value: originalQueueMicrotask,
-      writable: true,
-    });
-  });
-
-  it('switches mode and navigates home when queueMicrotask is unavailable', () => {
-    Object.defineProperty(globalThis, 'queueMicrotask', {
-      configurable: true,
-      value: undefined,
-      writable: true,
-    });
-
-    const { result } = renderHook(
-      () => ({
-        appContext: useAppContext(),
-        modeSwitch: useModeSwitch(),
-      }),
-      { wrapper: makeWrapper() },
-    );
-
-    expect(result.current.appContext.mode).toBe('family');
-
-    act(() => {
-      result.current.modeSwitch.switchMode('study');
-    });
-
-    expect(result.current.appContext.mode).toBe('study');
-    expect(mockReplace).not.toHaveBeenCalled();
-
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('commits the next mode before navigating home', () => {
@@ -198,5 +161,59 @@ describe('useModeSwitch', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
+  it('clears the pending timer on unmount (no stale callback on dead instance)', () => {
+    const clearTimeoutSpy = jest.spyOn(globalThis, 'clearTimeout');
+
+    const { result, unmount } = renderHook(() => useModeSwitch(), {
+      wrapper: makeWrapper(),
+    });
+
+    act(() => {
+      result.current.switchMode('study');
+    });
+
+    // Timer is pending - router.replace has NOT been called yet.
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    // Unmounting should clear the timer so the callback never fires.
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    // Running pending timers now should be a no-op.
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it('resets the busy lock even when router.replace throws', () => {
+    mockReplace.mockImplementationOnce(() => {
+      throw new Error('navigation error');
+    });
+
+    const { result } = renderHook(() => useModeSwitch(), {
+      wrapper: makeWrapper(),
+    });
+
+    act(() => {
+      result.current.switchMode('study');
+    });
+
+    expect(result.current.isSwitchingRef.current).toBe(true);
+
+    // The timer callback throws; catch it so the test harness does not fail.
+    // The finally block in the impl still runs and clears the lock.
+    expect(() => {
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+    }).toThrow('navigation error');
+
+    // Lock must be cleared even though router.replace threw.
+    expect(result.current.isSwitchingRef.current).toBe(false);
   });
 });

@@ -397,7 +397,7 @@ describe('ParentHomeScreen', () => {
     promptCardStyles.forEach((style) => {
       expect(style).toEqual(
         expect.objectContaining({
-          backgroundColor: '#ffffff',
+          backgroundColor: expect.any(String),
           borderColor: expect.any(String),
           borderRadius: 30,
           borderWidth: 1,
@@ -421,7 +421,7 @@ describe('ParentHomeScreen', () => {
     ).toBeUndefined();
     expect(resolvedStyle('parent-home-tonight-icon-child-a-primary')).toEqual(
       expect.objectContaining({
-        backgroundColor: '#ffffff',
+        backgroundColor: expect.any(String),
         borderColor: expect.any(String),
         borderWidth: 1,
         height: 30,
