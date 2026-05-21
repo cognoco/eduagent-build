@@ -17,8 +17,8 @@
  *   - getProgressSummary ignores sessions in non-`completed` statuses
  *     (regression for bug 194 — the original mock test only checked the
  *     mock interaction; this asserts the actual SQL filter)
- *   - getProgressSummary scopes by profileId — never returns rows for a
- *     sibling profile (IDOR break)
+ *   - [BUG-400] getProgressSummary throws ForbiddenError when the requester
+ *     has no family link to the child — defense-in-depth service-layer guard
  *   - findLatestCompletedLearningSession picks the most recent completed
  *     session, ignoring active/abandoned ones
  *   - upsertProgressSummary inserts on first write and updates on second
@@ -29,6 +29,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
   createDatabase,
+  familyLinks,
   learningSessions,
   profiles,
   progressSummaries,
@@ -42,6 +43,7 @@ import {
   getProgressSummary,
   upsertProgressSummary,
 } from './progress-summary';
+import { ForbiddenError } from '../errors';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -71,20 +73,21 @@ const PREFIX = 'integration-progress-summary';
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const rows = await db.query.accounts.findMany({
-    where: eq(accounts.email, `${PREFIX}@integration.test`),
-  });
-  const ids = rows.map((a: typeof accounts.$inferSelect) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
-  // Also clean the sibling-profile fixture used for IDOR checks.
-  const siblingRows = await db.query.accounts.findMany({
-    where: eq(accounts.email, `${PREFIX}-sibling@integration.test`),
-  });
-  const siblingIds = siblingRows.map((a: typeof accounts.$inferSelect) => a.id);
-  if (siblingIds.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, siblingIds));
+  const emailVariants = [
+    `${PREFIX}@integration.test`,
+    `${PREFIX}-child@integration.test`,
+    `${PREFIX}-sibling@integration.test`,
+    `${PREFIX}-parent@integration.test`,
+    `${PREFIX}-unrelated@integration.test`,
+  ];
+  for (const email of emailVariants) {
+    const rows = await db.query.accounts.findMany({
+      where: eq(accounts.email, email),
+    });
+    const ids = rows.map((a: typeof accounts.$inferSelect) => a.id);
+    if (ids.length > 0) {
+      await db.delete(accounts).where(inArray(accounts.id, ids));
+    }
   }
 }
 
@@ -96,6 +99,7 @@ interface SeedResult {
 
 async function seedAccountWithProfileAndSubject(
   emailSuffix = '',
+  opts: { isOwner?: boolean } = {},
 ): Promise<SeedResult> {
   const db = createIntegrationDb();
   const email = emailSuffix
@@ -115,7 +119,7 @@ async function seedAccountWithProfileAndSubject(
       accountId: account!.id,
       displayName: 'Test Learner',
       birthYear: 2010,
-      isOwner: true,
+      isOwner: opts.isOwner ?? true,
     })
     .returning();
   const [subject] = await db
@@ -132,6 +136,34 @@ async function seedAccountWithProfileAndSubject(
     profileId: profile!.id,
     subjectId: subject!.id,
   };
+}
+
+async function seedParentAccount(emailSuffix = '-parent'): Promise<string> {
+  const db = createIntegrationDb();
+  const email = `${PREFIX}${emailSuffix}@integration.test`;
+  const clerkUserId = `${PREFIX}${emailSuffix}-user`;
+  const [account] = await db
+    .insert(accounts)
+    .values({ clerkUserId, email })
+    .returning();
+  const [profile] = await db
+    .insert(profiles)
+    .values({
+      accountId: account!.id,
+      displayName: 'Test Parent',
+      birthYear: 1985,
+      isOwner: true,
+    })
+    .returning();
+  return profile!.id;
+}
+
+async function seedFamilyLink(
+  parentProfileId: string,
+  childProfileId: string,
+): Promise<void> {
+  const db = createIntegrationDb();
+  await db.insert(familyLinks).values({ parentProfileId, childProfileId });
 }
 
 async function seedSession(input: {
@@ -172,10 +204,16 @@ afterAll(async () => {
 
 describe('getProgressSummary (integration)', () => {
   it('returns no_recent_activity when the profile has no completed sessions', async () => {
-    const { profileId } = await seedAccountWithProfileAndSubject();
+    const child = await seedAccountWithProfileAndSubject('-child');
+    const parentProfileId = await seedParentAccount();
+    await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
 
-    const result = await getProgressSummary(db, profileId);
+    const result = await getProgressSummary(
+      db,
+      parentProfileId,
+      child.profileId,
+    );
 
     expect(result.summary).toBeNull();
     expect(result.generatedAt).toBeNull();
@@ -186,25 +224,31 @@ describe('getProgressSummary (integration)', () => {
   });
 
   it('returns fresh when the stored summary basis matches the latest completed session', async () => {
-    const { profileId, subjectId } = await seedAccountWithProfileAndSubject();
+    const child = await seedAccountWithProfileAndSubject('-child');
+    const parentProfileId = await seedParentAccount();
+    await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
     const now = new Date();
 
     const session = await seedSession({
-      profileId,
-      subjectId,
+      profileId: child.profileId,
+      subjectId: child.subjectId,
       status: 'completed',
       startedAt: now,
     });
 
     await upsertProgressSummary(db, {
-      childProfileId: profileId,
+      childProfileId: child.profileId,
       summary: 'Strong week on fractions.',
       basedOnLastSessionAt: now,
       latestSessionId: session.id,
     });
 
-    const result = await getProgressSummary(db, profileId);
+    const result = await getProgressSummary(
+      db,
+      parentProfileId,
+      child.profileId,
+    );
 
     expect(result.summary).toBe('Strong week on fractions.');
     expect(result.latestSessionId).toBe(session.id);
@@ -213,19 +257,21 @@ describe('getProgressSummary (integration)', () => {
   });
 
   it('returns stale when a newer completed session lands after the stored summary basis', async () => {
-    const { profileId, subjectId } = await seedAccountWithProfileAndSubject();
+    const child = await seedAccountWithProfileAndSubject('-child');
+    const parentProfileId = await seedParentAccount();
+    await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
     const earlier = new Date(Date.now() - 60 * 60 * 1000); // 1h ago
     const later = new Date();
 
     const oldSession = await seedSession({
-      profileId,
-      subjectId,
+      profileId: child.profileId,
+      subjectId: child.subjectId,
       status: 'completed',
       startedAt: earlier,
     });
     await upsertProgressSummary(db, {
-      childProfileId: profileId,
+      childProfileId: child.profileId,
       summary: 'Earlier summary.',
       basedOnLastSessionAt: earlier,
       latestSessionId: oldSession.id,
@@ -233,43 +279,53 @@ describe('getProgressSummary (integration)', () => {
 
     // A newer completed session arrives.
     await seedSession({
-      profileId,
-      subjectId,
+      profileId: child.profileId,
+      subjectId: child.subjectId,
       status: 'completed',
       startedAt: later,
     });
 
-    const result = await getProgressSummary(db, profileId);
+    const result = await getProgressSummary(
+      db,
+      parentProfileId,
+      child.profileId,
+    );
 
     expect(result.activityState).toBe('stale');
   });
 
   it('[REGRESSION bug 194] ignores sessions in non-completed statuses when computing freshness', async () => {
-    const { profileId, subjectId } = await seedAccountWithProfileAndSubject();
+    const child = await seedAccountWithProfileAndSubject('-child');
+    const parentProfileId = await seedParentAccount();
+    await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
 
     // Active, paused, and auto_closed sessions exist but must NOT count
     // as the latest — only `completed` does.
     await seedSession({
-      profileId,
-      subjectId,
+      profileId: child.profileId,
+      subjectId: child.subjectId,
       status: 'active',
       startedAt: new Date(),
     });
     await seedSession({
-      profileId,
-      subjectId,
+      profileId: child.profileId,
+      subjectId: child.subjectId,
       status: 'paused',
       startedAt: new Date(),
     });
     await seedSession({
-      profileId,
-      subjectId,
+      profileId: child.profileId,
+      subjectId: child.subjectId,
       status: 'auto_closed',
       startedAt: new Date(),
     });
 
-    const result = await getProgressSummary(db, profileId);
+    const result = await getProgressSummary(
+      db,
+      parentProfileId,
+      child.profileId,
+    );
 
     // With NO completed sessions, latestSessionId is null and we report
     // no_recent_activity — proving the WHERE clause filters by status.
@@ -277,32 +333,26 @@ describe('getProgressSummary (integration)', () => {
     expect(result.activityState).toBe('no_recent_activity');
   });
 
-  it('[IDOR break] never returns a sibling profile’s summary or session', async () => {
-    const own = await seedAccountWithProfileAndSubject();
-    const sibling = await seedAccountWithProfileAndSubject('-sibling');
+  // [BUG-400] Break test -- service-layer defense-in-depth IDOR guard.
+  //
+  // Red-green pattern:
+  //   GREEN (fix applied):  test passes -- ForbiddenError is thrown.
+  //   RED   (fix reverted): assertParentAccess removed from getProgressSummary ->
+  //     test fails with 'Received function did not throw' because getProgressSummary
+  //     returns the child data silently instead of throwing.
+  //
+  // This proves that without the service-layer assert, an unlinked requester
+  // can read any child progress summary by calling the function directly,
+  // bypassing the route-level assertOwnerAndParentAccess.
+  it('[BUG-400 break test] throws ForbiddenError when requester has no family link to child', async () => {
+    const child = await seedAccountWithProfileAndSubject('-child');
+    const unrelatedParentId = await seedParentAccount('-unrelated');
+    // Deliberately NO seedFamilyLink -- unrelated parent has no link to child.
     const db = createIntegrationDb();
-    const now = new Date();
 
-    // Seed a completed session + summary for the sibling (NOT for own).
-    const siblingSession = await seedSession({
-      profileId: sibling.profileId,
-      subjectId: sibling.subjectId,
-      status: 'completed',
-      startedAt: now,
-    });
-    await upsertProgressSummary(db, {
-      childProfileId: sibling.profileId,
-      summary: 'Sibling summary.',
-      basedOnLastSessionAt: now,
-      latestSessionId: siblingSession.id,
-    });
-
-    // Query OWN profile — must see nothing from the sibling.
-    const result = await getProgressSummary(db, own.profileId);
-
-    expect(result.summary).toBeNull();
-    expect(result.latestSessionId).toBeNull();
-    expect(result.activityState).toBe('no_recent_activity');
+    await expect(
+      getProgressSummary(db, unrelatedParentId, child.profileId),
+    ).rejects.toThrow(ForbiddenError);
   });
 });
 

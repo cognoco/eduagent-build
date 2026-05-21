@@ -85,6 +85,25 @@ import { reviewCalibrationGrade } from './functions/review-calibration-grade';
 import { topicProbeExtract } from './functions/topic-probe-extract';
 import { streakRecord } from './functions/streak-record';
 import { progressSummaryGeneration } from './functions/progress-summary';
+// [BUG-369] Observability terminus handlers for orphan events
+import {
+  sessionSummaryGeneratedObserve,
+  sessionSummaryFailedObserve,
+  sessionCompletedWithErrorsObserve,
+} from './functions/session-completed-observe';
+import {
+  summaryReconciliationScannedObserve,
+  summaryReconciliationRequeuedObserve,
+} from './functions/summary-reconciliation-observe';
+import {
+  sessionPurgeDelayedObserve,
+  sessionTranscriptPurgedObserve,
+  sessionTranscriptPurgeSkippedObserve,
+} from './functions/transcript-purge-observe';
+import {
+  sessionFilingResolvedObserve,
+  filingAutoRetryAttemptedObserve,
+} from './functions/filing-observe';
 
 export {
   inngest,
@@ -150,6 +169,17 @@ export {
   topicProbeExtract,
   streakRecord,
   progressSummaryGeneration,
+  // [BUG-369] New observability terminus handlers
+  sessionSummaryGeneratedObserve,
+  sessionSummaryFailedObserve,
+  sessionCompletedWithErrorsObserve,
+  summaryReconciliationScannedObserve,
+  summaryReconciliationRequeuedObserve,
+  sessionPurgeDelayedObserve,
+  sessionTranscriptPurgedObserve,
+  sessionTranscriptPurgeSkippedObserve,
+  sessionFilingResolvedObserve,
+  filingAutoRetryAttemptedObserve,
 };
 
 // All Inngest functions to register with the serve handler
@@ -217,4 +247,15 @@ export const functions = [
   topicProbeExtract,
   streakRecord,
   progressSummaryGeneration,
+  // [BUG-369] New observability terminus handlers
+  sessionSummaryGeneratedObserve,
+  sessionSummaryFailedObserve,
+  sessionCompletedWithErrorsObserve,
+  summaryReconciliationScannedObserve,
+  summaryReconciliationRequeuedObserve,
+  sessionPurgeDelayedObserve,
+  sessionTranscriptPurgedObserve,
+  sessionTranscriptPurgeSkippedObserve,
+  sessionFilingResolvedObserve,
+  filingAutoRetryAttemptedObserve,
 ];

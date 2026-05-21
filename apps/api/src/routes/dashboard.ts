@@ -92,12 +92,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth: assert parent->child link at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     // [BUG-62] No consent-visibility gate here. The mobile child-detail screen
     // renders a dedicated consent-restricted panel for PENDING / REQUESTED /
@@ -119,12 +114,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     const inventory = await getChildInventory(
       db,
@@ -140,15 +130,14 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId);
+
+    const summary = await getProgressSummary(
       db,
       parentProfileId,
       childProfileId,
     );
-    await assertChildDashboardDataVisible(db, childProfileId);
-
-    const summary = await getProgressSummary(db, childProfileId);
     return c.json(progressSummarySchema.parse(summary));
   })
 
@@ -163,12 +152,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
       const history = await getChildProgressHistory(
         db,
@@ -189,12 +173,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     const topics = await getChildSubjectTopics(
       db,
@@ -213,12 +192,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     const sessions = await getChildSessions(
       db,
@@ -237,12 +211,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     const session = await getChildSessionDetail(
       db,
@@ -263,12 +232,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const projection = await getMemoryProjection(db, childProfileId, {
@@ -307,12 +271,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     const reports = await getChildReports(db, parentProfileId, childProfileId);
     return c.json(childReportsResponseSchema.parse({ reports }));
@@ -326,12 +285,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     const report = await getChildReportDetail(
       db,
@@ -353,12 +307,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
 
     await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
     return c.json(reportViewedResponseSchema.parse({ viewed: true }));
@@ -372,12 +321,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const reports = await listWeeklyReportsForParentChild(
@@ -396,12 +340,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const report = await getWeeklyReportForParentChild(
@@ -426,12 +365,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       await assertChildDashboardDataVisible(db, childProfileId);
 
       await markWeeklyReportViewed(
