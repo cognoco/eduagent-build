@@ -147,4 +147,21 @@ describe('useModeSwitch', () => {
     expect(predicate({ queryKey: ['progress'] })).toBe(true);
     expect(predicate({ queryKey: ['profiles'] })).toBe(false);
   });
+
+  it('ignores repeated taps while a mode switch is in flight', () => {
+    const { result } = renderHook(() => useModeSwitch(), {
+      wrapper: makeWrapper(),
+    });
+
+    act(() => {
+      result.current.switchMode('study');
+      result.current.switchMode('study');
+    });
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+  });
 });
