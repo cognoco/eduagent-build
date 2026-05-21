@@ -1040,9 +1040,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         { ...body, summaryStatus: sanitizedSummaryStatus },
       );
 
+      // BUG-398: stale-session cron owns the dispatch for auto_closed; exclude here to prevent double-fire
       const shouldDispatchCompletionEvent =
         result.summaryStatus !== 'pending' &&
-        result.summaryStatus !== 'submitted';
+        result.summaryStatus !== 'submitted' &&
+        result.summaryStatus !== 'auto_closed';
 
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
       // Default false — only true when dispatch actually succeeds.

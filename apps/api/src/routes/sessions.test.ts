@@ -1177,6 +1177,41 @@ describe('session routes', () => {
         expect.objectContaining({ summaryStatus: 'skipped' }),
       );
     });
+
+    it('[BUG-398] does not dispatch app/session.completed when closeSession returns auto_closed (stale-cron race guard)', async () => {
+      // Break test: before the fix, shouldDispatchCompletionEvent only excluded
+      // 'pending' and 'submitted'. A closeSession result of 'auto_closed' (written
+      // by closeStaleSessions and returned when the cron races the user close)
+      // would trigger a duplicate app/session.completed dispatch — the stale-cron
+      // already dispatches its own via step.sendEvent. This test guards the gate.
+      (closeSession as jest.Mock).mockImplementationOnce(
+        (_db: unknown, _profileId: unknown, sessionId: unknown) => ({
+          message: 'Session closed',
+          sessionId,
+          topicId: null,
+          subjectId: SUBJECT_ID,
+          sessionType: 'learning',
+          verificationType: null,
+          wallClockSeconds: 600,
+          summaryStatus: 'auto_closed',
+          escalationRungs: [1, 2],
+        }),
+      );
+
+      await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ reason: 'silence_timeout' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(sendSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/session.completed' }),
+      );
+    });
   });
 
   describe('POST /v1/sessions/:sessionId/homework-state', () => {
