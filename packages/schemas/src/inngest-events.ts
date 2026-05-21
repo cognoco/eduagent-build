@@ -199,3 +199,30 @@ export const classificationFailedEventSchema = z.object({
 export type ClassificationFailedEvent = z.infer<
   typeof classificationFailedEventSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Summary / Learner-Recap events (#428, #429)
+// ---------------------------------------------------------------------------
+
+export const summaryEventPayloadSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  timestamp: z.string().datetime(),
+  subjectId: z.string().uuid().nullable().optional(),
+  topicId: z.string().uuid().nullable().optional(),
+  sessionSummaryId: z.string().uuid().optional(),
+});
+export type SummaryEventPayload = z.infer<typeof summaryEventPayloadSchema>;
+
+// ---------------------------------------------------------------------------
+// Book pre-generation event (#426)
+// ---------------------------------------------------------------------------
+
+export const bookTopicsGeneratedEventSchema = z.object({
+  subjectId: z.string().uuid(),
+  bookId: z.string().uuid(),
+  profileId: z.string().uuid(),
+});
+export type BookTopicsGeneratedEvent = z.infer<
+  typeof bookTopicsGeneratedEventSchema
+>;
