@@ -38,6 +38,9 @@ import { registerProvider } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
 import { llmMiddleware, resetLlmMiddleware } from './llm';
+// _clearProviders is called by the middleware when the env hash changes.
+// It is mocked via the spread of actual so its real behaviour is preserved;
+// we only need it imported here for the comment to be accurate.
 
 function createMockContext(env: Record<string, string | undefined>) {
   return {
@@ -47,11 +50,12 @@ function createMockContext(env: Record<string, string | undefined>) {
 
 const originalNodeEnv = process.env['NODE_ENV'];
 
-// NOTE: resetLlmMiddleware() only clears the middleware's `initialized` flag.
-// Router state (registered providers, circuit breakers) lives in router.ts and
-// requires separate _clearProviders() / _resetCircuits() calls. In this file
-// we mock the entire llm barrel so router state is irrelevant; but integration
-// tests must call both to get a clean slate. See router.test.ts for examples.
+// NOTE: resetLlmMiddleware() clears the middleware's env-hash (_registeredEnvHash)
+// so the next request performs fresh provider registration. Router state
+// (registered providers, circuit breakers) lives in router.ts and requires
+// separate _clearProviders() / _resetCircuits() calls. In this file we mock
+// the entire llm barrel so router state is irrelevant; but integration tests
+// must call both to get a clean slate. See router.test.ts for examples.
 beforeEach(() => {
   jest.clearAllMocks();
   resetLlmMiddleware();
@@ -192,36 +196,64 @@ describe('llmMiddleware', () => {
     expect(next).toHaveBeenCalledTimes(2);
   });
 
-  it('[BUG-96 / A1-HIGH BREAK] flips initialized=true even when registerProvider throws', async () => {
-    // Break test: BEFORE the fix, `initialized = true` ran AFTER registerProvider.
-    // If the second register call threw, the first provider stayed in the
-    // registry but `initialized` remained false; the next request re-entered
-    // the init block and threw "provider already registered" instead of the
-    // original error. With the try/finally fix, failed init is terminal:
-    // the flag flips, the next request skips registration, and any downstream
-    // routeAndCall surfaces the missing-provider error directly.
-    (registerProvider as jest.Mock)
-      .mockImplementationOnce(() => {
-        /* gemini OK */
-      })
-      .mockImplementationOnce(() => {
-        throw new Error('openai registration failed');
-      });
-
-    const c = createMockContext({
-      GEMINI_API_KEY: 'gem-key',
-      OPENAI_API_KEY: 'oai-key',
+  it('[BUG-96 / A1-HIGH BREAK — superseded by BUG-488] does NOT permanently lock initialization when registerProvider throws', async () => {
+    // With the BUG-488 env-hash fix, a failed registration leaves the hash
+    // unset, so the NEXT request with the same env will retry registration.
+    // This is intentionally different from the old try/finally-flip behavior
+    // (which made failed init permanently terminal per-isolate). The new
+    // behavior is safer: a transient failure (e.g., race on startup) self-heals
+    // on the next request rather than wedging the isolate forever.
+    (registerProvider as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('transient registration failure');
     });
+
+    const c = createMockContext({ GEMINI_API_KEY: 'gem-key' });
     const next = jest.fn().mockResolvedValue(undefined);
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'openai registration failed',
+      'transient registration failure',
     );
 
-    // Second invocation must short-circuit — no further registerProvider calls.
-    // Without the fix, the gemini provider would be re-registered here.
+    // Next request with the same env retries — this is the NEW contract.
+    (registerProvider as jest.Mock).mockResolvedValue(undefined);
     (registerProvider as jest.Mock).mockClear();
     await llmMiddleware(c, next);
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProvider).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('[BUG-488 / P2 BREAK] re-registers providers when env keys change between requests', async () => {
+    // Break test: BEFORE the fix, the first request's env keys bound the
+    // provider registry for the entire isolate lifetime. If a Worker was reused
+    // across preview→prod, the second env's API keys were silently ignored and
+    // the old providers (pointing at the first env's keys) continued to be used.
+    // With the env-hash fix, a key change triggers _clearProviders() + fresh
+    // registerProvider calls on the next request.
+    const c1 = createMockContext({ GEMINI_API_KEY: 'preview-key' });
+    const c2 = createMockContext({ GEMINI_API_KEY: 'prod-key' });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c1, next);
+    expect(createGeminiProvider).toHaveBeenCalledWith('preview-key');
+    expect(registerProvider).toHaveBeenCalledTimes(1);
+
+    jest.clearAllMocks();
+
+    // Different env key — must re-register with the new key, NOT skip.
+    await llmMiddleware(c2, next);
+    expect(createGeminiProvider).toHaveBeenCalledWith('prod-key');
+    expect(registerProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it('[BUG-488 / P2 BREAK] does NOT re-register when env keys are unchanged', async () => {
+    // Same env on two consecutive requests must NOT re-register (idempotent).
+    const c = createMockContext({ GEMINI_API_KEY: 'stable-key' });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c, next);
+    await llmMiddleware(c, next);
+
+    expect(registerProvider).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(2);
   });
 });

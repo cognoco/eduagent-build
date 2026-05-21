@@ -166,24 +166,29 @@ export async function updateSubscriptionFromWebhook(
   }
   if (updates.status !== undefined && updates.status !== existing.status) {
     if (!isValidTransition(existing.status, updates.status)) {
-      logger.error('Invalid Stripe subscription transition', {
+      // [BUG-447] Throw so callers do NOT proceed to updateQuotaPoolLimit.
+      // Returning the existing row silently caused quota pool to reflect
+      // newTier while subscription.tier stayed at oldTier — divergent billing
+      // state. Throwing surfaces the problem and prevents the downstream
+      // quota update from firing. Mirror of the fix in revenuecat.ts.
+      const transitionErr = new Error(
+        `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`,
+      );
+      logger.error('Invalid Stripe subscription transition — aborting update', {
         from: existing.status,
         to: updates.status,
         subscriptionId: existing.id,
+        tag: 'billing.invalid_transition',
       });
-      captureException(
-        new Error(
-          `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`,
-        ),
-        {
-          extra: {
-            subscriptionId: existing.id,
-            fromStatus: existing.status,
-            toStatus: updates.status,
-          },
+      captureException(transitionErr, {
+        extra: {
+          subscriptionId: existing.id,
+          fromStatus: existing.status,
+          toStatus: updates.status,
+          tag: 'billing.invalid_transition',
         },
-      );
-      return mapSubscriptionRow(existing);
+      });
+      throw transitionErr;
     }
     setValues.status = updates.status;
   }

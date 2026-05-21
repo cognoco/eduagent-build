@@ -52,7 +52,7 @@ export async function isRevenuecatEventProcessed(
   db: Database,
   accountId: string,
   eventId: string,
-  eventTimestampMs?: number
+  eventTimestampMs?: number,
 ): Promise<boolean> {
   const repo = createAccountRepository(db, accountId);
   const sub = await repo.subscriptions.findFirst();
@@ -86,7 +86,7 @@ export async function updateSubscriptionFromRevenuecatWebhook(
   updates: RevenuecatWebhookUpdate & {
     eventId: string;
     eventTimestampMs?: number;
-  }
+  },
 ): Promise<SubscriptionRow | null> {
   const repo = createAccountRepository(db, accountId);
   const existing = await repo.subscriptions.findFirst();
@@ -107,24 +107,29 @@ export async function updateSubscriptionFromRevenuecatWebhook(
   }
   if (updates.status !== undefined && updates.status !== existing.status) {
     if (!isValidTransition(existing.status, updates.status)) {
-      logger.error('Invalid subscription transition', {
+      // [BUG-447] Throw so callers (handleRenewal, handleProductChange) do NOT
+      // proceed to updateQuotaPoolLimit. Returning the existing row silently
+      // caused quota pool to reflect newTier while subscription.tier stayed
+      // at oldTier — divergent billing state. Throwing surfaces the problem
+      // immediately and prevents the downstream quota update from firing.
+      const transitionErr = new Error(
+        `Invalid subscription transition: ${existing.status} -> ${updates.status}`,
+      );
+      logger.error('Invalid subscription transition — aborting update', {
         from: existing.status,
         to: updates.status,
         subscriptionId: existing.id,
+        tag: 'billing.invalid_transition',
       });
-      captureException(
-        new Error(
-          `Invalid subscription transition: ${existing.status} -> ${updates.status}`
-        ),
-        {
-          extra: {
-            subscriptionId: existing.id,
-            fromStatus: existing.status,
-            toStatus: updates.status,
-          },
-        }
-      );
-      return mapSubscriptionRow(existing);
+      captureException(transitionErr, {
+        extra: {
+          subscriptionId: existing.id,
+          fromStatus: existing.status,
+          toStatus: updates.status,
+          tag: 'billing.invalid_transition',
+        },
+      });
+      throw transitionErr;
     }
     setValues.status = updates.status;
   }
@@ -179,7 +184,7 @@ export async function activateSubscriptionFromRevenuecat(
     trialEndsAt?: string;
     /** BD-01: Event timestamp for ordering-based idempotency. */
     eventTimestampMs?: number;
-  }
+  },
 ): Promise<SubscriptionRow> {
   const existing = await getSubscriptionByAccountId(db, accountId);
 
@@ -194,9 +199,9 @@ export async function activateSubscriptionFromRevenuecat(
     });
     captureException(
       new Error(
-        'Trial activation missing trialEndsAt — falling back to non-trial'
+        'Trial activation missing trialEndsAt — falling back to non-trial',
       ),
-      { extra: { accountId, tier, eventId } }
+      { extra: { accountId, tier, eventId } },
     );
     // Gracefully fall back to non-trial activation rather than crashing the webhook
     return activateSubscriptionFromRevenuecat(db, accountId, tier, eventId, {
@@ -287,7 +292,7 @@ export async function activateSubscriptionFromRevenuecat(
     db,
     existing.id,
     tierConfig.monthlyQuota,
-    tierConfig.dailyLimit
+    tierConfig.dailyLimit,
   );
 
   if (!updated)

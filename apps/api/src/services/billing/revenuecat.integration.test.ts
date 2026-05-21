@@ -318,23 +318,43 @@ describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => 
     expect(row!.lastRevenuecatEventTimestampMs).toBeNull();
   });
 
-  it('logs but does not throw on invalid status transition', async () => {
+  // [BUG-447] BREAK TEST: invalid status transition must throw so callers
+  // (handleRenewal, handleProductChange) do NOT proceed to updateQuotaPoolLimit.
+  // Pre-fix, the function returned the existing row (callers treated it as
+  // success). Post-fix, it throws — callers catch the error via their own
+  // error boundary or the webhook 500 path, and quota pool is never updated.
+  it('[BUG-447] throws on invalid status transition so quota pool stays coherent', async () => {
     const account = await seedAccount(1);
-    // 'expired' → anything is invalid per the state machine
-    await seedSubscription(account.id, { status: 'expired' });
+    // 'expired' → 'active' is invalid per the state machine
+    const { subscription } = await seedSubscriptionWithQuota(
+      account.id,
+      'plus',
+      {
+        status: 'expired',
+      },
+    );
     const db = createIntegrationDb();
 
-    // Should not throw; should return the existing (unchanged) subscription row
+    const poolBefore = await loadQuotaPool(subscription.id);
+    const limitBefore = poolBefore!.monthlyLimit;
+
+    // Must throw — callers must NOT proceed to updateQuotaPoolLimit
     await expect(
       updateSubscriptionFromRevenuecatWebhook(db, account.id, {
         eventId: 'evt-bad-transition',
+        tier: 'family', // attempting tier+status change
         status: 'active', // expired -> active is invalid
       }),
-    ).resolves.not.toBeNull();
+    ).rejects.toThrow(/Invalid subscription transition/);
 
-    // Status must remain 'expired' — the invalid transition is refused
+    // Status must remain 'expired' — the invalid transition was refused
     const row = await loadSubscription(account.id);
     expect(row!.status).toBe('expired');
+
+    // Quota pool must remain at the original limit — the throw prevented any
+    // updateQuotaPoolLimit call that a caller would have made for 'family' tier
+    const poolAfter = await loadQuotaPool(subscription.id);
+    expect(poolAfter!.monthlyLimit).toBe(limitBefore);
   });
 
   it('sets cancelledAt when cancelledAt is provided', async () => {

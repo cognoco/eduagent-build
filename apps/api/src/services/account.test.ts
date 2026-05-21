@@ -457,48 +457,144 @@ describe('findOrCreateAccount', () => {
     });
   });
 
-  it('reclaims account when email exists with a different clerkUserId', async () => {
-    const staleRow = mockAccountRow({
-      id: 'acc-existing',
-      clerkUserId: 'clerk_old_deleted',
-      email: 'returning@example.com',
+  // [BREAK — BUG-411] Email-reuse silent rewire is an account-takeover vector.
+  // When email matches an existing account with a DIFFERENT clerkUserId, the
+  // service must block the attempt loudly rather than silently reassigning the
+  // existing account to the incoming Clerk identity.
+  describe('[BUG-411] email-reuse reclaim block', () => {
+    function makeReclaimDb(staleRow: ReturnType<typeof mockAccountRow>) {
+      const mockFindFirst = jest
+        .fn()
+        // 1st call: findAccountByClerkId → not found (new clerkUserId)
+        .mockResolvedValueOnce(undefined)
+        // 2nd call: email lookup → found stale row
+        .mockResolvedValueOnce(staleRow);
+
+      return {
+        db: {
+          query: { accounts: { findFirst: mockFindFirst } },
+          insert: jest.fn(),
+          update: jest.fn(),
+        } as unknown as Database,
+        mockFindFirst,
+      };
+    }
+
+    it('[BREAK][BUG-411] throws ConflictError instead of silently rewiring', async () => {
+      const staleRow = mockAccountRow({
+        id: 'acc-existing',
+        clerkUserId: 'clerk_old_deleted',
+        email: 'returning@example.com',
+      });
+      const { db } = makeReclaimDb(staleRow);
+
+      await expect(
+        findOrCreateAccount(
+          db,
+          'clerk_new_reregistered',
+          'returning@example.com',
+        ),
+      ).rejects.toThrow('An account with this email already exists');
+
+      // Must NOT update the existing row (no silent rewire)
+      expect(db.update).not.toHaveBeenCalled();
+      // Must NOT insert a new row
+      expect(db.insert).not.toHaveBeenCalled();
     });
-    const updatedRow = {
-      ...staleRow,
-      clerkUserId: 'clerk_new_reregistered',
-      updatedAt: new Date(),
-    };
 
-    const mockFindFirst = jest
-      .fn()
-      // 1st call: findAccountByClerkId → not found (new clerkUserId)
-      .mockResolvedValueOnce(undefined)
-      // 2nd call: email lookup → found stale row
-      .mockResolvedValueOnce(staleRow);
+    it('[BREAK][BUG-411] calls captureException with reclaim_attempt_blocked tag', async () => {
+      const staleRow = mockAccountRow({
+        id: 'acc-existing',
+        clerkUserId: 'clerk_old_deleted',
+        email: 'returning@example.com',
+      });
+      const { db } = makeReclaimDb(staleRow);
 
-    const mockReturning = jest.fn().mockResolvedValue([updatedRow]);
-    const mockWhere = jest.fn().mockReturnValue({ returning: mockReturning });
-    const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
+      await expect(
+        findOrCreateAccount(
+          db,
+          'clerk_new_reregistered',
+          'returning@example.com',
+        ),
+      ).rejects.toThrow();
 
-    const db = {
-      query: { accounts: { findFirst: mockFindFirst } },
-      insert: jest.fn(),
-      update: jest.fn().mockReturnValue({ set: mockSet }),
-    } as unknown as Database;
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            'account.reclaim_attempt_blocked': true,
+            flow: 'findOrCreateAccount.reclaimBlock',
+            incomingClerkUserId: 'clerk_new_reregistered',
+            existingClerkUserId: 'clerk_old_deleted',
+          }),
+        }),
+      );
+    });
 
-    const result = await findOrCreateAccount(
-      db,
-      'clerk_new_reregistered',
-      'returning@example.com',
-    );
+    it('[BREAK][BUG-411] dispatches app/account.reclaim_attempt via safeSend', async () => {
+      const staleRow = mockAccountRow({
+        id: 'acc-existing',
+        clerkUserId: 'clerk_old_deleted',
+        email: 'returning@example.com',
+      });
+      const { db } = makeReclaimDb(staleRow);
 
-    expect(result.id).toBe('acc-existing');
-    expect(result.clerkUserId).toBe('clerk_new_reregistered');
-    expect(result.email).toBe('returning@example.com');
-    // Should update, not insert
-    expect(db.update).toHaveBeenCalled();
-    expect(db.insert).not.toHaveBeenCalled();
-    // Should NOT create a new trial subscription — the account already has one
-    expect(mockCreateSubscription).not.toHaveBeenCalled();
+      await expect(
+        findOrCreateAccount(
+          db,
+          'clerk_new_reregistered',
+          'returning@example.com',
+        ),
+      ).rejects.toThrow();
+
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/account.reclaim_attempt',
+          data: expect.objectContaining({
+            incomingClerkUserId: 'clerk_new_reregistered',
+            existingClerkUserId: 'clerk_old_deleted',
+            emailHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+            timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          }),
+        }),
+      );
+    });
+
+    it('does not block when email matches the same clerkUserId (no collision)', async () => {
+      // Exercises: findAccountByClerkId miss, email lookup returns the same
+      // clerkUserId → guard should NOT fire. Falls through to insert path.
+      const ownRow = mockAccountRow({
+        id: 'acc-own',
+        clerkUserId: 'clerk_same',
+        email: 'same@example.com',
+      });
+
+      const db = {
+        query: {
+          accounts: {
+            findFirst: jest
+              .fn()
+              .mockResolvedValueOnce(undefined) // clerkUserId lookup → miss
+              .mockResolvedValueOnce(ownRow), // email lookup → same clerkUserId, no block
+          },
+        },
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            onConflictDoNothing: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([ownRow]),
+            }),
+          }),
+        }),
+      } as unknown as Database;
+
+      // Should not throw — email matches same clerkUserId, falls through to insert
+      const result = await findOrCreateAccount(
+        db,
+        'clerk_same',
+        'same@example.com',
+      );
+      expect(result.id).toBe('acc-own');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
   });
 });

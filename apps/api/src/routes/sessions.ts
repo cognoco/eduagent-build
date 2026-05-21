@@ -813,6 +813,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   result.notePromptPostSession || undefined,
                 fluencyDrill: result.fluencyDrill || undefined,
                 confidence: result.confidence || undefined,
+                // [#419] Propagate the server-side readyToFinish flag so the
+                // streaming path parity with processMessage (non-streaming).
+                readyToFinish: result.readyToFinish || undefined,
               }),
             });
             await markPersisted({

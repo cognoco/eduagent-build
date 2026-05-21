@@ -14,6 +14,8 @@ const logger = createLogger();
 export interface AuthUser {
   userId: string;
   email?: string;
+  /** True only when Clerk's email_verified claim is explicitly true in the JWT. */
+  emailVerified?: boolean;
 }
 
 export type AuthEnv = {
@@ -73,7 +75,7 @@ async function verifyClerkJWT(
   token: string,
   jwksUrl: string | undefined,
   audience: string | undefined,
-): Promise<{ sub: string; email?: string }> {
+): Promise<{ sub: string; email?: string; emailVerified: boolean }> {
   if (!jwksUrl) {
     throw new Error('CLERK_JWKS_URL is not configured');
   }
@@ -111,6 +113,7 @@ async function verifyClerkJWT(
   return {
     sub: payload.sub,
     email: payload.email as string | undefined,
+    emailVerified: payload.email_verified === true,
   };
 }
 
@@ -145,6 +148,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
     c.set('user', {
       userId: result.sub,
       email: result.email,
+      emailVerified: result.emailVerified,
     });
     return next();
   } catch (err) {

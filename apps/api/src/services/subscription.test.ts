@@ -73,6 +73,15 @@ describe('isValidTransition', () => {
     expect(isValidTransition('trial', 'expired')).toBe(true);
   });
 
+  // [BUG-442] BREAK TEST: handleBillingIssue and handlePaymentFailed both set
+  // status='past_due'. If trial->past_due is missing from VALID_TRANSITIONS,
+  // isValidTransition('trial','past_due') returns false, the update function
+  // throws (post BUG-447 fix), and the user remains in 'trial' despite a failed
+  // payment — the billing issue is silently lost. The transition must be valid.
+  it('[BUG-442] allows trial -> past_due (payment failed before trial converts)', () => {
+    expect(isValidTransition('trial', 'past_due')).toBe(true);
+  });
+
   it('allows active -> past_due', () => {
     expect(isValidTransition('active', 'past_due')).toBe(true);
   });

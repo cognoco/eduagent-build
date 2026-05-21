@@ -23,6 +23,7 @@ export const BASE_AUTH_ENV = {
 const TEST_JWT_CLAIMS = {
   sub: 'user_test',
   email: 'test@example.com',
+  email_verified: true,
   iss: 'https://clerk.test',
   aud: BASE_AUTH_ENV.CLERK_AUDIENCE,
 } as const;
@@ -36,7 +37,7 @@ const TEST_JWT_CLAIMS = {
  *   makeAuthHeaders({ 'X-Profile-Id': 'profile-abc' })
  */
 export function makeAuthHeaders(
-  extra?: Record<string, string>
+  extra?: Record<string, string>,
 ): Record<string, string> {
   return {
     Authorization: `Bearer ${signTestJwt(TEST_JWT_CLAIMS)}`,

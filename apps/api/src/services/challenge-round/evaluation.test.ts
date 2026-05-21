@@ -1,5 +1,10 @@
 import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
-import { decideMasteryAndReview, summarizeEvaluation } from './evaluation';
+import type { Database } from '@eduagent/database';
+import {
+  decideMasteryAndReview,
+  summarizeEvaluation,
+  validateEvaluationEventIds,
+} from './evaluation';
 
 const allSolid: ChallengeRoundEvaluationItem[] = [
   {
@@ -240,5 +245,102 @@ describe('summarizeEvaluation', () => {
     expect(s.partial).toBe(1);
     expect(s.missing).toBe(2);
     expect(s.misconception).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [#477] validateEvaluationEventIds — answerEventId ownership guard
+// ---------------------------------------------------------------------------
+//
+// Break tests (red-green pattern):
+//   1. An answerEventId that belongs to another profile → whole evaluation
+//      rejected (strict mode). Re-verify by removing the throw — test fails.
+//   2. Valid IDs from the correct session → learnerQuote replaced with real
+//      event content so validateNoteDraft cannot be fed LLM-supplied text.
+//
+// DB is mocked as a minimal object (not jest.mock — no module replacement).
+// createScopedRepository(db, profileId) calls db.query.sessionEvents.findMany
+// internally; we control the returned rows to exercise both paths.
+
+function makeSessionEventsDb(rows: Array<{ id: string; content: string }>) {
+  return {
+    query: {
+      sessionEvents: {
+        findMany: jest.fn().mockResolvedValue(rows),
+      },
+    },
+  } as unknown as Database;
+}
+
+describe('validateEvaluationEventIds — [#477] ownership guard', () => {
+  const profileId = 'profile-owner';
+  const sessionId = 'session-abc';
+
+  const evals: ChallengeRoundEvaluationItem[] = [
+    {
+      concept: 'a',
+      result: 'solid',
+      evidence: 'x',
+      answerEventId: 'evt-1',
+      learnerQuote: 'LLM-supplied quote for a',
+    },
+    {
+      concept: 'b',
+      result: 'partial',
+      evidence: 'y',
+      answerEventId: 'evt-2',
+      learnerQuote: 'LLM-supplied quote for b',
+    },
+  ];
+
+  it('[#477] rejects the whole evaluation when any answerEventId is missing from the session', async () => {
+    // DB returns only evt-1; evt-2 absent (belongs to another profile/session).
+    // Strict mode: even one missing id → throw → caller treats as invalid.
+    const db = makeSessionEventsDb([
+      { id: 'evt-1', content: 'real content a' },
+    ]);
+    await expect(
+      validateEvaluationEventIds(db, profileId, sessionId, evals),
+    ).rejects.toThrow('[#477]');
+  });
+
+  it('[#477] rejects when no IDs match (all belong to another profile/session)', async () => {
+    const db = makeSessionEventsDb([]);
+    await expect(
+      validateEvaluationEventIds(db, profileId, sessionId, evals),
+    ).rejects.toThrow('[#477]');
+  });
+
+  it('[#477] replaces LLM-supplied learnerQuote with actual event content when all IDs are valid', async () => {
+    const db = makeSessionEventsDb([
+      { id: 'evt-1', content: 'real learner answer for a' },
+      { id: 'evt-2', content: 'real learner answer for b' },
+    ]);
+    const validated = await validateEvaluationEventIds(
+      db,
+      profileId,
+      sessionId,
+      evals,
+    );
+    // LLM-supplied quotes replaced by verified DB content.
+    expect(validated[0]!.learnerQuote).toBe('real learner answer for a');
+    expect(validated[1]!.learnerQuote).toBe('real learner answer for b');
+    // Other fields are preserved.
+    expect(validated[0]!.concept).toBe('a');
+    expect(validated[1]!.result).toBe('partial');
+  });
+
+  it('[#477] returns empty array without hitting DB when evals is empty', async () => {
+    const db = makeSessionEventsDb([]);
+    const validated = await validateEvaluationEventIds(
+      db,
+      profileId,
+      sessionId,
+      [],
+    );
+    expect(validated).toEqual([]);
+    expect(
+      (db.query.sessionEvents.findMany as jest.Mock).mock.calls.length,
+    ).toBe(0);
   });
 });

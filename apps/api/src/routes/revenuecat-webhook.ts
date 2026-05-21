@@ -24,6 +24,7 @@ import { getTierConfig } from '../services/subscription';
 import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
+import { safeSend } from '../services/safe-non-core';
 
 const logger = createLogger();
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
@@ -445,7 +446,7 @@ async function handleBillingIssue(
 }
 
 async function handleSubscriberAlias(
-  _db: Database,
+  db: Database,
   _kv: KVNamespace | undefined,
   event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
@@ -459,6 +460,68 @@ async function handleSubscriberAlias(
     transferredFrom: event.transferred_from,
     transferredTo: event.transferred_to,
   });
+
+  // [BUG-449] Full merge implementation deferred — escalation + event dispatch
+  // unblock visibility. TODO(BUG-449): full merge implementation deferred —
+  // escalation + event dispatch unblock visibility.
+  //
+  // When transferred_from has an existing subscription, credits/entitlements
+  // on that app_user_id are NOT yet migrated to the new identity. Surface
+  // this via Sentry (high severity) and dispatch an Inngest event so a future
+  // migration worker can consume it without data loss.
+  const transferredFrom = event.transferred_from ?? [];
+  if (transferredFrom.length > 0) {
+    // Resolve the transferred_from app_user_id(s) to check for existing subs
+    for (const fromUserId of transferredFrom) {
+      // Skip anonymous IDs — these are the normal alias case (anon→identified)
+      // where no subscription can be held on the anon side.
+      if (fromUserId.startsWith('$')) continue;
+
+      const fromAccount = await findAccountByClerkId(db, fromUserId);
+      if (!fromAccount) continue;
+
+      const fromSub = await getSubscriptionByAccountId(db, fromAccount.id);
+      if (!fromSub) continue;
+
+      // A subscription exists on the transferred_from identity — this is the
+      // revenue-loss scenario. Escalate immediately.
+      captureException(
+        new Error(
+          'SUBSCRIBER_ALIAS: transferred_from has active subscription — merge not implemented',
+        ),
+        {
+          extra: {
+            tag: 'revenuecat.alias.unhandled',
+            severity: 'high',
+            eventId: event.id,
+            fromAppUserId: fromUserId,
+            toAppUserId: event.app_user_id,
+            fromSubscriptionId: fromSub.id,
+            fromSubscriptionTier: fromSub.tier,
+            fromSubscriptionStatus: fromSub.status,
+          },
+        },
+      );
+
+      // Dispatch alias_received so a future migration worker can consume it.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/billing.alias_received',
+            data: {
+              eventId: event.id,
+              fromAppUserId: fromUserId,
+              toAppUserId: event.app_user_id,
+              fromAccountId: fromAccount.id,
+              fromSubscriptionId: fromSub.id,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'revenuecat.alias_received',
+        { eventId: event.id, fromAppUserId: fromUserId },
+      );
+    }
+  }
 }
 
 async function handleProductChange(

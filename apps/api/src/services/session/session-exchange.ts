@@ -2060,6 +2060,14 @@ export async function processMessage(
    * [BUG-92 / CR-2026-05-19-C4]
    */
   readyToFinish: boolean;
+  /**
+   * [#384] Envelope signals mirrored from the streaming path so both code
+   * paths expose the same client-facing shape. Absent means no prompt was
+   * requested / no confidence was emitted for this turn.
+   */
+  notePrompt?: boolean;
+  notePromptPostSession?: boolean;
+  confidence?: 'low' | 'medium' | 'high';
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
@@ -2209,6 +2217,11 @@ export async function processMessage(
     fluencyDrill: result.fluencyDrill ?? undefined,
     sourceAudit: result.sourceAudit,
     readyToFinish,
+    // [#384] Mirror streaming-path envelope signals so both code paths expose
+    // the same client-facing shape. Consumers MUST NOT assume these are absent.
+    notePrompt: result.notePrompt || undefined,
+    notePromptPostSession: result.notePromptPostSession || undefined,
+    confidence: result.confidence,
   };
 }
 
@@ -2250,6 +2263,13 @@ export async function streamMessage(
      *  emit a replace frame before done so the visible bubble matches what was
      *  persisted. */
     sourceReplacement?: string;
+    /**
+     * [#419] Server-side hard cap for interview/onboarding flows — mirrors
+     * `processMessage`. `true` when the LLM signalled `signals.ready_to_finish`
+     * OR the session has reached MAX_INTERVIEW_EXCHANGES. Streaming interview
+     * sessions were previously missing this, allowing them to run unbounded.
+     */
+    readyToFinish?: boolean;
     /** [BUG-941] Set when the LLM response was empty or unparseable — caller
      *  MUST emit a `fallback` SSE frame and skip persisting the exchange so
      *  the raw envelope never reaches ai_response.content. */
@@ -2486,6 +2506,17 @@ export async function streamMessage(
           context.isFirstEncounter === true,
         );
       }
+
+      // [#419] Apply the server-side hard cap for interview / onboarding flows,
+      // mirroring the non-streaming processMessage path. Without this, a
+      // streaming interview session could run all the way to
+      // MAX_EXCHANGES_PER_SESSION (50) when the LLM never emits the signal.
+      const readyToFinish = resolveReadyToFinish({
+        llmReadyToFinish: parsed.readyToFinish,
+        exchangeCount: persisted.exchangeCount,
+        sessionMetadata: session.metadata as Record<string, unknown> | null,
+      });
+
       return {
         response: sourceSafe.response,
         exchangeCount: persisted.exchangeCount,
@@ -2498,6 +2529,7 @@ export async function streamMessage(
         confidence: parsed.confidence,
         sourceAudit: sourceSafe.sourceAudit,
         sourceReplacement,
+        readyToFinish,
       };
     },
   };

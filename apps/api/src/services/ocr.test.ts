@@ -144,6 +144,22 @@ describe('getOcrProvider / setOcrProvider', () => {
     // After reset, calling without allowStub throws
     expect(() => getOcrProvider()).toThrow('OCR provider not configured');
   });
+
+  it('[BUG-489 / P2 BREAK] second call with different mode returns correct provider type (no singleton lock-in)', () => {
+    // Break test: BEFORE the fix, getOcrProvider set _provider on the first
+    // call and returned it on every subsequent call. If the first call used
+    // allowStub:true (e.g. test-seed warmup), the second call without allowStub
+    // silently returned StubOcrProvider instead of GeminiOcrProvider, meaning
+    // production OCR was silently broken for the isolate lifetime.
+    // With the fix, provider is built fresh per-call from the args — each call
+    // gets exactly the type it asks for.
+    const stub = getOcrProvider(undefined, true);
+    expect(stub).toBeInstanceOf(StubOcrProvider);
+
+    // Same isolate, different args — must return GeminiOcrProvider, NOT Stub.
+    const gemini = getOcrProvider(true);
+    expect(gemini).toBeInstanceOf(GeminiOcrProvider);
+  });
 });
 
 describe('GeminiOcrProvider', () => {
