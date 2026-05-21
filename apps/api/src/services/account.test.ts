@@ -12,11 +12,23 @@ const mockCreateSubscription = jest.fn().mockResolvedValue({
   tier: 'plus',
   status: 'trial',
 });
+// [BUG-417] getSubscriptionByAccountId is now called on the existing-account
+// branch to detect a missing trial subscription. Default: return a stub
+// subscription so existing tests that take the findFirst path (account found)
+// do not trigger the repair path. BUG-417 tests override this per-test.
+const mockGetSubscriptionByAccountId = jest.fn().mockResolvedValue({
+  id: 'sub-existing',
+  accountId: 'acc-1',
+  tier: 'plus',
+  status: 'trial',
+});
 jest.mock('./billing' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./billing') as typeof import('./billing');
   return {
     ...actual,
     createSubscription: (...args: unknown[]) => mockCreateSubscription(...args),
+    getSubscriptionByAccountId: (...args: unknown[]) =>
+      mockGetSubscriptionByAccountId(...args),
   };
 });
 
@@ -595,6 +607,105 @@ describe('findOrCreateAccount', () => {
       );
       expect(result.id).toBe('acc-own');
       expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+  });
+
+  // [BUG-417] BREAK TESTS: concurrent first-request race skips trial subscription.
+  // When two concurrent requests both pass the initial findFirst check (account
+  // not found), one wins the DB insert and creates the trial. If the winning
+  // request fails mid-flight after inserting the account row but before the trial
+  // subscription is committed, the losing request then finds `existing != null`
+  // and returned early — leaving an account without a trial subscription.
+  // Post-fix: when findOrCreateAccount finds an existing account but no
+  // subscription, it attempts to repair by creating the trial idempotently.
+  describe('[BUG-417] idempotent trial repair for accounts missing a subscription', () => {
+    function makeMissingTrialDb(
+      accountRow: ReturnType<typeof mockAccountRow>,
+    ): Database {
+      return {
+        query: {
+          accounts: {
+            findFirst: jest.fn().mockResolvedValue(accountRow),
+          },
+        },
+        // insert should not be called (account already exists)
+        insert: jest.fn(),
+      } as unknown as Database;
+    }
+
+    it('[BREAK] account seeded without subscription gets trial created on next findOrCreate call', async () => {
+      // Simulate: account exists (race winner created it), but sub is missing
+      // (the winner crashed before trial insertion committed).
+      mockGetSubscriptionByAccountId.mockResolvedValueOnce(null); // no sub
+      mockCreateSubscription.mockResolvedValueOnce({
+        id: 'sub-repaired',
+        accountId: 'acc-1',
+        tier: 'plus',
+        status: 'trial',
+      });
+
+      const accountWithNoSub = mockAccountRow({ id: 'acc-1' });
+      const db = makeMissingTrialDb(accountWithNoSub);
+
+      const result = await findOrCreateAccount(
+        db,
+        'clerk_user_123',
+        'user@example.com',
+      );
+
+      expect(result.id).toBe('acc-1');
+      // Trial must have been created in the repair path
+      expect(mockCreateSubscription).toHaveBeenCalledWith(
+        db,
+        'acc-1',
+        'plus',
+        expect.any(Number),
+        expect.objectContaining({
+          status: 'trial',
+          trialEndsAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        }),
+      );
+    });
+
+    it('[BREAK] repair path emits app/account.trial_missing_repair_attempted via safeSend for observability', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValueOnce(null); // no sub
+
+      const accountWithNoSub = mockAccountRow({ id: 'acc-1' });
+      const db = makeMissingTrialDb(accountWithNoSub);
+
+      await findOrCreateAccount(db, 'clerk_user_123', 'user@example.com');
+
+      // The safeSend dispatch must include the accountId and clerkUserId
+      // so on-call can query how often this race fires in the last 24h.
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/account.trial_missing_repair_attempted',
+          data: expect.objectContaining({
+            accountId: 'acc-1',
+            clerkUserId: 'clerk_user_123',
+            timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          }),
+        }),
+      );
+    });
+
+    it('does NOT trigger repair when account has an existing subscription', async () => {
+      // Default mock already returns a subscription — no repair should fire
+      mockGetSubscriptionByAccountId.mockResolvedValueOnce({
+        id: 'sub-existing',
+        accountId: 'acc-1',
+        tier: 'plus',
+        status: 'active',
+      });
+
+      const accountWithSub = mockAccountRow({ id: 'acc-1' });
+      const db = makeMissingTrialDb(accountWithSub);
+
+      await findOrCreateAccount(db, 'clerk_user_123', 'user@example.com');
+
+      // No repair — subscription already present
+      expect(mockCreateSubscription).not.toHaveBeenCalled();
+      expect(mockInngestSend).not.toHaveBeenCalled();
     });
   });
 });

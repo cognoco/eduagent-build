@@ -173,6 +173,49 @@ describe('summary-regenerate handlers', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // [FIX-425] Break tests — payload validation for sessionSummaryRegenerate
+  // ---------------------------------------------------------------------------
+
+  describe('[FIX-425] sessionSummaryRegenerate payload validation', () => {
+    it('throws NonRetriableError and skips LLM when profileId is not a UUID', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (sessionSummaryRegenerate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: {
+              profileId: 'not-a-uuid',
+              sessionId: SESSION_ID,
+              sessionSummaryId: SUMMARY_ID,
+              timestamp: TIMESTAMP,
+            },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateAndStoreLlmSummary).not.toHaveBeenCalled();
+    });
+
+    it('throws NonRetriableError and skips LLM when sessionId is missing', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (sessionSummaryRegenerate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: {
+              profileId: PROFILE_ID,
+              sessionSummaryId: SUMMARY_ID,
+              timestamp: TIMESTAMP,
+            },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateAndStoreLlmSummary).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // [FIX-428] Break tests — payload validation for sessionSummaryCreate
   // ---------------------------------------------------------------------------
 

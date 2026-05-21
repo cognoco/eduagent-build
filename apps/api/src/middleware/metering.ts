@@ -573,13 +573,15 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
 
     await next();
     if (shouldRefundAfterHandler(c.res.status)) {
-      await safeRefundQuota(db, subscriptionId, {
-        route: `metering.${c.req.method}.${c.req.path}`,
-        profileId,
-        // [CR-2026-05-19-C6] Refund to the same pool the decrement consumed.
-        source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
-        topUpCreditId: decrement.topUpCreditId,
-      });
+      // [BUG-503] Cache-aside invalidate-BEFORE-write: delete KV snapshot
+      // FIRST, then refund the DB. Without this ordering, a concurrent request
+      // could read the stale post-decrement KV between the DB refund write and
+      // the KV delete, decrement again, and write doubly-decremented counters
+      // back — persisting a phantom "used +1" state for up to the 24h TTL.
+      // Deleting first means concurrent reads either see the post-refund DB
+      // state (via re-fetch on cache miss) or the fresh post-delete state —
+      // both correct.
+      //
       // [CCR PR #281 / B67] Strip the in-flight quota headers (already handled
       // by skipping `withQuotaHeaders` on this branch) AND invalidate the KV
       // snapshot — the pre-refund counters live there and would feed the next
@@ -589,6 +591,13 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       if (kv) {
         await safeDeleteKV(kv, account.id);
       }
+      await safeRefundQuota(db, subscriptionId, {
+        route: `metering.${c.req.method}.${c.req.path}`,
+        profileId,
+        // [CR-2026-05-19-C6] Refund to the same pool the decrement consumed.
+        source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+        topUpCreditId: decrement.topUpCreditId,
+      });
       return;
     }
 

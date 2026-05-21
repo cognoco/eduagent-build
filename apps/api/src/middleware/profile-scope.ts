@@ -124,8 +124,12 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
               consentStatus: owner.consentStatus,
               hasPremiumLlm: owner.hasPremiumLlm ?? false,
               conversationLanguage: owner.conversationLanguage,
-              // The auto-resolve path always returns the owner profile.
-              isOwner: true,
+              // [BUG-410] Propagate the actual isOwner flag from the DB row.
+              // Previously hardcoded to true, which silently granted owner
+              // privileges when findOwnerProfile fell back to a non-owner row
+              // (no is_owner=true row in DB). The service now returns the real
+              // flag; the caller must not override it.
+              isOwner: owner.isOwner,
             });
           }
         } catch (err) {

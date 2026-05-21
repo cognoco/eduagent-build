@@ -18,6 +18,7 @@ jest.mock(
       ...actual,
       listProfiles: jest.fn(),
       createProfileWithLimitCheck: jest.fn(),
+      countProfiles: jest.fn(),
       getProfile: jest.fn(),
       updateProfile: jest.fn(),
       switchProfile: jest.fn(),
@@ -32,6 +33,7 @@ import type { Account } from '../services/account';
 import {
   listProfiles,
   createProfileWithLimitCheck,
+  countProfiles,
   getProfile,
   updateProfile,
   switchProfile,
@@ -109,6 +111,7 @@ const listProfilesMock = jest.mocked(listProfiles);
 const createProfileWithLimitCheckMock = jest.mocked(
   createProfileWithLimitCheck,
 );
+const countProfilesMock = jest.mocked(countProfiles);
 const getProfileMock = jest.mocked(getProfile);
 const updateProfileMock = jest.mocked(updateProfile);
 const switchProfileMock = jest.mocked(switchProfile);
@@ -188,6 +191,8 @@ describe('POST /v1/profiles', () => {
       isOwner: true,
     });
     createProfileWithLimitCheckMock.mockResolvedValue(profile);
+    // [BUG-407] profileMeta absent + count=0 → first-profile path, always allowed.
+    countProfilesMock.mockResolvedValue(0);
 
     const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
       method: 'POST',
@@ -314,6 +319,31 @@ describe('POST /v1/profiles', () => {
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     // Service must not be called — the gate fired at route entry.
+    expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
+  });
+
+  // [BUG-407] Break test — profileMeta absent + account already has profiles → 403.
+  // Old behaviour: absent meta was treated as "first profile, allow". A non-owner
+  // with an established profile context (meta resolution failed) could POST /profiles.
+  // New behaviour: do a real DB count; if count > 0, reject 403 (fail closed).
+  it('[BREAK][BUG-407] returns 403 when profileMeta is absent but account already has profiles', async () => {
+    // Simulate: meta absent (e.g. no owner row in DB, edge state), but 1 profile exists.
+    countProfilesMock.mockResolvedValue(1);
+
+    const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'Intruder',
+        birthYear: 2000,
+        location: 'EU',
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    // Service must not be called — gate fired before service invocation.
     expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
   });
 });

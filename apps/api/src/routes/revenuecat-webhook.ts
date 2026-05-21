@@ -150,25 +150,19 @@ function getTopUpCreditsForProduct(
 
 /**
  * Extracts the tier from a product ID using the product-to-tier map.
- * Falls back to parsing `com.eduagent.<tier>.<interval>` format.
+ * [BUG-444] The regex fallback was removed — it granted entitlement for ANY
+ * product matching `com.eduagent.<tier>.*` prefix, including future trial-only,
+ * marketing, or test products not in the authoritative PRODUCT_TIER_MAP.
+ * Unknown product_ids now hit the Sentry escalation path in callers.
  */
 function extractTierFromProductId(
   productId: string | undefined,
 ): ('plus' | 'family' | 'pro') | null {
   if (!productId) return null;
 
-  // Direct lookup
-  if (productId in PRODUCT_TIER_MAP) {
-    return PRODUCT_TIER_MAP[productId] ?? null;
-  }
-
-  // Fallback: parse com.eduagent.<tier>.<interval>
-  const match = productId.match(/^com\.eduagent\.(plus|family|pro)\./);
-  if (match) {
-    return match[1] as 'plus' | 'family' | 'pro';
-  }
-
-  return null;
+  // Authoritative lookup only — no regex fallback.
+  // Unknown products must be added to PRODUCT_TIER_MAP explicitly.
+  return PRODUCT_TIER_MAP[productId] ?? null;
 }
 
 // ---------------------------------------------------------------------------

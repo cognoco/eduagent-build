@@ -6,6 +6,10 @@ import {
   type LanguageEntry,
 } from '../data/languages';
 import type { LanguageDetection } from '@eduagent/schemas';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 const LANGUAGE_DETECTION_PROMPT = `You decide whether a learner's subject text means they want to study a language.
 
@@ -76,7 +80,16 @@ export async function detectLanguageSubject(
     }
 
     return entryToDetection(hint);
-  } catch {
+  } catch (err) {
+    // [BUG-462] Silent recovery banned (CLAUDE.md). Fallback is kept for
+    // resilience but the error must be visible — log + capture before returning.
+    captureException(err, {
+      extra: { context: 'language-detect.fallback', rawInput },
+    });
+    logger.warn('[language-detect] LLM call failed — falling back to hint', {
+      context: 'language-detect.fallback',
+      error: err instanceof Error ? err.message : String(err),
+    });
     return entryToDetection(hint);
   }
 }

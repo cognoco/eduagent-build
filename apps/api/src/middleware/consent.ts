@@ -71,11 +71,25 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       return;
     }
 
-    // No profileMeta → cannot evaluate consent, skip (defensive)
+    // [BUG-408] profileId is set but profileMeta is absent — this is an
+    // unexpected state. profileScopeMiddleware sets both together when it
+    // resolves a profile; if profileId is present but meta is missing, something
+    // went wrong (no owner row in DB, edge input, middleware ordering bug).
+    //
+    // Fail closed: we cannot evaluate consent without meta, and we must not
+    // allow the request to continue — a PENDING-consent learner would slip
+    // through. Return 500 (not 503 — this is not a transient DB outage; the
+    // profileScopeError sentinel covers that path above).
     const meta = c.get('profileMeta');
     if (!meta) {
-      await next();
-      return;
+      return c.json(
+        {
+          code: 'INTERNAL_SERVER_ERROR',
+          message:
+            'Profile metadata unavailable — cannot evaluate consent. Request rejected.',
+        },
+        500,
+      );
     }
 
     if (isExempt(c.req.path)) {

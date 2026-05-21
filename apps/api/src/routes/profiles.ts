@@ -20,6 +20,7 @@ import {
   getProfile,
   updateProfile,
   switchProfile,
+  countProfiles,
   ProfileValidationError,
   ProfileLimitError,
 } from '../services/profile';
@@ -53,18 +54,41 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const account = c.get('account');
     const input = c.req.valid('json');
 
-    // [CR-2026-05-19-H1] Only the account owner can create additional profiles.
-    // A brand-new account has no owner profile for profileScopeMiddleware to
-    // auto-resolve yet; let that first-profile path reach the service, where
-    // it is marked as the owner profile.
+    // [CR-2026-05-19-H1 / BUG-407] Only the account owner can create additional
+    // profiles. Two distinct cases:
+    //
+    // 1. profileMeta is present: straightforward — enforce isOwner === true.
+    // 2. profileMeta is absent: could be a first-profile creation (brand-new
+    //    account, no profiles yet) OR a broken/edge state where meta failed to
+    //    load despite existing profiles. The old heuristic treated "meta absent"
+    //    as "first profile" and allowed the request — this is wrong when the
+    //    account already has profiles but meta resolution failed silently.
+    //
+    //    Fix: do a real DB count. If 0 profiles exist, allow (first-profile
+    //    path). If 1+ exist, the owner must have been in meta — reject 403.
     const activeProfileMetaCreate = c.get('profileMeta');
-    if (activeProfileMetaCreate && activeProfileMetaCreate.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can create additional profiles.',
-      );
+    if (activeProfileMetaCreate) {
+      if (activeProfileMetaCreate.isOwner !== true) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the account owner can create additional profiles.',
+        );
+      }
+    } else {
+      // profileMeta absent — check DB to determine if this is a first-profile creation.
+      const existingCount = await countProfiles(db, account.id);
+      if (existingCount > 0) {
+        // Profiles exist but no owner meta resolved — never allow (fail closed).
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the account owner can create additional profiles.',
+        );
+      }
+      // existingCount === 0: brand-new account, first profile creation is always allowed.
     }
 
     try {

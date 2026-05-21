@@ -3,6 +3,10 @@ import { routeAndCall, extractFirstJsonObject } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
 import { detectLanguageHint } from '../data/languages';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Subject Name Resolution — classify user input before subject creation
@@ -121,8 +125,20 @@ export async function resolveSubjectName(
         detectedLanguageName: detectedLanguage?.names[0] ?? null,
       };
     }
-  } catch {
-    // Fall through to fallback
+  } catch (err) {
+    // [BUG-462] Silent recovery banned (CLAUDE.md). JSON parse fallback is
+    // kept for resilience but the error must be visible — log + capture before
+    // falling through to no_match.
+    captureException(err, {
+      extra: { context: 'subject-resolve.fallback', rawInput },
+    });
+    logger.warn(
+      '[subject-resolve] LLM response parse failed — falling back to no_match',
+      {
+        context: 'subject-resolve.fallback',
+        error: err instanceof Error ? err.message : String(err),
+      },
+    );
   }
 
   // BUG-31: Fallback to no_match instead of direct_match — the user should

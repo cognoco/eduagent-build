@@ -1,6 +1,6 @@
 import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
-import { decodeJWTHeader, fetchJWKS, verifyJWT } from './jwt';
+import { decodeJWTHeader, lookupJWKByKid, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
 import { captureException, addBreadcrumb } from '../services/sentry';
 import { createLogger } from '../services/logger';
@@ -99,12 +99,11 @@ async function verifyClerkJWT(
     throw new Error('JWT header missing kid');
   }
 
-  // Fetch JWKS and locate the matching key
-  const jwks = await fetchJWKS(jwksUrl);
-  const jwk: JWK | undefined = jwks.keys.find((k) => k.kid === header.kid);
-  if (!jwk) {
-    throw new Error(`No matching JWK found for kid: ${header.kid}`);
-  }
+  // [BUG-492] lookupJWKByKid handles key-rotation: if kid is absent from the
+  // cached JWKS, it forces a single re-fetch (deduped across concurrent
+  // requests) before throwing. This prevents up to 10-minute auth failures
+  // after Clerk key rotation.
+  const jwk: JWK = await lookupJWKByKid(jwksUrl, header.kid);
 
   // Verify signature and validate claims (issuer + audience)
   const issuer = deriveIssuerFromJwksUrl(jwksUrl);

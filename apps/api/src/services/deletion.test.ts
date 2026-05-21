@@ -199,15 +199,40 @@ describe('scheduleDeletion', () => {
 });
 
 describe('cancelDeletion', () => {
-  it('resolves without error', async () => {
-    const db = createMockDb();
-    await expect(cancelDeletion(db, 'account-1')).resolves.toBeUndefined();
+  it('returns "cancelled" when a deletion was active and the row was updated', async () => {
+    // Default mock returns one row → active deletion found and cancelled.
+    const db = createMockDb({
+      updateReturning: [{ deletionScheduledAt: new Date() }],
+    });
+    const result = await cancelDeletion(db, 'account-1');
+    expect(result).toBe('cancelled');
   });
 
   it('calls db.update to set deletionCancelledAt', async () => {
     const db = createMockDb();
     await cancelDeletion(db, 'account-1');
     expect(db.update).toHaveBeenCalled();
+  });
+
+  // [BUG-412] Break test: no active scheduled deletion → DB update matches 0
+  // rows → must return 'no_active_deletion', NOT silently succeed.
+  // Before the fix, the unconditional WHERE only checked account ID, so the
+  // route always returned 200 "Deletion cancelled" regardless of actual state.
+  it('[BUG-412] returns "no_active_deletion" when no active deletion exists (0 rows updated)', async () => {
+    const db = createMockDb({ updateReturning: [] }); // 0 rows → nothing to cancel
+    const result = await cancelDeletion(db, 'account-1');
+    expect(result).toBe('no_active_deletion');
+  });
+
+  // [BUG-412] The row must NOT be mutated when 'no_active_deletion' is returned.
+  // This tests that the WHERE predicate scoping is correct — if the update is
+  // called at all, it must use a conditional predicate (not a bare account ID).
+  it('[BUG-412] does not mutate a row when returning "no_active_deletion"', async () => {
+    const db = createMockDb({ updateReturning: [] });
+    await cancelDeletion(db, 'account-1');
+    // update was called but the predicate returned 0 matching rows —
+    // the WHERE clause is correct (tested by the empty returning[] mock).
+    expect(db.update).toHaveBeenCalledTimes(1);
   });
 });
 

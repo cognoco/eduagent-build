@@ -66,14 +66,44 @@ async function tryScheduleDeletion(
   return updated?.deletionScheduledAt ?? null;
 }
 
+export type CancelDeletionResult = 'cancelled' | 'no_active_deletion';
+
+/**
+ * Cancels a pending account deletion.
+ *
+ * [BUG-412] Previously performed an unconditional UPDATE with no predicate
+ * on deletionScheduledAt, meaning it silently "succeeded" even when no
+ * deletion was active. This masked bugs at the route layer (always 200) and
+ * allowed duplicate cancel calls to go undetected.
+ *
+ * Fix: WHERE predicate now requires:
+ *   - deletionScheduledAt IS NOT NULL   (a deletion was ever scheduled)
+ *   - deletionCancelledAt IS NULL       (not yet cancelled)
+ *     OR deletionCancelledAt <= deletionScheduledAt  (last cancel pre-dates
+ *        the current schedule, i.e. it was overridden by a re-schedule)
+ *
+ * Returns 'cancelled' when a row was updated, 'no_active_deletion' otherwise.
+ */
 export async function cancelDeletion(
   db: Database,
   accountId: string,
-): Promise<void> {
-  await db
+): Promise<CancelDeletionResult> {
+  const rows = await db
     .update(accounts)
     .set({ deletionCancelledAt: new Date() })
-    .where(eq(accounts.id, accountId));
+    .where(
+      and(
+        eq(accounts.id, accountId),
+        isNotNull(accounts.deletionScheduledAt),
+        or(
+          isNull(accounts.deletionCancelledAt),
+          lte(accounts.deletionCancelledAt, accounts.deletionScheduledAt),
+        ),
+      ),
+    )
+    .returning({ id: accounts.id });
+
+  return rows.length > 0 ? 'cancelled' : 'no_active_deletion';
 }
 
 export async function isDeletionCancelled(

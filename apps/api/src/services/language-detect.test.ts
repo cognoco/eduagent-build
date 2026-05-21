@@ -14,6 +14,28 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const mockCaptureException = jest.fn();
+const mockLoggerWarn = jest.fn();
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./logger') as typeof import('./logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: jest.fn(),
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
+
 import { detectLanguageSubject } from './language-detect';
 
 function llmResponse(json: Record<string, unknown>): void {
@@ -148,6 +170,49 @@ describe('detectLanguageSubject', () => {
     const result = await detectLanguageSubject('Spanish Civil War');
 
     expect(result).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-462] Break tests — LLM error is observable, fallback still returned
+  // ---------------------------------------------------------------------------
+
+  describe('[BUG-462] captureException + logger.warn on LLM failure', () => {
+    it('calls captureException with language-detect.fallback context when LLM throws', async () => {
+      mockRouteAndCall.mockRejectedValueOnce(new Error('quota exceeded'));
+
+      const result = await detectLanguageSubject('Portuguese');
+
+      // Fallback still returned — resilience preserved
+      expect(result).not.toBeNull();
+      expect(result!.code).toBe('pt');
+
+      // Error is now visible — not swallowed
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'language-detect.fallback',
+          }),
+        }),
+      );
+      expect(mockLoggerWarn).toHaveBeenCalled();
+    });
+
+    it('calls captureException when LLM throws a network error', async () => {
+      const networkError = new Error('fetch failed: ECONNRESET');
+      mockRouteAndCall.mockRejectedValueOnce(networkError);
+
+      await detectLanguageSubject('German');
+
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        networkError,
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'language-detect.fallback',
+          }),
+        }),
+      );
+    });
   });
 
   // Red-green proof [BUG-110]: revert to `.match(/\{[\s\S]*\}/)` and this

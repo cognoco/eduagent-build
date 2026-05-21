@@ -1316,6 +1316,63 @@ describe('PRODUCT_CHANGE', () => {
     expect(res.status).toBe(200);
     expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
   });
+
+  // [BUG-446] BREAK TEST: PRODUCT_CHANGE on an expired subscription must NOT
+  // call updateQuotaPoolLimit. With the wave-3 fix in place (BUG-447),
+  // updateSubscriptionFromRevenuecatWebhook throws on the invalid
+  // expired->active transition. The throw propagates from handleProductChange,
+  // skipping the `if (updated)` branch that contains updateQuotaPoolLimit.
+  // Pre-fix (before the throw was introduced), the function returned the existing
+  // row and callers proceeded to call updateQuotaPoolLimit — divergent billing state.
+  // Reverting the throw in updateSubscriptionFromRevenuecatWebhook makes this fail.
+  it('[BUG-446] PRODUCT_CHANGE on expired subscription does NOT call updateQuotaPoolLimit', async () => {
+    (
+      updateSubscriptionFromRevenuecatWebhook as jest.Mock
+    ).mockRejectedValueOnce(
+      new Error('Invalid subscription transition: expired -> active'),
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('PRODUCT_CHANGE', {
+        product_id: 'com.eduagent.plus.monthly',
+        new_product_id: 'com.eduagent.family.monthly',
+      }),
+    );
+
+    // 500 from the propagated throw — critical assertion is no quota update
+    expect([500, 502]).toContain(res.status);
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+  });
+
+  // [BUG-444] BREAK TEST: a product_id with the correct prefix pattern but NOT
+  // in PRODUCT_TIER_MAP must NOT be recognized as a paid tier. The regex
+  // fallback granted entitlement for any com.eduagent.<tier>.* product —
+  // including experimental/trial-only/marketing products. Post-fix, only
+  // explicit PRODUCT_TIER_MAP entries grant entitlement; unknown products route
+  // to the Sentry escalation path. Reverting the fix (re-adding the regex
+  // fallback) makes this test fail.
+  it('[BUG-444] product_id NOT in PRODUCT_TIER_MAP is rejected even if prefix matches', async () => {
+    // com.eduagent.plus.experimental matches the old regex but is not in the map
+    const res = await makeRequest(
+      makeWebhookPayload('INITIAL_PURCHASE', {
+        product_id: 'com.eduagent.plus.experimental',
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // Must NOT activate a subscription — unknown product
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+
+    // Must escalate to Sentry so the unknown product is surfaced immediately
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          productId: 'com.eduagent.plus.experimental',
+        }),
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 import { createHash } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { accounts, type Database } from '@eduagent/database';
-import { createSubscription } from './billing';
+import { createSubscription, getSubscriptionByAccountId } from './billing';
 import { computeTrialEndDate } from './trial';
 import { getTierConfig } from './subscription';
 import { createLogger } from './logger';
@@ -90,7 +90,63 @@ export async function findOrCreateAccount(
   timezone?: string | null,
 ): Promise<Account> {
   const existing = await findAccountByClerkId(db, clerkUserId);
-  if (existing) return existing;
+  if (existing) {
+    // [BUG-417] Idempotent trial repair: if this account exists but was created
+    // by a request that failed mid-flight after inserting the account row but
+    // before committing the trial subscription, subsequent requests hit this
+    // branch and skip trial creation. Guard: check for a missing subscription
+    // and provision the trial if absent.
+    const existingSub = await getSubscriptionByAccountId(db, existing.id);
+    if (!existingSub) {
+      // Account exists but has no subscription — race-condition recovery path.
+      logger.warn('account.trial_missing_repair_attempted', {
+        accountId: existing.id,
+        clerkUserId,
+      });
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/account.trial_missing_repair_attempted',
+            data: {
+              accountId: existing.id,
+              clerkUserId,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'account.trial_missing_repair_attempted',
+        { accountId: existing.id, clerkUserId },
+      );
+      try {
+        const plusTier = getTierConfig('plus');
+        const trialEndsAt = computeTrialEndDate(new Date(), timezone);
+        await createSubscription(
+          db,
+          existing.id,
+          'plus',
+          plusTier.monthlyQuota,
+          {
+            status: 'trial',
+            trialEndsAt: trialEndsAt.toISOString(),
+          },
+        );
+      } catch (error) {
+        logger.error('billing.trial_missing_repair_failed', {
+          accountId: existing.id,
+          clerkUserId,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        captureException(error, {
+          profileId: undefined,
+          extra: {
+            flow: 'findOrCreateAccount.trialMissingRepair',
+            accountId: existing.id,
+            clerkUserId,
+          },
+        });
+      }
+    }
+    return existing;
+  }
 
   // [BUG-411] Email-based reclaim is unsafe without out-of-band verification.
   // If email matches an existing row owned by a DIFFERENT clerkUserId, we

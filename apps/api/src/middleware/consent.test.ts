@@ -116,10 +116,16 @@ describe('consentMiddleware', () => {
     expect(res.status).toBe(200);
   });
 
-  it('passes through when profileMeta is not set', async () => {
+  // [BUG-408] Break test: when profileId is set but profileMeta is absent, the
+  // middleware must fail closed (500) rather than skip enforcement. A non-error
+  // path where meta wasn't loaded (missing owner row, edge input) must not let
+  // a PENDING-consent learner through.
+  it('[BUG-408] returns 500 when profileId is set but profileMeta is absent (fail closed, not open)', async () => {
     const app = createApp({ profileId: 'p-1' });
     const res = await app.request('/v1/subjects');
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.code).toBe('INTERNAL_SERVER_ERROR');
   });
 
   it('passes through for exempt path /v1/health', async () => {

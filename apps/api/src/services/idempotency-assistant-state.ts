@@ -8,6 +8,7 @@ import type { IdempotencyFlow } from './idempotency-marker';
 import { addBreadcrumb, captureException } from './sentry';
 import { createLogger } from './logger';
 import { inngest } from '../inngest/client';
+import { safeSend } from './safe-non-core';
 
 const logger = createLogger();
 
@@ -76,14 +77,20 @@ export async function lookupAssistantTurnState(params: {
       profileId,
       extra: { context: 'idempotency.lookupAssistantTurnState', flow, key },
     });
-    inngest
-      .send({
-        name: 'app/idempotency.assistant_turn_lookup_failed',
-        data: { profileId, flow },
-      })
-      .catch(() => {
-        // Fire-and-forget: best-effort event; failure is non-fatal.
-      });
+    // [BUG-420] Non-core telemetry dispatch must go through safeSend per
+    // CLAUDE.md "Silent recovery without escalation is banned" — bare
+    // inngest.send(...).catch(() => {}) erases all observability of dispatch
+    // failures. safeSend captures dispatch failures + timeouts in Sentry and
+    // logs them with `surface` while still never throwing into the caller.
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/idempotency.assistant_turn_lookup_failed',
+          data: { profileId, flow },
+        }),
+      'idempotency.assistant_turn_lookup_failed',
+      { profileId, flow },
+    );
     return SAFE_ASSISTANT_TURN_STATE;
   }
 }

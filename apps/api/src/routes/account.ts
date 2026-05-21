@@ -108,7 +108,18 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       );
     }
 
-    await cancelDeletion(db, account.id);
+    // [BUG-412] cancelDeletion now returns a typed result. Return 409 when
+    // there is no active scheduled deletion to cancel — previously this path
+    // always returned 200 even with nothing to cancel, masking bugs.
+    const cancelResult = await cancelDeletion(db, account.id);
+    if (cancelResult === 'no_active_deletion') {
+      return apiError(
+        c,
+        409,
+        ERROR_CODES.CONFLICT,
+        'No active account deletion to cancel.',
+      );
+    }
     return c.json(
       cancelDeletionResponseSchema.parse({ message: 'Deletion cancelled' }),
     );

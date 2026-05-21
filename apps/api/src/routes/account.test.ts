@@ -115,7 +115,7 @@ jest.mock('../services/deletion' /* gc1-allow: pattern-a conversion */, () => {
       ).toISOString(),
       scheduledNow: true,
     }),
-    cancelDeletion: jest.fn().mockResolvedValue(undefined),
+    cancelDeletion: jest.fn().mockResolvedValue('cancelled'),
     getDeletionStatus: jest.fn().mockResolvedValue({
       scheduled: true,
       deletionScheduledAt: '2026-02-17T00:00:00.000Z',
@@ -146,7 +146,11 @@ jest.mock('../services/export' /* gc1-allow: pattern-a conversion */, () => {
 import { app } from '../index';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
-import { getDeletionStatus, scheduleDeletion } from '../services/deletion';
+import {
+  cancelDeletion,
+  getDeletionStatus,
+  scheduleDeletion,
+} from '../services/deletion';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError } from '../errors';
 import { findOwnerProfile } from '../services/profile';
@@ -358,6 +362,26 @@ describe('account routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // [BUG-412] Break test: service returns 'no_active_deletion' → route must
+    // respond 409 CONFLICT, not 200. Before the fix, cancelDeletion returned
+    // void so the route always returned 200 regardless.
+    it('[BUG-412] returns 409 when there is no active deletion to cancel', async () => {
+      (cancelDeletion as jest.Mock).mockResolvedValueOnce('no_active_deletion');
+
+      const res = await app.request(
+        '/v1/account/cancel-deletion',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.CONFLICT });
     });
   });
 
