@@ -87,6 +87,29 @@ const WITHDRAWN_ADULT_META: ProfileMeta = {
 // ---------------------------------------------------------------------------
 
 describe('consentMiddleware', () => {
+  // [BUG-502] Break test: when profileScopeMiddleware sets the error sentinel
+  // (DB threw during auto-resolve), consentMiddleware must fail closed with 503
+  // rather than treating the absent profileId as an account-level route and
+  // skipping enforcement. This guards against PENDING-consent learners escaping
+  // the consent gate via a transient DB outage on the owner profile lookup.
+  it('[BUG-502] returns 503 when profileScopeError sentinel is set (fails closed, not open)', async () => {
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      // Simulate profileScopeMiddleware setting the error sentinel after a
+      // transient DB failure. profileId is absent (auto-resolve never completed).
+      c.set('profileScopeError' as never, new Error('DB connection lost'));
+      // profileId intentionally left unset — this is the fail-open path we block
+      await next();
+    });
+    app.use('*', consentMiddleware);
+    app.all('*', (c) => c.json({ ok: true }));
+
+    const res = await app.request('/v1/subjects');
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe('SERVICE_UNAVAILABLE');
+  });
+
   it('passes through when no profileId is set (account-level route)', async () => {
     const app = createApp({});
     const res = await app.request('/v1/subjects');

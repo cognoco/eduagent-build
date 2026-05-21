@@ -50,6 +50,13 @@ export type ProfileScopeEnv = {
     account: Account;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    /**
+     * [BUG-502 / BUG-487] Set when the auto-resolve path throws a transient
+     * error (DB outage). Downstream middleware (consent.ts) reads this sentinel
+     * to fail closed rather than treating the absent profileId as an
+     * account-level route and skipping enforcement.
+     */
+    profileScopeError: Error | undefined;
   };
 };
 
@@ -131,6 +138,21 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
               context: 'profile-scope.auto_resolve_owner',
               accountId: account.id,
             },
+          });
+          // [BUG-487 / BUG-502] Distinguish "no owner profile exists" (legit —
+          // proceed, downstream requireProfileId will 400 as appropriate) from
+          // "DB threw a transient error" (fail closed — never allow a
+          // PENDING-consent learner through the consent gate by accident).
+          //
+          // Set sentinel for belt-and-suspenders: consent.ts reads it and also
+          // fails closed if this throw is ever caught by an outer try/catch.
+          c.set(
+            'profileScopeError',
+            err instanceof Error ? err : new Error(String(err)),
+          );
+          throw new HTTPException(503, {
+            message:
+              'Profile resolution temporarily unavailable — please retry',
           });
         }
       }

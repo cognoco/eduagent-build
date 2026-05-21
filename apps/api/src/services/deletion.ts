@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { accounts, profiles, type Database } from '@eduagent/database';
 import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
@@ -154,12 +154,60 @@ export async function getProfileIdsForAccount(
   return rows.map((p) => p.id);
 }
 
+/**
+ * Result of an executeDeletion call.
+ * - 'deleted': account row was deleted (happy path).
+ * - 'cancelled': the cancellation flag is set and later than the schedule,
+ *   meaning the user cancelled during the grace period — do NOT delete.
+ *   The Inngest caller must handle this as a no-op and return early.
+ * - 'already_deleted': account row was not found (idempotent no-op).
+ */
+export type DeletionResult = 'deleted' | 'cancelled' | 'already_deleted';
+
 export async function executeDeletion(
   db: Database,
   accountId: string,
-): Promise<void> {
-  // FK cascades handle all child records. Idempotent — no-op if already deleted.
-  await db.delete(accounts).where(eq(accounts.id, accountId));
+): Promise<DeletionResult> {
+  // [Fix Bug #494] Atomic TOCTOU guard: DELETE only when the account still has
+  // an active (non-cancelled) deletion schedule. The WHERE expression mirrors
+  // the isDeletionCancelled() check but executes atomically with the DELETE,
+  // closing the race between cancelDeletion() and the post-grace-period
+  // Inngest step.
+  //
+  // Conditions for deletion:
+  //   1. id matches
+  //   2. deletionScheduledAt IS NOT NULL  — deletion was actually scheduled
+  //   3. deletionCancelledAt IS NULL      — never cancelled
+  //      OR deletionCancelledAt <= deletionScheduledAt  — cancelled before the
+  //         current schedule was created (i.e. cancel pre-dates this schedule)
+  //
+  // If 0 rows are deleted the account either never had a pending deletion,
+  // was cancelled during the grace period, or was already removed.
+  const result = await db
+    .delete(accounts)
+    .where(
+      and(
+        eq(accounts.id, accountId),
+        isNotNull(accounts.deletionScheduledAt),
+        or(
+          isNull(accounts.deletionCancelledAt),
+          lte(accounts.deletionCancelledAt, accounts.deletionScheduledAt),
+        ),
+      ),
+    )
+    .returning({ id: accounts.id });
+
+  if (result.length > 0) {
+    return 'deleted';
+  }
+
+  // Distinguish cancelled from already-deleted so callers get accurate telemetry.
+  const existingRow = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+    columns: { id: true },
+  });
+
+  return existingRow ? 'cancelled' : 'already_deleted';
 }
 
 export async function deleteProfile(

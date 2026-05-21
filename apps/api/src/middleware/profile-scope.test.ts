@@ -168,12 +168,17 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  // [CR-SILENT-RECOVERY-1] Break test: verifies the auto-resolve catch block
-  // emits BOTH a structured log (queryable observability) AND a Sentry capture
-  // (aggregate alerting) — not just a raw console.error. The rule "silent
-  // recovery without escalation is banned" requires both signals in
-  // auth-scoping code paths.
-  it('escalates via logger.error + captureException when findOwnerProfile throws', async () => {
+  // [BUG-487 / BUG-502] Break test: when findOwnerProfile throws a transient
+  // DB error, profileScopeMiddleware must respond 503 (fail closed) and must
+  // NOT call next(). Previous behavior was to swallow the error and call
+  // next() with profileId undefined, allowing consent to skip enforcement.
+  //
+  // Also verifies both observability signals still fire before the throw:
+  // - Structured log (queryable event name)
+  // - Sentry capture (aggregate alerting)
+  // This preserves the CR-SILENT-RECOVERY-1 requirement while fixing the
+  // fail-open bug.
+  it('[BUG-487/502] returns 503 + logs + captures when findOwnerProfile throws', async () => {
     const { findOwnerProfile } = jest.requireMock('../services/profile');
     // [BUG-231] See above — jest.fn() avoids the empty-function suppression.
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(jest.fn());
@@ -184,11 +189,10 @@ describe('profileScopeMiddleware', () => {
 
     const app = createApp();
     const res = await app.request('/test');
-    const body = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(body.profileId).toBeNull();
-    expect(body.profileMeta).toBeNull();
+    // [BUG-487] Must respond 503, NOT 200 — DB error is transient server fault.
+    // [BUG-502] Must NOT proceed to route handler (consent gate would fail open).
+    expect(res.status).toBe(503);
 
     // Structured log: JSON-encoded entry with the documented event name
     expect(errorSpy).toHaveBeenCalledTimes(1);

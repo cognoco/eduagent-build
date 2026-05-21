@@ -21,7 +21,8 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
-import { assertParentAccess } from '../services/family-access';
+import type { ProfileMeta } from '../middleware/profile-scope';
+import { assertOwnerAndParentAccess } from '../services/family-access';
 import { notFound } from '../errors';
 import {
   updateConversationLanguage,
@@ -37,6 +38,9 @@ type OnboardingRouteEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
+    // [CR-2026-05-19-H1] Required by assertOwnerAndParentAccess to gate
+    // parent-admin routes to owner profiles only.
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -55,7 +59,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
           db,
           profileId,
           account.id,
-          conversationLanguage
+          conversationLanguage,
         );
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
@@ -64,7 +68,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         throw err;
       }
       return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
-    }
+    },
   )
   .patch(
     '/onboarding/:profileId/language',
@@ -74,14 +78,15 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const account = c.get('account');
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      await assertParentAccess(db, parentProfileId, childProfileId);
+      // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { conversationLanguage } = c.req.valid('json');
       try {
         await updateConversationLanguage(
           db,
           childProfileId,
           account.id,
-          conversationLanguage
+          conversationLanguage,
         );
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
@@ -90,7 +95,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         throw err;
       }
       return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
-    }
+    },
   )
   // ---- Pronouns -----------------------------------------------------------
   .patch(
@@ -110,7 +115,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         throw err;
       }
       return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
-    }
+    },
   )
   .patch(
     '/onboarding/:profileId/pronouns',
@@ -120,7 +125,8 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const account = c.get('account');
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      await assertParentAccess(db, parentProfileId, childProfileId);
+      // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { pronouns } = c.req.valid('json');
       try {
         await updatePronouns(db, childProfileId, account.id, pronouns);
@@ -131,7 +137,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         throw err;
       }
       return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
-    }
+    },
   )
   // ---- Interest context ---------------------------------------------------
   .patch(
@@ -151,7 +157,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         throw err;
       }
       return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
-    }
+    },
   )
   .patch(
     '/onboarding/:profileId/interests/context',
@@ -161,7 +167,8 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const account = c.get('account');
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
-      await assertParentAccess(db, parentProfileId, childProfileId);
+      // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, childProfileId, account.id, interests);
@@ -172,5 +179,5 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         throw err;
       }
       return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
-    }
+    },
   );

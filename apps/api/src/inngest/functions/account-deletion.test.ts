@@ -58,7 +58,7 @@ describe('scheduledDeletion', () => {
   it('sleeps for 7-day grace period before checking cancellation', async () => {
     const { step, sleepCalls } = createInngestStepRunner();
     mockIsDeletionCancelled.mockResolvedValue(false);
-    mockExecuteDeletion.mockResolvedValue(undefined);
+    mockExecuteDeletion.mockResolvedValue('deleted');
 
     const handler = (scheduledDeletion as any).fn;
     await handler({
@@ -87,7 +87,7 @@ describe('scheduledDeletion', () => {
   it('executes deletion when not cancelled', async () => {
     const { step } = createInngestStepRunner();
     mockIsDeletionCancelled.mockResolvedValue(false);
-    mockExecuteDeletion.mockResolvedValue(undefined);
+    mockExecuteDeletion.mockResolvedValue('deleted');
 
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
@@ -102,7 +102,7 @@ describe('scheduledDeletion', () => {
   it('calls getStepDatabase inside each step.run closure', async () => {
     const { step } = createInngestStepRunner();
     mockIsDeletionCancelled.mockResolvedValue(false);
-    mockExecuteDeletion.mockResolvedValue(undefined);
+    mockExecuteDeletion.mockResolvedValue('deleted');
 
     const handler = (scheduledDeletion as any).fn;
     await handler({
@@ -198,5 +198,72 @@ describe('[FIX-INNGEST-2] idempotency and concurrency config', () => {
   it('declares retries: 5 for transient DB failures during deletion', () => {
     const opts = (scheduledDeletion as any).opts;
     expect(opts.retries).toBe(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [Fix Bug #494] TOCTOU cancellation-race break tests (unit layer)
+//
+// executeDeletion now returns 'deleted' | 'cancelled' | 'already_deleted'.
+// The account-deletion function must propagate the 'cancelled' result as
+// { status: 'cancelled' } so on-call has accurate telemetry when the atomic
+// guard fires.
+//
+// Red→green: before the fix executeDeletion returned void and the caller
+// always returned { status: 'deleted' }. With the fix, when executeDeletion
+// returns 'cancelled' the function must return { status: 'cancelled' }.
+// ---------------------------------------------------------------------------
+describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic guard', () => {
+  const mockDb = { query: {} };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockAccountExists.mockResolvedValue(true);
+    mockIsDeletionCancelled.mockResolvedValue(false);
+  });
+
+  it('returns { status: "cancelled" } when executeDeletion atomic guard fires', async () => {
+    // Simulates: user cancelled between check-cancellation and delete-account-data.
+    // The atomic WHERE in executeDeletion catches it and returns 'cancelled'.
+    mockExecuteDeletion.mockResolvedValue('cancelled');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-toctou' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'cancelled', accountId: 'acc-toctou' });
+  });
+
+  it('returns { status: "deleted" } on the happy path', async () => {
+    mockExecuteDeletion.mockResolvedValue('deleted');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-happy' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'deleted', accountId: 'acc-happy' });
+  });
+
+  it('returns { status: "already_deleted" } when executeDeletion finds row missing', async () => {
+    mockExecuteDeletion.mockResolvedValue('already_deleted');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-gone' } },
+      step,
+    });
+
+    expect(result).toEqual({
+      status: 'already_deleted',
+      accountId: 'acc-gone',
+    });
   });
 });

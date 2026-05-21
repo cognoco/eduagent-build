@@ -18,6 +18,12 @@ type ConsentEnv = {
     account: Account;
     profileId: string;
     profileMeta: ProfileMeta | undefined;
+    /**
+     * [BUG-502] Sentinel set by profileScopeMiddleware when auto-resolve throws
+     * a transient error. When present, consent must fail closed — absent profileId
+     * must NOT be treated as "account-level route, skip enforcement".
+     */
+    profileScopeError: Error | undefined;
   };
 };
 
@@ -42,6 +48,22 @@ function isExempt(path: string): boolean {
 
 export const consentMiddleware = createMiddleware<ConsentEnv>(
   async (c, next) => {
+    // [BUG-502] Belt-and-suspenders: if profileScopeMiddleware set the error
+    // sentinel (transient DB failure during auto-resolve), fail closed even
+    // though profileId is absent. The primary defence is the 503 throw in
+    // profile-scope.ts; this guard catches any future regression where that
+    // throw is suppressed by an outer try/catch.
+    const profileScopeError = c.get('profileScopeError');
+    if (profileScopeError) {
+      return c.json(
+        {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Profile resolution temporarily unavailable — please retry',
+        },
+        503,
+      );
+    }
+
     // No profileId → account-level route, skip
     const profileId = c.get('profileId');
     if (!profileId) {

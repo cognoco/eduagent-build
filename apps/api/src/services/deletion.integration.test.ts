@@ -28,7 +28,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { executeDeletion } from './deletion';
+import { cancelDeletion, executeDeletion, scheduleDeletion } from './deletion';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -131,28 +131,77 @@ describeIfDb(
       }
     });
 
+    // -----------------------------------------------------------------------
+    // [Fix Bug #494] TOCTOU break test — cancellation-race guard
+    //
+    // Scenario: account has a pending deletion schedule, user cancels it, then
+    // executeDeletion fires (simulating the Inngest post-grace-period step
+    // arriving after cancelDeletion). The atomic WHERE guard must prevent the
+    // delete and return 'cancelled'; the account row must still exist.
+    //
+    // Red→green: before the fix executeDeletion used `WHERE id = $1` with no
+    // cancellation predicate, so it would delete the account regardless of the
+    // cancellation flag. With the fix the atomic WHERE prevents the delete.
+    // -----------------------------------------------------------------------
+    it('[Bug #494] executeDeletion returns "cancelled" and leaves account intact when deletion was cancelled', async () => {
+      // Create a fresh account for this test (separate from the cascade suite).
+      const [cancelTestAccount] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: `clerk_cancel_race_${RUN_ID}`,
+          email: `cancel_race_${RUN_ID}@test.invalid`,
+        })
+        .returning({ id: accounts.id });
+      const cancelTestAccountId = cancelTestAccount!.id;
+
+      try {
+        // Schedule deletion (sets deletionScheduledAt).
+        await scheduleDeletion(db, cancelTestAccountId);
+
+        // User cancels during grace period (sets deletionCancelledAt > deletionScheduledAt).
+        await cancelDeletion(db, cancelTestAccountId);
+
+        // Inngest post-grace-period step fires — must be a no-op.
+        const result = await executeDeletion(db, cancelTestAccountId);
+
+        expect(result).toBe('cancelled');
+
+        // Account row must still exist.
+        const row = await db.query.accounts.findFirst({
+          where: (a, { eq: eqFn }) => eqFn(a.id, cancelTestAccountId),
+          columns: { id: true },
+        });
+        expect(row).not.toBeUndefined();
+      } finally {
+        // Clean up.
+        await db.execute(
+          sql`DELETE FROM accounts WHERE id = ${cancelTestAccountId}`,
+        );
+      }
+    });
+
     it('cascade-deletes all retention-pipeline rows for the deleted account', async () => {
       const before = await db.execute(
-        sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`
+        sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`,
       );
       expect((before.rows as Array<{ c: number }>)[0]!.c).toBeGreaterThan(0);
 
       await executeDeletion(db, accountId);
 
       const summaries = await db.execute(
-        sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`
+        sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`,
       );
       expect((summaries.rows as Array<{ c: number }>)[0]!.c).toBe(0);
 
       const embeddings = await db.execute(
-        sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${profileId}`
+        sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${profileId}`,
       );
       expect((embeddings.rows as Array<{ c: number }>)[0]!.c).toBe(0);
 
       const events = await db.execute(
-        sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`
+        sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`,
       );
       expect((events.rows as Array<{ c: number }>)[0]!.c).toBe(0);
     });
-  }
+  },
 );
