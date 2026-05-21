@@ -10,6 +10,21 @@
     "ota:preview": "doppler run -c stg -- eas update --branch preview",
     "ota:production": "doppler run -c prd -- eas update --branch production"
   },
+  "nx": {
+    "targets": {
+      "typecheck": {
+        "outputs": [
+          "{projectRoot}/**/*.d.ts",
+          "{projectRoot}/**/*.d.cts",
+          "{projectRoot}/**/*.d.mts",
+          "{projectRoot}/**/*.d.ts.map",
+          "{projectRoot}/**/*.d.cts.map",
+          "{projectRoot}/**/*.d.mts.map",
+          "{projectRoot}/tsconfig.tsbuildinfo"
+        ]
+      }
+    }
+  },
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.23",
     "@eduagent/schemas": "workspace:*",
