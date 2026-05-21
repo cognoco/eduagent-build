@@ -1,0 +1,29 @@
+# ZDX configuration for the eduagent-build (MentoMate) repo.
+# See: zdx/standard/README.md § How a project consumes the standard
+
+zdx:
+  version: 0.3.0
+
+  work-items:
+    # The single master ZDX Work Items DB across the estate. Per the ZDX
+    # standard there is one master DB; project work is sliced by the Project
+    # relation, and MentoMate is a project within the estate (conformance.md
+    # § satellite-tracker pattern names the "MentoMate Bug Tracker" as a
+    # satellite feeding this master). Confirm against the chosen test item.
+    database_id: "f170be9e04ae45d4961828f2438666bd"
+    data_source_id: "36fd1119-9955-4684-8bfe-deb145e6a21f"
+
+    token:
+      # Notion integration token, resolved from the NOTION_TOKEN env var
+      # (fleet-standard secret name). Inject via `doppler run` (the repo's
+      # secret store) or export it in the shell that launches the Archon run.
+      env_var: NOTION_TOKEN
+
+  # Command run by execute-workitem's validate / re-validate steps.
+  # check-change-class.sh is the repo's change-aware validator
+  # ("you touched X, run Y") — see docs/change-classes.md.
+  validate:
+    command: "bash scripts/check-change-class.sh --run"
+
+  conformance:
+    deviations: []
