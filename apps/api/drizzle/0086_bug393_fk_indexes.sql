@@ -1,4 +1,4 @@
--- 0090_bug393_fk_indexes.sql
+-- 0086_bug393_fk_indexes.sql
 -- BUG-393: Add missing B-tree indexes on FK columns that lack index coverage.
 --
 -- Background: Postgres does not automatically index FK columns. Without
