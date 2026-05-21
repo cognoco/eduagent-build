@@ -6,7 +6,8 @@ jest.mock(
     const actual = jest.requireActual('@eduagent/database');
     return {
       ...actual,
-      findSubscriptionById: (...args: unknown[]) =>
+      // [BUG-565] renamed to __unscoped suffix
+      findSubscriptionById__unscoped: (...args: unknown[]) =>
         mockFindSubscriptionById(...args),
     };
   },

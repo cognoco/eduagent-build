@@ -566,7 +566,21 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
       const userMsg =
         msg.length < 200 ? (friendlyMessage(msg) ?? msg) : undefined;
 
-      if (status === 401 || status === 403) {
+      // [BUG-546] Distinguish 401 (session expired) from 403 (forbidden).
+      // For 401: triggerAuthExpired() has already initiated async sign-out
+      // (wave 1 / BUG-547). Showing a 'sign-out' recovery button on top of
+      // an in-progress sign-out creates a double-sign-out + guard race.
+      // Use recovery:'none' so no action button is rendered — the in-progress
+      // sign-out will navigate away shortly.
+      // For 403: this is a genuine auth/permission failure; 'sign-out' is correct.
+      if (status === 401) {
+        return {
+          message: i18next.t('errors.sessionExpired'),
+          category: 'auth',
+          recovery: 'none',
+        };
+      }
+      if (status === 403) {
         return {
           message: userMsg ?? i18next.t('errors.forbidden'),
           category: 'auth',

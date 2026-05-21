@@ -9,7 +9,8 @@ import type { AgeBracket } from '@eduagent/schemas';
 // ── getConsentRequestCopy ──────────────────────────────────────────────
 
 describe('getConsentRequestCopy', () => {
-  it.each<AgeBracket>(['child', 'adolescent'])(
+  // [BUG-577] 'child' removed from AgeBracket; 'adolescent' covers all under-18
+  it.each<AgeBracket>(['adolescent'])(
     'returns child-friendly text for %s bracket',
     (bracket) => {
       const copy = getConsentRequestCopy(bracket);
@@ -29,18 +30,13 @@ describe('getConsentRequestCopy', () => {
     expect(copy.emailLabel).toBe("Parent's email address");
     expect(copy.successMessage).toContain("They'll need to approve");
   });
-
-  it('child and adolescent return identical copy', () => {
-    const child = getConsentRequestCopy('child');
-    const adolescent = getConsentRequestCopy('adolescent');
-    expect(child).toEqual(adolescent);
-  });
 });
 
 // ── getConsentPendingCopy ──────────────────────────────────────────────
 
 describe('getConsentPendingCopy', () => {
-  it.each<AgeBracket>(['child', 'adolescent'])(
+  // [BUG-577] 'child' removed from AgeBracket; 'adolescent' covers all under-18
+  it.each<AgeBracket>(['adolescent'])(
     'returns child-friendly text for %s bracket',
     (bracket) => {
       const copy = getConsentPendingCopy(bracket);
@@ -52,7 +48,7 @@ describe('getConsentPendingCopy', () => {
     },
   );
 
-  it('interpolates email in descriptionWithEmail for child/adolescent', () => {
+  it('interpolates email in descriptionWithEmail for adolescent', () => {
     const copy = getConsentPendingCopy('adolescent');
     const result = copy.descriptionWithEmail('mom@example.com');
     expect(result).toContain('mom@example.com');
@@ -74,22 +70,10 @@ describe('getConsentPendingCopy', () => {
     expect(result).toBe('We sent an email to parent@test.com.');
   });
 
-  it('child and adolescent return identical copy', () => {
-    const child = getConsentPendingCopy('child');
-    const adolescent = getConsentPendingCopy('adolescent');
-    expect(child.title).toBe(adolescent.title);
-    expect(child.descriptionWithoutEmail).toBe(
-      adolescent.descriptionWithoutEmail,
-    );
-    expect(child.subtext).toBe(adolescent.subtext);
-    expect(child.descriptionWithEmail('x@y.com')).toBe(
-      adolescent.descriptionWithEmail('x@y.com'),
-    );
-  });
-
   // ── noEmailSent fields (PENDING state — no parent email submitted) ──
 
-  it.each<AgeBracket>(['child', 'adolescent'])(
+  // [BUG-577] 'child' removed from AgeBracket; 'adolescent' covers all under-18
+  it.each<AgeBracket>(['adolescent'])(
     'returns child-friendly no-email-sent text for %s bracket',
     (bracket) => {
       const copy = getConsentPendingCopy(bracket);
@@ -102,7 +86,8 @@ describe('getConsentPendingCopy', () => {
     },
   );
 
-  it.each<AgeBracket>(['child', 'adolescent'])(
+  // [BUG-577] 'child' removed from AgeBracket; 'adolescent' covers all under-18
+  it.each<AgeBracket>(['adolescent'])(
     'returns change-email copy for %s bracket',
     (bracket) => {
       const copy = getConsentPendingCopy(bracket);
@@ -134,7 +119,8 @@ describe('getConsentPendingCopy', () => {
 // ── getConsentWithdrawnCopy ────────────────────────────────────────────
 
 describe('getConsentWithdrawnCopy', () => {
-  it.each<AgeBracket>(['child', 'adolescent'])(
+  // [BUG-577] 'child' removed from AgeBracket; 'adolescent' covers all under-18
+  it.each<AgeBracket>(['adolescent'])(
     'returns child-friendly text for %s bracket',
     (bracket) => {
       const copy = getConsentWithdrawnCopy(bracket);
@@ -160,18 +146,13 @@ describe('getConsentWithdrawnCopy', () => {
     );
     expect(copy.help).toContain('restore consent from their dashboard');
   });
-
-  it('child and adolescent return identical copy', () => {
-    const child = getConsentWithdrawnCopy('child');
-    const adolescent = getConsentWithdrawnCopy('adolescent');
-    expect(child).toEqual(adolescent);
-  });
 });
 
 // ── getConsentHandOffCopy ────────────────────────────────────────────
 
 describe('getConsentHandOffCopy', () => {
-  it.each<AgeBracket>(['child', 'adolescent'])(
+  // [BUG-577] 'child' removed from AgeBracket; 'adolescent' covers all under-18
+  it.each<AgeBracket>(['adolescent'])(
     'returns learner hand-off copy for %s bracket',
     (bracket) => {
       const copy = getConsentHandOffCopy(bracket);
@@ -186,11 +167,5 @@ describe('getConsentHandOffCopy', () => {
     expect(copy.childTitle).toBe('Parental consent required');
     expect(copy.successMessage).toBe('Consent link sent!');
     expect(copy.handBackButton).toBe('Done');
-  });
-
-  it('child and adolescent return identical copy', () => {
-    expect(getConsentHandOffCopy('child')).toEqual(
-      getConsentHandOffCopy('adolescent'),
-    );
   });
 });

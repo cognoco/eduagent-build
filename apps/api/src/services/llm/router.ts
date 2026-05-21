@@ -169,7 +169,6 @@ function getSafetyPreamble(ageBracket?: AgeBracket): string {
   switch (ageBracket) {
     case 'adult':
       return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
-    case 'child':
     case 'adolescent':
       return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
     default: {

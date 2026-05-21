@@ -8,8 +8,8 @@ import {
   quotaPools,
   subscriptions,
   type Database,
-  findSubscriptionById,
-  findQuotaPool,
+  findSubscriptionById__unscoped,
+  findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
@@ -58,13 +58,15 @@ export async function handleTierChange(
   subscriptionId: string,
   newTier: SubscriptionTier,
 ): Promise<TierChangeResult | null> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  // safe-caller: Stripe webhook tier-change handler — subscriptionId from verified Stripe event
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return null;
   }
 
-  const pool = await findQuotaPool(db, subscriptionId);
+  // safe-caller: Stripe webhook tier-change handler — subscriptionId from verified Stripe event
+  const pool = await findQuotaPool__unscoped(db, subscriptionId);
 
   if (!pool) {
     return null;

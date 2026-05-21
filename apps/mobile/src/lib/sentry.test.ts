@@ -7,6 +7,8 @@ import {
   _resetSentryState,
 } from './sentry';
 
+// [BUG-555] — Sentry user scope on profile switch
+
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   getClient: jest.fn(),
@@ -137,5 +139,83 @@ describe('evaluateSentryForProfile', () => {
 
     evaluateSentryForProfile(birthYear, null);
     expect(isSentryEnabled()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-555] Sentry user scope on profile switch
+//
+// Root cause: on profile switch (parent↔child proxy mode), evaluateSentryForProfile
+// is the only call that fires — but it never called Sentry.setUser, so Sentry
+// events continued to report under the previously set user identity.
+//
+// Fix: evaluateSentryForProfile now accepts a profileId param and calls
+// Sentry.setUser({ id: profileId }) on every enable path, and relies on
+// disableSentry() (which already calls setUser(null)) on every disable path.
+// ---------------------------------------------------------------------------
+
+describe('[BUG-555] evaluateSentryForProfile — Sentry user scope on profile switch', () => {
+  it('[break-test] calls Sentry.setUser with profileId when enabling for adult', () => {
+    const birthYear = new Date().getFullYear() - 25;
+    evaluateSentryForProfile(birthYear, null, 'profile-abc-123');
+
+    expect(Sentry.setUser).toHaveBeenCalledWith({ id: 'profile-abc-123' });
+    expect(isSentryEnabled()).toBe(true);
+  });
+
+  it('[break-test] calls Sentry.setUser with new profileId on profile switch', () => {
+    const birthYear = new Date().getFullYear() - 25;
+
+    // Parent profile
+    evaluateSentryForProfile(birthYear, null, 'parent-profile-id');
+    expect(Sentry.setUser).toHaveBeenLastCalledWith({
+      id: 'parent-profile-id',
+    });
+
+    jest.clearAllMocks();
+
+    // Switch to child profile
+    evaluateSentryForProfile(birthYear, null, 'child-profile-id');
+
+    // [break-test] Without the fix, setUser would not be called here and
+    // Sentry events would still report under parent-profile-id.
+    expect(Sentry.setUser).toHaveBeenCalledWith({ id: 'child-profile-id' });
+  });
+
+  it('[break-test] calls Sentry.setUser(null) when disabling for underage user', () => {
+    // First enable with a profile
+    const adultBirthYear = new Date().getFullYear() - 25;
+    evaluateSentryForProfile(adultBirthYear, null, 'parent-profile-id');
+    jest.clearAllMocks();
+
+    // Switch to underage child without consent → disable
+    const childBirthYear = new Date().getFullYear() - 10;
+    evaluateSentryForProfile(childBirthYear, 'PENDING', 'child-profile-id');
+
+    expect(isSentryEnabled()).toBe(false);
+    // disableSentry() calls Sentry.setUser(null)
+    expect(Sentry.setUser).toHaveBeenCalledWith(null);
+  });
+
+  it('calls Sentry.setUser(null) when profileId is null (no profile active)', () => {
+    const birthYear = new Date().getFullYear() - 25;
+    evaluateSentryForProfile(birthYear, null, null);
+
+    expect(Sentry.setUser).toHaveBeenCalledWith(null);
+  });
+
+  it('calls Sentry.setUser with profileId when consent granted for under-13', () => {
+    const birthYear = new Date().getFullYear() - 10;
+    evaluateSentryForProfile(birthYear, 'CONSENTED', 'child-profile-id');
+
+    expect(isSentryEnabled()).toBe(true);
+    expect(Sentry.setUser).toHaveBeenCalledWith({ id: 'child-profile-id' });
+  });
+
+  it('calls Sentry.setUser with profileId when no birthYear (adult assumed)', () => {
+    evaluateSentryForProfile(null, null, 'profile-xyz');
+
+    expect(isSentryEnabled()).toBe(true);
+    expect(Sentry.setUser).toHaveBeenCalledWith({ id: 'profile-xyz' });
   });
 });

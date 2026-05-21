@@ -34,6 +34,32 @@ import {
 import type { DataExport, ConsentStatus, Profile } from '@eduagent/schemas';
 import { projectAiResponseContent } from './llm/project-response';
 
+/**
+ * [BUG-413] Walk a Drizzle row (Record<string, unknown>) and convert any JS
+ * Date values to ISO-8601 strings so the row can be safely passed through
+ * dataExportSchema.parse() and JSON.stringify().
+ *
+ * Without this, tables cast as `Record<string, unknown>[]` pass Date objects
+ * directly into the export payload.  zod's `z.record(z.string(), z.unknown())`
+ * schema accepts them silently, but the downstream JSON serialisation emits a
+ * string (JSON.stringify calls toISOString internally), while any caller that
+ * does a strict equality check or feeds the value into a Date constructor gets
+ * the raw Date object rather than a string — causing inconsistent behaviour.
+ *
+ * The fix is explicit: walk every row before returning it so the export payload
+ * is always string-typed for date fields, regardless of what the DB driver
+ * returns.
+ */
+export function serializeDates(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    out[key] = value instanceof Date ? value.toISOString() : value;
+  }
+  return out;
+}
+
 export async function generateExport(
   db: Database,
   accountId: string,
@@ -276,42 +302,45 @@ export async function generateExport(
       requestedAt: row.requestedAt.toISOString(),
       respondedAt: row.respondedAt?.toISOString() ?? null,
     })),
-    subjects: subjectRows as Record<string, unknown>[],
-    curricula: curriculaRows as Record<string, unknown>[],
-    curriculumTopics: curriculumTopicRows as Record<string, unknown>[],
-    learningSessions: learningSessionRows as Record<string, unknown>[],
+    // [BUG-413] Apply serializeDates to every row so Date objects from the
+    // Drizzle / neon-serverless driver are converted to ISO strings before
+    // they reach the export payload.  Without this, rows passed as
+    // `Record<string, unknown>[]` carry raw Date values that behave
+    // inconsistently across zod parse, JSON.stringify, and callers.
+    subjects: subjectRows.map(serializeDates),
+    curricula: curriculaRows.map(serializeDates),
+    curriculumTopics: curriculumTopicRows.map(serializeDates),
+    learningSessions: learningSessionRows.map(serializeDates),
     sessionEvents: sessionEventRows.map((row) => {
+      const serialized = serializeDates(row as Record<string, unknown>);
       if (
-        typeof row === 'object' &&
-        row !== null &&
-        (row as Record<string, unknown>)['eventType'] === 'ai_response' &&
-        typeof (row as Record<string, unknown>)['content'] === 'string'
+        serialized['eventType'] === 'ai_response' &&
+        typeof serialized['content'] === 'string'
       ) {
         return {
-          ...(row as Record<string, unknown>),
-          content: projectAiResponseContent(
-            (row as Record<string, unknown>)['content'] as string,
-            { silent: true },
-          ),
+          ...serialized,
+          content: projectAiResponseContent(serialized['content'] as string, {
+            silent: true,
+          }),
         };
       }
-      return row as Record<string, unknown>;
+      return serialized;
     }),
-    sessionSummaries: sessionSummaryRows as Record<string, unknown>[],
-    retentionCards: retentionCardRows as Record<string, unknown>[],
-    assessments: assessmentRows as Record<string, unknown>[],
-    xpLedger: xpLedgerRows as Record<string, unknown>[],
-    streaks: streakRows as Record<string, unknown>[],
-    notificationPreferences: notificationPrefRows as Record<string, unknown>[],
-    learningModes: learningModeRows as Record<string, unknown>[],
-    teachingPreferences: teachingPrefRows as Record<string, unknown>[],
-    parkingLotItems: parkingLotRows as Record<string, unknown>[],
-    sessionEmbeddings: sessionEmbeddingRows as Record<string, unknown>[],
-    subscriptions: subscriptionRows as Record<string, unknown>[],
-    quotaPools: quotaPoolRows as Record<string, unknown>[],
-    topUpCredits: topUpCreditRows as Record<string, unknown>[],
-    needsDeepeningTopics: needsDeepeningTopicRows as Record<string, unknown>[],
-    familyLinks: familyLinkRows as Record<string, unknown>[],
+    sessionSummaries: sessionSummaryRows.map(serializeDates),
+    retentionCards: retentionCardRows.map(serializeDates),
+    assessments: assessmentRows.map(serializeDates),
+    xpLedger: xpLedgerRows.map(serializeDates),
+    streaks: streakRows.map(serializeDates),
+    notificationPreferences: notificationPrefRows.map(serializeDates),
+    learningModes: learningModeRows.map(serializeDates),
+    teachingPreferences: teachingPrefRows.map(serializeDates),
+    parkingLotItems: parkingLotRows.map(serializeDates),
+    sessionEmbeddings: sessionEmbeddingRows.map(serializeDates),
+    subscriptions: subscriptionRows.map(serializeDates),
+    quotaPools: quotaPoolRows.map(serializeDates),
+    topUpCredits: topUpCreditRows.map(serializeDates),
+    needsDeepeningTopics: needsDeepeningTopicRows.map(serializeDates),
+    familyLinks: familyLinkRows.map(serializeDates),
     learningProfiles: learningProfileRows.map((row) => ({
       ...row,
       consentPromptDismissedAt:

@@ -38,6 +38,7 @@
     "notFound": "Den siden eller gjenstanden finnes ikke lenger.",
     "resourceGone": "Denne ressursen er ikke lenger tilgjengelig.",
     "rateLimited": "Du har nådd grensen. Vent et øyeblikk og prøv igjen.",
+    "sessionExpired": "Your session expired — signing you out…",
     "forbidden": "Du har ikke tillatelse til å se dette.",
     "quotaExhausted": "Du har brukt alle øktene dine for i dag. Kom tilbake i morgen!",
     "sessionNotFound": "Den økten er ikke tilgjengelig lenger. Start en ny.",

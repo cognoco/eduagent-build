@@ -39,6 +39,14 @@ export const birthYearSchema = z
   })
   .refine((y) => y <= new Date().getFullYear(), {
     message: 'birthYear cannot be in the future',
+  })
+  // [CR-2026-05-19-H11] Product is strictly 11+. Reject birth years that
+  // would compute to age < 11 via `computeAgeBracket` (currentYear - birthYear).
+  // The ≤ threshold compensates for the month-level overestimation in
+  // that formula: a child born in December of (currentYear - 11) could be
+  // only 10 years old, so we require birthYear ≤ (currentYear - 11).
+  .refine((y) => y <= new Date().getFullYear() - 11, {
+    message: 'birthYear must correspond to a minimum age of 11',
   });
 
 export const profileCreateSchema = z.object({

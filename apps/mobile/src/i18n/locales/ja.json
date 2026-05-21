@@ -38,6 +38,7 @@
     "notFound": "そのページまたは項目は存在しません。",
     "resourceGone": "このリソースは利用できなくなりました。",
     "rateLimited": "制限に達しました。しばらく待ってからもう一度お試しください。",
+    "sessionExpired": "Your session expired — signing you out…",
     "forbidden": "これを表示する権限がありません。",
     "quotaExhausted": "今日のセッションはすべて使用しました。また明日お越しください！",
     "sessionNotFound": "そのセッションは利用できなくなりました。新しいセッションを開始してください。",

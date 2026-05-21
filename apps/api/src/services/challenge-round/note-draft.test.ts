@@ -65,6 +65,73 @@ describe('validateNoteDraft — rejects ungrounded drafts (HIGH-1 topic drift)',
   });
 });
 
+// [BUG-483] Break tests: verify that the verifiedEventContents path closes the
+// value-substitution attack surface.
+//
+// Attack: LLM produces a paraphrase whose vocabulary overlaps with its own
+// draft, making the guard a no-op.  Real learner text ("yeah mitochondria")
+// does NOT overlap sufficiently with the fabricated draft.
+describe('validateNoteDraft — verified event contents guard [BUG-483]', () => {
+  it('PASSES (false safe) when only LLM paraphrase is supplied (demonstrates the pre-fix vulnerability)', () => {
+    // LLM says the learner answered "the powerhouse of the cell is the mitochondria"
+    // — but the learner actually just said "yeah mitochondria".
+    const llmParaphrase = ['the powerhouse of the cell is the mitochondria'];
+    // LLM-drafted note reuses its own paraphrase vocabulary → overlap ≈ 1.0
+    const fabricatedDraft =
+      'The mitochondria is the powerhouse of the cell. It produces energy for life.';
+    const result = validateNoteDraft(fabricatedDraft, llmParaphrase);
+    // Guard passes because LLM paraphrase + LLM draft share the same vocabulary.
+    // This is the vulnerability: the guard does NOT catch value substitution here.
+    expect(result.ok).toBe(true);
+  });
+
+  it('[BUG-483] REJECTS when verified event content is sparse (real learner said little)', () => {
+    const llmParaphrase = ['the powerhouse of the cell is the mitochondria'];
+    const verifiedEventContent = ['yeah mitochondria'];
+    // Same LLM-drafted note — but now the guard tokenizes the REAL learner text.
+    const fabricatedDraft =
+      'The mitochondria is the powerhouse of the cell. It produces energy for life.';
+    const result = validateNoteDraft(
+      fabricatedDraft,
+      llmParaphrase,
+      verifiedEventContent,
+    );
+    // "mitochondria" is in both, but "powerhouse", "cell", "produces", "energy",
+    // "life" are in the draft but NOT in "yeah mitochondria" → overlap < 0.4.
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('low_lexical_overlap');
+  });
+
+  it('[BUG-483] ACCEPTS when verified event content matches the draft well', () => {
+    // Learner actually said something meaningful that aligns with the draft.
+    const llmParaphrase = ['the powerhouse of the cell is the mitochondria'];
+    const verifiedEventContent = [
+      'mitochondria is like the powerhouse makes all the energy for the cell',
+    ];
+    const groundedDraft =
+      'Mitochondria produce energy for the cell. They are the powerhouse.';
+    const result = validateNoteDraft(
+      groundedDraft,
+      llmParaphrase,
+      verifiedEventContent,
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('[BUG-483] falls back to solidLearnerQuotes when verifiedEventContents is empty', () => {
+    // Empty verifiedEventContents array → fallback to solidLearnerQuotes behaviour.
+    const quotes = [
+      'Photosynthesis happens in chloroplasts. The plant converts light energy into glucose.',
+    ];
+    const draft =
+      'Photosynthesis converts light energy into glucose inside chloroplasts.';
+    const withEmpty = validateNoteDraft(draft, quotes, []);
+    const withoutArg = validateNoteDraft(draft, quotes);
+    expect(withEmpty.ok).toBe(withoutArg.ok);
+    expect(withEmpty.overlapRatio).toBe(withoutArg.overlapRatio);
+  });
+});
+
 describe('validateNoteDraft — Unicode + non-Latin tokenization (MED-10)', () => {
   it('accepts accented Latin (Czech) when the draft mirrors the learner', () => {
     const quotes = ['Fotosyntéza probíhá v chloroplastech a vytváří glukózu.'];

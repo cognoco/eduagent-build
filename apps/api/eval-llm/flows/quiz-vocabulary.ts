@@ -17,9 +17,10 @@ import { callLlm } from '../runner/llm-bootstrap';
 // are now wired in per audit P0.1 / P1.2.
 // ---------------------------------------------------------------------------
 
-function ageYearsToBracket(ageYears: number): 'child' | 'adolescent' | 'adult' {
-  if (ageYears <= 9) return 'child';
-  if (ageYears <= 13) return 'adolescent';
+// [BUG-577] 'child' removed from AgeBracket; sub-11 ages clamp to 'adolescent'.
+// Eval profiles are all 11+ so ageYears ≤ 9 is unreachable in practice.
+function ageYearsToBracket(ageYears: number): 'adolescent' | 'adult' {
+  if (ageYears < 18) return 'adolescent';
   return 'adult';
 }
 

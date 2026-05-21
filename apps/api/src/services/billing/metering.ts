@@ -11,7 +11,7 @@ import {
   topUpCredits,
   usageEvents,
   type Database,
-  findQuotaPool,
+  findQuotaPool__unscoped,
 } from '@eduagent/database';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
@@ -194,7 +194,8 @@ export async function decrementQuota(
   }
 
   // Atomic update failed — determine why (daily vs monthly)
-  const pool = await findQuotaPool(db, subscriptionId);
+  // safe-caller: metering hot-path — subscriptionId sourced from the profile's own subscription row, already verified at middleware
+  const pool = await findQuotaPool__unscoped(db, subscriptionId);
 
   if (!pool) {
     return {

@@ -203,7 +203,11 @@ describe('classifyApiError', () => {
   });
 
   it('[BUG-545] classifies UpstreamError 500 as server / retry', () => {
-    const err = new UpstreamError('Internal Server Error', 'UPSTREAM_ERROR', 500);
+    const err = new UpstreamError(
+      'Internal Server Error',
+      'UPSTREAM_ERROR',
+      500,
+    );
     const result = classifyApiError(err);
     expect(result.category).toBe('server');
     expect(result.recovery).toBe('retry');
@@ -412,6 +416,46 @@ describe('classifyApiError', () => {
     expect(result.category).toBe('unknown');
     expect(result.recovery).toBe('retry');
     expect(result.message).toBe('Profile name must be at least 2 characters');
+  });
+
+  // --- [BUG-546] 401 vs 403 recovery distinction ---
+  //
+  // Root cause: the status-based fallback path treated 401 and 403 identically
+  // with recovery:'sign-out'. For 401, triggerAuthExpired() (BUG-547 / wave 1)
+  // already initiates async sign-out; rendering a 'Sign Out' button on top of
+  // an in-progress sign-out creates a double-sign-out + guard race.
+  // Fix: 401 → recovery:'none' (no button; sign-out in progress).
+  //      403 → recovery:'sign-out' (unchanged — genuine forbidden, not session expiry).
+
+  it('[BUG-546 / break-test] plain Error with status=401 → recovery is NOT sign-out', () => {
+    // SSE path: sse.ts throws plain Error with .status=401 after triggerAuthExpired().
+    // Showing a 'Sign Out' button on top of the in-progress sign-out is wrong.
+    const err = Object.assign(new Error('Session expired — signing out'), {
+      status: 401,
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    // [break-test] Pre-fix this was 'sign-out'; must now be 'none' to avoid
+    // double-sign-out race with the already-in-progress triggerAuthExpired().
+    expect(result.recovery).toBe('none');
+    expect(result.recovery).not.toBe('sign-out');
+  });
+
+  it('[BUG-546 / break-test] plain Error with status=403 → recovery is still sign-out', () => {
+    // 403 is a genuine permission failure, not session expiry. Sign-out
+    // recovery remains correct here (no in-progress triggerAuthExpired race).
+    const err = Object.assign(new Error('Forbidden'), { status: 403 });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('[BUG-546] 401 error message reflects session-expiry copy', () => {
+    const err = Object.assign(new Error('Session expired — signing out'), {
+      status: 401,
+    });
+    const result = classifyApiError(err);
+    expect(result.message).toContain('session expired');
   });
 
   // --- SSE idle timeout (interview / chat) [BUG-555] ---

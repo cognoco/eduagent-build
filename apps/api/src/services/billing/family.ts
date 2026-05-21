@@ -11,8 +11,8 @@ import {
   byokWaitlist,
   familyLinks,
   type Database,
-  findSubscriptionById,
-  findQuotaPool,
+  findSubscriptionById__unscoped,
+  findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { FamilyMember, SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
@@ -36,7 +36,7 @@ export type { FamilyMember } from '@eduagent/schemas';
  */
 export async function getSubscriptionForProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<SubscriptionRow | null> {
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
@@ -58,9 +58,9 @@ export async function getSubscriptionForProfile(
  */
 export async function getProfileCountForSubscription(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<number> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return 0;
@@ -70,7 +70,7 @@ export async function getProfileCountForSubscription(
     .select({ count: sql<number>`count(*)::int` })
     .from(profiles)
     .where(
-      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt))
+      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt)),
     );
 
   return result[0]?.count ?? 0;
@@ -86,16 +86,16 @@ export async function getProfileCountForSubscription(
  */
 export async function canAddProfile(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<boolean> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return false;
   }
 
   const tierConfig = getTierConfig(
-    (sub.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free'
+    (sub.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free',
   );
   const current = await getProfileCountForSubscription(db, subscriptionId);
 
@@ -112,7 +112,7 @@ export async function canAddProfile(
  */
 export async function addToByokWaitlist(
   db: Database,
-  email: string
+  email: string,
 ): Promise<void> {
   await db
     .insert(byokWaitlist)
@@ -153,7 +153,7 @@ export function getUsageEventsAvailableSince(): string {
 function formatDateLabel(
   dateIso: string | null,
   timezone: string | null | undefined,
-  locale = 'en-US'
+  locale = 'en-US',
 ): string | null {
   if (!dateIso) return null;
   const date = new Date(dateIso);
@@ -194,12 +194,12 @@ export function buildUsageDateLabels(input: {
       formatDateLabel(
         input.resetsAt,
         input.timezone,
-        input.locale ?? undefined
+        input.locale ?? undefined,
       ) ?? '',
     renewsAtLabel: formatDateLabel(
       input.renewsAt,
       input.timezone,
-      input.locale ?? undefined
+      input.locale ?? undefined,
     ),
   };
 }
@@ -209,9 +209,9 @@ export function buildUsageDateLabels(input: {
  */
 export async function listFamilyMembers(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<FamilyMember[]> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return [];
@@ -220,7 +220,7 @@ export async function listFamilyMembers(
   const rows = await db.query.profiles.findMany({
     where: and(
       eq(profiles.accountId, sub.accountId),
-      isNull(profiles.archivedAt)
+      isNull(profiles.archivedAt),
     ),
   });
 
@@ -244,9 +244,10 @@ export async function getUsageBreakdownForProfile(
      * viewers do not see family-wide daily aggregates.
      */
     dayStartAt: string;
-  }
+  },
 ): Promise<UsageBreakdown> {
-  const sub = await findSubscriptionById(db, input.subscriptionId);
+  // safe-caller: internal usage breakdown — subscriptionId from profile's own sub row, no user-facing raw return
+  const sub = await findSubscriptionById__unscoped(db, input.subscriptionId);
   if (!sub) {
     return {
       byProfile: [],
@@ -269,8 +270,8 @@ export async function getUsageBreakdownForProfile(
       and(
         eq(profiles.accountId, sub.accountId),
         eq(profiles.id, input.activeProfileId),
-        isNull(profiles.archivedAt)
-      )
+        isNull(profiles.archivedAt),
+      ),
     )
     .limit(1);
 
@@ -291,8 +292,8 @@ export async function getUsageBreakdownForProfile(
       and(
         eq(profiles.accountId, viewer.accountId),
         eq(profiles.isOwner, true),
-        isNull(profiles.archivedAt)
-      )
+        isNull(profiles.archivedAt),
+      ),
     )
     .limit(1);
   const [parentLink] = await db
@@ -306,8 +307,8 @@ export async function getUsageBreakdownForProfile(
           where family_child.id = ${familyLinks.childProfileId}
             and family_child.account_id = ${viewer.accountId}
             and family_child.archived_at is null
-        )`
-      )
+        )`,
+      ),
     )
     .limit(1);
   const [childLink] = await db
@@ -321,8 +322,8 @@ export async function getUsageBreakdownForProfile(
           where family_parent.id = ${familyLinks.parentProfileId}
             and family_parent.account_id = ${viewer.accountId}
             and family_parent.archived_at is null
-        )`
-      )
+        )`,
+      ),
     )
     .limit(1);
   const familyOwnerProfileId = familyOwner?.id ?? null;
@@ -346,11 +347,11 @@ export async function getUsageBreakdownForProfile(
       and(
         eq(usageEvents.profileId, profiles.id),
         eq(usageEvents.subscriptionId, input.subscriptionId),
-        gte(usageEvents.occurredAt, new Date(input.cycleStartAt))
-      )
+        gte(usageEvents.occurredAt, new Date(input.cycleStartAt)),
+      ),
     )
     .where(
-      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt))
+      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt)),
     )
     .groupBy(profiles.id, profiles.displayName);
 
@@ -367,11 +368,11 @@ export async function getUsageBreakdownForProfile(
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
     : isChild
-    ? []
-    : profileRows.filter((row) => row.profileId === input.activeProfileId);
+      ? []
+      : profileRows.filter((row) => row.profileId === input.activeProfileId);
   const familyUsed = profileRows.reduce((sum, row) => sum + row.used, 0);
   const selfRow = profileRows.find(
-    (row) => row.profileId === input.activeProfileId
+    (row) => row.profileId === input.activeProfileId,
   );
 
   return {
@@ -386,8 +387,8 @@ export async function getUsageBreakdownForProfile(
       ? { used: familyUsed, limit: input.monthlyLimit }
       : null,
     isOwnerBreakdownViewer,
-    selfUsedToday: isOwnerBreakdownViewer ? null : selfRow?.usedToday ?? 0,
-    selfUsedThisMonth: isOwnerBreakdownViewer ? null : selfRow?.used ?? 0,
+    selfUsedToday: isOwnerBreakdownViewer ? null : (selfRow?.usedToday ?? 0),
+    selfUsedThisMonth: isOwnerBreakdownViewer ? null : (selfRow?.used ?? 0),
   };
 }
 
@@ -409,9 +410,9 @@ export async function getUsageBreakdownForProfile(
 export async function addProfileToSubscription(
   db: Database,
   subscriptionId: string,
-  profileId: string
+  profileId: string,
 ): Promise<{ profileCount: number } | null> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return null;
@@ -449,7 +450,7 @@ export async function addProfileToSubscription(
 export class ProfileRemovalNotImplementedError extends Error {
   constructor() {
     super(
-      'Profile removal requires an invite/claim flow that is not yet implemented'
+      'Profile removal requires an invite/claim flow that is not yet implemented',
     );
     this.name = 'ProfileRemovalNotImplementedError';
   }
@@ -466,9 +467,9 @@ export async function removeProfileFromSubscription(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  newAccountId?: string
+  newAccountId?: string,
 ): Promise<{ removedProfileId: string } | null> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return null;
@@ -484,7 +485,7 @@ export async function removeProfileFromSubscription(
     where: and(
       eq(profiles.id, profileId),
       eq(profiles.accountId, sub.accountId),
-      isNull(profiles.archivedAt)
+      isNull(profiles.archivedAt),
     ),
   });
 
@@ -515,8 +516,8 @@ export async function removeProfileFromSubscription(
         eq(profiles.id, profile.id),
         eq(profiles.accountId, sub.accountId),
         eq(profiles.isOwner, false),
-        isNull(profiles.archivedAt)
-      )
+        isNull(profiles.archivedAt),
+      ),
     )
     .returning({ id: profiles.id });
 
@@ -529,8 +530,8 @@ export async function removeProfileFromSubscription(
     .where(
       or(
         eq(familyLinks.childProfileId, profile.id),
-        eq(familyLinks.parentProfileId, profile.id)
-      )
+        eq(familyLinks.parentProfileId, profile.id),
+      ),
     );
 
   return { removedProfileId: updated.id };
@@ -555,9 +556,9 @@ export async function removeProfileFromSubscription(
 export async function downgradeAllFamilyProfiles(
   db: Database,
   subscriptionId: string,
-  profileToAccountMap: Map<string, string>
+  profileToAccountMap: Map<string, string>,
 ): Promise<string[]> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return [];
@@ -608,7 +609,7 @@ export async function downgradeAllFamilyProfiles(
     db,
     subscriptionId,
     freeTier.monthlyQuota,
-    freeTier.dailyLimit
+    freeTier.dailyLimit,
   );
 
   return downgraded;
@@ -624,7 +625,7 @@ export async function downgradeAllFamilyProfiles(
  */
 export async function getFamilyPoolStatus(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<{
   tier: SubscriptionTier;
   monthlyLimit: number;
@@ -633,13 +634,13 @@ export async function getFamilyPoolStatus(
   profileCount: number;
   maxProfiles: number;
 } | null> {
-  const sub = await findSubscriptionById(db, subscriptionId);
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub) {
     return null;
   }
 
-  const pool = await findQuotaPool(db, subscriptionId);
+  const pool = await findQuotaPool__unscoped(db, subscriptionId);
 
   if (!pool) {
     return null;

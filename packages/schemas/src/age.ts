@@ -1,4 +1,4 @@
-export type AgeBracket = 'child' | 'adolescent' | 'adult';
+export type AgeBracket = 'adolescent' | 'adult';
 
 /**
  * The active-profile role discriminator. Mirrors
@@ -27,12 +27,12 @@ export interface AgeGateProfile {
 /**
  * Computes an age bracket from birthYear for consent gating and voice selection.
  *
- * Three-way model (D-C4-3), aligned to the strictly-11+ product constraint
- * ([CR-2026-05-19-H11]). Pre-11 ages should never appear for real users — the
- * 'child' bracket is retained as a defensive fallback for misconfigured or
- * test-only birth years so callers can still switch exhaustively.
- *   - 'child'      — under 11 (defensive only; product is strictly 11+)
- *   - 'adolescent' — 11 to 17 inclusive
+ * Two-way model (D-C4-2), aligned to the strictly-11+ product constraint
+ * ([CR-2026-05-19-H11]). The product never allows users under 11; birth years
+ * that would produce age < 11 are rejected by `birthYearSchema` at the API
+ * boundary, so `computeAgeBracket` treats them as the minimum valid bracket
+ * ('adolescent') rather than a now-removed 'child' value.
+ *   - 'adolescent' — under 18 (includes 11–17 and any clamped sub-11 input)
  *   - 'adult'      — 18 and above
  *
  * Uses `currentYear - birthYear`, which can overestimate by up to 11 months.
@@ -46,7 +46,6 @@ export function computeAgeBracket(
   const year = currentYear ?? new Date().getFullYear();
   const age = year - birthYear;
 
-  if (age < 11) return 'child';
   if (age < 18) return 'adolescent';
   return 'adult';
 }

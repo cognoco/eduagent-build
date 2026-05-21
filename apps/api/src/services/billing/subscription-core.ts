@@ -12,8 +12,8 @@ import {
   quotaPools,
   type Database,
   createAccountRepository,
-  findSubscriptionByStripeId,
-  findQuotaPool,
+  findSubscriptionByStripeId__unscoped,
+  findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
@@ -137,7 +137,11 @@ export async function updateSubscriptionFromWebhook(
   updates: WebhookSubscriptionUpdate,
 ): Promise<SubscriptionRow | null> {
   // Load current row (BD-10: via standalone helper — keyed by Stripe ID, not accountId)
-  const existing = await findSubscriptionByStripeId(db, stripeSubscriptionId);
+  // safe-caller: Stripe webhook — authenticated by Stripe event signature; keyed by external Stripe ID
+  const existing = await findSubscriptionByStripeId__unscoped(
+    db,
+    stripeSubscriptionId,
+  );
 
   if (!existing) {
     return null;
@@ -259,7 +263,8 @@ export async function getQuotaPool(
   db: Database,
   subscriptionId: string,
 ): Promise<QuotaPoolRow | null> {
-  const row = await findQuotaPool(db, subscriptionId);
+  // safe-caller: internal billing aggregate — subscriptionId comes from a previously-verified account row
+  const row = await findQuotaPool__unscoped(db, subscriptionId);
   return row ? mapQuotaPoolRow(row) : null;
 }
 
@@ -276,7 +281,8 @@ export async function resetMonthlyQuota(
   subscriptionId: string,
   newLimit: number,
 ): Promise<QuotaPoolRow | null> {
-  const existing = await findQuotaPool(db, subscriptionId);
+  // safe-caller: billing cycle reset (cron/Stripe webhook) — subscriptionId from verified event
+  const existing = await findQuotaPool__unscoped(db, subscriptionId);
 
   if (!existing) {
     return null;

@@ -38,6 +38,7 @@
     "notFound": "That page or item no longer exists.",
     "resourceGone": "This resource is no longer available.",
     "rateLimited": "You've hit the limit. Wait a moment and try again.",
+    "sessionExpired": "Your session expired — signing you out…",
     "forbidden": "You do not have permission to view this.",
     "quotaExhausted": "You've used all your sessions for today. Come back tomorrow!",
     "sessionNotFound": "That session isn't available anymore. Start a new one.",

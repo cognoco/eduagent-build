@@ -45,6 +45,15 @@ export function OutboxDrainProvider({
   const getTokenRef = React.useRef(getToken);
   getTokenRef.current = getToken;
 
+  // [#542] Track the profileId that the currently-running drain was started
+  // for. Checked on each iteration so a profile change mid-drain causes the
+  // loop to break and allows a fresh drain to start for the new profile.
+  const runningProfileIdRef = React.useRef<string | null>(null);
+
+  // [#541] Hold the abort handle for the in-flight XHR so we can abort it
+  // when the profile changes or the component unmounts.
+  const abortXhrRef = React.useRef<(() => void) | null>(null);
+
   const postToSupport = React.useCallback(
     async (body: {
       entries: Array<{
@@ -67,28 +76,39 @@ export function OutboxDrainProvider({
     [client],
   );
 
+  // [#540] Accept snapshotProfileId as an explicit argument so the header
+  // always reflects the profile captured at the start of runDrain, regardless
+  // of any concurrent profile change that occurs while the XHR is in flight.
   const buildHeaders = React.useCallback(
-    async (idempotencyKey: string) => {
+    async (idempotencyKey: string, snapshotProfileId: string) => {
       const token = await getTokenRef.current();
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      if (activeProfile?.id) headers['X-Profile-Id'] = activeProfile.id;
+      headers['X-Profile-Id'] = snapshotProfileId;
       if (getProxyMode()) headers['X-Proxy-Mode'] = 'true';
       return withIdempotencyKey(headers, idempotencyKey);
     },
-    [activeProfile?.id],
+    [],
   );
 
+  // [#540] Accept snapshotProfileId so all outbox operations for this entry
+  // use the profileId captured at drain-start, not the current closure value.
+  // [#542] Accept a cancelled predicate that the caller checks before/during
+  // streaming so a mid-drain profile change aborts this entry early.
   const replaySessionEntry = React.useCallback(
-    async (entry: OutboxEntry) => {
-      if (!activeProfile?.id) return;
+    async (
+      entry: OutboxEntry,
+      snapshotProfileId: string,
+      isCancelled: () => boolean,
+    ) => {
+      if (isCancelled()) return;
       const metadata = asSessionMetadata(entry);
       if (!metadata.sessionId) {
         await recordFailure(
-          activeProfile.id,
+          snapshotProfileId,
           'session',
           entry.id,
           'missing_session_id',
@@ -96,12 +116,17 @@ export function OutboxDrainProvider({
         return;
       }
 
-      await beginAttempt(activeProfile.id, 'session', entry.id);
-      const { events } = streamSSEViaXHR(
+      await beginAttempt(snapshotProfileId, 'session', entry.id);
+
+      if (isCancelled()) return;
+
+      const { events, abort } = streamSSEViaXHR(
         `${getApiUrl()}/v1/sessions/${metadata.sessionId}/stream`,
         {
           method: 'POST',
-          headers: await buildHeaders(entry.id),
+          // [#540] Headers now receive the snapshotProfileId instead of the
+          // closure value so X-Profile-Id always matches the drain's profile.
+          headers: await buildHeaders(entry.id, snapshotProfileId),
           body: JSON.stringify({
             message: entry.content,
             ...(metadata.homeworkMode
@@ -111,31 +136,48 @@ export function OutboxDrainProvider({
         },
       );
 
+      // [#541] Register the abort handle so runDrain can kill the XHR on
+      // profile-change or unmount.
+      abortXhrRef.current = abort;
+
       let fallbackReason: string | null = null;
-      for await (const event of events) {
-        if (event.type === 'replay') {
-          await markConfirmed(activeProfile.id, 'session', entry.id);
-          return;
-        }
-        if (event.type === 'fallback') {
-          fallbackReason = event.reason;
-        }
-        if (event.type === 'done') {
-          if (fallbackReason) {
-            await recordFailure(
-              activeProfile.id,
-              'session',
-              entry.id,
-              fallbackReason,
-            );
+      try {
+        for await (const event of events) {
+          // [#542] Check cancellation on every SSE event so a profile change
+          // stops consuming events and aborts the XHR immediately.
+          if (isCancelled()) {
+            abort();
             return;
           }
-          await markConfirmed(activeProfile.id, 'session', entry.id);
-          return;
+          if (event.type === 'replay') {
+            await markConfirmed(snapshotProfileId, 'session', entry.id);
+            return;
+          }
+          if (event.type === 'fallback') {
+            fallbackReason = event.reason;
+          }
+          if (event.type === 'done') {
+            if (fallbackReason) {
+              await recordFailure(
+                snapshotProfileId,
+                'session',
+                entry.id,
+                fallbackReason,
+              );
+              return;
+            }
+            await markConfirmed(snapshotProfileId, 'session', entry.id);
+            return;
+          }
+        }
+      } finally {
+        // Clear the abort handle once the stream has finished (or thrown).
+        if (abortXhrRef.current === abort) {
+          abortXhrRef.current = null;
         }
       }
     },
-    [activeProfile?.id, buildHeaders],
+    [buildHeaders],
   );
 
   const runDrain = React.useCallback(async () => {
@@ -143,14 +185,30 @@ export function OutboxDrainProvider({
       return;
     }
 
+    // [#540/#542] Snapshot the profileId once at drain-start.  Every
+    // sub-call (buildHeaders, beginAttempt, markConfirmed, recordFailure)
+    // receives this value so concurrent profile changes cannot contaminate
+    // in-flight operations.
+    const snapshotProfileId = activeProfile.id;
     runningRef.current = true;
+    runningProfileIdRef.current = snapshotProfileId;
+
+    // [#542] Cancellation flag checked inside each entry's handler and on
+    // every SSE event.  Set to true when profile changes mid-drain.
+    let cancelled = false;
+    const isCancelled = () => cancelled;
+
     try {
-      await drain(activeProfile.id, 'session', async (entry) => {
+      await drain(snapshotProfileId, 'session', async (entry) => {
+        // [#542] Stop processing further entries if the profile changed.
+        if (isCancelled()) return;
         try {
-          await replaySessionEntry(entry);
+          await replaySessionEntry(entry, snapshotProfileId, isCancelled);
         } catch (err) {
+          // If cancelled, suppress — the error is expected on abort.
+          if (isCancelled()) return;
           await recordFailure(
-            activeProfile.id,
+            snapshotProfileId,
             'session',
             entry.id,
             err instanceof Error ? err.message : 'replay_failed',
@@ -160,21 +218,58 @@ export function OutboxDrainProvider({
           });
         }
       });
-      await escalate(activeProfile.id, 'session', postToSupport).catch(
-        (err) => {
-          Sentry.captureException(err, {
-            tags: {
-              feature: 'message_outbox',
-              op: 'escalate',
-              flow: 'session',
-            },
-          });
-        },
-      );
+      if (!isCancelled()) {
+        await escalate(snapshotProfileId, 'session', postToSupport).catch(
+          (err) => {
+            Sentry.captureException(err, {
+              tags: {
+                feature: 'message_outbox',
+                op: 'escalate',
+                flow: 'session',
+              },
+            });
+          },
+        );
+      }
     } finally {
-      runningRef.current = false;
+      // Only clear runningRef when it is still ours to clear — a cancelled
+      // drain resets here so the new profile's drain can start immediately.
+      if (runningProfileIdRef.current === snapshotProfileId) {
+        runningRef.current = false;
+        runningProfileIdRef.current = null;
+      }
     }
+
+    return {
+      /** Exposed for tests — cancel the drain and abort any in-flight XHR. */
+      _cancel: () => {
+        cancelled = true;
+        abortXhrRef.current?.();
+        abortXhrRef.current = null;
+        // Release the lock so the new profile's runDrain can proceed.
+        if (runningProfileIdRef.current === snapshotProfileId) {
+          runningRef.current = false;
+          runningProfileIdRef.current = null;
+        }
+      },
+    };
   }, [activeProfile?.id, postToSupport, replaySessionEntry]);
+
+  // [#542/#541] When activeProfile.id changes, abort any in-flight XHR and
+  // clear the running lock so the new profile's drain can start immediately.
+  const prevProfileIdRef = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    const prevId = prevProfileIdRef.current;
+    prevProfileIdRef.current = activeProfile?.id;
+
+    if (prevId !== undefined && prevId !== activeProfile?.id) {
+      // Profile changed — cancel the in-flight drain.
+      abortXhrRef.current?.();
+      abortXhrRef.current = null;
+      runningRef.current = false;
+      runningProfileIdRef.current = null;
+    }
+  }, [activeProfile?.id]);
 
   React.useEffect(() => {
     void runDrain();
@@ -188,6 +283,17 @@ export function OutboxDrainProvider({
     });
     return () => sub.remove();
   }, [runDrain]);
+
+  // [#541] On unmount, abort any in-flight XHR so the request does not
+  // continue after the provider is removed from the tree (e.g. on sign-out).
+  React.useEffect(() => {
+    return () => {
+      abortXhrRef.current?.();
+      abortXhrRef.current = null;
+      runningRef.current = false;
+      runningProfileIdRef.current = null;
+    };
+  }, []);
 
   return children;
 }

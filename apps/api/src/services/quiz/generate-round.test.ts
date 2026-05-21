@@ -40,10 +40,9 @@ describe('buildCapitalsPrompt', () => {
   });
 
   it('[CR-2026-05-19-H11] never emits kid-flavored "under 13" framing for any bracket', () => {
-    // Product is strictly 11+. The 'child' bracket is unreachable for real
-    // birth years and the prompt copy must not steer the LLM toward a
-    // simplified, age-inappropriate register for the 11-12 cohort.
-    for (const ageBracket of ['child', 'adolescent', 'adult'] as const) {
+    // Product is strictly 11+. 'child' removed from AgeBracket in BUG-577;
+    // only 'adolescent' and 'adult' are valid values.
+    for (const ageBracket of ['adolescent', 'adult'] as const) {
       const prompt = buildCapitalsPrompt({
         discoveryCount: 6,
         ageBracket,
