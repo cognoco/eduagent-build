@@ -571,6 +571,8 @@ describe('progress routes', () => {
       mockGetOverdueTopicsGrouped.mockResolvedValueOnce({
         totalOverdue: 0,
         subjects: [],
+        truncated: false,
+        displayedCount: 0,
       });
 
       const res = await app.request(

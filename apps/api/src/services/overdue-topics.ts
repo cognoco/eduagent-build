@@ -18,18 +18,23 @@ function toOverdueDays(now: Date, nextReviewAt: Date | null): number {
 
 export async function getOverdueTopicsGrouped(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<OverdueTopicsResponse> {
   const repo = createScopedRepository(db, profileId);
   const now = new Date();
 
   const overdueCards = await repo.retentionCards.findMany(
     lt(retentionCards.nextReviewAt, now),
-    { limit: 500, orderBy: 'nextReviewAtAsc' }
+    { limit: 500, orderBy: 'nextReviewAtAsc' },
   );
 
   if (overdueCards.length === 0) {
-    return { totalOverdue: 0, subjects: [] };
+    return {
+      totalOverdue: 0,
+      subjects: [],
+      truncated: false,
+      displayedCount: 0,
+    };
   }
 
   // Real total may exceed the 500-card display cap. Run a separate count so
@@ -40,8 +45,8 @@ export async function getOverdueTopicsGrouped(
     .where(
       and(
         eq(retentionCards.profileId, profileId),
-        lt(retentionCards.nextReviewAt, now)
-      )
+        lt(retentionCards.nextReviewAt, now),
+      ),
     );
   const totalOverdue = countRow?.count ?? overdueCards.length;
 
@@ -62,8 +67,8 @@ export async function getOverdueTopicsGrouped(
     .where(
       and(
         inArray(curriculumTopics.id, topicIds),
-        eq(subjects.profileId, profileId)
-      )
+        eq(subjects.profileId, profileId),
+      ),
     );
   const topicMap = new Map(topicsRows.map((t) => [t.id, t]));
 
@@ -77,8 +82,8 @@ export async function getOverdueTopicsGrouped(
           .where(
             and(
               inArray(curricula.id, curriculumIds),
-              eq(subjects.profileId, profileId)
-            )
+              eq(subjects.profileId, profileId),
+            ),
           )
       : [];
   const curriculumMap = new Map(curriculaRows.map((c) => [c.id, c]));
@@ -137,8 +142,17 @@ export async function getOverdueTopicsGrouped(
       return a.subjectName.localeCompare(b.subjectName);
     });
 
+  // [BUG-470 / P2] Surface truncation so the mobile UI can show "500+" rather
+  // than implying the displayed list is the full backlog. The cap is 500 cards;
+  // if the returned list hits exactly 500, totalOverdue > displayedCount signals
+  // the UX discrepancy and truncated:true makes it unambiguous.
+  const displayedCount = overdueCards.length;
+  const truncated = displayedCount === 500 && totalOverdue > 500;
+
   return {
     totalOverdue,
     subjects: groupedSubjects,
+    truncated,
+    displayedCount,
   };
 }
