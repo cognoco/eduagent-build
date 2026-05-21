@@ -204,6 +204,7 @@ export function useSetSessionInputMode(
 ): UseMutationResult<SessionStartResult, Error, { inputMode: InputMode }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input: { inputMode: InputMode }) => {
@@ -217,7 +218,10 @@ export function useSetSessionInputMode(
     onSuccess: () => {
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchTranscriptAnyMode(sessionId)(query.queryKey),
+          queryKeys.sessions.matchTranscriptAnyMode(
+            sessionId,
+            activeProfile?.id,
+          )(query.queryKey),
       });
       // Input mode changes only mutate the session row/transcript metadata.
       // Progress, dashboard, retention, language-progress, and resume-nudge
@@ -234,6 +238,7 @@ export function useClearContinuationDepth(
 ): UseMutationResult<SessionStartResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async () => {
@@ -248,7 +253,10 @@ export function useClearContinuationDepth(
     onSuccess: () => {
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchAnyMode(sessionId)(query.queryKey),
+          queryKeys.sessions.matchAnyMode(
+            sessionId,
+            activeProfile?.id,
+          )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
     },
@@ -785,6 +793,7 @@ export function useSubmitSummary(
 ): UseMutationResult<SubmitSummaryResult, Error, { content: string }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input: { content: string }) => {
@@ -798,7 +807,10 @@ export function useSubmitSummary(
     onSuccess: () => {
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchSummaryAnyMode(sessionId)(query.queryKey),
+          queryKeys.sessions.matchSummaryAnyMode(
+            sessionId,
+            activeProfile?.id,
+          )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
     },
@@ -810,6 +822,7 @@ export function useSkipSummary(
 ): UseMutationResult<SkipSummaryResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async () => {
@@ -822,7 +835,10 @@ export function useSkipSummary(
     onSuccess: () => {
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchSummaryAnyMode(sessionId)(query.queryKey),
+          queryKeys.sessions.matchSummaryAnyMode(
+            sessionId,
+            activeProfile?.id,
+          )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
     },

@@ -22,6 +22,7 @@ import {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  triggerAuthExpired,
   UpstreamError,
   type QuotaExceededDetails,
 } from './api-client';
@@ -360,9 +361,11 @@ export function streamSSEViaXHR(
       return new BadRequestError(apiMessage ?? (responseText || 'Bad request'));
     }
     if (status === 401) {
-      // Session expired mid-stream — surface a typed error so
-      // isReconnectableSessionError can classify it as non-reconnectable and
-      // the UI can show "Session expired" rather than a generic reconnect card.
+      // [BUG-547] Session expired mid-stream — fire the shared auth-expired
+      // callback (same dedup guard as customFetch) so the user is signed out
+      // immediately rather than waiting ~30s for the next non-stream API call.
+      // The callback is registered by the root layout via setOnAuthExpired().
+      triggerAuthExpired();
       const err = new Error(
         apiMessage ?? 'Session expired — please sign in again',
       ) as Error & { status: number };
@@ -377,9 +380,12 @@ export function streamSSEViaXHR(
           quotaExceeded.data.details,
         );
       }
-      return new Error(
-        apiMessage ??
-          `API error ${status}: ${responseText || 'Payment required'}`,
+      // [BUG-545] Non-quota 402: use UpstreamError (not plain Error) so
+      // callers can inspect .status and .code without parsing message strings.
+      return new UpstreamError(
+        apiMessage ?? (responseText || 'Payment required'),
+        code ?? 'UPSTREAM_ERROR',
+        status,
       );
     }
     if (status === 403) {
@@ -419,15 +425,13 @@ export function streamSSEViaXHR(
         status,
       );
     }
-    if (code) {
-      return new UpstreamError(
-        apiMessage ?? (responseText || 'Server error'),
-        code,
-        status,
-      );
-    }
-    return new Error(
-      `API error ${status}: ${responseText || 'request failed'}`,
+    // [BUG-545] Always surface as UpstreamError — plain Error("API error {n}:…")
+    // forces callers to regex-parse formatted message strings to re-derive the
+    // status (violates "Classify errors before formatting" rule).
+    return new UpstreamError(
+      apiMessage ?? (responseText || 'request failed'),
+      code ?? 'UPSTREAM_ERROR',
+      status,
     );
   }
 

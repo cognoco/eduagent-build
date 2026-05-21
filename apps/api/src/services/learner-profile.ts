@@ -883,7 +883,8 @@ export function buildMemoryBlock(
   if (relevantStruggles.length > 0) {
     const struggleTopics = relevantStruggles
       .slice(0, 4)
-      .map((entry) => entry.topic)
+      // [PROMPT-INJECT-478] sanitize topic before interpolating into system prompt
+      .map((entry) => sanitizeXmlValue(entry.topic, 80))
       .join(', ');
     const text = `- They've been working hard on: ${struggleTopics}. Be patient and try a different angle before escalating.`;
     addSection(text, {
@@ -895,10 +896,10 @@ export function buildMemoryBlock(
   if (recentlyResolved && recentlyResolved.length > 0) {
     const resolvedList = recentlyResolved
       .map((entry) => {
-        if (typeof entry === 'string') return entry;
-        return entry.subject
-          ? `${entry.topic} (${entry.subject})`
-          : entry.topic;
+        if (typeof entry === 'string') return sanitizeXmlValue(entry, 80);
+        const topic = sanitizeXmlValue(entry.topic, 80);
+        const subject = entry.subject ? sanitizeXmlValue(entry.subject, 60) : null;
+        return subject ? `${topic} (${subject})` : topic;
       })
       .join(', ');
     const text = `- They recently overcame difficulties with: ${resolvedList}. Celebrate their growth!`;
@@ -916,7 +917,8 @@ export function buildMemoryBlock(
   if (topStrengths.length > 0) {
     const strengthLabels = topStrengths
       .map(
-        (entry) => `${entry.topics.slice(0, 3).join(', ')} (${entry.subject})`,
+        (entry) =>
+          `${entry.topics.slice(0, 3).map((t) => sanitizeXmlValue(t, 80)).join(', ')} (${sanitizeXmlValue(entry.subject, 60)})`,
       )
       .join('; ');
     const text = `- Confident with: ${strengthLabels}.`;
@@ -977,7 +979,7 @@ export function buildMemoryBlock(
     (i) => i.context === 'free_time' || i.context === 'both',
   );
   if (schoolInterests.length > 0) {
-    const labels = schoolInterests.map((i) => i.label).join(', ');
+    const labels = schoolInterests.map((i) => sanitizeXmlValue(i.label, 60)).join(', ');
     const text = `- School interests: ${labels}.`;
     addSection(text, {
       kind: 'interest',
@@ -985,7 +987,7 @@ export function buildMemoryBlock(
     });
   }
   if (freeTimeInterests.length > 0) {
-    const labels = freeTimeInterests.map((i) => i.label).join(', ');
+    const labels = freeTimeInterests.map((i) => sanitizeXmlValue(i.label, 60)).join(', ');
     const text = `- Free-time interests: ${labels}.`;
     addSection(text, {
       kind: 'interest',
@@ -995,7 +997,9 @@ export function buildMemoryBlock(
 
   const recentNotes = profile.communicationNotes.slice(-2);
   if (recentNotes.length > 0) {
-    const text = `- ${recentNotes.join('. ')}.`;
+    // [PROMPT-INJECT-478] escapeXml prevents crafted notes breaking prompt context
+    const escapedNotes = recentNotes.map((n) => escapeXml(n)).join('. ');
+    const text = `- <learner_notes>${escapedNotes}</learner_notes>.`;
     addSection(text, {
       kind: 'communication_note',
       text,
@@ -1033,7 +1037,9 @@ export function buildMemoryBlock(
           (boostUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
         ),
       );
-      const text = `- Upcoming: ${reason}, ${daysAway} day${
+      // [PROMPT-INJECT-478] reason is learner-entered; sanitize before interpolating
+      const safeReason = sanitizeXmlValue(reason, 120);
+      const text = `- Upcoming: ${safeReason}, ${daysAway} day${
         daysAway === 1 ? '' : 's'
       } away.`;
       addSection(text, {
@@ -1050,7 +1056,8 @@ export function buildMemoryBlock(
     (profile.lastSessionExchangeCount == null ||
       profile.lastSessionExchangeCount >= 4);
   if (summaryQualityOk) {
-    const text = `- Last session summary: ${profile.lastSessionSummary}`;
+    // [PROMPT-INJECT-478] escapeXml prevents summary from injecting a directive
+    const text = `- Last session summary: <learner_session_summary>${escapeXml(profile.lastSessionSummary!)}</learner_session_summary>`;
     addSection(text, {
       kind: 'learning_style',
       text,
@@ -1060,9 +1067,9 @@ export function buildMemoryBlock(
   // B.4: Parked questions from recent sessions
   const parked = (profile.parkedQuestions ?? []).slice(0, 5);
   if (parked.length > 0) {
-    const text = `- Parked questions from recent sessions: ${parked.join(
-      '; ',
-    )}`;
+    // [PROMPT-INJECT-478] escapeXml prevents tag-break injection from learner questions
+    const escapedParked = parked.map((q) => escapeXml(q)).join('; ');
+    const text = `- Parked questions from recent sessions: <learner_parked_questions>${escapedParked}</learner_parked_questions>`;
     addSection(text, {
       kind: 'communication_note',
       text,

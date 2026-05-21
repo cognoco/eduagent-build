@@ -254,15 +254,20 @@ describe('usageSchema', () => {
     expect(parsed.byProfile).toHaveLength(1);
   });
 
-  it('passthrough allows extra unknown fields (usageSchema uses .passthrough())', () => {
+  it('strips unknown fields — does NOT leak undeclared server fields to client [BUG-578]', () => {
+    // usageSchema uses .strip() (zod default), not .passthrough().
+    // Unknown fields must be dropped so server internals never leak to mobile.
     const parsed = usageSchema.parse({
       ...validUsage,
-      unknownFutureField: 'value',
+      unknownServerInternalField: 'should-be-dropped',
+      anotherLeakedField: 42,
     });
-    // Expect not to throw and passthrough field is retained
-    expect((parsed as Record<string, unknown>)['unknownFutureField']).toBe(
-      'value',
-    );
+    expect(
+      (parsed as Record<string, unknown>)['unknownServerInternalField'],
+    ).toBeUndefined();
+    expect(
+      (parsed as Record<string, unknown>)['anotherLeakedField'],
+    ).toBeUndefined();
   });
 
   it('accepts optional renewsAt and resetsAtLabel fields', () => {

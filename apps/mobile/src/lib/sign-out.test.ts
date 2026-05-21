@@ -6,6 +6,13 @@
 // is only called by evaluateSentryForProfile() AFTER the next profile loads —
 // too late. The fix calls Sentry.getCurrentScope().clear() + Sentry.setUser(null)
 // immediately after queryClient.clear() in signOutWithCleanup.
+//
+// [BUG-560] sign-out — auth-expired guard reset
+//
+// After sign-out, _authExpiredFiring must be reset so the next user's 401s
+// are not silently swallowed. clerkSignOut() is wrapped in try/finally;
+// resetAuthExpiredGuard() is called in the finally block so it fires even
+// when clerkSignOut throws.
 // ---------------------------------------------------------------------------
 
 import * as Sentry from '@sentry/react-native'; // gc1-allow: external boundary — Sentry SDK
@@ -13,7 +20,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { signOutWithCleanup } from './sign-out';
 
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
-import { setActiveProfileId } from './api-client';
+import { setActiveProfileId, resetAuthExpiredGuard } from './api-client';
 
 // Mock dependencies that signOutWithCleanup touches so the test is
 // self-contained and order-of-calls is verifiable via invocationCallOrder.
@@ -56,6 +63,7 @@ jest.mock(
     ...jest.requireActual('./api-client'),
     setActiveProfileId: jest.fn(),
     setProxyMode: jest.fn(),
+    resetAuthExpiredGuard: jest.fn(),
   }),
 );
 
@@ -278,5 +286,63 @@ describe('signOutWithCleanup — error propagation', () => {
     // Sentry scope was cleared before clerkSignOut was reached
     expect(scope.clear).toHaveBeenCalledTimes(1);
     expect(Sentry.setUser).toHaveBeenCalledWith(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Auth-expired guard reset [BUG-560]
+// ---------------------------------------------------------------------------
+
+describe('signOutWithCleanup — auth-expired guard reset [BUG-560]', () => {
+  it('[break-test] calls resetAuthExpiredGuard after clerkSignOut succeeds', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    const clerkSignOut = makeClerkSignOut();
+
+    await signOutWithCleanup({
+      clerkSignOut,
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    });
+
+    // Must be called exactly once — if resetAuthExpiredGuard were removed from
+    // sign-out.ts this assertion would fail, leaving _authExpiredFiring=true
+    // permanently and silently swallowing all subsequent 401s for the next user.
+    expect(resetAuthExpiredGuard).toHaveBeenCalledTimes(1);
+  });
+
+  it('[break-test] calls resetAuthExpiredGuard even when clerkSignOut throws', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+
+    await signOutWithCleanup({
+      clerkSignOut: jest.fn().mockRejectedValue(new Error('clerk error')),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    }).catch(() => {
+      /* expected */
+    });
+
+    // The finally block must fire even on rejection so the guard is always reset.
+    expect(resetAuthExpiredGuard).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls resetAuthExpiredGuard after clerkSignOut (ordering)', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    const clerkSignOut = makeClerkSignOut();
+
+    await signOutWithCleanup({
+      clerkSignOut,
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    });
+
+    const clerkOrder = clerkSignOut.mock.invocationCallOrder[0]!;
+    const guardResetOrder = (resetAuthExpiredGuard as jest.Mock).mock
+      .invocationCallOrder[0]!;
+
+    // resetAuthExpiredGuard fires in the finally block, after clerkSignOut resolves.
+    expect(clerkOrder).toBeLessThan(guardResetOrder);
   });
 });

@@ -1,4 +1,4 @@
-import { sm2 } from './sm2.js';
+﻿import { sm2 } from './sm2.js';
 import type { RetentionCard } from './sm2.js';
 
 describe('sm2', () => {
@@ -122,7 +122,7 @@ describe('sm2', () => {
     expect(result.card.easeFactor).toBeGreaterThanOrEqual(1.3);
   });
 
-  it('overdue card: nextReviewAt anchored to due date, not review time', () => {
+  it('overdue card: nextReviewAt anchored to reviewedAt (canonical SM-2), not due date [BUG-574]', () => {
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
@@ -137,37 +137,48 @@ describe('sm2', () => {
     };
 
     // reps=2, ease=2.5, quality=4 → newInterval = round(6 * 2.5) = 15
-    // Anchored to 14 days ago + 15 = ~1 day from now (not 15 days from now)
+    // Canonical SM-2 fix: anchor to reviewedAt (now), so nextReview ≈ now + 15 days.
+    // OLD bug: anchor to dueDate (14 days ago) + 15 = 1 day from now (schedule collapsed).
     const result = sm2({ quality: 4, card });
+    expect(result.card.interval).toBe(15);
+
     const nextReview = new Date(result.card.nextReviewAt);
     const now = new Date();
     const daysFromNow = (nextReview.getTime() - now.getTime()) / 86_400_000;
 
-    expect(daysFromNow).toBeLessThan(result.card.interval);
+    // Must be the full interval from now, not a compressed value
     expect(daysFromNow).toBeGreaterThan(0);
+    expect(daysFromNow).toBeCloseTo(result.card.interval, 0); // within ~1 day of 15
   });
 
-  it('severely overdue card: nextReviewAt clamped to tomorrow, not in past', () => {
+  it('severely overdue card (30 days): nextReviewAt = reviewedAt + newInterval, not squashed to 1 day [BUG-574]', () => {
+    // Card was due 30 days ago. newInterval = 6 (second successful recall).
+    // Bug #574: fallback was reviewedAt + 1 day. Fix: always reviewedAt + newInterval.
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const card: RetentionCard = {
       easeFactor: 2.5,
-      interval: 6,
-      repetitions: 2,
+      interval: 1,
+      repetitions: 1,
       lastReviewedAt: new Date(
-        thirtyDaysAgo.getTime() - 6 * 86_400_000,
+        thirtyDaysAgo.getTime() - 1 * 86_400_000,
       ).toISOString(),
       nextReviewAt: thirtyDaysAgo.toISOString(),
     };
 
-    // reps=2, ease=2.5, quality=4 → interval 15, but 30 days ago + 15 = -15 days (past)
-    // Should clamp to ~1 day from now
+    // reps=1 → second successful recall path → newInterval = 6
     const result = sm2({ quality: 4, card });
+    expect(result.wasSuccessful).toBe(true);
+    expect(result.card.interval).toBe(6);
+
     const nextReview = new Date(result.card.nextReviewAt);
     const now = new Date();
+    const daysFromNow = (nextReview.getTime() - now.getTime()) / 86_400_000;
 
-    expect(nextReview.getTime()).toBeGreaterThan(now.getTime());
+    // Must be ≈ 6 days from now, NOT 1 day from now
+    expect(daysFromNow).toBeCloseTo(6, 0);
+    expect(daysFromNow).toBeGreaterThan(4);
   });
 
   it('on-time card: nextReviewAt still anchored to now', () => {

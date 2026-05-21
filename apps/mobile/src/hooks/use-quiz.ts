@@ -190,7 +190,11 @@ export function useRoundDetail(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['quiz-round-detail', roundId],
+    // [BUG-528] Include activeProfile?.id so two profiles with the same
+    // roundId (e.g. shared curriculum) cannot share a cache entry. Without
+    // this, signing in as a different profile on the same device could return
+    // the previous user's quiz round from cache.
+    queryKey: ['quiz-round-detail', roundId, activeProfile?.id],
     queryFn: async ({ signal: querySignal }) => {
       if (!roundId) throw new Error('No round ID');
       const { signal, cleanup } = combinedSignal(querySignal);

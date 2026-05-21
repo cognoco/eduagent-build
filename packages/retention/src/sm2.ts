@@ -66,13 +66,12 @@ export function sm2(input: SM2Input): SM2Result {
     newInterval = Math.round((card?.interval ?? 6) * newEase);
   }
 
-  const dueDate = card?.nextReviewAt ? new Date(card.nextReviewAt) : null;
-  const anchor = dueDate && dueDate < reviewedAt ? dueDate : reviewedAt;
-  const nextReviewDate = new Date(anchor);
+  // [BUG-574] Always anchor next-review schedule to the actual review time
+  // (canonical SM-2). The earlier dueDate-anchored variant collapsed the
+  // schedule to +1 day whenever a learner recalled an overdue card, because
+  // anchor + newInterval landed in the past and triggered the +1-day fallback.
+  const nextReviewDate = new Date(reviewedAt);
   nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
-  if (nextReviewDate <= reviewedAt) {
-    nextReviewDate.setTime(reviewedAt.getTime() + 86_400_000);
-  }
 
   return {
     card: {

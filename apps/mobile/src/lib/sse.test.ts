@@ -1,4 +1,8 @@
 import { parseSSEStream, streamSSEViaXHR, type StreamEvent } from './sse';
+import {
+  clearOnAuthExpired,
+  setOnAuthExpired,
+} from './api-client';
 
 function createMockStream(events: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -534,7 +538,7 @@ describe('streamSSEViaXHR', () => {
     );
   });
 
-  it('[BUG-955] leaves malformed 402 responses as generic API errors', async () => {
+  it('[BUG-955 / BUG-545] throws UpstreamError for malformed 402 (non-quota, non-JSON)', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {
       method: 'POST',
@@ -551,9 +555,11 @@ describe('streamSSEViaXHR', () => {
       caught = err;
     }
 
+    // [BUG-545] Non-quota 402 must surface as UpstreamError (not plain Error)
+    // so callers can inspect .status without parsing formatted message strings.
     expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).name).not.toBe('QuotaExceededError');
-    expect((caught as Error).message).toContain('API error 402');
+    expect((caught as Error).name).toBe('UpstreamError');
+    expect((caught as { status?: number }).status).toBe(402);
   });
 
   it('[BUG-955] leaves quota-coded 402 responses with malformed details as generic API errors', async () => {
@@ -590,7 +596,7 @@ describe('streamSSEViaXHR', () => {
     expect((caught as Error).message).toContain('Quota reached');
   });
 
-  it('[BUG-955] leaves non-quota 402 responses as generic API errors', async () => {
+  it('[BUG-955 / BUG-545] throws UpstreamError for non-quota 402 with error code', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {
       method: 'POST',
@@ -610,9 +616,11 @@ describe('streamSSEViaXHR', () => {
       caught = err;
     }
 
+    // [BUG-545] Non-quota 402 with a structured code must surface as
+    // UpstreamError — callers inspect .code and .status, not message strings.
     expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).name).not.toBe('QuotaExceededError');
-    expect((caught as Error).message).toContain('API error 402');
+    expect((caught as Error).name).toBe('UpstreamError');
+    expect((caught as { status?: number }).status).toBe(402);
   });
 
   it('[BUG-955] throws NetworkError for onerror (status 0 / offline)', async () => {
@@ -635,5 +643,91 @@ describe('streamSSEViaXHR', () => {
 
     expect(caught).toBeInstanceOf(Error);
     expect((caught as Error).name).toBe('NetworkError');
+  });
+
+  describe('[BUG-547] 401 from SSE fires onAuthExpired callback', () => {
+    afterEach(() => {
+      clearOnAuthExpired();
+    });
+
+    it('calls the registered onAuthExpired callback when SSE receives 401', async () => {
+      const xhr = installFakeXhr();
+      const onAuthExpired = jest.fn();
+      setOnAuthExpired(onAuthExpired);
+
+      const { events } = streamSSEViaXHR('https://example.test/stream', {
+        method: 'POST',
+      });
+
+      xhr._emitError(401, 'Unauthorized');
+
+      try {
+        for await (const event of events) {
+          void event;
+        }
+      } catch {
+        // expected
+      }
+
+      expect(onAuthExpired).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call onAuthExpired for non-401 errors', async () => {
+      const xhr = installFakeXhr();
+      const onAuthExpired = jest.fn();
+      setOnAuthExpired(onAuthExpired);
+
+      const { events } = streamSSEViaXHR('https://example.test/stream', {
+        method: 'POST',
+      });
+
+      xhr._emitError(500, 'Internal Server Error');
+
+      try {
+        for await (const event of events) {
+          void event;
+        }
+      } catch {
+        // expected
+      }
+
+      expect(onAuthExpired).not.toHaveBeenCalled();
+    });
+
+    it('dedup guard prevents onAuthExpired from firing twice on concurrent 401s', async () => {
+      const xhr1 = installFakeXhr();
+      const onAuthExpired = jest.fn();
+      setOnAuthExpired(onAuthExpired);
+
+      const { events: events1 } = streamSSEViaXHR(
+        'https://example.test/stream',
+        { method: 'POST' },
+      );
+      xhr1._emitError(401, 'Unauthorized');
+      try {
+        for await (const e of events1) {
+          void e;
+        }
+      } catch {
+        // expected
+      }
+
+      // Second 401 on a new stream — guard should block the second fire
+      const xhr2 = installFakeXhr();
+      const { events: events2 } = streamSSEViaXHR(
+        'https://example.test/stream',
+        { method: 'POST' },
+      );
+      xhr2._emitError(401, 'Unauthorized');
+      try {
+        for await (const e of events2) {
+          void e;
+        }
+      } catch {
+        // expected
+      }
+
+      expect(onAuthExpired).toHaveBeenCalledTimes(1);
+    });
   });
 });
