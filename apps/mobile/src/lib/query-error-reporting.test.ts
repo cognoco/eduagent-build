@@ -39,15 +39,26 @@ describe('shouldReportQueryErrorToSentry', () => {
     expect(shouldReportQueryErrorToSentry(error)).toBe(false);
   });
 
-  it('suppresses service-unavailable shaped errors when class identity is lost', () => {
+  it('suppresses upstream-shaped 5xx errors when class identity is lost', () => {
     const error = {
       name: 'UpstreamError',
-      message: 'Database temporarily unavailable — please retry',
-      code: 'SERVICE_UNAVAILABLE',
-      status: 503,
+      message: 'Bad gateway',
+      code: 'UPSTREAM_ERROR',
+      status: 502,
     };
 
     expect(shouldReportQueryErrorToSentry(error)).toBe(false);
+  });
+
+  it('keeps reporting upstream-shaped 4xx errors when class identity is lost', () => {
+    const error = {
+      name: 'UpstreamError',
+      message: 'Not found',
+      code: 'NOT_FOUND',
+      status: 404,
+    };
+
+    expect(shouldReportQueryErrorToSentry(error)).toBe(true);
   });
 
   it('keeps reporting 4xx upstream errors (not server-side captured)', () => {

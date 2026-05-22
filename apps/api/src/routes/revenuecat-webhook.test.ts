@@ -124,7 +124,10 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 import { Hono } from 'hono';
-import { revenuecatWebhookRoute } from './revenuecat-webhook';
+import {
+  MAX_REVENUECAT_EVENT_AGE_MS,
+  revenuecatWebhookRoute,
+} from './revenuecat-webhook';
 import type { AppVariables } from '../types/hono';
 import { writeSubscriptionStatus } from '../services/kv';
 import {
@@ -559,7 +562,7 @@ describe('stale event guard [CR-049]', () => {
   // 4xx would cause RevenueCat to retry for up to 3 days. Pre-fix, the route
   // had no age guard and would process arbitrarily old replayed events.
   it('[CR-049] acks stale event (>48h) with 200 and does not mutate state', async () => {
-    const staleTimestampMs = Date.now() - 49 * 60 * 60 * 1000; // 49 hours ago
+    const staleTimestampMs = Date.now() - MAX_REVENUECAT_EVENT_AGE_MS - 60_000;
     const payload = makeWebhookPayload('RENEWAL', {
       event_timestamp_ms: staleTimestampMs,
     });
@@ -575,7 +578,7 @@ describe('stale event guard [CR-049]', () => {
   });
 
   it('[CR-049] processes recent events normally (within 48h window)', async () => {
-    const recentTimestampMs = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
+    const recentTimestampMs = Date.now() - MAX_REVENUECAT_EVENT_AGE_MS + 60_000;
     const payload = makeWebhookPayload('RENEWAL', {
       event_timestamp_ms: recentTimestampMs,
     });

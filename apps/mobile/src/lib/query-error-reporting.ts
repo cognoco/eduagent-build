@@ -1,15 +1,12 @@
 import { NetworkError, RateLimitedError, UpstreamError } from './api-errors';
 
-function isServiceUnavailableError(error: unknown): boolean {
+function isUpstream5xxLike(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as { name?: unknown; status?: unknown };
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    'code' in error &&
-    'status' in error &&
-    (error as { name?: unknown }).name === 'UpstreamError' &&
-    (error as { code?: unknown }).code === 'SERVICE_UNAVAILABLE' &&
-    (error as { status?: unknown }).status === 503
+    candidate.name === 'UpstreamError' &&
+    typeof candidate.status === 'number' &&
+    candidate.status >= 500
   );
 }
 
@@ -27,7 +24,7 @@ export function shouldReportQueryErrorToSentry(error: unknown): boolean {
 
   // Shape-match fallback for cases where class identity is lost across module
   // boundaries (e.g. serialisation round-trips).
-  if (isServiceUnavailableError(error)) return false;
+  if (isUpstream5xxLike(error)) return false;
 
   return true;
 }
