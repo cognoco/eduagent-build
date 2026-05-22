@@ -98,11 +98,11 @@
 <body>
 <main>
   <h1>P5 — E2E Speed Work Breakdown</h1>
-  <p class="sub">docs/audit/e2e/p5-speed-breakdown.html  ·  branch: e2e-speed  ·  2026-05-14</p>
+  <p class="sub">docs/audit/e2e/p5-speed-breakdown.html  ·  2026-05-14 (revised after Cloudflare API investigation)</p>
 
   <section>
     <h2>Why this exists</h2>
-    <p class="lede">The full Playwright suite takes <strong>23 minutes</strong> at 1 worker today, because Cloudflare's WAF rate-limits parallel workers against shared staging. That's the immediate ceiling on (a) making E2E a merge gate, and (b) cheap iteration during the autonomous <code style="font-family:var(--mono);font-size:12px;background:var(--panel);padding:1px 5px;border-radius:3px;">/goal</code> runs that fix the suite. P5 lifts the ceiling.</p>
+    <p class="lede">The full Playwright suite takes <strong>23 minutes</strong> at 1 worker today. The staging API runs on <code style="font-family:var(--mono);font-size:12px">mentomate-api-stg.zwizzly.workers.dev</code> — a Cloudflare-managed <code style="font-family:var(--mono);font-size:12px">*.workers.dev</code> domain with <strong>platform-level rate-limiting that users cannot configure</strong>. There are no WAF rules, no rate-limit rules, and no Bot Fight Mode on any of our zones (verified via API). Parallel workers trip Cloudflare's built-in protections (BUG-532: 403/429 on bursts). P5 lifts the ceiling by adding a custom domain we control.</p>
   </section>
 
   <section>
@@ -137,22 +137,47 @@
     <h2>Sub-packages</h2>
     <div class="subs">
       <div class="sub-card">
-        <div class="id">P5a</div>
-        <div class="title">Web parallelism unlock</div>
+        <div class="id">P5a — DECIDED</div>
+        <div class="title">Custom domain + WAF allowlist (option 1)</div>
         <span class="when front">front-load (before P1)</span>
-        <p>Strip the rate-limit ceiling so Playwright can use 4+ workers. Single biggest lever; pays back during P1 / M1 / P3 iteration, not just at the end.</p>
-        <h4>Two routes (pick one)</h4>
+        <p>The staging worker runs on <code>*.workers.dev</code> where rate-limits are Cloudflare-managed and not configurable. Fix: add a custom domain (e.g. <code>api-test.zwizzly.com</code>) pointing at the staging worker, then add a WAF skip rule for a secret test header on that zone. Playwright points at the custom domain. This is a stepping stone toward option 2 (dedicated test worker) later — all infra carries over.</p>
+        <h4>Steps</h4>
         <ul>
-          <li><strong>Cloudflare WAF allowlist</strong> for a secret header the test runner sets. Cheap, fast, leakable.</li>
-          <li><strong>Dedicated test worker</strong> (e.g. <code>mentomate-api-test</code>) with its own Neon test DB, WAF relaxed. Cleaner, more setup, no production-data risk.</li>
+          <li>Add DNS CNAME record on <code>zwizzly.com</code> zone (e.g. <code>api-test.zwizzly.com</code> → staging worker)</li>
+          <li>Bind the custom domain to <code>mentomate-api-stg</code> worker in Cloudflare</li>
+          <li>Add WAF rate-limit skip rule on <code>zwizzly.com</code> zone: if header <code>X-E2E-Bypass</code> matches a secret value, skip rate-limiting</li>
+          <li>Store bypass secret in Doppler stg as <code>PLAYWRIGHT_WAF_BYPASS_SECRET</code></li>
+          <li>Update <code>playwright.config.ts</code> / test helpers to set the header + point at the custom domain</li>
+          <li>Run full suite at 4 workers, measure wall-clock, confirm no 429s</li>
         </ul>
         <h4>Exit criteria</h4>
         <ul>
-          <li>Full web suite at 4 workers completes in &lt;10 min without WAF 429s</li>
-          <li>Choice + rationale committed to canonical runbook</li>
-          <li>If dedicated worker: deploy hook keeps it in lock-step with staging API code</li>
+          <li>Full web suite at 4 workers completes in &lt;10 min without 403/429</li>
+          <li>Custom domain + WAF rule documented in canonical runbook</li>
+          <li>Bypass secret stored in Doppler, not hardcoded</li>
         </ul>
         <div class="impact">Impact: 23m → ~7m for every full suite run. Saves ~16m per iteration on every /goal verify cycle.</div>
+      </div>
+
+      <div class="sub-card">
+        <div class="id">P5a+ — PLANNED (later)</div>
+        <div class="title">Dedicated test worker (option 2)</div>
+        <span class="when defer">deferred — after /goal packages complete</span>
+        <p>Replaces option 1: provision a separate <code>mentomate-api-test</code> worker with its own Neon test DB. Re-point the custom domain from the staging worker to the test worker. Retire the WAF skip rule (not needed — test worker has its own relaxed config). Gives full isolation: test traffic can't pollute staging data, no security risk from the WAF bypass.</p>
+        <h4>What carries over from option 1</h4>
+        <ul>
+          <li>DNS record (same custom domain, just re-point the binding)</li>
+          <li>Playwright config (same <code>PLAYWRIGHT_API_URL</code>, same value)</li>
+          <li>Doppler secret pattern (swap bypass secret for test-worker secret if needed)</li>
+        </ul>
+        <h4>New work</h4>
+        <ul>
+          <li>New wrangler.toml environment for <code>mentomate-api-test</code></li>
+          <li>Neon test DB branch/project + <code>DATABASE_URL</code> in Doppler</li>
+          <li>Deploy hook: same code deploys to staging + test simultaneously</li>
+          <li>Remove WAF skip rule from <code>zwizzly.com</code> zone</li>
+        </ul>
+        <div class="impact">Impact: full data isolation. No staging pollution from test runs. Clean security posture.</div>
       </div>
 
       <div class="sub-card">
@@ -227,7 +252,7 @@
           <text x="10" y="95">P5a (infra)</text>
           <text x="10" y="135">/goal runs</text>
           <text x="10" y="175">P5b (config)</text>
-          <text x="10" y="215">P5c (decision)</text>
+          <text x="10" y="215">P5a+ / P5c</text>
         </g>
         <g>
           <!-- Phase 0 -->
@@ -236,7 +261,7 @@
 
           <!-- P5a -->
           <rect x="200" y="80" width="160" height="20" rx="4" fill="#1f2a36" stroke="#6cb6ff"/>
-          <text x="210" y="95" fill="#e6edf3" font-size="11" font-family="ui-monospace, Menlo, monospace">WAF / test worker</text>
+          <text x="210" y="95" fill="#e6edf3" font-size="11" font-family="ui-monospace, Menlo, monospace">custom domain + WAF skip</text>
 
           <!-- /goal runs -->
           <rect x="370" y="120" width="170" height="20" rx="4" fill="#1f2a36" stroke="#f0b72f"/>
@@ -250,9 +275,9 @@
           <rect x="730" y="160" width="160" height="20" rx="4" fill="#1f2a36" stroke="#6cb6ff"/>
           <text x="740" y="175" fill="#e6edf3" font-size="11" font-family="ui-monospace, Menlo, monospace">tiering + CI lanes</text>
 
-          <!-- P5c -->
+          <!-- P5a+ (option 2) -->
           <rect x="730" y="200" width="160" height="20" rx="4" fill="#1f2a36" stroke="#6cb6ff" stroke-dasharray="3 3"/>
-          <text x="740" y="215" fill="#e6edf3" font-size="11" font-family="ui-monospace, Menlo, monospace">mobile parallelism decision</text>
+          <text x="740" y="215" fill="#e6edf3" font-size="11" font-family="ui-monospace, Menlo, monospace">P5a+ dedicated worker</text>
 
           <!-- arrows -->
           <path d="M280 100 C 280 110, 370 115, 370 122" stroke="#8ddb8c" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
@@ -269,14 +294,14 @@
   <section>
     <h2>Risks &amp; mitigations</h2>
     <div class="risks">
-      <div class="risk">
+      <div class="risk med">
         <div class="dot"></div>
-        <div class="what">WAF allowlist via UA header is leakable<small>If the secret header value leaks, anyone can bypass staging rate limits.</small></div>
-        <div class="mit"><strong>Mitigation:</strong> use a strong random secret header (not a recognisable UA string), store in Doppler, rotate quarterly. If leaked, rotate immediately. Prefer the dedicated test worker route if rotation discipline is uncertain.</div>
+        <div class="what">WAF bypass secret leaks (option 1, temporary)<small>If the <code>X-E2E-Bypass</code> header value leaks, anyone can bypass staging rate limits via the custom domain.</small></div>
+        <div class="mit"><strong>Mitigation:</strong> store in Doppler (not hardcoded), rotate quarterly, rotate immediately on leak. Risk retires when option 2 replaces option 1 — the skip rule gets deleted.</div>
       </div>
       <div class="risk med">
         <div class="dot"></div>
-        <div class="what">Dedicated test worker drifts from staging<small>Test worker keeps passing while staging API regresses, or vice versa.</small></div>
+        <div class="what">Dedicated test worker drifts from staging (option 2, future)<small>Test worker keeps passing while staging API regresses, or vice versa.</small></div>
         <div class="mit"><strong>Mitigation:</strong> deploy hook that pushes the same code+config to both whenever staging deploys. Or: shared deploy job with two targets. Treat divergence as a deploy failure.</div>
       </div>
       <div class="risk">
@@ -294,10 +319,10 @@
 
   <section>
     <h2>What this is not</h2>
-    <p class="lede">P5 is <strong>not a <code style="font-family:var(--mono);font-size:12px;background:var(--panel);padding:1px 5px;border-radius:3px;">/goal</code> activity</strong>. It's a mix of infrastructure (Cloudflare config, possibly a new Cloudflare worker), CI workflow edits, and a budget decision. Most of the work is human-driven; an agent can help with the spec-side config edits but the WAF rule, worker provisioning, and Maestro Cloud account live outside the repo. P5 is sequenced relative to the /goal packages but doesn't compete for the same execution capacity.</p>
+    <p class="lede">P5 is <strong>not a <code style="font-family:var(--mono);font-size:12px;background:var(--panel);padding:1px 5px;border-radius:3px;">/goal</code> activity</strong>. It's a mix of infrastructure (Cloudflare custom domain + WAF rule, later a dedicated worker), CI workflow edits, and a budget decision. Most of the work is human-driven; an agent can help with the code-side config edits but the DNS, WAF, and worker provisioning live outside the repo. P5 runs in parallel with the /goal packages. P5a (custom domain + WAF skip) is decided and ships before P1. P5a+ (dedicated test worker) is planned but deferred until after the /goal packages complete.</p>
   </section>
 
-  <p class="footnote">Numbers in the "After P5a" and "After P5a + P5b" panels are projections based on the measured 23-minute baseline at 1 worker. Real numbers replace projections once P5a lands and the first 4-worker run is timed.</p>
+  <p class="footnote">Numbers in the "After P5a" and "After P5a + P5b" panels are projections based on the measured 23-minute baseline at 1 worker. Real numbers replace projections once P5a lands and the first 4-worker run is timed. Cloudflare investigation (API verified 2026-05-14): account 0bcf2a3b..., zwizzly.com zone 5e62b7f0..., mentomate-api-stg has no custom domains, no zone-level WAF/rate-limit/bot rules configured. Throttling is workers.dev platform-level.</p>
 </main>
 
 <script>
