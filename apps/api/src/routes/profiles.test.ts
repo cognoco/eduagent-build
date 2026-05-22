@@ -21,6 +21,7 @@ jest.mock(
       countProfiles: jest.fn(),
       getProfile: jest.fn(),
       updateProfile: jest.fn(),
+      updateProfileAppContext: jest.fn(),
       switchProfile: jest.fn(),
     };
   },
@@ -37,6 +38,7 @@ import {
   countProfiles,
   getProfile,
   updateProfile,
+  updateProfileAppContext,
   switchProfile,
   ProfileLimitError,
   ProfileValidationError,
@@ -115,6 +117,7 @@ const createProfileWithLimitCheckMock = jest.mocked(
 const countProfilesMock = jest.mocked(countProfiles);
 const getProfileMock = jest.mocked(getProfile);
 const updateProfileMock = jest.mocked(updateProfile);
+const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
 const switchProfileMock = jest.mocked(switchProfile);
 
 beforeEach(() => {
@@ -550,6 +553,87 @@ describe('PATCH /v1/profiles/:id', () => {
 });
 
 // ---------------------------------------------------------------------------
+// PATCH /v1/profiles/:id/app-context
+// ---------------------------------------------------------------------------
+
+describe('PATCH /v1/profiles/:id/app-context', () => {
+  it('persists the default app context for a profile', async () => {
+    const updated = makeProfileRow({
+      id: PROFILE_ID_A,
+      displayName: 'Updated',
+    });
+    updateProfileAppContextMock.mockResolvedValue({
+      ...updated,
+      defaultAppContext: 'family',
+      hasFamilyLinks: true,
+    });
+
+    const res = await makeApp().request(
+      `/v1/profiles/${PROFILE_ID_A}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'family' }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      profile: {
+        id: PROFILE_ID_A,
+        defaultAppContext: 'family',
+        hasFamilyLinks: true,
+      },
+    });
+    expect(updateProfileAppContextMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID_A,
+      ACCOUNT_ID,
+      'family',
+    );
+  });
+
+  it('rejects an invalid app context value', async () => {
+    const res = await makeApp().request(
+      `/v1/profiles/${PROFILE_ID_A}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'recaps' }),
+      },
+    );
+
+    expect(res.status).toBe(400);
+    expect(updateProfileAppContextMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when a non-owner edits a sibling app context', async () => {
+    const appWithNonOwner = makeApp({
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2008,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+      } as ProfileMeta,
+    });
+
+    const res = await appWithNonOwner.request(
+      `/v1/profiles/${PROFILE_ID_B}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'study' }),
+      },
+    );
+
+    expect(res.status).toBe(403);
+    expect(updateProfileAppContextMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // POST /v1/profiles/switch
 // ---------------------------------------------------------------------------
 
@@ -696,6 +780,8 @@ function makeProfileRow(
     location: 'EU' as const,
     isOwner: overrides.isOwner ?? true,
     hasPremiumLlm: false,
+    defaultAppContext: null,
+    hasFamilyLinks: false,
     conversationLanguage: 'en' as const,
     pronouns: null,
     consentStatus: null,

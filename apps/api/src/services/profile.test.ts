@@ -57,6 +57,7 @@ import {
   findOwnerProfile,
   getProfile,
   updateProfile,
+  updateProfileAppContext,
   switchProfile,
   resolveProfileRole,
   getProfileAge,
@@ -87,6 +88,7 @@ function mockProfileRow(
     location: 'EU' | 'US' | 'OTHER' | null;
     isOwner: boolean;
     hasPremiumLlm: boolean;
+    defaultAppContext: 'study' | 'family' | null;
   }>,
 ) {
   return {
@@ -98,6 +100,7 @@ function mockProfileRow(
     location: overrides?.location ?? null,
     isOwner: overrides?.isOwner ?? false,
     hasPremiumLlm: overrides?.hasPremiumLlm ?? false,
+    defaultAppContext: overrides?.defaultAppContext ?? null,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -108,12 +111,23 @@ function createMockDb({
   findFirstResult = undefined as ReturnType<typeof mockProfileRow> | undefined,
   insertReturning = [] as ReturnType<typeof mockProfileRow>[],
   updateReturning = [] as ReturnType<typeof mockProfileRow>[],
+  familyFindManyResult = [] as Array<{
+    childProfileId: string;
+    createdAt: Date;
+  }>,
+  familyFindFirstResult = undefined as
+    | { childProfileId: string; createdAt: Date }
+    | undefined,
 } = {}): Database {
   return {
     query: {
       profiles: {
         findMany: jest.fn().mockResolvedValue(findManyResult),
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
+      },
+      familyLinks: {
+        findMany: jest.fn().mockResolvedValue(familyFindManyResult),
+        findFirst: jest.fn().mockResolvedValue(familyFindFirstResult),
       },
     },
     insert: jest.fn().mockReturnValue({
@@ -169,6 +183,30 @@ describe('listProfiles', () => {
 
     expect(result[0]!.consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');
     expect(result[1]!.consentStatus).toBeNull();
+  });
+
+  it('includes server-computed family link capability', async () => {
+    const linkCreatedAt = new Date('2026-02-03T04:05:06.000Z');
+    const rows = [
+      mockProfileRow({ id: 'owner-1', displayName: 'Owner', isOwner: true }),
+      mockProfileRow({ id: 'child-1', displayName: 'Child', isOwner: false }),
+    ];
+    const db = createMockDb({
+      findManyResult: rows,
+      familyFindManyResult: [
+        {
+          childProfileId: 'child-1',
+          createdAt: linkCreatedAt,
+        },
+      ],
+    });
+
+    const result = await listProfiles(db, 'account-123');
+
+    expect(result[0]!.hasFamilyLinks).toBe(true);
+    expect(result[0]!.linkCreatedAt).toBeNull();
+    expect(result[1]!.hasFamilyLinks).toBe(true);
+    expect(result[1]!.linkCreatedAt).toBe('2026-02-03T04:05:06.000Z');
   });
 });
 
@@ -440,6 +478,67 @@ describe('updateProfile', () => {
   });
 });
 
+describe('updateProfileAppContext', () => {
+  it('returns mapped profile after persisting the default app context', async () => {
+    const row = mockProfileRow({
+      id: 'owner-1',
+      isOwner: true,
+      defaultAppContext: 'family',
+    });
+    const db = createMockDb({
+      updateReturning: [row],
+      familyFindFirstResult: {
+        childProfileId: 'child-1',
+        createdAt: new Date('2026-02-03T04:05:06.000Z'),
+      },
+    });
+
+    const result = await updateProfileAppContext(
+      db,
+      'owner-1',
+      'account-123',
+      'family',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.defaultAppContext).toBe('family');
+    expect(result!.hasFamilyLinks).toBe(true);
+  });
+
+  it('returns null when the profile does not exist', async () => {
+    const db = createMockDb({ updateReturning: [] });
+
+    const result = await updateProfileAppContext(
+      db,
+      'profile-123',
+      'account-123',
+      'study',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('[BREAK] WHERE clause includes archived_at IS NULL guard', async () => {
+    let capturedWhere: unknown;
+    const db = {
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation((condition: unknown) => {
+            capturedWhere = condition;
+            return { returning: jest.fn().mockResolvedValue([]) };
+          }),
+        }),
+      }),
+    } as unknown as Database;
+
+    await updateProfileAppContext(db, 'profile-1', 'account-1', 'study');
+
+    const sqlText = drizzleConditionToText(capturedWhere);
+    expect(sqlText).toContain('archived_at');
+    expect(sqlText).toContain('is null');
+  });
+});
+
 describe('switchProfile', () => {
   it('returns null when profile not found', async () => {
     const db = createMockDb({ findFirstResult: undefined });
@@ -492,6 +591,9 @@ describe('findOwnerProfile', () => {
             return Promise.resolve(undefined);
           }),
         },
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
       },
     } as unknown as Database;
 
@@ -516,6 +618,9 @@ describe('findOwnerProfile', () => {
             return Promise.resolve(fallbackRow); // fallback query → non-owner row
           }),
         },
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
       },
     } as unknown as Database;
 
@@ -536,6 +641,9 @@ describe('findOwnerProfile', () => {
             if (callCount === 1) return Promise.resolve(undefined);
             return Promise.resolve(fallbackRow);
           }),
+        },
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
         },
       },
     } as unknown as Database;
@@ -564,6 +672,9 @@ describe('findOwnerProfile', () => {
             if (callCount === 1) return Promise.resolve(undefined);
             return Promise.resolve(fallbackRow);
           }),
+        },
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
         },
       },
     } as unknown as Database;

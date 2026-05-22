@@ -86,6 +86,8 @@ const ownerProfile: Profile = {
   location: null,
   isOwner: true,
   hasPremiumLlm: false,
+  defaultAppContext: null,
+  hasFamilyLinks: false,
   conversationLanguage: 'en',
   pronouns: null,
   consentStatus: null,

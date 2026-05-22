@@ -74,12 +74,16 @@ const guardianProfile = {
   ...NAMED_PROFILES.guardian,
   id: 'profile-parent',
   accountId: 'account-family',
+  defaultAppContext: 'family' as const,
+  hasFamilyLinks: true,
 };
 const linkedChildProfile = {
   ...NAMED_PROFILES.linkedChild,
   id: 'child-001',
   accountId: 'account-family',
   displayName: 'Emma',
+  defaultAppContext: null,
+  hasFamilyLinks: true,
 };
 
 function setRoutes(
