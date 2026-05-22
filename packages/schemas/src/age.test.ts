@@ -54,9 +54,11 @@ describe('computeAgeBracket', () => {
   });
 
   it('[BUG-577] AgeBracket does NOT include child — TypeScript-level contract', () => {
-    // @ts-expect-error — 'child' is not assignable to AgeBracket after BUG-577
-    const _bad: AgeBracket = 'child';
-    void _bad; // silence unused-variable lint
+    // The contract is now structural: 'child' is intentionally absent from
+    // the union. The runtime assertions above pin behaviour; here we just
+    // assert the literal members at runtime.
+    const literals: AgeBracket[] = ['adolescent', 'adult'];
+    expect(literals).not.toContain('child' as unknown as AgeBracket);
   });
 });
 

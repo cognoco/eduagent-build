@@ -378,10 +378,36 @@ export const apiErrorDetailsSchema = z.union([
 
 export type ApiErrorDetails = z.infer<typeof apiErrorDetailsSchema>;
 
-export const apiErrorSchema = z.object({
-  code: errorCodeSchema,
-  message: z.string(),
-  details: apiErrorDetailsSchema.optional(),
-});
+// [BUG-576] Per-code detail-shape contract. The base union (above) lets a
+// permissive `z.record` swallow malformed payloads — the discriminator below
+// pins each known code's details to its strict shape. Unknown codes still fall
+// through to the permissive record so the envelope stays parseable.
+const codeToDetailsSchema: Partial<Record<ErrorCode, z.ZodType>> = {
+  QUOTA_EXCEEDED: quotaExceededDetailsSchema,
+  VALIDATION_ERROR: validationErrorDetailsSchema,
+  RATE_LIMITED: rateLimitedDetailsSchema,
+  GONE: resourceGoneDetailsSchema,
+  SESSION_ARCHIVED: resourceGoneDetailsSchema,
+};
+
+export const apiErrorSchema = z
+  .object({
+    code: errorCodeSchema,
+    message: z.string(),
+    details: apiErrorDetailsSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    const strictSchema = codeToDetailsSchema[value.code];
+    if (!strictSchema || value.details === undefined) return;
+    const result = strictSchema.safeParse(value.details);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue({
+          ...issue,
+          path: ['details', ...issue.path],
+        });
+      }
+    }
+  });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;

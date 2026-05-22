@@ -251,6 +251,35 @@ describe('typed error classes [BUG-644]', () => {
       });
       expect(result.success).toBe(true);
     });
+
+    it('[BUG-576] rejects QUOTA_EXCEEDED with malformed details — no record fallthrough', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'QUOTA_EXCEEDED',
+        message: 'Out of quota',
+        // Missing required quotaExceeded fields (tier, reason, monthlyLimit, ...)
+        details: { traceId: 'abc' },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('[BUG-576] rejects VALIDATION_ERROR with missing issues array — no silent passthrough', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'VALIDATION_ERROR',
+        message: 'Bad input',
+        // VALIDATION_ERROR requires `details.issues: array`; supplying nothing matches the record fallback unless superRefine fires.
+        details: { component: 'session' },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('[BUG-576] still accepts unknown codes with arbitrary details (record fallback preserved)', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'INTERNAL_ERROR',
+        message: 'Boom',
+        details: { traceId: 'abc', component: 'session' },
+      });
+      expect(result.success).toBe(true);
+    });
   });
 
   it('instanceof survives a Promise.reject / catch round-trip', async () => {
