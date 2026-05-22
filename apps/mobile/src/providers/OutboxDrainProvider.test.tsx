@@ -20,7 +20,8 @@ import { useApiClient } from '../lib/api-client';
 // implementation pulls in Clerk, SecureStore, QueryClient, and full profile
 // state machine — instantiating that tree here would exercise auth/storage
 // internals unrelated to the three outbox bugs under test.
-jest.mock('../lib/profile', () => ({
+// prettier-ignore
+jest.mock('../lib/profile', () => ({ // gc1-allow: auth tree
   useProfile: jest.fn(),
 }));
 
@@ -28,7 +29,8 @@ jest.mock('../lib/profile', () => ({
 // wrappers; building a real client requires a running Hono server.  The
 // provider only calls client.support['outbox-spillover'].$post for escalation,
 // which is exercised through postToSupport and is irrelevant to these 3 bugs.
-jest.mock('../lib/api-client', () => ({
+// prettier-ignore
+jest.mock('../lib/api-client', () => ({ // gc1-allow: Hono client
   useApiClient: jest.fn(),
   getProxyMode: jest.fn().mockReturnValue(false),
   withIdempotencyKey: jest.fn(
@@ -41,7 +43,8 @@ jest.mock('../lib/api-client', () => ({
 
 // gc1-allow: getApiUrl is a thin env-var reader; real implementation reads
 // EXPO_PUBLIC_API_URL from the environment, which is not set in Jest.
-jest.mock('../lib/api', () => ({
+// prettier-ignore
+jest.mock('../lib/api', () => ({ // gc1-allow: env URL
   getApiUrl: jest.fn().mockReturnValue('http://localhost:8787'),
 }));
 
@@ -49,7 +52,8 @@ jest.mock('../lib/api', () => ({
 // implementation imports native sentry modules that fail in Jest.
 // The @sentry/react-native global mock in test-setup.ts does not cover
 // the local re-export at lib/sentry.ts.
-jest.mock('../lib/sentry', () => ({
+// prettier-ignore
+jest.mock('../lib/sentry', () => ({ // gc1-allow: native Sentry
   Sentry: { captureException: jest.fn() },
 }));
 
