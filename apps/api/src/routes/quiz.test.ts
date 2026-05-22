@@ -187,7 +187,9 @@ function setInsertReturning(id = '01933b3c-0000-7000-8000-000000000999') {
  * concurrent-race guard override this to return [] so `completeActive`
  * returns undefined and the service throws ConflictError.
  */
-function setUpdateReturning(rows: Array<{ id: string }> = [{ id: 'round-1' }]) {
+function setUpdateReturning(
+  rows: Array<{ id: string }> = [{ id: ROUND_ID_1 }],
+) {
   const returning = jest.fn().mockResolvedValue(rows);
   const where = jest.fn().mockReturnValue({ returning });
   const set = jest.fn().mockReturnValue({ where });
@@ -195,7 +197,7 @@ function setUpdateReturning(rows: Array<{ id: string }> = [{ id: 'round-1' }]) {
 }
 
 const ACTIVE_ROUND = {
-  id: 'a0000000-0000-4000-a000-000000000001',
+  id: ROUND_ID_1,
   profileId: 'test-profile-id',
   activityType: 'capitals',
   theme: 'Central European Capitals',
@@ -228,7 +230,7 @@ const ACTIVE_ROUND = {
 // getRoundByIdOrThrow returns after completeQuizRound has persisted.
 const COMPLETED_ROUND = {
   ...ACTIVE_ROUND,
-  id: 'a0000000-0000-4000-a000-000000000002',
+  id: ROUND_ID_COMPLETED,
   status: 'completed' as const,
   score: 1,
   xpEarned: 15,
@@ -882,7 +884,7 @@ describe('Quiz routes', () => {
         .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(txDb));
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1/check',
+        `/v1/quiz/rounds/${ROUND_ID_1}/check`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1128,7 +1130,7 @@ describe('Quiz routes', () => {
         .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(txDb));
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1/complete',
+        `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,
