@@ -1,5 +1,7 @@
 import { apiBaseUrl, buildTestSeedHeaders, seedEmailPrefix } from './runtime';
 
+const CLERK_API_BASE = 'https://api.clerk.com/v1';
+
 export interface SeedResponse {
   scenario: string;
   accountId: string;
@@ -21,6 +23,19 @@ export interface ResetResponse {
 const RETRY_MAX_ATTEMPTS = 6;
 const RETRY_BASE_DELAY_MS = 1_500;
 const RETRYABLE_STATUSES = new Set([403, 429, 502, 503]);
+const CLERK_LOOKUP_MAX_ATTEMPTS = 10;
+const CLERK_LOOKUP_DELAY_MS = 750;
+
+interface ClerkUser {
+  id: string;
+  primary_email_address_id?: string | null;
+  email_addresses?: Array<{
+    id?: string;
+    email_address?: string;
+  }>;
+}
+
+type ClerkUserLookupResponse = ClerkUser[] | { data?: ClerkUser[] };
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -85,7 +100,12 @@ export async function seedScenario(input: {
     `Seeding ${input.scenario}`,
   );
 
-  return readJsonOrThrow<SeedResponse>(response, `Seeding ${input.scenario}`);
+  const seeded = await readJsonOrThrow<SeedResponse>(
+    response,
+    `Seeding ${input.scenario}`,
+  );
+  await verifySeededClerkEmail(seeded.email);
+  return seeded;
 }
 
 export async function resetSeededAccounts(
@@ -106,4 +126,79 @@ export async function resetSeededAccounts(
   );
 
   return readJsonOrThrow<ResetResponse>(response, 'Resetting seeded accounts');
+}
+
+async function verifySeededClerkEmail(email: string): Promise<void> {
+  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+  if (!clerkSecretKey) return;
+
+  const emailAddressId = await findSeededClerkEmailAddressId(
+    email,
+    clerkSecretKey,
+  );
+
+  if (!emailAddressId) {
+    throw new Error(
+      `Could not find Clerk email address for seed user ${email}`,
+    );
+  }
+
+  const verifyResponse = await fetchWithRetry(
+    `${CLERK_API_BASE}/email_addresses/${encodeURIComponent(emailAddressId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${clerkSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ verified: true, primary: true }),
+    },
+    `Verifying Clerk seed email ${email}`,
+  );
+
+  if (!verifyResponse.ok) {
+    const detail = await verifyResponse.text().catch(() => '');
+    throw new Error(
+      `Verifying Clerk seed email ${email} failed (${verifyResponse.status}): ${detail}`,
+    );
+  }
+}
+
+async function findSeededClerkEmailAddressId(
+  email: string,
+  clerkSecretKey: string,
+): Promise<string | null> {
+  const params = new URLSearchParams({ email_address: email });
+
+  for (let attempt = 0; attempt < CLERK_LOOKUP_MAX_ATTEMPTS; attempt++) {
+    const lookupResponse = await fetchWithRetry(
+      `${CLERK_API_BASE}/users?${params.toString()}`,
+      {
+        headers: { Authorization: `Bearer ${clerkSecretKey}` },
+      },
+      `Looking up Clerk seed user ${email}`,
+    );
+    const lookup = await readJsonOrThrow<ClerkUserLookupResponse>(
+      lookupResponse,
+      `Looking up Clerk seed user ${email}`,
+    );
+    const users = Array.isArray(lookup) ? lookup : (lookup.data ?? []);
+    const user = users[0];
+    const emailAddress =
+      user?.email_addresses?.find(
+        (address) =>
+          address.email_address?.toLowerCase() === email.toLowerCase(),
+      ) ?? null;
+    const emailAddressId = emailAddress?.id ?? user?.primary_email_address_id;
+
+    if (emailAddressId) {
+      return emailAddressId;
+    }
+
+    if (attempt < CLERK_LOOKUP_MAX_ATTEMPTS - 1) {
+      await sleep(CLERK_LOOKUP_DELAY_MS);
+    }
+  }
+
+  return null;
 }
