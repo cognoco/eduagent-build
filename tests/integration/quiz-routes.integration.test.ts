@@ -24,6 +24,8 @@ import {
 const TEST_ENV = buildIntegrationEnv();
 const QUIZ_AUTH_USER_ID = 'integration-quiz-routes-user';
 const QUIZ_AUTH_EMAIL = 'integration-quiz-routes@integration.test';
+const QUIZ_ATTACKER_USER_ID = 'integration-quiz-routes-attacker';
+const QUIZ_ATTACKER_EMAIL = 'integration-quiz-routes-attacker@integration.test';
 
 async function createQuizProfile(): Promise<string> {
   const profile = await createProfileViaRoute({
@@ -72,16 +74,16 @@ function restoreDefaultLlmProvider() {
 beforeEach(async () => {
   _resetCircuits();
   await cleanupAccounts({
-    emails: [QUIZ_AUTH_EMAIL],
-    clerkUserIds: [QUIZ_AUTH_USER_ID],
+    emails: [QUIZ_AUTH_EMAIL, QUIZ_ATTACKER_EMAIL],
+    clerkUserIds: [QUIZ_AUTH_USER_ID, QUIZ_ATTACKER_USER_ID],
   });
   restoreDefaultLlmProvider();
 });
 
 afterAll(async () => {
   await cleanupAccounts({
-    emails: [QUIZ_AUTH_EMAIL],
-    clerkUserIds: [QUIZ_AUTH_USER_ID],
+    emails: [QUIZ_AUTH_EMAIL, QUIZ_ATTACKER_EMAIL],
+    clerkUserIds: [QUIZ_AUTH_USER_ID, QUIZ_ATTACKER_USER_ID],
   });
   restoreDefaultLlmProvider();
 });
@@ -483,10 +485,19 @@ describe('Integration: quiz scoring integrity', () => {
   it('[BREAK/WI-163] leaves another profile round unchanged when check uses a non-owner profileId', async () => {
     const ownerProfileId = await createQuizProfile();
     const { roundId, questions } = await startCapitalsRound(ownerProfileId);
-    const attackerProfileId = await createQuizProfile();
+    const attackerProfile = await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: {
+        userId: QUIZ_ATTACKER_USER_ID,
+        email: QUIZ_ATTACKER_EMAIL,
+      },
+      displayName: 'Quiz Integration Attacker',
+      birthYear: 2000,
+    });
     const attackerHeaders = buildAuthHeaders(
-      { sub: QUIZ_AUTH_USER_ID, email: QUIZ_AUTH_EMAIL },
-      attackerProfileId,
+      { sub: QUIZ_ATTACKER_USER_ID, email: QUIZ_ATTACKER_EMAIL },
+      attackerProfile.id,
     );
     const firstQuestion = questions[0]!;
     if (firstQuestion.type !== 'capitals') {
