@@ -157,21 +157,21 @@ jest.mock('../../../hooks/use-quiz', () => ({
   useGenerateRound: () => mockGenerateRound,
 }));
 
-// gc1-allow: native-boundary: _layout.tsx transitively loads useParentProxy
-// →profile→i18n→expo-localization and expo-router Stack which are native-only.
-// useQuizFlow requires mutable test state to control activityType/returnTo per-test.
-jest.mock('./_layout', () => ({
-  useQuizFlow: () => ({
-    activityType: mockFlowActivityType,
-    returnTo: mockFlowReturnTo,
-    subjectId: null,
-    setActivityType: mockSetActivityType,
-    setSubjectId: mockSetSubjectId,
-    setLanguageName: mockSetLanguageName,
-    setReturnTo: mockSetReturnTo,
-    setRound: mockSetRound,
+jest.mock(
+  './_layout' /* gc1-allow: native-boundary; _layout transitively loads native-only router/i18n modules in JSDOM */,
+  () => ({
+    useQuizFlow: () => ({
+      activityType: mockFlowActivityType,
+      returnTo: mockFlowReturnTo,
+      subjectId: null,
+      setActivityType: mockSetActivityType,
+      setSubjectId: mockSetSubjectId,
+      setLanguageName: mockSetLanguageName,
+      setReturnTo: mockSetReturnTo,
+      setRound: mockSetRound,
+    }),
   }),
-}));
+);
 
 const { default: QuizLaunchScreen, friendlyErrorMessage } = require('./launch');
 
