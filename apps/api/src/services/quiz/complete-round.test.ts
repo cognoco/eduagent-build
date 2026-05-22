@@ -19,6 +19,7 @@ import {
   getGuessWhoSm2Quality,
   getVocabSm2Quality,
   isAnswerCorrect,
+  selectAuthoritativeResults,
   validateResults,
 } from './complete-round';
 
@@ -615,6 +616,93 @@ describe('validateResults (anti-tampering)', () => {
 
     const validated = validateResults(vocabQuestions, freeTextResult);
     expect(validated).toHaveLength(1);
+  });
+});
+
+describe('selectAuthoritativeResults [WI-89 persisted attempts]', () => {
+  const capitalsQuestion: CapitalsQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Marseille', 'Nice'],
+    funFact: '',
+    isLibraryItem: false,
+  };
+  const guessWhoQuestion: GuessWhoQuestion = {
+    type: 'guess_who',
+    canonicalName: 'Isaac Newton',
+    correctAnswer: 'Isaac Newton',
+    acceptedAliases: ['Newton'],
+    clues: ['C1', 'C2', 'C3', 'C4', 'C5'],
+    mcFallbackOptions: ['Isaac Newton', 'Einstein', 'Tesla', 'Curie'],
+    funFact: 'Fact.',
+    isLibraryItem: false,
+  };
+
+  it('[BREAK/WI-89] uses the final guess_who attempt after an earlier wrong check', () => {
+    const selected = selectAuthoritativeResults(
+      [guessWhoQuestion],
+      [
+        {
+          questionIndex: 0,
+          correct: false,
+          answerGiven: 'Einstein',
+          timeMs: 0,
+          cluesUsed: 1,
+          answerMode: 'free_text',
+        },
+      ],
+      [
+        {
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'Newton',
+          timeMs: 4500,
+          cluesUsed: 3,
+          answerMode: 'free_text',
+        },
+      ],
+    );
+
+    expect(selected).toEqual([
+      expect.objectContaining({
+        questionIndex: 0,
+        answerGiven: 'Newton',
+        cluesUsed: 3,
+      }),
+    ]);
+  });
+
+  it('[BREAK/WI-89] keeps the first persisted capitals attempt to prevent retro-scoring', () => {
+    const selected = selectAuthoritativeResults(
+      [capitalsQuestion],
+      [
+        {
+          questionIndex: 0,
+          correct: false,
+          answerGiven: 'Lyon',
+          timeMs: 0,
+          answerMode: 'multiple_choice',
+        },
+      ],
+      [
+        {
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'Paris',
+          timeMs: 1,
+          answerMode: 'multiple_choice',
+        },
+      ],
+    );
+
+    expect(selected).toEqual([
+      expect.objectContaining({
+        questionIndex: 0,
+        answerGiven: 'Lyon',
+      }),
+    ]);
   });
 });
 

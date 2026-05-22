@@ -259,17 +259,35 @@ export function validateResults(
   return validated;
 }
 
-function selectAuthoritativeResults(
+/**
+ * [WI-89] Merge persisted /check attempts with the final /complete payload.
+ * Capitals/vocabulary keep the first attempt so revealed answers cannot be
+ * retro-scored. Guess Who intentionally allows multiple guesses before the
+ * question resolves, so the last server-validated attempt is authoritative.
+ *
+ * Exported only for unit testing; this is the trust-boundary merge policy.
+ */
+export function selectAuthoritativeResults(
+  questions: QuizQuestion[],
   persistedResults: QuestionResult[],
   requestResults: QuestionResult[],
 ): QuestionResult[] {
   const selected: QuestionResult[] = [];
-  const seenQuestionIndices = new Set<number>();
+  const selectedIndexByQuestionIndex = new Map<number, number>();
 
   for (const result of persistedResults.concat(requestResults)) {
-    if (seenQuestionIndices.has(result.questionIndex)) continue;
+    const existingIndex = selectedIndexByQuestionIndex.get(
+      result.questionIndex,
+    );
+    if (existingIndex !== undefined) {
+      const question = questions[result.questionIndex];
+      if (question?.type === 'guess_who') {
+        selected[existingIndex] = result;
+      }
+      continue;
+    }
     selected.push(result);
-    seenQuestionIndices.add(result.questionIndex);
+    selectedIndexByQuestionIndex.set(result.questionIndex, selected.length - 1);
   }
 
   return selected;
@@ -411,6 +429,7 @@ export async function completeQuizRound(
       ? (round.results as QuestionResult[])
       : [];
     const authoritativeResults = selectAuthoritativeResults(
+      questions,
       persistedResults,
       results,
     );
