@@ -50,6 +50,7 @@ import {
   pendingNotices,
   vocabulary,
   vocabularyRetentionCards,
+  dictationModeEnum,
   dictationResults,
   quizRounds,
   quizMissedItems,
@@ -786,7 +787,8 @@ export function createScopedRepository(db: Database, profileId: string) {
         date: string;
         sentenceCount: number;
         mistakeCount: number | null;
-        mode: 'homework' | 'surprise';
+        // [CR-162] Derive from schema enum so this type stays in sync automatically.
+        mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
       }) {
         // [BUG-4] Idempotent on (profile_id, date, mode): a retry of the
