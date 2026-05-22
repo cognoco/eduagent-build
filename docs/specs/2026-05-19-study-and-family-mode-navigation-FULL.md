@@ -46,6 +46,8 @@ test_patterns:
 
 **Created:** 2026-05-19
 
+> **Hard constraint (added 2026-05-22).** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) **must keep working** across every PR in this migration. V0 helpers and V0-off short-circuits stay alive when V1 ships; the new contract is gated behind a separate `MODE_NAV_V1_ENABLED` flag. See the "Hard Constraint — Preserve 5-Tab Mode Across All Increments" section of `docs/specs/2026-05-21-navigation-contract.md` for the full flag matrix, load-bearing files, and the required regression test.
+
 ## Overview
 
 ### Problem Statement

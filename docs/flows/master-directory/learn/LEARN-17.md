@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** Shared different scope  
 > **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/progress/index.tsx`, `apps/mobile/src/hooks/use-progress.ts`, `apps/mobile/src/components/progress/ProgressPillRow.tsx`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/progress/index.tsx`, `apps/mobile/src/hooks/use-progress.ts`, `apps/mobile/src/components/progress/ProgressPillRow.tsx`
 
 ## Purpose
 

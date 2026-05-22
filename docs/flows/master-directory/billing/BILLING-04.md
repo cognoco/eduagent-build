@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** Owner/account shared  
 > **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/more/account.tsx`, `apps/mobile/src/app/(app)/subscription.tsx`, `apps/mobile/src/hooks/use-subscription.ts`, `apps/mobile/src/hooks/use-revenuecat.ts`, `.claude/memory/billing-payments.md`, `.claude/memory/project_revenuecat_setup.md`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/more/account.tsx`, `apps/mobile/src/app/(app)/subscription.tsx`, `apps/mobile/src/hooks/use-subscription.ts`, `apps/mobile/src/hooks/use-revenuecat.ts`, `.claude/memory/billing-payments.md`, `.claude/memory/project_revenuecat_setup.md`
 
 ## Purpose
 

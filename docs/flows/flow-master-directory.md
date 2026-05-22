@@ -10,6 +10,27 @@ This document is the durable directory of product flows. It is intentionally sep
 
 Detailed flow pages live under [`master-directory/`](master-directory/README.md).
 
+## Related documents
+
+- [`docs/specs/2026-05-21-navigation-contract.md`](../specs/2026-05-21-navigation-contract.md) — target navigation contract (`resolveNavigationContract`, `study` / `family` shapes). Flow pages cite it when their audience access depends on the contract.
+- [`docs/audience-matrix.md`](../audience-matrix.md) — current-state inventory of scattered gating (F1–F14). Flow pages that touch gated surfaces (home, more, account, privacy, progress) should cite the matrix.
+- [`master-directory/README.md`](master-directory/README.md) — schema and grouping for the per-flow detail pages.
+- `CLAUDE.md` — authoritative for **current** profile shapes and `isOwner` gating rules.
+
+## Vocabulary — audience axis (overlapping vocabularies)
+
+Four documents describe the same audience axis with different vocabularies. Translation table:
+
+| This directory | `CLAUDE.md` (today) | Navigation contract (target) | Audience matrix |
+| --- | --- | --- | --- |
+| `Study-only` | `learner` shape | `study` mode | `mode === 'study'` |
+| `Family-only` | `guardian` shape, with linked children | `family` mode | `mode === 'family'`, `hasLinkedChildren`, `isParentProxy` |
+| `Shared same behavior` | both shapes, same screen | both modes, same contract | n/a |
+| `Shared different scope` | both shapes, different content gates | both modes, different `gates.*` | `isOwner`, `role`, `tier` reads |
+| `Owner/account shared` | `isOwner: true` | `gates.showBilling / showAccountSecurity / showExportDelete` | `isOwner`, `role` |
+
+The fact that "two shapes" means `guardian/learner` in CLAUDE.md and `study/family` in the navigation-contract spec is **intentional**: CLAUDE.md is V0 reality; the spec is FULL target.
+
 ## Audience Access Labels
 
 | Label | Meaning |
