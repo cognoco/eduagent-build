@@ -46,9 +46,11 @@ function _envValidationHash(
 
 export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
   async (c, next): Promise<Response | void> => {
-    const currentHash = _envValidationHash(
-      c.env as Record<string, string | undefined>,
-    );
+    // app.request() in tests can run without bindings (c.env === undefined).
+    // Guard before computing the hash so the optional-chain path below is the
+    // single source of truth for "no env, skip validation".
+    const env = (c.env ?? {}) as Record<string, string | undefined>;
+    const currentHash = _envValidationHash(env);
 
     if (_validatedEnvHash !== currentHash) {
       // Skip in tests and local development — tests mock bindings selectively,
