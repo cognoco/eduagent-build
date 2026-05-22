@@ -903,6 +903,32 @@ describe('extractBookSuggestionJson', () => {
     expect(parsed.suggestions[0]?.title).toBe('First');
   });
 
+  // [BUG-482] BREAK TEST: a `}` inside a description field must NOT be treated as
+  // the closing brace of the outer object. The old greedy /\{[\s\S]*\}/ regex
+  // stops at that inner `}`, producing a truncated string that fails JSON.parse
+  // and falls into the repair path — which then strips everything after `category`
+  // including the closing `}` of each suggestion and the outer `}`. The result:
+  // the `category` field is present but the entire JSON is malformed (no closing
+  // braces), so parse still fails and the call throws. With extractFirstJsonObject
+  // the brace-depth walker skips `}` inside string literals, so all fields survive.
+  it('[BUG-482] extracts all fields including category when description contains a closing brace', () => {
+    const response = [
+      '```json',
+      '{"book": "X", "description": "Sequel to Q&A}", "category": "fiction"}',
+      '```',
+    ].join('\n');
+
+    const parsed = extractBookSuggestionJson(response) as {
+      book: string;
+      description: string;
+      category: string;
+    };
+
+    expect(parsed.book).toBe('X');
+    expect(parsed.description).toBe('Sequel to Q&A}');
+    expect(parsed.category).toBe('fiction');
+  });
+
   it('[BUG-461] handles JSON inside markdown code fences', () => {
     const response = [
       'Sure, here are the book suggestions:',

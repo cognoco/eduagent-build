@@ -5,6 +5,7 @@ import {
   vectorNullable,
   vectorNullableToDriver,
   vectorToDriver,
+  VectorParseError,
   VECTOR_DIM,
 } from './_pgvector.js';
 
@@ -41,5 +42,36 @@ describe('pgvector customType', () => {
 
     expect(driver).toBe('[0.25,0.5,0.75]');
     expect(vectorNullableFromDriver(driver)).toEqual(v);
+  });
+
+  describe('vectorFromDriver — format fallback', () => {
+    it('JSON-array format still parses (existing happy path)', () => {
+      const result = vectorFromDriver('[0.1,0.2,0.3]');
+      expect(result).toEqual([0.1, 0.2, 0.3]);
+    });
+
+    it('pgvector text format "(0.1,0.2,0.3)" now parses correctly', () => {
+      const result = vectorFromDriver('(0.1,0.2,0.3)');
+      expect(result).toEqual([0.1, 0.2, 0.3]);
+    });
+
+    it('pure garbage throws VectorParseError (not a raw SyntaxError)', () => {
+      expect(() => vectorFromDriver('not a vector')).toThrow(VectorParseError);
+    });
+
+    it('VectorParseError message includes the original value', () => {
+      const raw = 'not a vector';
+      expect(() => vectorFromDriver(raw)).toThrow(
+        expect.objectContaining({ message: expect.stringContaining(raw) }),
+      );
+    });
+
+    it('VectorParseError message includes column hint when provided', () => {
+      expect(() => vectorFromDriver('bad', 'embedding')).toThrow(
+        expect.objectContaining({
+          message: expect.stringContaining('embedding'),
+        }),
+      );
+    });
   });
 });

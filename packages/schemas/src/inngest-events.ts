@@ -67,7 +67,10 @@ export const orphanPersistFailedEventSchema = z.object({
   draftId: z.string().uuid(),
   route: z.string(),
   reason: z.string().nullable(),
-  error: z.string(),
+  // Callers must scrub PII before constructing this message — raw transcript
+  // fragments, image URLs with tokens, or retried message bodies must not be
+  // included. Cap prevents unbounded payloads in Inngest observability sinks.
+  error: z.string().max(2000),
 });
 export type OrphanPersistFailedEvent = z.infer<
   typeof orphanPersistFailedEventSchema
@@ -194,7 +197,10 @@ export type ClassificationSkippedEvent = z.infer<
 export const classificationFailedEventSchema = z.object({
   sessionId: z.string().optional(),
   exchangeCount: z.number().optional(),
-  error: z.string().optional(),
+  // Callers must scrub PII before constructing this message — raw transcript
+  // fragments, image URLs with tokens, or retried message bodies must not be
+  // included. Cap prevents unbounded payloads in Inngest observability sinks.
+  error: z.string().max(2000).optional(),
 });
 export type ClassificationFailedEvent = z.infer<
   typeof classificationFailedEventSchema

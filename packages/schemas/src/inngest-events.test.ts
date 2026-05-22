@@ -1,8 +1,10 @@
 import {
+  classificationFailedEventSchema,
   filingResolvedEventSchema,
   filingRetryCompletedEventSchema,
   filingRetryEventSchema,
   filingTimedOutEventSchema,
+  orphanPersistFailedEventSchema,
   sessionSummaryFailedEventSchema,
   sessionTranscriptPurgedEventSchema,
   sessionPurgeDelayedEventSchema,
@@ -93,6 +95,44 @@ describe('filing lifecycle Inngest event schemas', () => {
         timestamp: '2026-04-29T10:00:00.000Z',
       }),
     ).toThrow();
+  });
+});
+
+describe('[BUG-585] orphanPersistFailedEventSchema error field max-length cap', () => {
+  const validUuid = '00000000-0000-4000-8000-000000000001';
+  const validBase = {
+    profileId: validUuid,
+    draftId: validUuid,
+    route: '/api/session',
+    reason: null,
+  };
+
+  it('accepts an error string at the 2000-character limit', () => {
+    expect(
+      orphanPersistFailedEventSchema.safeParse({
+        ...validBase,
+        error: 'a'.repeat(2000),
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an error string exceeding 2000 characters', () => {
+    expect(
+      orphanPersistFailedEventSchema.safeParse({
+        ...validBase,
+        error: 'a'.repeat(2001),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('[BUG-585] classificationFailedEventSchema rejects error string exceeding 2000 characters', () => {
+    expect(
+      classificationFailedEventSchema.safeParse({
+        sessionId: validUuid,
+        exchangeCount: 3,
+        error: 'x'.repeat(2001),
+      }).success,
+    ).toBe(false);
   });
 });
 

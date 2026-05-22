@@ -21,8 +21,36 @@ export function vectorToDriver(value: number[]): string {
   return `[${value.join(',')}]`;
 }
 
-export function vectorFromDriver(value: string): number[] {
-  return JSON.parse(value);
+/** Thrown when a raw driver value cannot be parsed as a vector. */
+export class VectorParseError extends Error {
+  constructor(raw: string, hint?: string) {
+    const location = hint ? ` (column: ${hint})` : '';
+    super(
+      `VectorParseError: cannot parse driver value as vector${location}: ${JSON.stringify(raw)}`,
+    );
+    this.name = 'VectorParseError';
+  }
+}
+
+export function vectorFromDriver(value: string, columnHint?: string): number[] {
+  // Primary path: pgvector returns JSON-array format "[0.1,0.2,…]"
+  try {
+    return JSON.parse(value) as number[];
+  } catch {
+    // no-op — fall through to text-format fallback
+  }
+
+  // Fallback: pgvector native text format "(0.1,0.2,…)"
+  const trimmed = value.trim();
+  if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+    const inner = trimmed.slice(1, -1);
+    const parts = inner.split(',').map(Number);
+    if (parts.length > 0 && parts.every((n) => !Number.isNaN(n))) {
+      return parts;
+    }
+  }
+
+  throw new VectorParseError(value, columnHint);
 }
 
 export function vectorNullableToDriver(value: number[] | null): string | null {
