@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------------
 // Retention Data Service — Sprint 8 Phase 1
 // DB-aware functions for retention routes. Delegates computation to
 // services/retention.ts (pure SM-2 logic).
@@ -463,24 +463,47 @@ export async function getProfileOverdueCount(
 }> {
   const repo = createScopedRepository(db, profileId);
   const now = new Date();
-
-  const allCards = await repo.retentionCards.findMany(
+  const overdueWhere = and(
+    eq(retentionCards.profileId, profileId),
     lt(retentionCards.nextReviewAt, now),
   );
 
-  // Sort by nextReviewAt ascending (most overdue first) and take top 3 IDs
-  const sorted = allCards.slice().sort((a, b) => {
-    const aTime = a.nextReviewAt?.getTime() ?? 0;
-    const bTime = b.nextReviewAt?.getTime() ?? 0;
-    return aTime - bTime;
-  });
+  // Run the three independent queries in parallel:
+  //   1. SQL count(*) — avoids loading all card rows into memory
+  //   2. Top 3 overdue topic IDs ordered by nextReviewAt ASC (most overdue first)
+  //   3. Nearest upcoming (not-yet-overdue) review timestamp
+  const [countRows, topCards, [upcomingReview]] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(retentionCards)
+      .where(overdueWhere),
+    db
+      .select({ topicId: retentionCards.topicId })
+      .from(retentionCards)
+      .where(overdueWhere)
+      .orderBy(asc(retentionCards.nextReviewAt))
+      .limit(3),
+    db
+      .select({ nextReviewAt: retentionCards.nextReviewAt })
+      .from(retentionCards)
+      .where(
+        and(
+          eq(retentionCards.profileId, profileId),
+          gt(retentionCards.nextReviewAt, now),
+        ),
+      )
+      .orderBy(asc(retentionCards.nextReviewAt))
+      .limit(1),
+  ]);
+
+  const overdueCount = countRows[0]?.count ?? 0;
+  const topTopicIds = topCards.map((c) => c.topicId);
 
   // Resolve subject info for the most overdue topic via the curriculum chain:
   // retentionCard.topicId → curriculumTopics → curricula → subjects
   let nextReviewTopic: NextReviewTopic | null = null;
-  const topCard = sorted[0];
-  if (topCard) {
-    const topTopicId = topCard.topicId;
+  const topTopicId = topTopicIds[0];
+  if (topTopicId) {
     const topic = await db.query.curriculumTopics.findFirst({
       where: eq(curriculumTopics.id, topTopicId),
     });
@@ -504,21 +527,9 @@ export async function getProfileOverdueCount(
     }
   }
 
-  const [upcomingReview] = await db
-    .select({ nextReviewAt: retentionCards.nextReviewAt })
-    .from(retentionCards)
-    .where(
-      and(
-        eq(retentionCards.profileId, profileId),
-        gt(retentionCards.nextReviewAt, now),
-      ),
-    )
-    .orderBy(asc(retentionCards.nextReviewAt))
-    .limit(1);
-
   return {
-    overdueCount: sorted.length,
-    topTopicIds: sorted.slice(0, 3).map((c) => c.topicId),
+    overdueCount,
+    topTopicIds,
     nextReviewTopic,
     nextUpcomingReviewAt: upcomingReview?.nextReviewAt?.toISOString() ?? null,
   };
