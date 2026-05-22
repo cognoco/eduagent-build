@@ -52,6 +52,15 @@ export function pushLearningResumeTarget(
   // `as Href` keeps the pathname checked against the route table (a typo or
   // route rename will fail at compile time) while accepting the dynamic
   // params shape; `as never` allowed any pathname through.
+  //
+  // [BUG-551] CLAUDE.md: cross-tab/cross-stack router.push must push the full
+  // ancestor chain. A single push to /(app)/session synthesises a 1-deep stack,
+  // so back() from session falls through to the active tab's first-route
+  // (Home) instead of the caller's previous screen.
+  // Fix: push the home screen first to seed the back-stack, then push session
+  // on top. The session screen uses homeHrefForReturnTo(returnTo) for its own
+  // back-navigation, so this also gives the correct target when returnTo is set.
+  router.push('/(app)/home' as Href);
   router.push({
     pathname: '/(app)/session',
     params: {

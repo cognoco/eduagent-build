@@ -91,6 +91,25 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
     };
   }
 
+  // [BUG-551] Cross-tab push must seed the back-stack with the home screen
+  // BEFORE pushing session. A single push synthesises a 1-deep stack so
+  // back() from session falls through to the active tab's first-route (Home)
+  // instead of the caller's previous screen.
+  it('[BUG-551] pushes home screen before session to seed the ancestor back-stack', () => {
+    const router = makeRouter();
+    const target = makeMinimalTarget();
+    pushLearningResumeTarget(router, target);
+
+    expect(router.push).toHaveBeenCalledTimes(2);
+    // First call must be the home screen (ancestor)
+    expect(router.push).toHaveBeenNthCalledWith(1, '/(app)/home');
+    // Second call is the session screen
+    expect(router.push).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ pathname: '/(app)/session' }),
+    );
+  });
+
   it('passes the session pathname and required params for a minimal target', () => {
     const router = makeRouter();
     const target = makeMinimalTarget();
@@ -110,7 +129,8 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
   it('omits topic / session / resume params when not provided on the target', () => {
     const router = makeRouter();
     pushLearningResumeTarget(router, makeMinimalTarget());
-    const call = router.push.mock.calls[0]![0] as { params: object };
+    // [BUG-551] push is called twice: index 0 is home, index 1 is session
+    const call = router.push.mock.calls[1]![0] as { params: object };
     const params = call.params as Record<string, unknown>;
     expect(params).not.toHaveProperty('topicId');
     expect(params).not.toHaveProperty('topicName');

@@ -328,14 +328,10 @@ describe('MentorMemoryScreen — accommodation badge text by age bracket', () =>
     mockActiveProfileBirthYear = undefined;
   });
 
-  it('shows young label for child bracket', async () => {
-    mockActiveProfileBirthYear = new Date().getFullYear() - 10;
-    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
-    const badge = await screen.findByTestId('accommodation-badge');
-    expect(badge).toHaveTextContent(
-      'Your mentor uses a special way to teach you!',
-    );
-  });
+  // [BUG-577] AgeBracket 'child' was removed (strictly-11+ product constraint).
+  // The under-11 'young label' branch no longer exists in the screen, so the
+  // previous test that asserted it has been deleted. Adolescent and adult are
+  // the only valid brackets.
 
   it('shows mid label for adolescent bracket', async () => {
     mockActiveProfileBirthYear = new Date().getFullYear() - 15;

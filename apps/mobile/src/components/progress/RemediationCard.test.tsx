@@ -3,6 +3,11 @@ import type { RetentionStatus } from './RetentionSignal';
 import { RemediationCard } from './RemediationCard';
 
 jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock,
+);
+
+jest.mock(
   './RetentionSignal' /* gc1-allow: Ionicons (native vector-icon asset) + ThemeContext provider not available in JSDOM test env */,
   () => ({
     RetentionSignal: ({ status }: { status: string }) => {
@@ -41,8 +46,8 @@ describe('without cooldown', () => {
 
   it('does not render cooldown message', () => {
     const { queryByText } = render(<RemediationCard {...defaultProps} />);
-    expect(queryByText(/You can try again/)).toBeNull();
-    expect(queryByText(/Come back tomorrow/)).toBeNull();
+    expect(queryByText(/You can retry/)).toBeNull();
+    expect(queryByText(/try again tomorrow/)).toBeNull();
   });
 
   it('does not render library link even if onBookPress provided', () => {
@@ -88,7 +93,7 @@ describe('with active cooldown', () => {
         cooldownEndsAt={inFuture(30 * 60_000)}
       />,
     );
-    expect(screen.getByText(/You can try again in 30 minutes/));
+    expect(screen.getByText(/You can retry in 30 min/));
   });
 
   it('shows hours cooldown message for 1-4 hours', () => {
@@ -98,7 +103,7 @@ describe('with active cooldown', () => {
         cooldownEndsAt={inFuture(2 * 60 * 60_000)}
       />,
     );
-    expect(screen.getByText(/You can try again in about 2 hours/));
+    expect(screen.getByText(/You can retry in about 2 h/));
   });
 
   it('shows tomorrow message for >4 hours', () => {
@@ -108,7 +113,7 @@ describe('with active cooldown', () => {
         cooldownEndsAt={inFuture(5 * 60 * 60_000)}
       />,
     );
-    expect(screen.getByText(/Come back tomorrow/));
+    expect(screen.getByText(/try again tomorrow/));
   });
 
   it('renders library link when onBookPress provided and fires it', () => {

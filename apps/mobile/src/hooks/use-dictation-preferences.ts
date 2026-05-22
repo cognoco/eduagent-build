@@ -48,8 +48,16 @@ export function useDictationPreferences(
   useEffect(() => {
     if (!profileId) return;
 
+    // Reset to defaults immediately so the previous profile's values are
+    // never visible while the new profile's SecureStore reads are in flight.
+    setPaceState('slow');
+    setPunctState(true);
+
+    let cancelled = false;
+
     void SecureStore.getItemAsync(getPaceKey(profileId))
       .then((stored) => {
+        if (cancelled) return;
         if (stored === 'slow' || stored === 'normal' || stored === 'fast') {
           setPaceState(stored);
         }
@@ -60,6 +68,7 @@ export function useDictationPreferences(
 
     void SecureStore.getItemAsync(getPunctKey(profileId))
       .then((stored) => {
+        if (cancelled) return;
         if (stored === 'true' || stored === 'false') {
           setPunctState(stored === 'true');
         }
@@ -67,6 +76,10 @@ export function useDictationPreferences(
       .catch((err) =>
         Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } }),
       );
+
+    return () => {
+      cancelled = true;
+    };
   }, [profileId]);
 
   const setPace = useCallback(

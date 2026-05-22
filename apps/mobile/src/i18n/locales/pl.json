@@ -93,7 +93,8 @@
   "auth": {
     "index": {
       "timeoutTitle": "Trwa to dłużej niż oczekiwano",
-      "timeoutMessage": "Sprawdź połączenie i spróbuj ponownie."
+      "timeoutMessage": "Sprawdź połączenie i spróbuj ponownie.",
+      "signInInstead": "Zaloguj się zamiast tego"
     },
     "ssoCallback": {
       "loadingLabel": "Kończenie logowania",
@@ -1773,6 +1774,19 @@
       "nudgeA11y": "Wyślij {{name}} zachętę",
       "viewAllReports": "Zobacz wszystkie raporty",
       "subjectsTitle": "Przedmioty"
+    },
+    "remediation": {
+      "heading": "Try a different approach",
+      "body": "It is completely normal to need another pass at this.",
+      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
+      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
+      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
+      "primaryCta": "Try a different way",
+      "primaryCtaA11y": "Try a different way to learn this topic",
+      "secondaryCta": "Or try again later",
+      "secondaryCtaA11y": "Try this topic again later",
+      "libraryLink": "While you wait, check out your Library",
+      "libraryLinkA11y": "Check out your Library"
     }
   },
   "onboarding": {

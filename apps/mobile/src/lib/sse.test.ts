@@ -1,6 +1,7 @@
 import { parseSSEStream, streamSSEViaXHR, type StreamEvent } from './sse';
 import {
   clearOnAuthExpired,
+  ConsentRequiredError,
   setOnAuthExpired,
 } from './api-client';
 
@@ -313,6 +314,8 @@ interface FakeXhrInstance {
   statusText: string;
   responseText: string;
   responseType: string;
+  // Returns null for all headers by default; override per-test for replay tests
+  getResponseHeader(header: string): string | null;
   // Helpers for tests
   _emitProgress(text: string): void;
   _emitError(status: number, body: string): void;
@@ -333,6 +336,10 @@ function installFakeXhr(): FakeXhrInstance {
     statusText: '',
     responseText: '',
     responseType: '',
+    // Default: no special response headers
+    getResponseHeader(_header: string) {
+      return null;
+    },
     _emitProgress(text: string) {
       this.responseText += text;
       this.onprogress?.();
@@ -623,6 +630,59 @@ describe('streamSSEViaXHR', () => {
     expect((caught as { status?: number }).status).toBe(402);
   });
 
+  // [BUG-558] 403 with code CONSENT_REQUIRED must throw ConsentRequiredError,
+  // not ForbiddenError. ForbiddenError triggers sign-out; ConsentRequiredError
+  // routes to the consent flow. Break test: verify classifyXhrError branches
+  // correctly on the code field.
+  it('[BUG-558] throws ConsentRequiredError for 403 with CONSENT_REQUIRED code', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      403,
+      JSON.stringify({
+        code: 'CONSENT_REQUIRED',
+        message: 'Consent required to continue',
+      }),
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(ConsentRequiredError);
+    expect((caught as Error).name).toBe('ConsentRequiredError');
+  });
+
+  it('[BUG-558] throws ForbiddenError (not ConsentRequiredError) for plain 403 without consent code', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(403, JSON.stringify({ message: 'Access denied' }));
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).toBe('ForbiddenError');
+    expect(caught).not.toBeInstanceOf(ConsentRequiredError);
+  });
+
   it('[BUG-955] throws NetworkError for onerror (status 0 / offline)', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {
@@ -728,6 +788,126 @@ describe('streamSSEViaXHR', () => {
       }
 
       expect(onAuthExpired).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // [BUG-539] onloadend buffer re-parse must be skipped when [DONE] was
+  // already consumed via onprogress. Previously the no-op onDone callback
+  // in the onloadend parseSSEBuffer call meant the flag was never set,
+  // causing a race where onloadend could synthesise a duplicate done event
+  // or drop the final event if the generator already returned.
+  describe('[BUG-539] onDoneFired guard — no duplicate done when onloadend races with onprogress', () => {
+    it('emits done exactly once when [DONE] consumed via onprogress and onloadend fires after', async () => {
+      const xhr = installFakeXhr();
+      const { events } = streamSSEViaXHR('https://example.test/stream', {
+        method: 'POST',
+      });
+
+      const collectedPromise = (async () => {
+        const collected: StreamEvent[] = [];
+        for await (const ev of events) {
+          collected.push(ev);
+        }
+        return collected;
+      })();
+
+      // onprogress delivers [DONE] — generator terminates
+      xhr._emitProgress('data: {"type":"chunk","content":"hello"}\n\n');
+      xhr._emitProgress(
+        'data: {"type":"done","exchangeCount":1,"escalationRung":1}\n\n',
+      );
+
+      // onloadend fires after onprogress has already processed [DONE]
+      xhr.status = 200;
+      xhr.onloadend?.();
+
+      const collected = await collectedPromise;
+
+      // Must have exactly one done event — not two
+      const doneEvents = collected.filter((e) => e.type === 'done');
+      expect(doneEvents).toHaveLength(1);
+      expect(doneEvents[0]).toEqual({
+        type: 'done',
+        exchangeCount: 1,
+        escalationRung: 1,
+      });
+    });
+  });
+
+  // [BUG-538] Replay body must pass schema validation before being pushed to
+  // the event queue. Previously, an unvalidated cast allowed malformed bodies
+  // (e.g. empty `{}`) to produce replay events with undefined required fields.
+  describe('[BUG-538] SSE replay shape validation', () => {
+    function installFakeXhrWithReplayHeader(): FakeXhrInstance {
+      const instance = installFakeXhr();
+      // Override the default no-op getResponseHeader to return the replay header
+      instance.getResponseHeader = (header: string) =>
+        header === 'Idempotency-Replay' ? 'true' : null;
+      return instance;
+    }
+
+    it('sets streamError and emits no replay event when body is empty {}', async () => {
+      const xhr = installFakeXhrWithReplayHeader();
+      const { events } = streamSSEViaXHR('https://example.test/stream', {
+        method: 'POST',
+      });
+
+      // Simulate: 200 response with Idempotency-Replay header but empty body
+      xhr.status = 200;
+      xhr.responseText = '{}';
+      xhr.onloadend?.();
+
+      const collected: StreamEvent[] = [];
+      let caught: unknown = null;
+      try {
+        for await (const ev of events) {
+          collected.push(ev);
+        }
+      } catch (e) {
+        caught = e;
+      }
+
+      // No replay event must be emitted — shape validation rejected the body
+      expect(collected.filter((e) => e.type === 'replay')).toHaveLength(0);
+      // streamError must be set so the consumer knows confirmation is unsafe
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toContain(
+        'Malformed idempotency replay response',
+      );
+    });
+
+    it('emits a valid replay event when body passes schema validation', async () => {
+      const xhr = installFakeXhrWithReplayHeader();
+      const { events } = streamSSEViaXHR('https://example.test/stream', {
+        method: 'POST',
+      });
+
+      const validBody = {
+        replayed: true,
+        clientId: 'c-abc123',
+        status: 'persisted',
+        assistantTurnReady: true,
+        latestExchangeId: 'ex-456',
+      };
+      xhr.status = 200;
+      xhr.responseText = JSON.stringify(validBody);
+      xhr.onloadend?.();
+
+      const collected: StreamEvent[] = [];
+      for await (const ev of events) {
+        collected.push(ev);
+      }
+
+      const replayEvents = collected.filter((e) => e.type === 'replay');
+      expect(replayEvents).toHaveLength(1);
+      expect(replayEvents[0]).toMatchObject({
+        type: 'replay',
+        clientId: 'c-abc123',
+        replayed: true,
+        status: 'persisted',
+        assistantTurnReady: true,
+        latestExchangeId: 'ex-456',
+      });
     });
   });
 });

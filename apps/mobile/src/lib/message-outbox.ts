@@ -164,6 +164,17 @@ export async function markConfirmed(
   });
 }
 
+/**
+ * Permanent-failure reasons are validation errors that can never succeed on
+ * retry (e.g. missing_session_id). Transient reasons (network, timeout) are
+ * retryable up to MAX_OUTBOX_ATTEMPTS.
+ */
+const PERMANENT_FAILURE_REASONS = new Set([
+  'missing_session_id',
+  'missing_profile_id',
+  'invalid_content',
+]);
+
 export async function recordFailure(
   profileId: string,
   flow: OutboxFlow,
@@ -172,18 +183,25 @@ export async function recordFailure(
 ): Promise<OutboxEntry | null> {
   return withLock(storageKey(profileId, flow), async () => {
     const entries = await readEntries(profileId, flow);
-    const nextEntries = entries.map((entry) =>
-      entry.id === id
-        ? {
-            ...entry,
-            failureReason: reason,
-            status:
-              entry.attempts >= MAX_OUTBOX_ATTEMPTS
-                ? ('permanently-failed' as const)
-                : entry.status,
-          }
-        : entry,
-    );
+    const nextEntries = entries.map((entry) => {
+      if (entry.id !== id) return entry;
+      // [BUG-556] Always bump attempts so the fence-post condition
+      // (entry.attempts >= MAX_OUTBOX_ATTEMPTS) is reachable even when
+      // recordFailure is called before beginAttempt (e.g. validation failures).
+      const nextAttempts = entry.attempts + 1;
+      // [BUG-556] Validation failures (missing_session_id etc.) are
+      // permanently invalid — mark them permanently-failed immediately
+      // regardless of attempt count so drain never retries them.
+      const isPermanent =
+        PERMANENT_FAILURE_REASONS.has(reason) ||
+        nextAttempts >= MAX_OUTBOX_ATTEMPTS;
+      return {
+        ...entry,
+        attempts: nextAttempts,
+        failureReason: reason,
+        status: isPermanent ? ('permanently-failed' as const) : entry.status,
+      };
+    });
     await writeEntries(profileId, flow, nextEntries);
     return nextEntries.find((entry) => entry.id === id) ?? null;
   });

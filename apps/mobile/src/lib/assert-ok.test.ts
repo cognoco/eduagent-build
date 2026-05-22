@@ -1,4 +1,11 @@
 import { assertOk, type ApiResponseError } from './assert-ok';
+import {
+  ConsentRequiredError,
+  ForbiddenError,
+  QuotaExceededError,
+  RateLimitedError,
+  ResourceGoneError,
+} from './api-errors';
 
 function makeResponse(
   status: number,
@@ -40,24 +47,28 @@ describe('assertOk', () => {
     expect(okRes.bodyUsed).toBe(false);
   });
 
-  it('throws an ApiResponseError on a 4xx with structured body', async () => {
+  it('throws a typed BadRequestError on a 400 with structured body', async () => {
+    // [BUG-544] 400 is now mapped to BadRequestError (typed) instead of generic
+    // ApiResponseError — mirrors customFetch so callers get consistent typed errors.
     const res = makeResponse(400, {
       code: 'INVALID_INPUT',
       message: 'Field is required',
       details: { field: 'name' },
     });
     await expect(assertOk(res)).rejects.toMatchObject({
-      name: 'ApiResponseError',
+      name: 'BadRequestError',
       status: 400,
       code: 'INVALID_INPUT',
-      message: 'Field is required',
     });
   });
 
-  it('falls back to a generic message on a 5xx without body', async () => {
+  it('throws UpstreamError on a 5xx without body', async () => {
+    // [BUG-544] 5xx is now mapped to UpstreamError (typed) instead of the
+    // generic ApiResponseError — callers can distinguish server faults from
+    // network drops without parsing the message string.
     const res = new Response(null, { status: 500 });
     await expect(assertOk(res)).rejects.toMatchObject({
-      name: 'ApiResponseError',
+      name: 'UpstreamError',
       status: 500,
       message: 'Request failed (500)',
     });
@@ -95,6 +106,71 @@ describe('assertOk', () => {
   //
   // Without the narrowing, .json() on the union returns the union body,
   // forcing every callsite to add `as { session: ... }`.
+  // [BUG-544] Break tests: assertOk must throw the same typed errors as
+  // customFetch — not generic Error for any status except 409.
+
+  it('[BUG-544] 403 with CONSENT_REQUIRED code throws ConsentRequiredError', async () => {
+    const res = makeResponse(403, {
+      code: 'CONSENT_REQUIRED',
+      message: 'Consent required',
+    });
+    await expect(assertOk(res)).rejects.toBeInstanceOf(ConsentRequiredError);
+  });
+
+  it('[BUG-544] 403 without special code throws ForbiddenError', async () => {
+    const res = makeResponse(403, {
+      code: 'SUBJECT_INACTIVE',
+      message: 'Forbidden',
+    });
+    await expect(assertOk(res)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('[BUG-544] 402 with QUOTA_EXCEEDED structured body throws QuotaExceededError', async () => {
+    const res = makeResponse(402, {
+      code: 'QUOTA_EXCEEDED',
+      message: 'Quota reached',
+      details: {
+        tier: 'free',
+        reason: 'monthly',
+        monthlyLimit: 100,
+        usedThisMonth: 100,
+        dailyLimit: null,
+        usedToday: 0,
+        topUpCreditsRemaining: 0,
+        upgradeOptions: [],
+      },
+    });
+    await expect(assertOk(res)).rejects.toBeInstanceOf(QuotaExceededError);
+  });
+
+  it('[BUG-544] 410 throws ResourceGoneError', async () => {
+    const res = makeResponse(410, { code: 'SESSION_EXPIRED', message: 'Gone' });
+    await expect(assertOk(res)).rejects.toBeInstanceOf(ResourceGoneError);
+  });
+
+  it('[BUG-544] 429 throws RateLimitedError', async () => {
+    const res = makeResponse(429, { message: 'Too many requests' });
+    await expect(assertOk(res)).rejects.toBeInstanceOf(RateLimitedError);
+  });
+
+  it('[BUG-544] typed errors from assertOk carry status, code, and bodyText fields', async () => {
+    const res = makeResponse(403, {
+      code: 'PROXY_DENIED',
+      message: 'No proxy access',
+    });
+    let caught: unknown = null;
+    try {
+      await assertOk(res);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(ForbiddenError);
+    const err = caught as ApiResponseError;
+    expect(err.status).toBe(403);
+    expect(err.code).toBe('PROXY_DENIED');
+    expect(err.bodyText).toContain('PROXY_DENIED');
+  });
+
   it('[BUG-982] return type narrows a Hono-style discriminated response union to the success branch', async () => {
     type SuccessBody = { session: { id: string } };
     type ErrorBody = { error: string };

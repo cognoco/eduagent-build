@@ -30,6 +30,17 @@ const CALLSITE_EXCEPTIONS: ReadonlyArray<{ file: string; reason: string }> = [
     reason:
       'The centralized helper itself — this is the sole authorized site that calls Clerk signOut directly.',
   },
+  {
+    file: 'app/(auth)/sign-in.tsx',
+    reason:
+      '[#509] The transitionStuck "Try again" handler fires before any user ' +
+      'session has been established and before profiles are loaded, so ' +
+      'signOutWithCleanup cannot be called (no queryClient, no profileIds). ' +
+      "The bare clerkSignOut() here clears Clerk's in-memory session only — " +
+      'the query cache and SecureStore are empty at this point because setActive ' +
+      'threw before auth completed. If signOut succeeds and isSignedIn is still ' +
+      'true (race), the code redirects to /(app)/home instead of clearing state.',
+  },
 ];
 
 function walkSourceFiles(dir: string, out: string[] = []): string[] {

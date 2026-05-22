@@ -214,6 +214,10 @@ jest.mock('@clerk/clerk-expo', () => ({
   useSSO: jest.fn().mockReturnValue({
     startSSOFlow: jest.fn(),
   }),
+  useClerk: jest.fn().mockReturnValue({
+    signOut: jest.fn().mockResolvedValue(undefined),
+    isSignedIn: false,
+  }),
 }));
 
 jest.mock('@clerk/clerk-expo/token-cache', () => ({

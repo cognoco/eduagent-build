@@ -93,7 +93,8 @@
   "auth": {
     "index": {
       "timeoutTitle": "Demorando mais que o esperado",
-      "timeoutMessage": "Verifique sua conexão e tente novamente."
+      "timeoutMessage": "Verifique sua conexão e tente novamente.",
+      "signInInstead": "Entrar em vez disso"
     },
     "ssoCallback": {
       "loadingLabel": "Finalizando o login",
@@ -1773,6 +1774,19 @@
       "nudgeA11y": "Enviar um incentivo para {{name}}",
       "viewAllReports": "Ver todos os relatórios",
       "subjectsTitle": "Matérias"
+    },
+    "remediation": {
+      "heading": "Try a different approach",
+      "body": "It is completely normal to need another pass at this.",
+      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
+      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
+      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
+      "primaryCta": "Try a different way",
+      "primaryCtaA11y": "Try a different way to learn this topic",
+      "secondaryCta": "Or try again later",
+      "secondaryCtaA11y": "Try this topic again later",
+      "libraryLink": "While you wait, check out your Library",
+      "libraryLinkA11y": "Check out your Library"
     }
   },
   "onboarding": {
