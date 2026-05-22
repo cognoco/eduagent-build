@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   completeRoundInputSchema,
@@ -50,6 +51,11 @@ type QuizRouteEnv = {
     profileMeta: ProfileMeta | undefined;
   };
 };
+
+// [BUG-392] Guard path params against non-UUID input reaching the DB layer.
+const roundIdParamSchema = z.object({
+  id: z.string().uuid(),
+});
 
 // ─── Answer-stripping projection ─────────────────────────────────────────
 // [CR-1] Prevent answer leaking: correctAnswer, acceptedAliases,
@@ -219,77 +225,82 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       200,
     );
   })
-  .get('/quiz/rounds/:id', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const db = c.get('db');
-    const roundId = c.req.param('id');
+  .get(
+    '/quiz/rounds/:id',
+    zValidator('param', roundIdParamSchema),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      const { id: roundId } = c.req.valid('param');
 
-    // Throws NotFoundError if the round doesn't exist OR belongs to a
-    // different profile — handled centrally by `app.onError` → 404.
-    const round = await getRoundByIdOrThrow(db, profileId, roundId);
-    const questions = round.questions as QuizQuestion[];
+      // Throws NotFoundError if the round doesn't exist OR belongs to a
+      // different profile — handled centrally by `app.onError` → 404.
+      const round = await getRoundByIdOrThrow(db, profileId, roundId);
+      const questions = round.questions as QuizQuestion[];
 
-    if (round.status === 'completed') {
-      // [F-032] Completed rounds surface the grading context the client
-      // needs to render a history detail screen: correctAnswer and
-      // acceptedAliases per question (safe to expose — grading is final),
-      // plus a celebrationTier and human-readable activityLabel. Distractors
-      // remain stripped — the round is over, there's no reason to leak them.
+      if (round.status === 'completed') {
+        // [F-032] Completed rounds surface the grading context the client
+        // needs to render a history detail screen: correctAnswer and
+        // acceptedAliases per question (safe to expose — grading is final),
+        // plus a celebrationTier and human-readable activityLabel. Distractors
+        // remain stripped — the round is over, there's no reason to leak them.
+        return c.json(
+          completedRoundDetailResponseSchema.parse({
+            id: round.id,
+            activityType: round.activityType,
+            activityLabel: formatActivityLabel(round.activityType),
+            theme: round.theme,
+            status: round.status,
+            score: round.score,
+            total: round.total,
+            xpEarned: round.xpEarned,
+            celebrationTier: getCelebrationTier(round.score ?? 0, round.total),
+            completedAt: round.completedAt?.toISOString(),
+            questions: questions.map((q) => {
+              const base = toClientSafeQuestions([q])[0];
+              if (base == null)
+                throw new Error(
+                  'toClientSafeQuestions returned empty array for a single question',
+                );
+              return {
+                ...base,
+                correctAnswer: q.correctAnswer,
+                acceptedAliases:
+                  q.type === 'vocabulary'
+                    ? q.acceptedAnswers
+                    : 'acceptedAliases' in q
+                      ? q.acceptedAliases
+                      : undefined,
+              };
+            }),
+            results: round.results,
+          }),
+          200,
+        );
+      }
+
       return c.json(
-        completedRoundDetailResponseSchema.parse({
+        activeRoundDetailResponseSchema.parse({
           id: round.id,
           activityType: round.activityType,
           activityLabel: formatActivityLabel(round.activityType),
           theme: round.theme,
-          status: round.status,
-          score: round.score,
+          questions: toClientSafeQuestions(questions),
           total: round.total,
-          xpEarned: round.xpEarned,
-          celebrationTier: getCelebrationTier(round.score ?? 0, round.total),
-          completedAt: round.completedAt?.toISOString(),
-          questions: questions.map((q) => {
-            const base = toClientSafeQuestions([q])[0];
-            if (base == null)
-              throw new Error(
-                'toClientSafeQuestions returned empty array for a single question',
-              );
-            return {
-              ...base,
-              correctAnswer: q.correctAnswer,
-              acceptedAliases:
-                q.type === 'vocabulary'
-                  ? q.acceptedAnswers
-                  : 'acceptedAliases' in q
-                    ? q.acceptedAliases
-                    : undefined,
-            };
-          }),
-          results: round.results,
         }),
         200,
       );
-    }
-
-    return c.json(
-      activeRoundDetailResponseSchema.parse({
-        id: round.id,
-        activityType: round.activityType,
-        activityLabel: formatActivityLabel(round.activityType),
-        theme: round.theme,
-        questions: toClientSafeQuestions(questions),
-        total: round.total,
-      }),
-      200,
-    );
-  })
+    },
+  )
   .post(
     '/quiz/rounds/:id/check',
+    zValidator('param', roundIdParamSchema),
     zValidator('json', questionCheckInputSchema),
     async (c) => {
       assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
-      const roundId = c.req.param('id');
+      const { id: roundId } = c.req.valid('param');
       const { questionIndex, answerGiven, answerMode } = c.req.valid('json');
 
       const result = await checkQuizAnswerWithCorrect(
@@ -313,12 +324,13 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
   )
   .post(
     '/quiz/rounds/:id/complete',
+    zValidator('param', roundIdParamSchema),
     zValidator('json', completeRoundInputSchema),
     async (c) => {
       assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
-      const roundId = c.req.param('id');
+      const { id: roundId } = c.req.valid('param');
       const { results } = c.req.valid('json');
 
       const result = await completeQuizRound(db, profileId, roundId, results);

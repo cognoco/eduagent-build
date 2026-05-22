@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { accountMiddleware } from './account';
+import { accountMiddleware, requireAccountMiddleware } from './account';
 import { clearVerifiedClerkEmailCacheForTest } from '../services/clerk-user';
 import type { AppVariables } from '../types/hono';
 
@@ -241,5 +241,103 @@ describe('accountMiddleware', () => {
       'clerk_verified',
       'user@example.com',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CR-353] requireAccountMiddleware — break test
+//
+// The bug: 17+ route handlers use c.get('account') without requireAccount().
+// If middleware ordering regresses (accountMiddleware skipped or reordered),
+// c.get('account') is undefined and account.id throws TypeError → 500.
+//
+// The fix: requireAccountMiddleware runs after accountMiddleware and returns a
+// structured 401 when user is set but account is not, so all 43+ call sites
+// are protected centrally without per-handler changes.
+//
+// Red-green protocol (manual verification done; preserved here as documentation):
+//   1. With fix: test passes (requireAccountMiddleware returns 401)
+//   2. Without fix (requireAccountMiddleware removed from chain): route handler
+//      throws TypeError "Cannot read properties of undefined (reading 'id')"
+//      → 500 instead of 401 — test fails on expect(res.status).toBe(401).
+// ---------------------------------------------------------------------------
+
+describe('[CR-353] requireAccountMiddleware — middleware-ordering regression guard', () => {
+  it('[BREAK] returns 401 when user is set but account was never resolved (middleware ordering regression)', async () => {
+    // Simulate the regression: authMiddleware ran and set user, but
+    // accountMiddleware was skipped/removed/reordered and never set account.
+    // The route handler would normally crash: c.get('account').id → TypeError.
+    const app = new Hono<{ Variables: AppVariables }>();
+
+    // Inject user (authMiddleware did its job)
+    app.use('*', async (c, next) => {
+      c.set('user', {
+        userId: 'user_regression',
+        email: 'regression@example.com',
+      } as AppVariables['user']);
+      await next();
+    });
+
+    // Deliberately SKIP accountMiddleware (the regression scenario).
+    // requireAccountMiddleware must catch this and return 401.
+    app.use('*', requireAccountMiddleware);
+
+    // Route handler — would crash with TypeError if requireAccountMiddleware
+    // did not short-circuit. The route should never be reached.
+    // Note: TypeScript types account as non-nullable (AppVariables['account']),
+    // but at runtime c.get('account') is undefined when accountMiddleware is
+    // skipped. The runtime crash is precisely what requireAccountMiddleware prevents.
+    app.get('/profiles', (c) => {
+      const account = c.get('account');
+      return c.json({ accountId: account.id });
+    });
+
+    const res = await app.request('/profiles');
+
+    // Must be 401 — NOT 500 (TypeError crash)
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(body.message).toMatch(/account required/i);
+  });
+
+  it('passes through transparently when account is correctly set', async () => {
+    // Happy path: both accountMiddleware and requireAccountMiddleware in correct order.
+    const app = new Hono<{ Variables: AppVariables }>();
+
+    app.use('*', async (c, next) => {
+      c.set('user', {
+        userId: 'user_happy',
+        email: 'happy@example.com',
+        emailVerified: true,
+      } as AppVariables['user']);
+      await next();
+    });
+    app.use('*', accountMiddleware);
+    app.use('*', requireAccountMiddleware);
+    app.get('/profiles', (c) => {
+      const account = c.get('account');
+      return c.json({ accountId: account.id });
+    });
+
+    const res = await app.request('/profiles');
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.accountId).toBe('test-account-id');
+  });
+
+  it('skips transparently for public routes where user is not set', async () => {
+    // Public path scenario: authMiddleware did not set user (public route).
+    // requireAccountMiddleware must let the request through unchanged.
+    const app = new Hono<{ Variables: AppVariables }>();
+
+    // No user set — simulates a public route that bypassed authMiddleware
+    app.use('*', requireAccountMiddleware);
+    app.get('/health', (c) => c.json({ ok: true }));
+
+    const res = await app.request('/health');
+
+    expect(res.status).toBe(200);
   });
 });

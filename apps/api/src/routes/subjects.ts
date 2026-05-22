@@ -28,6 +28,7 @@ import {
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError, SubjectNotFoundError } from '../errors';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 type SubjectRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -58,6 +59,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       // requireProfileId here, and /subjects/resolve in
       // LLM_ROUTE_PATTERNS_POST_ONLY in middleware/metering.ts.
       const profileId = requireProfileId(c.get('profileId'));
+      assertNotProxyMode(c);
       void profileId;
       const { rawInput } = c.req.valid('json');
       const result = await resolveSubjectName(rawInput);
@@ -71,6 +73,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const { text } = c.req.valid('json');
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      assertNotProxyMode(c);
       const result = await classifySubject(db, profileId, text);
       return c.json(subjectClassifyResultSchema.parse(result));
     },
@@ -86,6 +89,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
     const profileId = requireProfileId(c.get('profileId'));
+    assertNotProxyMode(c);
     // [FIX-API-1] Let errors propagate to the global onError handler in index.ts
     // which converts UpstreamLlmError → 502 LLM_UNAVAILABLE and captures all
     // others to Sentry. The old try/catch was masking quota and LLM errors

@@ -1161,67 +1161,67 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   )
 
   // Get session summary
-  .get('/sessions/:sessionId/summary', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const summary = await getSessionSummary(
-      db,
-      profileId,
-      c.req.param('sessionId'),
-    );
-    return c.json({ summary });
-  })
+  .get(
+    '/sessions/:sessionId/summary',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
+      const summary = await getSessionSummary(db, profileId, sessionId);
+      return c.json({ summary });
+    },
+  )
 
-  .post('/sessions/:sessionId/summary/skip', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const previousSummary = await getSessionSummary(
-      db,
-      profileId,
-      c.req.param('sessionId'),
-    );
-    const result = await skipSummary(db, profileId, c.req.param('sessionId'));
+  .post(
+    '/sessions/:sessionId/summary/skip',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
+      const previousSummary = await getSessionSummary(db, profileId, sessionId);
+      const result = await skipSummary(db, profileId, sessionId);
 
-    // BD-09: Surface pipeline status so client knows if post-processing was queued.
-    // Default false — only true when dispatch actually succeeds.
-    let pipelineQueued = false;
-    if (
-      !previousSummary ||
-      previousSummary.status === 'pending' ||
-      previousSummary.status === 'auto_closed'
-    ) {
-      const dispatch = await dispatchSessionCompletedEvent(
-        db,
-        profileId,
-        c.req.param('sessionId'),
-        {
-          summaryStatus: result.summary.status,
-        },
-      );
-      pipelineQueued = dispatch.pipelineQueued;
-    }
-    return c.json({
-      ...result,
-      pipelineQueued,
-    });
-  })
+      // BD-09: Surface pipeline status so client knows if post-processing was queued.
+      // Default false — only true when dispatch actually succeeds.
+      let pipelineQueued = false;
+      if (
+        !previousSummary ||
+        previousSummary.status === 'pending' ||
+        previousSummary.status === 'auto_closed'
+      ) {
+        const dispatch = await dispatchSessionCompletedEvent(
+          db,
+          profileId,
+          sessionId,
+          {
+            summaryStatus: result.summary.status,
+          },
+        );
+        pipelineQueued = dispatch.pipelineQueued;
+      }
+      return c.json({
+        ...result,
+        pipelineQueued,
+      });
+    },
+  )
 
   // Submit learner summary ("Your Words")
   .post(
     '/sessions/:sessionId/summary',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', summarySubmitSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const previousSummary = await getSessionSummary(
-        db,
-        profileId,
-        c.req.param('sessionId'),
-      );
+      const { sessionId } = c.req.valid('param');
+      const previousSummary = await getSessionSummary(db, profileId, sessionId);
       const result = await submitSummary(
         db,
         profileId,
-        c.req.param('sessionId'),
+        sessionId,
         c.req.valid('json'),
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
@@ -1235,7 +1235,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         const dispatch = await dispatchSessionCompletedEvent(
           db,
           profileId,
-          c.req.param('sessionId'),
+          sessionId,
           {
             summaryStatus: result.summary.status,
             qualityRating: qualityRatingFromSummaryStatus(
@@ -1272,26 +1272,30 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   )
 
   // Generate recall bridge questions after homework success (Story 2.7)
-  .post('/sessions/:sessionId/recall-bridge', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const sessionId = c.req.param('sessionId');
+  .post(
+    '/sessions/:sessionId/recall-bridge',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
 
-    const session = await getSession(db, profileId, sessionId);
-    if (!session) return notFound(c, 'Session not found');
+      const session = await getSession(db, profileId, sessionId);
+      if (!session) return notFound(c, 'Session not found');
 
-    if (session.sessionType !== 'homework') {
-      return apiError(
-        c,
-        400,
-        ERROR_CODES.VALIDATION_ERROR,
-        'Recall bridge is only available for homework sessions',
-      );
-    }
+      if (session.sessionType !== 'homework') {
+        return apiError(
+          c,
+          400,
+          ERROR_CODES.VALIDATION_ERROR,
+          'Recall bridge is only available for homework sessions',
+        );
+      }
 
-    const result = await generateRecallBridge(db, profileId, sessionId);
-    return c.json(result);
-  });
+      const result = await generateRecallBridge(db, profileId, sessionId);
+      return c.json(result);
+    },
+  );
 
 function qualityRatingFromSummaryStatus(
   status: 'accepted' | 'submitted',

@@ -189,7 +189,7 @@ describe('book-suggestions routes', () => {
   describe('GET /v1/subjects/:subjectId/book-suggestions', () => {
     it('returns 401 without auth header', async () => {
       const res = await app.request(
-        '/v1/subjects/some-subject-id/book-suggestions',
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions',
         {},
         TEST_ENV,
       );
@@ -199,7 +199,7 @@ describe('book-suggestions routes', () => {
 
     it('returns 200 with auth (envelope shape)', async () => {
       const res = await app.request(
-        '/v1/subjects/some-subject-id/book-suggestions',
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions',
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -213,6 +213,17 @@ describe('book-suggestions routes', () => {
       expect(Array.isArray(body.suggestions)).toBe(true);
       expect(typeof body.curriculumBookCount).toBe('number');
     });
+
+    // [BUG-392] UUID validation guard — non-UUID path params must be rejected
+    // with 400 before reaching the DB layer.
+    it('returns 400 for non-UUID subjectId', async () => {
+      const res = await app.request(
+        '/v1/subjects/not-a-uuid/book-suggestions',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -222,7 +233,7 @@ describe('book-suggestions routes', () => {
   describe('GET /v1/subjects/:subjectId/book-suggestions/all', () => {
     it('returns 401 without auth header', async () => {
       const res = await app.request(
-        '/v1/subjects/some-subject-id/book-suggestions/all',
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/all',
         {},
         TEST_ENV,
       );
@@ -232,7 +243,7 @@ describe('book-suggestions routes', () => {
 
     it('returns 200 with auth', async () => {
       const res = await app.request(
-        '/v1/subjects/some-subject-id/book-suggestions/all',
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/all',
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -241,6 +252,17 @@ describe('book-suggestions routes', () => {
 
       const body = await res.json();
       expect(Array.isArray(body)).toBe(true);
+    });
+
+    // [BUG-392] UUID validation guard — non-UUID path params must be rejected
+    // with 400 before reaching the DB layer.
+    it('returns 400 for non-UUID subjectId on /all endpoint', async () => {
+      const res = await app.request(
+        '/v1/subjects/not-a-uuid/book-suggestions/all',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
     });
   });
 });

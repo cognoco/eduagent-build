@@ -460,6 +460,92 @@ describe('PATCH /v1/profiles/:id', () => {
 
     expect(res.status).toBe(500);
   });
+
+  // [BREAK][CR-2026-05-19-H1] Non-owner attempting to edit a SIBLING profile
+  // must be rejected with 403. Red-green regression test: revert the isOwner
+  // guard in profiles.ts and this test will fail with status 200.
+  it('[BREAK][CR-2026-05-19-H1] returns 403 when a non-owner edits a sibling profile', async () => {
+    // App: active profile is PROFILE_ID_A (non-owner), attempting PATCH on PROFILE_ID_B
+    const appWithNonOwner = new Hono<TestEnv>();
+    appWithNonOwner.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      c.set('account', {
+        id: ACCOUNT_ID,
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Account);
+      // Non-owner active profile = PROFILE_ID_A
+      c.set('profileId', PROFILE_ID_A);
+      c.set('profileMeta', {
+        isOwner: false,
+        birthYear: 2008,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+      } as ProfileMeta);
+      await next();
+    });
+    appWithNonOwner.onError((err, c) =>
+      c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    appWithNonOwner.route('/v1', profileRoutes);
+
+    // Attempt to PATCH sibling profile PROFILE_ID_B — must return 403
+    const res = await appWithNonOwner.request(`/v1/profiles/${PROFILE_ID_B}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'Hacked' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    // Service must not be called — gate fires before the DB write.
+    expect(updateProfileMock).not.toHaveBeenCalled();
+  });
+
+  // [CR-2026-05-19-H1] Non-owner self-update must still be allowed.
+  it('allows a non-owner to update their own profile', async () => {
+    const updated = makeProfileRow({ id: PROFILE_ID_A, displayName: 'Self' });
+    updateProfileMock.mockResolvedValue(updated);
+
+    const appSelfUpdate = new Hono<TestEnv>();
+    appSelfUpdate.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      c.set('account', {
+        id: ACCOUNT_ID,
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Account);
+      // Non-owner active profile = PROFILE_ID_A; patching own profile
+      c.set('profileId', PROFILE_ID_A);
+      c.set('profileMeta', {
+        isOwner: false,
+        birthYear: 2008,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+      } as ProfileMeta);
+      await next();
+    });
+    appSelfUpdate.onError((err, c) =>
+      c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    appSelfUpdate.route('/v1', profileRoutes);
+
+    const res = await appSelfUpdate.request(`/v1/profiles/${PROFILE_ID_A}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'Self' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(updateProfileMock).toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

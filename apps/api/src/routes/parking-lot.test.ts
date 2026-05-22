@@ -75,6 +75,47 @@ function createApp(profileId: string | typeof NO_PROFILE = 'test-profile-id') {
 
 beforeEach(() => jest.clearAllMocks());
 
+// [BUG-392] UUID validation guard tests — non-UUID path params must be rejected
+// with 400 before reaching the DB layer. This prevents Postgres errors (5xx)
+// and cross-account confusion if the DB layer assumed a scoped repo handles it.
+describe('UUID param validation [BUG-392]', () => {
+  it('GET /sessions/:sessionId/parking-lot returns 400 for non-UUID sessionId', async () => {
+    const app = createApp();
+    const res = await app.request('/sessions/not-a-uuid/parking-lot');
+    expect(res.status).toBe(400);
+    expect(mockGetParkingLotItems).not.toHaveBeenCalled();
+  });
+
+  it('GET /subjects/:subjectId/topics/:topicId/parking-lot returns 400 for non-UUID topicId', async () => {
+    const app = createApp();
+    const res = await app.request(
+      `/subjects/${TEST_SUBJECT_ID}/topics/not-a-uuid/parking-lot`,
+    );
+    expect(res.status).toBe(400);
+    expect(mockGetParkingLotItemsForTopic).not.toHaveBeenCalled();
+  });
+
+  it('GET /subjects/:subjectId/topics/:topicId/parking-lot returns 400 for non-UUID subjectId', async () => {
+    const app = createApp();
+    const res = await app.request(
+      `/subjects/not-a-uuid/topics/${TEST_TOPIC_ID}/parking-lot`,
+    );
+    expect(res.status).toBe(400);
+    expect(mockGetParkingLotItemsForTopic).not.toHaveBeenCalled();
+  });
+
+  it('POST /sessions/:sessionId/parking-lot returns 400 for non-UUID sessionId', async () => {
+    const app = createApp();
+    const res = await app.request('/sessions/not-a-uuid/parking-lot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: 'What is quantum entanglement?' }),
+    });
+    expect(res.status).toBe(400);
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET /sessions/:sessionId/parking-lot', () => {
   it('returns 200 with items and count', async () => {
     mockGetParkingLotItems.mockResolvedValueOnce({

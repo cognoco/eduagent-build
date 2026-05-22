@@ -1430,6 +1430,54 @@ describe('session routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [BUG-392] UUID param validation guard — non-UUID path params must be
+  // rejected with 400 before reaching the DB layer. Prevents Postgres errors
+  // (5xx) and cross-account confusion if the DB layer assumed a scoped repo
+  // handles it.
+  // -------------------------------------------------------------------------
+  describe('UUID param validation [BUG-392]', () => {
+    it('GET /sessions/:sessionId/summary returns 400 for non-UUID sessionId', async () => {
+      const res = await app.request(
+        '/v1/sessions/not-a-uuid/summary',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /sessions/:sessionId/summary returns 400 for non-UUID sessionId', async () => {
+      const res = await app.request(
+        '/v1/sessions/not-a-uuid/summary',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ content: 'Test summary content.' }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /sessions/:sessionId/summary/skip returns 400 for non-UUID sessionId', async () => {
+      const res = await app.request(
+        '/v1/sessions/not-a-uuid/summary/skip',
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /sessions/:sessionId/recall-bridge returns 400 for non-UUID sessionId', async () => {
+      const res = await app.request(
+        '/v1/sessions/not-a-uuid/recall-bridge',
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // POST /v1/sessions/:sessionId/stream
   // -------------------------------------------------------------------------
 
