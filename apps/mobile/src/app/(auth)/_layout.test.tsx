@@ -188,6 +188,42 @@ describe('AuthRoutesLayout', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
+  // ---------------------------------------------------------------------------
+  // BUG-506 regression — deep-link redirect target changes while already signed in.
+  //
+  // Before the fix: redirectTargetRef.current was mutated during render but was
+  // NOT in the effect deps. A new deep-link arriving after sign-in would update
+  // the ref silently; the effect never re-ran; router.replace was never called
+  // with the new target.
+  //
+  // After the fix: effectiveTarget state mirrors redirectTargetRef.current and
+  // is included in the effect deps. Changing the param → state update → effect
+  // re-runs → correct router.replace.
+  // ---------------------------------------------------------------------------
+
+  it('[BUG-506] re-redirects when redirectTo param changes while already signed in', () => {
+    // Start: signed-in user arrives at /(auth)/sign-in?redirectTo=/foo
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/foo' });
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    const { rerender } = render(<AuthLayout />);
+
+    // First redirect must fire
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/foo');
+    mockReplace.mockClear();
+
+    // A freshly-arrived deep-link updates the redirectTo param to /bar
+    mockUseLocalSearchParams.mockReturnValue({ redirectTo: '/bar' });
+
+    rerender(<AuthLayout />);
+
+    // Effect must re-run with the new target — this was the broken path
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/bar');
+  });
+
   it('renders nothing when isLoaded is false (Clerk still initializing)', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: false,

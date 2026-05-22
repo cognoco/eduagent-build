@@ -179,8 +179,46 @@ export default function SignUpScreen() {
           console.warn(
             `[AUTH-DEBUG] sign-up SSO: no session created.` +
               ` signIn.status=${ssoSignIn?.status ?? 'null'}` +
-              ` signUp.status=${ssoSignUp?.status ?? 'null'}`,
+              ` signUp.status=${ssoSignUp?.status ?? 'null'}` +
+              ` signUp.missingFields=${JSON.stringify(ssoSignUp?.missingFields ?? [])}`,
           );
+
+        // Existing account: SSO matched an account that needs further sign-in
+        // steps (e.g. TOTP, phone verification). Redirect to sign-in where
+        // handleIncompleteSignIn can guide the user through the right factor.
+        if (ssoSignIn?.status) {
+          if (__DEV__)
+            console.warn(
+              `[AUTH-DEBUG] sign-up SSO: matched existing account, redirecting to sign-in.` +
+                ` signIn.status=${ssoSignIn.status}`,
+            );
+          router.replace({
+            pathname: '/(auth)/sign-in',
+            params: { ssoNeedsSignIn: '1' },
+          } as Parameters<typeof router.replace>[0]);
+          return;
+        }
+
+        // New account: sign-up is incomplete because required profile fields
+        // (e.g. username, phone) are missing. Surface what is needed.
+        if (ssoSignUp?.missingFields && ssoSignUp.missingFields.length > 0) {
+          const fields = (ssoSignUp.missingFields as string[]).join(', ');
+          setError(
+            `Sign-up needs more information: ${fields}. Please sign up with email instead.`,
+          );
+          return;
+        }
+
+        // Sign-up object exists but in an unexpected incomplete state.
+        if (ssoSignUp?.status && ssoSignUp.status !== 'complete') {
+          setError(
+            `Sign-up via ${
+              strategy === 'oauth_google' ? 'Google' : 'SSO'
+            } needs additional information. Please sign up with email instead.`,
+          );
+          return;
+        }
+
         setError('Sign-up could not be completed. Please try again.');
       } catch (err: unknown) {
         if (__DEV__) console.warn('[AUTH-DEBUG] sign-up SSO threw:', err);
