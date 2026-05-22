@@ -159,27 +159,29 @@ describe('sessionSummaryFailedObserve [BUG-369]', () => {
   });
 
   it('returns logged status with valid payload', async () => {
+    const sessionId = '00000000-0000-4000-8000-000000000003';
     const result = await invoke(sessionSummaryFailedObserve, {
-      profileId: 'profile-3',
-      sessionId: 'session-3',
+      profileId: '00000000-0000-4000-8000-000000000023',
+      sessionId,
       sessionSummaryId: null,
       timestamp: '2026-01-01T00:00:00.000Z',
     });
-    expect(result).toMatchObject({ status: 'logged', sessionId: 'session-3' });
+    expect(result).toMatchObject({ status: 'logged', sessionId });
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('[BREAK] emits a structured warn log', async () => {
+    const sessionId = '00000000-0000-4000-8000-000000000004';
     await invoke(sessionSummaryFailedObserve, {
-      profileId: 'profile-4',
-      sessionId: 'session-4',
+      profileId: '00000000-0000-4000-8000-000000000024',
+      sessionId,
       sessionSummaryId: null,
       timestamp: '2026-01-01T00:00:00.000Z',
     });
     const entry = lastJsonLine(consoleWarnSpy);
     expect(entry?.message).toBe('session.summary.failed.received');
     expect(entry?.level).toBe('warn');
-    expect(entry?.context).toMatchObject({ sessionId: 'session-4' });
+    expect(entry?.context).toMatchObject({ sessionId });
   });
 
   it('[BREAK] returns schema_error on invalid payload', async () => {

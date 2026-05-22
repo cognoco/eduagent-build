@@ -118,4 +118,48 @@ describe('useApiReachability', () => {
     });
     expect(result.current.isApiReachable).toBe(true);
   });
+
+  it('does not call setState after unmount when fetch resolves late [BUG-532]', async () => {
+    // Arrange: a fetch that we resolve manually AFTER unmount.
+    let resolveFetch: ((value: Response) => void) | undefined;
+    mockFetch.mockImplementation(
+      () =>
+        new Promise<Response>((res) => {
+          resolveFetch = res;
+        }),
+    );
+
+    // Capture act() warnings — an unmounted-setState will surface as a console.error
+    // containing "Warning: Can't perform a React state update on an unmounted component"
+    // or in React 18 as "Warning: An update to ... inside a test was not wrapped in act(...)".
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    const { unmount } = renderHook(() => useApiReachability());
+
+    // Unmount BEFORE the fetch resolves.
+    unmount();
+
+    // Now resolve the fetch — this should NOT cause setState to fire.
+    await act(async () => {
+      resolveFetch?.({ ok: true } as Response);
+      // Flush microtasks so any pending promise continuations run.
+      await Promise.resolve();
+    });
+
+    // Assert: no console.error calls mentioning state updates or act warnings.
+    const stateUpdateWarnings = consoleErrorSpy.mock.calls.filter((args) =>
+      args.some(
+        (arg) =>
+          typeof arg === 'string' &&
+          (arg.includes('unmounted') ||
+            arg.includes('not wrapped in act') ||
+            arg.includes('state update')),
+      ),
+    );
+    expect(stateUpdateWarnings).toHaveLength(0);
+
+    consoleErrorSpy.mockRestore();
+  });
 });

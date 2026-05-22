@@ -28,7 +28,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { explainTopicOrdering } from './curriculum';
+import { eq } from 'drizzle-orm';
+import { explainTopicOrdering, moveTopicToBook } from './curriculum';
 import { NotFoundError } from '../errors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -303,6 +304,61 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     expect(results).toHaveLength(2);
     expect(results[0]!.id).toBe(tree.topicIds[1]);
     expect(results[1]!.id).toBe(tree.topicIds[2]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-458] Break test: moveTopicToBook IDOR — cross-profile topic theft
+// ---------------------------------------------------------------------------
+
+describe('[BUG-458] moveTopicToBook IDOR — cross-profile source book ownership (integration)', () => {
+  /**
+   * Attack scenario:
+   *   Profile A has:  subjectA → bookA → topicA
+   *   Profile B has:  subjectB → bookB → topicB
+   *
+   *   Attacker (Profile A) calls moveTopicToBook with:
+   *     subjectId    = A.subjectId  (A owns this → ownership check passes)
+   *     sourceBookId = B.bookId     (B owns this — THE ATTACK)
+   *     topicId      = B.topicId    (belongs to B.bookId → topic-in-book check passes)
+   *     targetBookId = A.bookId     (A owns this → target-book check passes)
+   *
+   *   Without the fix, all three checks pass and the UPDATE rebinds B's topic
+   *   to A's book — cross-account data destruction + theft.
+   *   After the fix, the source-book ownership check throws NotFoundError.
+   */
+  it('throws NotFoundError when sourceBookId belongs to a different profile', async () => {
+    const treeA = await seedBook(db, 'BUG458-A', ['A-Topic', 'A-Topic2']);
+    const treeB = await seedBook(db, 'BUG458-B', ['B-Secret-Topic']);
+
+    // Capture B's topic's current book_id so we can verify it was not mutated.
+    const [topicBefore] = await db
+      .select({ bookId: curriculumTopics.bookId })
+      .from(curriculumTopics)
+      .where(eq(curriculumTopics.id, treeB.topicIds[0]!))
+      .limit(1);
+
+    // Profile A attacks: uses its own subjectId + targetBookId, but B's sourceBookId + topicId.
+    await expect(
+      moveTopicToBook(
+        db,
+        treeA.profileId, // attacker's profileId
+        treeA.subjectId, // attacker's subjectId (passes ownership check)
+        treeB.bookId, // VICTIM's bookId as sourceBookId
+        treeB.topicIds[0]!, // VICTIM's topicId
+        treeA.bookId, // attacker's targetBookId
+      ),
+    ).rejects.toThrow(NotFoundError);
+
+    // B's topic must still point to B's book — not moved to A's book.
+    const [topicAfter] = await db
+      .select({ bookId: curriculumTopics.bookId })
+      .from(curriculumTopics)
+      .where(eq(curriculumTopics.id, treeB.topicIds[0]!))
+      .limit(1);
+
+    expect(topicAfter!.bookId).toBe(topicBefore!.bookId);
+    expect(topicAfter!.bookId).toBe(treeB.bookId);
   });
 });
 

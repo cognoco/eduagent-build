@@ -226,6 +226,21 @@ describe('typed error classes [BUG-644]', () => {
       expect(result.success).toBe(true);
     });
 
+    it('accepts account email verification errors with no details', () => {
+      expect(
+        apiErrorSchema.safeParse({
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Email not verified',
+        }).success,
+      ).toBe(true);
+      expect(
+        apiErrorSchema.safeParse({
+          code: 'EMAIL_NOT_AVAILABLE',
+          message: 'Email not available',
+        }).success,
+      ).toBe(true);
+    });
+
     it('REJECTS a primitive details payload (must be an object)', () => {
       const result = apiErrorSchema.safeParse({
         code: 'INTERNAL_ERROR',

@@ -227,6 +227,12 @@ explicitly sets `ALLOW_MISSING_IDEMPOTENCY_KV=true` as a temporary prelaunch
 override. Without the binding or override, env validation returns a 500 before
 serving traffic.
 
+Clerk session tokens should include `email` and may include `email_verified`
+for the account-middleware fast path. If either claim is missing or stale, the
+API verifies the primary email through Clerk's Backend API using
+`CLERK_SECRET_KEY`; this prevents a Clerk session-token template drift from
+blocking all signed-in users.
+
 ### Approval gate
 
 **Double gate:**
