@@ -18,7 +18,7 @@ import { markSessionActivated } from '../../lib/auth-transition';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
-import * as Sentry from '@sentry/react-native';
+import { Sentry } from '../../lib/sentry';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.

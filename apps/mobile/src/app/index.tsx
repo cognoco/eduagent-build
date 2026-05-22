@@ -3,8 +3,8 @@ import { View, ActivityIndicator } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
-import * as Sentry from '@sentry/react-native';
 import { useThemeColors } from '../lib/theme';
+import { Sentry } from '../lib/sentry';
 import { ErrorFallback } from '../components/common';
 
 export default function Index() {
