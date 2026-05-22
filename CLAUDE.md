@@ -22,6 +22,8 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 
 ## Profile Shapes (Two Tab Shapes + isOwner Gating)
 
+**For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see `docs/specs/2026-05-21-navigation-contract.md`. The short version is below.
+
 **Tab shape** controls which tabs appear — only two shapes exist:
 
 | Tab shape | Who | Tabs | Home |
@@ -29,13 +31,15 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 | **guardian** | Owner with linked children | all 5 (home, own-learning, library, progress, more) | `ParentHomeScreen` (mentoring hub) |
 | **learner** | Everyone else (solo owner OR child on parent's account) | 4 (home, library, progress, more — NO own-learning) | `LearnerScreen` |
 
-**`isOwner` gating** controls what appears INSIDE tabs (especially More and Progress):
+Note: `home.tsx` always mounts `<LearnerScreen>`. The decision to render `ParentHomeScreen` vs the learner home happens **inside** `LearnerScreen.tsx` (around the `showParentHome && !isParentProxy && (mode === 'family' || hasLinkedChildren || isFamilyPlanOwner)` branch). `home.tsx` is not a branching point.
+
+**`isOwner` gating** controls what appears INSIDE tabs (especially More and Progress). Billing/Security live inside `more/account.tsx`; Export/Delete live inside `more/privacy.tsx` — they are not top-level More rows:
 
 | Feature | Owner (guardian or solo) | Non-owner (child on parent's account) |
 |---|---|---|
-| Billing / subscription | visible | hidden |
-| Account security | visible | hidden |
-| Export / delete account | visible | hidden |
+| Billing / subscription (in `more/account.tsx`) | visible | hidden |
+| Account security (in `more/account.tsx`) | visible | hidden |
+| Export / delete account (in `more/privacy.tsx`) | visible | hidden |
 | Add child | visible if 18+ | hidden |
 | Progress toggle (view children) | visible if has children | hidden |
 
