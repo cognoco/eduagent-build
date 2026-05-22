@@ -3,6 +3,7 @@ import * as SecureStore from '../lib/secure-storage';
 import { useDictationPreferences } from './use-dictation-preferences';
 
 jest.mock('../lib/secure-storage', () => ({
+  // gc1-allow: native-boundary — expo-secure-store is unavailable in jest; sanitizeSecureStoreKey is exercised via real logic in the factory return
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),

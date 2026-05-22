@@ -28,11 +28,13 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../../../../hooks/use-dashboard', () => ({
+  ...jest.requireActual('../../../../../hooks/use-dashboard'),
   useChildSubjectTopics: (...args: unknown[]) =>
     mockUseChildSubjectTopics(...args),
 }));
 
 jest.mock('../../../../../hooks/use-progress', () => ({
+  ...jest.requireActual('../../../../../hooks/use-progress'),
   useChildInventory: (...args: unknown[]) => mockUseChildInventory(...args),
   useProfileSessions: (...args: unknown[]) => mockUseProfileSessions(...args),
 }));

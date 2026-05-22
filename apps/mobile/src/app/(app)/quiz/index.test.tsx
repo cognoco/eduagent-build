@@ -71,11 +71,14 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../../lib/api-client', () =>
+  // gc1-allow: external-boundary: typed Hono RPC client wraps fetch; mockApiClientFactory is the canonical fetch-boundary stub
   require('../../../test-utils/mock-api-routes').mockApiClientFactory(
     mockFetch,
   ),
 );
 
+// gc1-allow: native-boundary: lib/profile transitively loads i18n→expo-localization
+// and secure-storage which are native-only and cannot run in JSDOM.
 jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: {
@@ -123,6 +126,22 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+// gc1-allow: native-boundary: _layout.tsx transitively loads useParentProxy
+// →profile→i18n→expo-localization and expo-router Stack which are native-only.
+// QuizFlowProvider and useQuizFlow are pure React but cannot be tree-shaken
+// from the module without mocking it in JSDOM.
+jest.mock('./_layout', () => ({
+  useQuizFlow: () => ({
+    setActivityType: jest.fn(),
+    setSubjectId: jest.fn(),
+    setLanguageName: jest.fn(),
+    setReturnTo: jest.fn(),
+    setRound: jest.fn(),
+    setPrefetchedRoundId: jest.fn(),
+    setCompletionResult: jest.fn(),
+  }),
+}));
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -139,18 +158,6 @@ jest.mock('../../../lib/theme', () => ({
   useThemeColors: () => ({
     primary: '#2563eb',
     textPrimary: '#111827',
-  }),
-}));
-
-jest.mock('./_layout', () => ({
-  useQuizFlow: () => ({
-    setActivityType: jest.fn(),
-    setSubjectId: jest.fn(),
-    setLanguageName: jest.fn(),
-    setReturnTo: jest.fn(),
-    setRound: jest.fn(),
-    setPrefetchedRoundId: jest.fn(),
-    setCompletionResult: jest.fn(),
   }),
 }));
 

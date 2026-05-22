@@ -7,14 +7,13 @@ import {
 } from '@testing-library/react-native';
 
 import { FamilyOrientationCue } from './FamilyOrientationCue';
+import * as SecureStorageModule from '../../lib/secure-storage';
 
-const mockGetItem = jest.fn();
-const mockSetItem = jest.fn();
-
-jest.mock('../../lib/secure-storage', () => ({
-  getItemAsync: (key: string) => mockGetItem(key),
-  setItemAsync: (key: string, value: string) => mockSetItem(key, value),
-}));
+// Real lib/secure-storage (wraps expo-secure-store, globally mocked in
+// test-setup.ts). Spy on getItemAsync/setItemAsync so each test can control
+// return values including pending-promise scenarios.
+const mockGetItem = jest.spyOn(SecureStorageModule, 'getItemAsync');
+const mockSetItem = jest.spyOn(SecureStorageModule, 'setItemAsync');
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({

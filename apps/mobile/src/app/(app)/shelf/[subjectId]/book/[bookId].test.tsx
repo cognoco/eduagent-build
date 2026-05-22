@@ -82,7 +82,7 @@ jest.mock('../../../../../hooks/use-progress', () => ({
 
 jest.mock(
   '../../../../../hooks/use-sessions',
-  /* gc1-allow: session mutation state */ () => ({
+  /* gc1-allow: transport-boundary: hook calls useApiClient which requires real HTTP transport */ () => ({
     useStartFirstCurriculumSession: () => ({
       mutateAsync: mockStartFirstCurriculumMutateAsync,
       isPending: false,

@@ -1,5 +1,5 @@
 # Flow P5: Parent Mode Switch — Family <-> My Learning
-# Validates: the parent Home mode chip and the "Go to My Learning" card
+# Validates: the parent Home mode chip and compact "My Learning" affordance
 # both drive the Study/Family context switch instead of leaving the user
 # on the same Family surface.
 # Tags: nightly, parent, navigation
@@ -27,7 +27,7 @@ tags:
 
 - takeScreenshot: parent-mode-switch-01-family
 
-# 3. The activation card moves the adult into their own learner surface.
+# 3. The compact activity-section affordance moves the adult into their own learner surface.
 - scrollUntilVisible:
     element:
       id: 'parent-home-study-activation-action'

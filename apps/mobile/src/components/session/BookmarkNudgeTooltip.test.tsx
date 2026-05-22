@@ -6,29 +6,18 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
-const secureStore: Record<string, string> = {};
-jest.mock('../../lib/secure-storage', () => ({
-  getItemAsync: jest.fn((key: string) =>
-    Promise.resolve(secureStore[key] ?? null),
-  ),
-  setItemAsync: jest.fn((key: string, value: string) => {
-    secureStore[key] = value;
-    return Promise.resolve();
-  }),
-  deleteItemAsync: jest.fn((key: string) => {
-    delete secureStore[key];
-    return Promise.resolve();
-  }),
-  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+// Use the real lib/secure-storage (wraps expo-secure-store, which is globally
+// mocked in test-setup.ts with an in-memory __store). Seed test state via
+// jest.requireMock('expo-secure-store').__store instead of a local record.
+const expoSecureStoreMock = jest.requireMock('expo-secure-store') as {
+  __store: Map<string, string>;
+};
 
 const { BookmarkNudgeTooltip } = require('./BookmarkNudgeTooltip');
 
 describe('BookmarkNudgeTooltip', () => {
   beforeEach(() => {
-    for (const key of Object.keys(secureStore)) {
-      delete secureStore[key];
-    }
+    // test-setup.ts already clears expoSecureStoreMock.__store before each test.
     jest.clearAllMocks();
   });
 
@@ -81,7 +70,7 @@ describe('BookmarkNudgeTooltip', () => {
 
   it('stays hidden when SecureStore already records a dismissal for the profile', async () => {
     // sanitizeSecureStoreKey replaces ':' with '_', so the stored key uses underscore
-    secureStore['bookmark-nudge-shown_p1'] = 'true';
+    expoSecureStoreMock.__store.set('bookmark-nudge-shown_p1', 'true');
 
     render(
       <BookmarkNudgeTooltip
@@ -113,7 +102,9 @@ describe('BookmarkNudgeTooltip', () => {
     expect(screen.queryByTestId('bookmark-nudge-tooltip')).toBeNull();
     await waitFor(() => {
       // sanitizeSecureStoreKey replaces ':' with '_'
-      expect(secureStore['bookmark-nudge-shown_p1']).toBe('true');
+      expect(expoSecureStoreMock.__store.get('bookmark-nudge-shown_p1')).toBe(
+        'true',
+      );
     });
   });
 

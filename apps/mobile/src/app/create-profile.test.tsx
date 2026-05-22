@@ -53,12 +53,19 @@ jest.mock('@react-native-community/datetimepicker', () => {
 });
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
+jest.mock(
+  '../lib/api-client' /* gc1-allow: transport-boundary — routed mock fetch replaces network layer */,
+  () => {
+    const actual = jest.requireActual('../lib/api-client');
+    return {
+      ...actual,
+      useApiClient: () => {
+        const { hc } = require('hono/client');
+        return hc('http://localhost', { fetch: mockFetch });
+      },
+    };
   },
-}));
+);
 
 const mockSwitchProfile = jest.fn().mockResolvedValue(undefined);
 

@@ -48,6 +48,7 @@ import {
   type Profile,
   type ProfileContextValue,
 } from '../lib/profile';
+import { AppContextProvider } from '../lib/app-context';
 import { createRoutedMockFetch, type RoutedMockFetch } from './mock-api-routes';
 import { createTestProfile } from './app-hook-test-utils';
 
@@ -237,7 +238,11 @@ export function renderScreen(
       createElement(
         ProfileContext.Provider,
         { value: profileContextValue },
-        children,
+        // AppContextProvider reads useProfile() from the ProfileContext above.
+        // When FEATURE_FLAGS.MODE_NAV_V0_ENABLED is false (test default) it
+        // returns mode:null, which satisfies `mode !== 'study'` enabled guards
+        // on guardian-only dashboard/progress queries.
+        createElement(AppContextProvider, null, children),
       ),
     );
   }

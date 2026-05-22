@@ -125,8 +125,21 @@ describe('errorHasCode', () => {
     expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(false);
   });
 
-  it('falls back to message string matching', () => {
+  // [BUG-389] errorHasCode must NOT fall back to string-matching on the error
+  // message. The api-client boundary always sets typed .code / .apiCode
+  // properties — classify-before-format rule requires reading those, never
+  // parsing JSON text from a message that may have already been formatted.
+  it('does NOT string-match on the error message JSON body (BUG-389)', () => {
+    // A plain Error with the code embedded in the message (old api-client
+    // fallback shape) must NOT match — .code is missing, so the result is false.
     const err = new Error('API error 403: {"code":"SUBJECT_INACTIVE"}');
+    expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(false);
+  });
+
+  it('matches when .code is set on the error object (correct typed-error path)', () => {
+    const err = Object.assign(new Error('Subject paused'), {
+      code: 'SUBJECT_INACTIVE',
+    });
     expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(true);
   });
 });

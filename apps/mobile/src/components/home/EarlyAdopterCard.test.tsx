@@ -2,15 +2,16 @@ import { render, screen } from '@testing-library/react-native';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 
 jest.mock('../../lib/profile', () => ({
+  ...jest.requireActual('../../lib/profile'),
   useProfile: () => ({ activeProfile: { id: 'profile-1' } }),
 }));
 
-jest.mock('../../lib/secure-storage', () => ({
-  getItemAsync: jest.fn().mockResolvedValue(null),
-  setItemAsync: jest.fn().mockResolvedValue(undefined),
-}));
+// gc1-allow: native-boundary — lib/secure-storage wraps expo-secure-store, which is
+// globally stubbed in test-setup.ts; using the real wrapper here keeps the
+// sanitizeSecureStoreKey logic exercised and avoids duplicating the in-memory store.
 
 jest.mock('../feedback/FeedbackProvider', () => ({
+  ...jest.requireActual('../feedback/FeedbackProvider'),
   useFeedbackContext: () => ({ openFeedback: jest.fn() }),
 }));
 

@@ -35,8 +35,8 @@ interface LibrarySearchResultsProps {
   subjectTintsById?: Map<string, LearningSubjectTint>;
   onSubjectPress: (subjectId: string) => void;
   onBookPress: (subjectId: string, bookId: string) => void;
-  onTopicPress: (topicId: string) => void;
-  onNotePress: (topicId: string) => void;
+  onTopicPress: (topicId: string, subjectId: string, bookId: string) => void;
+  onNotePress: (topicId: string, subjectId: string, bookId: string) => void;
   onSessionPress: (
     sessionId: string,
     subjectId: string,
@@ -223,7 +223,7 @@ function TopicRow({
   onPress,
 }: {
   item: TopicResult;
-  onPress: (topicId: string) => void;
+  onPress: (topicId: string, subjectId: string, bookId: string) => void;
 }): React.ReactElement {
   return (
     <ResultRow
@@ -233,7 +233,7 @@ function TopicRow({
       subtitle={`${item.bookTitle} - ${item.subjectName}`}
       subjectId={item.subjectId}
       subjectName={item.subjectName}
-      onPress={() => onPress(item.id)}
+      onPress={() => onPress(item.id, item.subjectId, item.bookId)}
     />
   );
 }
@@ -243,7 +243,7 @@ function NoteRow({
   onPress,
 }: {
   item: NoteResult;
-  onPress: (topicId: string) => void;
+  onPress: (topicId: string, subjectId: string, bookId: string) => void;
 }): React.ReactElement {
   return (
     <ResultRow
@@ -255,7 +255,7 @@ function NoteRow({
       )}`}
       subjectId={item.subjectId}
       subjectName={item.subjectName}
-      onPress={() => onPress(item.topicId)}
+      onPress={() => onPress(item.topicId, item.subjectId, item.bookId)}
     />
   );
 }

@@ -111,19 +111,27 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
-jest.mock('../../../hooks/use-subjects', () => ({
-  useConfigureLanguageSubject: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: mockIsPending,
+jest.mock(
+  '../../../hooks/use-subjects' /* gc1-allow: mutation-hook-controlled-pending — race-condition tests (BUG-692-FOLLOWUP) require deferred Promise resolution and synchronous isPending toggling; renderScreen cannot synchronously control mutation isPending state */,
+  () => ({
+    ...jest.requireActual('../../../hooks/use-subjects'),
+    useConfigureLanguageSubject: () => ({
+      mutateAsync: mockMutateAsync,
+      isPending: mockIsPending,
+    }),
   }),
-}));
+);
 
-jest.mock('../../../hooks/use-sessions', () => ({
-  useStartFirstCurriculumSession: () => ({
-    mutateAsync: mockStartFirstCurriculumMutateAsync,
-    isPending: false,
+jest.mock(
+  '../../../hooks/use-sessions' /* gc1-allow: mutation-hook-controlled-pending — race-condition tests (BUG-692-FOLLOWUP) require deferred Promise resolution; renderScreen cannot synchronously control mutation isPending state */,
+  () => ({
+    ...jest.requireActual('../../../hooks/use-sessions'),
+    useStartFirstCurriculumSession: () => ({
+      mutateAsync: mockStartFirstCurriculumMutateAsync,
+      isPending: false,
+    }),
   }),
-}));
+);
 
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,

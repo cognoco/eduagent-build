@@ -41,16 +41,16 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-// BrandCelebration uses reanimated — skip it to keep the test environment
-// lean. Not under test here.
+// gc1-allow: native-boundary: BrandCelebration uses react-native-reanimated
+// and react-native-svg which are native modules unavailable in JSDOM.
 jest.mock('../../../components/common/BrandCelebration', () => ({
   BrandCelebration: () => null,
 }));
 
-// useFetchRound is the external-network boundary (wraps TanStack Query +
-// fetch). Stubbing it here is equivalent to stubbing the server response —
-// the component logic we care about (missed-section rendering) doesn't
-// read from this hook.
+// gc1-allow: native-boundary: use-quiz transitively loads lib/api-client
+// →lib/api→expo-constants and lib/profile→i18n→expo-localization which are
+// native-only modules unavailable in JSDOM. useFetchRound stub controls the
+// prefetched-round data returned to the results screen.
 jest.mock('../../../hooks/use-quiz', () => ({
   useFetchRound: () => ({ data: mockFetchRoundData, isLoading: false }),
 }));

@@ -8,13 +8,9 @@
 
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ExpoSecureStore from 'expo-secure-store'; // gc1-allow: native-boundary (already globally mocked in test-setup.ts)
 
-const mockDelete = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('./secure-storage', () => ({
-  deleteItemAsync: (...args: unknown[]) => mockDelete(...args),
-  sanitizeSecureStoreKey: (raw: string) => raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+const mockDelete = jest.mocked(ExpoSecureStore.deleteItemAsync);
 
 describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
   beforeEach(() => {

@@ -43,6 +43,9 @@ jest.mock('react-i18next', () => {
   return { useTranslation: () => ({ t }) };
 });
 
+// gc1-allow: native-boundary: i18n/index.ts imports expo-localization and
+// @react-native-async-storage/async-storage which are native-only modules.
+// This stub provides the i18next.t() function used by friendlyErrorMessage.
 jest.mock('../../../i18n', () => {
   const TRANSLATIONS: Record<string, string> = {
     'quiz.launch.friendlyErrors.upstreamError':
@@ -150,9 +153,13 @@ jest.mock(
 );
 
 jest.mock('../../../hooks/use-quiz', () => ({
+  ...jest.requireActual('../../../hooks/use-quiz'),
   useGenerateRound: () => mockGenerateRound,
 }));
 
+// gc1-allow: native-boundary: _layout.tsx transitively loads useParentProxy
+// →profile→i18n→expo-localization and expo-router Stack which are native-only.
+// useQuizFlow requires mutable test state to control activityType/returnTo per-test.
 jest.mock('./_layout', () => ({
   useQuizFlow: () => ({
     activityType: mockFlowActivityType,

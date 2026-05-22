@@ -7,6 +7,12 @@ import {
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
+import {
+  ProfileContext,
+  type Profile,
+  type ProfileContextValue,
+} from '../../../lib/profile';
+import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
 
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting
@@ -14,40 +20,19 @@ import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
 
 let mockFetch: RoutedMockFetch;
 
-jest.mock('../../../lib/api-client', () => {
-  const {
-    createRoutedMockFetch,
-    mockApiClientFactory,
-  } = require('../../../test-utils/mock-api-routes');
-  mockFetch = createRoutedMockFetch();
-  return mockApiClientFactory(mockFetch);
-});
-
-jest.mock('../../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-    },
-    profiles: [
-      {
-        id: 'test-profile-id',
-        accountId: 'test-account-id',
-        displayName: 'Test Learner',
-        isOwner: true,
-      },
-    ],
-  }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
+jest.mock(
+  '../../../lib/api-client', // gc1-allow: fetch-boundary — mockApiClientFactory installs hc() with a controlled mock fetch so real hooks exercise real request logic
+  () => {
+    const {
+      createRoutedMockFetch,
+      mockApiClientFactory,
+    } = require('../../../test-utils/mock-api-routes');
+    mockFetch = createRoutedMockFetch();
+    return mockApiClientFactory(mockFetch);
   },
-}));
+);
+
+// lib/profile removed — replaced with inline ProfileContext.Provider in wrapper below
 
 // ---------------------------------------------------------------------------
 // External / rendering mocks (kept — not API hooks)
@@ -254,8 +239,26 @@ function setupRoutes(opts: SetupOptions = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// QueryClient wrapper
+// QueryClient + ProfileContext wrapper
 // ---------------------------------------------------------------------------
+
+const testProfile: Profile = createTestProfile({
+  id: 'test-profile-id',
+  accountId: 'test-account-id',
+  displayName: 'Test Learner',
+  isOwner: true,
+  birthYear: 1990,
+});
+
+const profileContextValue: ProfileContextValue = {
+  profiles: [testProfile],
+  activeProfile: testProfile,
+  switchProfile: async () => ({ success: true }),
+  isLoading: false,
+  profileLoadError: null,
+  profileWasRemoved: false,
+  acknowledgeProfileRemoval: () => undefined,
+};
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -263,7 +266,11 @@ function createWrapper() {
   });
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ProfileContext.Provider value={profileContextValue}>
+          {children}
+        </ProfileContext.Provider>
+      </QueryClientProvider>
     );
   }
   return { queryClient, Wrapper };

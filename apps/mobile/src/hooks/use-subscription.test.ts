@@ -1,6 +1,10 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId, setProxyMode } from '../lib/api-client';
 import {
   useSubscription,
   useUsage,
@@ -11,40 +15,33 @@ import {
 import { NotFoundError } from '../lib/api-errors';
 
 const mockFetch = jest.fn();
+const originalFetch = globalThis.fetch;
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    // Pass raw Response through — matches production hc() behavior.
-    // Each hook uses assertOk() to throw on non-OK responses.
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) =>
-        mockFetch(...(args as Parameters<typeof fetch>)),
-    });
-  },
-}));
-
-jest.mock('../lib/api', () => ({
-  getApiUrl: () => 'http://localhost:8787',
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
-
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
+
+beforeEach(() => {
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+  setProxyMode(false);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+  setActiveProfileId(undefined);
+  setProxyMode(false);
+});
 
 // ---------------------------------------------------------------------------
 // useSubscription
@@ -277,10 +274,11 @@ describe('useFamilySubscription', () => {
   });
 
   it('returns null when the family endpoint throws NotFoundError (production api-client path)', async () => {
-    // [BUG-160] Simulate the production api-client throwing the typed
-    // NotFoundError (the actual class thrown for 404 in api-client.ts:269)
-    // instead of a generic Error with a status-prefixed message.
-    mockFetch.mockRejectedValueOnce(new NotFoundError('Not Found'));
+    // [BUG-160] The real api-client (api-client.ts:275) converts a 404 HTTP
+    // response into a typed NotFoundError before returning to the queryFn.
+    // The hook's catch block checks `instanceof NotFoundError` — this test
+    // exercises that path using the actual api-client behaviour.
+    mockFetch.mockResolvedValueOnce(new Response('Not found', { status: 404 }));
 
     const { result } = renderHook(() => useFamilySubscription(), {
       wrapper: createWrapper(),

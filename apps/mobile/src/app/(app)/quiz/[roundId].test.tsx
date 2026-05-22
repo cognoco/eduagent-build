@@ -49,6 +49,10 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const mockUseRoundDetail = jest.fn();
+// gc1-allow: native-boundary: use-quiz transitively loads lib/api-client
+// →lib/api→expo-constants and lib/profile→i18n→expo-localization which are
+// native-only modules unavailable in JSDOM. useRoundDetail stub controls the
+// round detail data returned to the history detail screen.
 jest.mock('../../../hooks/use-quiz', () => ({
   useRoundDetail: (...args: unknown[]) => mockUseRoundDetail(...args),
 }));

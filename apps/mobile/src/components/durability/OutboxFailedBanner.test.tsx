@@ -6,27 +6,23 @@ import {
 } from '@testing-library/react-native';
 import { OutboxFailedBanner } from './OutboxFailedBanner';
 import { ensureI18nReady } from '../../i18n';
-import {
-  listPermanentlyFailed,
-  deletePermanentlyFailed,
-} from '../../lib/message-outbox';
+import * as MessageOutboxModule from '../../lib/message-outbox';
 import * as Clipboard from 'expo-clipboard';
 
-jest.mock('../../lib/message-outbox', () => ({
-  listPermanentlyFailed: jest.fn(),
-  deletePermanentlyFailed: jest.fn(),
-}));
-jest.mock('expo-clipboard', () => ({
-  setStringAsync: jest.fn(),
-}));
+// Real lib/message-outbox: AsyncStorage and expo-crypto are globally mocked in
+// test-setup.ts, so the real module runs against in-memory storage.
+// Spy on the functions under test so each test can control their return values.
+const mockListPermanentlyFailed = jest.spyOn(
+  MessageOutboxModule,
+  'listPermanentlyFailed',
+);
+const mockDeletePermanentlyFailed = jest.spyOn(
+  MessageOutboxModule,
+  'deletePermanentlyFailed',
+);
 
-const mockListPermanentlyFailed = listPermanentlyFailed as jest.MockedFunction<
-  typeof listPermanentlyFailed
->;
-const mockDeletePermanentlyFailed =
-  deletePermanentlyFailed as jest.MockedFunction<
-    typeof deletePermanentlyFailed
-  >;
+// gc1-allow: external-boundary — expo-clipboard is a native module stubbed
+// globally in test-setup.ts; the bare-specifier mock is already in place.
 const mockSetStringAsync = Clipboard.setStringAsync as jest.MockedFunction<
   typeof Clipboard.setStringAsync
 >;

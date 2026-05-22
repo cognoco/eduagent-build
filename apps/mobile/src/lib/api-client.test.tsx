@@ -30,7 +30,9 @@ jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: mockGetToken }),
 }));
 
-jest.mock('./api', () => ({ getApiUrl: () => 'http://localhost' }));
+// ./api uses real implementation: getApiUrl() returns a localhost URL in __DEV__ (test env)
+// and EXPO_PUBLIC_API_URL is not set in CI test runs, so the __DEV__ branch fires.
+// The real module reads expo-constants which is shimmed by jest-expo — no mock needed.
 
 describe('api-client auth-expired guard [BUG-630 / I-2]', () => {
   afterEach(() => {

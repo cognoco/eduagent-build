@@ -3,14 +3,14 @@ import { ConflictError, RateLimitedError } from '@eduagent/schemas';
 
 import { FilingFailedBanner } from './FilingFailedBanner';
 
-// Mock Sentry before any component import
-jest.mock('../../lib/sentry', () => ({
-  Sentry: { captureException: jest.fn() },
-}));
+// gc1-allow: observability — lib/sentry wraps @sentry/react-native, which is
+// globally mocked in test-setup.ts (Sentry.init, captureException, etc.).
+// Using the real wrapper keeps the re-export and age-gate logic live.
 
 // Mock useRetryFiling hook
 const mockMutateAsync = jest.fn();
 jest.mock('../../hooks/use-retry-filing', () => ({
+  ...jest.requireActual('../../hooks/use-retry-filing'),
   useRetryFiling: () => ({
     mutateAsync: mockMutateAsync,
     isPending: false,
