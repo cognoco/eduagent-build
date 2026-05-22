@@ -2319,7 +2319,7 @@ export default function AppLayout() {
         <ErrorFallback
           variant="centered"
           title="We could not load your profile"
-          message="Retry loading your profile, or sign out and sign in again."
+          message={formatApiError(profileLoadError)}
           primaryAction={{
             label: t('common.retry'),
             onPress: () => {
