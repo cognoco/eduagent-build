@@ -171,26 +171,27 @@ export async function checkQuizAnswerWithCorrect(
   assertAnswerInOptions(question, answerGiven, answerMode);
   const correct = isAnswerCorrect(question, answerGiven);
 
-  // [WI-89-HIGH] Transactional persistence: wrap read-modify-write so
-  // concurrent /check calls can't lose entries.
-  // Re-reads results inside the tx for authoritative state.
-  // [WI-89-MED] UPDATE also guards on `status = 'active'` — if the round was
-  // concurrently completed, the tx no-ops. The 0-row response below is
-  // harmless because the /check read already returned correct; only the
-  // persisted record is missing, which /complete compensates for by padding.
+  // [WI-89-HIGH] Lock the row before appending the attempt. Without
+  // SELECT ... FOR UPDATE, two concurrent /check calls can read the same
+  // results snapshot and the later UPDATE can overwrite the earlier append.
   await db.transaction(async (tx) => {
-    const txRepo = createScopedRepository(tx as unknown as Database, profileId);
-    // [WI-89-HIGH] Re-select inside the transaction to prevent lost-update
-    // races. A stale `round.results` (captured before tx.start) could
-    // overwrite a parallel /check's entry.
-    const currentRound = await txRepo.quizRounds.findById(roundId);
-    if (!currentRound || currentRound.status !== 'active') {
-      // [WI-89-MED] Round was completed concurrently or doesn't exist — no-op.
+    const [currentRound] = await tx
+      .select()
+      .from(quizRounds)
+      .where(
+        and(
+          eq(quizRounds.id, roundId),
+          eq(quizRounds.profileId, profileId),
+          eq(quizRounds.status, 'active'),
+        ),
+      )
+      .for('update')
+      .limit(1);
+
+    if (!currentRound) {
       return;
     }
-    const currentResults = (currentRound.results ?? []) as Array<{
-      questionIndex: number;
-    }>;
+    const currentResults = (currentRound.results ?? []) as QuestionResult[];
     const alreadyAttempted = currentResults.some(
       (r) => r.questionIndex === questionIndex,
     );
@@ -430,9 +431,6 @@ export async function completeQuizRound(
 
     const questions = round.questions as QuizQuestion[];
     const total = round.total;
-    // [WI-89] Server-side scoring: derive authoritative results from persisted
-    // check attempts. Client results are ignored for scoring/XP/mastery but
-    // counted for droppedResults so the client knows how many were discarded.
     // [WI-89] Server-side scoring: derive authoritative results from persisted
     // check attempts. Client results are ignored for scoring/XP/mastery but
     // counted for droppedResults so the client knows how many were discarded.

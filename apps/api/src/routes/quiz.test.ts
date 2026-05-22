@@ -868,7 +868,12 @@ describe('Quiz routes', () => {
       (mockDb as any).query.quizRounds.findFirst = jest
         .fn()
         .mockResolvedValue(ACTIVE_ROUND);
-      // [WI-89] /check now wraps persistence in a transaction with re-read.
+      const selectLimit = jest.fn().mockResolvedValue([ACTIVE_ROUND]);
+      const selectFor = jest.fn().mockReturnValue({ limit: selectLimit });
+      const selectWhere = jest.fn().mockReturnValue({ for: selectFor });
+      const selectFrom = jest.fn().mockReturnValue({ where: selectWhere });
+      (mockDb as any).select = jest.fn().mockReturnValue({ from: selectFrom });
+      // [WI-89] /check now wraps persistence in a transaction with row lock.
       (mockDb as any).transaction = jest
         .fn()
         .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
@@ -892,6 +897,7 @@ describe('Quiz routes', () => {
         correct: false,
         correctAnswer: 'Vienna',
       });
+      expect(selectFor).toHaveBeenCalledWith('update');
       expect(updateSetPayloads).toContainEqual(
         expect.objectContaining({
           results: [

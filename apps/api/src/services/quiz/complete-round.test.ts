@@ -5,6 +5,7 @@ import type {
   QuizQuestion,
   VocabularyQuestion,
 } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
 import { BadRequestError } from '@eduagent/schemas';
 import {
   assertAnswerInOptions,
@@ -12,6 +13,7 @@ import {
   buildMissedItemText,
   calculateScore,
   calculateXp,
+  checkQuizAnswerWithCorrect,
   getCapitalsSm2Quality,
   getCelebrationTier,
   getGuessWhoSm2Quality,
@@ -256,6 +258,82 @@ describe('assertAnswerInOptions [BUG-STALE-OPTIONS]', () => {
     expect(() =>
       assertAnswerInOptions(vocabQuestion, 'CAT', 'multiple_choice'),
     ).not.toThrow();
+  });
+});
+
+describe('checkQuizAnswerWithCorrect concurrency guard', () => {
+  it('[BREAK/WI-89] locks the quiz round row before appending a check attempt', async () => {
+    const question: CapitalsQuestion = {
+      type: 'capitals',
+      country: 'Austria',
+      correctAnswer: 'Vienna',
+      acceptedAliases: ['Vienna', 'Wien'],
+      distractors: ['Salzburg', 'Graz', 'Innsbruck'],
+      funFact: '',
+      isLibraryItem: false,
+    };
+    const round = {
+      id: 'round-1',
+      profileId: 'profile-1',
+      status: 'active',
+      activityType: 'capitals',
+      questions: [question],
+      results: [],
+      total: 1,
+    };
+
+    const selectLimit = jest.fn().mockResolvedValue([round]);
+    const selectFor = jest.fn().mockReturnValue({ limit: selectLimit });
+    const selectWhere = jest.fn().mockReturnValue({ for: selectFor });
+    const selectFrom = jest.fn().mockReturnValue({ where: selectWhere });
+    const select = jest.fn().mockReturnValue({ from: selectFrom });
+    const updateSet = jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    });
+    const update = jest.fn().mockReturnValue({ set: updateSet });
+    const tx = {
+      query: {
+        quizRounds: {
+          findFirst: jest.fn().mockResolvedValue(round),
+        },
+      },
+      select,
+      update,
+    };
+    const db = {
+      query: {
+        quizRounds: {
+          findFirst: jest.fn().mockResolvedValue(round),
+        },
+      },
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (txArg: unknown) => unknown) => fn(tx)),
+    } as unknown as Database;
+
+    await checkQuizAnswerWithCorrect(
+      db,
+      'profile-1',
+      'round-1',
+      0,
+      'Salzburg',
+      'multiple_choice',
+    );
+
+    expect(db.transaction as jest.Mock).toHaveBeenCalledTimes(1);
+    expect(selectFor).toHaveBeenCalledWith('update');
+    expect(selectLimit).toHaveBeenCalledWith(1);
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Salzburg',
+          }),
+        ],
+      }),
+    );
   });
 });
 
