@@ -864,7 +864,6 @@ describe('Quiz routes', () => {
         updateSetPayloads.push(payload);
         return { where };
       });
-      (mockDb as any).update = jest.fn().mockReturnValue({ set });
       (mockDb as any).query.quizRounds.findFirst = jest
         .fn()
         .mockResolvedValue(ACTIVE_ROUND);
@@ -872,11 +871,15 @@ describe('Quiz routes', () => {
       const selectFor = jest.fn().mockReturnValue({ limit: selectLimit });
       const selectWhere = jest.fn().mockReturnValue({ for: selectFor });
       const selectFrom = jest.fn().mockReturnValue({ where: selectWhere });
-      (mockDb as any).select = jest.fn().mockReturnValue({ from: selectFrom });
+      const txDb = {
+        ...mockDb,
+        select: jest.fn().mockReturnValue({ from: selectFrom }),
+        update: jest.fn().mockReturnValue({ set }),
+      };
       // [WI-89] /check now wraps persistence in a transaction with row lock.
       (mockDb as any).transaction = jest
         .fn()
-        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(txDb));
 
       const res = await app.request(
         '/v1/quiz/rounds/round-1/check',
@@ -1099,7 +1102,6 @@ describe('Quiz routes', () => {
         updateSetPayloads.push(payload);
         return { where };
       });
-      (mockDb as any).update = jest.fn().mockReturnValue({ set });
       (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
         ...ACTIVE_ROUND,
         total: 1,
@@ -1115,11 +1117,15 @@ describe('Quiz routes', () => {
         ],
       });
       // [WI-89] Re-override transaction so the callback receives mockDb
-      // directly (with the update mock above), not the metering fixture's
-      // updateImpl spread via createRouteMeteringFixture in beforeEach.
+      // plus the update mock above, without replacing the metering fixture's
+      // top-level db helpers used before the route handler runs.
+      const txDb = {
+        ...mockDb,
+        update: jest.fn().mockReturnValue({ set }),
+      };
       (mockDb as any).transaction = jest
         .fn()
-        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(txDb));
 
       const res = await app.request(
         '/v1/quiz/rounds/round-1/complete',
