@@ -1170,7 +1170,10 @@ export default function SessionSummaryScreen() {
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/topic/[topicId]',
-                    params: { topicId: suggestion.id },
+                    params: {
+                      topicId: suggestion.id,
+                      subjectId: filedSubjectId ?? subjectId,
+                    },
                   } as Href)
                 }
                 className="flex-row items-center py-3 border-b border-surface-elevated"

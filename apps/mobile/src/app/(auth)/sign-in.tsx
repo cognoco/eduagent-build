@@ -349,7 +349,11 @@ export default function SignInScreen() {
       if (next !== 'active') return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        setOauthLoading(null);
+        // [CR-116] AppState callback fires asynchronously; the 1.5s deferral
+        // means the screen may have unmounted before this runs. The cleanup
+        // below clears the timer on unmount, but a synchronous unmount-then-
+        // fire race is still possible. Guard before touching state.
+        if (isMountedRef.current) setOauthLoading(null);
       }, 1500);
     });
     return () => {
@@ -731,7 +735,7 @@ export default function SignInScreen() {
         if (__DEV__) console.warn('[AUTH-DEBUG] SSO flow threw:', err);
         setError(extractClerkError(err));
       } finally {
-        setOauthLoading(null);
+        if (isMountedRef.current) setOauthLoading(null);
       }
     },
     [
@@ -739,6 +743,7 @@ export default function SignInScreen() {
       clearSessionExpiredMessage,
       clearVerificationFlow,
       handleIncompleteSignIn,
+      isMountedRef,
       isLoaded,
       startSSOFlow,
     ],

@@ -939,7 +939,7 @@
     "empty": {
       "title": "Biblioteket ditt er tomt",
       "message": "Start en studieøkt, så vil emnene dine vises her.",
-      "goHome": "Gå til Hjem"
+      "createFirstSubject": "Legg til ditt første fag"
     },
     "curriculumComplete": {
       "title": "Du har dekket alt her!",

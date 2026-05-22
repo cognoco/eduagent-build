@@ -939,7 +939,7 @@
     "empty": {
       "title": "ライブラリは空です",
       "message": "学習セッションを開始すると、科目がここに表示されます。",
-      "goHome": "ホームへ"
+      "createFirstSubject": "最初の教科を追加"
     },
     "curriculumComplete": {
       "title": "ここではすべてを学習しました！",

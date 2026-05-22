@@ -939,7 +939,7 @@
     "empty": {
       "title": "Tu biblioteca está vacía",
       "message": "Inicia una sesión de estudio y tus materias aparecerán aquí.",
-      "goHome": "Ir a Inicio"
+      "createFirstSubject": "Añade tu primera materia"
     },
     "curriculumComplete": {
       "title": "¡Has cubierto todo aquí!",

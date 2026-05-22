@@ -571,7 +571,7 @@ export default function LibraryScreen() {
             testID="library-empty-go-home"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              {t('library.empty.goHome')}
+              {t('library.empty.createFirstSubject')}
             </Text>
           </Pressable>
         </View>
