@@ -11,21 +11,21 @@ const allSolid: ChallengeRoundEvaluationItem[] = [
     concept: 'a',
     result: 'solid',
     evidence: 'x',
-    answerEventId: '00000000-0000-0000-0000-000000000001',
+    answerEventId: '00000000-0000-4000-8000-000000000001',
     learnerQuote: 'I said a clearly',
   },
   {
     concept: 'b',
     result: 'solid',
     evidence: 'y',
-    answerEventId: '00000000-0000-0000-0000-000000000002',
+    answerEventId: '00000000-0000-4000-8000-000000000002',
     learnerQuote: 'I said b clearly',
   },
   {
     concept: 'c',
     result: 'solid',
     evidence: 'z',
-    answerEventId: '00000000-0000-0000-0000-000000000003',
+    answerEventId: '00000000-0000-4000-8000-000000000003',
     learnerQuote: 'I said c clearly',
   },
 ];
@@ -35,14 +35,14 @@ const mixed: ChallengeRoundEvaluationItem[] = [
     concept: 'a',
     result: 'solid',
     evidence: 'x',
-    answerEventId: '00000000-0000-0000-0000-000000000001',
+    answerEventId: '00000000-0000-4000-8000-000000000001',
     learnerQuote: 'I said a clearly',
   },
   {
     concept: 'b',
     result: 'partial',
     evidence: 'partial-evidence-b',
-    answerEventId: '00000000-0000-0000-0000-000000000002',
+    answerEventId: '00000000-0000-4000-8000-000000000002',
     learnerQuote: 'I partly said b',
   },
   {
@@ -50,7 +50,7 @@ const mixed: ChallengeRoundEvaluationItem[] = [
     result: 'misconception',
     evidence: 'learner confused c with d',
     correction: 'C is actually …',
-    answerEventId: '00000000-0000-0000-0000-000000000003',
+    answerEventId: '00000000-0000-4000-8000-000000000003',
     learnerQuote: 'I said c incorrectly',
   },
 ];
@@ -60,14 +60,14 @@ const allMissing: ChallengeRoundEvaluationItem[] = [
     concept: 'a',
     result: 'missing',
     evidence: 'no answer',
-    answerEventId: '00000000-0000-0000-0000-000000000001',
+    answerEventId: '00000000-0000-4000-8000-000000000001',
     learnerQuote: 'idk',
   },
   {
     concept: 'b',
     result: 'missing',
     evidence: 'no answer',
-    answerEventId: '00000000-0000-0000-0000-000000000002',
+    answerEventId: '00000000-0000-4000-8000-000000000002',
     learnerQuote: 'pass',
   },
 ];
@@ -125,14 +125,14 @@ describe('decideMasteryAndReview — adversarial misconception (HIGH-8)', () => 
         concept: 'a',
         result: 'solid',
         evidence: 'x',
-        answerEventId: '00000000-0000-0000-0000-000000000001',
+        answerEventId: '00000000-0000-4000-8000-000000000001',
         learnerQuote: 'solid a',
       },
       {
         concept: 'b',
         result: 'solid',
         evidence: 'y',
-        answerEventId: '00000000-0000-0000-0000-000000000002',
+        answerEventId: '00000000-0000-4000-8000-000000000002',
         learnerQuote: 'solid b',
       },
       {
@@ -140,7 +140,7 @@ describe('decideMasteryAndReview — adversarial misconception (HIGH-8)', () => 
         result: 'misconception',
         evidence: 'subtle wrong idea',
         correction: 'right idea',
-        answerEventId: '00000000-0000-0000-0000-000000000003',
+        answerEventId: '00000000-0000-4000-8000-000000000003',
         learnerQuote: 'wrong c',
       },
     ];
@@ -157,7 +157,7 @@ describe('decideMasteryAndReview — adversarial misconception (HIGH-8)', () => 
         concept: 'c',
         result: 'partial',
         evidence: 'incomplete',
-        answerEventId: '00000000-0000-0000-0000-000000000003',
+        answerEventId: '00000000-0000-4000-8000-000000000003',
         learnerQuote: 'mostly c',
       },
     ];
@@ -195,14 +195,14 @@ describe('decideMasteryAndReview — reteach / invalid edge cases', () => {
         concept: 'a',
         result: 'missing',
         evidence: 'no answer',
-        answerEventId: '00000000-0000-0000-0000-000000000001',
+        answerEventId: '00000000-0000-4000-8000-000000000001',
         learnerQuote: 'idk',
       },
       {
         concept: 'b',
         result: 'partial',
         evidence: 'half-answer',
-        answerEventId: '00000000-0000-0000-0000-000000000002',
+        answerEventId: '00000000-0000-4000-8000-000000000002',
         learnerQuote: 'mostly b',
       },
     ];
@@ -282,14 +282,14 @@ describe('validateEvaluationEventIds — [#477] ownership guard', () => {
       concept: 'a',
       result: 'solid',
       evidence: 'x',
-      answerEventId: 'aaaaaaaa-0000-0000-0000-000000000001',
+      answerEventId: 'aaaaaaaa-0000-4000-8000-000000000001',
       learnerQuote: 'LLM-supplied quote for a',
     },
     {
       concept: 'b',
       result: 'partial',
       evidence: 'y',
-      answerEventId: 'aaaaaaaa-0000-0000-0000-000000000002',
+      answerEventId: 'aaaaaaaa-0000-4000-8000-000000000002',
       learnerQuote: 'LLM-supplied quote for b',
     },
   ];
@@ -298,7 +298,7 @@ describe('validateEvaluationEventIds — [#477] ownership guard', () => {
     // DB returns only the first ID; the second is absent (belongs to another profile/session).
     // Strict mode: even one missing id → throw → caller treats as invalid.
     const db = makeSessionEventsDb([
-      { id: 'aaaaaaaa-0000-0000-0000-000000000001', content: 'real content a' },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000001', content: 'real content a' },
     ]);
     await expect(
       validateEvaluationEventIds(db, profileId, sessionId, evals),
@@ -315,11 +315,11 @@ describe('validateEvaluationEventIds — [#477] ownership guard', () => {
   it('[#477] replaces LLM-supplied learnerQuote with actual event content when all IDs are valid', async () => {
     const db = makeSessionEventsDb([
       {
-        id: 'aaaaaaaa-0000-0000-0000-000000000001',
+        id: 'aaaaaaaa-0000-4000-8000-000000000001',
         content: 'real learner answer for a',
       },
       {
-        id: 'aaaaaaaa-0000-0000-0000-000000000002',
+        id: 'aaaaaaaa-0000-4000-8000-000000000002',
         content: 'real learner answer for b',
       },
     ]);

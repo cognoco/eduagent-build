@@ -13,7 +13,7 @@ function evalItem(
     concept: 'photosynthesis',
     result: 'solid',
     evidence: 'learner described chloroplast role correctly',
-    answerEventId: '00000000-0000-0000-0000-000000000001',
+    answerEventId: '00000000-0000-4000-8000-000000000001',
     learnerQuote: 'plants use chloroplasts to capture light',
     ...overrides,
   };
@@ -150,7 +150,7 @@ describe('transitionChallengeState — answer_complete', () => {
         evaluations: [
           evalItem({
             concept: 'a',
-            answerEventId: '00000000-0000-0000-0000-000000000001',
+            answerEventId: '00000000-0000-4000-8000-000000000001',
           }),
         ],
       },
@@ -159,7 +159,7 @@ describe('transitionChallengeState — answer_complete', () => {
         evaluation: [
           evalItem({
             concept: 'b',
-            answerEventId: '00000000-0000-0000-0000-000000000002',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
           }),
         ],
       },
@@ -180,11 +180,11 @@ describe('transitionChallengeState — answer_complete', () => {
         evaluations: [
           evalItem({
             concept: 'a',
-            answerEventId: '00000000-0000-0000-0000-000000000001',
+            answerEventId: '00000000-0000-4000-8000-000000000001',
           }),
           evalItem({
             concept: 'b',
-            answerEventId: '00000000-0000-0000-0000-000000000002',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
           }),
         ],
       },
@@ -193,7 +193,7 @@ describe('transitionChallengeState — answer_complete', () => {
         evaluation: [
           evalItem({
             concept: 'c',
-            answerEventId: '00000000-0000-0000-0000-000000000003',
+            answerEventId: '00000000-0000-4000-8000-000000000003',
           }),
         ],
       },
@@ -216,11 +216,11 @@ describe('transitionChallengeState — answer_complete', () => {
         evaluation: [
           evalItem({
             concept: 'a',
-            answerEventId: '00000000-0000-0000-0000-000000000001',
+            answerEventId: '00000000-0000-4000-8000-000000000001',
           }),
           evalItem({
             concept: 'b',
-            answerEventId: '00000000-0000-0000-0000-000000000002',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
           }),
         ],
       },
