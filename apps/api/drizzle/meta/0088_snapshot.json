@@ -1,6 +1,6 @@
 {
-  "id": "3d6666d0-d097-41d7-a7ee-763825aa141f",
-  "prevId": "2ac6495e-c7ec-453c-8f76-3bc808bd2f22",
+  "id": "903ea923-3e70-47f0-9c4e-a95c3d5ec57a",
+  "prevId": "3d6666d0-d097-41d7-a7ee-763825aa141f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5587,6 +5587,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
         "decision": {
           "name": "decision",
           "type": "text",
@@ -5613,7 +5620,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "memory_dedup_decisions_profile_category_idx": {
+          "name": "memory_dedup_decisions_profile_category_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "memory_dedup_decisions_profile_id_profiles_id_fk": {
           "name": "memory_dedup_decisions_profile_id_profiles_id_fk",
@@ -5626,9 +5655,9 @@
         }
       },
       "compositePrimaryKeys": {
-        "memory_dedup_decisions_profile_id_pair_key_pk": {
-          "name": "memory_dedup_decisions_profile_id_pair_key_pk",
-          "columns": ["profile_id", "pair_key"]
+        "memory_dedup_decisions_profile_id_pair_key_category_pk": {
+          "name": "memory_dedup_decisions_profile_id_pair_key_category_pk",
+          "columns": ["profile_id", "pair_key", "category"]
         }
       },
       "uniqueConstraints": {},

@@ -1,4 +1,4 @@
--- 0087_bug363_dedup_pairkey_category.sql
+-- 0088_bug363_dedup_pairkey_category.sql
 -- BUG-363: Add `category` column to `memory_dedup_decisions` and widen the
 -- primary key to (profile_id, pair_key, category).
 --
