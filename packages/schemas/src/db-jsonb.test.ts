@@ -9,6 +9,8 @@ import {
   onboardingDraftExtractedSignalsSchema,
   parseOnboardingDraftExchangeHistory,
   parseOnboardingDraftExtractedSignals,
+  assessmentExchangeHistorySchema,
+  parseAssessmentExchangeHistory,
 } from './db-jsonb.js';
 
 const validCacheData = {
@@ -301,5 +303,92 @@ describe('parseOnboardingDraftExtractedSignals [BUG-225]', () => {
       analogyFraming: 'definitely-invalid-value',
     });
     expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-391] assessments.exchange_history
+// ---------------------------------------------------------------------------
+describe('assessmentExchangeHistorySchema [BUG-391]', () => {
+  it('defaults to empty array when value is undefined', () => {
+    const result = assessmentExchangeHistorySchema.parse(undefined);
+    expect(result).toEqual([]);
+  });
+
+  it('accepts an empty array (fresh assessment)', () => {
+    expect(assessmentExchangeHistorySchema.safeParse([]).success).toBe(true);
+  });
+
+  it('accepts a valid exchange array matching the neon-serverless parsed-JSONB shape', () => {
+    // Simulates what neon-serverless returns after Drizzle reads the JSONB
+    // column: plain JS objects (already parsed from JSON), not Date objects.
+    const rawFromDb = [
+      { role: 'assistant', content: 'What is a variable?' },
+      { role: 'user', content: 'A box that stores data.' },
+    ];
+    const result = assessmentExchangeHistorySchema.safeParse(rawFromDb);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0]!.role).toBe('assistant');
+      expect(result.data[1]!.role).toBe('user');
+    }
+  });
+
+  it('rejects an entry with an invalid role', () => {
+    const result = assessmentExchangeHistorySchema.safeParse([
+      { role: 'system', content: 'injected' },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an entry missing content', () => {
+    const result = assessmentExchangeHistorySchema.safeParse([
+      { role: 'user' },
+    ]);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('parseAssessmentExchangeHistory [BUG-391]', () => {
+  it('returns empty array for null (corrupted / legacy null DB value)', () => {
+    // parseAssessmentExchangeHistory returns [] (not null) on failure so the
+    // assessment can degrade to empty-history state without throwing.
+    expect(parseAssessmentExchangeHistory(null)).toEqual([]);
+  });
+
+  it('returns empty array for undefined (column value absent)', () => {
+    expect(parseAssessmentExchangeHistory(undefined)).toEqual([]);
+  });
+
+  it('returns empty array for non-array input (corrupted row)', () => {
+    expect(parseAssessmentExchangeHistory('corrupted')).toEqual([]);
+    expect(parseAssessmentExchangeHistory(42)).toEqual([]);
+    expect(parseAssessmentExchangeHistory({ role: 'user' })).toEqual([]);
+  });
+
+  it('returns empty array for array with invalid exchange shape', () => {
+    expect(
+      parseAssessmentExchangeHistory([{ role: 'invalid_role', content: 'Hi' }]),
+    ).toEqual([]);
+  });
+
+  it('returns typed array for a valid neon-serverless-shaped row', () => {
+    // This simulates the exact raw value Drizzle surfaces from neon-serverless:
+    // a plain JS array of objects (JSONB is already parsed), typed as `unknown`
+    // because the column has no $type cast at the Drizzle level pre-fix.
+    const rawFromDb: unknown = [
+      { role: 'assistant', content: 'What is recursion?' },
+      { role: 'user', content: 'A function calling itself.' },
+    ];
+    const result = parseAssessmentExchangeHistory(rawFromDb);
+    expect(result).toHaveLength(2);
+    expect(result[0]!.role).toBe('assistant');
+    expect(result[0]!.content).toBe('What is recursion?');
+    expect(result[1]!.role).toBe('user');
+  });
+
+  it('returns empty array for empty array input (new assessment)', () => {
+    expect(parseAssessmentExchangeHistory([])).toEqual([]);
   });
 });
