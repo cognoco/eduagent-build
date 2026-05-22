@@ -449,7 +449,7 @@ async function handleBillingIssue(
       },
     );
 
-    // core-send: payment-failed alert — billing observability cannot be silent.
+    // core-send: payment-failed alert - billing observability cannot be silent.
     // A swallowed dispatch leaves the failed payment unobserved by alerting.
     await inngest.send({
       name: 'app/payment.failed',

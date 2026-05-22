@@ -26,6 +26,7 @@ import type {
   AssessmentStatus,
   ChatExchange,
 } from '@eduagent/schemas';
+import { parseAssessmentExchangeHistory } from '@eduagent/schemas';
 
 // [BUG-665 / S-5] Structured logger for parse-fallback observability. Sentry
 // covers production aggregation, but the structured logger surfaces the same
@@ -625,8 +626,11 @@ function mapAssessmentRow(
     status: row.status,
     masteryScore: row.masteryScore ?? null,
     qualityRating: row.qualityRating ?? null,
-    exchangeHistory: (row.exchangeHistory ??
-      []) as AssessmentRecord['exchangeHistory'],
+    // [BUG-391] Use runtime parser — $type<ChatExchange[]> on the column is
+    // TS-only; a corrupted or migrated row would silently propagate without
+    // this. parseAssessmentExchangeHistory returns [] on parse failure so the
+    // assessment degrades to an empty-history state rather than throwing.
+    exchangeHistory: parseAssessmentExchangeHistory(row.exchangeHistory),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

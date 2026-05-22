@@ -1,14 +1,19 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useSessionActions } from './use-session-actions';
-import { platformAlert } from '../../lib/platform-alert';
+import * as PlatformAlertModule from '../../lib/platform-alert';
+import * as SessionRecoveryModule from '../../lib/session-recovery';
 
-jest.mock('../../lib/platform-alert', () => ({
-  platformAlert: jest.fn(),
-}));
+// Use real platform-alert (wraps RN Alert, which is a no-op in Jest).
+// Spy so tests can introspect the calls.
+const platformAlert = jest
+  .spyOn(PlatformAlertModule, 'platformAlert')
+  .mockImplementation(jest.fn());
 
-jest.mock('../../lib/session-recovery', () => ({
-  clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-}));
+// Use real session-recovery (wraps secure-storage → expo-secure-store globally mocked).
+// Spy on clearSessionRecoveryMarker so tests can verify it was called.
+jest
+  .spyOn(SessionRecoveryModule, 'clearSessionRecoveryMarker')
+  .mockResolvedValue(undefined);
 
 function createMockOpts(overrides: Record<string, unknown> = {}) {
   return {

@@ -1044,24 +1044,27 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('topic row tap pushes to topic screen', () => {
+    // [BUG-404] topic and note pushes must include subjectId + bookId so the
+    // topic screen can skip the extra useResolveTopicSubject round-trip and the
+    // back-button fallback resolves to the correct book screen.
+    it('topic row tap pushes to topic screen with subjectId and bookId context', () => {
       renderSearching();
       fireEvent.press(screen.getByTestId('topic-row-top-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
-          params: { topicId: 'top-1' },
+          params: { topicId: 'top-1', subjectId: 'sub-1', bookId: 'book-1' },
         }),
       );
     });
 
-    it('note row tap pushes to parent topic', () => {
+    it('note row tap pushes to parent topic with subjectId and bookId context', () => {
       renderSearching();
       fireEvent.press(screen.getByTestId('note-row-note-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
-          params: { topicId: 'top-1' },
+          params: { topicId: 'top-1', subjectId: 'sub-1', bookId: 'book-1' },
         }),
       );
     });

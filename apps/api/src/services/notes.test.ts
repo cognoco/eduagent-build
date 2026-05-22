@@ -410,6 +410,35 @@ describe('updateNote — profile isolation', () => {
     expect(result.id).toBe('note-123');
     expect(result.content).toBe('updated content');
   });
+
+  // [BUG-391] NoteRow mapper — neon-serverless returns Date objects for
+  // timestamp columns; the mapper must normalise them to ISO 8601 strings
+  // so callers always receive the API-contract shape regardless of whether
+  // they pass through a schema parse.
+  it('normalises Date timestamps to ISO strings via mapNoteRow [BUG-391]', async () => {
+    const created = new Date('2026-03-01T08:00:00.000Z');
+    const updated = new Date('2026-03-02T09:30:00.000Z');
+    const rawRow = {
+      id: 'note-abc',
+      topicId: 'topic-1',
+      sessionId: null,
+      content: 'mapper test note',
+      createdAt: created,
+      updatedAt: updated,
+    };
+    const db = makeDbStub({ updateReturning: [[rawRow]] });
+    const result = await updateNote(
+      db,
+      'profile-1',
+      'note-abc',
+      'mapper test note',
+    );
+    // Must be ISO strings, not Date objects
+    expect(typeof result.createdAt).toBe('string');
+    expect(typeof result.updatedAt).toBe('string');
+    expect(result.createdAt).toBe(created.toISOString());
+    expect(result.updatedAt).toBe(updated.toISOString());
+  });
 });
 
 // ---------------------------------------------------------------------------

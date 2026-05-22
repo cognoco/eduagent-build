@@ -22,6 +22,7 @@ let mockActiveProfile: Profile | null = createTestProfile({
 let mockProfiles: Profile[] | null = null;
 
 jest.mock('./use-settings', () => ({
+  ...jest.requireActual('./use-settings'),
   useRegisterPushToken: () => ({ mutateAsync: mockMutateAsync }),
 }));
 

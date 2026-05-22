@@ -1,19 +1,15 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
+import * as HapticsModule from '../../lib/haptics';
 
 // ---------------------------------------------------------------------------
-// Mocks — external boundaries only
+// Real lib/haptics (expo-haptics is globally mocked in test-setup.ts).
+// Spy on each exported function so tests can verify calls.
 // ---------------------------------------------------------------------------
 
-const mockHapticLight = jest.fn();
-const mockHapticMedium = jest.fn();
-const mockHapticSuccess = jest.fn();
-
-jest.mock('../../lib/haptics', () => ({
-  hapticLight: () => mockHapticLight(),
-  hapticMedium: () => mockHapticMedium(),
-  hapticSuccess: () => mockHapticSuccess(),
-}));
+const mockHapticLight = jest.spyOn(HapticsModule, 'hapticLight');
+const mockHapticMedium = jest.spyOn(HapticsModule, 'hapticMedium');
+const mockHapticSuccess = jest.spyOn(HapticsModule, 'hapticSuccess');
 
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');

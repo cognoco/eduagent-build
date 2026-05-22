@@ -16,6 +16,7 @@ import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
 import { learningSessions } from './sessions';
 import { generateUUIDv7 } from '../utils/uuid';
+import type { ChatExchange } from '@eduagent/schemas';
 
 export const verificationDepthEnum = pgEnum('verification_depth', [
   'recall',
@@ -76,7 +77,14 @@ export const assessments = pgTable(
       withTimezone: true,
     }),
     qualityRating: integer('quality_rating'),
-    exchangeHistory: jsonb('exchange_history').notNull().default([]),
+    // [BUG-391] $type<ChatExchange[]> is TS-only; callers MUST pass the raw
+    // value through parseAssessmentExchangeHistory() from @eduagent/schemas/db-jsonb
+    // before treating it as typed — the parser returns [] on schema failure so
+    // the read path can degrade gracefully to an empty-history assessment.
+    exchangeHistory: jsonb('exchange_history')
+      .notNull()
+      .default([])
+      .$type<ChatExchange[]>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

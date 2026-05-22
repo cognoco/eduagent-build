@@ -165,6 +165,11 @@ const TEST_ENV = {
 
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
+// [BUG-392] Test UUIDs — route now validates params are valid UUIDs.
+const ROUND_ID_1 = 'a0000000-0000-4000-a000-000000000001';
+const ROUND_ID_COMPLETED = 'a0000000-0000-4000-a000-000000000002';
+const ROUND_ID_OTHER_PROFILE = 'a0000000-0000-4000-a000-000000000003';
+
 let meteringFixture: ReturnType<typeof createRouteMeteringFixture>;
 
 function setInsertReturning(id = '01933b3c-0000-7000-8000-000000000999') {
@@ -655,6 +660,58 @@ describe('Quiz routes', () => {
     });
   });
 
+  // [BUG-392] UUID param validation guard — non-UUID path params rejected 400
+  // before reaching the DB layer (prevents Postgres errors and IDOR confusion).
+  describe('UUID param validation [BUG-392]', () => {
+    it('GET /v1/quiz/rounds/:id returns 400 for non-UUID id', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds/not-a-uuid',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /v1/quiz/rounds/:id/check returns 400 for non-UUID id', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds/not-a-uuid/check',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            questionIndex: 0,
+            answerGiven: 'Vienna',
+            answerMode: 'multiple_choice',
+          }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /v1/quiz/rounds/:id/complete returns 400 for non-UUID id', async () => {
+      const res = await app.request(
+        '/v1/quiz/rounds/not-a-uuid/complete',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            results: [
+              {
+                questionIndex: 0,
+                correct: true,
+                answerGiven: 'Vienna',
+                timeMs: 3000,
+              },
+            ],
+          }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('GET /v1/quiz/rounds/:id', () => {
     it('returns 404 for a round not owned by the caller (IDOR break-test)', async () => {
       // Scoped-repo findFirst returns undefined because profile_id predicate
@@ -665,7 +722,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(undefined);
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-belonging-to-profile-b',
+        `/v1/quiz/rounds/${ROUND_ID_OTHER_PROFILE}`,
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -679,7 +736,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(ACTIVE_ROUND);
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1',
+        `/v1/quiz/rounds/${ROUND_ID_1}`,
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -695,7 +752,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(COMPLETED_ROUND);
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-completed',
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -725,7 +782,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(ACTIVE_ROUND);
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1',
+        `/v1/quiz/rounds/${ROUND_ID_1}`,
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -746,7 +803,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(COMPLETED_ROUND);
 
       const completedRes = await app.request(
-        '/v1/quiz/rounds/round-completed',
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -758,7 +815,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(ACTIVE_ROUND);
 
       const activeRes = await app.request(
-        '/v1/quiz/rounds/round-1',
+        `/v1/quiz/rounds/${ROUND_ID_1}`,
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -778,7 +835,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(ACTIVE_ROUND);
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1',
+        `/v1/quiz/rounds/${ROUND_ID_1}`,
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -805,7 +862,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(ACTIVE_ROUND);
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1/complete',
+        `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -854,7 +911,7 @@ describe('Quiz routes', () => {
 
     it('returns 400 for empty results', async () => {
       const res = await app.request(
-        '/v1/quiz/rounds/round-1/complete',
+        `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -873,7 +930,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue(undefined);
 
       const res = await app.request(
-        '/v1/quiz/rounds/someone-elses-round/complete',
+        `/v1/quiz/rounds/${ROUND_ID_OTHER_PROFILE}/complete`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -900,7 +957,7 @@ describe('Quiz routes', () => {
         .mockResolvedValue({ ...ACTIVE_ROUND, status: 'completed' });
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1/complete',
+        `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -935,7 +992,7 @@ describe('Quiz routes', () => {
       });
 
       const res = await app.request(
-        '/v1/quiz/rounds/round-1/complete',
+        `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,

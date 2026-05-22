@@ -84,13 +84,16 @@ jest.mock('@clerk/clerk-expo', () => ({
 
 // Mock getRevenueCatApiKey to return a key for native, empty for web.
 // The hooks use isRevenueCatAvailable() which checks Platform.OS AND getRevenueCatApiKey().
-jest.mock('../lib/revenuecat', () => ({
-  getRevenueCatApiKey: jest.fn().mockImplementation(() => {
-    const { Platform: P } = require('react-native');
-    if (P.OS === 'ios' || P.OS === 'android') return 'test_api_key';
-    return '';
+jest.mock(
+  '../lib/revenuecat' /* gc1-allow: native-boundary; RevenueCat SDK is native-only and lib/revenuecat is a thin wrapper */,
+  () => ({
+    getRevenueCatApiKey: jest.fn().mockImplementation(() => {
+      const { Platform: P } = require('react-native');
+      if (P.OS === 'ios' || P.OS === 'android') return 'test_api_key';
+      return '';
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Helpers

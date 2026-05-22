@@ -44,6 +44,7 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockMutateAsync = jest.fn();
 
 jest.mock('../hooks/use-consent', () => ({
+  ...jest.requireActual('../hooks/use-consent'),
   useRequestConsent: () => ({
     mutateAsync: mockMutateAsync,
     isPending: false,
@@ -55,9 +56,12 @@ const mockUseNetworkStatus = jest.fn(() => ({
   isReady: true,
 }));
 
-jest.mock('../hooks/use-network-status', () => ({
-  useNetworkStatus: () => mockUseNetworkStatus(),
-}));
+jest.mock(
+  '../hooks/use-network-status', // gc1-allow: native-boundary: @react-native-community/netinfo cannot run in JSDOM
+  () => ({
+    useNetworkStatus: () => mockUseNetworkStatus(),
+  }),
+);
 
 /**
  * Controllable mock for reduced-motion tests. Default: false (animations run).

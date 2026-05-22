@@ -63,54 +63,65 @@ jest.mock('../../lib/theme', /* gc1-allow: theme hook requires native ColorSchem
   }),
 }));
 
-jest.mock('../../lib/sentry', () => ({
-  // gc1-allow: @sentry/react-native native crash handlers
-  Sentry: {
-    addBreadcrumb: jest.fn(),
-  },
-}));
+jest.mock(
+  '../../lib/sentry',
+  /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */ () => ({
+    Sentry: {
+      addBreadcrumb: jest.fn(),
+    },
+  }),
+);
 
-jest.mock('../../lib/platform-alert', () => ({
-  ...jest.requireActual('../../lib/platform-alert'),
-  platformAlert: jest.fn(),
-}));
+// platformAlert is a thin wrapper; spy on it so alert calls are observable.
+jest.mock(
+  '../../lib/platform-alert',
+  /* gc1-allow: temporary-internal: platformAlert spy needed for alert assertion tests */ () => ({
+    ...jest.requireActual('../../lib/platform-alert'),
+    platformAlert: jest.fn(),
+  }),
+);
 
 // [BUG-800] formatApiError stub: returns Error.message verbatim so tests can
 // assert the typed server reason reaches platformAlert.
-jest.mock('../../lib/format-api-error', () => ({
-  ...jest.requireActual('../../lib/format-api-error'),
-  formatApiError: (e: unknown) =>
-    e instanceof Error ? e.message : 'Unknown error',
-}));
+jest.mock(
+  '../../lib/format-api-error',
+  /* gc1-allow: temporary-internal: BUG-800 break test requires raw server message passthrough, not real i18n classification */ () => ({
+    ...jest.requireActual('../../lib/format-api-error'),
+    formatApiError: (e: unknown) =>
+      e instanceof Error ? e.message : 'Unknown error',
+  }),
+);
 
-jest.mock('../../lib/profile', () => ({
-  // gc1-allow: ProfileProvider uses SecureStore (native)
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-      birthYear: 2012,
-    },
-    profiles: [
-      {
+jest.mock(
+  '../../lib/profile',
+  /* gc1-allow: native-boundary: ProfileProvider uses SecureStore (native) */ () => ({
+    useProfile: () => ({
+      activeProfile: {
         id: 'test-profile-id',
         accountId: 'test-account-id',
         displayName: 'Test Learner',
         isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
         birthYear: 2012,
       },
-    ],
-    setActiveProfileId: jest.fn(),
-    isRestoringId: false,
+      profiles: [
+        {
+          id: 'test-profile-id',
+          accountId: 'test-account-id',
+          displayName: 'Test Learner',
+          isOwner: true,
+          birthYear: 2012,
+        },
+      ],
+      setActiveProfileId: jest.fn(),
+      isRestoringId: false,
+    }),
+    isGuardianProfile: () => false,
   }),
-  isGuardianProfile: () => false,
-}));
+);
 
 // use-parent-proxy uses setProxyMode from api-client (not the RPC useApiClient hook)
 // plus SecureStore reads — not an API hook. Keep as a direct mock.
@@ -119,32 +130,53 @@ const mockUseParentProxy = jest.fn(() => ({
   childProfile: null,
   parentProfile: null,
 }));
-jest.mock('../../hooks/use-parent-proxy', () => ({
-  // gc1-allow: SecureStore read/write in useEffect
-  useParentProxy: () => mockUseParentProxy(),
-}));
-
-// use-rating-prompt reads/writes SecureStore and calls expo-store-review —
-// no useApiClient() calls — keep as a direct mock.
-const mockOnSuccessfulRecall = jest.fn();
-jest.mock('../../hooks/use-rating-prompt', () => ({
-  // gc1-allow: expo-store-review + SecureStore native APIs
-  useRatingPrompt: () => ({
-    onSuccessfulRecall: mockOnSuccessfulRecall,
+jest.mock(
+  '../../hooks/use-parent-proxy' /* gc1-allow: native-boundary; hook reads/writes SecureStore in effects */,
+  () => ({
+    useParentProxy: () => mockUseParentProxy(),
   }),
-}));
+);
 
-const mockReadSummaryDraft = jest.fn();
-const mockWriteSummaryDraft = jest.fn();
-const mockClearSummaryDraft = jest.fn();
+// use-rating-prompt reads/writes SecureStore and calls expo-store-review.
+// It has no useApiClient() calls, so keep it as a direct mock.
+const mockOnSuccessfulRecall = jest.fn();
+jest.mock(
+  '../../hooks/use-rating-prompt' /* gc1-allow: native-boundary; hook calls StoreReview and SecureStore APIs */,
+  () => ({
+    useRatingPrompt: () => ({
+      onSuccessfulRecall: mockOnSuccessfulRecall,
+    }),
+  }),
+);
+
 let resolveDefaultSummaryDraftReads: Array<() => void> = [];
 
-jest.mock('../../lib/summary-draft', () => ({
-  readSummaryDraft: (...args: unknown[]) => mockReadSummaryDraft(...args),
-  writeSummaryDraft: (...args: unknown[]) => mockWriteSummaryDraft(...args),
-  clearSummaryDraft: (...args: unknown[]) => mockClearSummaryDraft(...args),
-  DRAFT_TTL_MS: 7 * 24 * 60 * 60 * 1000,
-}));
+// summary-draft uses expo-secure-store which is shimmed globally in test-setup.ts
+// (in-memory Map). Use the real implementation with spies so SecureStore interactions
+// and TTL/sanitize logic are exercised rather than stubbed.
+const summaryDraftModule = jest.requireActual<
+  typeof import('../../lib/summary-draft')
+>('../../lib/summary-draft');
+
+const mockReadSummaryDraft = jest
+  .spyOn(summaryDraftModule, 'readSummaryDraft')
+  .mockImplementation(
+    () =>
+      new Promise<null>((resolve) => {
+        resolveDefaultSummaryDraftReads.push(() => resolve(null));
+      }),
+  );
+const mockWriteSummaryDraft = jest
+  .spyOn(summaryDraftModule, 'writeSummaryDraft')
+  .mockResolvedValue(undefined);
+const mockClearSummaryDraft = jest
+  .spyOn(summaryDraftModule, 'clearSummaryDraft')
+  .mockResolvedValue(undefined);
+
+jest.mock(
+  '../../lib/summary-draft' /* gc1-allow: requireActual passthrough — needed for spyOn to intercept exports */,
+  () => jest.requireActual('../../lib/summary-draft'),
+);
 
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock state — mutated per-test via setRoute()
@@ -287,8 +319,10 @@ const mockFetch = createRoutedMockFetch({
   'topic-suggestions': () => mockTopicSuggestionsData,
 });
 
-jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+jest.mock(
+  '../../lib/api-client',
+  /* gc1-allow: transport-boundary: Hono RPC client requires real HTTP transport */ () =>
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 // Create a fresh QueryClient per test to prevent cross-test query cache

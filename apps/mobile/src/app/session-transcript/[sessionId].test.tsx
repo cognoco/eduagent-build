@@ -39,29 +39,45 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    textPrimary: '#111827',
-    textSecondary: '#6b7280',
-    textInverse: '#ffffff',
-    danger: '#ef4444',
+jest.mock(
+  '../../lib/theme',
+  /* gc1-allow: native-boundary: theme hook requires native ColorScheme unavailable in JSDOM */ () => ({
+    useThemeColors: () => ({
+      primary: '#00b4d8',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+      textInverse: '#ffffff',
+      danger: '#ef4444',
+    }),
   }),
-}));
+);
 
-jest.mock('../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
+// navigation.ts is a pure utility (no native deps). Use the real module with
+// a spy on goBackOrReplace so tests can assert the route argument passed by the screen.
+const navigationModule = jest.requireActual<
+  typeof import('../../lib/navigation')
+>('../../lib/navigation');
+jest
+  .spyOn(navigationModule, 'goBackOrReplace')
+  .mockImplementation((...args: unknown[]) => mockGoBackOrReplace(...args));
+jest.mock(
+  '../../lib/navigation' /* gc1-allow: requireActual passthrough — needed for spyOn to intercept goBackOrReplace */,
+  () => jest.requireActual('../../lib/navigation'),
+);
 
-jest.mock('../../lib/format-api-error', () => ({
-  formatApiError: (e: unknown) =>
-    e instanceof Error ? e.message : 'Could not load',
-}));
+// format-api-error is a pure utility — real i18n initialized in test-setup.ts with English
+// catalog. Use requireActual so the full classification logic runs in tests.
+jest.mock(
+  '../../lib/format-api-error' /* gc1-allow: requireActual passthrough — pure utility, real classification logic needed */,
+  () => jest.requireActual('../../lib/format-api-error'),
+);
 
-jest.mock('../../hooks/use-sessions', () => ({
-  useSessionTranscript: () => mockTranscriptResult,
-}));
+jest.mock(
+  '../../hooks/use-sessions',
+  /* gc1-allow: transport-boundary: hook calls useApiClient which requires real HTTP transport */ () => ({
+    useSessionTranscript: () => mockTranscriptResult,
+  }),
+);
 
 const { default: SessionTranscriptScreen } = require('./[sessionId]');
 

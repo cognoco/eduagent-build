@@ -28,80 +28,76 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-jest.mock('../../../hooks/use-retention', () => ({
-  useSubmitRecallTest: () => ({
-    mutate: mockRecallMutate,
+jest.mock(
+  '../../../hooks/use-retention', // gc1-allow: native-boundary — ChatShell mock (below) exposes mock-send-button; real useSubmitRecallTest cannot integrate with the real ChatShell in JSDOM without its own native-dep chain (speech-recognition, TTS, reanimated)
+  () => ({
+    useSubmitRecallTest: () => ({
+      mutate: mockRecallMutate,
+    }),
   }),
-}));
+);
 
-jest.mock('../../../components/session/ChatShell', () => {
-  const ReactReq = require('react');
-  const { View, Text, Pressable } = require('react-native');
+jest.mock(
+  '../../../components/session/ChatShell', // gc1-allow: native-boundary — ChatShell pulls expo-speech-recognition, react-native-reanimated, TTS hooks and safe-area; none of these can run in JSDOM
+  () => {
+    const ReactReq = require('react');
+    const { View, Text, Pressable } = require('react-native');
 
-  return {
-    ChatShell: ({
-      messages,
-      inputAccessory,
-      footer,
-      onSend,
-    }: {
-      messages: Array<{ id: string; content: string }>;
-      inputAccessory?: React.ReactNode;
-      footer?: React.ReactNode;
-      onSend?: (text: string) => void;
-    }) =>
-      ReactReq.createElement(
-        View,
-        { testID: 'mock-chat-shell' },
-        messages.map((message) =>
-          ReactReq.createElement(Text, { key: message.id }, message.content),
+    return {
+      ChatShell: ({
+        messages,
+        inputAccessory,
+        footer,
+        onSend,
+      }: {
+        messages: Array<{ id: string; content: string }>;
+        inputAccessory?: React.ReactNode;
+        footer?: React.ReactNode;
+        onSend?: (text: string) => void;
+      }) =>
+        ReactReq.createElement(
+          View,
+          { testID: 'mock-chat-shell' },
+          messages.map((message) =>
+            ReactReq.createElement(Text, { key: message.id }, message.content),
+          ),
+          ReactReq.isValidElement(inputAccessory) ? inputAccessory : null,
+          ReactReq.isValidElement(footer) ? footer : null,
+          onSend
+            ? ReactReq.createElement(
+                Pressable,
+                {
+                  testID: 'mock-send-button',
+                  onPress: () => onSend('I remember this topic well'),
+                },
+                ReactReq.createElement(Text, null, 'Send'),
+              )
+            : null,
         ),
-        ReactReq.isValidElement(inputAccessory) ? inputAccessory : null,
-        ReactReq.isValidElement(footer) ? footer : null,
-        onSend
-          ? ReactReq.createElement(
-              Pressable,
-              {
-                testID: 'mock-send-button',
-                onPress: () => onSend('I remember this topic well'),
-              },
-              ReactReq.createElement(Text, null, 'Send'),
-            )
-          : null,
-      ),
-    animateResponse: (
-      content: string,
-      setMessages: React.Dispatch<
-        React.SetStateAction<
-          Array<{ id: string; role: string; content: string }>
-        >
-      >,
-      setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
-      onComplete?: () => void,
-    ) => {
-      setIsStreaming(false);
-      setMessages((prev) => [
-        ...prev,
-        { id: `ai-${prev.length}`, role: 'assistant', content },
-      ]);
-      onComplete?.();
-      return () => undefined;
-    },
-  };
-});
+      animateResponse: (
+        content: string,
+        setMessages: React.Dispatch<
+          React.SetStateAction<
+            Array<{ id: string; role: string; content: string }>
+          >
+        >,
+        setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
+        onComplete?: () => void,
+      ) => {
+        setIsStreaming(false);
+        setMessages((prev) => [
+          ...prev,
+          { id: `ai-${prev.length}`, role: 'assistant', content },
+        ]);
+        onComplete?.();
+        return () => undefined;
+      },
+    };
+  },
+);
 
-jest.mock('../../../components/progress', () => {
-  const ReactReq = require('react');
-  const { View, Text } = require('react-native');
-  return {
-    RemediationCard: () =>
-      ReactReq.createElement(
-        View,
-        { testID: 'remediation-card' },
-        ReactReq.createElement(Text, null, 'Remediation ready'),
-      ),
-  };
-});
+// components/progress (RemediationCard) uses only React Native primitives —
+// real implementation runs in JSDOM. No mock needed.
 
 const RecallTestScreen = require('./recall-test').default;
 

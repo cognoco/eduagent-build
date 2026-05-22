@@ -11,19 +11,13 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('../../hooks/use-dashboard', () => ({
+  ...jest.requireActual('../../hooks/use-dashboard'),
   useChildSubjectTopics: (...args: unknown[]) =>
     mockUseChildSubjectTopics(...args),
 }));
 
-jest.mock('./RetentionSignal', () => {
-  const { Text } = require('react-native');
-
-  return {
-    RetentionSignal: ({ status }: { status: string }) => (
-      <Text testID={`retention-signal-${status}`}>{status}</Text>
-    ),
-  };
-});
+// RetentionSignal is a real sibling component — uses real implementation.
+// @expo/vector-icons and react-i18next are globally mocked in test-setup.ts.
 
 describe('AccordionTopicList', () => {
   beforeEach(() => {

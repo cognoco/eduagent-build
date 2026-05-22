@@ -26,8 +26,10 @@ import {
 
 const mockFetch = createRoutedMockFetch();
 
-jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+jest.mock(
+  '../../lib/api-client' /* gc1-allow: transport-boundary — routed mock fetch replaces real network; all hooks run against mockFetch */,
+  () =>
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 const mockUseProfile = jest.fn();
@@ -99,11 +101,8 @@ jest.mock('expo-speech-recognition', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
+  ...jest.requireActual('../../lib/profile'),
   useProfile: () => mockUseProfile(),
-  isGuardianProfile: (
-    profile: { isOwner: boolean } | null | undefined,
-    profiles: ReadonlyArray<{ isOwner: boolean }>,
-  ) => profile?.isOwner === true && profiles.some((p) => !p.isOwner),
 }));
 
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
@@ -129,32 +128,42 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
   useTokenVars: () => ({}),
 }));
 
-jest.mock('../../hooks/use-revenuecat', () => ({
-  useRevenueCatIdentity: jest.fn(),
-}));
+jest.mock(
+  '../../hooks/use-revenuecat' /* gc1-allow: native-boundary — wraps react-native-purchases SDK which is unavailable in jest */,
+  () => ({
+    useRevenueCatIdentity: jest.fn(),
+  }),
+);
 
 jest.mock('../../hooks/use-mentor-language-sync', () => ({
+  ...jest.requireActual('../../hooks/use-mentor-language-sync'),
   useMentorLanguageSync: jest.fn(),
 }));
 
-jest.mock('../../lib/sentry', () => ({
-  evaluateSentryForProfile: jest.fn(),
-  // useParentProxy (rendered inside _layout) catches SecureStore failures
-  // with Sentry.captureException — provide a no-op so the hook doesn't crash
-  // during _layout rendering.
-  Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
-}));
+jest.mock(
+  '../../lib/sentry' /* gc1-allow: native-boundary — wraps @sentry/react-native SDK; observability sink that cannot run in jest */,
+  () => ({
+    evaluateSentryForProfile: jest.fn(),
+    // useParentProxy (rendered inside _layout) catches SecureStore failures
+    // with Sentry.captureException — provide a no-op so the hook doesn't crash
+    // during _layout rendering.
+    Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
+  }),
+);
 
-jest.mock('../../lib/secure-storage', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
-  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+jest.mock(
+  '../../lib/secure-storage' /* gc1-allow: native-boundary — wraps expo-secure-store which is unavailable in jest */,
+  () => ({
+    getItemAsync: jest.fn(),
+    setItemAsync: jest.fn(),
+    deleteItemAsync: jest.fn(),
+    sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+  }),
+);
 
-jest.mock('../../components/feedback/FeedbackProvider', () => ({
-  FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
+// FeedbackProvider is real — it composes FeedbackSheet (visible:false) which
+// runs against the mocked theme/safe-area boundaries already in this file.
+// No internal mock needed.
 
 // use-subjects uses useApiClient — mocked at the fetch boundary via mockFetch.
 // Route: GET /subjects → { subjects: [] }

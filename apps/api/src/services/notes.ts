@@ -13,6 +13,10 @@ import { ConflictError, NotFoundError } from '../errors';
 
 const MAX_NOTES_PER_TOPIC = 50;
 
+/**
+ * Raw DB row shape returned by neon-serverless for timestamp columns.
+ * Not exported — internal to this module only.
+ */
 type NoteRow = {
   id: string;
   topicId: string;
@@ -21,6 +25,41 @@ type NoteRow = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+/**
+ * API-contract note shape with timestamps normalised to ISO 8601 strings.
+ * This is what all public service functions return so callers always receive
+ * a consistent shape regardless of whether neon-serverless returns Date or
+ * string for timestamp columns.
+ *
+ * [BUG-391] Without a mapper, raw `Date` objects from neon-serverless were
+ * being passed out of the service. Consumers that didn't go through a schema
+ * parse (e.g. `noteMutationResponseSchema.parse`) would have silently
+ * serialised the Date as a non-ISO string in JSON.stringify fallback paths.
+ */
+type MappedNoteRow = {
+  id: string;
+  topicId: string;
+  sessionId: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Normalise a raw Drizzle NoteRow (neon-serverless returns Date objects for
+ * timestamp columns) to the API-contract shape with ISO 8601 strings.
+ */
+function mapNoteRow(row: NoteRow): MappedNoteRow {
+  return {
+    id: row.id,
+    topicId: row.topicId,
+    sessionId: row.sessionId,
+    content: row.content,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
 /**
  * Atomic count-and-insert for topic notes. Wraps the cap check + insert in
@@ -41,7 +80,7 @@ async function insertNoteWithCap(
     content: string;
   },
   options: { dedupeExactSessionContent?: boolean } = {},
-): Promise<NoteRow> {
+): Promise<MappedNoteRow> {
   return db.transaction(async (tx) => {
     const lockKey = `notes:${values.profileId}:${values.topicId}`;
     await tx.execute(
@@ -71,7 +110,7 @@ async function insertNoteWithCap(
           ),
         )
         .limit(1);
-      if (existingForSession) return existingForSession;
+      if (existingForSession) return mapNoteRow(existingForSession);
     }
 
     const [countRow] = await tx
@@ -99,7 +138,7 @@ async function insertNoteWithCap(
     });
 
     if (!row) throw new Error('Insert topic note did not return a row');
-    return row;
+    return mapNoteRow(row);
   });
 }
 
@@ -121,7 +160,7 @@ export async function createNoteForSession(
     content: string;
     // Note: source='challenge_round' MUST be guarded by validateNoteDraft (services/challenge-round/note-draft.ts) before this call — enforced by note-draft.guard.test.ts.
   },
-): Promise<NoteRow> {
+): Promise<MappedNoteRow> {
   return insertNoteWithCap(
     db,
     {
@@ -374,7 +413,7 @@ export async function createNote(
   topicId: string,
   content: string,
   sessionId?: string,
-): Promise<NoteRow> {
+): Promise<MappedNoteRow> {
   await verifyTopicOwnership(db, profileId, subjectId, topicId);
 
   if (sessionId) {
@@ -406,14 +445,7 @@ export async function updateNote(
   profileId: string,
   noteId: string,
   content: string,
-): Promise<{
-  id: string;
-  topicId: string;
-  sessionId: string | null;
-  content: string;
-  createdAt: Date;
-  updatedAt: Date;
-}> {
+): Promise<MappedNoteRow> {
   const [row] = await db
     .update(topicNotes)
     .set({ content, updatedAt: new Date() })
@@ -428,7 +460,7 @@ export async function updateNote(
     });
 
   if (!row) throw new NotFoundError('Note');
-  return row;
+  return mapNoteRow(row);
 }
 
 export async function deleteNoteById(

@@ -1,16 +1,10 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { NoteInput } from './NoteInput';
 
-jest.mock('../../hooks/use-speech-recognition', () => ({
-  useSpeechRecognition: () => ({
-    status: 'idle',
-    transcript: '',
-    isListening: false,
-    startListening: jest.fn(),
-    stopListening: jest.fn(),
-    clearTranscript: jest.fn(),
-  }),
-}));
+// useSpeechRecognition dynamically imports
+// expo-speech-recognition (a native module not available in Jest). The real
+// hook gracefully handles the missing module by returning idle state, which
+// is all these tests require. No override needed.
 
 describe('NoteInput', () => {
   it('renders text input and buttons', () => {

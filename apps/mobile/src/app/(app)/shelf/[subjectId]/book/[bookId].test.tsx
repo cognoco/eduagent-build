@@ -82,7 +82,7 @@ jest.mock('../../../../../hooks/use-progress', () => ({
 
 jest.mock(
   '../../../../../hooks/use-sessions',
-  /* gc1-allow: session mutation state */ () => ({
+  /* gc1-allow: transport-boundary: hook calls useApiClient which requires real HTTP transport */ () => ({
     useStartFirstCurriculumSession: () => ({
       mutateAsync: mockStartFirstCurriculumMutateAsync,
       isPending: false,
@@ -102,18 +102,20 @@ jest.mock('../../../../../hooks/use-move-topic', () => ({
   useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
 }));
 
-jest.mock('../../../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    accent: '#00bfa5',
-    primary: '#0d9488',
-    success: '#22c55e',
-    danger: '#ef4444',
-    textSecondary: '#888',
-    textInverse: '#fff',
-    surface: '#fff',
+jest.mock(
+  '../../../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      accent: '#00bfa5',
+      primary: '#0d9488',
+      success: '#22c55e',
+      danger: '#ef4444',
+      textSecondary: '#888',
+      textInverse: '#fff',
+      surface: '#fff',
+    }),
   }),
-}));
+);
 
 jest.mock('../../../../../lib/format-api-error', () => ({
   ...jest.requireActual('../../../../../lib/format-api-error'),
@@ -121,12 +123,14 @@ jest.mock('../../../../../lib/format-api-error', () => ({
     error instanceof Error ? error.message : 'Unknown error',
 }));
 
-jest.mock('../../../../../components/common', () => ({
-  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
-  BookPageFlipAnimation: () => null,
-  MagicPenAnimation: () => null,
-  CelebrationAnimation: () => null,
-}));
+jest.mock(
+  '../../../../../components/common' /* gc1-allow: native-boundary; animations use reanimated worklets/SVG modules in JSDOM */,
+  () => ({
+    BookPageFlipAnimation: () => null,
+    MagicPenAnimation: () => null,
+    CelebrationAnimation: () => null,
+  }),
+);
 
 function makeTopic(overrides: Partial<any> = {}) {
   return {

@@ -346,20 +346,20 @@ export default function LibraryScreen() {
   );
 
   const handleTopicPress = useCallback(
-    (topicId: string) => {
+    (topicId: string, subjectId: string, bookId: string) => {
       router.push({
         pathname: '/(app)/topic/[topicId]',
-        params: { topicId },
+        params: { topicId, subjectId, bookId },
       } as Href);
     },
     [router],
   );
 
   const handleNotePress = useCallback(
-    (topicId: string) => {
+    (topicId: string, subjectId: string, bookId: string) => {
       router.push({
         pathname: '/(app)/topic/[topicId]',
-        params: { topicId },
+        params: { topicId, subjectId, bookId },
       } as Href);
     },
     [router],

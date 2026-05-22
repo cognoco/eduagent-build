@@ -7,7 +7,7 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,7 +37,7 @@ export default function DeleteAccountScreen() {
   const { t } = useTranslation();
   const { signOut } = useAuth();
   const queryClient = useQueryClient();
-  const { profiles } = useProfile();
+  const { profiles, activeProfile } = useProfile();
   const hasLinkedChildren = useHasLinkedChildren();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
@@ -148,6 +148,14 @@ export default function DeleteAccountScreen() {
         day: 'numeric',
       })
     : null;
+
+  // [F4] Defense-in-depth: this screen is normally reachable only via
+  // more/privacy.tsx which gates on role === 'owner'. A deep-link or direct
+  // push by a non-owner would reach this destructive UI without that gate.
+  // Mirror the pattern in own-learning.tsx:33-35.
+  if (activeProfile?.isOwner !== true) {
+    return <Redirect href="/(app)/more" />;
+  }
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

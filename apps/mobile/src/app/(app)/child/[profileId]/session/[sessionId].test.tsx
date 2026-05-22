@@ -47,6 +47,7 @@ jest.mock('@expo/vector-icons', () => {
 const mockUseChildSessionDetail = jest.fn();
 
 jest.mock('../../../../../hooks/use-dashboard', () => ({
+  ...jest.requireActual('../../../../../hooks/use-dashboard'),
   useChildSessionDetail: (...args: unknown[]) =>
     mockUseChildSessionDetail(...args),
 }));

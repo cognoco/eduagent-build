@@ -1,4 +1,4 @@
-import * as SecureStore from './secure-storage';
+import * as ExpoSecureStore from 'expo-secure-store';
 import {
   writeSummaryDraft,
   readSummaryDraft,
@@ -6,22 +6,13 @@ import {
   DRAFT_TTL_MS,
 } from './summary-draft';
 
-jest.mock('./secure-storage', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
-  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
-jest.mock('./sentry', () => ({
-  Sentry: {
-    captureException: jest.fn(),
-    addBreadcrumb: jest.fn(),
-  },
-}));
+// ./secure-storage and ./sentry use real implementations:
+// - expo-secure-store is globally mocked in test-setup.ts with an in-memory store
+// - @sentry/react-native is globally mocked in test-setup.ts
 
-const mockGet = jest.mocked(SecureStore.getItemAsync);
-const mockSet = jest.mocked(SecureStore.setItemAsync);
-const mockDelete = jest.mocked(SecureStore.deleteItemAsync);
+const mockGet = jest.mocked(ExpoSecureStore.getItemAsync);
+const mockSet = jest.mocked(ExpoSecureStore.setItemAsync);
+const mockDelete = jest.mocked(ExpoSecureStore.deleteItemAsync);
 
 const PROFILE = 'profile-123';
 const SESSION = 'session-abc';

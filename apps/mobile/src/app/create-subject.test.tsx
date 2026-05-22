@@ -44,11 +44,14 @@ const mockFetch = createRoutedMockFetch({
 
 jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
 
-jest.mock('../lib/api-client', () =>
-  require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+jest.mock(
+  '../lib/api-client' /* gc1-allow: transport-boundary — routed mock fetch replaces network layer */,
+  () =>
+    require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 jest.mock('../lib/profile', () => ({
+  ...jest.requireActual('../lib/profile'),
   useProfile: () => ({
     activeProfile: {
       id: 'test-profile-id',
@@ -60,10 +63,13 @@ jest.mock('../lib/profile', () => ({
       pronouns: null,
       consentStatus: null,
     },
+    profiles: [],
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
   }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
 }));
 
 const mockBack = jest.fn();
@@ -105,21 +111,15 @@ jest.mock(
 );
 
 jest.mock(
-  '../lib/format-api-error',
-  /* gc1-allow: error formatting */ () => ({
+  '../lib/format-api-error' /* gc1-allow: native-boundary — format-api-error calls i18next which requires expo-localization/async-storage init unavailable in jest */,
+  () => ({
     formatApiError: (error: unknown) =>
       error instanceof Error ? error.message : 'Something went wrong',
   }),
 );
 
-// NOT an API hook — keep as-is.
-jest.mock('../hooks/use-keyboard-scroll', () => ({
-  useKeyboardScroll: () => ({
-    scrollRef: { current: null },
-    onFieldLayout: () => () => undefined,
-    onFieldFocus: () => () => undefined,
-  }),
-}));
+// useKeyboardScroll uses only React hooks (useRef, useCallback, useEffect) —
+// runs real in jest; no mock needed.
 
 function createWrapper() {
   const queryClient = new QueryClient({

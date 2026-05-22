@@ -49,9 +49,12 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const mockUseRoundDetail = jest.fn();
-jest.mock('../../../hooks/use-quiz', () => ({
-  useRoundDetail: (...args: unknown[]) => mockUseRoundDetail(...args),
-}));
+jest.mock(
+  '../../../hooks/use-quiz' /* gc1-allow: native-boundary; use-quiz transitively loads native-only API/profile modules in JSDOM */,
+  () => ({
+    useRoundDetail: (...args: unknown[]) => mockUseRoundDetail(...args),
+  }),
+);
 
 function buildGuessWhoRound() {
   return {

@@ -138,11 +138,22 @@ describe('LibrarySearchResults', () => {
     fireEvent.press(screen.getByTestId(`book-row-${BOOK_ID}`));
     expect(props.onBookPress).toHaveBeenCalledWith(SUBJECT_ID, BOOK_ID);
 
+    // [BUG-404] topic and note presses must forward subjectId + bookId so the
+    // topic screen skips the useResolveTopicSubject round-trip and the back
+    // button falls through to the correct book screen, not library root.
     fireEvent.press(screen.getByTestId(`topic-row-${TOPIC_ID}`));
-    expect(props.onTopicPress).toHaveBeenCalledWith(TOPIC_ID);
+    expect(props.onTopicPress).toHaveBeenCalledWith(
+      TOPIC_ID,
+      SUBJECT_ID,
+      BOOK_ID,
+    );
 
     fireEvent.press(screen.getByTestId(`note-row-${NOTE_ID}`));
-    expect(props.onNotePress).toHaveBeenCalledWith(TOPIC_ID);
+    expect(props.onNotePress).toHaveBeenCalledWith(
+      TOPIC_ID,
+      SUBJECT_ID,
+      BOOK_ID,
+    );
 
     fireEvent.press(screen.getByTestId(`session-row-${SESSION_ID}`));
     expect(props.onSessionPress).toHaveBeenCalledWith(

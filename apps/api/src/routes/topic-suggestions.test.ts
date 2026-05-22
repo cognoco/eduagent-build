@@ -96,35 +96,39 @@ jest.mock(
 // Mock LLM services — registerProvider for llm middleware
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/llm',
-  ) as typeof import('../services/llm');
-  return {
-    ...actual,
-    // gc1-allow: LLM routeAndCall external boundary
-    routeAndCall: jest.fn(),
-    registerProvider: jest.fn(),
-    getRegisteredProviders: jest.fn().mockReturnValue([]),
-    _clearProviders: jest.fn(),
-    _resetCircuits: jest.fn(),
-  };
-});
+jest.mock(
+  '../services/llm' /* gc1-allow: LLM routeAndCall external boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/llm',
+    ) as typeof import('../services/llm');
+    return {
+      ...actual,
+      routeAndCall: jest.fn(),
+      registerProvider: jest.fn(),
+      getRegisteredProviders: jest.fn().mockReturnValue([]),
+      _clearProviders: jest.fn(),
+      _resetCircuits: jest.fn(),
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Mock Sentry (used by global error handler)
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/sentry',
-  ) as typeof import('../services/sentry');
-  return {
-    ...actual,
-    // gc1-allow: @sentry/cloudflare external boundary
-    captureException: jest.fn(),
-  };
-});
+jest.mock(
+  '../services/sentry' /* gc1-allow: @sentry/cloudflare external boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/sentry',
+    ) as typeof import('../services/sentry');
+    return {
+      ...actual,
+      captureException: jest.fn(),
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Import app AFTER all mocks are in place
@@ -165,7 +169,7 @@ describe('topic-suggestions routes', () => {
   describe('GET /v1/subjects/:subjectId/books/:bookId/topic-suggestions', () => {
     it('returns 401 without auth header', async () => {
       const res = await app.request(
-        '/v1/subjects/some-subject-id/books/some-book-id/topic-suggestions',
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/books/a0000000-0000-4000-a000-000000000401/topic-suggestions',
         {},
         TEST_ENV,
       );
@@ -175,7 +179,7 @@ describe('topic-suggestions routes', () => {
 
     it('returns 200 with auth', async () => {
       const res = await app.request(
-        '/v1/subjects/some-subject-id/books/some-book-id/topic-suggestions',
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/books/a0000000-0000-4000-a000-000000000401/topic-suggestions',
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -184,6 +188,26 @@ describe('topic-suggestions routes', () => {
 
       const body = await res.json();
       expect(Array.isArray(body)).toBe(true);
+    });
+
+    // [BUG-392] UUID validation guard — non-UUID path params must be rejected
+    // with 400 before reaching the DB layer.
+    it('returns 400 for non-UUID subjectId', async () => {
+      const res = await app.request(
+        '/v1/subjects/not-a-uuid/books/a0000000-0000-4000-a000-000000000401/topic-suggestions',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for non-UUID bookId', async () => {
+      const res = await app.request(
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/books/not-a-uuid/topic-suggestions',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
     });
   });
 });

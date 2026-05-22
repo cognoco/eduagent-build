@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   parkingLotAddSchema,
@@ -27,36 +28,55 @@ type ParkingLotRouteEnv = {
   };
 };
 
+// [BUG-392] Guard path params against non-UUID input reaching the DB layer.
+const sessionParamSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+
+const topicParamSchema = z.object({
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid(),
+});
+
 export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
   // Get parked questions for a session
-  .get('/sessions/:sessionId/parking-lot', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const sessionId = c.req.param('sessionId');
+  .get(
+    '/sessions/:sessionId/parking-lot',
+    zValidator('param', sessionParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
 
-    const result = await getParkingLotItems(db, profileId, sessionId);
-    return c.json(parkingLotItemsResponseSchema.parse(result));
-  })
+      const result = await getParkingLotItems(db, profileId, sessionId);
+      return c.json(parkingLotItemsResponseSchema.parse(result));
+    },
+  )
 
   // Get parked questions linked to a topic for topic review
-  .get('/subjects/:subjectId/topics/:topicId/parking-lot', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const topicId = c.req.param('topicId');
+  .get(
+    '/subjects/:subjectId/topics/:topicId/parking-lot',
+    zValidator('param', topicParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { topicId } = c.req.valid('param');
 
-    const result = await getParkingLotItemsForTopic(db, profileId, topicId);
-    return c.json(parkingLotItemsResponseSchema.parse(result));
-  })
+      const result = await getParkingLotItemsForTopic(db, profileId, topicId);
+      return c.json(parkingLotItemsResponseSchema.parse(result));
+    },
+  )
 
   // Park a question for later
   .post(
     '/sessions/:sessionId/parking-lot',
+    zValidator('param', sessionParamSchema),
     zValidator('json', parkingLotAddSchema),
     async (c) => {
       const { question } = c.req.valid('json');
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const sessionId = c.req.param('sessionId');
+      const { sessionId } = c.req.valid('param');
       const session = await getSession(db, profileId, sessionId);
       if (!session) {
         return notFound(c, 'Session not found');
@@ -67,7 +87,7 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
         profileId,
         sessionId,
         question,
-        session.topicId ?? undefined
+        session.topicId ?? undefined,
       );
 
       if (!item) {
@@ -75,10 +95,10 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
           c,
           409,
           ERROR_CODES.QUOTA_EXCEEDED,
-          `Parking lot limit reached (max ${MAX_ITEMS_PER_TOPIC} items per topic)`
+          `Parking lot limit reached (max ${MAX_ITEMS_PER_TOPIC} items per topic)`,
         );
       }
 
       return c.json(parkingLotAddResponseSchema.parse({ item }), 201);
-    }
+    },
   );

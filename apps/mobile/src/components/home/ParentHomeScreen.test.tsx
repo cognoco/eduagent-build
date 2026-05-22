@@ -295,11 +295,15 @@ describe('ParentHomeScreen', () => {
     expect(mockSwitchMode).not.toHaveBeenCalled();
   });
 
-  it('switches to student view only from the explicit My Learning action', async () => {
+  it('switches to student view from the compact My Learning action', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
     await waitForParentTransitionNotice();
+
+    screen.getByTestId('parent-home-study-activation');
+    screen.getByText('Continue your own learning');
+    expect(screen.queryByText('Want to study too?')).toBeNull();
 
     fireEvent.press(screen.getByTestId('parent-home-study-activation-action'));
 
@@ -346,7 +350,7 @@ describe('ParentHomeScreen', () => {
     });
   });
 
-  it('shows tonight prompts and compact status from dashboard data', async () => {
+  it('shows conversation prompts inside the child card with compact status from dashboard data', async () => {
     mockLinkedChildren = [CHILD_A];
     mockDashboardData = {
       children: [
@@ -384,9 +388,12 @@ describe('ParentHomeScreen', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
     await waitForParentTransitionNotice();
 
-    screen.getByTestId('parent-home-tonight-section');
+    expect(screen.queryByTestId('parent-home-tonight-section')).toBeNull();
+    screen.getByTestId('parent-home-child-prompts-child-a');
     screen.getByText('Conversation starters');
     screen.getByText('What made Fractions click today?');
+    screen.getByText("What's the trickiest part of Fractions right now?");
+    screen.getByText('What should we focus on tomorrow?');
     expect(
       screen.queryByText('Emma: What made Fractions click today?'),
     ).toBeNull();
@@ -400,9 +407,9 @@ describe('ParentHomeScreen', () => {
         expect.objectContaining({
           backgroundColor: expect.any(String),
           borderColor: expect.any(String),
-          borderRadius: 30,
+          borderRadius: 16,
           borderWidth: 1,
-          minHeight: 58,
+          minHeight: 48,
         }),
       );
       expect(style.borderColor).toMatch(/^#[0-9a-f]{8}$/i);
@@ -416,6 +423,13 @@ describe('ParentHomeScreen', () => {
         shadowColor: expect.any(String),
       }),
     );
+    const childAccent = resolvedStyle('parent-home-check-child-child-a')
+      .shadowColor as string;
+    const promptBorder = resolvedStyle('parent-home-tonight-child-a-primary')
+      .borderColor as string;
+    expect(promptBorder.toLowerCase()).toMatch(
+      new RegExp(`^${childAccent.toLowerCase()}`),
+    );
     expect(
       screen.getByTestId('parent-home-tonight-child-a-primary').props
         .accessibilityRole,
@@ -425,8 +439,8 @@ describe('ParentHomeScreen', () => {
         backgroundColor: expect.any(String),
         borderColor: expect.any(String),
         borderWidth: 1,
-        height: 30,
-        width: 30,
+        height: 28,
+        width: 28,
       }),
     );
     const promptTextStyle = resolvedStyle(
@@ -434,9 +448,9 @@ describe('ParentHomeScreen', () => {
     );
     expect(promptTextStyle).toEqual(
       expect.objectContaining({
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '400',
-        lineHeight: 21,
+        lineHeight: 20,
       }),
     );
     expect(promptTextStyle.backgroundColor).toBeUndefined();
@@ -492,7 +506,7 @@ describe('ParentHomeScreen', () => {
     screen.getByText('You lead by example.');
   });
 
-  it('ranks multi-child tonight prompts by sessions — most active child appears first', async () => {
+  it('shows one activity-based prompt inside each child card when multiple children are linked', async () => {
     mockLinkedChildren = [CHILD_B, CHILD_A]; // intentionally reversed to verify sort
     mockDashboardData = {
       children: [
@@ -560,8 +574,20 @@ describe('ParentHomeScreen', () => {
     const liamPrompt = screen.getByTestId(
       'parent-home-tonight-child-b-primary',
     );
-    screen.getByText('Emma: What made Math click today?');
-    screen.getByText('Liam: What would make starting feel easy tonight?');
+    screen.getByTestId('parent-home-child-prompts-child-a');
+    screen.getByTestId('parent-home-child-prompts-child-b');
+    screen.getByText('What made Math click today?');
+    screen.getByText('What would make starting feel easy tonight?');
+    expect(
+      screen.queryByTestId('parent-home-tonight-child-a-trickiest'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('parent-home-tonight-child-b-curious'),
+    ).toBeNull();
+    expect(screen.queryByText('Emma: What made Math click today?')).toBeNull();
+    expect(
+      screen.queryByText('Liam: What would make starting feel easy tonight?'),
+    ).toBeNull();
     expect(
       resolvedStyle('parent-home-tonight-child-a-primary').borderColor,
     ).not.toBe(
@@ -570,11 +596,8 @@ describe('ParentHomeScreen', () => {
     expect(
       resolvedStyle('parent-home-check-child-child-a').shadowColor,
     ).not.toBe(resolvedStyle('parent-home-check-child-child-b').shadowColor);
-    const allPrompts = screen.getAllByTestId(/^parent-home-tonight-/);
-    // Emma (5 sessions) must appear before Liam (0 sessions) regardless of input order
-    expect(allPrompts.indexOf(emmaPrompt)).toBeLessThan(
-      allPrompts.indexOf(liamPrompt),
-    );
+    expect(emmaPrompt).toBeTruthy();
+    expect(liamPrompt).toBeTruthy();
     screen.getByText('Liam may need attention');
   });
 

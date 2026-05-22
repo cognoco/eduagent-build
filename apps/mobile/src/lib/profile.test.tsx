@@ -1,7 +1,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as SecureStore from './secure-storage';
+import * as ExpoSecureStore from 'expo-secure-store';
 import {
   ProfileProvider,
   useProfile,
@@ -15,12 +15,8 @@ import {
 } from './api-client';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 
-jest.mock('./secure-storage', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn().mockResolvedValue(undefined),
-  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+// ./secure-storage uses real implementation: expo-secure-store is globally mocked
+// in test-setup.ts with an in-memory store. We control behavior via ExpoSecureStore fns directly.
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ isSignedIn: true, userId: 'clerk-user-test' }),
@@ -28,6 +24,7 @@ jest.mock('@clerk/clerk-expo', () => ({
 
 const mockFetch = jest.fn();
 jest.mock('./api-client', () => ({
+  ...jest.requireActual('./api-client'),
   useApiClient: () => {
     const { hc } = require('hono/client');
     return hc('http://localhost', { fetch: mockFetch });
@@ -90,8 +87,8 @@ describe('ProfileProvider', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     jest.clearAllMocks();
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
-    (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue(null);
+    jest.mocked(ExpoSecureStore.setItemAsync).mockResolvedValue(undefined);
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 }),
     );
@@ -114,7 +111,7 @@ describe('ProfileProvider', () => {
   });
 
   it('restores active profile from SecureStore', async () => {
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('child-id');
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('child-id');
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
     });
@@ -126,7 +123,7 @@ describe('ProfileProvider', () => {
   });
 
   it('falls back to owner when saved ID is stale', async () => {
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('deleted-id');
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('deleted-id');
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
     });
@@ -134,18 +131,20 @@ describe('ProfileProvider', () => {
       expect(result.current.isLoading).toBe(false);
     });
     expect(result.current.activeProfile?.id).toBe('owner-id');
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+    expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
       'owner-id',
     );
   });
 
   it('[BREAK] never pushes a SecureStore-restored profile id that the current account does not own', async () => {
-    (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
-      Promise.resolve(
-        key === 'mentomate_active_profile_id' ? 'userA-profile-id' : null,
-      ),
-    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'mentomate_active_profile_id' ? 'userA-profile-id' : null,
+        ),
+      );
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
     });
@@ -157,7 +156,7 @@ describe('ProfileProvider', () => {
       (call) => call[0],
     );
     expect(pushedIds).not.toContain('userA-profile-id');
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+    expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
       'owner-id',
     );
@@ -172,11 +171,13 @@ describe('ProfileProvider', () => {
         displayName: 'Previous User',
       },
     ];
-    (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
-      Promise.resolve(
-        key === 'mentomate_active_profile_id' ? 'userA-owner' : null,
-      ),
-    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'mentomate_active_profile_id' ? 'userA-owner' : null,
+        ),
+      );
     mockFetch.mockReset();
     let resolveFetch: (value: Response) => void = () => undefined;
     mockFetch.mockReturnValue(
@@ -221,7 +222,7 @@ describe('ProfileProvider', () => {
       await result.current.switchProfile('child-id');
     });
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+    expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
       'child-id',
     );
@@ -346,9 +347,9 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-    (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(
-      new Error('SecureStore unavailable'),
-    );
+    jest
+      .mocked(ExpoSecureStore.setItemAsync)
+      .mockRejectedValueOnce(new Error('SecureStore unavailable'));
     let switchResult: Awaited<
       ReturnType<typeof result.current.switchProfile>
     > | null = null;
@@ -395,9 +396,9 @@ describe('ProfileProvider', () => {
 
   it('[BREAK] clears mentomate_parent_home_seen on sign-out', async () => {
     await clearProfileSecureStorageOnSignOut(['owner-id']);
-    const deletedKeys = (
-      SecureStore.deleteItemAsync as jest.Mock
-    ).mock.calls.map((c) => c[0] as string);
+    const deletedKeys = jest
+      .mocked(ExpoSecureStore.deleteItemAsync)
+      .mock.calls.map((c) => c[0] as string);
     expect(deletedKeys).toContain('mentomate_parent_home_seen_owner-id');
   });
 });
@@ -406,8 +407,8 @@ describe('useLinkedChildren', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     jest.clearAllMocks();
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
-    (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue(null);
+    jest.mocked(ExpoSecureStore.setItemAsync).mockResolvedValue(undefined);
   });
   afterEach(() => {
     queryClient?.clear();
@@ -430,7 +431,7 @@ describe('useLinkedChildren', () => {
   });
 
   it('returns empty when active profile is not an owner', async () => {
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('child-id');
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('child-id');
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 }),
     );
@@ -502,8 +503,8 @@ describe('useHasLinkedChildren', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     jest.clearAllMocks();
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
-    (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue(null);
+    jest.mocked(ExpoSecureStore.setItemAsync).mockResolvedValue(undefined);
   });
   afterEach(() => {
     queryClient?.clear();
@@ -540,7 +541,7 @@ describe('useHasLinkedChildren', () => {
   });
 
   it('returns false when active profile is not owner (proxy mode)', async () => {
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('child-id');
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('child-id');
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 }),
     );
@@ -559,8 +560,8 @@ describe('proxy-mode regression', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     jest.clearAllMocks();
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
-    (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue(null);
+    jest.mocked(ExpoSecureStore.setItemAsync).mockResolvedValue(undefined);
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 }),
     );

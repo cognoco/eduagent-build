@@ -28,7 +28,10 @@ import {
 import { envValidationMiddleware } from './middleware/env-validation';
 import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
-import { accountMiddleware } from './middleware/account';
+import {
+  accountMiddleware,
+  requireAccountMiddleware,
+} from './middleware/account';
 import { profileScopeMiddleware } from './middleware/profile-scope';
 import type { ProfileMeta } from './middleware/profile-scope';
 import type { LLMTier } from './services/subscription';
@@ -214,6 +217,11 @@ api.use('*', databaseMiddleware);
 
 // Account middleware — resolves Clerk user → local Account; skips public routes
 api.use('*', accountMiddleware);
+
+// [CR-353] Account-presence enforcement — centralized guard that returns 401
+// (not 500) if an authenticated request reaches routes without a resolved account.
+// Protects all 43+ c.get('account') call sites from middleware ordering regressions.
+api.use('*', requireAccountMiddleware);
 
 // Profile scope middleware — reads X-Profile-Id header, verifies ownership; skips when absent
 api.use('*', profileScopeMiddleware);

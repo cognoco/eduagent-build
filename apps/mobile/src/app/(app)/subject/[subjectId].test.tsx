@@ -1,6 +1,18 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
+import {
+  ProfileContext,
+  type Profile,
+  type ProfileContextValue,
+} from '../../../lib/profile';
+import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
 
 jest.mock(
   'react-i18next',
@@ -38,43 +50,88 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
-const mockUpdateAnalogyDomain = jest.fn();
-let mockAnalogyDomain: string | null = null;
-let mockIsLoading = false;
-let mockIsPending = false;
+// ---------------------------------------------------------------------------
+// Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting
+// ---------------------------------------------------------------------------
 
-jest.mock('../../../hooks/use-settings', () => ({
-  useAnalogyDomain: () => ({
-    data: mockAnalogyDomain,
-    isLoading: mockIsLoading,
-  }),
-  useUpdateAnalogyDomain: () => ({
-    mutate: mockUpdateAnalogyDomain,
-    isPending: mockIsPending,
-  }),
-}));
+let mockFetch: RoutedMockFetch;
 
-let mockSubjects: Array<Record<string, unknown>> | undefined = [
-  { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
-];
-let mockSubjectsLoading = false;
+jest.mock(
+  '../../../lib/api-client', // gc1-allow: fetch-boundary — mockApiClientFactory installs hc() with a controlled mock fetch so real hooks exercise real request logic
+  () => {
+    const {
+      createRoutedMockFetch,
+      mockApiClientFactory,
+    } = require('../../../test-utils/mock-api-routes');
+    mockFetch = createRoutedMockFetch();
+    return mockApiClientFactory(mockFetch);
+  },
+);
 
-jest.mock('../../../hooks/use-subjects', () => ({
-  useSubjects: () => ({
-    data: mockSubjects,
-    isLoading: mockSubjectsLoading,
-  }),
-}));
+// ---------------------------------------------------------------------------
+// Profile context
+// ---------------------------------------------------------------------------
+
+const testProfile: Profile = createTestProfile({
+  id: 'test-profile-id',
+  accountId: 'test-account-id',
+  displayName: 'Test Learner',
+  isOwner: true,
+  birthYear: 1990,
+});
+
+const profileContextValue: ProfileContextValue = {
+  profiles: [testProfile],
+  activeProfile: testProfile,
+  switchProfile: async () => ({ success: true }),
+  isLoading: false,
+  profileLoadError: null,
+  profileWasRemoved: false,
+  acknowledgeProfileRemoval: () => undefined,
+};
+
+// ---------------------------------------------------------------------------
+// Route helpers
+// ---------------------------------------------------------------------------
+
+interface SetupOptions {
+  analogyDomain?: string | null;
+  subjects?: Array<Record<string, unknown>>;
+  analogyLoading?: boolean;
+}
+
+function setupRoutes(opts: SetupOptions = {}) {
+  const {
+    analogyDomain = null,
+    subjects = [
+      { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
+    ],
+    analogyLoading = false,
+  } = opts;
+
+  if (analogyLoading) {
+    mockFetch.setRoute('analogy-domain', () => new Promise(() => undefined));
+  } else {
+    mockFetch.setRoute('analogy-domain', { analogyDomain });
+  }
+  mockFetch.setRoute('/subjects', { subjects });
+}
+
+// ---------------------------------------------------------------------------
+// QueryClient + ProfileContext wrapper
+// ---------------------------------------------------------------------------
 
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      children,
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ProfileContext.Provider value={profileContextValue}>
+          {children}
+        </ProfileContext.Provider>
+      </QueryClientProvider>
     );
   };
 }
@@ -84,45 +141,49 @@ const SubjectSettingsScreen = require('./[subjectId]').default;
 describe('SubjectSettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAnalogyDomain = null;
-    mockIsLoading = false;
-    mockIsPending = false;
-    mockSubjects = [
-      { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
-    ];
-    mockSubjectsLoading = false;
+    setupRoutes();
   });
 
-  it('renders the subject name in the header', () => {
+  it('renders the subject name in the header', async () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText('Mathematics');
+    await waitFor(() => {
+      screen.getByText('Mathematics');
+    });
   });
 
-  it('renders the Analogy Preference section header', () => {
+  it('renders the Analogy Preference section header', async () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText('Analogy Preference');
+    await waitFor(() => {
+      screen.getByText('Analogy Preference');
+    });
   });
 
-  it('renders the description text', () => {
+  it('renders the description text', async () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText(
-      "Choose a domain for analogies. The mentor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer.",
-    );
+    await waitFor(() => {
+      screen.getByText(
+        "Choose a domain for analogies. The mentor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer.",
+      );
+    });
   });
 
-  it('renders the analogy domain picker', () => {
+  it('renders the analogy domain picker', async () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('analogy-domain-picker');
+    await waitFor(() => {
+      screen.getByTestId('analogy-domain-picker');
+    });
   });
 
-  it('renders all domain options', () => {
+  it('renders all domain options', async () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('analogy-domain-none');
+    await waitFor(() => {
+      screen.getByTestId('analogy-domain-none');
+    });
     screen.getByTestId('analogy-domain-cooking');
     screen.getByTestId('analogy-domain-sports');
     screen.getByTestId('analogy-domain-building');
@@ -131,18 +192,24 @@ describe('SubjectSettingsScreen', () => {
     screen.getByTestId('analogy-domain-gaming');
   });
 
-  it('shows "No preference" as active when analogyDomain is null', () => {
+  it('shows "No preference" as active when analogyDomain is null', async () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('analogy-domain-picker');
+    });
     const activeTexts = screen.getAllByText('Active');
     expect(activeTexts).toHaveLength(1);
   });
 
-  it('shows selected domain as active', () => {
-    mockAnalogyDomain = 'cooking';
+  it('shows selected domain as active', async () => {
+    setupRoutes({ analogyDomain: 'cooking' });
 
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('analogy-domain-picker');
+    });
     const activeTexts = screen.getAllByText('Active');
     expect(activeTexts).toHaveLength(1);
 
@@ -158,40 +225,70 @@ describe('SubjectSettingsScreen', () => {
     expect(hasActiveInCooking).toBe(true);
   });
 
-  it('calls updateAnalogyDomain when a domain is selected', () => {
+  it('calls updateAnalogyDomain when a domain is selected', async () => {
+    // Stub the PUT route so the mutation succeeds
+    mockFetch.setRoute('analogy-domain', { analogyDomain: 'sports' });
+
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('analogy-domain-sports');
+    });
     fireEvent.press(screen.getByTestId('analogy-domain-sports'));
-    // UX-DE-L9: mutate now includes onError to surface failures
-    expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith(
-      'sports',
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
+
+    await waitFor(() => {
+      const putCall = (
+        mockFetch.mock.calls as [string, RequestInit | undefined][]
+      ).find(
+        ([url, init]) =>
+          url.includes('analogy-domain') && init?.method === 'PUT',
+      );
+      expect(putCall).toBeTruthy();
+      const body = JSON.parse(putCall![1]?.body as string);
+      expect(body.analogyDomain).toBe('sports');
+    });
   });
 
-  it('calls updateAnalogyDomain with null when "No preference" pressed', () => {
-    mockAnalogyDomain = 'cooking';
+  it('calls updateAnalogyDomain with null when "No preference" pressed', async () => {
+    setupRoutes({ analogyDomain: 'cooking' });
+    mockFetch.setRoute('analogy-domain', { analogyDomain: null });
 
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('analogy-domain-none');
+    });
     fireEvent.press(screen.getByTestId('analogy-domain-none'));
-    expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith(
-      null,
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
+
+    await waitFor(() => {
+      const putCall = (
+        mockFetch.mock.calls as [string, RequestInit | undefined][]
+      ).find(
+        ([url, init]) =>
+          url.includes('analogy-domain') && init?.method === 'PUT',
+      );
+      expect(putCall).toBeTruthy();
+      const body = JSON.parse(putCall![1]?.body as string);
+      expect(body.analogyDomain).toBeNull();
+    });
   });
 
-  it('shows loading state when data is loading', () => {
-    mockIsLoading = true;
+  it('shows loading state when data is loading', async () => {
+    setupRoutes({ analogyLoading: true });
 
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('analogy-domain-loading');
+    await waitFor(() => {
+      screen.getByTestId('analogy-domain-loading');
+    });
   });
 
-  it('returns to the subject shelf when back button is pressed', () => {
+  it('returns to the subject shelf when back button is pressed', async () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('subject-settings-back');
+    });
     fireEvent.press(screen.getByTestId('subject-settings-back'));
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
@@ -203,42 +300,54 @@ describe('SubjectSettingsScreen', () => {
   // (pedagogyMode 'four_strands') because the four-strands pedagogy teaches
   // vocabulary directly without analogy framing.
   describe('language subject handling [BUG-939]', () => {
-    it('hides Analogy Preference for four_strands subjects', () => {
-      mockSubjects = [
-        { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
-      ];
+    it('hides Analogy Preference for four_strands subjects', async () => {
+      setupRoutes({
+        subjects: [
+          { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
+        ],
+      });
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-      expect(screen.queryByText('Analogy Preference')).toBeNull();
+      await waitFor(() => {
+        expect(screen.queryByText('Analogy Preference')).toBeNull();
+      });
       expect(screen.queryByTestId('analogy-domain-picker')).toBeNull();
       expect(
         screen.getByTestId('subject-settings-language-empty'),
       ).toBeTruthy();
     });
 
-    it('shows Analogy Preference for non-language subjects', () => {
-      mockSubjects = [
-        { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
-      ];
+    it('shows Analogy Preference for non-language subjects', async () => {
+      setupRoutes({
+        subjects: [
+          { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
+        ],
+      });
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-      screen.getByText('Analogy Preference');
+      await waitFor(() => {
+        screen.getByText('Analogy Preference');
+      });
       expect(
         screen.queryByTestId('subject-settings-language-empty'),
       ).toBeNull();
     });
 
-    it('still shows the back button on the language-subject empty state', () => {
-      mockSubjects = [
-        { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
-      ];
+    it('still shows the back button on the language-subject empty state', async () => {
+      setupRoutes({
+        subjects: [
+          { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
+        ],
+      });
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
       // Empty state must not be a dead-end — back button is reachable.
-      screen.getByTestId('subject-settings-back');
+      await waitFor(() => {
+        screen.getByTestId('subject-settings-back');
+      });
     });
   });
 });

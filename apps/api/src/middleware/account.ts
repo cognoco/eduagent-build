@@ -85,3 +85,47 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
     return next();
   },
 );
+
+/**
+ * [CR-353] Centralized account-presence enforcement middleware.
+ *
+ * authMiddleware sets `user` for all non-public paths and returns 401 for
+ * unauthenticated requests. accountMiddleware then resolves user → account.
+ * If middleware ordering ever regresses (a route mounts outside the chain,
+ * or accountMiddleware is conditionally skipped), `c.get('account')` is
+ * undefined at the route handler and `account.id` throws TypeError → 500.
+ *
+ * This middleware is the single centralized enforcement point: it runs after
+ * accountMiddleware and returns a structured 401 if user is set but account
+ * is not, ensuring every authenticated route handler can trust `c.get('account')`.
+ *
+ * Public routes (no user set by authMiddleware) are transparently skipped.
+ *
+ * Mount in index.ts immediately after accountMiddleware:
+ *   api.use('*', accountMiddleware);
+ *   api.use('*', requireAccountMiddleware);
+ */
+export const requireAccountMiddleware = createMiddleware<AccountEnv>(
+  async (c, next) => {
+    const user = c.get('user');
+    // Public routes — authMiddleware did not set user; allow through.
+    if (!user) {
+      return next();
+    }
+    // Authenticated route — account MUST be set by accountMiddleware.
+    // If it is not, middleware ordering has regressed; return a structured
+    // 401 rather than letting the route handler crash with TypeError → 500.
+    const account = c.get('account');
+    if (!account) {
+      return c.json(
+        {
+          code: ERROR_CODES.UNAUTHORIZED,
+          message:
+            'Account required — authenticated user has no resolved account. This is a server-side middleware ordering fault.',
+        },
+        401,
+      );
+    }
+    return next();
+  },
+);

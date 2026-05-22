@@ -101,29 +101,39 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    muted: '#94a3b8',
-    primary: '#00b4d8',
-    textInverse: '#ffffff',
-    textSecondary: '#64748b',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      muted: '#94a3b8',
+      primary: '#00b4d8',
+      textInverse: '#ffffff',
+      textSecondary: '#64748b',
+    }),
   }),
-}));
+);
 
-jest.mock('../../../hooks/use-subjects', () => ({
-  useConfigureLanguageSubject: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: mockIsPending,
+jest.mock(
+  '../../../hooks/use-subjects' /* gc1-allow: mutation-hook-controlled-pending — race-condition tests (BUG-692-FOLLOWUP) require deferred Promise resolution and synchronous isPending toggling; renderScreen cannot synchronously control mutation isPending state */,
+  () => ({
+    ...jest.requireActual('../../../hooks/use-subjects'),
+    useConfigureLanguageSubject: () => ({
+      mutateAsync: mockMutateAsync,
+      isPending: mockIsPending,
+    }),
   }),
-}));
+);
 
-jest.mock('../../../hooks/use-sessions', () => ({
-  useStartFirstCurriculumSession: () => ({
-    mutateAsync: mockStartFirstCurriculumMutateAsync,
-    isPending: false,
+jest.mock(
+  '../../../hooks/use-sessions' /* gc1-allow: mutation-hook-controlled-pending — race-condition tests (BUG-692-FOLLOWUP) require deferred Promise resolution; renderScreen cannot synchronously control mutation isPending state */,
+  () => ({
+    ...jest.requireActual('../../../hooks/use-sessions'),
+    useStartFirstCurriculumSession: () => ({
+      mutateAsync: mockStartFirstCurriculumMutateAsync,
+      isPending: false,
+    }),
   }),
-}));
+);
 
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,

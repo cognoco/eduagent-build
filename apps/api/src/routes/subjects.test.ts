@@ -106,14 +106,19 @@ type TestEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: { isOwner: boolean } | undefined;
   };
 };
 
-function makeApp(opts?: { profileId?: string }) {
+function makeApp(opts?: {
+  profileId?: string;
+  profileMeta?: { isOwner: boolean };
+}) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
     c.set('profileId', opts?.profileId ?? PROFILE_ID);
+    c.set('profileMeta', opts?.profileMeta ?? { isOwner: true });
     await next();
   });
   app.onError((err, c) =>

@@ -213,10 +213,11 @@ export function errorHasCode(error: unknown, code: string): boolean {
     }
   }
 
-  if (error instanceof Error) {
-    return error.message.includes(`"code":"${code}"`);
-  }
-
+  // [BUG-389] No string-matching on error.message. The api-client boundary
+  // (customFetch, classifyXhrError, assertOk) always sets a typed .code or
+  // .apiCode property. Matching `"code":"${code}"` inside message text is the
+  // classify-after-format antipattern — the message may have already been
+  // transformed by formatApiError, or may contain unrelated JSON fragments.
   return false;
 }
 

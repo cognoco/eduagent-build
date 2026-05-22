@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { isAdultOwner } from '@eduagent/schemas';
 import type { DashboardChild, DashboardData, Profile } from '@eduagent/schemas';
 import { isInGracePeriod } from '../../lib/consent-grace';
-import type { Translate, TranslateKey } from '../../i18n';
+import type { Translate } from '../../i18n';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useDashboard } from '../../hooks/use-dashboard';
@@ -23,7 +23,7 @@ import {
   useFamilySubscription,
   useSubscription,
 } from '../../hooks/use-subscription';
-import { getGreeting, getTimeOfDay } from '../../lib/greeting';
+import { getGreeting } from '../../lib/greeting';
 import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
 import { withOpacity } from '../../lib/color-opacity';
@@ -40,7 +40,8 @@ import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 import { BaseCoachingCard } from '../coaching/BaseCoachingCard';
 
-const MAX_TONIGHT_PROMPTS = 3;
+const SINGLE_CHILD_PROMPT_COUNT = 3;
+const MULTI_CHILD_PROMPT_COUNT = 1;
 
 function initialOf(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
@@ -344,6 +345,7 @@ function buildSingleChildPrompts(
   dashboardChild: DashboardChild | undefined,
   t: Translate,
   includeChildName: boolean,
+  maxPrompts: number,
 ): TonightPrompt[] {
   const childName = firstNameOf(child.displayName);
   const focus =
@@ -399,50 +401,30 @@ function buildSingleChildPrompts(
     });
   }
 
-  return prompts.slice(0, MAX_TONIGHT_PROMPTS);
+  return prompts.slice(0, maxPrompts);
 }
 
-function buildTonightPrompts(
+function buildChildPromptMap(
   children: Profile[],
   dashboard: DashboardData | undefined,
   t: Translate,
-): TonightPrompt[] {
-  const first = children[0];
-  if (!first) return [];
-  if (children.length === 1) {
-    return buildSingleChildPrompts(
-      first,
-      findDashboardChild(dashboard, first.id),
-      t,
-      false,
-    );
-  }
-
-  const ranked = [...children].sort((a, b) => {
-    const aSessions =
-      findDashboardChild(dashboard, a.id)?.sessionsThisWeek ?? 0;
-    const bSessions =
-      findDashboardChild(dashboard, b.id)?.sessionsThisWeek ?? 0;
-    return bSessions - aSessions;
-  });
-
-  return ranked.slice(0, MAX_TONIGHT_PROMPTS).map((child) => ({
-    key: `${child.id}-primary`,
-    childId: child.id,
-    text: primaryPromptFor(
-      child,
-      findDashboardChild(dashboard, child.id),
-      t,
-      true,
-    ),
-  }));
-}
-
-function tonightTitleKey(now?: Date): TranslateKey {
-  const tod = getTimeOfDay(now ?? new Date());
-  if (tod === 'morning') return 'home.parent.tonight.titleMorning';
-  if (tod === 'afternoon') return 'home.parent.tonight.titleAfternoon';
-  return 'home.parent.tonight.titleEvening';
+): Map<string, TonightPrompt[]> {
+  const maxPrompts =
+    children.length === 1
+      ? SINGLE_CHILD_PROMPT_COUNT
+      : MULTI_CHILD_PROMPT_COUNT;
+  return new Map(
+    children.map((child) => [
+      child.id,
+      buildSingleChildPrompts(
+        child,
+        findDashboardChild(dashboard, child.id),
+        t,
+        false,
+        maxPrompts,
+      ),
+    ]),
+  );
 }
 
 function ConversationStarterCard({
@@ -454,27 +436,25 @@ function ConversationStarterCard({
 }): React.ReactElement {
   const colors = useThemeColors();
   const accent = tint?.solid ?? colors.primary;
-  const bubbleBorderColor = withOpacity(accent, 0.34);
+  const bubbleBorderColor = withOpacity(accent, 0.26);
 
   return (
     <View
       testID={`parent-home-tonight-${prompt.key}`}
       style={{
-        backgroundColor: colors.surface,
+        backgroundColor: withOpacity(accent, 0.06),
         borderColor: bubbleBorderColor,
-        borderRadius: 30,
+        borderRadius: 16,
         borderWidth: 1,
-        minHeight: 58,
+        minHeight: 48,
       }}
     >
       <View
         style={{
           alignItems: 'center',
-          backgroundColor: colors.surface,
-          borderRadius: 30,
           flexDirection: 'row',
-          paddingHorizontal: 16,
-          paddingVertical: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 9,
         }}
       >
         <View
@@ -485,27 +465,70 @@ function ConversationStarterCard({
             borderColor: bubbleBorderColor,
             borderWidth: 1,
             borderRadius: 999,
-            height: 30,
+            height: 28,
             justifyContent: 'center',
-            width: 30,
+            width: 28,
           }}
         >
-          <Ionicons name="chatbubble-outline" size={20} color={accent} />
+          <Ionicons name="chatbubble-outline" size={16} color={accent} />
         </View>
         <Text
           testID={`parent-home-tonight-text-${prompt.key}`}
           style={{
             color: colors.textPrimary,
             flex: 1,
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: '400',
             includeFontPadding: false,
-            lineHeight: 21,
-            marginLeft: 10,
+            lineHeight: 20,
+            marginLeft: 9,
           }}
         >
           {prompt.text}
         </Text>
+      </View>
+    </View>
+  );
+}
+
+function ChildConversationStarters({
+  child,
+  prompts,
+  tint,
+  t,
+}: {
+  child: Profile;
+  prompts: TonightPrompt[];
+  tint: SubjectTint | undefined;
+  t: Translate;
+}): React.ReactElement | null {
+  const colors = useThemeColors();
+  if (prompts.length === 0) return null;
+
+  return (
+    <View
+      className="mt-4 border-t border-border pt-3"
+      testID={`parent-home-child-prompts-${child.id}`}
+    >
+      <View className="flex-row items-center mb-2">
+        <Ionicons
+          name="chatbubbles-outline"
+          size={16}
+          color={tint?.solid ?? colors.primary}
+          className="me-2"
+        />
+        <Text className="text-caption font-bold uppercase text-text-secondary">
+          {t('home.parent.tonight.titleEvening')}
+        </Text>
+      </View>
+      <View style={{ gap: 6 }}>
+        {prompts.map((prompt) => (
+          <ConversationStarterCard
+            key={`tonight-${prompt.key}`}
+            prompt={prompt}
+            tint={tint}
+          />
+        ))}
       </View>
     </View>
   );
@@ -553,6 +576,7 @@ function ChildActionButton({
 
 function ChildCommandCard({
   child,
+  conversationPrompts,
   dashboardChild,
   tint,
   onOpenProfile,
@@ -562,6 +586,7 @@ function ChildCommandCard({
   t,
 }: {
   child: Profile;
+  conversationPrompts: TonightPrompt[];
   dashboardChild: DashboardChild | undefined;
   tint: SubjectTint | undefined;
   onOpenProfile: () => void;
@@ -657,6 +682,12 @@ function ChildCommandCard({
           testID={`parent-home-send-nudge-${child.id}`}
         />
       </View>
+      <ChildConversationStarters
+        child={child}
+        prompts={conversationPrompts}
+        tint={tint}
+        t={t}
+      />
     </View>
   );
 }
@@ -665,11 +696,13 @@ function RecentChildActivitySection({
   childrenProfiles,
   dashboard,
   onOpenChild,
+  onSwitchToStudy,
   t,
 }: {
   childrenProfiles: Profile[];
   dashboard: DashboardData | undefined;
   onOpenChild: (childProfileId: string) => void;
+  onSwitchToStudy: () => void;
   t: Translate;
 }): React.ReactElement | null {
   const colors = useThemeColors();
@@ -734,6 +767,50 @@ function RecentChildActivitySection({
             />
           </Pressable>
         ))}
+        <View
+          className="rounded-button bg-primary-soft px-3 py-2.5"
+          testID="parent-home-study-activation"
+        >
+          <Pressable
+            onPress={onSwitchToStudy}
+            className="flex-row items-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('home.parent.studyActivation.action')}
+            testID="parent-home-study-activation-action"
+          >
+            <View
+              className="w-9 h-9 rounded-full bg-surface items-center justify-center me-3"
+              accessibilityElementsHidden
+            >
+              <Ionicons
+                name="school-outline"
+                size={18}
+                color={colors.primary}
+              />
+            </View>
+            <View className="flex-1 min-w-0">
+              <Text
+                className="text-body-sm font-semibold text-text-primary"
+                numberOfLines={1}
+              >
+                {t('home.parent.cards.continueOwn')}
+              </Text>
+              <Text
+                className="text-caption text-text-secondary mt-0.5"
+                numberOfLines={1}
+              >
+                {t('home.parent.cards.continueOwnEmptySubtitle')}
+              </Text>
+            </View>
+            <Text
+              className="text-body-sm font-semibold text-primary ms-3"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {t('tabs.myLearning')}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -971,10 +1048,6 @@ export function ParentHomeScreen({
       }),
     });
   }
-  const tonightPrompts = useMemo(
-    () => buildTonightPrompts(linkedChildren, dashboard, t),
-    [linkedChildren, dashboard, t],
-  );
   const childTintsById = useMemo(
     () =>
       getSubjectTintMap(
@@ -983,14 +1056,10 @@ export function ParentHomeScreen({
       ),
     [colorScheme, linkedChildren],
   );
-  const promptTintsByKey = useMemo(() => {
-    const tints = new Map<string, SubjectTint>();
-    tonightPrompts.forEach((prompt) => {
-      const tint = childTintsById.get(prompt.childId);
-      if (tint) tints.set(prompt.key, tint);
-    });
-    return tints;
-  }, [childTintsById, tonightPrompts]);
+  const childPromptsById = useMemo(
+    () => buildChildPromptMap(linkedChildren, dashboard, t),
+    [linkedChildren, dashboard, t],
+  );
 
   const navigateToCreateChildProfile = useCallback(() => {
     if (Platform.OS === 'web') {
@@ -1142,26 +1211,11 @@ export function ParentHomeScreen({
         ) : null}
 
         {linkedChildren.length > 0 ? (
-          <View className="mt-4" testID="parent-home-tonight-section">
-            <Text className="text-h3 font-bold text-text-primary mb-3">
-              {t(tonightTitleKey(now))}
-            </Text>
-            <View style={{ gap: 6 }}>
-              <ParentTransitionNotice
-                profileId={activeProfile?.id}
-                childNames={childNames}
-              />
-              {tonightPrompts.map((prompt) => {
-                const tint = promptTintsByKey.get(prompt.key);
-                return (
-                  <ConversationStarterCard
-                    key={`tonight-${prompt.key}`}
-                    prompt={prompt}
-                    tint={tint}
-                  />
-                );
-              })}
-            </View>
+          <View className="mt-4">
+            <ParentTransitionNotice
+              profileId={activeProfile?.id}
+              childNames={childNames}
+            />
           </View>
         ) : null}
 
@@ -1169,40 +1223,9 @@ export function ParentHomeScreen({
           childrenProfiles={linkedChildren}
           dashboard={dashboard}
           onOpenChild={pushChildProgress}
+          onSwitchToStudy={() => switchMode('study')}
           t={t}
         />
-
-        <View
-          className="bg-surface rounded-card px-4 py-4 mt-5"
-          testID="parent-home-study-activation"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            {t('home.parent.studyActivation.title', {
-              defaultValue: 'Want to study too?',
-            })}
-          </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            {t('home.parent.studyActivation.body', {
-              defaultValue:
-                'Switch to My Learning when this is your study time.',
-            })}
-          </Text>
-          <Pressable
-            onPress={() => switchMode('study')}
-            className="self-start bg-primary rounded-button px-4 py-3 mt-3"
-            accessibilityRole="button"
-            accessibilityLabel={t('home.parent.studyActivation.action', {
-              defaultValue: 'Go to My Learning',
-            })}
-            testID="parent-home-study-activation-action"
-          >
-            <Text className="text-body-sm font-semibold text-text-inverse">
-              {t('home.parent.studyActivation.action', {
-                defaultValue: 'Go to My Learning',
-              })}
-            </Text>
-          </Pressable>
-        </View>
 
         <Text className="text-h3 font-bold text-text-primary mt-5 mb-3">
           {t('home.parent.childrenHeader')}
@@ -1223,6 +1246,7 @@ export function ParentHomeScreen({
             <ChildCommandCard
               key={child.id}
               child={child}
+              conversationPrompts={childPromptsById.get(child.id) ?? []}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               tint={childTintsById.get(child.id)}
               onOpenProfile={() => pushChildProfile(child.id)}

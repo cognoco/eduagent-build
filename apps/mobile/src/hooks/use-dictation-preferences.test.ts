@@ -2,12 +2,15 @@ import { renderHook, act } from '@testing-library/react-native';
 import * as SecureStore from '../lib/secure-storage';
 import { useDictationPreferences } from './use-dictation-preferences';
 
-jest.mock('../lib/secure-storage', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
-  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+jest.mock(
+  '../lib/secure-storage' /* gc1-allow: native-boundary; expo-secure-store is unavailable in Jest, while sanitizeSecureStoreKey stays real */,
+  () => ({
+    getItemAsync: jest.fn(),
+    setItemAsync: jest.fn(),
+    deleteItemAsync: jest.fn(),
+    sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+  }),
+);
 const mockGet = jest.mocked(SecureStore.getItemAsync);
 const mockSet = jest.mocked(SecureStore.setItemAsync);
 

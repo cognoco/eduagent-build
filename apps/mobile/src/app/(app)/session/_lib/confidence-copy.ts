@@ -1,26 +1,24 @@
+import { computeAgeBracket } from '@eduagent/schemas';
+
 /**
- * Age-aware copy for the F6 confidence affordance. Three variants keep the
+ * Age-aware copy for the F6 confidence affordance. Two variants keep the
  * metacognitive intent (learner signals uncertainty about their own
  * understanding) but adjust phrasing to fit the learner's voice.
  *
- * Brackets follow `computeAgeBracket` thresholds (under 13 / 13–17 / 18+).
- * `null` birthYear falls back to the middle bracket — neutral default.
+ * Brackets follow `computeAgeBracket` thresholds (adolescent = 11–17 / adult = 18+).
+ * The pre-11 'child' bracket is unreachable in the strictly-11+ product.
+ * `null` birthYear falls back to 'adolescent' — the neutral default.
  */
 export function getConfidenceCopy(birthYear: number | null): {
   label: string;
   accessibilityLabel: string;
   retryMessage: string;
 } {
-  const age = birthYear == null ? null : new Date().getFullYear() - birthYear;
-  if (age != null && age < 13) {
-    return {
-      label: 'Does this feel right? Tap to ask',
-      accessibilityLabel:
-        "If something doesn't make sense yet, that's okay! Tap here to ask the mentor to explain it a different way.",
-      retryMessage: "I don't get this — can you say it another way?",
-    };
-  }
-  if (age != null && age >= 18) {
+  // null birthYear defaults to 'adolescent' — neutral copy for unknown age.
+  const bracket =
+    birthYear == null ? 'adolescent' : computeAgeBracket(birthYear);
+
+  if (bracket === 'adult') {
     return {
       label: 'Not sure about this? Tap to ask',
       accessibilityLabel:
@@ -29,6 +27,9 @@ export function getConfidenceCopy(birthYear: number | null): {
         "I'm not sure that was right — can you explain it differently?",
     };
   }
+
+  // adolescent (11–17) — also covers the unreachable 'child' bracket as a
+  // defensive fallback, consistent with the strictly-11+ product constraint.
   return {
     label: 'Is this right? Tap to ask',
     accessibilityLabel:

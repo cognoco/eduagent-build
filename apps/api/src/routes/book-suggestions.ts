@@ -27,14 +27,20 @@ const pickerQuerySchema = z.object({
   topup: z.enum(['1']).optional(),
 });
 
+// [BUG-392] Guard path params against non-UUID input reaching the DB layer.
+const subjectParamSchema = z.object({
+  subjectId: z.string().uuid(),
+});
+
 export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
   .get(
     '/subjects/:subjectId/book-suggestions',
+    zValidator('param', subjectParamSchema),
     zValidator('query', pickerQuerySchema),
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
-      const subjectId = c.req.param('subjectId');
+      const { subjectId } = c.req.valid('param');
       const { topup } = c.req.valid('query');
 
       const result =
@@ -45,12 +51,17 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
       return c.json(bookSuggestionsResponseSchema.parse(result), 200);
     },
   )
-  .get('/subjects/:subjectId/book-suggestions/all', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const suggestions = await getAllBookSuggestions(
-      c.get('db'),
-      profileId,
-      c.req.param('subjectId'),
-    );
-    return c.json(bookSuggestionsArrayResponseSchema.parse(suggestions), 200);
-  });
+  .get(
+    '/subjects/:subjectId/book-suggestions/all',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
+      const suggestions = await getAllBookSuggestions(
+        c.get('db'),
+        profileId,
+        subjectId,
+      );
+      return c.json(bookSuggestionsArrayResponseSchema.parse(suggestions), 200);
+    },
+  );

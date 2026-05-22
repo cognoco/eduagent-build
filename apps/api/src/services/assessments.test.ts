@@ -30,6 +30,9 @@ import type {
 } from '@eduagent/schemas';
 import { NotFoundError } from '../errors';
 import type { Database } from '@eduagent/database';
+// [BUG-391] parseAssessmentExchangeHistory used via mapAssessmentRow — imported
+// here to confirm the schema-level parser integrates with the service mapper.
+import { parseAssessmentExchangeHistory } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1058,5 +1061,71 @@ describe('recordAssessmentCompletionActivity', () => {
         total: 100,
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-391] mapAssessmentRow — parseAssessmentExchangeHistory integration
+// ---------------------------------------------------------------------------
+// mapAssessmentRow is private so we exercise it via createAssessment /
+// getAssessment which both call it internally.
+describe('mapAssessmentRow — parseAssessmentExchangeHistory integration [BUG-391]', () => {
+  it('degrades to empty array when DB returns corrupted exchangeHistory', async () => {
+    // Simulates a row where exchange_history contains data that fails the
+    // ChatExchange schema (e.g. role: 'system' is not in the enum).
+    const corruptedRow = mockAssessmentRow({
+      exchangeHistory: [{ role: 'system', content: 'injected' }],
+    });
+    const db = createAssessmentMockDb({ insertReturning: [corruptedRow] });
+
+    const result = await createAssessment(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId,
+    );
+
+    // parseAssessmentExchangeHistory returns [] on parse failure — the
+    // assessment degrades to empty-history state rather than crashing.
+    expect(result.exchangeHistory).toEqual([]);
+  });
+
+  it('returns typed ChatExchange array for a well-formed neon-serverless row', async () => {
+    // Simulates the real neon-serverless shape: JSONB column is already
+    // parsed to plain JS objects by the driver before reaching Drizzle.
+    const validRow = mockAssessmentRow({
+      exchangeHistory: [
+        { role: 'assistant', content: 'What is a variable?' },
+        { role: 'user', content: 'A named storage location.' },
+      ],
+    });
+    const db = createAssessmentMockDb({ insertReturning: [validRow] });
+
+    const result = await createAssessment(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId,
+    );
+
+    expect(result.exchangeHistory).toHaveLength(2);
+    expect(result.exchangeHistory[0]!.role).toBe('assistant');
+    expect(result.exchangeHistory[1]!.role).toBe('user');
+  });
+
+  it('parseAssessmentExchangeHistory parser itself returns [] for null (direct unit test)', () => {
+    expect(parseAssessmentExchangeHistory(null)).toEqual([]);
+  });
+
+  it('parseAssessmentExchangeHistory parser returns [] for corrupt data', () => {
+    expect(parseAssessmentExchangeHistory({ role: 'user' })).toEqual([]);
+  });
+
+  it('parseAssessmentExchangeHistory parser returns typed array for valid data', () => {
+    const result = parseAssessmentExchangeHistory([
+      { role: 'user', content: 'Hello' },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.content).toBe('Hello');
   });
 });

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { useDictationPlayback } from '../../../hooks/use-dictation-playback';
 import { useDictationPreferences } from '../../../hooks/use-dictation-preferences';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -22,10 +23,13 @@ export default function PlaybackScreen(): React.ReactElement {
 
   const prefs = useDictationPreferences(activeProfile?.id);
 
-  const ageYears = activeProfile?.birthYear
-    ? new Date().getFullYear() - activeProfile.birthYear
-    : 10;
-  const chunkSize = ageYears <= 8 ? 2 : ageYears <= 12 ? 3 : 4;
+  // null birthYear defaults to 'adolescent' — the more conservative chunk size.
+  // MentoMate is strictly 11+; `adolescent` intentionally covers all under-18
+  // learners after the old child bracket was removed.
+  const ageBracket = activeProfile?.birthYear
+    ? computeAgeBracket(activeProfile.birthYear)
+    : 'adolescent';
+  const chunkSize = ageBracket === 'adult' ? 4 : 3;
 
   const playback = useDictationPlayback({
     sentences: data?.sentences ?? [],

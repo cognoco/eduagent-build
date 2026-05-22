@@ -130,13 +130,25 @@ export const profileRoutes = new Hono<ProfileEnv>()
     async (c) => {
       const db = c.get('db');
       const account = c.get('account');
+      const id = c.req.param('id');
       const input = c.req.valid('json');
-      const profile = await updateProfile(
-        db,
-        c.req.param('id'),
-        account.id,
-        input,
-      );
+
+      // [CR-2026-05-19-H1] Only the account owner (or the profile itself) can
+      // update a profile. A child profile on a parent's account must not be
+      // able to edit sibling profiles (IDOR). Self-updates are always allowed
+      // so a non-owner can still update their own displayName/avatar/colorScheme.
+      const activeProfileId = c.get('profileId');
+      const profileMeta = c.get('profileMeta');
+      if (profileMeta?.isOwner !== true && id !== activeProfileId) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the account owner can update other profiles.',
+        );
+      }
+
+      const profile = await updateProfile(db, id, account.id, input);
       if (!profile) return notFound(c, 'Profile not found');
       return c.json(profileResponseSchema.parse({ profile }));
     },
@@ -148,6 +160,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
       const db = c.get('db');
       const account = c.get('account');
       const { profileId } = c.req.valid('json');
+      // No isOwner check here by design: switching the active profile is
+      // account-scoped and purely per-device (not destructive). Any profile on
+      // the account can legitimately switch to another profile on the same
+      // account — e.g., a child handing the device back to a parent.
+      // [CR-2026-05-19-H1 note: intentionally left without owner gate]
       const result = await switchProfile(db, profileId, account.id);
       if (!result)
         return forbidden(c, 'Profile does not belong to this account');

@@ -70,29 +70,34 @@ const mockFetch = createRoutedMockFetch({
   '/subjects': { subjects: [] },
 });
 
-jest.mock('../../../lib/api-client', () =>
-  require('../../../test-utils/mock-api-routes').mockApiClientFactory(
-    mockFetch,
-  ),
+jest.mock(
+  '../../../lib/api-client' /* gc1-allow: external-boundary; typed Hono RPC client wraps fetch through mockApiClientFactory */,
+  () =>
+    require('../../../test-utils/mock-api-routes').mockApiClientFactory(
+      mockFetch,
+    ),
 );
 
-jest.mock('../../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
+jest.mock(
+  '../../../lib/profile' /* gc1-allow: native-boundary; lib/profile transitively loads native-only i18n/secure-storage modules in JSDOM */,
+  () => ({
+    useProfile: () => ({
+      activeProfile: {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
+      },
+    }),
+    ProfileContext: {
+      Provider: ({ children }: { children: React.ReactNode }) => children,
     },
   }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
-}));
+);
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -123,6 +128,21 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+jest.mock(
+  './_layout' /* gc1-allow: native-boundary; _layout transitively loads native-only router/i18n modules in JSDOM */,
+  () => ({
+    useQuizFlow: () => ({
+      setActivityType: jest.fn(),
+      setSubjectId: jest.fn(),
+      setLanguageName: jest.fn(),
+      setReturnTo: jest.fn(),
+      setRound: jest.fn(),
+      setPrefetchedRoundId: jest.fn(),
+      setCompletionResult: jest.fn(),
+    }),
+  }),
+);
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -134,25 +154,15 @@ function createWrapper() {
   };
 }
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#2563eb',
-    textPrimary: '#111827',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#2563eb',
+      textPrimary: '#111827',
+    }),
   }),
-}));
-
-jest.mock('./_layout', () => ({
-  useQuizFlow: () => ({
-    setActivityType: jest.fn(),
-    setSubjectId: jest.fn(),
-    setLanguageName: jest.fn(),
-    setReturnTo: jest.fn(),
-    setRound: jest.fn(),
-    setPrefetchedRoundId: jest.fn(),
-    setCompletionResult: jest.fn(),
-  }),
-}));
+);
 
 const QuizIndexScreen = require('./index').default;
 

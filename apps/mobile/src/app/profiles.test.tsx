@@ -73,8 +73,8 @@ const mockUseSubscription = jest.fn().mockReturnValue({ data: null });
 const mockUseFamilySubscription = jest.fn().mockReturnValue({ data: null });
 
 jest.mock(
-  '../hooks/use-subscription',
-  /* gc1-allow: hooks require QueryClient + API client infra not available in unit test */ () => ({
+  '../hooks/use-subscription', // gc1-allow: hooks require QueryClient + API client infra not available in unit test
+  () => ({
     useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
     useFamilySubscription: (...args: unknown[]) =>
       mockUseFamilySubscription(...args),
@@ -83,8 +83,8 @@ jest.mock(
 
 const mockMutate = jest.fn();
 jest.mock(
-  '../hooks/use-profiles',
-  /* gc1-allow: hook requires QueryClient + Clerk auth context not available in unit test */ () => ({
+  '../hooks/use-profiles', // gc1-allow: hook requires QueryClient + Clerk auth context not available in unit test
+  () => ({
     useUpdateProfileName: () => ({
       mutate: mockMutate,
       isPending: false,
@@ -93,8 +93,8 @@ jest.mock(
 );
 
 jest.mock(
-  '../lib/format-api-error',
-  /* gc1-allow: formatApiError calls i18next.t() which requires i18n initialisation not present in this test suite */ () => ({
+  '../lib/format-api-error', // gc1-allow: formatApiError calls i18next.t() which requires i18n initialisation not present in this test suite
+  () => ({
     formatApiError: (e: unknown) =>
       e instanceof Error ? e.message : 'Unknown error',
   }),

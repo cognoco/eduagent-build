@@ -79,34 +79,39 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 // Mock theme
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    muted: '#a3a3a3',
-    primary: '#0d9488',
-    textInverse: '#ffffff',
-    textPrimary: '#1a1a1a',
-    textSecondary: '#525252',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      muted: '#a3a3a3',
+      primary: '#0d9488',
+      textInverse: '#ffffff',
+      textPrimary: '#1a1a1a',
+      textSecondary: '#525252',
+    }),
   }),
-}));
+);
 
 // Mock the OCR hook — use-homework-ocr has no useApiClient() calls (processes
 // images locally via expo-camera + Cloudflare R2 upload). Keep as direct mock.
 const mockProcess = jest.fn().mockResolvedValue(undefined);
 const mockRetry = jest.fn().mockResolvedValue(undefined);
 const mockCancel = jest.fn();
-jest.mock('../../../hooks/use-homework-ocr', () => ({
-  useHomeworkOcr: jest.fn().mockReturnValue({
-    text: null,
-    status: 'idle',
-    error: null,
-    errorCode: undefined,
-    failCount: 0,
-    process: mockProcess,
-    retry: mockRetry,
-    cancel: mockCancel,
+jest.mock(
+  '../../../hooks/use-homework-ocr', // gc1-allow: native-boundary: uses TextRecognition ML Kit, expo-image-manipulator, expo-file-system — requires native build
+  () => ({
+    useHomeworkOcr: jest.fn().mockReturnValue({
+      text: null,
+      status: 'idle',
+      error: null,
+      errorCode: undefined,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    }),
   }),
-}));
+);
 
 const mockStartListening = jest.fn().mockResolvedValue(undefined);
 const mockStopListening = jest.fn().mockResolvedValue(undefined);
@@ -136,20 +141,23 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-    },
+jest.mock(
+  '../../../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
+  () => ({
+    useProfile: () => ({
+      activeProfile: {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
+      },
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock — route handlers close over mutable variables below.
@@ -193,10 +201,12 @@ const mockFetch = createRoutedMockFetch({
   },
 });
 
-jest.mock('../../../lib/api-client', () =>
-  require('../../../test-utils/mock-api-routes').mockApiClientFactory(
-    mockFetch,
-  ),
+jest.mock(
+  '../../../lib/api-client', // gc1-allow: transport-boundary: wires Hono RPC client through routed mock fetch
+  () =>
+    require('../../../test-utils/mock-api-routes').mockApiClientFactory(
+      mockFetch,
+    ),
 );
 
 // CameraScreen is required AFTER jest.mock and mockFetch are initialized,
