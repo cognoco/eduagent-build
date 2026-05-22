@@ -1,3 +1,4 @@
+import { quizRounds, type Database } from '@eduagent/database';
 import type {
   CapitalsQuestion,
   GuessWhoQuestion,
@@ -12,6 +13,7 @@ import {
   buildMissedItemText,
   calculateScore,
   calculateXp,
+  checkQuizAnswerWithCorrect,
   getCapitalsSm2Quality,
   getCelebrationTier,
   getGuessWhoSm2Quality,
@@ -19,6 +21,70 @@ import {
   isAnswerCorrect,
   validateResults,
 } from './complete-round';
+
+function extractDrizzleParamValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (typeof node !== 'object') return [String(node)];
+  if (visited.has(node)) return [];
+  visited.add(node);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (
+    'value' in obj &&
+    (typeof obj['value'] === 'string' || typeof obj['value'] === 'number')
+  ) {
+    values.push(String(obj['value']));
+  }
+
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      values.push(
+        ...child.flatMap((item) => extractDrizzleParamValues(item, visited)),
+      );
+    } else {
+      values.push(...extractDrizzleParamValues(child, visited));
+    }
+  }
+
+  return values;
+}
+
+function extractDrizzleSqlText(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string') return node;
+  if (typeof node !== 'object') return '';
+  if (visited.has(node)) return '';
+  visited.add(node);
+
+  const obj = node as Record<string, unknown>;
+  const fragments: string[] = [];
+  if (Array.isArray(obj['value'])) {
+    fragments.push(
+      ...(obj['value'] as unknown[]).filter(
+        (value): value is string => typeof value === 'string',
+      ),
+    );
+  }
+  if (Array.isArray(obj['queryChunks'])) {
+    fragments.push(
+      ...(obj['queryChunks'] as unknown[]).map((chunk) =>
+        typeof chunk === 'string'
+          ? chunk
+          : extractDrizzleSqlText(chunk, visited),
+      ),
+    );
+  }
+
+  return fragments.join(' ');
+}
 
 describe('calculateScore', () => {
   it('counts correct answers', () => {
@@ -66,6 +132,14 @@ describe('calculateXp', () => {
     ];
 
     expect(calculateXp(results, 1)).toBe(35);
+  });
+
+  it('[BREAK/WI-89] does not award timer bonus when check-time persistence has unknown timeMs 0', () => {
+    const results: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 0 },
+    ];
+
+    expect(calculateXp(results, 2, 'capitals')).toBe(10);
   });
 });
 
@@ -259,6 +333,72 @@ describe('assertAnswerInOptions [BUG-STALE-OPTIONS]', () => {
   });
 });
 
+describe('checkQuizAnswerWithCorrect [WI-89 scoring state]', () => {
+  const question: CapitalsQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Marseille', 'Nice'],
+    funFact: '',
+    isLibraryItem: false,
+  };
+
+  it('[BREAK/WI-89] persists a wrong active-round check attempt into results', async () => {
+    const profileId = 'profile-1';
+    const roundId = 'round-1';
+    const previousResult: QuestionResult = {
+      questionIndex: 1,
+      correct: true,
+      answerGiven: 'Berlin',
+      timeMs: 300,
+      answerMode: 'multiple_choice',
+    };
+    const returning = jest.fn().mockResolvedValue([{ id: roundId }]);
+    const where = jest.fn().mockReturnValue({ returning });
+    const set = jest.fn().mockReturnValue({ where });
+    const update = jest.fn().mockReturnValue({ set });
+    const db = {
+      query: {
+        quizRounds: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: roundId,
+            profileId,
+            status: 'active',
+            questions: [question],
+            results: [previousResult],
+          }),
+        },
+      },
+      update,
+    } as unknown as Database;
+
+    const result = await checkQuizAnswerWithCorrect(
+      db,
+      profileId,
+      roundId,
+      0,
+      'Lyon',
+      'multiple_choice',
+    );
+
+    expect(result).toEqual({ correct: false, correctAnswer: 'Paris' });
+    expect(update).toHaveBeenCalledWith(quizRounds);
+    const setArg = set.mock.calls[0]?.[0] as { results: unknown };
+    expect(Array.isArray(setArg.results)).toBe(false);
+    const resultsSql = extractDrizzleSqlText(setArg.results);
+    expect(resultsSql).toContain('jsonb_array_elements');
+    expect(resultsSql).toContain("->>'questionIndex'");
+    expect(resultsSql).toContain('Lyon');
+    expect(where).toHaveBeenCalledTimes(1);
+    const whereArg = where.mock.calls[0]?.[0];
+    expect(extractDrizzleParamValues(whereArg)).toEqual(
+      expect.arrayContaining([roundId, profileId, 'active']),
+    );
+    expect(returning).toHaveBeenCalledWith({ id: quizRounds.id });
+  });
+});
+
 describe('validateResults (anti-tampering)', () => {
   const questions: QuizQuestion[] = [
     {
@@ -315,6 +455,76 @@ describe('validateResults (anti-tampering)', () => {
     const validated = validateResults(questions, malicious);
     expect(validated).toHaveLength(1);
     expect(validated[0]?.questionIndex).toBe(0);
+  });
+
+  it('[BREAK/WI-230] deduplicates duplicate questionIndex entries before score and XP aggregation', () => {
+    const duplicated: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 100,
+        answerMode: 'multiple_choice',
+      },
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 100,
+        answerMode: 'multiple_choice',
+      },
+      {
+        questionIndex: 1,
+        correct: true,
+        answerGiven: 'Berlin',
+        timeMs: 100,
+        answerMode: 'multiple_choice',
+      },
+    ];
+    const deduplicated: QuestionResult[] = [duplicated[0]!, duplicated[2]!];
+
+    const validated = validateResults(questions, duplicated);
+    const validatedDeduplicated = validateResults(questions, deduplicated);
+
+    expect(validated).toEqual(validatedDeduplicated);
+    expect(validated.map((result) => result.questionIndex)).toEqual([0, 1]);
+    expect(calculateScore(validated)).toBe(2);
+    expect(calculateXp(validated, 2, 'capitals')).toBe(
+      calculateXp(validatedDeduplicated, 2, 'capitals'),
+    );
+  });
+
+  it('[BREAK/WI-163] keeps the first attempt when a later duplicate would retro-score', () => {
+    const retroScoreAttempt: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'Lyon',
+        timeMs: 100,
+        answerMode: 'multiple_choice',
+      },
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 100,
+        answerMode: 'multiple_choice',
+      },
+    ];
+
+    const validated = validateResults(questions, retroScoreAttempt);
+
+    expect(validated).toEqual([
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'Lyon',
+        timeMs: 100,
+        answerMode: 'multiple_choice',
+      },
+    ]);
+    expect(calculateScore(validated)).toBe(0);
+    expect(calculateXp(validated, 2, 'capitals')).toBe(0);
   });
 
   // [BUG-STALE-OPTIONS] validateResults must drop MC results where

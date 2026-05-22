@@ -152,7 +152,8 @@ jest.mock('./_layout', () => ({
   }),
 }));
 
-const { default: QuizPlayScreen } = require('./play');
+const { default: QuizPlayScreen, appendUniqueQuestionResult } =
+  require('./play') as typeof import('./play');
 
 beforeEach(() => {
   mockCompleteRoundMutate.mockImplementation((_input, opts) => {
@@ -558,6 +559,49 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
 
     expect(mockSetRound).toHaveBeenCalledWith(null);
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/launch');
+  });
+});
+
+describe('appendUniqueQuestionResult [WI-282]', () => {
+  it('[BREAK/WI-282] replaces an existing questionIndex instead of appending a duplicate', () => {
+    const first = {
+      questionIndex: 0,
+      correct: false,
+      answerGiven: 'Prague',
+      timeMs: 900,
+      answerMode: 'multiple_choice' as const,
+    };
+    const corrected = {
+      questionIndex: 0,
+      correct: true,
+      answerGiven: 'Bratislava',
+      timeMs: 1200,
+      answerMode: 'multiple_choice' as const,
+    };
+
+    expect(appendUniqueQuestionResult([first], corrected)).toEqual([corrected]);
+  });
+
+  it('[BREAK/WI-282] preserves order when appending a new questionIndex', () => {
+    const first = {
+      questionIndex: 0,
+      correct: true,
+      answerGiven: 'Bratislava',
+      timeMs: 900,
+      answerMode: 'multiple_choice' as const,
+    };
+    const second = {
+      questionIndex: 1,
+      correct: true,
+      answerGiven: 'Paris',
+      timeMs: 1200,
+      answerMode: 'multiple_choice' as const,
+    };
+
+    expect(appendUniqueQuestionResult([first], second)).toEqual([
+      first,
+      second,
+    ]);
   });
 });
 

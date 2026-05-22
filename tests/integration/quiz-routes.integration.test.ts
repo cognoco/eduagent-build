@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { quizRounds, vocabulary } from '@eduagent/database';
-import { ERROR_CODES } from '@eduagent/schemas';
+import { quizMasteryItems, quizRounds, vocabulary } from '@eduagent/database';
+import { ERROR_CODES, type QuizQuestion } from '@eduagent/schemas';
 import { app } from '../../apps/api/src/index';
 import { QUIZ_CONFIG } from '../../apps/api/src/services/quiz/config';
 import {
@@ -248,5 +248,274 @@ describe('Integration: POST /v1/quiz/rounds', () => {
       llmFixture.dispose();
       restoreDefaultLlmProvider();
     }
+  });
+});
+
+describe('Integration: quiz scoring integrity', () => {
+  async function startCapitalsRound(profileId: string): Promise<{
+    headers: HeadersInit;
+    roundId: string;
+    questions: QuizQuestion[];
+  }> {
+    const headers = buildAuthHeaders(
+      { sub: QUIZ_AUTH_USER_ID, email: QUIZ_AUTH_EMAIL },
+      profileId,
+    );
+    const startRes = await app.request(
+      '/v1/quiz/rounds',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ activityType: 'capitals' }),
+      },
+      TEST_ENV,
+    );
+    expect(startRes.status).toBe(200);
+    const started = (await startRes.json()) as { id: string };
+
+    const db = createIntegrationDb();
+    const activeRound = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, started.id),
+    });
+    expect(activeRound).toBeDefined();
+    return {
+      headers,
+      roundId: started.id,
+      questions: activeRound!.questions as QuizQuestion[],
+    };
+  }
+
+  it('[BREAK/WI-163] records wrong checks and ignores forged completion results after answer reveal', async () => {
+    const profileId = await createQuizProfile();
+    const { headers, roundId, questions } = await startCapitalsRound(profileId);
+    const firstQuestion = questions[0]!;
+    if (firstQuestion.type !== 'capitals') {
+      throw new Error('Expected capitals fixture question');
+    }
+    const wrongAnswer = firstQuestion.distractors[0]!;
+
+    const checkRes = await app.request(
+      `/v1/quiz/rounds/${roundId}/check`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          questionIndex: 0,
+          answerGiven: wrongAnswer,
+          answerMode: 'multiple_choice',
+        }),
+      },
+      TEST_ENV,
+    );
+    expect(checkRes.status).toBe(200);
+    expect(await checkRes.json()).toMatchObject({
+      correct: false,
+      correctAnswer: firstQuestion.correctAnswer,
+    });
+
+    const db = createIntegrationDb();
+    const afterCheck = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, roundId),
+    });
+    expect(afterCheck!.results).toEqual([
+      expect.objectContaining({
+        questionIndex: 0,
+        correct: false,
+        answerGiven: wrongAnswer,
+        answerMode: 'multiple_choice',
+      }),
+    ]);
+
+    const completeRes = await app.request(
+      `/v1/quiz/rounds/${roundId}/complete`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          results: [
+            {
+              questionIndex: 0,
+              correct: true,
+              answerGiven: firstQuestion.correctAnswer,
+              timeMs: 1,
+              answerMode: 'multiple_choice',
+            },
+          ],
+        }),
+      },
+      TEST_ENV,
+    );
+    expect(completeRes.status).toBe(200);
+    const completed = await completeRes.json();
+    expect(completed.score).toBe(0);
+    expect(completed.xpEarned).toBe(0);
+    expect(completed.questionResults).toEqual([
+      expect.objectContaining({
+        questionIndex: 0,
+        correct: false,
+        answerGiven: wrongAnswer,
+        correctAnswer: firstQuestion.correctAnswer,
+      }),
+    ]);
+
+    const storedCompletedRound = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, roundId),
+    });
+    expect(storedCompletedRound).toMatchObject({
+      status: 'completed',
+      score: 0,
+      xpEarned: 0,
+    });
+    const masteryRows = await db.query.quizMasteryItems.findMany({
+      where: eq(quizMasteryItems.profileId, profileId),
+    });
+    expect(masteryRows).toHaveLength(0);
+  });
+
+  it('[BREAK/WI-89] keeps the first check result when the same question is checked repeatedly', async () => {
+    const profileId = await createQuizProfile();
+    const { headers, roundId, questions } = await startCapitalsRound(profileId);
+    const firstQuestion = questions[0]!;
+    if (firstQuestion.type !== 'capitals') {
+      throw new Error('Expected capitals fixture question');
+    }
+    const wrongAnswer = firstQuestion.distractors[0]!;
+
+    const firstCheck = await app.request(
+      `/v1/quiz/rounds/${roundId}/check`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          questionIndex: 0,
+          answerGiven: wrongAnswer,
+          answerMode: 'multiple_choice',
+        }),
+      },
+      TEST_ENV,
+    );
+    expect(firstCheck.status).toBe(200);
+
+    const secondCheck = await app.request(
+      `/v1/quiz/rounds/${roundId}/check`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          questionIndex: 0,
+          answerGiven: firstQuestion.correctAnswer,
+          answerMode: 'multiple_choice',
+        }),
+      },
+      TEST_ENV,
+    );
+    expect(secondCheck.status).toBe(200);
+
+    const db = createIntegrationDb();
+    const storedRound = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, roundId),
+    });
+    expect(storedRound!.results).toEqual([
+      expect.objectContaining({
+        questionIndex: 0,
+        correct: false,
+        answerGiven: wrongAnswer,
+      }),
+    ]);
+  });
+
+  it('[BREAK/WI-89] preserves concurrent checks without lost JSONB updates', async () => {
+    const profileId = await createQuizProfile();
+    const { headers, roundId, questions } = await startCapitalsRound(profileId);
+    const firstQuestion = questions[0]!;
+    const secondQuestion = questions[1]!;
+    if (
+      firstQuestion.type !== 'capitals' ||
+      secondQuestion?.type !== 'capitals'
+    ) {
+      throw new Error('Expected capitals fixture questions');
+    }
+
+    const [firstCheck, secondCheck] = await Promise.all([
+      app.request(
+        `/v1/quiz/rounds/${roundId}/check`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            questionIndex: 0,
+            answerGiven: firstQuestion.distractors[0]!,
+            answerMode: 'multiple_choice',
+          }),
+        },
+        TEST_ENV,
+      ),
+      app.request(
+        `/v1/quiz/rounds/${roundId}/check`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            questionIndex: 1,
+            answerGiven: secondQuestion.distractors[0]!,
+            answerMode: 'multiple_choice',
+          }),
+        },
+        TEST_ENV,
+      ),
+    ]);
+    expect(firstCheck.status).toBe(200);
+    expect(secondCheck.status).toBe(200);
+
+    const db = createIntegrationDb();
+    const storedRound = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, roundId),
+    });
+    expect(storedRound!.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ questionIndex: 0 }),
+        expect.objectContaining({ questionIndex: 1 }),
+      ]),
+    );
+    expect(storedRound!.results).toHaveLength(2);
+  });
+
+  it('[BREAK/WI-163] leaves another profile round unchanged when check uses a non-owner profileId', async () => {
+    const ownerProfileId = await createQuizProfile();
+    const { roundId, questions } = await startCapitalsRound(ownerProfileId);
+    const attackerProfileId = await createQuizProfile();
+    const attackerHeaders = buildAuthHeaders(
+      { sub: QUIZ_AUTH_USER_ID, email: QUIZ_AUTH_EMAIL },
+      attackerProfileId,
+    );
+    const firstQuestion = questions[0]!;
+    if (firstQuestion.type !== 'capitals') {
+      throw new Error('Expected capitals fixture question');
+    }
+
+    const checkRes = await app.request(
+      `/v1/quiz/rounds/${roundId}/check`,
+      {
+        method: 'POST',
+        headers: attackerHeaders,
+        body: JSON.stringify({
+          questionIndex: 0,
+          answerGiven: firstQuestion.correctAnswer,
+          answerMode: 'multiple_choice',
+        }),
+      },
+      TEST_ENV,
+    );
+    expect(checkRes.status).toBe(404);
+
+    const db = createIntegrationDb();
+    const storedRound = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, roundId),
+    });
+    expect(storedRound).toMatchObject({
+      profileId: ownerProfileId,
+      results: [],
+      status: 'active',
+    });
   });
 });

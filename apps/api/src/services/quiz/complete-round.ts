@@ -1,4 +1,10 @@
-import { createScopedRepository, type Database } from '@eduagent/database';
+import { and, eq, sql } from 'drizzle-orm';
+
+import {
+  createScopedRepository,
+  quizRounds,
+  type Database,
+} from '@eduagent/database';
 import type {
   CompleteRoundResponse,
   QuestionResult,
@@ -165,6 +171,45 @@ export async function checkQuizAnswerWithCorrect(
   if (!question) throw new NotFoundError('Question');
   assertAnswerInOptions(question, answerGiven, answerMode);
   const correct = isAnswerCorrect(question, answerGiven);
+  const attempt: QuestionResult = {
+    questionIndex,
+    correct,
+    answerGiven,
+    timeMs: 0,
+    ...(answerMode ? { answerMode } : {}),
+  };
+  const attemptJson = JSON.stringify([attempt]);
+  const questionIndexText = String(questionIndex);
+  const updated = await db
+    .update(quizRounds)
+    .set({
+      results: sql`
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM jsonb_array_elements(
+              COALESCE(${quizRounds.results}, '[]'::jsonb)
+            ) AS persisted_result(value)
+            WHERE persisted_result.value->>'questionIndex' = ${questionIndexText}
+          )
+          THEN COALESCE(${quizRounds.results}, '[]'::jsonb)
+          ELSE COALESCE(${quizRounds.results}, '[]'::jsonb) || ${attemptJson}::jsonb
+        END
+      `,
+    })
+    .where(
+      and(
+        eq(quizRounds.id, roundId),
+        eq(quizRounds.profileId, profileId),
+        eq(quizRounds.status, 'active'),
+      ),
+    )
+    .returning({ id: quizRounds.id });
+
+  if (!updated[0]) {
+    throw new ConflictError('Round already completed');
+  }
+
   return { correct, correctAnswer: question.correctAnswer };
 }
 
@@ -184,9 +229,12 @@ export function validateResults(
   clientResults: QuestionResult[],
 ): QuestionResult[] {
   const validated: QuestionResult[] = [];
+  const seenQuestionIndices = new Set<number>();
   for (const result of clientResults) {
     const question = questions[result.questionIndex];
     if (!question) continue;
+    if (seenQuestionIndices.has(result.questionIndex)) continue;
+    seenQuestionIndices.add(result.questionIndex);
     // Drop MC answers for fixed-option question types when the submitted
     // value is not one of the server-known options.
     if (
@@ -209,6 +257,22 @@ export function validateResults(
     });
   }
   return validated;
+}
+
+function selectAuthoritativeResults(
+  persistedResults: QuestionResult[],
+  requestResults: QuestionResult[],
+): QuestionResult[] {
+  const selected: QuestionResult[] = [];
+  const seenQuestionIndices = new Set<number>();
+
+  for (const result of persistedResults.concat(requestResults)) {
+    if (seenQuestionIndices.has(result.questionIndex)) continue;
+    selected.push(result);
+    seenQuestionIndices.add(result.questionIndex);
+  }
+
+  return selected;
 }
 
 export function buildMissedItemText(question: QuizQuestion): string {
@@ -246,7 +310,9 @@ export function calculateXp(
   const baseXp = correctResults.length * QUIZ_CONFIG.xp.perCorrect;
   const timerBonus =
     correctResults.filter(
-      (result) => result.timeMs < QUIZ_CONFIG.defaults.timerBonusThresholdMs,
+      (result) =>
+        result.timeMs > 0 &&
+        result.timeMs < QUIZ_CONFIG.defaults.timerBonusThresholdMs,
     ).length * QUIZ_CONFIG.xp.timerBonus;
   const perfectBonus =
     correctResults.length === total ? QUIZ_CONFIG.xp.perfectBonus : 0;
@@ -341,8 +407,16 @@ export async function completeQuizRound(
 
     const questions = round.questions as QuizQuestion[];
     const total = round.total;
-    const validatedResults = validateResults(questions, results);
-    const droppedResults = results.length - validatedResults.length;
+    const persistedResults = Array.isArray(round.results)
+      ? (round.results as QuestionResult[])
+      : [];
+    const authoritativeResults = selectAuthoritativeResults(
+      persistedResults,
+      results,
+    );
+    const validatedResults = validateResults(questions, authoritativeResults);
+    const droppedResults =
+      authoritativeResults.length - validatedResults.length;
     const score = calculateScore(validatedResults);
     const xpEarned = calculateXp(validatedResults, total, round.activityType);
     const celebrationTier = getCelebrationTier(score, total);

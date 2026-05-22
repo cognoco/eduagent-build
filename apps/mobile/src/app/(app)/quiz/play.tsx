@@ -48,6 +48,23 @@ interface SubmitRoundOptions {
   navigateOnSuccess?: boolean;
 }
 
+export function appendUniqueQuestionResult(
+  results: QuestionResult[],
+  result: QuestionResult,
+): QuestionResult[] {
+  const existingIndex = results.findIndex(
+    (existing) => existing.questionIndex === result.questionIndex,
+  );
+
+  if (existingIndex === -1) {
+    return [...results, result];
+  }
+
+  return results.map((existing, index) =>
+    index === existingIndex ? result : existing,
+  );
+}
+
 function formatElapsedTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -331,17 +348,14 @@ export default function QuizPlayScreen(): React.ReactElement {
   const handleGuessWhoResolved = useCallback(
     (result: GuessWhoResolvedResult) => {
       const timeMs = Date.now() - questionStartTimeRef.current;
-      const nextResults: QuestionResult[] = [
-        ...resultsRef.current,
-        {
-          questionIndex: currentIndex,
-          correct: result.correct,
-          answerGiven: result.answerGiven,
-          timeMs,
-          cluesUsed: result.cluesUsed,
-          answerMode: result.answerMode,
-        },
-      ];
+      const nextResults = appendUniqueQuestionResult(resultsRef.current, {
+        questionIndex: currentIndex,
+        correct: result.correct,
+        answerGiven: result.answerGiven,
+        timeMs,
+        cluesUsed: result.cluesUsed,
+        answerMode: result.answerMode,
+      });
       resultsRef.current = nextResults;
       setGuessWhoCluesUsed(result.cluesUsed);
       setSelectedAnswer(result.answerGiven);
@@ -575,7 +589,10 @@ export default function QuizPlayScreen(): React.ReactElement {
       answerMode,
     };
 
-    const nextResults = [...resultsRef.current, nextResult];
+    const nextResults = appendUniqueQuestionResult(
+      resultsRef.current,
+      nextResult,
+    );
     resultsRef.current = nextResults;
     setAnswerState(correct ? 'correct' : 'wrong');
     setShowContinueHint(false);
