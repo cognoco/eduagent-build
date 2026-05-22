@@ -53,9 +53,12 @@ jest.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: ({ children }: { children?: unknown }) => children,
 }));
 
-jest.mock('../i18n', () => ({
-  ensureI18nReady: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  '../i18n',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    ensureI18nReady: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
@@ -75,74 +78,118 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
   useTokenVars: () => ({}),
 }));
 
-jest.mock('../lib/profile', () => ({
-  ProfileProvider: ({ children }: { children?: unknown }) => children,
-  useProfile: jest.fn().mockReturnValue({ activeProfile: null, profiles: [] }),
-}));
+jest.mock(
+  '../lib/profile',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    ProfileProvider: ({ children }: { children?: unknown }) => children,
+    useProfile: jest
+      .fn()
+      .mockReturnValue({ activeProfile: null, profiles: [] }),
+  }),
+);
 
-jest.mock('../lib/app-context', () => ({
-  AppContextProvider: ({ children }: { children?: unknown }) => children,
-}));
+jest.mock(
+  '../lib/app-context',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    AppContextProvider: ({ children }: { children?: unknown }) => children,
+  }),
+);
 
-jest.mock('../lib/api-client', () => ({
-  setOnAuthExpired: jest.fn(),
-  clearOnAuthExpired: jest.fn(),
-  resetAuthExpiredGuard: jest.fn(),
-}));
+jest.mock(
+  '../lib/api-client',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    setOnAuthExpired: jest.fn(),
+    clearOnAuthExpired: jest.fn(),
+    resetAuthExpiredGuard: jest.fn(),
+  }),
+);
 
-jest.mock('../lib/auth-expiry', () => ({
-  markSessionExpired: jest.fn(),
-}));
+jest.mock(
+  '../lib/auth-expiry',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    markSessionExpired: jest.fn(),
+  }),
+);
 
-jest.mock('../lib/sign-out', () => ({
-  signOutWithCleanup: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  '../lib/sign-out',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    signOutWithCleanup: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
-jest.mock('../lib/secure-storage', () => ({
-  getItemAsync: jest.fn().mockResolvedValue(null),
-  setItemAsync: jest.fn().mockResolvedValue(undefined),
-  deleteItemAsync: jest.fn().mockResolvedValue(undefined),
-  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+jest.mock(
+  '../lib/secure-storage',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    getItemAsync: jest.fn().mockResolvedValue(null),
+    setItemAsync: jest.fn().mockResolvedValue(undefined),
+    deleteItemAsync: jest.fn().mockResolvedValue(undefined),
+    sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+  }),
+);
 
-jest.mock('../components/common', () => ({
-  ErrorBoundary: ({ children }: { children?: unknown }) => children,
-  OfflineBanner: () => null,
-}));
+jest.mock(
+  '../components/common',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    ErrorBoundary: ({ children }: { children?: unknown }) => children,
+    OfflineBanner: () => null,
+  }),
+);
 
-jest.mock('../providers/OutboxDrainProvider', () => ({
-  OutboxDrainProvider: ({ children }: { children?: unknown }) => children,
-}));
+jest.mock(
+  '../providers/OutboxDrainProvider',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    OutboxDrainProvider: ({ children }: { children?: unknown }) => children,
+  }),
+);
 
-jest.mock('../hooks/use-network-status', () => ({
-  useNetworkStatus: () => ({ isOffline: false }),
-}));
+jest.mock(
+  '../hooks/use-network-status',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    useNetworkStatus: () => ({ isOffline: false }),
+  }),
+);
 
-jest.mock('../lib/sentry', () => ({
-  enableSentry: jest.fn(),
-  Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
-}));
+jest.mock(
+  '../lib/sentry',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    enableSentry: jest.fn(),
+    Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
+  }),
+);
 
-jest.mock('../lib/revenuecat', () => ({
-  configureRevenueCat: jest.fn(),
-}));
+jest.mock(
+  '../lib/revenuecat',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    configureRevenueCat: jest.fn(),
+  }),
+);
 
-jest.mock('../components/AnimatedSplash', () => ({
-  AnimatedSplash: ({ onComplete }: { onComplete: () => void }) => {
-    require('react').useEffect(() => {
-      onComplete();
-    }, [onComplete]);
-    return null;
-  },
-}));
+jest.mock(
+  '../components/AnimatedSplash',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    AnimatedSplash: ({ onComplete }: { onComplete: () => void }) => {
+      require('react').useEffect(() => {
+        onComplete();
+      }, [onComplete]);
+      return null;
+    },
+  }),
+);
 
-jest.mock('../lib/query-persister', () => ({
-  createScopedPersister: jest.fn().mockReturnValue({}),
-}));
+jest.mock(
+  '../lib/query-persister',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    createScopedPersister: jest.fn().mockReturnValue({}),
+  }),
+);
 
-jest.mock('../lib/query-error-reporting', () => ({
-  shouldReportQueryErrorToSentry: jest.fn().mockReturnValue(false),
-}));
+jest.mock(
+  '../lib/query-error-reporting',
+  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+    shouldReportQueryErrorToSentry: jest.fn().mockReturnValue(false),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // ClerkGate unit tests — BUG-507
