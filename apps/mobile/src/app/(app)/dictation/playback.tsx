@@ -24,6 +24,8 @@ export default function PlaybackScreen(): React.ReactElement {
   const prefs = useDictationPreferences(activeProfile?.id);
 
   // null birthYear defaults to 'adolescent' — the more conservative chunk size.
+  // MentoMate is strictly 11+; `adolescent` intentionally covers all under-18
+  // learners after the old child bracket was removed.
   const ageBracket = activeProfile?.birthYear
     ? computeAgeBracket(activeProfile.birthYear)
     : 'adolescent';

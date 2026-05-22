@@ -449,20 +449,17 @@ async function handleBillingIssue(
       },
     );
 
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'app/payment.failed',
-          data: {
-            subscriptionId: updated.id,
-            accountId: updated.accountId,
-            source: 'revenuecat',
-            timestamp: new Date().toISOString(),
-          },
-        }),
-      'revenuecat.webhook.payment-failed',
-      { eventId: event.id },
-    );
+    // core-send: payment-failed alert - billing observability cannot be silent.
+    // A swallowed dispatch leaves the failed payment unobserved by alerting.
+    await inngest.send({
+      name: 'app/payment.failed',
+      data: {
+        subscriptionId: updated.id,
+        accountId: updated.accountId,
+        source: 'revenuecat',
+        timestamp: new Date().toISOString(),
+      },
+    });
   }
 }
 

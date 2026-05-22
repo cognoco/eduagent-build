@@ -37,7 +37,7 @@ type NoteRow = {
  * parse (e.g. `noteMutationResponseSchema.parse`) would have silently
  * serialised the Date as a non-ISO string in JSON.stringify fallback paths.
  */
-export type MappedNoteRow = {
+type MappedNoteRow = {
   id: string;
   topicId: string;
   sessionId: string | null;

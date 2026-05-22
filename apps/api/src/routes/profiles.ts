@@ -138,8 +138,8 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // able to edit sibling profiles (IDOR). Self-updates are always allowed
       // so a non-owner can still update their own displayName/avatar/colorScheme.
       const activeProfileId = c.get('profileId');
-      const profileMetaPatch = c.get('profileMeta');
-      if (profileMetaPatch?.isOwner !== true && id !== activeProfileId) {
+      const profileMeta = c.get('profileMeta');
+      if (profileMeta?.isOwner !== true && id !== activeProfileId) {
         return apiError(
           c,
           403,
