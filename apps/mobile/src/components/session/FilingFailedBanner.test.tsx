@@ -3,7 +3,7 @@ import { ConflictError, RateLimitedError } from '@eduagent/schemas';
 
 import { FilingFailedBanner } from './FilingFailedBanner';
 
-// gc1-allow: observability — lib/sentry wraps @sentry/react-native, which is
+// lib/sentry wraps @sentry/react-native, which is
 // globally mocked in test-setup.ts (Sentry.init, captureException, etc.).
 // Using the real wrapper keeps the re-export and age-gate logic live.
 

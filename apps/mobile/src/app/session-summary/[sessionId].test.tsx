@@ -130,20 +130,24 @@ const mockUseParentProxy = jest.fn(() => ({
   childProfile: null,
   parentProfile: null,
 }));
-jest.mock('../../hooks/use-parent-proxy', () => ({
-  // gc1-allow: SecureStore read/write in useEffect
-  useParentProxy: () => mockUseParentProxy(),
-}));
-
-// use-rating-prompt reads/writes SecureStore and calls expo-store-review —
-// no useApiClient() calls — keep as a direct mock.
-const mockOnSuccessfulRecall = jest.fn();
-jest.mock('../../hooks/use-rating-prompt', () => ({
-  // gc1-allow: expo-store-review + SecureStore native APIs
-  useRatingPrompt: () => ({
-    onSuccessfulRecall: mockOnSuccessfulRecall,
+jest.mock(
+  '../../hooks/use-parent-proxy' /* gc1-allow: native-boundary; hook reads/writes SecureStore in effects */,
+  () => ({
+    useParentProxy: () => mockUseParentProxy(),
   }),
-}));
+);
+
+// use-rating-prompt reads/writes SecureStore and calls expo-store-review.
+// It has no useApiClient() calls, so keep it as a direct mock.
+const mockOnSuccessfulRecall = jest.fn();
+jest.mock(
+  '../../hooks/use-rating-prompt' /* gc1-allow: native-boundary; hook calls StoreReview and SecureStore APIs */,
+  () => ({
+    useRatingPrompt: () => ({
+      onSuccessfulRecall: mockOnSuccessfulRecall,
+    }),
+  }),
+);
 
 let resolveDefaultSummaryDraftReads: Array<() => void> = [];
 

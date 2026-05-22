@@ -1,7 +1,7 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { NoteInput } from './NoteInput';
 
-// gc1-allow: native-boundary — useSpeechRecognition dynamically imports
+// useSpeechRecognition dynamically imports
 // expo-speech-recognition (a native module not available in Jest). The real
 // hook gracefully handles the missing module by returning idle state, which
 // is all these tests require. No override needed.

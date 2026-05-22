@@ -21,7 +21,7 @@ const mockDeletePermanentlyFailed = jest.spyOn(
   'deletePermanentlyFailed',
 );
 
-// gc1-allow: external-boundary — expo-clipboard is a native module stubbed
+// expo-clipboard is a native module stubbed
 // globally in test-setup.ts; the bare-specifier mock is already in place.
 const mockSetStringAsync = Clipboard.setStringAsync as jest.MockedFunction<
   typeof Clipboard.setStringAsync

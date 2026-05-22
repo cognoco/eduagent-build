@@ -1,7 +1,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as ExpoSecureStore from 'expo-secure-store'; // gc1-allow: native-boundary (already globally mocked in test-setup.ts)
+import * as ExpoSecureStore from 'expo-secure-store';
 import {
   ProfileProvider,
   useProfile,

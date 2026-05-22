@@ -79,16 +79,18 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 // Mock theme
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    muted: '#a3a3a3',
-    primary: '#0d9488',
-    textInverse: '#ffffff',
-    textPrimary: '#1a1a1a',
-    textSecondary: '#525252',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      muted: '#a3a3a3',
+      primary: '#0d9488',
+      textInverse: '#ffffff',
+      textPrimary: '#1a1a1a',
+      textSecondary: '#525252',
+    }),
   }),
-}));
+);
 
 // Mock the OCR hook — use-homework-ocr has no useApiClient() calls (processes
 // images locally via expo-camera + Cloudflare R2 upload). Keep as direct mock.

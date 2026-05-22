@@ -6,7 +6,7 @@ jest.mock('../../lib/profile', () => ({
   useProfile: () => ({ activeProfile: { id: 'profile-1' } }),
 }));
 
-// gc1-allow: native-boundary — lib/secure-storage wraps expo-secure-store, which is
+// lib/secure-storage wraps expo-secure-store, which is
 // globally stubbed in test-setup.ts; using the real wrapper here keeps the
 // sanitizeSecureStoreKey logic exercised and avoids duplicating the in-memory store.
 

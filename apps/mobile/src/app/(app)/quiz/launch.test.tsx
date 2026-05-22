@@ -43,31 +43,31 @@ jest.mock('react-i18next', () => {
   return { useTranslation: () => ({ t }) };
 });
 
-// gc1-allow: native-boundary: i18n/index.ts imports expo-localization and
-// @react-native-async-storage/async-storage which are native-only modules.
-// This stub provides the i18next.t() function used by friendlyErrorMessage.
-jest.mock('../../../i18n', () => {
-  const TRANSLATIONS: Record<string, string> = {
-    'quiz.launch.friendlyErrors.upstreamError':
-      'Something went wrong creating your quiz. Try again!',
-    'quiz.launch.friendlyErrors.timeout':
-      'The quiz took too long to create. Try again!',
-    'quiz.launch.friendlyErrors.rateLimited':
-      'Too many requests — wait a moment and try again.',
-    'quiz.launch.friendlyErrors.validationError':
-      'Something went wrong. Please try a different activity.',
-    'quiz.launch.friendlyErrors.genericShort':
-      'Something went wrong. Try again!',
-  };
-  const t = (key: string, opts?: Record<string, unknown>) => {
-    const template = TRANSLATIONS[key] ?? key;
-    if (!opts) return template;
-    return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
-      String(opts[k] ?? `{{${k}}}`),
-    );
-  };
-  return { __esModule: true, i18next: { t } };
-});
+jest.mock(
+  '../../../i18n' /* gc1-allow: native-boundary; i18n imports native localization/storage modules in JSDOM */,
+  () => {
+    const TRANSLATIONS: Record<string, string> = {
+      'quiz.launch.friendlyErrors.upstreamError':
+        'Something went wrong creating your quiz. Try again!',
+      'quiz.launch.friendlyErrors.timeout':
+        'The quiz took too long to create. Try again!',
+      'quiz.launch.friendlyErrors.rateLimited':
+        'Too many requests — wait a moment and try again.',
+      'quiz.launch.friendlyErrors.validationError':
+        'Something went wrong. Please try a different activity.',
+      'quiz.launch.friendlyErrors.genericShort':
+        'Something went wrong. Try again!',
+    };
+    const t = (key: string, opts?: Record<string, unknown>) => {
+      const template = TRANSLATIONS[key] ?? key;
+      if (!opts) return template;
+      return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
+        String(opts[k] ?? `{{${k}}}`),
+      );
+    };
+    return { __esModule: true, i18next: { t } };
+  },
+);
 
 const mockReplace = jest.fn();
 const mockGoBackOrReplace = jest.fn();

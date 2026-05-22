@@ -73,26 +73,28 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    accent: '#00b4d8',
-    muted: '#888888',
-    background: '#ffffff',
-    border: '#e8e0d4',
-    surface: '#f5f5f5',
-    surfaceElevated: '#eeeeee',
-    textPrimary: '#1a1a1a',
-    textSecondary: '#666666',
-    retentionWeak: '#ff0000',
-    retentionFading: '#ffaa00',
-    retentionStrong: '#00ff00',
-    success: '#00c851',
-    warning: '#ffbb33',
-    danger: '#ff4444',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#00b4d8',
+      accent: '#00b4d8',
+      muted: '#888888',
+      background: '#ffffff',
+      border: '#e8e0d4',
+      surface: '#f5f5f5',
+      surfaceElevated: '#eeeeee',
+      textPrimary: '#1a1a1a',
+      textSecondary: '#666666',
+      retentionWeak: '#ff0000',
+      retentionFading: '#ffaa00',
+      retentionStrong: '#00ff00',
+      success: '#00c851',
+      warning: '#ffbb33',
+      danger: '#ff4444',
+    }),
   }),
-}));
+);
 
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,

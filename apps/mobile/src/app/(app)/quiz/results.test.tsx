@@ -41,19 +41,19 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-// gc1-allow: native-boundary: BrandCelebration uses react-native-reanimated
-// and react-native-svg which are native modules unavailable in JSDOM.
-jest.mock('../../../components/common/BrandCelebration', () => ({
-  BrandCelebration: () => null,
-}));
+jest.mock(
+  '../../../components/common/BrandCelebration' /* gc1-allow: native-boundary; BrandCelebration uses native animation/SVG modules in JSDOM */,
+  () => ({
+    BrandCelebration: () => null,
+  }),
+);
 
-// gc1-allow: native-boundary: use-quiz transitively loads lib/api-client
-// →lib/api→expo-constants and lib/profile→i18n→expo-localization which are
-// native-only modules unavailable in JSDOM. useFetchRound stub controls the
-// prefetched-round data returned to the results screen.
-jest.mock('../../../hooks/use-quiz', () => ({
-  useFetchRound: () => ({ data: mockFetchRoundData, isLoading: false }),
-}));
+jest.mock(
+  '../../../hooks/use-quiz' /* gc1-allow: native-boundary; use-quiz transitively loads native-only API/profile modules in JSDOM */,
+  () => ({
+    useFetchRound: () => ({ data: mockFetchRoundData, isLoading: false }),
+  }),
+);
 
 interface SeedInput {
   round: QuizRoundResponse;

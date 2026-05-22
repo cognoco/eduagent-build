@@ -70,32 +70,34 @@ const mockFetch = createRoutedMockFetch({
   '/subjects': { subjects: [] },
 });
 
-jest.mock('../../../lib/api-client', () =>
-  // gc1-allow: external-boundary: typed Hono RPC client wraps fetch; mockApiClientFactory is the canonical fetch-boundary stub
-  require('../../../test-utils/mock-api-routes').mockApiClientFactory(
-    mockFetch,
-  ),
+jest.mock(
+  '../../../lib/api-client' /* gc1-allow: external-boundary; typed Hono RPC client wraps fetch through mockApiClientFactory */,
+  () =>
+    require('../../../test-utils/mock-api-routes').mockApiClientFactory(
+      mockFetch,
+    ),
 );
 
-// gc1-allow: native-boundary: lib/profile transitively loads i18n→expo-localization
-// and secure-storage which are native-only and cannot run in JSDOM.
-jest.mock('../../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
+jest.mock(
+  '../../../lib/profile' /* gc1-allow: native-boundary; lib/profile transitively loads native-only i18n/secure-storage modules in JSDOM */,
+  () => ({
+    useProfile: () => ({
+      activeProfile: {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
+      },
+    }),
+    ProfileContext: {
+      Provider: ({ children }: { children: React.ReactNode }) => children,
     },
   }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
-}));
+);
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -152,13 +154,15 @@ function createWrapper() {
   };
 }
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#2563eb',
-    textPrimary: '#111827',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#2563eb',
+      textPrimary: '#111827',
+    }),
   }),
-}));
+);
 
 const QuizIndexScreen = require('./index').default;
 
