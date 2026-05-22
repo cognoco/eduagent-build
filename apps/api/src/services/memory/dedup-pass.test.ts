@@ -16,8 +16,23 @@ import {
 
 describe('dedupPairKey', () => {
   it('is independent of pair order', () => {
-    expect(dedupPairKey('fractions', 'fraction arithmetic')).toBe(
-      dedupPairKey('fraction arithmetic', 'fractions'),
+    expect(dedupPairKey('interest', 'fractions', 'fraction arithmetic')).toBe(
+      dedupPairKey('interest', 'fraction arithmetic', 'fractions'),
+    );
+  });
+
+  // [BUG-363] Break test: same text pair in different categories must NOT produce
+  // the same key — a 'strength' decision must not shadow an 'interest' decision.
+  it('[BUG-363] produces DIFFERENT keys for same text pair in different categories', () => {
+    const interestKey = dedupPairKey('interest', 'fractions', 'fraction work');
+    const strengthKey = dedupPairKey('strength', 'fractions', 'fraction work');
+    expect(interestKey).not.toBe(strengthKey);
+  });
+
+  // Same category must still produce the same key (memo lookup must work).
+  it('[BUG-363] produces the SAME key for same text pair in the same category', () => {
+    expect(dedupPairKey('struggle', 'algebra', 'algebra basics')).toBe(
+      dedupPairKey('struggle', 'algebra basics', 'algebra'),
     );
   });
 });

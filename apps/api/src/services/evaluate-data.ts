@@ -8,6 +8,8 @@ import { eq, and, desc } from 'drizzle-orm';
 import {
   retentionCards,
   curriculumTopics,
+  curriculumBooks,
+  subjects,
   learningSessions,
   sessionEvents,
   createScopedRepository,
@@ -41,20 +43,30 @@ export interface EvaluateSessionState {
 export async function checkEvaluateEligibility(
   db: Database,
   profileId: string,
-  topicId: string
+  topicId: string,
 ): Promise<EvaluateEligibility> {
   const repo = createScopedRepository(db, profileId);
 
   // Look up the retention card
   const card = await repo.retentionCards.findFirst(
-    eq(retentionCards.topicId, topicId)
+    eq(retentionCards.topicId, topicId),
   );
 
-  // Look up topic title
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, topicId),
-  });
-  const topicTitle = topic?.title ?? topicId;
+  // Look up topic title — scoped through parent chain so a caller supplying a
+  // foreign topicId cannot exfiltrate another profile's topic content via the
+  // topicTitle field.  Chain: curriculumTopics → curriculumBooks → subjects.
+  // [BUG-354] Without this join, GET /topics/:id/evaluate-eligibility accepted
+  // any topicId and returned the foreign topic title in the response body.
+  const [topicRow] = await db
+    .select({ title: curriculumTopics.title })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+    .where(
+      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId)),
+    )
+    .limit(1);
+  const topicTitle = topicRow?.title ?? topicId;
 
   if (!card) {
     return {
@@ -83,8 +95,8 @@ export async function checkEvaluateEligibility(
     reason: eligible
       ? undefined
       : easeFactor < 2.5
-      ? 'Ease factor below 2.5 — topic retention not strong enough'
-      : 'No successful reviews yet',
+        ? 'Ease factor below 2.5 — topic retention not strong enough'
+        : 'No successful reviews yet',
   };
 }
 
@@ -99,11 +111,11 @@ export async function checkEvaluateEligibility(
 export async function advanceEvaluateRung(
   db: Database,
   profileId: string,
-  topicId: string
+  topicId: string,
 ): Promise<1 | 2 | 3 | 4> {
   const repo = createScopedRepository(db, profileId);
   const card = await repo.retentionCards.findFirst(
-    eq(retentionCards.topicId, topicId)
+    eq(retentionCards.topicId, topicId),
   );
 
   if (!card) return 1;
@@ -120,8 +132,8 @@ export async function advanceEvaluateRung(
     .where(
       and(
         eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId)
-      )
+        eq(retentionCards.profileId, profileId),
+      ),
     );
 
   return newRung;
@@ -137,11 +149,11 @@ export async function processEvaluateFailureEscalation(
   db: Database,
   profileId: string,
   topicId: string,
-  consecutiveFailures: number
+  consecutiveFailures: number,
 ): Promise<EvaluateFailureAction> {
   const repo = createScopedRepository(db, profileId);
   const card = await repo.retentionCards.findFirst(
-    eq(retentionCards.topicId, topicId)
+    eq(retentionCards.topicId, topicId),
   );
 
   const currentRung = (card?.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4;
@@ -165,8 +177,8 @@ export async function processEvaluateFailureEscalation(
       .where(
         and(
           eq(retentionCards.id, card.id),
-          eq(retentionCards.profileId, profileId)
-        )
+          eq(retentionCards.profileId, profileId),
+        ),
       );
   }
 
@@ -184,11 +196,11 @@ export async function processEvaluateFailureEscalation(
 export async function getEvaluateSessionState(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<EvaluateSessionState | null> {
   const repo = createScopedRepository(db, profileId);
   const session = await repo.sessions.findFirst(
-    eq(learningSessions.id, sessionId)
+    eq(learningSessions.id, sessionId),
   );
 
   if (!session || session.verificationType !== 'evaluate' || !session.topicId) {
@@ -197,14 +209,14 @@ export async function getEvaluateSessionState(
 
   // Get the retention card for difficulty rung
   const card = await repo.retentionCards.findFirst(
-    eq(retentionCards.topicId, session.topicId)
+    eq(retentionCards.topicId, session.topicId),
   );
 
   // C-01: compute actual consecutiveFailures from session events
   const evalEvents = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.eventType, 'evaluate_challenge')
+      eq(sessionEvents.eventType, 'evaluate_challenge'),
     ),
     // [BUG-913 sweep] Tie-break by id when created_at collides — see
     // session-crud.ts getSessionTranscript for the full rationale.

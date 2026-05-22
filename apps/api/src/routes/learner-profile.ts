@@ -17,7 +17,7 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { requireProfileId } from '../middleware/profile-scope';
+import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import {
   buildHumanReadableMemoryExport,
@@ -112,7 +112,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const input = c.req.valid('json');
       await deleteMemoryItem(
         db,
@@ -157,7 +158,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     assertCanManageOwnConsent(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-    const accountId = c.get('account').id;
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const accountId = requireAccount(c.get('account')).id;
     await deleteAllMemory(db, profileId, accountId);
     return c.json({ success: true });
   })
@@ -180,7 +182,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const { memoryEnabled } = c.req.valid('json');
       await toggleMemoryEnabled(db, profileId, accountId, memoryEnabled);
       return c.json(
@@ -214,7 +217,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const { memoryCollectionEnabled } = c.req.valid('json');
       await toggleMemoryCollection(
         db,
@@ -258,7 +262,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const { memoryInjectionEnabled } = c.req.valid('json');
       await toggleMemoryInjection(
         db,
@@ -303,7 +308,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const { consent } = c.req.valid('json');
       await grantMemoryConsent(db, profileId, accountId, consent);
       return c.json(
@@ -364,7 +370,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const { value } = c.req.valid('json');
       await unsuppressInference(db, profileId, accountId, value);
       return c.json(
@@ -395,7 +402,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const { accommodationMode } = c.req.valid('json');
       await updateAccommodationMode(
         db,

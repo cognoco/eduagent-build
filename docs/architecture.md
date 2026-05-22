@@ -146,7 +146,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 Monorepo with two apps: Expo mobile client + Hono API backend. **Starting from fork of existing Nx monorepo** ([cognoco/nx-monorepo](https://github.com/cognoco/nx-monorepo)), not from scratch.
 
-### Current Versions (verified Feb 2026)
+### Current Versions (verified 2026-05-22 against root package.json)
 
 | Technology | Version | Notes |
 |-----------|---------|-------|
@@ -1206,15 +1206,15 @@ Key rules for the envelope pattern:
 4. **Flows that only return prose** (e.g., dictation-prepare-homework) do not use the envelope. It is strictly for state-machine decisions.
 5. **Providers that support JSON mode** (Gemini, OpenAI, Anthropic) get the schema as `response_format`. Fallback providers receive an in-prompt JSON instruction; `parseEnvelope()` extracts the first balanced `{…}` from the response and validates it.
 
-Migration status (see `docs/specs/2026-04-18-llm-response-envelope.md` for full spec):
+Migration status (verified against code 2026-05-22; full spec archived at `docs/_archive/specs/Done/2026-04-18-llm-response-envelope.md`):
 
 | Flow | Old mechanism | Envelope field | Status |
 |---|---|---|---|
-| Interview complete | `[INTERVIEW_COMPLETE]` marker | `signals.ready_to_finish` | Shadow mode — both parsers run, envelope preferred, legacy fallback |
-| Partial progress | `[PARTIAL_PROGRESS]` marker | `signals.partial_progress` | Schema ready, not yet wired |
-| Needs deepening | `[NEEDS_DEEPENING]` marker | `signals.needs_deepening` | Schema ready, not yet wired |
-| Note prompt | `{"notePrompt":true}` JSON-in-text | `ui_hints.note_prompt` | Schema ready, not yet wired |
-| Fluency drill | `{"fluencyDrill":{…}}` JSON-in-text | `ui_hints.fluency_drill` | Schema ready, not yet wired |
+| Interview complete | `[INTERVIEW_COMPLETE]` marker | `signals.ready_to_finish` | Migrated — marker removed from `apps/api/src` entirely |
+| Partial progress | `[PARTIAL_PROGRESS]` marker | `signals.partial_progress` | Migrated — marker survives only as a negative prompt instruction in `exchange-prompts.ts` |
+| Needs deepening | `[NEEDS_DEEPENING]` marker | `signals.needs_deepening` | Migrated — marker survives only as a negative prompt instruction in `exchange-prompts.ts` |
+| Note prompt | `{"notePrompt":true}` JSON-in-text | `ui_hints.note_prompt` | Migrated — primary path uses envelope; bare-JSON fallback retained as historical safety net (`envelope.ts:258`) |
+| Fluency drill | `{"fluencyDrill":{…}}` JSON-in-text | `ui_hints.fluency_drill` | Migrated — primary path uses envelope; bare-JSON fallback retained as historical safety net |
 
 **LLM Personalization Pipeline:**
 
@@ -1233,9 +1233,9 @@ When adding a new LLM flow, check whether it should receive any of these inputs.
 `apps/api/eval-llm/` provides a fixture-based evaluation framework for prompt quality. Run via `pnpm eval:llm`.
 
 - **Fixtures:** 5 synthetic learner profiles (ages 11–17) with diverse interests, languages, and learning styles in `eval-llm/fixtures/profiles.ts`.
-- **Flows:** 9 registered flow definitions (quiz-capitals, quiz-vocabulary, quiz-guess-who, dictation-generate, dictation-prepare-homework, dictation-review, session-analysis, filing-pre-session, exchanges). Each flow builds the real prompt from fixture data, captures the output as a markdown snapshot.
+- **Flows:** 19+ registered flow definitions in `apps/api/eval-llm/index.ts` (including the original quiz/dictation/session-analysis/filing/exchanges set plus adaptive-teaching, assessment-evaluation, language-prompts, memory-dedup-decisions, probes, session-recap, session-summary, topic-intent-matcher, book-suggestion-regeneration, progress-summary). Each flow builds the real prompt from fixture data, captures the output as a markdown snapshot.
 - **Tiers:** Tier 1 (default) — snapshot-only, no LLM call, validates prompt assembly. Tier 2 (`--live`) — calls the real LLM, validates response shape against `expectedResponseSchema` if set.
-- **`expectedResponseSchema`** — optional field on `FlowDefinition`. When set and running Tier 2, the runner parses the LLM response as JSON and runs Zod `.safeParse()`. Schema violations render in the snapshot markdown. Currently dormant pending full envelope migration of the exchange loop.
+- **`expectedResponseSchema`** — optional field on `FlowDefinition`. When set and running Tier 2, the runner parses the LLM response as JSON and runs Zod `.safeParse()`. Schema violations render in the snapshot markdown. Live on `exchangesFlow` and `probesFlow` (via `emitsEnvelope: true`).
 
 Use the eval harness to validate prompt changes before shipping: run baseline → make change → re-run → diff snapshots.
 
@@ -1617,7 +1617,7 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 | Epic 15: Visible Progress | Daily snapshots, milestone detection, journey screen, parent reports, weekly push notifications | DONE |
 | Epic 16: Adaptive Memory | Post-session LLM analysis, learner profiles, mentor memory, accommodation modes, "What My Mentor Knows" screens | DONE |
 | Epic 17: Voice-First Learning | Server-side STT/TTS, pronunciation, hands-free mode, voice-optimized prompting | NOT STARTED |
-| Epic 18: LLM Tuning | Structured response envelope (`llmResponseEnvelopeSchema`), personalization injection (interests, ageYears, strengths, urgency into all prompts), reliability fixes (marker migration, tone register), eval harness (`pnpm eval:llm`) | IN PROGRESS |
+| Epic 18: LLM Tuning | Structured response envelope (`llmResponseEnvelopeSchema`), personalization injection (interests, ageYears, strengths, urgency into all prompts), reliability fixes (marker migration, tone register), eval harness (`pnpm eval:llm`) | DONE |
 
 **Functional Requirements Coverage (121 MVP FRs):**
 
@@ -1636,7 +1636,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
 | COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered |
-| i18n | EN only (v1.0) | English-only UI (no i18n framework). LLM `preferredLanguage` in system prompt for learning language. Multi-language UI deferred. | Covered |
+| i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `preferredLanguage` in system prompt for learning language. | Covered |
 | Accessibility | WCAG 2.1 AA | Phased per UX spec (MVP free, v1.1 moderate, v2.0 operational). NativeWind supports accessibility props. | Phased |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
 

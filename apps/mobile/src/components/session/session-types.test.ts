@@ -2,6 +2,7 @@ import {
   getConversationStage,
   isGreeting,
   errorHasCode,
+  isTimeoutError,
   isReconnectableSessionError,
   reconnectPromptForError,
   RECONNECT_PROMPT,
@@ -141,6 +142,45 @@ describe('errorHasCode', () => {
       code: 'SUBJECT_INACTIVE',
     });
     expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(true);
+  });
+});
+
+// [BUG-389] isTimeoutError — must classify by `isTimeout` property, not message text.
+describe('isTimeoutError [BUG-389]', () => {
+  it('returns true when isTimeout property is true', () => {
+    const err = Object.assign(
+      new Error('The connection timed out while waiting for a reply'),
+      {
+        isTimeout: true,
+      },
+    );
+    expect(isTimeoutError(err)).toBe(true);
+  });
+
+  it('[BUG-389 break-test] returns true even when message text differs (property is authoritative)', () => {
+    // Pre-fix: removing the message check meant only isTimeout property worked.
+    // This test fails before fix if isTimeoutError relied on message matching.
+    const err = Object.assign(new Error('Connection took too long'), {
+      isTimeout: true,
+    });
+    expect(isTimeoutError(err)).toBe(true);
+  });
+
+  it('returns false when isTimeout is absent even if message matches old text', () => {
+    // [BUG-389] After fix: message-string matching is removed.
+    // A plain Error with timeout-like text but no isTimeout property must return false.
+    const err = new Error('The connection timed out while waiting for a reply');
+    // No isTimeout property — must not classify as timeout.
+    expect(isTimeoutError(err)).toBe(false);
+  });
+
+  it('returns false for null', () => {
+    expect(isTimeoutError(null)).toBe(false);
+  });
+
+  it('returns false for a plain network error', () => {
+    const err = new Error('Network request failed');
+    expect(isTimeoutError(err)).toBe(false);
   });
 });
 

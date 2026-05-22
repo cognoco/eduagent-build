@@ -13,6 +13,8 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { requireAccount } from '../middleware/profile-scope';
+
 import { notFound, forbidden, validationError, apiError } from '../errors';
 import {
   listProfiles,
@@ -45,13 +47,15 @@ type ProfileEnv = {
 export const profileRoutes = new Hono<ProfileEnv>()
   .get('/profiles', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     const profiles = await listProfiles(db, account.id);
     return c.json(profileListResponseSchema.parse({ profiles }));
   })
   .post('/profiles', zValidator('json', profileCreateSchema), async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     const input = c.req.valid('json');
 
     // [CR-2026-05-19-H1 / BUG-407] Only the account owner can create additional
@@ -119,7 +123,8 @@ export const profileRoutes = new Hono<ProfileEnv>()
   })
   .get('/profiles/:id', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     const profile = await getProfile(db, c.req.param('id'), account.id);
     if (!profile) return notFound(c, 'Profile not found');
     return c.json(profileResponseSchema.parse({ profile }));
@@ -129,7 +134,8 @@ export const profileRoutes = new Hono<ProfileEnv>()
     zValidator('json', profileUpdateSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const id = c.req.param('id');
       const input = c.req.valid('json');
 
@@ -158,7 +164,8 @@ export const profileRoutes = new Hono<ProfileEnv>()
     zValidator('json', profileSwitchSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const { profileId } = c.req.valid('json');
       // No isOwner check here by design: switching the active profile is
       // account-scoped and purely per-device (not destructive). Any profile on

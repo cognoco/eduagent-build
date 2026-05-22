@@ -89,9 +89,6 @@ let _xhrInstances: FakeXhrInstance[] = [];
 function installFakeXhr(): () => FakeXhrInstance[] {
   _xhrInstances = [];
 
-  const OriginalXHR = (global as unknown as { XMLHttpRequest?: unknown })
-    .XMLHttpRequest;
-
   (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = jest.fn(
     () => {
       const instance: FakeXhrInstance = {
@@ -158,8 +155,6 @@ function installFakeXhr(): () => FakeXhrInstance[] {
   ) as unknown;
 
   return () => _xhrInstances;
-
-  void OriginalXHR; // restored in afterEach
 }
 
 // ---------------------------------------------------------------------------
@@ -190,11 +185,7 @@ function setupMocks(profileId: string) {
 // scenario. Suppress unused-symbol noise with a no-op reference.
 function _renderProvider(profileId: string) {
   setupMocks(profileId);
-  return render(
-    <OutboxDrainProvider>
-      <></>
-    </OutboxDrainProvider>,
-  );
+  return render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
 }
 void _renderProvider;
 
@@ -236,11 +227,7 @@ describe('OutboxDrainProvider', () => {
 
       setupMocks('profile-A');
 
-      render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
-      );
+      render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
 
       // Wait for the XHR to be created.
       await waitFor(() => expect(getXhrInstances().length).toBeGreaterThan(0));
@@ -275,11 +262,7 @@ describe('OutboxDrainProvider', () => {
 
       setupMocks('profile-B');
 
-      render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
-      );
+      render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
 
       await waitFor(() => expect(getXhrInstances().length).toBeGreaterThan(0));
 
@@ -314,9 +297,7 @@ describe('OutboxDrainProvider', () => {
       setupMocks('profile-C');
 
       const { unmount } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // Wait for XHR to be created and the drain to be in-flight.
@@ -339,9 +320,7 @@ describe('OutboxDrainProvider', () => {
       setupMocks('profile-D');
 
       const { unmount } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // No XHR should have been created since the outbox is empty.
@@ -375,9 +354,7 @@ describe('OutboxDrainProvider', () => {
       setupMocks('profile-E');
 
       const { rerender } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // Wait for profile-E's XHR to be created.
@@ -393,11 +370,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       await act(async () => {
-        rerender(
-          <OutboxDrainProvider>
-            <></>
-          </OutboxDrainProvider>,
-        );
+        rerender(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
       });
 
       // The old XHR for profile-E must have been aborted.
@@ -436,9 +409,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       const { rerender } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // Wait for profile-G's XHR to be active.
@@ -453,11 +424,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       await act(async () => {
-        rerender(
-          <OutboxDrainProvider>
-            <></>
-          </OutboxDrainProvider>,
-        );
+        rerender(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
       });
 
       // profile-G XHR aborted.
@@ -502,9 +469,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       const { rerender } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       await waitFor(() => expect(getXhrInstances().length).toBeGreaterThan(0));
@@ -520,11 +485,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       await act(async () => {
-        rerender(
-          <OutboxDrainProvider>
-            <></>
-          </OutboxDrainProvider>,
-        );
+        rerender(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
       });
 
       // The X-Profile-Id on the already-opened XHR must still be profile-H.

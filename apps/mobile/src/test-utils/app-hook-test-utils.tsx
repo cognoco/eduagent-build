@@ -65,6 +65,8 @@ export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
 interface CreateHookWrapperOptions {
   activeProfile?: Profile | null;
   profiles?: Profile[];
+  /** [ACCOUNT-04] Set to true to simulate explicit proxy mode (parent viewing child). */
+  isExplicitProxyMode?: boolean;
 }
 
 export function createHookWrapper(options: CreateHookWrapperOptions = {}) {
@@ -81,6 +83,7 @@ export function createHookWrapper(options: CreateHookWrapperOptions = {}) {
   const profileContextValue: ProfileContextValue = {
     profiles,
     activeProfile,
+    isExplicitProxyMode: options.isExplicitProxyMode ?? false,
     switchProfile: async () => ({ success: true }),
     isLoading: false,
     profileLoadError: null,

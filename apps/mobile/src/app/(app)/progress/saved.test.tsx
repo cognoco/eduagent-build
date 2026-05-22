@@ -225,11 +225,15 @@ describe('SavedBookmarksScreen', () => {
       screen.getByTestId('saved-empty-library-cta');
     });
 
-    it('navigates to library when "Go to library" is pressed', () => {
+    it('navigates directly to library (not via goBackOrReplace) when "Go to library" is pressed [LEARN-24]', () => {
+      // [LEARN-24] The CTA copy says "Go to Library" — it must always land on Library.
+      // Using goBackOrReplace would pick router.back() when canGoBack() is true,
+      // which sends the user back to Progress instead. A direct replace is correct.
       mockHooks({ bookmarks: [] });
       render(<SavedBookmarksScreen />);
       fireEvent.press(screen.getByTestId('saved-empty-library-cta'));
-      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+      expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
         expect.anything(),
         '/(app)/library',
       );

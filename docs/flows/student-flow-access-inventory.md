@@ -115,7 +115,7 @@ Notes:
 
 | Original ID | Student access | How it should work |
 | --- | --- | --- |
-| HOMEWORK-01 | All students | Homework starts from learner home or More and opens the active student's homework capture path. |
+| HOMEWORK-01 | All students | Homework starts from learner home and opens the active student's homework capture path. It is not surfaced from More. |
 | HOMEWORK-02, HOMEWORK-07 | All students | Camera permission first-request and permanently-denied states remain student-safe recovery flows. |
 | HOMEWORK-03 | All students | Manual fallback remains available when OCR is weak or fails. |
 | HOMEWORK-04 | All students | Homework tutoring session operates as the active student's learning session. |

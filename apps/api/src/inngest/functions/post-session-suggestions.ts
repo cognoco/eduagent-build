@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { eq, and, isNull, count } from 'drizzle-orm';
 import { z } from 'zod';
 import { inngest } from '../client';

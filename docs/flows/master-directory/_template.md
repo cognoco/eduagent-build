@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** TBD  
 > **Last mapped:** YYYY-MM-DD  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md` (cite when the flow touches a gated surface — home, more, account, privacy, progress, billing)
 
 ## Purpose
 

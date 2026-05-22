@@ -421,7 +421,7 @@ describe('submitSummary', () => {
       await submitSummary(db, 'prof-owner', 'sess-1', {
         content: 'My summary',
       });
-    } catch (_err) {
+    } catch {
       // LLM boundary error is expected in unit test context — intentional.
       // The important thing is that session and subject lookups were called.
     }

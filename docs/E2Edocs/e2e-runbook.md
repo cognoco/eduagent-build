@@ -345,6 +345,50 @@ requirements without empirical evidence.
 
 ---
 
+## Deferred Coverage — Auth, Consent, and Onboarding rows (BUG-75)
+
+Added 2026-05-22. **Owner: test-infra team. Target: defer — unblock when Clerk test-email infra or network-throttle infra is available.**
+
+These flow-inventory rows cannot be first-status-tested in the current environment because they depend on external email delivery (Clerk), MFA hardware, or network conditions that cannot be injected through the existing seed API.
+
+### Blocker summary
+
+| Inventory row | Blocker | What is needed to unblock |
+|---|---|---|
+| AUTH-02 — Sign up with email + password | `DEFERRED:CLERK-1` — Clerk development-tier email quota (100/month) is exhausted; sign-up completion requires email delivery of the verification code | Clerk `testing_token` flow (see [Clerk docs](https://clerk.com/docs/testing/overview)) or a dedicated test email domain with a Clerk production instance where email quotas do not apply |
+| AUTH-03 — Sign-up email verification code | `DEFERRED:CLERK-1` — same email-quota blocker as AUTH-02; verification code step is nested inside the sign-up flow | Same as AUTH-02 |
+| AUTH-05 — Additional sign-in verification (MFA) | `DEFERRED:CLERK-2` — no seeded MFA scenarios exist; email-code, phone, TOTP, and backup-code branches all require Clerk MFA configuration on the test account | A `consent-pending-mfa` or `mfa-email-code` seed scenario that sets up a Clerk test account with MFA enabled; requires Clerk Backend API MFA setup via `CLERK_SECRET_KEY` |
+| AUTH-06 — Forgot password | `DEFERRED:CLERK-1` — reset-code delivery is blocked by the same email quota | Same as AUTH-02; alternatively, Clerk's `testing_token` mode bypasses email for OTP but reset-password is a distinct flow |
+| AUTH-14 — Sign-in transition stuck-state recovery | `DEFERRED:INFRA-1` — no slow-network or delayed-auth simulation available; the `isTransitioning` + `transitionStuck` states (in `auth-transition.ts`) only trigger when `setActive()` succeeds but the auth-layout redirect takes longer than `SESSION_TRANSITION_MS` | ADB-injected network throttling, or a Playwright network-intercept approach that adds artificial latency to the `/__clerk/auth-token` response |
+| ACCOUNT-19 — Consent request during underage profile creation | `DEFERRED:VERIFY` — seed scenarios for an underage in-progress profile-creation flow are not currently implemented | A new seed scenario (`create-profile-underage`) that leaves the account in the post-create-profile state with age below threshold so the consent gate fires on next login |
+| ACCOUNT-20 — Child handoff to parent consent request | `DEFERRED:VERIFY` — the `hand-to-parent-consent.yaml` Maestro flow requires a fragile sign-out-then-parent-sign-in sequence that was not stable in this pass | Playwright web spec using `consent-pending` scenario: parent signs in, child profile appears with `consent_pending` state, handoff CTA and parent-approval flow tested end-to-end |
+| ACCOUNT-26 — Regional consent variants | `DEFERRED:VERIFY` — the existing YAML flows (`consent-coppa-under13.yaml`, `consent-gdpr-under16.yaml`, `consent-above-threshold.yaml`) have not received an emulator pass; they depend on the `create-profile-underage` scenario gap above | Run existing flows once a stable `create-profile-underage` seed scenario is available |
+
+### What a seedable path would look like
+
+For the Clerk-email-blocked rows (AUTH-02, AUTH-03, AUTH-06):
+- Clerk's [Testing Tokens](https://clerk.com/docs/testing/overview) API allows bypass of email/SMS OTP in non-production environments. The token is requested via `POST /v1/testing_tokens` with the `CLERK_SECRET_KEY`. The Playwright `seedAndSignIn` helper would need to request a testing token and inject it into the sign-up / forgot-password flow before submitting.
+- Scope estimate: ~50 lines in `apps/mobile/e2e-web/helpers/seed-and-sign-in.ts` + new `j26-auth02-signup.spec.ts` + `j27-auth06-forgot-password.spec.ts`. Does not require any API or seed-service changes.
+
+For AUTH-14 (stuck-state recovery):
+- Playwright's `page.route()` can intercept and delay the Clerk session-set response. No seed changes needed; a standalone spec that delays the response by `SESSION_TRANSITION_MS + 2000ms` then releases it would exercise both the spinner and the stuck-state `ErrorFallback`.
+- Scope estimate: ~40 lines. Feasible as a follow-up once the auth flow is otherwise stable.
+
+For ACCOUNT-19 and ACCOUNT-20:
+- A new seed scenario `consent-pending-underage` in `apps/api/src/services/test-seed.ts` that creates a child profile with age below 16 and `consent_status = 'pending'` (skipping the Clerk user creation so it's purely a DB-state scenario). The Playwright spec would sign in as the parent, verify the consent gate, and approve.
+- Scope estimate: ~80 lines in `test-seed.ts` + ~60 lines in a new spec. Defer after AUTH stabilization.
+
+### How to verify when unblocked
+
+1. Implement Clerk testing-token support in `seedAndSignIn` helper.
+2. Add `j26-auth02-signup.spec.ts` and `j27-auth06-forgot-password.spec.ts` specs using `testing_token` bypass.
+3. Update `e2e-flow-coverage-audit-2026-05-13.md` AUTH-02/03/06 rows from `DEFERRED:CLERK-1` to covered.
+4. AUTH-14: add network-intercept spec once AUTH-02 baseline is stable.
+5. ACCOUNT-19/20: add `consent-pending-underage` seed + `j28-account19-consent-underage.spec.ts`.
+6. Remove or update this runbook section once all rows move to covered.
+
+---
+
 ## SUBJECT-16 / SUBJECT-17: Conversation language and pronouns (Playwright web)
 
 Added 2026-05-22. Covers the flow-inventory rows that were previously blocked

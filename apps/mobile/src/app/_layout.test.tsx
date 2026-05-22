@@ -212,7 +212,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
     expect(toJSON()).toBeNull();
@@ -226,7 +226,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -248,7 +248,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={onRetry}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -270,7 +270,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={onRetry}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -289,7 +289,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={onContinueOffline}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -307,7 +307,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
     expect(onReady).toHaveBeenCalledTimes(1);
@@ -322,9 +322,38 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
     expect(screen.queryByTestId('clerk-timeout-screen')).toBeNull();
+  });
+
+  // [BUG-507] Regression: the 12-second failsafe must NOT silently route into
+  // the authenticated app layout when Clerk is not loaded (isLoaded=false,
+  // i.e. the user is not signed in). It must instead show the timeout/retry UI.
+  // The old code called setClerkReady(true) unconditionally, which removed the
+  // ClerkGate null-render and let the authenticated tree mount.
+  it('[BUG-507] does NOT render children (authenticated layout) when timedOut=true but Clerk not loaded', () => {
+    (useAuth as jest.Mock).mockReturnValue({ isLoaded: false });
+    const { View } = require('react-native');
+    const { toJSON } = render(
+      <ClerkGate
+        onReady={noOp}
+        timedOut={true}
+        onRetry={noOp}
+        onContinueOffline={noOp}
+      >
+        {/* sentinel testID lets us assert children were NOT mounted */}
+        <View testID="authenticated-layout-sentinel" />
+      </ClerkGate>,
+    );
+
+    // Timeout screen IS visible (retry/offline options shown)
+    expect(screen.getByTestId('clerk-timeout-screen')).toBeTruthy();
+    // ClerkGate renders the timeout UI — the JSON tree should be non-null
+    expect(toJSON()).not.toBeNull();
+    // Children (the authenticated app layout) must NOT be in the tree when Clerk
+    // is not loaded — they would only appear if ClerkGate bypassed its isLoaded guard.
+    expect(screen.queryByTestId('authenticated-layout-sentinel')).toBeNull();
   });
 });

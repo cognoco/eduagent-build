@@ -1,4 +1,5 @@
 import {
+  index,
   pgTable,
   primaryKey,
   text,
@@ -7,6 +8,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 
+// BUG-363: `category` scopes pair_key to prevent cross-category false-positive
+// dedup collisions (e.g. an 'interest' pair_key shadowing a 'struggle' decision).
 export const memoryDedupDecisions = pgTable(
   'memory_dedup_decisions',
   {
@@ -14,6 +17,7 @@ export const memoryDedupDecisions = pgTable(
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     pairKey: text('pair_key').notNull(),
+    category: text('category').notNull().default('unknown'),
     decision: text('decision', {
       enum: ['merge', 'supersede', 'keep_both', 'discard_new'],
     }).notNull(),
@@ -23,5 +27,11 @@ export const memoryDedupDecisions = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.profileId, table.pairKey] })],
+  (table) => [
+    primaryKey({ columns: [table.profileId, table.pairKey, table.category] }),
+    index('memory_dedup_decisions_profile_category_idx').on(
+      table.profileId,
+      table.category,
+    ),
+  ],
 );

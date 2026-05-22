@@ -29,6 +29,7 @@ function makeWrapper(value: Partial<ProfileContextValue>) {
     const merged: ProfileContextValue = {
       profiles: [],
       activeProfile: null,
+      isExplicitProxyMode: false,
       switchProfile: async () => ({ success: true }),
       isLoading: false,
       profileLoadError: null,
@@ -51,6 +52,7 @@ function makeMutableWrapper(initialValue: Partial<ProfileContextValue>) {
     const merged: ProfileContextValue = {
       profiles: [],
       activeProfile: null,
+      isExplicitProxyMode: false,
       switchProfile: async () => ({ success: true }),
       isLoading: false,
       profileLoadError: null,

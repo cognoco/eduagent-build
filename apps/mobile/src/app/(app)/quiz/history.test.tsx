@@ -98,11 +98,28 @@ describe('QuizHistoryScreen', () => {
     jest.useRealTimers();
   });
 
-  it('navigates back to quiz index via goBackOrReplace', () => {
+  it('navigates back to quiz index via goBackOrReplace when no returnTo param', () => {
     render(<QuizHistoryScreen />);
     fireEvent.press(screen.getByTestId('quiz-history-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.objectContaining({ push: mockPush }),
+      '/(app)/quiz',
+    );
+  });
+
+  it('[QUIZ-09] honors returnTo=practice: loaded-list back button routes to /(app)/practice', () => {
+    // Break test: before the fix, the loaded-list back button hardcoded '/(app)/quiz'
+    // ignoring the returnTo param that loading/empty/error states already honored.
+    mockSearchParams = { returnTo: 'practice' };
+    render(<QuizHistoryScreen />);
+    fireEvent.press(screen.getByTestId('quiz-history-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.objectContaining({ push: mockPush }),
+      '/(app)/practice',
+    );
+    // Must not fall back to the hardcoded quiz route.
+    expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
+      expect.anything(),
       '/(app)/quiz',
     );
   });

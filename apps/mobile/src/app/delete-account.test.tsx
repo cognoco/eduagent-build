@@ -112,6 +112,7 @@ function createProfileContext(
   return {
     profiles,
     activeProfile,
+    isExplicitProxyMode: false,
     switchProfile: jest.fn(async () => ({ success: true })),
     isLoading: false,
     profileLoadError: null,

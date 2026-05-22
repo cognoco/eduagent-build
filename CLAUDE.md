@@ -24,6 +24,8 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 
 **For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see `docs/specs/2026-05-21-navigation-contract.md`. The short version is below.
 
+> **Hard constraint for the V0 → V1 migration.** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) is supported product behavior and **must not regress** across any nav-contract PR. The V0 helpers (`resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` in `apps/mobile/src/app/(app)/_layout.tsx:120-180`) and the V0-off short-circuits in `app-context.tsx:37, 44, 61` stay alive when V1 ships. `resolveNavigationContract` wiring is gated behind a separate `MODE_NAV_V1_ENABLED` flag and never replaces the V0-off fallback. See the "Hard Constraint" section of the navigation-contract spec for the full flag matrix and test requirement.
+
 **Tab shape** controls which tabs appear — only two shapes exist:
 
 | Tab shape | Who | Tabs | Home |

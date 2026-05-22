@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { NonRetriableError } from 'inngest';
 import { eq, and } from 'drizzle-orm';
 import { curriculumBooks, subjects, type Database } from '@eduagent/database';

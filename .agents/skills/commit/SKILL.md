@@ -90,7 +90,7 @@ EOF
 - Lint/format auto-fix: re-stage auto-fixed files and retry once.
 - Stale NX graph: run `pnpm exec nx reset`, re-stage intended files, retry once.
 - Type/test failure in related files: stop and report; do not unstage-and-ship a related broken change.
-- Type/test failure in unrelated unstaged files: use `git stash push --keep-index -u -m "temp: unstaged WIP"`, commit, then `git stash pop`. If the stash entry is kept, inspect before proceeding.
+- Type/test failure in unrelated unstaged files: first anchor a safety-net snapshot — `ts=$(date +%s); snap=$(git stash create -u); [ -n "$snap" ] && git update-ref "refs/preserved/commit-skill-$ts" "$snap"` — then `git stash push --keep-index -u -m "temp: unstaged WIP $ts"`, commit, then `git stash pop`. On clean completion delete the preserved ref (`git update-ref -d refs/preserved/commit-skill-$ts`); on any failure leave it and report the ref name so the caller can recover via `git stash apply <sha>`. If the stash pop reports "stash entry is kept", inspect before proceeding.
 
 Maximum two commit attempts.
 

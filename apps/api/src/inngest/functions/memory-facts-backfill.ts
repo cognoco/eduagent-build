@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile
 import { asc, eq, gt, isNull, and, or } from 'drizzle-orm';
 import { learningProfiles, memoryFacts } from '@eduagent/database';
 import { inngest } from '../client';

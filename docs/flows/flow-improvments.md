@@ -120,7 +120,7 @@ Interpretation notes:
 
 | ID | Flow | What feels missing | What will annoy or frustrate the end user |
 | --- | --- | --- | --- |
-| HOMEWORK-01 | Start homework from learner home or More screen | A more unified relationship between homework and normal learning. | Homework can feel like a separate tool rather than part of one continuous mentor experience. |
+| HOMEWORK-01 | Start homework from learner home | A more unified relationship between homework and normal learning. | Homework can feel like a separate tool rather than part of one continuous mentor experience. |
 | HOMEWORK-02 | Camera permission, capture, preview, and OCR | Gallery/image import, plus clearer OCR confidence feedback. | Camera-only is painful for screenshots, PDFs, or already-taken photos. |
 | HOMEWORK-03 | Manual fallback when OCR is weak or fails | Faster cleanup help after OCR. | Manually editing OCR into usable problem cards is still a lot of work when the user wanted quick help. |
 | HOMEWORK-04 | Homework tutoring session with multi-problem navigation | Stronger affordances around moving between problems and switching help modes. | Users may not realize how to progress through multiple problems once the session starts. |

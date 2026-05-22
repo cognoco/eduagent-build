@@ -10,18 +10,14 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const { createInngestTransportCapture } =
+  require('../../test-utils/inngest-transport-capture') as typeof import('../../test-utils/inngest-transport-capture');
+
+const mockInngestTransport = createInngestTransportCapture();
+
 jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
-  return {
-    ...actual,
-    inngest: {
-      createFunction: jest.fn((_config, _trigger, handler) => ({
-        fn: handler,
-        _config,
-        _trigger,
-      })),
-    },
-  };
+  return { ...actual, ...mockInngestTransport.module };
 });
 
 import { summaryReconciliationCron } from './summary-reconciliation-cron';
@@ -76,6 +72,22 @@ function createStubStep(overrides: Record<string, unknown> = {}) {
 }
 
 describe('summaryReconciliationCron', () => {
+  beforeEach(() => {
+    mockInngestTransport.clear();
+  });
+
+  // [BUG-696 / J-7] Guard: reconciliation cron must never call bare inngest.send.
+  // All outbound events must go through step.sendEvent (memoized). If bare
+  // inngest.send is introduced, this test fires because mockInngestTransport.sentEvents
+  // captures it while the stub step.sendEvent does not.
+  it('[BUG-696 / J-7] never calls bare inngest.send — uses memoized step.sendEvent only', async () => {
+    const step = createStubStep({});
+    const handler = (summaryReconciliationCron as any).fn;
+    await handler({ step });
+
+    expect(mockInngestTransport.sentEvents).toHaveLength(0);
+  });
+
   describe('event fan-out behaviour', () => {
     it('fans out create/regenerate/recap events without replaying app/session.completed', async () => {
       const step = createStubStep({
@@ -171,7 +183,7 @@ describe('summaryReconciliationCron', () => {
         'notify-summary-reconciliation-scanned',
         expect.objectContaining({
           name: 'app/summary.reconciliation.scanned',
-          data: expect.objectContaining({ totalCount: 0 }),
+          data: expect.objectContaining({ totalScanned: 0 }),
         }),
       );
       // [BUG-994] No requeued event when nothing was requeued (avoids alert noise).

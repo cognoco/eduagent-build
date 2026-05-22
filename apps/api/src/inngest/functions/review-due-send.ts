@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (curriculumTopics joined to subjects via curricula to resolve subject names)
 // ---------------------------------------------------------------------------
 // Review Due Send — Handles a single app/retention.review-due event,
 // resolves subject names from the topic chain, and sends a push notification.
@@ -43,7 +44,7 @@ export const reviewDueSend = inngest.createFunction(
           db,
           profileId,
           'review_reminder',
-          24
+          24,
         );
       } catch (err) {
         captureException(err, {
@@ -124,5 +125,5 @@ export const reviewDueSend = inngest.createFunction(
     }
 
     return result;
-  }
+  },
 );

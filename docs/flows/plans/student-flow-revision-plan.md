@@ -262,7 +262,7 @@ These flows must be walkable in Chrome or the mobile web preview unless the row 
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOMEWORK-01 | Homework starts from student home/More. | TODO | | | | |
+| HOMEWORK-01 | Homework starts from student home. | TODO | | | | |
 | HOMEWORK-02 | Camera permission/capture/OCR works. | TODO | | | | |
 | HOMEWORK-03 | Manual fallback works when OCR is weak/fails. | TODO | | | | |
 | HOMEWORK-04 | Homework tutoring session belongs to active student. | TODO | | | | |

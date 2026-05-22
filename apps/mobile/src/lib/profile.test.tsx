@@ -230,6 +230,9 @@ describe('ProfileProvider', () => {
   });
 
   it('[BREAK] updates API-client profile and proxy mode before query resets on parent-to-child switch', async () => {
+    // [ACCOUNT-04] A plain switchProfile() to a child slot does NOT set proxy
+    // mode — the parent is actually using the child's account, not previewing it.
+    // Proxy requires an explicit opt-in via switchProfile(id, { proxyMode: true }).
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
@@ -248,20 +251,42 @@ describe('ProfileProvider', () => {
     const childProfilePushIndex = profilePushCalls.mock.calls.findIndex(
       (call) => call[0] === 'child-id',
     );
-    const proxyEnabledPushIndex = proxyPushCalls.mock.calls.findIndex(
-      (call) => call[0] === true,
+    // Plain switch → proxy must be set to FALSE (no proxyMode option passed).
+    const proxyDisabledPushIndex = proxyPushCalls.mock.calls.findIndex(
+      (call) => call[0] === false,
     );
     const profilePushOrder =
       profilePushCalls.mock.invocationCallOrder[childProfilePushIndex];
     const proxyPushOrder =
-      proxyPushCalls.mock.invocationCallOrder[proxyEnabledPushIndex];
+      proxyPushCalls.mock.invocationCallOrder[proxyDisabledPushIndex];
     const resetOrder = resetSpy.mock.invocationCallOrder.at(-1);
     expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith('child-id');
-    expect(setProxyMode).toHaveBeenLastCalledWith(true);
+    expect(setProxyMode).toHaveBeenLastCalledWith(false);
     expect(childProfilePushIndex).toBeGreaterThanOrEqual(0);
-    expect(proxyEnabledPushIndex).toBeGreaterThanOrEqual(0);
+    expect(proxyDisabledPushIndex).toBeGreaterThanOrEqual(0);
     expect(profilePushOrder).toBeLessThan(resetOrder!);
     expect(proxyPushOrder).toBeLessThan(resetOrder!);
+  });
+
+  it('[ACCOUNT-04 BREAK] explicit proxyMode:true sets proxy flag and persists to SecureStore', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    await act(async () => {
+      await result.current.switchProfile('child-id', { proxyMode: true });
+    });
+    expect(setProxyMode).toHaveBeenLastCalledWith(true);
+    expect(result.current.isExplicitProxyMode).toBe(true);
+    expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
+      'parent-proxy-active',
+      'true',
+    );
   });
 
   it('resets data queries on profile switch (cache isolation)', async () => {
@@ -590,6 +615,8 @@ describe('proxy-mode regression', () => {
   });
 
   it('[BREAK] switchProfile back to owner clears proxy flag and restores useLinkedChildren', async () => {
+    // [ACCOUNT-04] First switch into child via explicit proxy, then switch back.
+    // Switching back to owner always clears proxy regardless of options.
     const { result } = renderHook(
       () => ({ profile: useProfile(), linked: useLinkedChildren() }),
       { wrapper: createWrapper() },
@@ -600,17 +627,23 @@ describe('proxy-mode regression', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
+    // Enter proxy explicitly (the confirm-modal path).
     await act(async () => {
-      await result.current.profile.switchProfile('child-id');
+      await result.current.profile.switchProfile('child-id', {
+        proxyMode: true,
+      });
     });
     expect(setProxyMode).toHaveBeenLastCalledWith(true);
+    expect(result.current.profile.isExplicitProxyMode).toBe(true);
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
+    // Switch back to owner — proxy must be cleared.
     await act(async () => {
       await result.current.profile.switchProfile('owner-id');
     });
     expect(setProxyMode).toHaveBeenLastCalledWith(false);
+    expect(result.current.profile.isExplicitProxyMode).toBe(false);
     expect(result.current.profile.activeProfile?.id).toBe('owner-id');
     expect(result.current.linked).toHaveLength(1);
     expect(result.current.linked[0]!.id).toBe('child-id');

@@ -25,7 +25,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { requireProfileId } from '../middleware/profile-scope';
+import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
@@ -84,7 +84,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
       const preferences = await upsertNotificationPrefs(
         db,
@@ -118,7 +119,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
       const result = body.childProfileId
         ? await upsertChildCelebrationLevel(
@@ -163,7 +165,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
 
       try {
@@ -188,7 +191,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   .get('/settings/family-pool-breakdown-sharing', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-    const accountId = c.get('account').id;
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const accountId = requireAccount(c.get('account')).id;
 
     try {
       const value = await getOwnedFamilyPoolBreakdownSharing(
@@ -213,7 +217,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
 
       try {
@@ -242,7 +247,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
       await registerPushToken(db, profileId, accountId, body.token);
       return c.json(

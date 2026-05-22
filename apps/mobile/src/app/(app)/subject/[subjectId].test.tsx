@@ -83,6 +83,7 @@ const testProfile: Profile = createTestProfile({
 const profileContextValue: ProfileContextValue = {
   profiles: [testProfile],
   activeProfile: testProfile,
+  isExplicitProxyMode: false,
   switchProfile: async () => ({ success: true }),
   isLoading: false,
   profileLoadError: null,

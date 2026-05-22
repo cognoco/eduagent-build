@@ -21,7 +21,6 @@ import {
   accounts,
   profiles,
   familyLinks,
-  learningProfiles,
   notificationLog,
   createDatabase,
 } from '@eduagent/database';

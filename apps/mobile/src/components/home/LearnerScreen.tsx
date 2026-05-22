@@ -24,7 +24,6 @@ import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren, useProfile } from '../../lib/profile';
 import {
   LEARNER_HOME_RETURN_TO,
-  homeHrefForReturnTo,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
 import {
@@ -127,7 +126,7 @@ export function LearnerScreen({
   const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { data: subscription } = useSubscription();
-  const { switchProfile } = useProfile();
+  const { switchProfile, isExplicitProxyMode } = useProfile();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
@@ -135,9 +134,10 @@ export function LearnerScreen({
   const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
     string | null
   >(null);
-  const isParentProxy = Boolean(
-    activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
-  );
+  // [ACCOUNT-04] Use the explicit proxy flag from context instead of deriving
+  // from profile shape. A non-owner profile switched to via plain switchProfile()
+  // is a normal learner session — proxy chrome must not appear.
+  const isParentProxy = isExplicitProxyMode;
   const parentProfile = isParentProxy
     ? profiles.find((profile) => profile.isOwner)
     : null;
@@ -164,10 +164,6 @@ export function LearnerScreen({
   }, [dashboard]);
   const returnParams = useMemo(
     () => ({ returnTo: returnToTab }),
-    [returnToTab],
-  );
-  const homeHref = useMemo(
-    () => homeHrefForReturnTo(returnToTab),
     [returnToTab],
   );
 
@@ -444,12 +440,26 @@ export function LearnerScreen({
                 Retry
               </Text>
             </Pressable>
+            {/* [HOME-08] Replace the self-referential "Go home" (which is this
+                screen) with escape routes that actually change state — matching
+                the recovery pattern already used in home.tsx:119. */}
             <Pressable
-              onPress={() => router.replace(homeHref as Href)}
+              onPress={() => router.replace('/(app)/library' as Href)}
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
-              testID="learner-loading-go-home"
+              testID="learner-loading-go-library"
             >
-              <Text className="text-body text-text-secondary">Go home</Text>
+              <Text className="text-body text-primary font-medium">
+                Go to Library
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.replace('/(app)/more' as Href)}
+              className="min-h-[44px] items-center justify-center px-6 py-2"
+              testID="learner-loading-go-more"
+            >
+              <Text className="text-body text-primary font-medium">
+                More options
+              </Text>
             </Pressable>
           </View>
         )}

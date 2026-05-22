@@ -223,7 +223,7 @@ Dictation is a five-screen flow under `/(app)/dictation` with its own React cont
 
 | ID | Flow | Primary routes / entry points | Coverage |
 | --- | --- | --- | --- |
-| HOMEWORK-01 | Start homework from learner home or More screen | learner home `home-action-homework`, `/(app)/more` -> `/(app)/homework/camera` | `e2e/flows/homework/homework-from-entry-card.yaml`, `e2e/flows/homework/homework-flow.yaml` |
+| HOMEWORK-01 | Start homework from learner home | learner home `home-action-homework` -> `/(app)/homework/camera` | `e2e/flows/homework/homework-from-entry-card.yaml`, `e2e/flows/homework/homework-flow.yaml` |
 | HOMEWORK-02 | Camera permission, capture, preview, and OCR. Permission phase has two distinct sub-states: first-request prompt (`grant-permission-button`) and permanently-denied/Settings-redirect (`open-settings-button`); auto-refreshes on app resume (commit 22c7c99c). i18n keys now render translated strings (C-1 fix, commit d0e1efdc); null-safety + fetch-boundary tests added (commit fc8413ed) | `/(app)/homework/camera` | `e2e/flows/homework/camera-ocr.yaml` |
 | HOMEWORK-03 | Manual fallback when OCR is weak or fails | camera fallback and manual text entry | Covered inside `e2e/flows/homework/camera-ocr.yaml` |
 | HOMEWORK-04 | Homework tutoring session with multi-problem navigation | `/(app)/session?mode=homework` | `e2e/flows/homework/homework-flow.yaml` |

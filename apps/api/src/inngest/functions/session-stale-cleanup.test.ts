@@ -124,6 +124,22 @@ describe('session-stale-cleanup Inngest function', () => {
     expect(trigger.cron).toBe('*/10 * * * *');
   });
 
+  // [BUG-401] Break test — retries config must match mirror functions.
+  //
+  // Red-green pattern:
+  //   GREEN (fix applied):  retries === 5, test passes.
+  //   RED   (fix reverted): retries is undefined (Inngest default 4) or wrong.
+  //     Test fails: "Expected: 5, Received: undefined".
+  //
+  // Mirrors account-deletion.ts:13 and consent-revocation.ts:36 (retries: 5).
+  // Without explicit retries, a transient DB error during closeStaleSessions
+  // exhausts Inngest's default retry budget earlier than the mirror functions,
+  // causing divergent resilience posture for cron vs. event-driven functions.
+  it('[BUG-401 break test] is configured with retries: 5 matching mirror functions', () => {
+    const config = (sessionStaleCleanup as any).opts;
+    expect(config.retries).toBe(5);
+  });
+
   it('passes a 30-minute cutoff to closeStaleSessions', async () => {
     mockCloseStaleSessions.mockResolvedValue([]);
 

@@ -1724,7 +1724,7 @@ describe('dashboard service integration', () => {
       respondedAt: subtractDays(new Date(), 1),
     });
 
-    const subjectId = await seedSubject({
+    await seedSubject({
       profileId: childProfileId,
       name: 'BUG466-Math',
     });

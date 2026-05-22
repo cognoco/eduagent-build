@@ -167,10 +167,10 @@ export const summaryReconciliationCron = inngest.createFunction(
     await step.sendEvent('notify-summary-reconciliation-scanned', {
       name: 'app/summary.reconciliation.scanned',
       data: {
-        createCount: missingSummaries.length,
-        regenerateCount: missingLlmSummaries.length,
-        recapCount: missingRecaps.length,
-        totalCount,
+        queryACount: missingSummaries.length,
+        queryBCount: missingLlmSummaries.length,
+        queryCCount: missingRecaps.length,
+        totalScanned: totalCount,
         timestamp,
       },
     });

@@ -44,6 +44,7 @@ function createWrapperWithSharedQueryClient(
   const profileContextValue: ProfileContextValue = {
     profiles: [profile],
     activeProfile: profile,
+    isExplicitProxyMode: false,
     switchProfile: async () => ({ success: true }),
     isLoading: false,
     profileLoadError: null,

@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (learningSessions.profileId enforced in WHERE)
 import { and, count, desc, eq, lt, sql } from 'drizzle-orm';
 import { learningSessions, sessionEvents } from '@eduagent/database';
 import {

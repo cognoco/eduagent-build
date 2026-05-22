@@ -259,6 +259,7 @@ describe('AppLayout', () => {
       profileWasRemoved: false,
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile: jest.fn(),
+      isExplicitProxyMode: false,
     });
 
     // Default fetch routes for API hooks
@@ -720,6 +721,7 @@ describe('AppLayout', () => {
       profileWasRemoved: false,
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile,
+      isExplicitProxyMode: true,
     });
 
     renderLayout();

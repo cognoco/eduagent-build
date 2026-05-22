@@ -27,6 +27,7 @@ jest.mock(
 );
 
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
@@ -602,6 +603,75 @@ describe('POST /v1/profiles/switch', () => {
 
     expect(res.status).toBe(400);
     expect(switchProfileMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CR-353 / BUG-353] Break test: requireAccount() defensive unwrap
+//
+// Simulates a middleware-ordering regression where accountMiddleware is not
+// mounted (or is conditionally skipped) so c.get('account') returns undefined
+// at runtime. Without requireAccount(), the first `account.id` access in any
+// handler throws TypeError → 500, which is unstructured and hard to diagnose.
+//
+// With requireAccount() applied to every handler, the response is a structured
+// 401 — even when the middleware chain regresses.
+//
+// Red-green: revert any `requireAccount(c.get('account'))` call in profiles.ts
+// back to `c.get('account')` and both tests below flip from 401 → 500.
+// ---------------------------------------------------------------------------
+
+describe('[CR-353 / BUG-353] requireAccount defensive unwrap — 401 not 500 on account=undefined', () => {
+  /**
+   * Mini-app with NO account injected into context — simulates a
+   * middleware-ordering regression where accountMiddleware ran but failed
+   * to set `account` (e.g. early return, conditional skip, mounting outside
+   * the middleware chain).
+   */
+  function makeAppWithoutAccount() {
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      // Deliberately omit c.set('account', ...) to simulate the regression.
+      c.set('profileId', undefined);
+      c.set('profileMeta', undefined);
+      await next();
+    });
+    app.onError((err, c) => {
+      // Re-surface HTTPException with its own status so Hono returns the
+      // correct 4xx code rather than a generic 500.
+      if (err instanceof HTTPException) {
+        return c.json({ code: 'HTTP_ERROR', message: err.message }, err.status);
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500);
+    });
+    app.route('/v1', profileRoutes);
+    return app;
+  }
+
+  it('[BREAK] GET /v1/profiles returns 401 (not 500 TypeError) when account is undefined', async () => {
+    const res = await makeAppWithoutAccount().request('/v1/profiles');
+    // Before the fix: c.get('account').id throws TypeError → onError → 500.
+    // After the fix: requireAccount(c.get('account')) throws HTTPException(401) → 401.
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    // Must not be an unstructured 500 crash
+    expect(body.code).not.toBe('INTERNAL_ERROR');
+  });
+
+  it('[BREAK] POST /v1/profiles returns 401 (not 500 TypeError) when account is undefined', async () => {
+    const res = await makeAppWithoutAccount().request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'Test',
+        birthYear: 2000,
+        location: 'EU',
+      }),
+    });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).not.toBe('INTERNAL_ERROR');
   });
 });
 

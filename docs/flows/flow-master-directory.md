@@ -10,6 +10,27 @@ This document is the durable directory of product flows. It is intentionally sep
 
 Detailed flow pages live under [`master-directory/`](master-directory/README.md).
 
+## Related documents
+
+- [`docs/specs/2026-05-21-navigation-contract.md`](../specs/2026-05-21-navigation-contract.md) — target navigation contract (`resolveNavigationContract`, `study` / `family` shapes). Flow pages cite it when their audience access depends on the contract.
+- [`docs/audience-matrix.md`](../audience-matrix.md) — current-state inventory of scattered gating (F1–F14). Flow pages that touch gated surfaces (home, more, account, privacy, progress) should cite the matrix.
+- [`master-directory/README.md`](master-directory/README.md) — schema and grouping for the per-flow detail pages.
+- `CLAUDE.md` — authoritative for **current** profile shapes and `isOwner` gating rules.
+
+## Vocabulary — audience axis (overlapping vocabularies)
+
+Four documents describe the same audience axis with different vocabularies. Translation table:
+
+| This directory | `CLAUDE.md` (today) | Navigation contract (target) | Audience matrix |
+| --- | --- | --- | --- |
+| `Study-only` | `learner` shape | `study` mode | `mode === 'study'` |
+| `Family-only` | `guardian` shape, with linked children | `family` mode | `mode === 'family'`, `hasLinkedChildren`, `isParentProxy` |
+| `Shared same behavior` | both shapes, same screen | both modes, same contract | n/a |
+| `Shared different scope` | both shapes, different content gates | both modes, different `gates.*` | `isOwner`, `role`, `tier` reads |
+| `Owner/account shared` | `isOwner: true` | `gates.showBilling / showAccountSecurity / showExportDelete` | `isOwner`, `role` |
+
+The fact that "two shapes" means `guardian/learner` in CLAUDE.md and `study/family` in the navigation-contract spec is **intentional**: CLAUDE.md is V0 reality; the spec is FULL target.
+
 ## Audience Access Labels
 
 | Label | Meaning |
@@ -185,7 +206,7 @@ This register mirrors every flow ID currently listed in mobile-app-flow-inventor
 | DICT-08 | Sentence-level remediation (rewrite each mistake; autocorrect disabled; accepts whatever child types) | Not created | TBD | Not mapped |
 | DICT-09 | Perfect-score celebration screen | Not created | TBD | Not mapped |
 | DICT-10 | Recording dictation result on "I'm done" or after review (`POST /dictation/results`) with retry alert if save fails | Not created | TBD | Not mapped |
-| HOMEWORK-01 | Start homework from learner home or More screen | [master-directory/homework/HOMEWORK-01.md](master-directory/homework/HOMEWORK-01.md) | `Shared different scope` | Draft |
+| HOMEWORK-01 | Start homework from learner home | [master-directory/homework/HOMEWORK-01.md](master-directory/homework/HOMEWORK-01.md) | `Shared different scope` | Draft |
 | HOMEWORK-02 | Camera permission, capture, preview, and OCR. Permission phase has two distinct sub-states: first-request prompt (`grant-permission-button`) and permanently-denied/Settings-redirect (`open-settings-button`); auto-refreshes on app resume (commit 22c7c99c). i18n keys now render translated strings (C-1 fix, commit d0e1efdc); null-safety + fetch-boundary tests added (commit fc8413ed) | Not created | TBD | Not mapped |
 | HOMEWORK-03 | Manual fallback when OCR is weak or fails | Not created | TBD | Not mapped |
 | HOMEWORK-04 | Homework tutoring session with multi-problem navigation | Not created | TBD | Not mapped |
