@@ -30,10 +30,43 @@ export function isTransientDatabaseError(error: unknown): boolean {
   );
 }
 
+/**
+ * Options for withTransientDatabaseRetry.
+ *
+ * `idempotent` MUST be `true`. This is a required opt-in that forces callers
+ * to explicitly confirm the operation is safe to run more than once. Operations
+ * that are NOT idempotent (e.g. pure INSERT, fetch-then-decrement composites)
+ * must NOT be passed here — a retried transient error would replay the side
+ * effect. Use idempotent patterns (INSERT … ON CONFLICT DO UPDATE, read-only
+ * SELECTs, or SELECT-then-conditional-upsert inside a transaction) at the call
+ * site, then pass `{ idempotent: true }`.
+ */
+export interface TransientRetryOptions {
+  /**
+   * Must be explicitly set to `true`. Callers that cannot guarantee
+   * idempotency must NOT use this wrapper.
+   */
+  idempotent: true;
+}
+
 export async function withTransientDatabaseRetry<T>(
   label: string,
   operation: () => Promise<T>,
+  options: TransientRetryOptions,
 ): Promise<T> {
+  // The options parameter is intentionally used as a compile-time and
+  // runtime contract. The `idempotent: true` constraint is enforced by the
+  // TypeScript type — only `{ idempotent: true }` satisfies it. At runtime we
+  // assert the value to catch callers that bypass TypeScript (e.g. plain JS or
+  // a type cast).
+  if (options.idempotent !== true) {
+    throw new Error(
+      `withTransientDatabaseRetry called for '${label}' without idempotent:true. ` +
+        'Only idempotent operations (upserts, read-only queries) may be retried. ' +
+        'See TransientRetryOptions for the contract.',
+    );
+  }
+
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= TRANSIENT_DB_RETRY_ATTEMPTS; attempt += 1) {

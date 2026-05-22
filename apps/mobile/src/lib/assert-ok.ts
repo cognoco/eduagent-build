@@ -99,6 +99,10 @@ export async function assertOk<T extends Response>(
           );
         }
       } catch (e) {
+        // Re-throw guard: the outer catch (e) above wraps both the body-text read
+        // and quotaExceededSchema.safeParse. If a QuotaExceededError was already
+        // constructed (happy path), preserve it; otherwise fall through to
+        // UpstreamError with the truncated body.
         // Re-throw if it's a QuotaExceededError we just constructed
         if (e instanceof QuotaExceededError) throw e;
         // Otherwise fall through to UpstreamError

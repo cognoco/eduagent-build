@@ -48,6 +48,8 @@ import {
   type CachedSubscriptionStatus,
 } from '../services/kv';
 import { createLogger } from '../services/logger';
+import { safeSend } from '../services/safe-non-core';
+import { inngest } from '../inngest/client';
 
 const logger = createLogger();
 
@@ -229,11 +231,33 @@ async function maybeReplayIdempotentSessionRequest(
       buildIdempotencyCacheKey(profileId, 'session', key),
     );
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.warn('[metering] Idempotency replay lookup failed', {
       event: 'metering.idempotency_replay_lookup_failed',
       profileId,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
     });
+    // [CR-2026-05-21-047] Silent recovery in billing without a structured metric
+    // is banned (CLAUDE.md "Fix Development Rules"). On KV outage every idempotent
+    // session request is processed twice if the client retries — including
+    // double-decrementing the quota pool. Emit via safeSend so dispatch failure
+    // is captured in Sentry but never throws and never breaks the user action.
+    const account = c.get('account') as { id: string } | undefined;
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/idempotency.preflight_lookup_failed',
+          data: {
+            accountId: account?.id ?? null,
+            profileId: profileId ?? null,
+            route: c.req.path,
+            error: errorMessage,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'metering.idempotency_replay_lookup_failed',
+      { profileId, route: c.req.path },
+    );
     return null;
   }
 

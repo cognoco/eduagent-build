@@ -18,16 +18,22 @@ export function useNetworkStatus(): NetworkStatus {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     // Proactive initial check — show offline banner immediately if already offline
     // rather than waiting for the first connectivity-change event.
     // .catch ensures isReady is always set even if NetInfo.fetch() rejects.
+    // The mounted guard prevents setState from being called if the component
+    // unmounts before the promise resolves (BUG-531).
     NetInfo.fetch()
       .then((state: NetInfoState) => {
+        if (!mounted) return;
         const offline = state.isInternetReachable === false;
         setIsOffline(offline);
         setIsReady(true);
       })
       .catch(() => {
+        if (!mounted) return;
         setIsReady(true);
       });
 
@@ -38,7 +44,10 @@ export function useNetworkStatus(): NetworkStatus {
       setIsReady(true);
     });
 
-    return unsubscribe;
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   return { isOffline, isReady };

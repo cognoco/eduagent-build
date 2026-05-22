@@ -204,6 +204,23 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
 // temporal dead zone when the factory first fires. Instead, the factory stores
 // the spy fns on a stable object keyed off __spies so they can be retrieved
 // later via jest.requireMock().
+// [CR-2026-05-21-047] safeSend spy — assertion mechanism for idempotency replay
+// KV failure observability (CLAUDE.md "Fix Development Rules": silent recovery
+// in billing without a structured metric is banned).
+const mockSafeSendFn = jest.fn().mockResolvedValue(undefined);
+jest.mock(
+  '../services/safe-non-core' /* gc1-allow: unit test — safeSend spy is the assertion mechanism for KV failure observability (CR-2026-05-21-047) */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/safe-non-core',
+    ) as typeof import('../services/safe-non-core');
+    return {
+      ...actual,
+      safeSend: (...args: unknown[]) => mockSafeSendFn(...args),
+    };
+  },
+);
+
 jest.mock(
   '../services/logger' /* gc1-allow: metering unit test — logger spy is the assertion mechanism for KV observability (BUG-753) */,
   () => {
@@ -337,6 +354,7 @@ function mockQuota(overrides?: Record<string, unknown>) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSafeSendFn.mockResolvedValue(undefined);
   fakeKV.reset();
   // Default: ensureFreeSubscription returns a plus subscription
   mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
@@ -578,6 +596,67 @@ describe('metering middleware', () => {
       expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
       expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    // [CR-2026-05-21-047] Break test — KV failure in idempotency replay lookup
+    // must emit a safeSend dispatch for observability AND still return null
+    // (fall through to normal metering). Without the fix, safeSend is never
+    // called — the failure is silent and every client retry double-decrements
+    // the quota pool on KV outage.
+    it('[CR-2026-05-21-047] emits safeSend on idempotency KV read failure and still processes the request (no behavior change)', async () => {
+      mockSafeSendFn.mockClear();
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      // A separate idempotency KV that throws on the FIRST get (metering
+      // middleware's maybeReplayIdempotentSessionRequest), then returns null
+      // on subsequent gets (the route-level idempotencyPreflight). This
+      // isolates the metering catch path as the subject under test.
+      const throwingIdempotencyKV = {
+        get: jest
+          .fn()
+          .mockRejectedValueOnce(new Error('KV outage'))
+          .mockResolvedValue(null),
+        put: jest.fn().mockResolvedValue(undefined),
+        delete: jest.fn().mockResolvedValue(undefined),
+      } as unknown as KVNamespace;
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: { ...AUTH_HEADERS, 'Idempotency-Key': 'retry-key' },
+          body: JSON.stringify({ message: 'What is 2+2?' }),
+        },
+        { ...TEST_ENV, IDEMPOTENCY_KV: throwingIdempotencyKV },
+      );
+
+      // User-facing behavior unchanged: request falls through to normal metering
+      expect(res.status).toBe(200);
+      expect(mockDecrementQuota).toHaveBeenCalled();
+
+      // [BREAK] safeSend must have been called — proves the failure is observable.
+      // Before the fix this assertion fails because safeSend is never invoked.
+      expect(mockSafeSendFn).toHaveBeenCalledTimes(1);
+
+      // Verify the send thunk contains the expected event shape
+      const [sendThunk, surface, context] = mockSafeSendFn.mock.calls[0] as [
+        () => Promise<unknown>,
+        string,
+        Record<string, unknown>,
+      ];
+      expect(surface).toBe('metering.idempotency_replay_lookup_failed');
+      expect(context).toMatchObject({ route: expect.any(String) });
+
+      // The thunk itself is a function (we do not call it — safeSend is mocked)
+      expect(typeof sendThunk).toBe('function');
     });
 
     it('refunds quota when a metered route rejects before producing an answer', async () => {

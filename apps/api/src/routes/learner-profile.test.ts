@@ -568,10 +568,376 @@ describe('learner-profile routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [CR-2026-05-21-010] Break tests -- non-owner MINOR profiles must be blocked
+  // from self-routes that mutate consent / collection state.
+  // Red: these assertions fail before the assertCanManageOwnConsent gate is added.
+  // Green: they pass after the gate is in place.
+  // The same profile can still read its own profile (export-text GET).
+  // An adult non-owner (18+) is still allowed to manage its own consent.
+  // -------------------------------------------------------------------------
+
+  describe('[CR-2026-05-21-010] minor non-owner profile is blocked from self consent/collection mutations', () => {
+    const MINOR_NON_OWNER_PROFILE_ID = 'e0000000-0000-4000-e000-000000000001';
+    const MINOR_NON_OWNER_HEADERS = makeAuthHeaders({
+      'X-Profile-Id': MINOR_NON_OWNER_PROFILE_ID,
+    });
+
+    beforeEach(() => {
+      // getProfile resolves to a non-owner minor profile (birthYear 2012 -> age ~14).
+      const profileServiceMock = jest.requireMock(
+        '../services/profile',
+      ) as Record<string, jest.Mock>;
+      profileServiceMock['getProfile']!.mockImplementation(
+        async (_db: unknown, profileId: string) => ({
+          id: profileId,
+          birthYear: 2012,
+          location: null,
+          consentStatus: 'CONSENTED',
+          isOwner: false,
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+        }),
+      );
+    });
+
+    it('[BREAK] DELETE /learner-profile/all returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/all',
+        { method: 'DELETE', headers: MINOR_NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      // Gate must block before service is called.
+      expect(mockDeleteAllMemory).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] PATCH /learner-profile/memory-enabled returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/memory-enabled',
+        {
+          method: 'PATCH',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ memoryEnabled: false }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockToggleMemoryEnabled).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] PATCH /learner-profile/collection returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/collection',
+        {
+          method: 'PATCH',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ memoryCollectionEnabled: false }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockToggleMemoryCollection).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] PATCH /learner-profile/injection returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/injection',
+        {
+          method: 'PATCH',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ memoryInjectionEnabled: false }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockToggleMemoryInjection).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] POST /learner-profile/consent returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/consent',
+        {
+          method: 'POST',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
+    });
+
+    it('GET /learner-profile/export-text returns 200 for minor non-owner profile (read is not gated)', async () => {
+      // Read-only routes must not be affected by the consent/collection gate.
+      const res = await app.request(
+        '/v1/learner-profile/export-text',
+        { headers: MINOR_NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('[CR-2026-05-21-010] adult non-owner profile (18+) is allowed to manage own consent', () => {
+    const ADULT_NON_OWNER_PROFILE_ID = 'f0000000-0000-4000-f000-000000000001';
+    const ADULT_NON_OWNER_HEADERS = makeAuthHeaders({
+      'X-Profile-Id': ADULT_NON_OWNER_PROFILE_ID,
+    });
+
+    beforeEach(() => {
+      // getProfile resolves to a non-owner adult profile (birthYear 2000 -> age ~26).
+      const profileServiceMock = jest.requireMock(
+        '../services/profile',
+      ) as Record<string, jest.Mock>;
+      profileServiceMock['getProfile']!.mockImplementation(
+        async (_db: unknown, profileId: string) => ({
+          id: profileId,
+          birthYear: 2000,
+          location: null,
+          consentStatus: 'CONSENTED',
+          isOwner: false,
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+        }),
+      );
+      mockDeleteAllMemory.mockResolvedValue(undefined);
+      mockGrantMemoryConsent.mockResolvedValue(undefined);
+      mockToggleMemoryEnabled.mockResolvedValue(undefined);
+      mockToggleMemoryCollection.mockResolvedValue(undefined);
+      mockToggleMemoryInjection.mockResolvedValue(undefined);
+    });
+
+    it('DELETE /learner-profile/all returns 200 for adult non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/all',
+        { method: 'DELETE', headers: ADULT_NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockDeleteAllMemory).toHaveBeenCalled();
+    });
+
+    it('POST /learner-profile/consent returns 200 for adult non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/consent',
+        {
+          method: 'POST',
+          headers: ADULT_NON_OWNER_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGrantMemoryConsent).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // [CR-2026-05-19-H1] Break tests — non-owner profile must be rejected from
   // all parent-child routes that require assertOwnerAndParentAccess.
   // A child on a parent's account (isOwner:false) must get 403, not data.
   // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // [CR-2026-05-21-010] Break tests — non-owner MINOR profiles must be blocked
+  // from self-routes that mutate consent / collection state.
+  // Red: these assertions fail before the assertCanManageOwnConsent gate is added.
+  // Green: they pass after the gate is in place.
+  // The same profile can still read its own profile (GET /learner-profile).
+  // An adult non-owner (18+) is still allowed to manage its own consent.
+  // -------------------------------------------------------------------------
+
+  describe('[CR-2026-05-21-010] minor non-owner profile is blocked from self consent/collection mutations', () => {
+    const MINOR_NON_OWNER_PROFILE_ID = 'e0000000-0000-4000-e000-000000000001';
+    const MINOR_NON_OWNER_HEADERS = makeAuthHeaders({
+      'X-Profile-Id': MINOR_NON_OWNER_PROFILE_ID,
+    });
+
+    beforeEach(() => {
+      // getProfile resolves to a non-owner minor profile (birthYear 2012 → age ~14).
+      const profileServiceMock = jest.requireMock(
+        '../services/profile',
+      ) as Record<string, jest.Mock>;
+      profileServiceMock['getProfile']!.mockImplementation(
+        async (_db: unknown, profileId: string) => ({
+          id: profileId,
+          birthYear: 2012,
+          location: null,
+          consentStatus: 'CONSENTED',
+          isOwner: false,
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+        }),
+      );
+    });
+
+    it('[BREAK] DELETE /learner-profile/all returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/all',
+        { method: 'DELETE', headers: MINOR_NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      // Gate must block before service is called.
+      expect(mockDeleteAllMemory).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] PATCH /learner-profile/memory-enabled returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/memory-enabled',
+        {
+          method: 'PATCH',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ memoryEnabled: false }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockToggleMemoryEnabled).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] PATCH /learner-profile/collection returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/collection',
+        {
+          method: 'PATCH',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ memoryCollectionEnabled: false }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockToggleMemoryCollection).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] PATCH /learner-profile/injection returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/injection',
+        {
+          method: 'PATCH',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ memoryInjectionEnabled: false }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockToggleMemoryInjection).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] POST /learner-profile/consent returns 403 for minor non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/consent',
+        {
+          method: 'POST',
+          headers: MINOR_NON_OWNER_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
+    });
+
+    it('GET /learner-profile/export-text returns 200 for minor non-owner profile (read is not gated)', async () => {
+      // Read-only routes must not be affected by the consent/collection gate.
+      const res = await app.request(
+        '/v1/learner-profile/export-text',
+        { headers: MINOR_NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('[CR-2026-05-21-010] adult non-owner profile (18+) is allowed to manage own consent', () => {
+    const ADULT_NON_OWNER_PROFILE_ID = 'f0000000-0000-4000-f000-000000000001';
+    const ADULT_NON_OWNER_HEADERS = makeAuthHeaders({
+      'X-Profile-Id': ADULT_NON_OWNER_PROFILE_ID,
+    });
+
+    beforeEach(() => {
+      // getProfile resolves to a non-owner adult profile (birthYear 2000 → age ~26).
+      const profileServiceMock = jest.requireMock(
+        '../services/profile',
+      ) as Record<string, jest.Mock>;
+      profileServiceMock['getProfile']!.mockImplementation(
+        async (_db: unknown, profileId: string) => ({
+          id: profileId,
+          birthYear: 2000,
+          location: null,
+          consentStatus: 'CONSENTED',
+          isOwner: false,
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+        }),
+      );
+      mockDeleteAllMemory.mockResolvedValue(undefined);
+      mockGrantMemoryConsent.mockResolvedValue(undefined);
+      mockToggleMemoryEnabled.mockResolvedValue(undefined);
+      mockToggleMemoryCollection.mockResolvedValue(undefined);
+      mockToggleMemoryInjection.mockResolvedValue(undefined);
+    });
+
+    it('DELETE /learner-profile/all returns 200 for adult non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/all',
+        { method: 'DELETE', headers: ADULT_NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockDeleteAllMemory).toHaveBeenCalled();
+    });
+
+    it('POST /learner-profile/consent returns 200 for adult non-owner profile', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/consent',
+        {
+          method: 'POST',
+          headers: ADULT_NON_OWNER_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGrantMemoryConsent).toHaveBeenCalled();
+    });
+  });
 
   describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent child routes', () => {
     const NON_OWNER_PROFILE_ID = 'd0000000-0000-4000-d000-000000000001';

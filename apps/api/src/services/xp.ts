@@ -97,7 +97,7 @@ export async function insertSessionXpEntry(
       eq(assessments.status, 'passed'),
     ),
   });
-  if (!assessment || !assessment.masteryScore) return;
+  if (!assessment || assessment.masteryScore == null) return;
 
   // 2. Check for existing XP entry (avoid duplicates)
   const repo = createScopedRepository(db, profileId);

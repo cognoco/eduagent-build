@@ -70,6 +70,9 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
     const account = await withTransientDatabaseRetry(
       'accountMiddleware.findOrCreateAccount',
       () => findOrCreateAccount(db, user.userId, verifiedEmail),
+      // findOrCreateAccount uses INSERT … ON CONFLICT DO UPDATE (upsert) —
+      // safe to retry if the connection drops mid-flight.
+      { idempotent: true },
     );
     c.set('account', account);
     return next();

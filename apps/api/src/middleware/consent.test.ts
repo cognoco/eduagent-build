@@ -147,13 +147,75 @@ describe('consentMiddleware', () => {
     expect(res.status).toBe(200);
   });
 
-  it('passes through for exempt path /v1/profiles', async () => {
+  it('passes through for exempt path GET /v1/profiles (list)', async () => {
     const app = createApp({
       profileId: 'p-1',
       profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/profiles',
     });
-    const res = await app.request('/v1/profiles');
+    const res = await app.request('/v1/profiles', { method: 'GET' });
     expect(res.status).toBe(200);
+  });
+
+  it('passes through for exempt path GET /v1/profiles/:id (read)', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/profiles/:id',
+    });
+    const res = await app.request('/v1/profiles/some-profile-id', {
+      method: 'GET',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('passes through for exempt path POST /v1/profiles/switch', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/profiles/switch',
+    });
+    const res = await app.request('/v1/profiles/switch', { method: 'POST' });
+    expect(res.status).toBe(200);
+  });
+
+  // [CR-2026-05-21-085] Break test: PATCH /v1/profiles/:id must be BLOCKED for
+  // learners with PENDING consent. The old bare `/v1/profiles` prefix (no trailing
+  // slash) allowed this mutation via startsWith, letting a learner mutate
+  // birthYear (which alters the consent requirement itself) or displayName
+  // before consent was granted.
+  it('[CR-2026-05-21-085] blocks PATCH /v1/profiles/:id for child with PENDING consent', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/profiles/:id',
+    });
+    const res = await app.request('/v1/profiles/some-profile-id', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'hacked' }),
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('CONSENT_REQUIRED');
+  });
+
+  // [CR-2026-05-21-085] Break test: POST /v1/profiles (create) must be BLOCKED
+  // for learners with PENDING consent.
+  it('[CR-2026-05-21-085] blocks POST /v1/profiles for child with PENDING consent', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/profiles',
+    });
+    const res = await app.request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'new-child', birthYear: 2010 }),
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('CONSENT_REQUIRED');
   });
 
   it('passes through for exempt path /v1/billing/', async () => {
