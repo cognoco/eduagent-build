@@ -232,6 +232,7 @@ export async function executeDeletion(
   }
 
   // Distinguish cancelled from already-deleted so callers get accurate telemetry.
+  // Race-acceptable: if a concurrent process deletes the row between the UPDATE returning 0 rows and this SELECT, we'll report 'already_deleted' instead of 'cancelled' — telemetry-only impact.
   const existingRow = await db.query.accounts.findFirst({
     where: eq(accounts.id, accountId),
     columns: { id: true },

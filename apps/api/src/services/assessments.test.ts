@@ -28,7 +28,7 @@ import type {
   AssessmentEvaluation,
   AssessmentRecord,
 } from '@eduagent/schemas';
-import { NotFoundError } from '@eduagent/schemas';
+import { NotFoundError } from '../errors';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------

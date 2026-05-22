@@ -758,11 +758,11 @@ type StreamOnCompleteResult = Awaited<
 >;
 
 // Each assignment will produce a TS error if the field is absent.
-type _assertStreamReadyToFinish = StreamOnCompleteResult extends {
-  readyToFinish?: boolean;
-}
-  ? true
-  : never;
+// `extends { readyToFinish?: boolean }` was vacuous (any object satisfies it
+// because the field is optional). The key-existence form below is strict: it
+// produces `never` if the key is removed from StreamOnCompleteResult.
+type _assertStreamReadyToFinish =
+  'readyToFinish' extends keyof StreamOnCompleteResult ? true : never;
 const _streamReadyToFinishCheck: _assertStreamReadyToFinish = true;
 void _streamReadyToFinishCheck;
 
@@ -773,12 +773,14 @@ void _streamReadyToFinishCheck;
 
 type ProcessMessageResult = Awaited<ReturnType<typeof processMessage>>;
 
-type _assertProcessNotePrompt = ProcessMessageResult extends {
-  notePrompt?: boolean;
-  notePromptPostSession?: boolean;
-  confidence?: 'low' | 'medium' | 'high';
-}
-  ? true
+// Same fix as above: optional-extends is vacuous. Key-existence checks are
+// strict — any removed field collapses the type to `never`.
+type _assertProcessNotePrompt = 'notePrompt' extends keyof ProcessMessageResult
+  ? 'notePromptPostSession' extends keyof ProcessMessageResult
+    ? 'confidence' extends keyof ProcessMessageResult
+      ? true
+      : never
+    : never
   : never;
 const _processNotePromptCheck: _assertProcessNotePrompt = true;
 void _processNotePromptCheck;

@@ -322,6 +322,7 @@ describe('[BUG-459] explainTopicOrdering cross-account topic disclosure (integra
     // loaded and fed into the LLM prompt — an information disclosure. After
     // the fix the topic lookup is constrained to subjectB's curriculum, so the
     // topic is not found and the function throws NotFoundError.
+    expect(treeA.topicIds.length).toBeGreaterThan(0);
     await expect(
       explainTopicOrdering(
         db,

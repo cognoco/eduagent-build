@@ -173,6 +173,7 @@ describe('sessionSummaryFailedObserve [BUG-369]', () => {
     await invoke(sessionSummaryFailedObserve, {
       profileId: 'profile-4',
       sessionId: 'session-4',
+      sessionSummaryId: null,
       timestamp: '2026-01-01T00:00:00.000Z',
     });
     const entry = lastJsonLine(consoleWarnSpy);

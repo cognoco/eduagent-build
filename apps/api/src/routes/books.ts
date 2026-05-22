@@ -193,7 +193,12 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         inngest
           .send({
             name: 'app/book.topics-generated',
-            data: { subjectId, bookId, profileId },
+            data: {
+              subjectId,
+              bookId,
+              profileId,
+              timestamp: new Date().toISOString(),
+            },
           })
           .catch((err) => {
             captureException(err, {

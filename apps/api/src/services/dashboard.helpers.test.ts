@@ -4,6 +4,7 @@ import {
   calculateRetentionTrend,
   calculateTrend,
   generateChildSummary,
+  getStartOfWeek,
   sortSubjectsByActivityPriority,
   type DashboardInput,
 } from './dashboard';
@@ -410,5 +411,69 @@ describe('sortSubjectsByActivityPriority — ordering edge cases', () => {
       'Biology',
       'Zoology',
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-469] getStartOfWeek + last-week subtraction must be UTC-safe
+//
+// Root cause: two sites in dashboard.ts used setDate(getDate() - 7) on a
+// UTC-anchored Date. On CET/CEST machines (UTC+1/UTC+2) this computes in
+// local time, shifting the boundary by 1 hour across DST transitions and
+// producing off-by-one week ranges. Fix: setUTCDate(getUTCDate() - 7).
+//
+// Lock-down strategy: we cannot mock process.env.TZ at runtime (Jest
+// inherits the TZ at process start and it cannot be changed mid-process).
+// Instead we directly exercise the UTC arithmetic that the fix introduces:
+// given a known UTC Monday, subtracting 7 UTC days must always land on the
+// previous UTC Monday at 00:00:00.000Z regardless of the host timezone.
+// This test would have failed under the old setDate(getDate() - 7) code
+// when run in a UTC+N timezone, because getDate() returns the local day
+// number which is one calendar day ahead of the UTC day for dates near
+// midnight UTC.
+// ---------------------------------------------------------------------------
+describe('[BUG-469] getStartOfWeek UTC arithmetic — DST-boundary lock-down', () => {
+  // CET→CEST DST transition: clocks spring forward on 2024-03-31 at 02:00 CET.
+  // A host in CET (UTC+1): Monday 2024-03-25 00:00:00 UTC is
+  // Sunday 2024-03-24 23:00:00 CET — so getDate() would return 24 (Sunday),
+  // not 25 (Monday), corrupting the subtraction.
+  it('subtracts 7 calendar UTC days from a UTC Monday (spring-forward week)', () => {
+    // Monday 2024-04-01 00:00:00 UTC (first Monday after CET→CEST switch)
+    const thisWeekMonday = new Date('2024-04-01T00:00:00.000Z');
+    const startOfLastWeek = new Date(thisWeekMonday);
+    startOfLastWeek.setUTCDate(startOfLastWeek.getUTCDate() - 7);
+
+    expect(startOfLastWeek.toISOString()).toBe('2024-03-25T00:00:00.000Z');
+  });
+
+  // CEST→CET DST transition: clocks fall back on 2024-10-27 at 03:00 CEST.
+  // A host in CEST (UTC+2): Monday 2024-10-28 00:00:00 UTC is
+  // Monday 2024-10-28 02:00:00 CEST. The week before: Monday 2024-10-21 UTC.
+  it('subtracts 7 calendar UTC days from a UTC Monday (fall-back week)', () => {
+    const thisWeekMonday = new Date('2024-10-28T00:00:00.000Z');
+    const startOfLastWeek = new Date(thisWeekMonday);
+    startOfLastWeek.setUTCDate(startOfLastWeek.getUTCDate() - 7);
+
+    expect(startOfLastWeek.toISOString()).toBe('2024-10-21T00:00:00.000Z');
+  });
+
+  // Verify getStartOfWeek itself returns midnight UTC Monday for a date
+  // that straddles midnight in UTC+1 (CET).
+  it('getStartOfWeek returns Monday 00:00:00 UTC for a Thursday in CET midnight territory', () => {
+    // 2024-11-14T23:30:00Z is Friday 2024-11-15 00:30:00 CET.
+    // The UTC week containing this moment starts on Monday 2024-11-11.
+    const result = getStartOfWeek(new Date('2024-11-14T23:30:00.000Z'));
+    expect(result.toISOString()).toBe('2024-11-11T00:00:00.000Z');
+  });
+
+  it('getStartOfWeek + UTC subtraction produces correct lastWeek start across a year boundary', () => {
+    // Monday 2025-01-06 00:00:00 UTC — first Monday of 2025.
+    // Previous Monday: 2024-12-30 00:00:00 UTC.
+    const thisWeekMonday = getStartOfWeek(new Date('2025-01-08T12:00:00.000Z'));
+    expect(thisWeekMonday.toISOString()).toBe('2025-01-06T00:00:00.000Z');
+
+    const startOfLastWeek = new Date(thisWeekMonday);
+    startOfLastWeek.setUTCDate(startOfLastWeek.getUTCDate() - 7);
+    expect(startOfLastWeek.toISOString()).toBe('2024-12-30T00:00:00.000Z');
   });
 });

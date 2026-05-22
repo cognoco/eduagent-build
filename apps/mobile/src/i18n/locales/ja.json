@@ -38,7 +38,7 @@
     "notFound": "そのページまたは項目は存在しません。",
     "resourceGone": "このリソースは利用できなくなりました。",
     "rateLimited": "制限に達しました。しばらく待ってからもう一度お試しください。",
-    "sessionExpired": "Your session expired — signing you out…",
+    "sessionExpired": "セッションの有効期限が切れました — サインアウトします…",
     "forbidden": "これを表示する権限がありません。",
     "quotaExhausted": "今日のセッションはすべて使用しました。また明日お越しください！",
     "sessionNotFound": "そのセッションは利用できなくなりました。新しいセッションを開始してください。",
@@ -1751,17 +1751,17 @@
       "subjectsTitle": "科目"
     },
     "remediation": {
-      "heading": "Try a different approach",
-      "body": "It is completely normal to need another pass at this.",
-      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
-      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
-      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
-      "primaryCta": "Try a different way",
-      "primaryCtaA11y": "Try a different way to learn this topic",
-      "secondaryCta": "Or try again later",
-      "secondaryCtaA11y": "Try this topic again later",
-      "libraryLink": "While you wait, check out your Library",
-      "libraryLinkA11y": "Check out your Library"
+      "heading": "別のアプローチを試してみよう",
+      "body": "もう一度取り組む必要があるのはまったく普通のことです。",
+      "cooldownMinutes": "{{minutes}}分後に再挑戦できます — 少し休憩してから戻ってきてください。",
+      "cooldownHours": "約{{hours}}時間後に再挑戦できます — 離れて気持ちを整えましょう。",
+      "cooldownTomorrow": "少し長めに休んで、明日また試してみましょう。",
+      "primaryCta": "別の方法で学ぶ",
+      "primaryCtaA11y": "このトピックを別の方法で学ぶ",
+      "secondaryCta": "または後でもう一度試す",
+      "secondaryCtaA11y": "このトピックを後でもう一度試す",
+      "libraryLink": "待つ間、ライブラリをチェックしよう",
+      "libraryLinkA11y": "ライブラリを見る"
     }
   },
   "onboarding": {

@@ -322,7 +322,7 @@ export async function assertChildDashboardDataVisible(
 // ---------------------------------------------------------------------------
 
 /** Returns Monday 00:00:00 UTC of the week containing the given date. */
-function getStartOfWeek(date: Date): Date {
+export function getStartOfWeek(date: Date): Date {
   const d = new Date(date);
   const day = d.getUTCDay();
   const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
@@ -758,7 +758,7 @@ export async function getChildrenForParent(
   const now = new Date();
   const startOfThisWeek = getStartOfWeek(now);
   const startOfLastWeek = new Date(startOfThisWeek);
-  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+  startOfLastWeek.setUTCDate(startOfLastWeek.getUTCDate() - 7);
 
   const allRecentSessions = await db.query.learningSessions.findMany({
     where: and(
@@ -1084,7 +1084,7 @@ export async function getChildDetail(
   const now = new Date();
   const startOfThisWeek = getStartOfWeek(now);
   const startOfLastWeek = new Date(startOfThisWeek);
-  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+  startOfLastWeek.setUTCDate(startOfLastWeek.getUTCDate() - 7);
 
   const recentSessions = await db.query.learningSessions.findMany({
     where: and(

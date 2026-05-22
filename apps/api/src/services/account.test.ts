@@ -493,6 +493,8 @@ describe('findOrCreateAccount', () => {
     }
 
     it('[BREAK][BUG-411] throws ConflictError instead of silently rewiring', async () => {
+      // [BREAK] Without the fix: findOrCreateAccount silently updated the account row to the new clerkUserId, enabling account takeover.
+      //   (Reverting the reclaim-block guard in services/account.ts makes this test fail.)
       const staleRow = mockAccountRow({
         id: 'acc-existing',
         clerkUserId: 'clerk_old_deleted',
@@ -515,6 +517,8 @@ describe('findOrCreateAccount', () => {
     });
 
     it('[BREAK][BUG-411] calls captureException with reclaim_attempt_blocked tag', async () => {
+      // [BREAK] Without the fix: no captureException call occurred; the reclaim attempt was invisible to on-call.
+      //   (Reverting the reclaim-block guard in services/account.ts makes this test fail.)
       const staleRow = mockAccountRow({
         id: 'acc-existing',
         clerkUserId: 'clerk_old_deleted',
@@ -544,6 +548,8 @@ describe('findOrCreateAccount', () => {
     });
 
     it('[BREAK][BUG-411] dispatches app/account.reclaim_attempt via safeSend', async () => {
+      // [BREAK] Without the fix: no Inngest event was emitted; reclaim attempts were silently dropped.
+      //   (Reverting the reclaim-block guard in services/account.ts makes this test fail.)
       const staleRow = mockAccountRow({
         id: 'acc-existing',
         clerkUserId: 'clerk_old_deleted',
@@ -634,6 +640,8 @@ describe('findOrCreateAccount', () => {
     }
 
     it('[BREAK] account seeded without subscription gets trial created on next findOrCreate call', async () => {
+      // [BREAK] Without the fix: findOrCreateAccount returned early when account already existed, leaving it permanently without a trial subscription.
+      //   (Reverting the missing-trial repair path in services/account.ts makes this test fail.)
       // Simulate: account exists (race winner created it), but sub is missing
       // (the winner crashed before trial insertion committed).
       mockGetSubscriptionByAccountId.mockResolvedValueOnce(null); // no sub
@@ -668,6 +676,8 @@ describe('findOrCreateAccount', () => {
     });
 
     it('[BREAK] repair path emits app/account.trial_missing_repair_attempted via safeSend for observability', async () => {
+      // [BREAK] Without the fix: the repair path ran silently with no Inngest event; missing-trial races were invisible in production.
+      //   (Reverting the safeSend dispatch in the repair path in services/account.ts makes this test fail.)
       mockGetSubscriptionByAccountId.mockResolvedValueOnce(null); // no sub
 
       const accountWithNoSub = mockAccountRow({ id: 'acc-1' });

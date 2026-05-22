@@ -12,25 +12,15 @@
 // Pattern mirrors ask-classification-observe.ts and ask-gate-observe.ts.
 // ---------------------------------------------------------------------------
 
-import { z } from 'zod';
-import { summaryReconciliationRequeuedEventSchema } from '@eduagent/schemas';
+import {
+  summaryReconciliationRequeuedEventSchema,
+  summaryReconciliationScannedEventSchema,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
-
-// ---------------------------------------------------------------------------
-// Inline schema for the scanned event (not yet in @eduagent/schemas)
-// ---------------------------------------------------------------------------
-
-const summaryReconciliationScannedEventSchema = z.object({
-  queryACount: z.number().int().nonnegative(),
-  queryBCount: z.number().int().nonnegative(),
-  queryCCount: z.number().int().nonnegative(),
-  totalScanned: z.number().int().nonnegative(),
-  timestamp: z.string(),
-});
 
 // ---------------------------------------------------------------------------
 // Handlers

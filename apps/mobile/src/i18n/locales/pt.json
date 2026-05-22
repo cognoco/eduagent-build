@@ -38,7 +38,7 @@
     "notFound": "Essa página ou item não existe mais.",
     "resourceGone": "Este recurso não está mais disponível.",
     "rateLimited": "Você atingiu o limite. Aguarde um momento e tente novamente.",
-    "sessionExpired": "Your session expired — signing you out…",
+    "sessionExpired": "A sua sessão expirou — a terminar sessão…",
     "forbidden": "Você não tem permissão para ver isto.",
     "quotaExhausted": "Você usou todas as suas sessões de hoje. Volte amanhã!",
     "sessionNotFound": "Essa sessão não está mais disponível. Inicie uma nova.",

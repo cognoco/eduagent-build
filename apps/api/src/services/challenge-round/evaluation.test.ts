@@ -262,6 +262,7 @@ describe('summarizeEvaluation', () => {
 // createScopedRepository(db, profileId) calls db.query.sessionEvents.findMany
 // internally; we control the returned rows to exercise both paths.
 
+// Unit-mock: multi-table join not required — guard only needs sessionEvents rows to verify profileId ownership.
 function makeSessionEventsDb(rows: Array<{ id: string; content: string }>) {
   return {
     query: {

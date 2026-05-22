@@ -231,6 +231,11 @@ export async function listFamilyMembers(
   }));
 }
 
+/**
+ * @param input.subscriptionId Caller MUST verify ownership of this subscription via
+ *   `findSubscriptionByProfile` or equivalent before calling. This function does not
+ *   enforce profileId ownership of the subscription row.
+ */
 export async function getUsageBreakdownForProfile(
   db: Database,
   input: {

@@ -21,21 +21,15 @@
 // Pattern mirrors ask-classification-observe.ts and ask-gate-observe.ts.
 // ---------------------------------------------------------------------------
 
-import { z } from 'zod';
-import { filingResolvedEventSchema } from '@eduagent/schemas';
+import {
+  filingResolvedEventSchema,
+  filingAutoRetryAttemptedEventSchema,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
-
-// Inline schema for the auto-retry-attempted event (not yet in @eduagent/schemas).
-const filingAutoRetryAttemptedEventSchema = z.object({
-  sessionId: z.string().uuid(),
-  profileId: z.string().uuid(),
-  attemptNumber: z.number().int().positive(),
-  timestamp: z.string(),
-});
 
 // ---------------------------------------------------------------------------
 // Handlers

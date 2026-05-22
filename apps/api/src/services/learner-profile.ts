@@ -898,7 +898,9 @@ export function buildMemoryBlock(
       .map((entry) => {
         if (typeof entry === 'string') return sanitizeXmlValue(entry, 80);
         const topic = sanitizeXmlValue(entry.topic, 80);
-        const subject = entry.subject ? sanitizeXmlValue(entry.subject, 60) : null;
+        const subject = entry.subject
+          ? sanitizeXmlValue(entry.subject, 60)
+          : null;
         return subject ? `${topic} (${subject})` : topic;
       })
       .join(', ');
@@ -918,7 +920,10 @@ export function buildMemoryBlock(
     const strengthLabels = topStrengths
       .map(
         (entry) =>
-          `${entry.topics.slice(0, 3).map((t) => sanitizeXmlValue(t, 80)).join(', ')} (${sanitizeXmlValue(entry.subject, 60)})`,
+          `${entry.topics
+            .slice(0, 3)
+            .map((t) => sanitizeXmlValue(t, 80))
+            .join(', ')} (${sanitizeXmlValue(entry.subject, 60)})`,
       )
       .join('; ');
     const text = `- Confident with: ${strengthLabels}.`;
@@ -932,9 +937,9 @@ export function buildMemoryBlock(
     const styleParts: string[] = [];
     if (profile.learningStyle.preferredExplanations?.length) {
       styleParts.push(
-        `${profile.learningStyle.preferredExplanations.join(
-          ' and ',
-        )}-based explanations`,
+        `${profile.learningStyle.preferredExplanations
+          .map((s) => sanitizeXmlValue(s, 80))
+          .join(' and ')}-based explanations`,
       );
     }
     if (profile.learningStyle.pacePreference) {
@@ -979,7 +984,9 @@ export function buildMemoryBlock(
     (i) => i.context === 'free_time' || i.context === 'both',
   );
   if (schoolInterests.length > 0) {
-    const labels = schoolInterests.map((i) => sanitizeXmlValue(i.label, 60)).join(', ');
+    const labels = schoolInterests
+      .map((i) => sanitizeXmlValue(i.label, 60))
+      .join(', ');
     const text = `- School interests: ${labels}.`;
     addSection(text, {
       kind: 'interest',
@@ -987,7 +994,9 @@ export function buildMemoryBlock(
     });
   }
   if (freeTimeInterests.length > 0) {
-    const labels = freeTimeInterests.map((i) => sanitizeXmlValue(i.label, 60)).join(', ');
+    const labels = freeTimeInterests
+      .map((i) => sanitizeXmlValue(i.label, 60))
+      .join(', ');
     const text = `- Free-time interests: ${labels}.`;
     addSection(text, {
       kind: 'interest',

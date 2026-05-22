@@ -88,16 +88,23 @@ export function useCelebration(options?: {
   const shownFromCurrentBatchRef = useRef(0);
   const lastBatchIdRef = useRef<string | null>(null);
 
+  // Keep a ref to the latest options so callbacks (e.g. onAllComplete) are
+  // always current without re-creating flushNext on every render.
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  });
+
   const flushNext = useCallback(() => {
     setPendingQueue((current) => {
       const [next, ...rest] = current;
       setActiveEntry(next ?? null);
       if (!next) {
-        options?.onAllComplete?.();
+        optionsRef.current?.onAllComplete?.();
       }
       return rest;
     });
-  }, [options]);
+  }, []);
 
   useEffect(() => {
     if (!options?.queue || options.queue.length === 0) return;

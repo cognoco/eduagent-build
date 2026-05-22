@@ -38,7 +38,7 @@
     "notFound": "Ta strona lub element już nie istnieje.",
     "resourceGone": "Ten zasób nie jest już dostępny.",
     "rateLimited": "Osiągnięto limit. Poczekaj chwilę i spróbuj ponownie.",
-    "sessionExpired": "Your session expired — signing you out…",
+    "sessionExpired": "Twoja sesja wygasła — wylogowywanie…",
     "forbidden": "Nie masz uprawnień, aby to wyświetlić.",
     "quotaExhausted": "Wykorzystano wszystkie sesje na dziś. Wróć jutro!",
     "sessionNotFound": "Ta sesja nie jest już dostępna. Rozpocznij nową.",
@@ -1776,17 +1776,17 @@
       "subjectsTitle": "Przedmioty"
     },
     "remediation": {
-      "heading": "Try a different approach",
-      "body": "It is completely normal to need another pass at this.",
-      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
-      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
-      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
-      "primaryCta": "Try a different way",
-      "primaryCtaA11y": "Try a different way to learn this topic",
-      "secondaryCta": "Or try again later",
-      "secondaryCtaA11y": "Try this topic again later",
-      "libraryLink": "While you wait, check out your Library",
-      "libraryLinkA11y": "Check out your Library"
+      "heading": "Spróbuj inaczej",
+      "body": "Potrzeba kolejnego podejścia do tematu jest całkowicie normalna.",
+      "cooldownMinutes": "Możesz spróbować ponownie za {{minutes}} min — zrób krótką przerwę.",
+      "cooldownHours": "Możesz spróbować ponownie za ok. {{hours}} godz. — odejdź na chwilę.",
+      "cooldownTomorrow": "Zrób dłuższą przerwę i spróbuj znowu jutro.",
+      "primaryCta": "Ucz się inaczej",
+      "primaryCtaA11y": "Ucz się tego tematu w inny sposób",
+      "secondaryCta": "Lub spróbuj później",
+      "secondaryCtaA11y": "Spróbuj tego tematu później",
+      "libraryLink": "W międzyczasie zajrzyj do swojej Biblioteki",
+      "libraryLinkA11y": "Zajrzyj do swojej Biblioteki"
     }
   },
   "onboarding": {
