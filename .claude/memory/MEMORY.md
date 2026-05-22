@@ -20,6 +20,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Auth
 
 - [project_clerk_key_environments.md](project_clerk_key_environments.md) — Clerk key alignment table. Must match end-to-end per environment.
+- [project_clerk_email_verification_fallback.md](project_clerk_email_verification_fallback.md) — Clerk token-template drift can omit `email_verified`; API falls back to Clerk Backend API instead of expiring sessions.
 
 ## Pre-Launch Action Items
 

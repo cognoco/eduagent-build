@@ -19,6 +19,27 @@ const UUID_RE =
  * automatically cleared on commit or rollback and never leaks
  * to other requests.
  *
+ * ## Nested transactions / savepoint semantics (CR-2026-05-21-164, BUG-569)
+ *
+ * The `fn` callback receives the Drizzle transaction handle typed as
+ * `Database` (via `tx as unknown as Database`). This means callers CAN call
+ * `tx.transaction(...)` inside `fn`. Drizzle detects the nesting and silently
+ * opens a **SAVEPOINT** instead of a new `BEGIN`. Consequently:
+ *
+ * - Rolling back the inner `.transaction()` only rolls back to the savepoint;
+ *   the outer transaction (and the `SET LOCAL` GUC) remains active and will
+ *   commit normally unless the outer call also throws.
+ * - This is intentional behaviour inherited from Drizzle's nested-transaction
+ *   model — it is NOT a bug in `withProfileScope` itself.
+ * - Callers that need true transactional independence (e.g. separate
+ *   COMMIT/ROLLBACK) must open a second database connection rather than
+ *   nesting inside `withProfileScope`.
+ *
+ * The savepoint behaviour is locked down by the `[BUG-569]` test block in
+ * `rls.test.ts`. Any future refactor that changes this semantics (e.g.
+ * introducing a branded `ScopedTx` type that removes `.transaction()`) must
+ * update those tests and this comment.
+ *
  * @throws {Error} if profileId is not a valid UUID (prevents SQL injection
  *   via the raw literal inlining required by SET LOCAL).
  */

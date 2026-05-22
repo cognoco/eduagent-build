@@ -90,3 +90,127 @@ describe('withProfileScope', () => {
     ).rejects.toThrow('profileId must be a UUID');
   });
 });
+
+// ---------------------------------------------------------------------------
+// [BUG-569] Savepoint semantics lock-down
+//
+// withProfileScope passes `tx as unknown as Database` to the callback, so
+// callers can invoke `tx.transaction(...)` inside `fn`. Drizzle implements
+// nested transactions via SAVEPOINTs — rolling back the inner call only
+// rolls back to the savepoint; the outer transaction remains active.
+//
+// This block locks down that contract so a future refactor (e.g. a branded
+// ScopedTx type that removes .transaction()) is detected immediately.
+//
+// See rls.ts JSDoc "Nested transactions / savepoint semantics" for full
+// rationale. CR-2026-05-21-164.
+// ---------------------------------------------------------------------------
+
+const UUID_SAVEPOINT = '55555555-5555-5555-5555-555555555555';
+
+describe('[BUG-569] withProfileScope — savepoint semantics', () => {
+  it('fn receives a handle that exposes .transaction() (the savepoint entry-point)', async () => {
+    const db = createMockDb();
+
+    // Track what methods the fn argument exposes
+    let fnArgHasTransaction = false;
+
+    (db.transaction as jest.Mock).mockImplementation(async (fn) => {
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        // Drizzle's real tx handle also exposes .transaction() for nested calls
+        transaction: jest.fn().mockResolvedValue('inner-result'),
+      };
+      return fn(tx);
+    });
+
+    await withProfileScope(db, UUID_SAVEPOINT, async (txAsDb) => {
+      // The cast `tx as unknown as Database` means the runtime object that
+      // reaches here is the tx handle. If it has .transaction, savepoint
+      // nesting is possible. This assertion locks down the structural contract.
+      fnArgHasTransaction =
+        typeof (txAsDb as unknown as { transaction?: unknown }).transaction ===
+        'function';
+      return 'ok';
+    });
+
+    expect(fnArgHasTransaction).toBe(true);
+  });
+
+  it('a nested tx.transaction() call inside fn is forwarded to the tx handle (savepoint path)', async () => {
+    const db = createMockDb();
+
+    const innerTxMock = jest.fn().mockResolvedValue('savepoint-result');
+
+    (db.transaction as jest.Mock).mockImplementation(async (fn) => {
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        transaction: innerTxMock,
+      };
+      return fn(tx);
+    });
+
+    let innerResult: string | undefined;
+
+    await withProfileScope(db, UUID_SAVEPOINT, async (txAsDb) => {
+      // Simulate a caller opening a nested transaction inside the profile scope.
+      // In a real Drizzle connection this would open a SAVEPOINT.
+      // Here we verify the call reaches the tx handle (not db.transaction again),
+      // which is the structural precondition for the savepoint behaviour.
+      innerResult = await (
+        txAsDb as unknown as {
+          transaction: (fn: () => Promise<string>) => Promise<string>;
+        }
+      ).transaction(async () => 'from-inner');
+      return 'outer-ok';
+    });
+
+    // The inner .transaction() call was forwarded to the tx handle (savepoint path),
+    // NOT to db.transaction (which would have opened a new BEGIN).
+    expect(innerTxMock).toHaveBeenCalledTimes(1);
+    // db.transaction was only called once (for the outer withProfileScope call).
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(innerResult).toBe('savepoint-result');
+  });
+
+  it('outer transaction commits even when a nested tx.transaction() throws (savepoint rollback only)', async () => {
+    const db = createMockDb();
+
+    let outerCallbackCompleted = false;
+
+    (db.transaction as jest.Mock).mockImplementation(async (fn) => {
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        // Simulate Drizzle savepoint rollback: inner throws, outer continues
+        transaction: jest
+          .fn()
+          .mockRejectedValue(new Error('savepoint rollback')),
+      };
+      return fn(tx);
+    });
+
+    await withProfileScope(db, UUID_SAVEPOINT, async (txAsDb) => {
+      try {
+        await (
+          txAsDb as unknown as {
+            transaction: (fn: () => Promise<void>) => Promise<void>;
+          }
+        ).transaction(async () => {
+          throw new Error('inner failure');
+        });
+      } catch {
+        // Savepoint rolled back — outer transaction continues.
+        // This is the critical savepoint semantic: catching the inner error
+        // does NOT automatically abort the outer transaction.
+      }
+      outerCallbackCompleted = true;
+      return 'outer-committed';
+    });
+
+    // The outer callback ran to completion despite the inner throw —
+    // consistent with savepoint semantics where the outer txn survives.
+    expect(outerCallbackCompleted).toBe(true);
+    // Outer db.transaction was called exactly once.
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+});

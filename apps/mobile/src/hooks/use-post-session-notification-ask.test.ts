@@ -148,6 +148,49 @@ describe('usePostSessionNotificationAsk', () => {
     });
   });
 
+  it('resets firedRef when profileId changes — second profile can prime', async () => {
+    // Render with profileId=A and trigger the primer.
+    const { rerender } = renderHook(
+      ({ profileId }: { profileId: string }) =>
+        usePostSessionNotificationAsk(profileId, true, false),
+      { initialProps: { profileId: 'profile-A' } },
+    );
+
+    // Wait for permissions check to complete for profile A.
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalledTimes(1);
+    });
+
+    // Advance past the delay so the primer fires for profile A.
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+
+    // Clear mocks before testing profile B.
+    jest.clearAllMocks();
+    mockSecureGet.mockResolvedValue(null);
+    mockSecureSet.mockResolvedValue(undefined);
+    mockGetPerm.mockResolvedValue({
+      status: 'undetermined',
+      canAskAgain: true,
+    });
+
+    // Swap to profileId=B — firedRef must reset so the primer can fire again.
+    rerender({ profileId: 'profile-B' });
+
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    // The primer should fire for the new profile.
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+  });
+
   it('Not now marks seen and does not fire OS prompt', async () => {
     renderHook(() => usePostSessionNotificationAsk('p1', true, false));
 

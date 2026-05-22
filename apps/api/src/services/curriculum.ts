@@ -1794,6 +1794,20 @@ export async function moveTopicToBook(
     .limit(1);
   if (!targetBook) throw new NotFoundError('Target book');
 
+  // Verify source book belongs to the same subject (prevents IDOR: attacker
+  // passing a victim's bookId as sourceBookId while using their own subjectId).
+  const [sourceBook] = await db
+    .select({ id: curriculumBooks.id })
+    .from(curriculumBooks)
+    .where(
+      and(
+        eq(curriculumBooks.id, sourceBookId),
+        eq(curriculumBooks.subjectId, subjectId),
+      ),
+    )
+    .limit(1);
+  if (!sourceBook) throw new NotFoundError('Source book');
+
   // Verify topic belongs to the source book
   const [topic] = await db
     .select({ id: curriculumTopics.id })
