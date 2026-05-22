@@ -73,7 +73,10 @@ import {
 import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
-import { executeDeletion } from '../../apps/api/src/services/deletion';
+import {
+  executeDeletion,
+  scheduleDeletion,
+} from '../../apps/api/src/services/deletion';
 
 import { app } from '../../apps/api/src/index';
 
@@ -399,6 +402,7 @@ describe('Integration: account deletion cascade', () => {
       embedding: Array.from({ length: 1024 }, () => 0.01),
     });
 
+    await scheduleDeletion(db, accountId);
     await executeDeletion(db, accountId);
 
     const summaries = await db.execute(
@@ -420,8 +424,8 @@ describe('Integration: account deletion cascade', () => {
   // ---------------------------------------------------------------------------
   // [BUG-368] Comprehensive PII cascade audit.
   //
-  // executeDeletion() is essentially `DELETE FROM accounts WHERE id = ?` and
-  // relies entirely on FK `ON DELETE CASCADE` to wipe derived PII. If even one
+  // The scheduled deletion path ultimately deletes the account row and relies
+  // entirely on FK `ON DELETE CASCADE` to wipe derived PII. If even one
   // PII-bearing table lacks cascade, account deletion silently leaves orphan
   // PII — a GDPR violation. This test seeds every PII-bearing table reachable
   // from `accounts` (directly or transitively via profiles) and asserts that
@@ -870,6 +874,7 @@ describe('Integration: account deletion cascade', () => {
       // -----------------------------------------------------------------------
       // Act: delete the account. Cascade FKs do the work.
       // -----------------------------------------------------------------------
+      await scheduleDeletion(db, accountId);
       await executeDeletion(db, accountId);
 
       // -----------------------------------------------------------------------
