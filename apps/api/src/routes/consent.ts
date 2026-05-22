@@ -13,7 +13,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { requireProfileId } from '../middleware/profile-scope';
+import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { getProfile } from '../services/profile';
 import {
@@ -131,7 +131,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     zValidator('json', consentRequestSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const input = c.req.valid('json');
 
       const childProfile = await getProfile(

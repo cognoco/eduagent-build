@@ -10,6 +10,8 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { requireAccount } from '../middleware/profile-scope';
+
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -34,7 +36,9 @@ type AccountRouteEnv = {
 export const accountRoutes = new Hono<AccountRouteEnv>()
   .get('/account/deletion-status', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime
+    // (TS declares it non-nullable but that depends on middleware ordering).
+    const account = requireAccount(c.get('account'));
     try {
       const status = await getDeletionStatus(db, account.id);
       return c.json(accountDeletionStatusResponseSchema.parse(status));
@@ -47,7 +51,8 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   })
   .post('/account/delete', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can schedule account deletion.
     const activeProfileMetaDelete = c.get('profileMeta');
@@ -95,7 +100,8 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   })
   .post('/account/cancel-deletion', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can cancel account deletion.
     const activeProfileMetaCancelDeletion = c.get('profileMeta');
@@ -126,7 +132,8 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   })
   .get('/account/export', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can export account data.
     const activeProfileMetaExport = c.get('profileMeta');

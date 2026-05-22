@@ -672,6 +672,31 @@ export async function processRecallTest(
   input: RecallTestSubmitInput,
 ): Promise<RecallTestResponse> {
   const repo = createScopedRepository(db, profileId);
+
+  // IDOR prevention: verify the topic belongs to one of the profile's subjects
+  // BEFORE creating any retention state or reading evaluation context.
+  // Mirrors the ownership check in startRelearn (lines 886-909).
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: eq(curriculumTopics.id, input.topicId),
+  });
+  const curriculum = topic
+    ? await db.query.curricula.findFirst({
+        where: eq(curricula.id, topic.curriculumId),
+      })
+    : null;
+  const subjectId = curriculum?.subjectId ?? null;
+  if (subjectId) {
+    const ownedSubject = await repo.subjects.findFirst(
+      eq(subjects.id, subjectId),
+    );
+    if (!ownedSubject) {
+      throw new NotFoundError('Topic');
+    }
+  } else {
+    // Topic doesn't exist or has no curriculum chain — reject
+    throw new NotFoundError('Topic');
+  }
+
   const card = await repo.retentionCards.findFirst(
     eq(retentionCards.topicId, input.topicId),
   );
@@ -705,10 +730,8 @@ export async function processRecallTest(
     };
   }
 
-  // Look up topic title for LLM evaluation context
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, input.topicId),
-  });
+  // topic was already fetched for the ownership check above — reuse it here
+  // for the LLM evaluation context (avoids a redundant DB round-trip).
   const topicTitle = topic?.title ?? input.topicId;
   const quality =
     attemptMode === 'dont_remember'
@@ -776,11 +799,8 @@ export async function processRecallTest(
   // pattern: post-atomic-write safeWrite so a ledger failure is captured in
   // Sentry but never aborts the recall test response.
   const recallCompletedAt = new Date();
-  const topicCurriculum = topic
-    ? await db.query.curricula.findFirst({
-        where: eq(curricula.id, topic.curriculumId),
-      })
-    : null;
+  // curriculum was already fetched during the ownership check above — reuse it.
+  const topicCurriculum = curriculum;
   await safeWrite(
     () =>
       recordPracticeActivityEvent(db, {

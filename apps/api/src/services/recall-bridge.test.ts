@@ -13,7 +13,15 @@ const mockDatabaseModule = createDatabaseModuleMock({
       sessions: { findFirst: mockFindFirst },
     })),
     learningSessions: { id: 'id' },
-    curriculumTopics: { id: 'id' },
+    curriculumTopics: {
+      id: 'id',
+      title: 'title',
+      description: 'description',
+      bookId: 'bookId',
+    },
+    // BUG-354: recall-bridge now joins through curriculumBooks → subjects
+    curriculumBooks: { id: 'id', subjectId: 'subjectId' },
+    subjects: { id: 'id', profileId: 'profileId' },
   },
 });
 
@@ -31,13 +39,34 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
 
 import { generateRecallBridge } from './recall-bridge';
 
+// generateRecallBridge now uses db.select().from().innerJoin()…limit() for the
+// topic lookup (parent-chain join — BUG-354 fix). Wire mockTopicFindFirst
+// through the chain so existing tests keep their fixture-control point.
+// mockTopicFindFirst.mockResolvedValue(topic) → db.select(…).limit(1) resolves
+// to [topic] or [] when null.
 function createMockDb(): any {
+  // mockTopicFindFirst controls the resolved value: wrap its result as an array.
+  const selectMock = jest.fn().mockImplementation(() => {
+    // Capture the pending resolved value from mockTopicFindFirst without awaiting.
+    // We store the promise and build a chain that awaits it on .limit().
+    const topicPromise = mockTopicFindFirst();
+    const limitMock = jest
+      .fn()
+      .mockImplementation(() =>
+        topicPromise.then((v: unknown) => (v != null ? [v] : [])),
+      );
+    const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const innerJoin2Mock = jest.fn().mockReturnValue({ where: whereMock });
+    const innerJoin1Mock = jest
+      .fn()
+      .mockReturnValue({ innerJoin: innerJoin2Mock });
+    const fromMock = jest.fn().mockReturnValue({ innerJoin: innerJoin1Mock });
+    return { from: fromMock };
+  });
+
   return {
-    query: {
-      curriculumTopics: {
-        findFirst: mockTopicFindFirst,
-      },
-    },
+    query: {},
+    select: selectMock,
   };
 }
 

@@ -9,7 +9,7 @@
  */
 
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import {
   accounts,
   createDatabase,
@@ -23,8 +23,9 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { NotFoundError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { getProfileOverdueCount } from './retention-data';
+import { getProfileOverdueCount, processRecallTest } from './retention-data';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -259,4 +260,123 @@ describe('getProfileOverdueCount SQL correctness (integration) [BUG-473]', () =>
     // Top 3 limit enforced
     expect(result.topTopicIds).toHaveLength(3);
   });
+});
+
+// ---------------------------------------------------------------------------
+// LEARN-13 — processRecallTest IDOR ownership enforcement (break test)
+//
+// Security property: posting to /retention/recall-test with a topicId that
+// belongs to a DIFFERENT profile's subject must be rejected (NotFoundError →
+// HTTP 404) BEFORE any retention state is created for the requesting profile.
+//
+// Red-green regression pattern (CLAUDE.md "Fix Development Rules"):
+//   PASS with fix in place → FAIL after reverting fix → PASS after restoring.
+// ---------------------------------------------------------------------------
+
+const LEARN13_PREFIX = `integ-learn13-${RUN_ID}`;
+
+/**
+ * Seeds a minimal account → profile → subject → curriculum → book → 1 topic.
+ * Returns profileId and the single topicId.
+ */
+async function seedProfileWithOneTopic(
+  database: Database,
+  label: string,
+): Promise<{ profileId: string; topicId: string }> {
+  const [account] = await database
+    .insert(accounts)
+    .values({
+      clerkUserId: `${LEARN13_PREFIX}-${label}`,
+      email: `${LEARN13_PREFIX}-${label}@test.invalid`,
+    })
+    .returning({ id: accounts.id });
+
+  const [profile] = await database
+    .insert(profiles)
+    .values({
+      accountId: account!.id,
+      displayName: `LEARN13 ${label}`,
+      birthYear: 2005,
+      isOwner: true,
+    })
+    .returning({ id: profiles.id });
+
+  const [subject] = await database
+    .insert(subjects)
+    .values({
+      profileId: profile!.id,
+      name: `Subject ${label}`,
+      status: 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning({ id: subjects.id });
+
+  const [curriculum] = await database
+    .insert(curricula)
+    .values({ subjectId: subject!.id, version: 1 })
+    .returning({ id: curricula.id });
+
+  const [book] = await database
+    .insert(curriculumBooks)
+    .values({
+      subjectId: subject!.id,
+      title: `Book ${label}`,
+      sortOrder: 0,
+    })
+    .returning({ id: curriculumBooks.id });
+
+  const [topic] = await database
+    .insert(curriculumTopics)
+    .values({
+      curriculumId: curriculum!.id,
+      bookId: book!.id,
+      title: `Topic ${label}`,
+      description: `Description for ${label}`,
+      sortOrder: 0,
+      estimatedMinutes: 30,
+    })
+    .returning({ id: curriculumTopics.id });
+
+  return { profileId: profile!.id, topicId: topic!.id };
+}
+
+async function cleanupLearn13(database: Database): Promise<void> {
+  await database
+    .delete(accounts)
+    .where(like(accounts.clerkUserId, `${LEARN13_PREFIX}%`));
+}
+
+describe('processRecallTest IDOR ownership guard [LEARN-13]', () => {
+  beforeAll(async () => {
+    await cleanupLearn13(db);
+  });
+
+  afterAll(async () => {
+    await cleanupLearn13(db);
+  });
+
+  it('rejects a recall-test submission when topicId belongs to a different profile (NotFoundError)', async () => {
+    // Profile A — the attacker / requester
+    const profileA = await seedProfileWithOneTopic(db, 'profileA');
+    // Profile B — the victim whose topic is used in the attack
+    const profileB = await seedProfileWithOneTopic(db, 'profileB');
+
+    // Act: Profile A submits a recall test using Profile B's topicId
+    await expect(
+      processRecallTest(db, profileA.profileId, {
+        topicId: profileB.topicId,
+        answer: 'some answer',
+        attemptMode: 'standard',
+      }),
+    ).rejects.toThrow(NotFoundError);
+
+    // Assert: no retention card was created for Profile A pointing at B's topic
+    const leakedCard = await db.query.retentionCards.findFirst({
+      where: and(
+        eq(retentionCards.profileId, profileA.profileId),
+        eq(retentionCards.topicId, profileB.topicId),
+      ),
+    });
+    expect(leakedCard).toBeUndefined();
+  }, 30_000);
 });
