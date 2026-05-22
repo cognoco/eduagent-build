@@ -522,7 +522,7 @@ describe('challenge round envelope fields', () => {
             concept: 'photosynthesis vs respiration',
             result: 'solid',
             evidence: 'learner described both directions of energy flow',
-            answerEventId: 'event-solid-1',
+            answerEventId: '00000000-0000-0000-0000-000000000001',
             learnerQuote:
               'photosynthesis stores energy in glucose and respiration releases it',
           },
@@ -530,7 +530,7 @@ describe('challenge round envelope fields', () => {
             concept: 'role of ATP',
             result: 'partial',
             evidence: 'mentioned energy currency, missed structure',
-            answerEventId: 'event-partial-1',
+            answerEventId: '00000000-0000-0000-0000-000000000002',
             learnerQuote: 'ATP is like energy money',
           },
           {
@@ -538,7 +538,7 @@ describe('challenge round envelope fields', () => {
             result: 'misconception',
             evidence: 'said nucleus instead of chloroplast',
             correction: 'occurs in chloroplasts',
-            answerEventId: 'event-misconception-1',
+            answerEventId: '00000000-0000-0000-0000-000000000003',
             learnerQuote: 'photosynthesis happens in the nucleus',
           },
         ],
@@ -578,7 +578,7 @@ describe('challenge round envelope fields', () => {
             concept: 'x',
             result: 'solid',
             evidence: 'ok',
-            answerEventId: 'e-1',
+            answerEventId: '00000000-0000-0000-0000-000000000001',
             // missing learnerQuote
           },
         ],
@@ -592,7 +592,7 @@ describe('challenge round envelope fields', () => {
       concept: 'x',
       result: 'solid' as const,
       evidence: 'ok',
-      answerEventId: 'e-1',
+      answerEventId: '00000000-0000-0000-0000-000000000001',
       learnerQuote: 'q',
     };
     const result = llmResponseEnvelopeSchema.safeParse({

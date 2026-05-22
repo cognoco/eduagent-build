@@ -31,13 +31,47 @@ export const nudgeTemplateSchema = z.enum([
 ]);
 export type NudgeTemplate = z.infer<typeof nudgeTemplateSchema>;
 
-export const notificationPayloadSchema = z.object({
+// ---------------------------------------------------------------------------
+// [CR-178] Typed notification data shapes — discriminated union by type.
+//
+// `nudge` is the only type that currently carries a structured data payload
+// (nudgeId, fromDisplayName, templateKey — forwarded to the mobile
+// deep-link handler in nudge.ts). All other types confirmed to pass no
+// `data` at current call sites (grep apps/api/src/**/*.ts, 2026-05-22).
+//
+// To add a new type with data: add a new z.object variant to the union below
+// with `type: z.literal('<new-type>')` and the specific `data` shape.
+// ---------------------------------------------------------------------------
+
+const notificationBaseSchema = z.object({
   profileId: z.string().uuid(),
   title: z.string(),
   body: z.string(),
-  type: notificationTypeSchema,
-  data: z.record(z.string(), z.string()).optional(),
 });
+
+/** nudge: carries structured data forwarded to the mobile deep-link handler */
+const nudgePayloadSchema = notificationBaseSchema.extend({
+  type: z.literal('nudge'),
+  data: z.object({
+    nudgeId: z.string().uuid(),
+    fromDisplayName: z.string(),
+    templateKey: nudgeTemplateSchema,
+  }),
+});
+
+/** All other types: no structured data payload at current call sites */
+const noDataPayloadSchema = notificationBaseSchema.extend({
+  // [CR-178] Exclude 'nudge' so this branch can't accidentally match it —
+  // new types added to notificationTypeSchema automatically fall here unless
+  // a dedicated typed variant is added above.
+  type: notificationTypeSchema.exclude(['nudge']),
+  data: z.undefined().optional(),
+});
+
+export const notificationPayloadSchema = z.union([
+  nudgePayloadSchema,
+  noDataPayloadSchema,
+]);
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
 export const nudgeCreateSchema = z.object({
