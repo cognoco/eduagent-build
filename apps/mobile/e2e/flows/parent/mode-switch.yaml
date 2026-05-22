@@ -2,12 +2,12 @@
 # Validates: the parent Home mode chip and the "Go to My Learning" card
 # both drive the Study/Family context switch instead of leaving the user
 # on the same Family surface.
-# Tags: nightly, parent, mode-nav
+# Tags: nightly, parent, navigation
 appId: com.mentomate.app
 tags:
   - nightly
   - parent
-  - mode-nav
+  - navigation
 ---
 # 1. Seed & sign in as parent with a linked child.
 - runFlow:

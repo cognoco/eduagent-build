@@ -21,6 +21,7 @@ import { useApiClient } from '../lib/api-client';
 // state machine — instantiating that tree here would exercise auth/storage
 // internals unrelated to the three outbox bugs under test.
 jest.mock('../lib/profile', () => ({
+  // gc1-allow: full ProfileProvider auth/storage tree is outside these outbox drain bugs
   useProfile: jest.fn(),
 }));
 
@@ -29,6 +30,7 @@ jest.mock('../lib/profile', () => ({
 // provider only calls client.support['outbox-spillover'].$post for escalation,
 // which is exercised through postToSupport and is irrelevant to these 3 bugs.
 jest.mock('../lib/api-client', () => ({
+  // gc1-allow: Hono RPC client requires runtime server/auth; test only needs support spillover
   useApiClient: jest.fn(),
   getProxyMode: jest.fn().mockReturnValue(false),
   withIdempotencyKey: jest.fn(
@@ -42,6 +44,7 @@ jest.mock('../lib/api-client', () => ({
 // gc1-allow: getApiUrl is a thin env-var reader; real implementation reads
 // EXPO_PUBLIC_API_URL from the environment, which is not set in Jest.
 jest.mock('../lib/api', () => ({
+  // gc1-allow: env-backed API URL reader is isolated from outbox drain behavior
   getApiUrl: jest.fn().mockReturnValue('http://localhost:8787'),
 }));
 
@@ -50,6 +53,7 @@ jest.mock('../lib/api', () => ({
 // The @sentry/react-native global mock in test-setup.ts does not cover
 // the local re-export at lib/sentry.ts.
 jest.mock('../lib/sentry', () => ({
+  // gc1-allow: native Sentry side-effect sink is isolated from outbox drain behavior
   Sentry: { captureException: jest.fn() },
 }));
 
