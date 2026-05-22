@@ -10,6 +10,10 @@ export const sessionStaleCleanup = inngest.createFunction(
   {
     id: 'session-stale-cleanup',
     name: 'Auto-close stale learning sessions',
+    // [BUG-401] Explicit retries so closeStaleSessions sequential loop has
+    // headroom to recover from transient DB errors even on a large backlog.
+    // Mirrors account-deletion.ts:13 and consent-revocation.ts:36 (retries: 5).
+    retries: 5,
   },
   { cron: '*/10 * * * *' },
   async ({ step }) => {
@@ -52,7 +56,7 @@ export const sessionStaleCleanup = inngest.createFunction(
             reason: 'silence_timeout',
             timestamp: now.toISOString(),
           },
-        }))
+        })),
       );
     }
 
@@ -60,14 +64,14 @@ export const sessionStaleCleanup = inngest.createFunction(
     // Prefetched rounds the user never completed stay 'active' forever and
     // are quota-charged. Mark them 'abandoned' so they don't accumulate.
     const quizRoundCutoff = new Date(
-      now.getTime() - QUIZ_ROUND_STALE_HOURS * 60 * 60 * 1000
+      now.getTime() - QUIZ_ROUND_STALE_HOURS * 60 * 60 * 1000,
     );
     const abandonedRounds = await step.run(
       'abandon-stale-quiz-rounds',
       async () => {
         const db = getStepDatabase();
         return abandonStaleQuizRounds(db, quizRoundCutoff);
-      }
+      },
     );
 
     return {
@@ -77,5 +81,5 @@ export const sessionStaleCleanup = inngest.createFunction(
       cutoff: cutoff.toISOString(),
       timestamp: now.toISOString(),
     };
-  }
+  },
 );

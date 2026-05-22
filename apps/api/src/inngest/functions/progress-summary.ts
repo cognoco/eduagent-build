@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (learningSessions and familyLinks queried with profileId enforced)
 import { and, desc, eq } from 'drizzle-orm';
 import { familyLinks, learningSessions, profiles } from '@eduagent/database';
 

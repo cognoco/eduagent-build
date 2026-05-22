@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (curriculumTopics looked up by IDs from event; familyLinks enforced by profileId)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { eq, inArray } from 'drizzle-orm';

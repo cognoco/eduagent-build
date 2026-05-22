@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (profiles updated with explicit childProfileId + archivedAt guard)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { and, eq, isNull } from 'drizzle-orm';

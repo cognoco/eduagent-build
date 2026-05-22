@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile
 // ---------------------------------------------------------------------------
 // Quota Reset — Sprint 9 Phase 2 + Dual-Cap daily reset
 // Daily cron: reset daily counters for all pools, plus monthly quota for
