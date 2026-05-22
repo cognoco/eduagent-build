@@ -133,6 +133,7 @@ export function createScreenWrapper(options: ScreenWrapperOptions = {}) {
     profiles,
     activeProfile,
     switchProfile: jest.fn().mockResolvedValue({ success: true }),
+    isExplicitProxyMode: false,
     isLoading: options.isLoading ?? false,
     profileLoadError: options.profileLoadError ?? null,
     profileWasRemoved: options.profileWasRemoved ?? false,

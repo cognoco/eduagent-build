@@ -56,6 +56,7 @@ function makeWrapper({
   const profileContext: ProfileContextValue = {
     profiles,
     activeProfile,
+    isExplicitProxyMode: false,
     switchProfile: jest.fn().mockResolvedValue({ success: true }),
     isLoading: false,
     profileLoadError: null,

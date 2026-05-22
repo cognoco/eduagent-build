@@ -227,6 +227,7 @@ function createWrapper(opts?: { seedCache?: boolean }) {
   const profileContextValue: ProfileContextValue = {
     profiles: [mockActiveProfile],
     activeProfile: mockActiveProfile,
+    isExplicitProxyMode: false,
     switchProfile: async () => ({ success: true }),
     isLoading: false,
     profileLoadError: null,

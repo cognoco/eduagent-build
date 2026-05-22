@@ -1694,6 +1694,49 @@ describe('SessionSummaryScreen', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // [LEARN-07] "See your Library" CTA must always navigate to Library
+  // ---------------------------------------------------------------------------
+  describe('"See your Library" CTA [LEARN-07]', () => {
+    it('navigates to /(app)/library when topicId and subjectId are present in params', () => {
+      // Previously the handler routed to topic detail when both params were set.
+      // The CTA copy says "Library" — it must always go to Library.
+      mockParams.topicId = 'topic-uuid-123';
+      mockParams.subjectId = 'subject-uuid-456';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('go-to-library'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('navigates to /(app)/library when no topicId/subjectId in params', () => {
+      mockParams.topicId = undefined;
+      mockParams.subjectId = undefined;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('go-to-library'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('does not navigate to topic detail regardless of params', () => {
+      mockParams.topicId = 'topic-uuid-789';
+      mockParams.subjectId = 'subject-uuid-012';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('go-to-library'));
+
+      // Must never route to topic detail — that is the bug this test guards against.
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/(app)/topic/[topicId]' }),
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Feature 3: Purged-transcript badge
   // ---------------------------------------------------------------------------
   describe('purged-transcript badge', () => {

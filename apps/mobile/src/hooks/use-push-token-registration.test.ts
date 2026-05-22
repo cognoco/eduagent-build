@@ -20,6 +20,9 @@ let mockActiveProfile: Profile | null = createTestProfile({
   id: 'profile-1',
 });
 let mockProfiles: Profile[] | null = null;
+// [ACCOUNT-04] Explicit proxy flag — must be true for the "viewing as child"
+// test case since useParentProxy no longer derives from profile shape.
+let mockIsExplicitProxyMode = false;
 
 jest.mock('./use-settings', () => ({
   ...jest.requireActual('./use-settings'),
@@ -45,6 +48,7 @@ function createProfileWrapper() {
     const value: ProfileContextValue = {
       profiles,
       activeProfile: mockActiveProfile,
+      isExplicitProxyMode: mockIsExplicitProxyMode,
       switchProfile: async () => ({ success: true }),
       isLoading: false,
       profileLoadError: null,
@@ -79,6 +83,7 @@ describe('usePushTokenRegistration', () => {
     // Restore resolved values after clearAllMocks
     mockMutateAsync.mockResolvedValue({ registered: true });
     mockProfiles = null;
+    mockIsExplicitProxyMode = false;
   });
 
   it('registers push token when notification permission is already granted', async () => {
@@ -247,6 +252,9 @@ describe('usePushTokenRegistration', () => {
   });
 
   it('does not register the parent device while viewing as a child', async () => {
+    // [ACCOUNT-04] Proxy must be explicitly set — plain profile switch to a
+    // non-owner slot does NOT set proxy. This test simulates the explicit proxy
+    // path (parent confirmed "View account" modal).
     const ownerProfile = createTestProfile({
       id: 'owner-profile',
       isOwner: true,
@@ -257,6 +265,7 @@ describe('usePushTokenRegistration', () => {
     });
     mockActiveProfile = childProfile;
     mockProfiles = [ownerProfile, childProfile];
+    mockIsExplicitProxyMode = true;
 
     const { result } = renderHook(() => usePushTokenRegistration(), {
       wrapper: createProfileWrapper(),

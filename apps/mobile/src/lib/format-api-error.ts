@@ -636,8 +636,16 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
       }
     }
 
-    // 3b. SSE timeout
-    if (msgLower.includes('timed out while waiting for a reply')) {
+    // 3b. SSE timeout — classify by the stable `isTimeout` property set by
+    // sse.ts, then fall back to message heuristic only for legacy paths that
+    // don't set the property. [BUG-389] The property check is the primary
+    // gate: it survives message text changes and i18n refactors. The message
+    // heuristic is retained solely as a belt-and-braces fallback for
+    // third-party or test paths that construct the error without `isTimeout`.
+    if (
+      (error as Error & { isTimeout?: unknown }).isTimeout === true ||
+      msgLower.includes('timed out while waiting for a reply')
+    ) {
       return {
         message: i18next.t('errors.timedOut'),
         category: 'network',

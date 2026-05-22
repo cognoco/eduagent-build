@@ -185,8 +185,12 @@ describe('ProfilesScreen', () => {
 
     fireEvent.press(screen.getByTestId('proxy-confirm-view'));
 
+    // [ACCOUNT-04] Proxy confirmation must pass proxyMode:true so ProfileProvider
+    // sets the explicit proxy flag — NOT derived from profile shape.
     await waitFor(() => {
-      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
+      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id', {
+        proxyMode: true,
+      });
     });
 
     await waitFor(() => {
@@ -337,8 +341,11 @@ describe('ProfilesScreen', () => {
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
     fireEvent.press(screen.getByTestId('proxy-confirm-view'));
 
+    // [ACCOUNT-04] Proxy confirmation must pass proxyMode:true.
     await waitFor(() => {
-      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
+      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id', {
+        proxyMode: true,
+      });
     });
 
     await waitFor(() => {

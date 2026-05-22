@@ -214,7 +214,46 @@ export default function ProfilesScreen() {
     const id = pendingChildId;
     setPendingChildId(null);
     setPendingChildName('');
-    void handleSwitch(id);
+    // [ACCOUNT-04] Pass proxyMode:true so ProfileProvider sets the explicit
+    // proxy flag. This is the ONLY legitimate entry point for proxy mode —
+    // the user has read and confirmed the "Viewing [child]'s account" modal.
+    void handleSwitchAsProxy(id);
+  };
+
+  const handleSwitchAsProxy = async (profileId: string) => {
+    if (isSwitching || switchInFlightRef.current) return;
+    switchInFlightRef.current = true;
+    setIsSwitching(true);
+    const timeoutId = setTimeout(() => {
+      switchInFlightRef.current = false;
+      setIsSwitching(false);
+      platformAlert('Taking longer than expected', 'Please try again.');
+    }, 20_000);
+    try {
+      const result = await switchProfile(profileId, { proxyMode: true });
+      clearTimeout(timeoutId);
+      if (result?.success === false) {
+        platformAlert(
+          'Could not switch profiles',
+          result.error ?? 'Please try again.',
+        );
+        return;
+      }
+      handleClose();
+      if (result?.persistenceFailed) {
+        platformAlert(
+          'Profile switched',
+          'We could not save this profile choice on this device. You may need to pick it again after reopening the app.',
+        );
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      platformAlert('Could not switch profiles', formatApiError(err));
+    } finally {
+      clearTimeout(timeoutId);
+      switchInFlightRef.current = false;
+      setIsSwitching(false);
+    }
   };
 
   const handleCancelProxySwitch = () => {
