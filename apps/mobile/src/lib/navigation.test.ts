@@ -60,6 +60,36 @@ describe('goBackOrReplace', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledWith('/(app)/home');
   });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-552] goBackOrReplace fallback contract lock-down
+  //
+  // When canGoBack() returns false (first-route / deep-link entry), the
+  // function MUST call router.replace with the exact fallbackHref passed by
+  // the caller, and MUST NOT call router.back().
+  //
+  // Callers are responsible for passing the *parent* screen as fallbackHref,
+  // not the app home root — passing home creates a UX dead-end (the user is
+  // dropped at Home with no path back to their context). This test uses a
+  // representative parent href ('/(app)/more') to make the contract explicit.
+  //
+  // See CLAUDE.md — "cross-tab / cross-stack router.push" rule.
+  // ---------------------------------------------------------------------------
+  it('[BUG-552] deep-link / first-route: calls replace(fallbackHref) with the exact parent href, never back()', () => {
+    const parentHref = '/(app)/more' as const;
+    const router = {
+      back: jest.fn(),
+      canGoBack: jest.fn().mockReturnValue(false),
+      replace: jest.fn(),
+    } satisfies Pick<Router, 'back' | 'canGoBack' | 'replace'>;
+
+    goBackOrReplace(router, parentHref);
+
+    expect(router.canGoBack).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith(parentHref);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -246,6 +246,40 @@ describe('useShakeDetector — shake detection', () => {
     expect(mockAddListener).not.toHaveBeenCalled();
     expect(onShake).not.toHaveBeenCalled();
   });
+
+  // [BUG-533] setShakeAvailable(true) must not fire after unmount.
+  // The `cancelled` flag guards the call site immediately after addListener.
+  // React 19 silently drops setState on unmounted components so a visible
+  // act() warning may not appear, but the structural guard is correct regardless.
+  it('[BUG-533] does not call setShakeAvailable(true) after component unmounts before isAvailableAsync resolves', async () => {
+    let resolveAvailability!: (v: boolean) => void;
+    mockIsAvailableAsync.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveAvailability = resolve;
+        }),
+    );
+
+    const onShake = jest.fn();
+    const { result, unmount } = renderHook(() => useShakeDetector(onShake));
+
+    // Before resolution: shakeAvailable must be false
+    expect(result.current.shakeAvailable).toBe(false);
+
+    // Unmount before the availability promise resolves
+    unmount();
+
+    // Now resolve the promise — the cancelled flag must suppress setShakeAvailable
+    await act(async () => {
+      resolveAvailability(true);
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    // addListener must not have been called (cancelled path short-circuits before it)
+    expect(mockAddListener).not.toHaveBeenCalled();
+    // shakeAvailable stays false — setShakeAvailable(true) was guarded by !cancelled
+    expect(result.current.shakeAvailable).toBe(false);
+  });
 });
 
 describe('useShakeDetector — web platform (no-op)', () => {

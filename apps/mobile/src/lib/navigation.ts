@@ -27,6 +27,33 @@ export function homeHrefForReturnTo(
   return '/(app)/home' as Href;
 }
 
+/**
+ * Navigate back in the stack, or replace the current screen with `fallbackHref`
+ * when there is nowhere to go back to.
+ *
+ * **When the fallback fires**
+ * `router.canGoBack()` returns `false` whenever the current screen is the
+ * first (and only) entry in the navigation stack — most commonly when the
+ * screen was reached via a deep-link or a cross-tab `router.push` that did
+ * not first seed the ancestor chain. In that case this function calls
+ * `router.replace(fallbackHref)` instead of `router.back()`.
+ *
+ * **Callers MUST pass the parent screen, NOT home.**
+ * Passing `'/(app)/home'` as the fallback turns the first-route / deep-link
+ * case into a UX dead-end: the user is dumped at Home with no way to return
+ * to the content they came from. Pass the immediate parent of the current
+ * screen — e.g. a list screen, a tab root, or the `more` tab — so that
+ * `replace` keeps the user in the correct context.
+ *
+ * @see CLAUDE.md — "cross-tab / cross-stack router.push" rule: pushes must
+ *   include the full ancestor chain so that `router.back()` resolves
+ *   correctly and the fallback only fires as a last-resort guard.
+ *
+ * @param router  Expo Router instance (or a compatible test double).
+ * @param fallbackHref  The parent screen href to `replace` with when the
+ *   back-stack is empty. Must NOT be the app home screen unless the caller
+ *   is certain it can only ever be reached from home.
+ */
 export function goBackOrReplace(
   router: Pick<Router, 'back' | 'canGoBack' | 'replace'>,
   fallbackHref: Href,
