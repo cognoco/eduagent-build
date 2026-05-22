@@ -4,23 +4,29 @@ import * as SecureStore from '../lib/secure-storage';
 import { platformAlert } from '../lib/platform-alert';
 import { usePostSessionNotificationAsk } from './use-post-session-notification-ask';
 
-jest.mock('../lib/platform-alert', () => ({
-  // gc1-allow: native-boundary — Alert.alert is a no-op on native in jest; win.confirm() is unavailable in jsdom; platformAlert cannot run without native shim
-  platformAlert: jest.fn(),
-}));
+jest.mock(
+  '../lib/platform-alert' /* gc1-allow: native-boundary; platformAlert needs native/web alert shims unavailable in this hook test */,
+  () => ({
+    platformAlert: jest.fn(),
+  }),
+);
 
-jest.mock('../lib/secure-storage', () => ({
-  // gc1-allow: native-boundary — expo-secure-store is not available in jest; web localStorage fallback does not match the mock-controlled per-test sequences needed here
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
-  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+jest.mock(
+  '../lib/secure-storage' /* gc1-allow: native-boundary; secure storage needs mock-controlled per-test responses */,
+  () => ({
+    getItemAsync: jest.fn(),
+    setItemAsync: jest.fn(),
+    deleteItemAsync: jest.fn(),
+    sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+  }),
+);
 
-jest.mock('../lib/sentry', () => ({
-  // gc1-allow: observability — @sentry/react-native is an external SDK boundary; lib/sentry is a thin init/gate wrapper that calls Sentry.init() with native transports on import
-  Sentry: { addBreadcrumb: jest.fn(), captureException: jest.fn() },
-}));
+jest.mock(
+  '../lib/sentry' /* gc1-allow: observability boundary; lib/sentry initializes native Sentry transports on import */,
+  () => ({
+    Sentry: { addBreadcrumb: jest.fn(), captureException: jest.fn() },
+  }),
+);
 
 const mockSecureGet = SecureStore.getItemAsync as jest.Mock;
 const mockSecureSet = SecureStore.setItemAsync as jest.Mock;

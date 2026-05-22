@@ -126,21 +126,20 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
-// gc1-allow: native-boundary: _layout.tsx transitively loads useParentProxy
-// →profile→i18n→expo-localization and expo-router Stack which are native-only.
-// QuizFlowProvider and useQuizFlow are pure React but cannot be tree-shaken
-// from the module without mocking it in JSDOM.
-jest.mock('./_layout', () => ({
-  useQuizFlow: () => ({
-    setActivityType: jest.fn(),
-    setSubjectId: jest.fn(),
-    setLanguageName: jest.fn(),
-    setReturnTo: jest.fn(),
-    setRound: jest.fn(),
-    setPrefetchedRoundId: jest.fn(),
-    setCompletionResult: jest.fn(),
+jest.mock(
+  './_layout' /* gc1-allow: native-boundary; _layout transitively loads native-only router/i18n modules in JSDOM */,
+  () => ({
+    useQuizFlow: () => ({
+      setActivityType: jest.fn(),
+      setSubjectId: jest.fn(),
+      setLanguageName: jest.fn(),
+      setReturnTo: jest.fn(),
+      setRound: jest.fn(),
+      setPrefetchedRoundId: jest.fn(),
+      setCompletionResult: jest.fn(),
+    }),
   }),
-}));
+);
 
 function createWrapper() {
   const queryClient = new QueryClient({
