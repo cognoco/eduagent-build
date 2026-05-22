@@ -14,6 +14,7 @@
 
 import {
   conversationLanguageSchema,
+  appContextSchema,
   pronounsSchema,
   profileSchema,
   onboardingPronounsPatchSchema,
@@ -132,6 +133,12 @@ describe('profileSchema forward-compat', () => {
     expect(parsed.pronouns).toBeNull();
   });
 
+  it('defaults app-context rollout fields for legacy profile rows', () => {
+    const parsed = profileSchema.parse(legacyRowWithoutC1Fields);
+    expect(parsed.defaultAppContext).toBeNull();
+    expect(parsed.hasFamilyLinks).toBe(false);
+  });
+
   it('[BKT-C.1] preserves explicit conversationLanguage when present', () => {
     const parsed = profileSchema.parse({
       ...legacyRowWithoutC1Fields,
@@ -146,6 +153,17 @@ describe('profileSchema forward-compat', () => {
       pronouns: 'they/them',
     });
     expect(parsed.pronouns).toBe('they/them');
+  });
+});
+
+describe('appContextSchema', () => {
+  it('accepts the two persisted app contexts', () => {
+    expect(appContextSchema.parse('study')).toBe('study');
+    expect(appContextSchema.parse('family')).toBe('family');
+  });
+
+  it('rejects unsupported contexts', () => {
+    expect(() => appContextSchema.parse('recaps')).toThrow();
   });
 });
 

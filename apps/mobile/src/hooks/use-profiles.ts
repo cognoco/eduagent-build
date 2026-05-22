@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { useApiClient } from '../lib/api-client';
-import type { Profile } from '@eduagent/schemas';
+import type { AppContext, Profile } from '@eduagent/schemas';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
@@ -56,6 +56,32 @@ export function useUpdateProfileName() {
       const res = await client.profiles[':id'].$patch({
         param: { id: profileId },
         json: { displayName },
+      });
+      await assertOk(res);
+      const data = (await res.json()) as { profile: Profile };
+      return data.profile;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    },
+  });
+}
+
+export function useUpdateProfileAppContext() {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      profileId,
+      defaultAppContext,
+    }: {
+      profileId: string;
+      defaultAppContext: AppContext;
+    }) => {
+      const res = await client.profiles[':id']['app-context'].$patch({
+        param: { id: profileId },
+        json: { defaultAppContext },
       });
       await assertOk(res);
       const data = (await res.json()) as { profile: Profile };

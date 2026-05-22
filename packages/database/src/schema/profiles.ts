@@ -65,6 +65,7 @@ export const profiles = pgTable(
     location: locationTypeEnum('location'),
     isOwner: boolean('is_owner').notNull().default(false),
     hasPremiumLlm: boolean('has_premium_llm').notNull().default(false),
+    defaultAppContext: text('default_app_context'),
     // BKT-C.1 — tutor's speaking language. NOT NULL default 'en' so existing
     // rows backfill to English without a behavioral change. CHECK enforces the
     // supported language list at the DB layer.
@@ -98,6 +99,10 @@ export const profiles = pgTable(
     check(
       'profiles_pronouns_length_check',
       sql`${table.pronouns} IS NULL OR char_length(${table.pronouns}) <= 32`,
+    ),
+    check(
+      'profiles_default_app_context_check',
+      sql`${table.defaultAppContext} IS NULL OR ${table.defaultAppContext} IN ('study','family')`,
     ),
   ],
 );

@@ -297,17 +297,22 @@ jest.mock('../../lib/api-client', () => ({
   ...jest.requireActual('../../lib/api-client'),
   useApiClient: () => ({}),
 }));
-jest.mock('../../lib/app-context' /* gc1-allow: progress screen tests need deterministic study/family mode without provider side effects */, () => ({
-  useAppContext: () => ({
-    mode:
-      mockSearchParams.profileId &&
-      mockLinkedChildren.some((child) => child.id === mockSearchParams.profileId)
-        ? 'family'
-        : 'study',
-    setMode: jest.fn(),
-    familyCapable: mockLinkedChildren.length > 0,
+jest.mock(
+  '../../lib/app-context' /* gc1-allow: progress screen tests need deterministic study/family mode without provider side effects */,
+  () => ({
+    useAppContext: () => ({
+      mode:
+        mockSearchParams.profileId &&
+        mockLinkedChildren.some(
+          (child) => child.id === mockSearchParams.profileId,
+        )
+          ? 'family'
+          : 'study',
+      setMode: jest.fn(),
+      familyCapable: mockLinkedChildren.length > 0,
+    }),
   }),
-}));
+);
 let mockSearchParams: { profileId?: string | string[] } = {};
 jest.mock('expo-router', () => {
   const ReactReq = jest.requireActual<typeof import('react')>('react');
@@ -359,6 +364,8 @@ function makeLinkedChild(overrides?: Partial<Profile>): Profile {
     displayName: 'Emma',
     isOwner: false,
     hasPremiumLlm: false,
+    defaultAppContext: null,
+    hasFamilyLinks: false,
     consentStatus: null,
     linkCreatedAt: null,
     conversationLanguage: 'en',
@@ -403,6 +410,8 @@ const childProgressProfile: Profile = {
   displayName: 'Emma',
   isOwner: false,
   hasPremiumLlm: false,
+  defaultAppContext: null,
+  hasFamilyLinks: false,
   consentStatus: null,
   linkCreatedAt: null,
   conversationLanguage: 'en',

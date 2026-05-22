@@ -71,7 +71,9 @@ const mockFetch = createRoutedMockFetch({
 jest.mock(
   '../../lib/api-client' /* gc1-allow: API client hook wraps auth/network boundary; test drives screen fetch states */,
   () =>
-    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(((
+      ...args: Parameters<typeof fetch>
+    ) => mockFetch(...args)) as jest.Mock),
 );
 
 jest.mock(

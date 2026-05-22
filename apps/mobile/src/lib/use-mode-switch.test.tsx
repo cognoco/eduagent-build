@@ -14,6 +14,10 @@ import { createTestProfile } from '../test-utils/app-hook-test-utils';
 
 const mockReplace = jest.fn();
 
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({ getToken: jest.fn().mockResolvedValue('mock-token') }),
+}));
+
 jest.mock(
   'expo-router' /* gc1-allow: hook test needs a deterministic navigation boundary */,
   () => ({
@@ -77,12 +81,15 @@ function makeWrapper({
 
 describe('useModeSwitch', () => {
   const originalFlag = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
+  const originalV1Flag = FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
 
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       true;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      false;
   });
 
   afterEach(() => {
@@ -90,6 +97,8 @@ describe('useModeSwitch', () => {
     jest.useRealTimers();
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       originalFlag;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      originalV1Flag;
   });
 
   it('commits the next mode before navigating home', () => {

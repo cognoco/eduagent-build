@@ -239,6 +239,12 @@ export async function generateExport(
   const linkCreatedAtByChildId = new Map(
     familyLinkRows.map((link) => [link.childProfileId, link.createdAt]),
   );
+  const linkedParentIds = new Set(
+    familyLinkRows.map((link) => link.parentProfileId),
+  );
+  const linkedChildIds = new Set(
+    familyLinkRows.map((link) => link.childProfileId),
+  );
 
   const learningProfileRows =
     profileIds.length > 0
@@ -281,6 +287,11 @@ export async function generateExport(
       location: row.location ?? null,
       isOwner: row.isOwner,
       hasPremiumLlm: row.hasPremiumLlm,
+      defaultAppContext:
+        (row.defaultAppContext as Profile['defaultAppContext']) ?? null,
+      hasFamilyLinks: row.isOwner
+        ? linkedParentIds.has(row.id)
+        : linkedChildIds.has(row.id),
       // BKT-C.1 — include the new personalization dimensions in the GDPR
       // export. The CHECK constraint on conversation_language guarantees the
       // value is one of the 8 codes; cast narrows Drizzle's `string` to the

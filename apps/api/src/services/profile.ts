@@ -13,6 +13,7 @@ import { inngest } from '../inngest/client';
 const logger = createLogger();
 import type {
   AgeBracket,
+  AppContext,
   ProfileCreateInput,
   ProfileUpdateInput,
   Profile,
@@ -53,7 +54,10 @@ export class ProfileLimitError extends Error {
 function mapProfileRow(
   row: typeof profiles.$inferSelect,
   consentStatus: Profile['consentStatus'] = null,
-  linkCreatedAt: Date | null = null,
+  familyMeta: {
+    linkCreatedAt?: Date | null;
+    hasFamilyLinks?: boolean;
+  } = {},
 ): Profile {
   return {
     id: row.id,
@@ -64,6 +68,9 @@ function mapProfileRow(
     location: row.location ?? null,
     isOwner: row.isOwner,
     hasPremiumLlm: row.hasPremiumLlm,
+    defaultAppContext:
+      (row.defaultAppContext as Profile['defaultAppContext']) ?? null,
+    hasFamilyLinks: familyMeta.hasFamilyLinks ?? false,
     // BKT-C.1 — narrow the DB row's text type to the Zod enum. The CHECK
     // constraint guarantees the value is always one of the 8 codes; the cast
     // is a type-narrowing no-op at runtime.
@@ -71,9 +78,25 @@ function mapProfileRow(
       row.conversationLanguage as Profile['conversationLanguage'],
     pronouns: row.pronouns ?? null,
     consentStatus,
-    linkCreatedAt: linkCreatedAt?.toISOString() ?? null,
+    linkCreatedAt: familyMeta.linkCreatedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+async function loadProfileFamilyMeta(
+  db: Database,
+  row: typeof profiles.$inferSelect,
+): Promise<{ linkCreatedAt: Date | null; hasFamilyLinks: boolean }> {
+  const link = await db.query.familyLinks.findFirst({
+    where: row.isOwner
+      ? eq(familyLinks.parentProfileId, row.id)
+      : eq(familyLinks.childProfileId, row.id),
+  });
+
+  return {
+    linkCreatedAt: row.isOwner ? null : (link?.createdAt ?? null),
+    hasFamilyLinks: !!link,
   };
 }
 
@@ -100,14 +123,16 @@ export async function listProfiles(
   const linkCreatedAtByChildId = new Map(
     links.map((link) => [link.childProfileId, link.createdAt]),
   );
+  const linkedChildIds = new Set(links.map((link) => link.childProfileId));
   const mapped = await Promise.all(
     rows.map(async (row) => {
       const status = await getConsentStatus(db, row.id);
-      return mapProfileRow(
-        row,
-        status,
-        linkCreatedAtByChildId.get(row.id) ?? null,
-      );
+      return mapProfileRow(row, status, {
+        linkCreatedAt: linkCreatedAtByChildId.get(row.id) ?? null,
+        hasFamilyLinks: row.isOwner
+          ? links.length > 0
+          : linkedChildIds.has(row.id),
+      });
     }),
   );
   return mapped;
@@ -156,7 +181,8 @@ export async function findOwnerProfile(
 
   if (ownerRow) {
     const consentStatus = await getConsentStatus(db, ownerRow.id);
-    return mapProfileRow(ownerRow, consentStatus);
+    const familyMeta = await loadProfileFamilyMeta(db, ownerRow);
+    return mapProfileRow(ownerRow, consentStatus, familyMeta);
   }
 
   // [BUG-410] Fallback: no owner flag set — account is in a corrupt/inconsistent
@@ -202,7 +228,8 @@ export async function findOwnerProfile(
 
   const consentStatus = await getConsentStatus(db, fallbackRow.id);
   // Return with actual isOwner (false) — do NOT force to true.
-  return mapProfileRow(fallbackRow, consentStatus);
+  const familyMeta = await loadProfileFamilyMeta(db, fallbackRow);
+  return mapProfileRow(fallbackRow, consentStatus, familyMeta);
 }
 
 /**
@@ -290,7 +317,9 @@ export async function createProfile(
     }
   }
 
-  return mapProfileRow(row, consentStatus);
+  return mapProfileRow(row, consentStatus, {
+    hasFamilyLinks: !!parentProfileId,
+  });
 }
 
 /**
@@ -426,7 +455,8 @@ export async function getProfile(
   });
   if (!row) return null;
   const status = await getConsentStatus(db, row.id);
-  return mapProfileRow(row, status);
+  const familyMeta = await loadProfileFamilyMeta(db, row);
+  return mapProfileRow(row, status, familyMeta);
 }
 
 /**
@@ -457,7 +487,40 @@ export async function updateProfile(
     .returning();
   if (!rows[0]) return null;
   const status = await getConsentStatus(db, rows[0].id);
-  return mapProfileRow(rows[0], status);
+  const familyMeta = await loadProfileFamilyMeta(db, rows[0]);
+  return mapProfileRow(rows[0], status, familyMeta);
+}
+
+/**
+ * Persists the active app context for a profile.
+ *
+ * Returns null if the profile does not exist or is not owned by the account.
+ * The route layer enforces whether the caller may update this profile.
+ */
+export async function updateProfileAppContext(
+  db: Database,
+  profileId: string,
+  accountId: string,
+  defaultAppContext: AppContext,
+): Promise<Profile | null> {
+  const rows = await db
+    .update(profiles)
+    .set({
+      defaultAppContext,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(profiles.id, profileId),
+        eq(profiles.accountId, accountId),
+        isNull(profiles.archivedAt),
+      ),
+    )
+    .returning();
+  if (!rows[0]) return null;
+  const status = await getConsentStatus(db, rows[0].id);
+  const familyMeta = await loadProfileFamilyMeta(db, rows[0]);
+  return mapProfileRow(rows[0], status, familyMeta);
 }
 
 /**

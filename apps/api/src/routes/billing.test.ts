@@ -16,6 +16,7 @@ const mockDbInsert = jest.fn().mockReturnValue({
   }),
 });
 const mockProfileFindFirst = jest.fn().mockResolvedValue(undefined);
+const mockFamilyLinksFindFirst = jest.fn().mockResolvedValue(undefined);
 const mockConsentStateFindFirst = jest.fn().mockResolvedValue(undefined);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
@@ -27,6 +28,9 @@ const mockDatabaseModule = createDatabaseModuleMock({
     query: {
       profiles: {
         findFirst: (...args: unknown[]) => mockProfileFindFirst(...args),
+      },
+      familyLinks: {
+        findFirst: (...args: unknown[]) => mockFamilyLinksFindFirst(...args),
       },
       consentStates: {
         findFirst: (...args: unknown[]) => mockConsentStateFindFirst(...args),
@@ -284,6 +288,7 @@ beforeEach(() => {
   mockGetFamilyPoolStatus.mockResolvedValue(null);
   mockGetUsageBreakdownForProfile.mockResolvedValue(null);
   mockProfileFindFirst.mockResolvedValue(undefined);
+  mockFamilyLinksFindFirst.mockResolvedValue(undefined);
   mockConsentStateFindFirst.mockResolvedValue(undefined);
 });
 

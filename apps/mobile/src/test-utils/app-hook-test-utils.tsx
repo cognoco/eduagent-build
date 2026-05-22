@@ -50,6 +50,8 @@ export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
     location: null,
     isOwner: true,
     hasPremiumLlm: false,
+    defaultAppContext: null,
+    hasFamilyLinks: false,
     // BKT-C.1 — required fields on Profile. Default to English tutor, null
     // pronouns (matches the onboarding default path).
     conversationLanguage: 'en',
