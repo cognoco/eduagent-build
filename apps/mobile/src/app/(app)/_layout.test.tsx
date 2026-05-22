@@ -1087,6 +1087,29 @@ describe('computeVisibleTabs', () => {
     );
   });
 
+  it('preserves the legacy guardian shell when both mode-navigation flags are off', () => {
+    const flags =
+      require('../../lib/feature-flags') as typeof import('../../lib/feature-flags');
+    const mutableFlags = flags.FEATURE_FLAGS as unknown as {
+      MODE_NAV_V0_ENABLED: boolean;
+      MODE_NAV_V1_ENABLED: boolean;
+    };
+    const originalV0 = mutableFlags.MODE_NAV_V0_ENABLED;
+    const originalV1 = mutableFlags.MODE_NAV_V1_ENABLED;
+
+    try {
+      mutableFlags.MODE_NAV_V0_ENABLED = false;
+      mutableFlags.MODE_NAV_V1_ENABLED = false;
+
+      expect(computeVisibleTabs('guardian')).toEqual(
+        new Set(['home', 'own-learning', 'library', 'progress', 'more']),
+      );
+    } finally {
+      mutableFlags.MODE_NAV_V0_ENABLED = originalV0;
+      mutableFlags.MODE_NAV_V1_ENABLED = originalV1;
+    }
+  });
+
   it('defaults to guardian shape', () => {
     expect(computeVisibleTabs()).toEqual(computeVisibleTabs('guardian'));
   });
