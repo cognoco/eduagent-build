@@ -19,8 +19,8 @@ import {
   type MemorySource,
   type SessionAnalysisOutput,
   type StrengthEntry,
-  type StruggleEntry,
-  struggleEntrySchema,
+  type FocusAreaEntry,
+  focusAreaEntrySchema,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
 import {
@@ -172,9 +172,9 @@ function asStrengthArray(value: unknown): StrengthEntry[] {
   return value.filter((item): item is StrengthEntry => Boolean(item));
 }
 
-function asStruggleArray(value: unknown): StruggleEntry[] {
+function asStruggleArray(value: unknown): FocusAreaEntry[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is StruggleEntry => Boolean(item));
+  return value.filter((item): item is FocusAreaEntry => Boolean(item));
 }
 
 function asLearningStyle(value: unknown): LearningStyle {
@@ -342,8 +342,8 @@ export function mergeStrengths(
 }
 
 export function archiveStaleStruggles(
-  struggles: StruggleEntry[],
-): StruggleEntry[] {
+  struggles: FocusAreaEntry[],
+): FocusAreaEntry[] {
   const cutoff = new Date(
     Date.now() - STRUGGLE_ARCHIVAL_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
@@ -351,10 +351,10 @@ export function archiveStaleStruggles(
 }
 
 export function mergeStruggles(
-  existing: StruggleEntry[],
+  existing: FocusAreaEntry[],
   incoming: StruggleSignal[],
   suppressed: string[],
-): StruggleEntry[] {
+): FocusAreaEntry[] {
   const suppressedSet = new Set(suppressed.map(normalizeMemoryValue));
   const result = [...existing];
 
@@ -422,10 +422,10 @@ export function mergeCommunicationNotes(
 }
 
 export function resolveStruggle(
-  struggles: StruggleEntry[],
+  struggles: FocusAreaEntry[],
   topic: string,
   subject?: string | null,
-): StruggleEntry[] {
+): FocusAreaEntry[] {
   const result = [...struggles];
   const index = result.findIndex(
     (entry) =>
@@ -452,8 +452,8 @@ export function resolveStruggle(
 }
 
 export function detectStruggleNotifications(
-  beforeStruggles: StruggleEntry[],
-  afterStruggles: StruggleEntry[],
+  beforeStruggles: FocusAreaEntry[],
+  afterStruggles: FocusAreaEntry[],
   resolvedTopics: Array<{ topic: string; subject: string | null }> | null,
 ): StruggleNotification[] {
   const notifications: StruggleNotification[] = [];
@@ -636,7 +636,7 @@ function buildAnalysisUpdates(
 
   if (analysis.resolvedTopics?.length) {
     const base =
-      (updates.struggles as StruggleEntry[] | undefined) ?? mergedStruggles;
+      (updates.struggles as FocusAreaEntry[] | undefined) ?? mergedStruggles;
     let resolved = base;
     for (const entry of analysis.resolvedTopics) {
       resolved = resolveStruggle(resolved, entry.topic, entry.subject);
@@ -681,7 +681,7 @@ function buildAnalysisUpdates(
   }
 
   const afterStruggles =
-    (updates.struggles as StruggleEntry[] | undefined) ?? mergedStruggles;
+    (updates.struggles as FocusAreaEntry[] | undefined) ?? mergedStruggles;
   const notifications = detectStruggleNotifications(
     beforeStruggles,
     afterStruggles,
@@ -779,7 +779,7 @@ export interface MemoryBlockProfile {
   // buildMemoryBlock coerces internally before segmenting.
   interests: Array<string | InterestEntry>;
   strengths: StrengthEntry[];
-  struggles: StruggleEntry[];
+  struggles: FocusAreaEntry[];
   communicationNotes: string[];
   memoryEnabled?: boolean;
   memoryInjectionEnabled?: boolean;
@@ -1163,7 +1163,7 @@ export function selectCurrentlyWorkingOn(
   const seen = new Set<string>();
 
   for (const value of struggles) {
-    const parsed = struggleEntrySchema.safeParse(value);
+    const parsed = focusAreaEntrySchema.safeParse(value);
     if (!parsed.success) continue;
 
     const entry = parsed.data;

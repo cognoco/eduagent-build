@@ -550,6 +550,55 @@ describe('idempotency', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Stale event guard [CR-049]
+// ---------------------------------------------------------------------------
+
+describe('stale event guard [CR-049]', () => {
+  // [CR-049 break test] An event with event_timestamp_ms more than 48h in the
+  // past must be silently acknowledged (200) without mutating state. Returning
+  // 4xx would cause RevenueCat to retry for up to 3 days. Pre-fix, the route
+  // had no age guard and would process arbitrarily old replayed events.
+  it('[CR-049] acks stale event (>48h) with 200 and does not mutate state', async () => {
+    const staleTimestampMs = Date.now() - 49 * 60 * 60 * 1000; // 49 hours ago
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: staleTimestampMs,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.received).toBe(true);
+    expect(body.stale).toBe(true);
+    // No state mutation — the event was dropped silently.
+    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+    expect(ensureFreeSubscription).not.toHaveBeenCalled();
+  });
+
+  it('[CR-049] processes recent events normally (within 48h window)', async () => {
+    const recentTimestampMs = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: recentTimestampMs,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+  });
+
+  it('[CR-049] processes events with no event_timestamp_ms (missing field passes through)', async () => {
+    // If event_timestamp_ms is absent, the guard cannot evaluate age and must
+    // not block the event — RevenueCat may omit the field on older SDK versions.
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: undefined,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // INITIAL_PURCHASE
 // ---------------------------------------------------------------------------
 

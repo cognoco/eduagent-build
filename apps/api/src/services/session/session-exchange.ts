@@ -21,7 +21,7 @@ import type {
   SessionMessageInput,
   LearningStyle,
   StrengthEntry,
-  StruggleEntry,
+  FocusAreaEntry,
   SubscriptionTier,
   VerificationType,
 } from '@eduagent/schemas';
@@ -1534,7 +1534,7 @@ export async function prepareExchangeContext(
             ? memorySnapshot.struggles
             : ((Array.isArray(learningProfile.struggles)
                 ? learningProfile.struggles
-                : []) as StruggleEntry[]),
+                : []) as FocusAreaEntry[]),
           communicationNotes: memorySnapshot
             ? memorySnapshot.communicationNotes
             : Array.isArray(learningProfile.communicationNotes)

@@ -842,6 +842,21 @@ export const revenuecatWebhookRoute = new Hono<{
     );
   }
 
+  // [CR-049] 48-hour max-age guard — reject stale or replayed events.
+  // Return 200 (not 4xx) so RevenueCat does not retry for up to 3 days.
+  const MAX_EVENT_AGE_MS = 48 * 60 * 60 * 1000;
+  if (
+    event.event_timestamp_ms !== undefined &&
+    Date.now() - event.event_timestamp_ms > MAX_EVENT_AGE_MS
+  ) {
+    logger.warn('[revenuecat] Stale event ignored (>48h old)', {
+      eventType: event.type,
+      eventId: event.id,
+      eventAgeMs: Date.now() - event.event_timestamp_ms,
+    });
+    return c.json({ received: true, stale: true });
+  }
+
   await ensureFreeSubscription(db, accountId);
 
   // Dispatch to event-specific handler

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   assessments,
   curricula,
@@ -861,12 +861,14 @@ export async function getLatestSnapshotOnOrBefore(
   profileId: string,
   snapshotDate: string,
 ): Promise<LatestSnapshot | null> {
-  const rows = await db.query.progressSnapshots.findMany({
-    where: eq(progressSnapshots.profileId, profileId),
+  const row = await db.query.progressSnapshots.findFirst({
+    where: and(
+      eq(progressSnapshots.profileId, profileId),
+      lte(progressSnapshots.snapshotDate, snapshotDate),
+    ),
     orderBy: desc(progressSnapshots.snapshotDate),
   });
-  const match = rows.find((row) => row.snapshotDate <= snapshotDate);
-  return match ? snapshotRowToLatestSnapshot(match) : null;
+  return row ? snapshotRowToLatestSnapshot(row) : null;
 }
 
 export async function getSnapshotsInRange(

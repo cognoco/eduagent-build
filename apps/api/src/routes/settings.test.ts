@@ -6,6 +6,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockProfileFindFirst = jest.fn();
+const mockFamilyLinksFindFirst = jest.fn().mockResolvedValue(undefined);
 
 const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
@@ -13,6 +14,9 @@ const mockDatabaseModule = createDatabaseModuleMock({
     query: {
       profiles: {
         findFirst: (...args: unknown[]) => mockProfileFindFirst(...args),
+      },
+      familyLinks: {
+        findFirst: (...args: unknown[]) => mockFamilyLinksFindFirst(...args),
       },
       consentStates: {
         findFirst: jest.fn().mockResolvedValue(undefined),
@@ -91,6 +95,7 @@ afterAll(() => {
 beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
+  mockFamilyLinksFindFirst.mockResolvedValue(undefined);
   mockProfileFindFirst.mockResolvedValue({
     id: 'profile-1',
     accountId: 'test-account-id',

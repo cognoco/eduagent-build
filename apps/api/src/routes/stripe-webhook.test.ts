@@ -637,6 +637,62 @@ describe('customer.subscription.updated', () => {
 
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
+
+  // [CR-052 break test] A second subscription.updated event fired AFTER
+  // cancellation (e.g. a period-end reminder) must NOT clobber cancelledAt
+  // back to null. Pre-fix, the else branch always set cancelledAt = null when
+  // canceled_at was absent, wiping the timestamp recorded by the first event.
+  it('[CR-052] second subscription.updated (no canceled_at) does not clobber cancelledAt set by first call', async () => {
+    // First event: subscription is cancelled — canceled_at is present.
+    const firstSub = makeSubscription({
+      status: 'canceled',
+      canceled_at: 1700100000,
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', firstSub),
+    );
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    const firstCall = (updateSubscriptionFromWebhook as jest.Mock).mock
+      .calls[0]?.[2] as Record<string, unknown> | undefined;
+    expect(firstCall?.cancelledAt).toBeDefined();
+    expect(firstCall?.cancelledAt).not.toBeNull();
+
+    jest.clearAllMocks();
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription(),
+    );
+
+    // Second event: a follow-up event (e.g. period-end reminder) with no
+    // canceled_at on the Stripe object. cancelledAt must NOT appear in updates.
+    const secondSub = makeSubscription({
+      status: 'canceled',
+      canceled_at: null,
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', secondSub),
+    );
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    const secondCall = (updateSubscriptionFromWebhook as jest.Mock).mock
+      .calls[0]?.[2] as Record<string, unknown> | undefined;
+    // cancelledAt must NOT be present (not null, not a new value) — omitted entirely.
+    expect(secondCall).not.toHaveProperty('cancelledAt');
+  });
 });
 
 // ---------------------------------------------------------------------------

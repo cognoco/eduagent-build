@@ -158,6 +158,12 @@ export const consentRevocation = inngest.createFunction(
       }
 
       await step.sendEvent('schedule-archive-cleanup', {
+        // [CR-026] Deterministic event id so a step.sendEvent replay (network
+        // blip, Inngest retry after the 30d sleep) deduplicates at the event
+        // layer and never starts a second archive-cleanup run for the same
+        // profile. The archive-cleanup function also carries idempotency +
+        // concurrency(limit:1) as defence-in-depth.
+        id: `archive-cleanup-${childProfileId}`,
         name: 'app/profile.archived',
         data: { profileId: childProfileId, parentProfileId },
       });

@@ -161,12 +161,14 @@ async function handleSubscriptionEvent(
   if (periodEnd) {
     updates.currentPeriodEnd = new Date(periodEnd * 1000).toISOString();
   }
+  // [CR-052] Only set cancelledAt when Stripe signals a cancellation timestamp.
+  // Do NOT null it out here — subsequent events (e.g. period-end reminders) fire
+  // after the cancellation is recorded and must not clobber it. Re-activation
+  // events (invoice.payment_succeeded) clear cancelledAt explicitly.
   if (stripeSubscription.canceled_at) {
     updates.cancelledAt = new Date(
       stripeSubscription.canceled_at * 1000,
     ).toISOString();
-  } else {
-    updates.cancelledAt = null;
   }
 
   const updated = await updateSubscriptionFromWebhook(

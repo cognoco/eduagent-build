@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
+import { captureMessage } from '../services/sentry';
 import { createLogger, type LogLevel } from '../services/logger';
 
 export const requestLogger = createMiddleware<{
@@ -37,6 +38,14 @@ export const requestLogger = createMiddleware<{
 
   if (status >= 500) {
     logger.error('Request failed', context);
+    // Capture non-exception 5xx responses (e.g. explicit error() calls that
+    // never throw). Thrown errors are already captured by the global error
+    // handler — this is the complementary path for status-only failures.
+    captureMessage('5xx response', {
+      requestPath: c.req.path,
+      extra: { status, method: c.req.method, latencyMs },
+      level: 'error',
+    });
   } else if (status >= 400) {
     logger.warn('Client error', context);
   } else {

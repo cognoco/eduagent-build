@@ -1,4 +1,4 @@
-import type { StrengthEntry, StruggleEntry } from '@eduagent/schemas';
+import type { StrengthEntry, FocusAreaEntry } from '@eduagent/schemas';
 import type {
   MemoryBlockProfile,
   MemoryBlockEntry,
@@ -40,7 +40,7 @@ jest.mock('./llm/router' /* gc1-allow: pattern-a conversion */, () => {
 describe('selectCurrentlyWorkingOn', () => {
   const now = new Date('2026-05-09T12:00:00.000Z');
 
-  function entry(overrides: Partial<StruggleEntry> = {}): StruggleEntry {
+  function entry(overrides: Partial<FocusAreaEntry> = {}): FocusAreaEntry {
     return {
       subject: 'Math',
       topic: 'Fractions',
@@ -338,7 +338,7 @@ describe('archiveStaleStruggles', () => {
       Date.now() - 100 * 24 * 60 * 60 * 1000,
     ).toISOString();
     const freshDate = new Date().toISOString();
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -361,7 +361,7 @@ describe('archiveStaleStruggles', () => {
 
   it('keeps all struggles within 90-day window', () => {
     const freshDate = new Date().toISOString();
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -396,7 +396,7 @@ describe('mergeStruggles', () => {
   });
 
   it('increments attempts and upgrades confidence on repeat', () => {
-    const existing: StruggleEntry[] = [
+    const existing: FocusAreaEntry[] = [
       {
         topic: 'fractions',
         subject: 'Math',
@@ -415,7 +415,7 @@ describe('mergeStruggles', () => {
   });
 
   it('upgrades to high confidence at 5+ attempts', () => {
-    const existing: StruggleEntry[] = [
+    const existing: FocusAreaEntry[] = [
       {
         topic: 'fractions',
         subject: 'Math',
@@ -458,7 +458,7 @@ describe('mergeStruggles', () => {
   });
 
   it('upserts null-subject struggles by topic match', () => {
-    const existing: StruggleEntry[] = [
+    const existing: FocusAreaEntry[] = [
       {
         topic: 'fractions',
         subject: null,
@@ -478,7 +478,7 @@ describe('mergeStruggles', () => {
 
   it('updates lastSeen on increment', () => {
     const oldDate = '2026-03-01T00:00:00Z';
-    const existing: StruggleEntry[] = [
+    const existing: FocusAreaEntry[] = [
       {
         topic: 'fractions',
         subject: 'Math',
@@ -557,7 +557,7 @@ describe('mergeCommunicationNotes', () => {
 
 describe('resolveStruggle', () => {
   it('decrements attempts and downgrades confidence', () => {
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -573,7 +573,7 @@ describe('resolveStruggle', () => {
   });
 
   it('removes the struggle when attempts drop to zero', () => {
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -587,7 +587,7 @@ describe('resolveStruggle', () => {
   });
 
   it('returns list unchanged if topic is not found', () => {
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -603,7 +603,7 @@ describe('resolveStruggle', () => {
   });
 
   it('matches topic case-insensitively', () => {
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'Fractions',
@@ -618,7 +618,7 @@ describe('resolveStruggle', () => {
   });
 
   it('matches null-subject struggles', () => {
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: null,
         topic: 'reading directions',
@@ -633,7 +633,7 @@ describe('resolveStruggle', () => {
   });
 
   it('downgrades high → medium at 4 attempts', () => {
-    const struggles: StruggleEntry[] = [
+    const struggles: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1491,7 +1491,7 @@ describe('buildMemoryBlock', () => {
 
 describe('detectStruggleNotifications', () => {
   it('emits struggle_noticed when a struggle first reaches medium confidence', () => {
-    const before: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1500,7 +1500,7 @@ describe('detectStruggleNotifications', () => {
         lastSeen: '2026-04-01T00:00:00Z',
       },
     ];
-    const after: StruggleEntry[] = [
+    const after: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1519,8 +1519,8 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('emits struggle_noticed for a brand-new struggle that starts at medium', () => {
-    const before: StruggleEntry[] = [];
-    const after: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [];
+    const after: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'algebra',
@@ -1535,7 +1535,7 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('emits struggle_flagged when a struggle reaches high confidence', () => {
-    const before: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1544,7 +1544,7 @@ describe('detectStruggleNotifications', () => {
         lastSeen: '2026-04-01T00:00:00Z',
       },
     ];
-    const after: StruggleEntry[] = [
+    const after: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1563,7 +1563,7 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('does not emit when confidence stays the same', () => {
-    const entry: StruggleEntry = {
+    const entry: FocusAreaEntry = {
       subject: 'Math',
       topic: 'fractions',
       attempts: 4,
@@ -1575,8 +1575,8 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('does not emit for low-confidence struggles', () => {
-    const before: StruggleEntry[] = [];
-    const after: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [];
+    const after: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'algebra',
@@ -1590,7 +1590,7 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('emits struggle_resolved when a resolved topic was in the before list', () => {
-    const before: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1600,7 +1600,7 @@ describe('detectStruggleNotifications', () => {
       },
     ];
     // After resolution, fractions is gone
-    const after: StruggleEntry[] = [];
+    const after: FocusAreaEntry[] = [];
     const resolved = [{ topic: 'fractions', subject: 'Math' as string | null }];
     const notifications = detectStruggleNotifications(before, after, resolved);
     expect(notifications).toHaveLength(1);
@@ -1612,15 +1612,15 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('does not emit struggle_resolved for topics not in the before list', () => {
-    const before: StruggleEntry[] = [];
-    const after: StruggleEntry[] = [];
+    const before: FocusAreaEntry[] = [];
+    const after: FocusAreaEntry[] = [];
     const resolved = [{ topic: 'algebra', subject: 'Math' as string | null }];
     const notifications = detectStruggleNotifications(before, after, resolved);
     expect(notifications).toHaveLength(0);
   });
 
   it('handles null-subject struggles correctly', () => {
-    const before: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [
       {
         subject: null,
         topic: 'reading carefully',
@@ -1629,7 +1629,7 @@ describe('detectStruggleNotifications', () => {
         lastSeen: '2026-04-01T00:00:00Z',
       },
     ];
-    const after: StruggleEntry[] = [
+    const after: FocusAreaEntry[] = [
       {
         subject: null,
         topic: 'reading carefully',
@@ -1648,7 +1648,7 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('emits both struggle_flagged and struggle_resolved in one analysis', () => {
-    const before: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1664,7 +1664,7 @@ describe('detectStruggleNotifications', () => {
         lastSeen: '2026-04-01T00:00:00Z',
       },
     ];
-    const after: StruggleEntry[] = [
+    const after: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',
@@ -1682,7 +1682,7 @@ describe('detectStruggleNotifications', () => {
   });
 
   it('matches topics case-insensitively', () => {
-    const before: StruggleEntry[] = [
+    const before: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'Fractions',
@@ -1691,7 +1691,7 @@ describe('detectStruggleNotifications', () => {
         lastSeen: '2026-04-01T00:00:00Z',
       },
     ];
-    const after: StruggleEntry[] = [
+    const after: FocusAreaEntry[] = [
       {
         subject: 'Math',
         topic: 'fractions',

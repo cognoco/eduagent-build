@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { ProfileScopeEnv } from './profile-scope';
+import type { ProfileMeta, ProfileScopeEnv } from './profile-scope';
 
 const PROXY_MODE_MESSAGE = 'Not available in proxy mode';
 const PROXY_MODE_CODE = 'PROXY_MODE';
@@ -32,10 +32,10 @@ const proxyModeBody = {
  * switch race) but it can no longer downgrade a true proxy request.
  */
 export function assertNotProxyMode(
-  c: Context<ProfileScopeEnv> | Context
+  c: Context<ProfileScopeEnv> | Context,
 ): void {
   const profileMeta = (c as Context<ProfileScopeEnv>).get('profileMeta') as
-    | { isOwner: boolean }
+    | ProfileMeta
     | undefined;
 
   // [BUG-975 / CCR-PR126-H-1] Fail closed when profileMeta is absent.

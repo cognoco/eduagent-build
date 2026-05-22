@@ -13,6 +13,12 @@ export const archiveCleanup = inngest.createFunction(
     id: 'archive-cleanup',
     name: 'Hard-delete archived profile after retention window',
     retries: 5,
+    // Idempotency dedupes within 24h so a duplicate `app/profile.archived`
+    // event (operator re-fire, step.sendEvent replay after a network blip)
+    // cannot start a second 30-day timer and later run deleteProfile twice.
+    // concurrency(limit:1) serialises any concurrent runs that slip through
+    // before Inngest can deduplicate them.
+    idempotency: 'event.data.profileId',
     concurrency: { key: 'event.data.profileId', limit: 1 },
   },
   { event: 'app/profile.archived' },
@@ -46,5 +52,5 @@ export const archiveCleanup = inngest.createFunction(
     });
 
     return { status: 'complete', profileId };
-  }
+  },
 );
