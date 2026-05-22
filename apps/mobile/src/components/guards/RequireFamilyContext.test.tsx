@@ -11,6 +11,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AppContextProvider } from '../../lib/app-context';
 import {
@@ -24,6 +25,10 @@ import { RequireFamilyContext } from './RequireFamilyContext';
 // expo-router: external navigation boundary
 // gc1-allow: hook test needs a deterministic navigation boundary for useRouter
 const mockReplace = jest.fn();
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({ getToken: jest.fn().mockResolvedValue('mock-token') }),
+}));
 
 jest.mock(
   'expo-router' /* gc1-allow: RequireFamilyContext renders router.replace; real expo-router requires a navigation container */,
@@ -45,6 +50,8 @@ const adultOwner: Profile = {
   location: null,
   isOwner: true,
   hasPremiumLlm: false,
+  defaultAppContext: null,
+  hasFamilyLinks: false,
   conversationLanguage: 'en',
   pronouns: null,
   consentStatus: null,
@@ -88,10 +95,16 @@ function makeWrapper(
   };
 
   return function Wrapper({ children }: { children: ReactNode }) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+
     return (
-      <ProfileContext.Provider value={profileContext}>
-        <AppContextProvider>{children}</AppContextProvider>
-      </ProfileContext.Provider>
+      <QueryClientProvider client={queryClient}>
+        <ProfileContext.Provider value={profileContext}>
+          <AppContextProvider>{children}</AppContextProvider>
+        </ProfileContext.Provider>
+      </QueryClientProvider>
     );
   };
 }
@@ -120,14 +133,19 @@ function renderGuard(
 
 describe('RequireFamilyContext [PARENT-03]', () => {
   const originalFlag = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
+  const originalV1Flag = FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      false;
   });
 
   afterEach(() => {
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       originalFlag;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      originalV1Flag;
   });
 
   // -------------------------------------------------------------------------

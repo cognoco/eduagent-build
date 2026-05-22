@@ -142,6 +142,8 @@ const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   displayName: 'Alex Parent',
   isOwner: true,
   hasPremiumLlm: false,
+  defaultAppContext: null,
+  hasFamilyLinks: false,
   consentStatus: null,
   linkCreatedAt: null,
   conversationLanguage: 'en',

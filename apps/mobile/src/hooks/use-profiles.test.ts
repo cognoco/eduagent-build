@@ -5,7 +5,11 @@ import {
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId } from '../lib/api-client';
-import { useProfiles, useUpdateProfileName } from './use-profiles';
+import {
+  useProfiles,
+  useUpdateProfileAppContext,
+  useUpdateProfileName,
+} from './use-profiles';
 
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
@@ -197,5 +201,51 @@ describe('useUpdateProfileName', () => {
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
     });
+  });
+});
+
+describe('useUpdateProfileAppContext', () => {
+  it('sends PATCH with defaultAppContext and invalidates profiles', async () => {
+    const updatedProfile = {
+      id: 'p1',
+      accountId: 'a1',
+      displayName: 'Owner',
+      avatarUrl: null,
+      birthYear: 1980,
+      isOwner: true,
+      defaultAppContext: 'family',
+      hasFamilyLinks: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: updatedProfile }), {
+        status: 200,
+      }),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateProfileAppContext(), {
+      wrapper,
+    });
+
+    result.current.mutate({
+      profileId: 'p1',
+      defaultAppContext: 'family',
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/profiles/p1/app-context');
+    expect(init.method).toBe('PATCH');
+    const body = JSON.parse(init.body as string);
+    expect(body.defaultAppContext).toBe('family');
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
   });
 });
