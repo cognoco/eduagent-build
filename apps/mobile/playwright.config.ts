@@ -5,7 +5,6 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const mobileDir = path.join(process.cwd(), 'apps', 'mobile');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
-const includeP1BCoverage = process.env.PLAYWRIGHT_INCLUDE_P1B === '1';
 
 // [BUG-325] Worker-count discriminator. We previously inferred "is this the
 // shared *.workers.dev staging API?" by substring-matching the API URL —
@@ -168,9 +167,12 @@ export default defineConfig({
     {
       name: 'later-phases',
       dependencies: ['setup'],
-      testMatch: includeP1BCoverage
-        ? /flows[\\/](journeys[\\/](j0[89]|j[1-9][0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/
-        : /flows[\\/](journeys[\\/](j0[89]|j1[0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
+      // Both branches now match j08–j99 so new inventory specs (j24+) are
+      // included in the default run without requiring PLAYWRIGHT_INCLUDE_P1B.
+      // The P1B branch is retained for forward-compat; the non-P1B branch has
+      // been widened from j1[0-9] to j[1-9][0-9] to include j20-j99.
+      testMatch:
+        /flows[\\/](journeys[\\/](j0[89]|j[1-9][0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
     },
   ],
 });
