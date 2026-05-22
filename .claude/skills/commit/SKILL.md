@@ -103,6 +103,25 @@ window by keeping batches small (rule 4 above). 8-10 files takes ~15-30s
 of hook time; `git add -A` with 50 files can take 2-5 min, during which
 ANY other agent's write is at risk.
 
+## Stash safety net (always on)
+
+Whenever this skill needs to stash unstaged WIP — to isolate the working
+tree before pre-commit, or to unblock a failing batch — it MUST first
+capture a `git stash create -u` snapshot and anchor it as a
+`refs/preserved/commit-skill-<timestamp>` ref. This is a non-destructive
+snapshot commit (the working tree is unchanged) that survives even if
+the subsequent `git stash pop` fails, conflicts, or is dropped by a
+concurrent agent's stash cycle.
+
+The rule: never call `git stash push` without first calling
+`git stash create + git update-ref` per the lifecycle in the failing-tests
+section below. On clean completion the ref is deleted; on any failure it
+is left in place and reported to the caller so they can
+`git stash apply <sha>` to recover. This is what would have prevented
+the 2026-05-21 wipe of ~78 files of test annotations — see
+[[feedback_parallel_agent_stash_wipe_prevention]] and
+[[feedback_git_fsck_stash_recovery]].
+
 ## Steps
 
 ### 1. Determine scope
@@ -294,20 +313,42 @@ Parse the failing file paths from the hook output. Compare against
   **Stash lifecycle (strict):**
   1. Snapshot existing stashes before any push:
      `before=$(git stash list | wc -l)`.
-  2. Push with the `temp:` label:
-     `git stash push --keep-index -u -m "temp: commit-skill WIP"`.
-  3. Commit. On success, pop:
+  2. **Safety-net anchor** — capture a permanent snapshot ref before
+     touching the working tree. `git stash create` produces a snapshot
+     commit without modifying the tree or the stash list — invisible
+     to other agents and immune to subsequent stash-pop conflicts:
+     ```
+     ts=$(date +%s)
+     snap=$(git stash create -u "commit-skill safety $ts")
+     [ -n "$snap" ] && git update-ref "refs/preserved/commit-skill-$ts" "$snap"
+     ```
+     If the rest of the lifecycle goes wrong (pop conflict, lost
+     stash, race with another agent's stash cycle), the caller's WIP
+     is anchored at `refs/preserved/commit-skill-<ts>` and recoverable
+     via `git stash apply <sha>`. Costs nothing — pure snapshot.
+  3. Push with the `temp:` label (only if step 2's `$snap` is non-empty,
+     i.e. there actually IS unstaged WIP to isolate):
+     `git stash push --keep-index -u -m "temp: commit-skill WIP $ts"`.
+  4. Commit. On success, pop:
      `git stash pop stash@{0}` (always pop by exact ref, never bare
      `git stash pop`).
-  4. Verify stash count returned to `before`. If it did not:
-     `git stash list` — locate the `temp: commit-skill WIP` entry and
+  5. Verify stash count returned to `before`. If it did not:
+     `git stash list` — locate the `temp: commit-skill WIP $ts` entry
+     (the timestamp suffix disambiguates from sibling agent runs) and
      `git stash drop stash@{N}`. **Never drop a stash whose message
-     does not start with `temp:`** — pre-existing stashes are the
-     caller's WIP and must be preserved.
-  5. If `git stash pop` reports "stash entry is kept" (conflict), STOP
+     does not start with `temp: commit-skill WIP`** — pre-existing
+     stashes are the caller's WIP and must be preserved.
+  6. **Clean exit only**: on confirmed-clean completion, delete the
+     safety-net ref:
+     `git update-ref -d "refs/preserved/commit-skill-$ts"`.
+     On ANY failure path — pop conflict, dropped stash, error before
+     pop — **leave the preserved ref** and report its name to the
+     caller. They can recover with
+     `git stash apply $(git rev-parse refs/preserved/commit-skill-<ts>)`.
+  7. If `git stash pop` reports "stash entry is kept" (conflict), STOP
      and report. Do not retry the pop, do not drop, do not force.
      Verify with `git stash show --stat 'stash@{0}'` and surface the
-     conflict to the caller.
+     conflict to the caller along with the preserved-ref name.
 
 - **Failing files ARE in your staged set:** classify by relatedness.
   - *Related* (test for code you're committing, same logical scope,
