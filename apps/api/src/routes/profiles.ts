@@ -2,6 +2,7 @@
 import { zValidator } from '@hono/zod-validator';
 import {
   profileCreateSchema,
+  profileAppContextUpdateSchema,
   profileUpdateSchema,
   profileSwitchSchema,
   profileResponseSchema,
@@ -21,6 +22,7 @@ import {
   createProfileWithLimitCheck,
   getProfile,
   updateProfile,
+  updateProfileAppContext,
   switchProfile,
   countProfiles,
   ProfileValidationError,
@@ -129,6 +131,36 @@ export const profileRoutes = new Hono<ProfileEnv>()
     if (!profile) return notFound(c, 'Profile not found');
     return c.json(profileResponseSchema.parse({ profile }));
   })
+  .patch(
+    '/profiles/:id/app-context',
+    zValidator('json', profileAppContextUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = requireAccount(c.get('account'));
+      const id = c.req.param('id');
+      const { defaultAppContext } = c.req.valid('json');
+
+      const activeProfileId = c.get('profileId');
+      const profileMeta = c.get('profileMeta');
+      if (profileMeta?.isOwner !== true && id !== activeProfileId) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the account owner can update other profiles.',
+        );
+      }
+
+      const profile = await updateProfileAppContext(
+        db,
+        id,
+        account.id,
+        defaultAppContext,
+      );
+      if (!profile) return notFound(c, 'Profile not found');
+      return c.json(profileResponseSchema.parse({ profile }));
+    },
+  )
   .patch(
     '/profiles/:id',
     zValidator('json', profileUpdateSchema),
