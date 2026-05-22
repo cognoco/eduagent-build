@@ -379,7 +379,7 @@ export function ProfileProvider({
         ? { success: true, persistenceFailed: true }
         : { success: true };
     },
-    [client, profiles, queryClient],
+    [client, queryClient],
   );
 
   const acknowledgeProfileRemoval = useCallback(() => {

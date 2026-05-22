@@ -14,7 +14,11 @@ import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
-import { useProfile, isGuardianProfile } from '../lib/profile';
+import {
+  useProfile,
+  isGuardianProfile,
+  type SwitchProfileOptions,
+} from '../lib/profile';
 import { goBackOrReplace } from '../lib/navigation';
 import { useThemeColors } from '../lib/theme';
 import {
@@ -156,7 +160,10 @@ export default function ProfilesScreen() {
   // NOT add a redundant client-side ownership guard — doing so would be
   // false reassurance about security and would mask a real server-side
   // regression behind a green client check.
-  const handleSwitch = async (profileId: string) => {
+  const handleSwitch = async (
+    profileId: string,
+    options?: SwitchProfileOptions,
+  ) => {
     if (isSwitching || switchInFlightRef.current) return;
     switchInFlightRef.current = true;
     setIsSwitching(true);
@@ -166,7 +173,10 @@ export default function ProfilesScreen() {
       platformAlert('Taking longer than expected', 'Please try again.');
     }, 20_000);
     try {
-      const result = await switchProfile(profileId);
+      const result =
+        options !== undefined
+          ? await switchProfile(profileId, options)
+          : await switchProfile(profileId);
       clearTimeout(timeoutId);
       if (result?.success === false) {
         platformAlert(
@@ -217,43 +227,7 @@ export default function ProfilesScreen() {
     // [ACCOUNT-04] Pass proxyMode:true so ProfileProvider sets the explicit
     // proxy flag. This is the ONLY legitimate entry point for proxy mode —
     // the user has read and confirmed the "Viewing [child]'s account" modal.
-    void handleSwitchAsProxy(id);
-  };
-
-  const handleSwitchAsProxy = async (profileId: string) => {
-    if (isSwitching || switchInFlightRef.current) return;
-    switchInFlightRef.current = true;
-    setIsSwitching(true);
-    const timeoutId = setTimeout(() => {
-      switchInFlightRef.current = false;
-      setIsSwitching(false);
-      platformAlert('Taking longer than expected', 'Please try again.');
-    }, 20_000);
-    try {
-      const result = await switchProfile(profileId, { proxyMode: true });
-      clearTimeout(timeoutId);
-      if (result?.success === false) {
-        platformAlert(
-          'Could not switch profiles',
-          result.error ?? 'Please try again.',
-        );
-        return;
-      }
-      handleClose();
-      if (result?.persistenceFailed) {
-        platformAlert(
-          'Profile switched',
-          'We could not save this profile choice on this device. You may need to pick it again after reopening the app.',
-        );
-      }
-    } catch (err) {
-      clearTimeout(timeoutId);
-      platformAlert('Could not switch profiles', formatApiError(err));
-    } finally {
-      clearTimeout(timeoutId);
-      switchInFlightRef.current = false;
-      setIsSwitching(false);
-    }
+    void handleSwitch(id, { proxyMode: true });
   };
 
   const handleCancelProxySwitch = () => {

@@ -50,14 +50,16 @@ jest.mock(
   }),
 );
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: native-boundary — theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#6366f1',
-    textInverse: '#ffffff',
-    muted: '#9ca3af',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: native-boundary — theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#6366f1',
+      textInverse: '#ffffff',
+      muted: '#9ca3af',
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock (replaces hook-level mocks for use-subscription,

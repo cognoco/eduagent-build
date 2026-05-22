@@ -212,7 +212,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
     expect(toJSON()).toBeNull();
@@ -226,7 +226,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -248,7 +248,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={onRetry}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -270,7 +270,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={onRetry}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -289,7 +289,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={onContinueOffline}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
 
@@ -307,7 +307,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
     expect(onReady).toHaveBeenCalledTimes(1);
@@ -322,7 +322,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <></>
+        {null}
       </ClerkGate>,
     );
     expect(screen.queryByTestId('clerk-timeout-screen')).toBeNull();
@@ -335,6 +335,7 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
   // ClerkGate null-render and let the authenticated tree mount.
   it('[BUG-507] does NOT render children (authenticated layout) when timedOut=true but Clerk not loaded', () => {
     (useAuth as jest.Mock).mockReturnValue({ isLoaded: false });
+    const { View } = require('react-native');
     const { toJSON } = render(
       <ClerkGate
         onReady={noOp}
@@ -342,7 +343,8 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         onRetry={noOp}
         onContinueOffline={noOp}
       >
-        <>{/* authenticated layout sentinel */}</>
+        {/* sentinel testID lets us assert children were NOT mounted */}
+        <View testID="authenticated-layout-sentinel" />
       </ClerkGate>,
     );
 
@@ -350,8 +352,8 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
     expect(screen.getByTestId('clerk-timeout-screen')).toBeTruthy();
     // ClerkGate renders the timeout UI — the JSON tree should be non-null
     expect(toJSON()).not.toBeNull();
-    // But children (the app layout) must NOT be in the tree
-    // ClerkGate returns the timeout screen, not children, when !isLoaded
-    expect(screen.queryByTestId('clerk-timeout-screen')).not.toBeNull();
+    // Children (the authenticated app layout) must NOT be in the tree when Clerk
+    // is not loaded — they would only appear if ClerkGate bypassed its isLoaded guard.
+    expect(screen.queryByTestId('authenticated-layout-sentinel')).toBeNull();
   });
 });

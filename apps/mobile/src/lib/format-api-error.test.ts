@@ -505,11 +505,12 @@ describe('classifyApiError', () => {
     // phrase happens to be in the message, but the phrase here differs enough
     // that the primary guard (isTimeout) is what we're validating.
     const result = classifyApiError(err);
-    // classifyApiError classifies 'timed out' in isNetworkRelated — acceptable
-    // (network/retry). The critical constraint is that it does NOT use the
-    // isTimeout structural guard for a message-only match.
-    // This test primarily confirms the isTimeout path works in isolation.
-    expect(result.recovery).toBeDefined();
+    // 'upstream' in the message matches isTechnicalMessage, so shouldPassThroughUserMessage
+    // returns false and the error falls to the unknown-fallback. Critically: the
+    // `isTimeout` structural gate was NOT involved — confirming the property check
+    // is the exclusive path for SSE timeout classification.
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
   });
 });
 

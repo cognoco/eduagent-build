@@ -16,18 +16,18 @@ export function RequireFamilyContext({
   children,
 }: {
   children: ReactNode;
-}): React.ReactElement {
+}): ReactNode {
   const router = useRouter();
   const { setMode } = useAppContext();
   const { canRenderFamilyRoute, familyCapable } = useGuardFamilyRoute();
 
   if (!FEATURE_FLAGS.MODE_NAV_V0_ENABLED) {
-    return <>{children}</>;
+    return children;
   }
 
   // Happy path: user is already in Family mode.
   if (canRenderFamilyRoute) {
-    return <>{children}</>;
+    return children;
   }
 
   // [PARENT-03] Study mode hit a family/child route.
