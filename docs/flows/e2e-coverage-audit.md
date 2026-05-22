@@ -178,7 +178,7 @@ The "Outdated" category is what motivated this audit — many tests were written
 
 | ID | Flow | Status | Notes |
 |---|---|---|---|
-| HOMEWORK-01 | Start homework from home/More | Covered | Two YAMLs aligned. |
+| HOMEWORK-01 | Start homework from learner home | Covered | Two YAMLs aligned; More is not an intended homework entry point. |
 | HOMEWORK-02 | Camera permission + capture + OCR | Covered | Stage 1 (1.13): `camera-ocr.yaml` still covers first-request; permanently-denied state covered by `homework/camera-permission-denied.yaml` (Stage 2). |
 | HOMEWORK-03 | Manual fallback when OCR weak | Partial | Optional emulator workaround inside `camera-ocr.yaml`. |
 | HOMEWORK-04 | Homework tutoring session | Covered | `homework-flow.yaml`. |

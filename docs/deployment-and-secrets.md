@@ -130,7 +130,7 @@ Secrets come from **three sources**:
 
 2. **Sensitive secrets** — synced from Doppler `stg` config to Cloudflare Workers via `pnpm secrets:sync stg`. Stored as Workers Secrets on the `mentomate-api-stg` worker.
 
-3. **GitHub Actions secrets** — `CLOUDFLARE_API_TOKEN` authenticates `wrangler deploy`, and `DATABASE_URL_STAGING` is used for staging migrations in `deploy.yml`.
+3. **GitHub Actions secrets** — `CLOUDFLARE_API_TOKEN` authenticates `wrangler deploy`, `DATABASE_URL_STAGING` is used for staging migrations, and `DOPPLER_TOKEN_STG` syncs Doppler secrets to the staging Worker before the deploy. `deploy.yml` hard-fails if `DOPPLER_TOKEN_STG` is unset (unless `SKIP_DOPPLER_SYNC` is set after a local sync). Same pattern for production with `DOPPLER_TOKEN_PRD`.
 
 ### Approval gate
 
@@ -603,11 +603,16 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `DATABASE_URL_PRODUCTION` | `deploy.yml` — production Neon migrations before production deploys |
 | `DATABASE_URL_STAGING_HOST` | `deploy.yml` — expected host guard for staging DB target verification |
 | `DATABASE_URL_PRODUCTION_HOST` | `deploy.yml` — expected host guard for production DB target verification |
+| `DOPPLER_TOKEN_STG` | `deploy.yml`, `e2e-web.yml` — staging Doppler service token for Worker secret sync |
+| `DOPPLER_TOKEN_PRD` | `deploy.yml` — production Doppler service token for Worker secret sync |
+| `SKIP_DOPPLER_SYNC` | `deploy.yml` — opt-out flag when Doppler→Worker sync was run locally before dispatch |
 | `STAGING_API_URL` | Optional deploy smoke override; defaults to `https://api-stg.mentomate.com` |
 | `PRODUCTION_API_URL` | Optional deploy smoke override; defaults to `https://api.mentomate.com` |
-| `EXPO_TOKEN` | `deploy.yml`, `mobile-ci.yml` — authenticates EAS CLI |
-| `CLAUDE_CODE_OAUTH_TOKEN` | `claude.yml`, `claude-code-review.yml` — AI review |
-| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | `e2e-ci.yml` — Clerk auth in E2E tests |
+| `EXPO_TOKEN` | `deploy.yml`, `mobile-ci.yml`, `ci.yml` — authenticates EAS CLI |
+| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW` | `ci.yml` (OTA update step), `e2e-ci.yml`, `e2e-web.yml` — Clerk publishable key for preview/staging |
+| `EXPO_PUBLIC_SENTRY_DSN` | `ci.yml` — Sentry DSN injected into preview OTA updates |
+| `TEST_SEED_SECRET` | `e2e-ci.yml`, `e2e-web.yml`, `e2e-web-cleanup.yml` — auth for test seed endpoint |
+| `CLAUDE_CODE_OAUTH_TOKEN` (+ `_2`, `_3`) | `claude.yml`, `claude-code-review.yml` — AI review |
 
 ---
 

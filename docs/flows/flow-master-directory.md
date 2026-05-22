@@ -185,7 +185,7 @@ This register mirrors every flow ID currently listed in mobile-app-flow-inventor
 | DICT-08 | Sentence-level remediation (rewrite each mistake; autocorrect disabled; accepts whatever child types) | Not created | TBD | Not mapped |
 | DICT-09 | Perfect-score celebration screen | Not created | TBD | Not mapped |
 | DICT-10 | Recording dictation result on "I'm done" or after review (`POST /dictation/results`) with retry alert if save fails | Not created | TBD | Not mapped |
-| HOMEWORK-01 | Start homework from learner home or More screen | [master-directory/homework/HOMEWORK-01.md](master-directory/homework/HOMEWORK-01.md) | `Shared different scope` | Draft |
+| HOMEWORK-01 | Start homework from learner home | [master-directory/homework/HOMEWORK-01.md](master-directory/homework/HOMEWORK-01.md) | `Shared different scope` | Draft |
 | HOMEWORK-02 | Camera permission, capture, preview, and OCR. Permission phase has two distinct sub-states: first-request prompt (`grant-permission-button`) and permanently-denied/Settings-redirect (`open-settings-button`); auto-refreshes on app resume (commit 22c7c99c). i18n keys now render translated strings (C-1 fix, commit d0e1efdc); null-safety + fetch-boundary tests added (commit fc8413ed) | Not created | TBD | Not mapped |
 | HOMEWORK-03 | Manual fallback when OCR is weak or fails | Not created | TBD | Not mapped |
 | HOMEWORK-04 | Homework tutoring session with multi-problem navigation | Not created | TBD | Not mapped |

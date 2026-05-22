@@ -130,10 +130,12 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 - **Commercial LLM routing changes require the live premium-routing gate.** Run `pnpm test:llm:premium-routing` after changing Plus/Family/add-on/provider routing. The runner uses the app services directly, forces hard rung-4 and rung-5 cases, verifies sourceAudit, compares Gemini/Claude quality at rung 4, and verifies the OpenAI advanced candidate is used only at rung 5 when OpenAI is configured.
 - **Book and topic-map generation uses the stronger Gemini-only path.** Book generation routes at rung 3 with `providerPolicy: 'gemini_only'`, so the model is Gemini 2.5 Pro and cannot fall back to GPT/Claude. This is deliberate because generated topic maps are upstream of tutoring quality and must respect Family/default Gemini-only boundaries.
 - **Book and topic-map generation changes require the live book-generation gate.** Run `pnpm test:llm:book-generation` after changing book generation, book suggestions, curriculum topic persistence, or session topic-map context. The runner uses the app's book-generation services directly and checks broad/narrow classification, generated topic-map coherence, chapter sequencing, visual connections, age register, overload risk, and unsupported precise factual claims before the tutor uses that structure in sessions. Precise unsourced factual claims are failures; generated curriculum should stay source-neutral until a tutoring turn has reliable source support.
+- **LLM responses that drive state-machine decisions use the structured envelope.** Parse with `parseEnvelope()` from `services/llm/envelope.ts`; schema `llmResponseEnvelopeSchema` lives in `@eduagent/schemas`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal.
 
 ### Background Jobs (Inngest) Rules
 
 - **Use Inngest for any async work that should survive a request lifecycle.** Never fire-and-forget in a route handler.
+- **Non-core dispatches go through `safeSend()`.** Telemetry, post-success notifications, and observability events dispatch via `safeSend()` in `apps/api/src/services/safe-non-core.ts` so a dispatch failure reaches Sentry but never throws and never breaks the user action. Bare `inngest.send(...)` is reserved for CORE flows where dispatch failure must short-circuit the user action — those sites carry a `// core-send: <reason>` comment immediately above the call. Forward-only ratchet test: `apps/api/src/services/safe-non-core.guard.test.ts`.
 - **Event naming: `app/{domain}.{action}`** — e.g., `app/session.completed`, `app/coaching.precompute`.
 - **Payloads always include `profileId` + `timestamp`.** Never include secrets or connection strings (e.g., `databaseUrl`) — event payloads are serialized to queues.
 - **Database access inside Inngest steps:** Use a `getStepDatabase()` helper that reads `process.env['DATABASE_URL']` at runtime. Cloudflare Worker env bindings are request-scoped and unavailable in step functions.
@@ -240,4 +242,4 @@ Challenge Round is the assessment mode where the tutor proposes a timed retrieva
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-02-17
+Last Updated: 2026-05-22 (envelope contract, safeSend pattern, store status, llm-routing gate)
