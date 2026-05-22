@@ -78,6 +78,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
       }
     } else {
       // profileMeta absent — check DB to determine if this is a first-profile creation.
+      // TODO(G1): move countProfiles+403 logic to services/profile.ts as assertProfileCreationAllowed(db, accountId)
       const existingCount = await countProfiles(db, account.id);
       if (existingCount > 0) {
         // Profiles exist but no owner meta resolved — never allow (fail closed).

@@ -32,7 +32,10 @@ import {
   updateAccommodationMode,
 } from '../services/learner-profile';
 import { parseLearnerInput } from '../services/learner-input';
-import { assertOwnerAndParentAccess } from '../services/family-access';
+import {
+  assertCanManageOwnConsent,
+  assertOwnerAndParentAccess,
+} from '../services/family-access';
 import {
   getOrCreateMemoryProjection,
   toLearnerSelfView,
@@ -85,12 +88,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
     return c.json(
       learnerProfileExportTextResponseSchema.parse({
@@ -104,12 +102,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
     return c.json(learnerProfileGetResponseSchema.parse({ profile }));
   })
@@ -143,12 +136,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const input = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await deleteMemoryItem(
@@ -166,6 +154,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     },
   )
   .delete('/learner-profile/all', async (c) => {
+    assertCanManageOwnConsent(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const accountId = c.get('account').id;
@@ -177,12 +166,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('profileId');
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    await assertOwnerAndParentAccess(
-      c,
-      db,
-      parentProfileId,
-      childProfileId,
-    );
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
     // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
     await deleteAllMemory(db, childProfileId, undefined);
     return c.json({ success: true });
@@ -191,6 +175,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/memory-enabled',
     zValidator('json', toggleMemoryEnabledSchema),
     async (c) => {
+      // [CR-2026-05-21-010] Minor non-owner profiles cannot toggle memory
+      // enabled on self — consent is parent-controlled.
+      assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const accountId = c.get('account').id;
@@ -209,12 +196,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { memoryEnabled } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await toggleMemoryEnabled(db, childProfileId, undefined, memoryEnabled);
@@ -227,6 +209,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/collection',
     zValidator('json', toggleMemoryCollectionSchema),
     async (c) => {
+      // [CR-2026-05-21-010] Minor non-owner profiles cannot toggle memory
+      // collection on self — data-collection consent is parent-controlled.
+      assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const accountId = c.get('account').id;
@@ -250,12 +235,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { memoryCollectionEnabled } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await toggleMemoryCollection(
@@ -273,6 +253,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/injection',
     zValidator('json', toggleMemoryInjectionSchema),
     async (c) => {
+      // [CR-2026-05-21-010] Minor non-owner profiles cannot toggle memory
+      // injection on self — injection consent is parent-controlled.
+      assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const accountId = c.get('account').id;
@@ -296,12 +279,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { memoryInjectionEnabled } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await toggleMemoryInjection(
@@ -319,6 +297,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/consent',
     zValidator('json', grantMemoryConsentSchema),
     async (c) => {
+      // [CR-2026-05-21-010] Minor non-owner profiles cannot self-grant or
+      // self-revoke memory consent — the parent's grant (via /:profileId/consent)
+      // must not be overridden by the child acting on self.
+      assertCanManageOwnConsent(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const accountId = c.get('account').id;
@@ -337,12 +319,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { consent } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await grantMemoryConsent(db, childProfileId, undefined, consent);
@@ -370,12 +347,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(
         db,
@@ -408,12 +380,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { value } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await unsuppressInference(db, childProfileId, undefined, value);
@@ -449,12 +416,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-      await assertOwnerAndParentAccess(
-        c,
-        db,
-        parentProfileId,
-        childProfileId,
-      );
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { accommodationMode } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await updateAccommodationMode(

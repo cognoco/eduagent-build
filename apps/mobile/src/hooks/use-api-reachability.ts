@@ -30,6 +30,9 @@ export function useApiReachability(): ApiReachability {
   const [isChecked, setIsChecked] = useState(false);
   const pendingRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Hoisted so the effect cleanup can abort the in-flight fetch on unmount,
+  // preventing setState calls on an unmounted component (BUG-532).
+  const controllerRef = useRef<AbortController | null>(null);
 
   const checkHealth = useCallback(async (): Promise<void> => {
     // Skip if a check is already in flight — prevents runaway polling when
@@ -39,6 +42,7 @@ export function useApiReachability(): ApiReachability {
     pendingRef.current = true;
     try {
       const controller = new AbortController();
+      controllerRef.current = controller;
       const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
 
       const res = await fetch(`${getApiUrl()}/v1/health`, {
@@ -66,6 +70,9 @@ export function useApiReachability(): ApiReachability {
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      // Abort any in-flight health fetch to prevent setState on an unmounted
+      // component (BUG-532).
+      controllerRef.current?.abort();
     };
   }, [checkHealth]);
 

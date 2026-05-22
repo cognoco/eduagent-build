@@ -124,9 +124,9 @@ export type StreakRecordEvent = z.infer<typeof streakRecordEventSchema>;
 
 /** BUG-991 — emitted when LLM summary generation fails for a session. */
 export const sessionSummaryFailedEventSchema = z.object({
-  profileId: z.string(),
-  sessionId: z.string(),
-  sessionSummaryId: z.string().nullable(),
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  sessionSummaryId: z.string().uuid().nullable(),
   timestamp: z.string(),
 });
 export type SessionSummaryFailedEvent = z.infer<
@@ -136,8 +136,8 @@ export type SessionSummaryFailedEvent = z.infer<
 /** BUG-992 — emitted on successful transcript purge (failure rate = 1 - success rate). */
 export const sessionTranscriptPurgedEventSchema = z.object({
   profileId: z.string().uuid(),
-  sessionId: z.string(),
-  sessionSummaryId: z.string().nullable(),
+  sessionId: z.string().uuid(),
+  sessionSummaryId: z.string().uuid().nullable(),
   eventsDeleted: z.number().int().nonnegative(),
   embeddingRowsReplaced: z.number().int().nonnegative(),
   purgedAt: z.string().optional(),
@@ -149,7 +149,7 @@ export type SessionTranscriptPurgedEvent = z.infer<
 /** BUG-993 — emitted when sessions are past day-37 without llmSummary/learnerRecap. */
 export const sessionPurgeDelayedEventSchema = z.object({
   delayedCount: z.number().int().positive(),
-  sessionIds: z.array(z.string()),
+  sessionIds: z.array(z.string().uuid()),
   missingPreconditionCount: z.number().int().nonnegative(),
   timestamp: z.string(),
 });
@@ -228,7 +228,73 @@ export const bookTopicsGeneratedEventSchema = z.object({
   subjectId: z.string().uuid(),
   bookId: z.string().uuid(),
   profileId: z.string().uuid(),
+  timestamp: z.string().datetime(),
 });
 export type BookTopicsGeneratedEvent = z.infer<
   typeof bookTopicsGeneratedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Session-completed observability events (Bug-369)
+// ---------------------------------------------------------------------------
+
+/** Emitted on successful LLM summary generation. */
+export const sessionSummaryGeneratedEventSchema = z.object({
+  profileId: z.string(),
+  sessionId: z.string(),
+  sessionSummaryId: z.string().nullable().optional(),
+  sessionState: z.string().optional(),
+  topicsCount: z.number().optional(),
+  narrativeLength: z.number().optional(),
+  timestamp: z.string(),
+});
+export type SessionSummaryGeneratedEvent = z.infer<
+  typeof sessionSummaryGeneratedEventSchema
+>;
+
+/** Emitted when >=1 soft step fails during session completion. */
+export const sessionCompletedWithErrorsEventSchema = z.object({
+  sessionId: z.string(),
+  profileId: z.string(),
+  failedSteps: z.array(
+    z.object({
+      step: z.string(),
+      error: z.string().nullable(),
+    }),
+  ),
+  timestamp: z.string(),
+});
+export type SessionCompletedWithErrorsEvent = z.infer<
+  typeof sessionCompletedWithErrorsEventSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Filing auto-retry observability event (Bug-369)
+// ---------------------------------------------------------------------------
+
+/** Emitted each time the filing-timed-out observer claims a retry slot. */
+export const filingAutoRetryAttemptedEventSchema = z.object({
+  sessionId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  attemptNumber: z.number().int().positive(),
+  timestamp: z.string(),
+});
+export type FilingAutoRetryAttemptedEvent = z.infer<
+  typeof filingAutoRetryAttemptedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Summary-reconciliation scan observability event (Bug-369)
+// ---------------------------------------------------------------------------
+
+/** Emitted at the start of each summary-reconciliation cron run. */
+export const summaryReconciliationScannedEventSchema = z.object({
+  queryACount: z.number().int().nonnegative(),
+  queryBCount: z.number().int().nonnegative(),
+  queryCCount: z.number().int().nonnegative(),
+  totalScanned: z.number().int().nonnegative(),
+  timestamp: z.string(),
+});
+export type SummaryReconciliationScannedEvent = z.infer<
+  typeof summaryReconciliationScannedEventSchema
 >;

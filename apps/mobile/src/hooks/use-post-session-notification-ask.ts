@@ -25,15 +25,18 @@ export function usePostSessionNotificationAsk(
   isParentProxy: boolean,
 ): void {
   const { t } = useTranslation();
-  const firedRef = useRef(false);
+  // Tracks the profileId for which the primer has already fired this mount.
+  // Using a profile-keyed ref (vs. a boolean) means a profile swap automatically
+  // resets the guard — no separate effect needed.
+  const firedForProfileRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (firedRef.current) return;
+    if (firedForProfileRef.current === profileId) return;
     if (!profileId) return;
     if (!hasCompletedSession) return;
     if (isParentProxy) return;
 
-    firedRef.current = true;
+    firedForProfileRef.current = profileId;
     let cancelled = false;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 

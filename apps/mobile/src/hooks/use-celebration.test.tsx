@@ -347,3 +347,30 @@ describe('useCelebration — audience copy', () => {
     expect(result.current.CelebrationOverlay).not.toBeNull();
   });
 });
+
+describe('useCelebration — stale callback regression (Bug 537)', () => {
+  it('does not call the first callback (fnA) after swapping to fnB', async () => {
+    const fnA = jest.fn();
+    const fnB = jest.fn();
+
+    const entry1 = makeEntry('polar_star', 'polar_star', {
+      queuedAt: '2026-02-01T10:00:00.000Z',
+    });
+
+    const { rerender } = renderHook(
+      ({ onAllComplete, queue }) =>
+        useCelebration({ queue, celebrationLevel: 'all', onAllComplete }),
+      { initialProps: { onAllComplete: fnA, queue: [entry1] } },
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    rerender({ onAllComplete: fnB, queue: [entry1] });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(fnA).not.toHaveBeenCalled();
+  });
+});

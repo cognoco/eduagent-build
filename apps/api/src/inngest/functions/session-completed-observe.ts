@@ -15,45 +15,16 @@
 // Pattern mirrors ask-classification-observe.ts and ask-gate-observe.ts.
 // ---------------------------------------------------------------------------
 
-import { z } from 'zod';
+import {
+  sessionSummaryFailedEventSchema,
+  sessionSummaryGeneratedEventSchema,
+  sessionCompletedWithErrorsEventSchema,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
-
-// ---------------------------------------------------------------------------
-// Inline schemas
-// ---------------------------------------------------------------------------
-
-const sessionSummaryGeneratedEventSchema = z.object({
-  profileId: z.string(),
-  sessionId: z.string(),
-  sessionSummaryId: z.string().nullable().optional(),
-  sessionState: z.string().optional(),
-  topicsCount: z.number().optional(),
-  narrativeLength: z.number().optional(),
-  timestamp: z.string(),
-});
-
-const sessionSummaryFailedEventSchema = z.object({
-  profileId: z.string(),
-  sessionId: z.string(),
-  sessionSummaryId: z.string().nullable().optional(),
-  timestamp: z.string(),
-});
-
-const sessionCompletedWithErrorsEventSchema = z.object({
-  sessionId: z.string(),
-  profileId: z.string(),
-  failedSteps: z.array(
-    z.object({
-      step: z.string(),
-      error: z.string().nullable(),
-    }),
-  ),
-  timestamp: z.string(),
-});
 
 // ---------------------------------------------------------------------------
 // Handlers

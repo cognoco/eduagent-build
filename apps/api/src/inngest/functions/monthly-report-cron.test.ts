@@ -1107,6 +1107,158 @@ describe('monthlyReportGenerate', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // [CR-2026-05-21-022] Break test: push-success + email-throw → email lands
+  // on retry.
+  //
+  // Pre-fix (single step): push succeeds, logs a notification row.  Email
+  // throws.  Inngest retries the whole step.  The dedup check now sees
+  // recentCount > 0 → returns early.  Email is permanently lost.
+  //
+  // Post-fix (split steps): send-monthly-push completes (memoized on retry);
+  // send-monthly-email is a separate step so it replays independently.  The
+  // dedup check is NOT re-evaluated on the retry because its step is already
+  // memoized.  Email lands on the second attempt.
+  // ---------------------------------------------------------------------------
+  describe('[CR-2026-05-21-022] push-success + email-throw retry scenario', () => {
+    // Shared report result that generate-monthly-report would produce.
+    const REPORT_RESULT = {
+      status: 'completed' as const,
+      childDisplayName: 'Emma',
+      reportMonth: '2026-03-01',
+      struggleTopics: [] as string[],
+      isSelfReport: false,
+    };
+
+    beforeEach(() => {
+      // Email pref is ON (default true when row missing); parent has email.
+      (
+        mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+      ).mockResolvedValue(null); // null → monthlyProgressEmail defaults to true
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ accountId: 'account-parent' });
+      (
+        mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ email: 'parent@example.test' });
+    });
+
+    it('attempt 1: send-monthly-email throw propagates (Inngest will retry)', async () => {
+      // Simulate: generate-monthly-report already succeeded (memoized),
+      // push step runs fine, email step throws.
+      const runner = createInngestStepRunner({
+        runResults: {
+          'generate-monthly-report': REPORT_RESULT,
+        },
+        runErrors: {
+          'send-monthly-email': new Error('Email service down'),
+        },
+      });
+
+      const handler = (monthlyReportGenerate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: makeGenerateEvent(),
+            name: 'app/monthly-report.generate',
+          },
+          step: runner.step,
+        }),
+      ).rejects.toThrow('Email service down');
+
+      // Push step DID run on attempt 1.
+      expect(runner.runNames()).toContain('send-monthly-push');
+      // Email step was attempted.
+      expect(runner.runNames()).toContain('send-monthly-email');
+    });
+
+    it('attempt 2: email sends when push step is memoized (dedup check NOT re-evaluated)', async () => {
+      // Simulate Inngest retry: both generate-monthly-report AND
+      // send-monthly-push are memoized (already completed).
+      // Only send-monthly-email replays — and this time it succeeds.
+      //
+      // This is the key assertion: if the email step were still inside the
+      // same step as the push (pre-fix), Inngest would re-run the entire
+      // send-push-notification step, the dedup check would fire again, and
+      // email would be lost.  With the split, send-monthly-push is skipped
+      // entirely on retry and email lands.
+      const runner = createInngestStepRunner({
+        runResults: {
+          'generate-monthly-report': REPORT_RESULT,
+          'send-monthly-push': { sent: true },
+        },
+        // No runErrors → send-monthly-email runs for real.
+      });
+
+      const handler = (monthlyReportGenerate as any).fn;
+      const result = await handler({
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
+        step: runner.step,
+      });
+
+      // Function completes successfully.
+      expect(result).toEqual(expect.objectContaining({ status: 'completed' }));
+
+      // The push step callback was NOT executed on retry (runResults bypassed
+      // it), so the dedup check was not re-evaluated and did not suppress email.
+      // The step runner still records the step name in runCalls (it always does),
+      // but mockGetRecentNotificationCount must not have been called.
+      expect(mockGetRecentNotificationCount).not.toHaveBeenCalled();
+
+      // Email step DID run and sent the email.
+      expect(runner.runNames()).toContain('send-monthly-email');
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'parent@example.test' }),
+        expect.objectContaining({
+          idempotencyKey: expect.stringContaining('monthly-parent-001-'),
+        }),
+      );
+    });
+
+    it('regression: with old single-step design, dedup check would block email on retry', () => {
+      // This test documents the pre-fix failure mode without running the old
+      // code.  It asserts the new invariant: send-monthly-push and
+      // send-monthly-email are registered as distinct step names so Inngest
+      // can memoize them independently.
+      //
+      // If a future refactor merges them back into one step, the step name
+      // 'send-push-notification' (old) or any single step containing both
+      // sendPushNotification AND sendEmail would violate this invariant.
+      // The two attempt-1 / attempt-2 tests above are the authoritative
+      // break tests; this comment records the reasoning.
+      //
+      // Assertion: the implementation file registers two separate step names.
+      // We verify this via the step runner's runCalls after a successful run.
+      const runner = createInngestStepRunner({
+        runResults: {
+          'generate-monthly-report': REPORT_RESULT,
+        },
+      });
+
+      const handler = (monthlyReportGenerate as any).fn;
+      return handler({
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
+        step: runner.step,
+      }).then(() => {
+        const names = runner.runNames();
+        expect(names).toContain('send-monthly-push');
+        expect(names).toContain('send-monthly-email');
+        // Must be SEPARATE entries (not merged into one step).
+        expect(names.indexOf('send-monthly-push')).not.toBe(
+          names.indexOf('send-monthly-email'),
+        );
+        // Old merged step name must not exist.
+        expect(names).not.toContain('send-push-notification');
+      });
+    });
+  });
+
   describe('duplicate report handling', () => {
     it('does not crash when onConflictDoNothing silently skips insert', async () => {
       (

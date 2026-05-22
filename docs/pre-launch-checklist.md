@@ -28,6 +28,7 @@ Last updated: 2026-05-15
   - [ ] `CLERK_SECRET_KEY` — from Clerk Dashboard (production app)
   - [ ] `CLERK_JWKS_URL` — from Clerk Dashboard (production app)
   - [ ] `CLERK_AUDIENCE` — configure in Clerk Dashboard → Sessions → JWT audience, then add to Doppler
+  - [ ] Clerk session token includes `email` and optionally `email_verified` for the API fast path. The API falls back to `CLERK_SECRET_KEY` + Clerk Backend API when those claims are missing, so token-template drift must not block sign-in.
   - [ ] `GEMINI_API_KEY` — Google AI Studio
   - [ ] `VOYAGE_API_KEY` — Voyage AI (embeddings)
   - [ ] `RESEND_API_KEY` — Resend (transactional email)

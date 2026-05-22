@@ -146,8 +146,15 @@ export async function getOverdueTopicsGrouped(
   // than implying the displayed list is the full backlog. The cap is 500 cards;
   // if the returned list hits exactly 500, totalOverdue > displayedCount signals
   // the UX discrepancy and truncated:true makes it unambiguous.
+  //
+  // Fail-open: if countRow?.count is null (e.g. the COUNT query returned no
+  // row) and we already hit the 500-row cap, we cannot know the true total —
+  // assume truncated so the UI shows "500+" rather than a misleadingly-exact
+  // number. This is conservative and correct.
   const displayedCount = overdueCards.length;
-  const truncated = displayedCount === 500 && totalOverdue > 500;
+  const countAvailable = countRow?.count != null;
+  const truncated =
+    displayedCount === 500 && (!countAvailable || totalOverdue > 500);
 
   return {
     totalOverdue,

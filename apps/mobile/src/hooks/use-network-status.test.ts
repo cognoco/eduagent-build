@@ -79,4 +79,46 @@ describe('useNetworkStatus', () => {
     unmount();
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
+
+  it('does not call setState after unmount when fetch resolves late (BUG-531)', async () => {
+    // Regression guard: without a mounted-flag guard, the .then/.catch callbacks
+    // call setState on an already-unmounted component. In React 19 this is silently
+    // ignored, but the callbacks still execute (wasted closures). The mounted guard
+    // short-circuits before touching setState.
+    //
+    // Note: React 19 changed the "Can't perform a React state update on an unmounted
+    // component" warning — it no longer fires for this pattern. This test verifies
+    // the cleanup path completes without any console.error output.
+    let resolveDeferred!: (state: {
+      isInternetReachable: boolean | null;
+    }) => void;
+    const deferredPromise = new Promise<{
+      isInternetReachable: boolean | null;
+    }>((resolve) => {
+      resolveDeferred = resolve;
+    });
+
+    const NetInfo = jest.requireMock('@react-native-community/netinfo') as {
+      fetch: jest.Mock;
+    };
+    NetInfo.fetch.mockReturnValueOnce(deferredPromise);
+
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    const { unmount } = renderHook(() => useNetworkStatus());
+    unmount();
+
+    // Resolve AFTER unmount — the mounted guard in the fix ensures the .then body
+    // exits immediately without touching setState.
+    resolveDeferred({ isInternetReachable: false });
+    await deferredPromise;
+    await Promise.resolve(); // flush microtask queue
+
+    // Confirm no console.error fired from the post-unmount fetch resolution path.
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
 });

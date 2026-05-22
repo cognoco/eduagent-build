@@ -547,6 +547,11 @@ export const stripeWebhookRoute = new Hono<{
     return c.json({ received: true, stale: true });
   }
 
+  // claimWebhookId gates checkout.session.completed because that event creates
+  // the initial subscription row (no timestamp to compare against). Other
+  // billing events (subscription.updated, invoice.payment_succeeded,
+  // subscription.deleted) rely on the timestamp guard in
+  // updateSubscriptionFromWebhook to reject duplicate replays.
   switch (event.type) {
     case 'checkout.session.completed': {
       // [#450] Atomic idempotency gate — must be the FIRST step before any

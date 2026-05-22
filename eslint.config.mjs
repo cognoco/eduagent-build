@@ -241,6 +241,17 @@ export default [
     files: ['apps/api/src/routes/**/*.ts'],
     // Test files legitimately import drizzle-orm for seed/teardown helpers —
     // the restriction targets production route handlers only.
+    //
+    // G3 (LLM SDK) note: the ignores below also silence the G3 ban on route
+    // test files. This is intentional and safe because:
+    //   (a) No route test file currently imports an LLM SDK directly — the
+    //       shared `llm-provider-fixtures.ts` harness is used instead.
+    //   (b) The broader G3 override at the top of this config (files:
+    //       ['apps/api/src/services/llm/providers/**']) already enforces the
+    //       correct production boundary where LLM SDK imports ARE allowed.
+    //   (c) Route test files are not production route handlers; a G3 violation
+    //       in a test file would be caught in code review and by the
+    //       integration-mock-guard rather than by this lint rule.
     ignores: [
       'apps/api/src/routes/**/*.test.ts',
       'apps/api/src/routes/**/*.integration.test.ts',

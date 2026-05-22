@@ -396,6 +396,7 @@ describe('executeDeletion', () => {
   });
 
   it('returns "cancelled" when atomic guard fires (0 rows deleted, row still exists)', async () => {
+    // Inline db mock — extend createMockDb with deleteReturning override if this pattern repeats.
     // Simulate: WHERE guard excluded the row (cancelled) — 0 rows returned.
     // findFirst then returns the existing row → 'cancelled'.
     const db = {
@@ -425,6 +426,7 @@ describe('executeDeletion', () => {
   });
 
   it('returns "already_deleted" when atomic guard fires (0 rows deleted, row missing)', async () => {
+    // Inline db mock — extend createMockDb with deleteReturning override if this pattern repeats.
     // Simulate: WHERE guard excluded the row and the account is already gone.
     const db = {
       query: {

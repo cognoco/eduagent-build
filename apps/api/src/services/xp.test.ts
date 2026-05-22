@@ -212,6 +212,35 @@ describe('insertSessionXpEntry', () => {
     expect(insertValues).not.toHaveBeenCalled();
   });
 
+  // [BUG-474] masteryScore: 0 must NOT be treated as missing — JS truthiness
+  // bug. Before fix: `!assessment.masteryScore` short-circuits on 0.
+  it('inserts XP when masteryScore is exactly 0 [BUG-474]', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    queryAssessmentsFindFirst.mockResolvedValue({
+      id: 'assessment-zero',
+      profileId: 'profile-001',
+      topicId: 'topic-001',
+      status: 'passed',
+      masteryScore: 0,
+      verificationDepth: 'recall',
+    });
+
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
+
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile-001',
+        topicId: 'topic-001',
+        subjectId: 'subject-001',
+      }),
+    );
+  });
+
   it('skips when XP entry already exists (dedup)', async () => {
     const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
 

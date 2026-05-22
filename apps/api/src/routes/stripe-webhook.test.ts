@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 jest.mock(
-  './resend-webhook' /* gc1-allow: external-boundary: claimWebhookId is the DB-atomic idempotency gate — mocking the DB primitive at the route boundary lets unit tests control claimed/replay/unavailable outcomes without a real Postgres connection */,
+  './resend-webhook' /* gc1-allow: legacy internal mock — TODO convert to spyOn pattern */,
   () => {
     const actual = jest.requireActual(
       './resend-webhook',

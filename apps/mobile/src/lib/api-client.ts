@@ -230,6 +230,12 @@ export function useApiClient(): ApiClient {
         // was sent, this is a timing issue — let TanStack Query retry
         // instead of signing the user out.
         if (res.status === 401) {
+          if (code === 'EMAIL_NOT_AVAILABLE' || code === 'EMAIL_NOT_VERIFIED') {
+            throw new ForbiddenError(
+              apiMessage ?? 'Please verify your email address, then try again.',
+              code,
+            );
+          }
           if (__DEV__) {
             // [BUG-132] The token field below logs ONLY presence
             // ("present" | "null") — never the raw token value. This is a

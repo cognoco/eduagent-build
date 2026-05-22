@@ -32,7 +32,6 @@ const EXEMPT_PREFIXES = [
   '/v1/health',
   '/v1/auth/',
   '/v1/consent/',
-  '/v1/profiles',
   '/v1/onboarding/',
   '/v1/billing/',
   '/v1/stripe/',
@@ -42,7 +41,34 @@ const EXEMPT_PREFIXES = [
   '/v1/maintenance/',
 ];
 
-function isExempt(path: string): boolean {
+/**
+ * [CR-2026-05-21-085] /v1/profiles exemption is method-scoped.
+ *
+ * The old EXEMPT_PREFIXES entry `/v1/profiles` (bare, no trailing slash)
+ * matched ALL methods on ALL /v1/profiles* routes via startsWith, allowing
+ * PENDING-consent learners to PATCH /v1/profiles/:id (mutating birthYear,
+ * displayName, etc.) and POST /v1/profiles (creating new profiles).
+ *
+ * Correct policy:
+ *   GET  /v1/profiles          → exempt (list profiles to pick the right one)
+ *   GET  /v1/profiles/:id      → exempt (read consent state)
+ *   POST /v1/profiles/switch   → exempt (switch to a consented profile)
+ *   POST /v1/profiles          → GATED  (creates data)
+ *   PATCH /v1/profiles/:id     → GATED  (mutates birthYear, displayName, etc.)
+ */
+function isProfilesExempt(path: string, method: string): boolean {
+  const upper = method.toUpperCase();
+  if (upper !== 'GET' && upper !== 'POST') return false;
+  if (upper === 'GET') {
+    // Exempt: GET /v1/profiles and GET /v1/profiles/:id (anything under /v1/profiles/)
+    return path === '/v1/profiles' || path.startsWith('/v1/profiles/');
+  }
+  // POST: only /v1/profiles/switch is exempt
+  return path === '/v1/profiles/switch';
+}
+
+function isExempt(path: string, method: string): boolean {
+  if (isProfilesExempt(path, method)) return true;
   return EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
@@ -92,7 +118,7 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       );
     }
 
-    if (isExempt(c.req.path)) {
+    if (isExempt(c.req.path, c.req.method)) {
       await next();
       return;
     }

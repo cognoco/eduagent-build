@@ -179,8 +179,11 @@ async function loadProgressState(
   db: Database,
   profileId: string,
 ): Promise<ProgressState> {
-  return withTransientDatabaseRetry('load_progress_state', () =>
-    loadProgressStateOnce(db, profileId),
+  return withTransientDatabaseRetry(
+    'load_progress_state',
+    () => loadProgressStateOnce(db, profileId),
+    // loadProgressStateOnce is a read-only SELECT — safe to retry.
+    { idempotent: true },
   );
 }
 
@@ -951,21 +954,25 @@ export async function upsertProgressSnapshot(
   snapshotDate: string,
   metrics: ProgressMetrics,
 ): Promise<void> {
-  await withTransientDatabaseRetry('upsertProgressSnapshot', () =>
-    db
-      .insert(progressSnapshots)
-      .values({
-        profileId,
-        snapshotDate,
-        metrics,
-      })
-      .onConflictDoUpdate({
-        target: [progressSnapshots.profileId, progressSnapshots.snapshotDate],
-        set: {
+  await withTransientDatabaseRetry(
+    'upsertProgressSnapshot',
+    () =>
+      db
+        .insert(progressSnapshots)
+        .values({
+          profileId,
+          snapshotDate,
           metrics,
-          updatedAt: new Date(),
-        },
-      }),
+        })
+        .onConflictDoUpdate({
+          target: [progressSnapshots.profileId, progressSnapshots.snapshotDate],
+          set: {
+            metrics,
+            updatedAt: new Date(),
+          },
+        }),
+    // INSERT … ON CONFLICT DO UPDATE is idempotent — safe to retry.
+    { idempotent: true },
   );
 }
 

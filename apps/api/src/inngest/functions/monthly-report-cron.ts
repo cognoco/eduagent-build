@@ -439,8 +439,8 @@ export const monthlyReportGenerate = inngest.createFunction(
       return { status: 'completed', parentId, childId };
     }
 
-    // [J-6] Step 2: Send push notification + email in a separate step so that
-    // a push failure only retries the push — not the LLM + DB insert above.
+    // [J-6] Step 2: Send push notification in its own step so that a push
+    // failure only retries the push — not the LLM + DB insert above.
     //
     // [BUG-699-FOLLOWUP] 24h notification-log dedup — same shape as the
     // trial-expiry fix. Inngest's step.run memoizes within one run, but a
@@ -449,7 +449,17 @@ export const monthlyReportGenerate = inngest.createFunction(
     // without this guard. The cadence (monthly cron) makes the read-then-
     // write race window irrelevant in practice; if duplicates ever surface,
     // promote to a (profile_id, type, day) unique index on notificationLog.
-    await step.run('send-push-notification', async () => {
+    //
+    // [CR-2026-05-21-022] Push and email are now SEPARATE steps. Previously
+    // both lived in one step: if push succeeded (logging a row) and email
+    // threw, the retry's dedup check would find recentCount > 0 and return
+    // early — email was permanently lost. Splitting them means:
+    //   - send-monthly-push:  dedup check + push send (logs internally)
+    //   - send-monthly-email: email send only (Resend idempotency key dedupes
+    //     within 24h so a retry never double-sends email)
+    // The push step's completed status is memoized by Inngest on retry, so
+    // the dedup check is NOT re-executed when only the email step replays.
+    const pushResult = await step.run('send-monthly-push', async () => {
       const db = getStepDatabase();
       const recentCount = await getRecentNotificationCount(
         db,
@@ -458,7 +468,7 @@ export const monthlyReportGenerate = inngest.createFunction(
         24,
       );
       if (recentCount > 0) {
-        return { sent: false, reason: 'dedup_24h' };
+        return { sent: false, reason: 'dedup_24h' as const };
       }
       await sendPushNotification(db, {
         profileId: parentId,
@@ -466,15 +476,33 @@ export const monthlyReportGenerate = inngest.createFunction(
         body: 'Open the app to see what they learned this month.',
         type: 'monthly_report',
       });
+      return { sent: true, reason: undefined };
+    });
 
-      // Email channel: send when monthly_progress_email = true AND parent has
-      // accounts.email. Resend idempotency-key dedupes within 24h so Inngest
-      // step retries are safe.
-      const prefs = await db.query.notificationPreferences.findFirst({
-        where: eq(notificationPreferences.profileId, parentId),
-        columns: { monthlyProgressEmail: true },
-      });
-      if (prefs?.monthlyProgressEmail ?? true) {
+    // [CR-2026-05-21-022] Step 3: Send email in a separate step. If this step
+    // throws, Inngest retries only this step — the push step above is already
+    // memoized and its dedup marker (the notification log row) does not
+    // interfere with the email retry. Resend's idempotencyKey prevents
+    // duplicate delivery if the email already sent on a prior attempt.
+    //
+    // Gate: if the push step was blocked by the 24h dedup guard, the event is
+    // a duplicate (cron edge re-fire or operator replay). Skip email too so
+    // the parent does not receive a duplicate. On a normal first-send, or on
+    // a retry after email failure, pushResult.reason is undefined and email
+    // proceeds.
+    //
+    // Email channel: send when monthly_progress_email = true AND parent has
+    // accounts.email.
+    if (!('reason' in pushResult) || pushResult.reason !== 'dedup_24h') {
+      await step.run('send-monthly-email', async () => {
+        const db = getStepDatabase();
+        const prefs = await db.query.notificationPreferences.findFirst({
+          where: eq(notificationPreferences.profileId, parentId),
+          columns: { monthlyProgressEmail: true },
+        });
+        if (!(prefs?.monthlyProgressEmail ?? true)) {
+          return { sent: false, reason: 'email_pref_off' };
+        }
         const parentProfile = await db.query.profiles.findFirst({
           where: eq(profiles.id, parentId),
           columns: { accountId: true },
@@ -487,35 +515,34 @@ export const monthlyReportGenerate = inngest.createFunction(
           : null;
         const parentEmail = parentAccount?.email ?? null;
 
-        if (parentEmail) {
-          const struggleLines: ChildStruggleLine[] = [
-            {
-              childName: reportResult.childDisplayName,
-              topics: reportResult.struggleTopics,
-            },
-          ];
-          const summary = `${reportResult.childDisplayName}'s monthly report is ready. Open the app to see what they learned this month.`;
-          const emailPayload = formatMonthlyProgressEmail(
-            parentEmail,
-            summary,
-            struggleLines,
-          );
-          await sendEmail(emailPayload, {
-            resendApiKey: getStepResendApiKey(),
-            idempotencyKey: buildLegacyEmailIdempotencyKey(
-              'monthly',
-              parentId,
-              reportResult.reportMonth,
-            ),
-          });
-        } else {
+        if (!parentEmail) {
           // Expected: OAuth-only accounts or Clerk not exposing email field.
-          // The return value's sent: false already provides observability.
+          return { sent: false, reason: 'no_email' };
         }
-      }
 
-      return { sent: true };
-    });
+        const struggleLines: ChildStruggleLine[] = [
+          {
+            childName: reportResult.childDisplayName,
+            topics: reportResult.struggleTopics,
+          },
+        ];
+        const summary = `${reportResult.childDisplayName}'s monthly report is ready. Open the app to see what they learned this month.`;
+        const emailPayload = formatMonthlyProgressEmail(
+          parentEmail,
+          summary,
+          struggleLines,
+        );
+        await sendEmail(emailPayload, {
+          resendApiKey: getStepResendApiKey(),
+          idempotencyKey: buildLegacyEmailIdempotencyKey(
+            'monthly',
+            parentId,
+            reportResult.reportMonth,
+          ),
+        });
+        return { sent: true };
+      });
+    }
 
     return { status: 'completed', parentId, childId };
   },

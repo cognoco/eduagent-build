@@ -4,6 +4,7 @@ import {
   ConsentRequiredError,
   setOnAuthExpired,
 } from './api-client';
+import { classifyApiError } from './format-api-error';
 
 function createMockStream(events: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -788,6 +789,42 @@ describe('streamSSEViaXHR', () => {
       }
 
       expect(onAuthExpired).toHaveBeenCalledTimes(1);
+    });
+
+    // [BUG-547 / break-test] 401 fires onAuthExpired AND must produce
+    // recovery:'none' (not 'sign-out') via classifyApiError — sign-out is
+    // already in progress via the callback, so no button should be rendered.
+    it('[BUG-547 / break-test] 401 calls onAuthExpired once and classifyApiError yields recovery:none', async () => {
+      const xhr = installFakeXhr();
+      const onAuthExpired = jest.fn();
+      setOnAuthExpired(onAuthExpired);
+
+      const { events } = streamSSEViaXHR('https://example.test/stream', {
+        method: 'POST',
+      });
+
+      xhr._emitError(
+        401,
+        JSON.stringify({ message: 'Session expired — please sign in again' }),
+      );
+
+      let caught: unknown = null;
+      try {
+        for await (const event of events) {
+          void event;
+        }
+      } catch (err) {
+        caught = err;
+      }
+
+      // Callback must fire exactly once
+      expect(onAuthExpired).toHaveBeenCalledTimes(1);
+
+      // The thrown error must classify to recovery:'none' — NOT 'sign-out'.
+      // sign-out is already in progress; rendering a button causes a double-fire.
+      const classified = classifyApiError(caught);
+      expect(classified.recovery).toBe('none');
+      expect(classified.recovery).not.toBe('sign-out');
     });
   });
 

@@ -178,7 +178,7 @@ describe('retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)', 
     expect(() =>
       sessionTranscriptPurgedEventSchema.parse({
         profileId: validUuid,
-        sessionId: 'session-abc',
+        sessionId: validUuid,
         sessionSummaryId: null,
         eventsDeleted: 0,
         embeddingRowsReplaced: 0,
@@ -242,5 +242,103 @@ describe('retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)', 
         timestamp: ts,
       }),
     ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BUG-581 — UUID enforcement regression tests (red-green)
+// ---------------------------------------------------------------------------
+
+describe('BUG-581 — UUID enforcement on retention SLO schemas', () => {
+  const validUuid = '00000000-0000-4000-8000-000000000001';
+  const validUuid2 = '00000000-0000-4000-8000-000000000002';
+  const ts = '2026-05-05T10:00:00.000Z';
+
+  // sessionSummaryFailedEventSchema ----------------------------------------
+
+  it('[BUG-581][BUG-991] rejects sessionSummaryFailedEvent with non-UUID profileId', () => {
+    const result = sessionSummaryFailedEventSchema.safeParse({
+      profileId: 'not-a-uuid',
+      sessionId: validUuid,
+      sessionSummaryId: null,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[BUG-581][BUG-991] rejects sessionSummaryFailedEvent with non-UUID sessionId', () => {
+    const result = sessionSummaryFailedEventSchema.safeParse({
+      profileId: validUuid,
+      sessionId: 'not-a-uuid',
+      sessionSummaryId: null,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[BUG-581][BUG-991] accepts sessionSummaryFailedEvent with valid UUIDs', () => {
+    const result = sessionSummaryFailedEventSchema.safeParse({
+      profileId: validUuid,
+      sessionId: validUuid2,
+      sessionSummaryId: null,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('[BUG-581][BUG-991] accepts sessionSummaryFailedEvent with valid sessionSummaryId UUID', () => {
+    const result = sessionSummaryFailedEventSchema.safeParse({
+      profileId: validUuid,
+      sessionId: validUuid2,
+      sessionSummaryId: validUuid,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  // sessionTranscriptPurgedEventSchema — sessionId field ---------------------
+
+  it('[BUG-581][BUG-992] rejects sessionTranscriptPurgedEvent with non-UUID sessionId', () => {
+    const result = sessionTranscriptPurgedEventSchema.safeParse({
+      profileId: validUuid,
+      sessionId: 'not-a-uuid',
+      sessionSummaryId: null,
+      eventsDeleted: 0,
+      embeddingRowsReplaced: 0,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[BUG-581][BUG-992] accepts sessionTranscriptPurgedEvent with valid UUID sessionId', () => {
+    const result = sessionTranscriptPurgedEventSchema.safeParse({
+      profileId: validUuid,
+      sessionId: validUuid2,
+      sessionSummaryId: null,
+      eventsDeleted: 0,
+      embeddingRowsReplaced: 0,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  // sessionPurgeDelayedEventSchema — sessionIds array -----------------------
+
+  it('[BUG-581][BUG-993] rejects sessionPurgeDelayedEvent with non-UUID in sessionIds array', () => {
+    const result = sessionPurgeDelayedEventSchema.safeParse({
+      delayedCount: 1,
+      sessionIds: ['not-a-uuid'],
+      missingPreconditionCount: 0,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[BUG-581][BUG-993] accepts sessionPurgeDelayedEvent with valid UUID sessionIds', () => {
+    const result = sessionPurgeDelayedEventSchema.safeParse({
+      delayedCount: 1,
+      sessionIds: [validUuid, validUuid2],
+      missingPreconditionCount: 0,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(true);
   });
 });

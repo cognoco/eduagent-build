@@ -66,15 +66,15 @@ function isCoachingCardLike(value: unknown): value is CoachingCard {
 function normalizeInteractionStats(value: unknown): HomeCardInteractionStats {
   const record = isRecord(value) ? value : {};
   const normalizeCountMap = (
-    input: unknown
+    input: unknown,
   ): Partial<Record<HomeCardId, number>> => {
     if (!isRecord(input)) return {};
 
     return Object.fromEntries(
       Object.entries(input).filter(
         (entry): entry is [HomeCardId, number] =>
-          typeof entry[1] === 'number' && Number.isFinite(entry[1])
-      )
+          typeof entry[1] === 'number' && Number.isFinite(entry[1]),
+      ),
     ) as Partial<Record<HomeCardId, number>>;
   };
 
@@ -85,7 +85,7 @@ function normalizeInteractionStats(value: unknown): HomeCardInteractionStats {
           typeof entry.cardId === 'string' &&
           (entry.interactionType === 'tap' ||
             entry.interactionType === 'dismiss') &&
-          typeof entry.occurredAt === 'string'
+          typeof entry.occurredAt === 'string',
       )
     : [];
 
@@ -119,7 +119,7 @@ export function buildFallbackHomeSurfaceCard(profileId: string): CoachingCard {
 
 export function normalizeHomeSurfaceCacheData(
   raw: unknown,
-  profileId: string
+  profileId: string,
 ): HomeSurfaceCacheData {
   if (isHomeSurfaceCacheData(raw)) {
     return {
@@ -141,7 +141,7 @@ export function normalizeHomeSurfaceCacheData(
 
 export async function findHomeSurfaceCache(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<HomeSurfaceCacheRow | undefined> {
   return db.query.coachingCardCache.findFirst({
     where: eq(coachingCardCache.profileId, profileId),
@@ -150,7 +150,7 @@ export async function findHomeSurfaceCache(
 
 export async function readHomeSurfaceCacheData(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<{
   row: HomeSurfaceCacheRow;
   data: HomeSurfaceCacheData;
@@ -184,7 +184,7 @@ async function mergeHomeSurfaceCacheDataInTx(
   options?: {
     pendingCelebrations?: PendingCelebration[];
     expiresAt?: Date;
-  }
+  },
 ): Promise<HomeSurfaceCacheData> {
   // Ensure a row exists so SELECT FOR UPDATE has something to lock.
   // ON CONFLICT DO NOTHING is idempotent for concurrent first-writes.
@@ -249,6 +249,10 @@ async function mergeHomeSurfaceCacheDataInTx(
  * cast as Database and set `options.inTransaction = true` to skip the inner
  * `db.transaction()` wrapper. [BUG-467] Without this, neon-serverless throws
  * on nested transactions or silently degrades the SELECT FOR UPDATE row lock.
+ *
+ * When `inTransaction: true` is passed, `db` MUST be a transaction handle
+ * (`PgTransaction` cast as `Database`). Passing a non-transactional handle
+ * silently loses row-lock guarantees. Callers are responsible for honoring this.
  */
 export async function mergeHomeSurfaceCacheData(
   db: Database,
@@ -260,7 +264,7 @@ export async function mergeHomeSurfaceCacheData(
     /** Set true when `db` is already a transaction handle. Skips the inner
      *  db.transaction() wrapper to avoid nested transactions on neon-serverless. */
     inTransaction?: boolean;
-  }
+  },
 ): Promise<HomeSurfaceCacheData> {
   if (options?.inTransaction) {
     // Caller already holds a transaction — run the body directly on the
@@ -278,7 +282,7 @@ export async function writeHomeSurfacePendingCelebrations(
   db: Database,
   profileId: string,
   pendingCelebrations: PendingCelebration[],
-  options?: { inTransaction?: boolean }
+  options?: { inTransaction?: boolean },
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + HOME_SURFACE_TTL_MS);
 
@@ -293,7 +297,7 @@ export async function markHomeSurfaceCelebrationsSeen(
   db: Database,
   profileId: string,
   viewer: 'child' | 'parent',
-  seenAt = new Date()
+  seenAt = new Date(),
 ): Promise<void> {
   await db
     .update(coachingCardCache)

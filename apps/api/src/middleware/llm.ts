@@ -113,10 +113,11 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
 /**
  * Reset initialization state — only for testing.
  *
- * NOTE: This clears both the env hash and the provider registry so the next
- * request performs a fresh registration. For partial isolation (hash only),
- * set `_registeredEnvHash` directly, but prefer this function.
+ * Clears both the env-hash registration cache and the provider registry so
+ * the next request performs a fresh registration. For partial isolation
+ * (hash only), set `_registeredEnvHash` directly, but prefer this function.
  */
 export function resetLlmMiddleware(): void {
   _registeredEnvHash = null;
+  _clearProviders();
 }

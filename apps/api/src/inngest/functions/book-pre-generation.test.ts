@@ -124,6 +124,7 @@ function createEventData(
     subjectId: SUBJECT_ID,
     bookId: BOOK_ID,
     profileId: PROFILE_ID,
+    timestamp: new Date().toISOString(),
     ...overrides,
   };
 }

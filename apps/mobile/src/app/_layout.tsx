@@ -329,15 +329,24 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
  * Clerk initialization. ClerkLoaded renders NOTHING until Clerk is ready;
  * this component shows a themed spinner during the gap and signals readiness
  * back to the root layout so the splash doesn't dismiss prematurely.
+ *
+ * @internal Exported for co-located unit tests only. Do not import from outside
+ * this file. Expo Router only picks up the default export as a route.
  */
-function ClerkGate({
+export function ClerkGate({
   children,
   onReady,
   timedOut,
+  onRetry,
+  onContinueOffline,
 }: {
   children: React.ReactNode;
   onReady: () => void;
   timedOut: boolean;
+  /** Re-mounts ClerkProvider so Clerk can attempt initialization again. */
+  onRetry: () => void;
+  /** Lets the user proceed without a Clerk session (offline / degraded network). */
+  onContinueOffline: () => void;
 }) {
   const { isLoaded } = useAuth();
   // [L] ThemeContext is not yet mounted at this point (ClerkGate renders above
@@ -355,6 +364,7 @@ function ClerkGate({
     if (timedOut) {
       return (
         <View
+          testID="clerk-timeout-screen"
           style={{
             flex: 1,
             alignItems: 'center',
@@ -384,18 +394,16 @@ function ClerkGate({
           >
             Please check your internet connection and try again.
           </Text>
+          {/* Primary action: force Clerk to re-initialise by remounting ClerkProvider */}
           <Pressable
-            onPress={() =>
-              platformAlert(
-                'Please restart',
-                'Close the app completely and reopen it.',
-              )
-            }
+            testID="clerk-retry-button"
+            onPress={onRetry}
             style={{
               backgroundColor: gateColors.primary,
               borderRadius: 12,
               paddingVertical: 14,
               paddingHorizontal: 32,
+              marginBottom: 12,
             }}
             accessibilityRole="button"
             accessibilityLabel="Try again"
@@ -408,6 +416,24 @@ function ClerkGate({
               }}
             >
               Try again
+            </Text>
+          </Pressable>
+          {/* Secondary action: continue without auth for offline / degraded network */}
+          <Pressable
+            testID="clerk-offline-button"
+            onPress={onContinueOffline}
+            style={{ paddingVertical: 10, paddingHorizontal: 16 }}
+            accessibilityRole="button"
+            accessibilityLabel="Continue without account"
+          >
+            <Text
+              style={{
+                color: gateColors.muted,
+                fontSize: 14,
+                textDecorationLine: 'underline',
+              }}
+            >
+              Continue without account
             </Text>
           </Pressable>
         </View>
@@ -532,6 +558,9 @@ export default function RootLayout() {
   const [animDone, setAnimDone] = useState(false);
   const [clerkReady, setClerkReady] = useState(false);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
+  // BUG-507: bumping this key force-unmounts and remounts ClerkProvider so
+  // Clerk re-attempts initialisation when the user presses "Try again".
+  const [clerkProviderKey, setClerkProviderKey] = useState(0);
   const showSplash = !animDone;
 
   useEffect(() => {
@@ -545,6 +574,27 @@ export default function RootLayout() {
 
   const onClerkReady = useCallback(() => {
     if (__DEV__) console.log('[Splash] Clerk ready');
+    setClerkReady(true);
+  }, []);
+
+  // BUG-507: force-remount ClerkProvider so Clerk re-attempts init on retry.
+  // Resetting clerkTimedOut + clerkReady lets the 12-s failsafe arm again for
+  // the fresh ClerkProvider instance.
+  const onRetryClerk = useCallback(() => {
+    if (__DEV__) console.log('[Splash] Clerk retry — remounting ClerkProvider');
+    setClerkTimedOut(false);
+    setClerkReady(false);
+    setClerkProviderKey((k) => k + 1);
+  }, []);
+
+  // BUG-507: user-initiated offline continuation. Marks Clerk "ready" without
+  // it actually loading so the app proceeds to sign-in/sign-up screens. The
+  // authenticated app requires a valid session; the sign-in screen will handle
+  // the unauthenticated state as normal. This is NOT the failsafe path — it is
+  // an explicit opt-in by the user after seeing the timeout UI.
+  const onContinueOffline = useCallback(() => {
+    if (__DEV__) console.log('[Splash] User chose to continue without Clerk');
+    setClerkTimedOut(false);
     setClerkReady(true);
   }, []);
 
@@ -609,11 +659,20 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        {/* BUG-507: key is bumped by onRetryClerk to force full remount so
+            Clerk re-attempts initialisation instead of staying permanently
+            stuck in the not-loaded state. */}
         <ClerkProvider
+          key={clerkProviderKey}
           publishableKey={clerkPublishableKey}
           tokenCache={tokenCache}
         >
-          <ClerkGate onReady={onClerkReady} timedOut={clerkTimedOut}>
+          <ClerkGate
+            onReady={onClerkReady}
+            timedOut={clerkTimedOut}
+            onRetry={onRetryClerk}
+            onContinueOffline={onContinueOffline}
+          >
             <ScopedPersistProvider>
               <ProfileProvider>
                 <AppContextProvider>

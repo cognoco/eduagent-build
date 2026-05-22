@@ -38,7 +38,7 @@
     "notFound": "Diese Seite oder dieses Element existiert nicht mehr.",
     "resourceGone": "Diese Ressource ist nicht mehr verfügbar.",
     "rateLimited": "Du hast das Limit erreicht. Warte einen Moment und versuche es erneut.",
-    "sessionExpired": "Your session expired — signing you out…",
+    "sessionExpired": "Deine Sitzung ist abgelaufen — du wirst abgemeldet…",
     "forbidden": "Du hast keine Berechtigung, dies anzusehen.",
     "quotaExhausted": "Du hast alle deine Sitzungen für heute verbraucht. Komm morgen wieder!",
     "sessionNotFound": "Diese Sitzung ist nicht mehr verfügbar. Starte eine neue.",
@@ -1751,17 +1751,17 @@
       "subjectsTitle": "Fächer"
     },
     "remediation": {
-      "heading": "Try a different approach",
-      "body": "It is completely normal to need another pass at this.",
-      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
-      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
-      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
-      "primaryCta": "Try a different way",
-      "primaryCtaA11y": "Try a different way to learn this topic",
-      "secondaryCta": "Or try again later",
-      "secondaryCtaA11y": "Try this topic again later",
-      "libraryLink": "While you wait, check out your Library",
-      "libraryLinkA11y": "Check out your Library"
+      "heading": "Probier's anders an",
+      "body": "Es ist völlig normal, etwas noch einmal durchzugehen.",
+      "cooldownMinutes": "Du kannst es in {{minutes}} Min. erneut versuchen — mach kurz Pause.",
+      "cooldownHours": "Du kannst es in ca. {{hours}} Std. erneut versuchen — lass es sacken.",
+      "cooldownTomorrow": "Mach eine längere Pause und versuche es morgen nochmal.",
+      "primaryCta": "Anders lernen",
+      "primaryCtaA11y": "Dieses Thema auf eine andere Art lernen",
+      "secondaryCta": "Oder später nochmal versuchen",
+      "secondaryCtaA11y": "Dieses Thema später nochmal versuchen",
+      "libraryLink": "Schau in der Zwischenzeit in deine Bibliothek",
+      "libraryLinkA11y": "Deine Bibliothek ansehen"
     }
   },
   "onboarding": {

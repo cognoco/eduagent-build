@@ -1,4 +1,4 @@
-﻿import { sm2 } from './sm2.js';
+import { sm2 } from './sm2.js';
 import type { RetentionCard } from './sm2.js';
 
 describe('sm2', () => {

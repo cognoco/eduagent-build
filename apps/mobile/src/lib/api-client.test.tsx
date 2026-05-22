@@ -19,7 +19,11 @@ import {
   setProxyMode,
   useApiClient,
 } from './api-client';
-import { UpstreamError, QuotaExceededError } from './api-errors';
+import {
+  ForbiddenError,
+  UpstreamError,
+  QuotaExceededError,
+} from './api-errors';
 
 const mockGetToken = jest.fn();
 jest.mock('@clerk/clerk-expo', () => ({
@@ -250,5 +254,81 @@ describe('useApiClient 402 error classification [CR-API-402-04]', () => {
 
     expect(err).toBeInstanceOf(QuotaExceededError);
     expect(err).not.toBeInstanceOf(UpstreamError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-1016] Account verification 401s must not be treated as expired tokens.
+//
+// Staging once returned EMAIL_NOT_VERIFIED because the Clerk session token
+// omitted the email_verified claim. The old client treated every 401 with a
+// token as "expired", signed the user out, and showed the wrong banner.
+// ---------------------------------------------------------------------------
+
+describe('useApiClient 401 account-verification classification [BUG-1016]', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    mockGetToken.mockResolvedValue('test-token');
+    setActiveProfileId('profile-A');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    clearOnAuthExpired();
+    resetAuthExpiredGuard();
+    setActiveProfileId(undefined);
+    mockGetToken.mockReset();
+  });
+
+  function makeClient() {
+    const { result } = renderHook(() => useApiClient());
+    return result.current as unknown as {
+      v1: { health: { $get: () => Promise<Response> } };
+    };
+  }
+
+  it('[BREAK] EMAIL_NOT_VERIFIED does not fire the auth-expired sign-out callback', async () => {
+    const onAuthExpired = jest.fn();
+    setOnAuthExpired(onAuthExpired);
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 'EMAIL_NOT_VERIFIED',
+            message:
+              'Email not verified. Please verify your email address and try again.',
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        ),
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(onAuthExpired).not.toHaveBeenCalled();
+    expect(err).toBeInstanceOf(ForbiddenError);
+    expect((err as ForbiddenError).apiCode).toBe('EMAIL_NOT_VERIFIED');
+  });
+
+  it('generic authenticated 401 still fires auth-expired handling', async () => {
+    const onAuthExpired = jest.fn();
+    setOnAuthExpired(onAuthExpired);
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or expired token',
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        ),
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    await client.v1.health.$get().catch(() => undefined);
+
+    expect(onAuthExpired).toHaveBeenCalledTimes(1);
   });
 });

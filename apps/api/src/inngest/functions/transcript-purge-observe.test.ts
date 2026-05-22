@@ -98,7 +98,13 @@ describe('sessionPurgeDelayedObserve [BUG-369]', () => {
   it('returns logged status with delayedCount', async () => {
     const result = await invoke(sessionPurgeDelayedObserve, {
       delayedCount: 5,
-      sessionIds: ['s1', 's2', 's3', 's4', 's5'],
+      sessionIds: [
+        '00000000-0000-4000-8000-000000000001',
+        '00000000-0000-4000-8000-000000000002',
+        '00000000-0000-4000-8000-000000000003',
+        '00000000-0000-4000-8000-000000000004',
+        '00000000-0000-4000-8000-000000000005',
+      ],
       missingPreconditionCount: 2,
       timestamp: '2026-01-01T00:00:00.000Z',
     });
@@ -109,7 +115,11 @@ describe('sessionPurgeDelayedObserve [BUG-369]', () => {
   it('[BREAK] emits a structured warn log with delayed count', async () => {
     await invoke(sessionPurgeDelayedObserve, {
       delayedCount: 3,
-      sessionIds: ['s1', 's2', 's3'],
+      sessionIds: [
+        '00000000-0000-4000-8000-000000000011',
+        '00000000-0000-4000-8000-000000000012',
+        '00000000-0000-4000-8000-000000000013',
+      ],
       missingPreconditionCount: 1,
       timestamp: '2026-01-01T00:00:00.000Z',
     });
@@ -160,9 +170,9 @@ describe('sessionTranscriptPurgedObserve [BUG-369]', () => {
 
   it('returns logged status with eventsDeleted', async () => {
     const result = await invoke(sessionTranscriptPurgedObserve, {
-      profileId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      sessionId: 'session-p',
-      sessionSummaryId: 'summary-p',
+      profileId: '00000000-0000-4000-8000-000000000040',
+      sessionId: '00000000-0000-4000-8000-000000000041',
+      sessionSummaryId: '00000000-0000-4000-8000-000000000042',
       eventsDeleted: 42,
       embeddingRowsReplaced: 10,
     });
@@ -172,8 +182,8 @@ describe('sessionTranscriptPurgedObserve [BUG-369]', () => {
 
   it('[BREAK] emits a structured info log (SLO success signal)', async () => {
     await invoke(sessionTranscriptPurgedObserve, {
-      profileId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      sessionId: 'session-q',
+      profileId: '00000000-0000-4000-8000-000000000050',
+      sessionId: '00000000-0000-4000-8000-000000000051',
       sessionSummaryId: null,
       eventsDeleted: 15,
       embeddingRowsReplaced: 3,

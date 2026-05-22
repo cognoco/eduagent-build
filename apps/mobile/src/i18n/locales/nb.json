@@ -38,7 +38,7 @@
     "notFound": "Den siden eller gjenstanden finnes ikke lenger.",
     "resourceGone": "Denne ressursen er ikke lenger tilgjengelig.",
     "rateLimited": "Du har nådd grensen. Vent et øyeblikk og prøv igjen.",
-    "sessionExpired": "Your session expired — signing you out…",
+    "sessionExpired": "Økten din er utløpt — logger deg ut…",
     "forbidden": "Du har ikke tillatelse til å se dette.",
     "quotaExhausted": "Du har brukt alle øktene dine for i dag. Kom tilbake i morgen!",
     "sessionNotFound": "Den økten er ikke tilgjengelig lenger. Start en ny.",
@@ -1751,17 +1751,17 @@
       "subjectsTitle": "Emner"
     },
     "remediation": {
-      "heading": "Try a different approach",
-      "body": "It is completely normal to need another pass at this.",
-      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
-      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
-      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
-      "primaryCta": "Try a different way",
-      "primaryCtaA11y": "Try a different way to learn this topic",
-      "secondaryCta": "Or try again later",
-      "secondaryCtaA11y": "Try this topic again later",
-      "libraryLink": "While you wait, check out your Library",
-      "libraryLinkA11y": "Check out your Library"
+      "heading": "Prøv en annen tilnærming",
+      "body": "Det er helt normalt å trenge en ny runde med dette.",
+      "cooldownMinutes": "Du kan prøve igjen om {{minutes}} min — ta en liten pause.",
+      "cooldownHours": "Du kan prøve igjen om ca. {{hours}} t — ta en pause og la det synke inn.",
+      "cooldownTomorrow": "Ta en lengre pause og prøv igjen i morgen.",
+      "primaryCta": "Lær på en annen måte",
+      "primaryCtaA11y": "Lær dette emnet på en annen måte",
+      "secondaryCta": "Eller prøv igjen senere",
+      "secondaryCtaA11y": "Prøv dette emnet igjen senere",
+      "libraryLink": "Mens du venter, sjekk ut Biblioteket ditt",
+      "libraryLinkA11y": "Sjekk ut Biblioteket ditt"
     }
   },
   "onboarding": {

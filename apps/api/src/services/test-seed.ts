@@ -149,7 +149,8 @@ export interface ResetOptions {
 
 interface ClerkUser {
   id: string;
-  email_addresses: Array<{ email_address: string }>;
+  primary_email_address_id?: string | null;
+  email_addresses: Array<{ id?: string; email_address: string }>;
   external_id: string | null;
 }
 
@@ -231,7 +232,59 @@ async function createClerkTestUser(
     throw new Error(`Clerk user PATCH failed (${patchRes.status}): ${body}`);
   }
 
+  await verifyClerkTestUserEmail(userId, email, env);
+
   return { clerkUserId: userId, password };
+}
+
+async function verifyClerkTestUserEmail(
+  userId: string,
+  email: string,
+  env: SeedEnv,
+): Promise<void> {
+  if (!env.CLERK_SECRET_KEY) return;
+
+  const userRes = await fetch(
+    `${CLERK_API_BASE}/users/${encodeURIComponent(userId)}`,
+    {
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    },
+  );
+
+  if (!userRes.ok) {
+    const body = await userRes.text();
+    throw new Error(`Clerk user lookup failed (${userRes.status}): ${body}`);
+  }
+
+  const user = (await userRes.json()) as ClerkUser;
+  const emailAddress =
+    user.email_addresses.find(
+      (address) => address.email_address.toLowerCase() === email.toLowerCase(),
+    ) ?? null;
+  const emailAddressId = emailAddress?.id ?? user.primary_email_address_id;
+
+  if (!emailAddressId) {
+    throw new Error(`Clerk email address not found for seed user ${email}`);
+  }
+
+  const verifyRes = await fetch(
+    `${CLERK_API_BASE}/email_addresses/${encodeURIComponent(emailAddressId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ verified: true, primary: true }),
+    },
+  );
+
+  if (!verifyRes.ok) {
+    const body = await verifyRes.text();
+    throw new Error(
+      `Clerk email verification failed (${verifyRes.status}): ${body}`,
+    );
+  }
 }
 
 /** Look up a Clerk user by email address. Returns null if not found.

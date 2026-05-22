@@ -31,7 +31,12 @@
  *   cleanup();
  */
 
-import { createElement, type ReactElement, type ReactNode } from 'react';
+import {
+  createElement,
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import {
   render,
   cleanup as rtlCleanup,
@@ -45,6 +50,10 @@ import {
 } from '../lib/profile';
 import { createRoutedMockFetch, type RoutedMockFetch } from './mock-api-routes';
 import { createTestProfile } from './app-hook-test-utils';
+
+// Re-export so consumers can import everything from this single entry point.
+export { createRoutedMockFetch, createTestProfile };
+export type { RoutedMockFetch };
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://localhost:8787';
 
@@ -243,6 +252,51 @@ export function renderScreen(
   }
 
   return { result, queryClient, routedFetch, cleanup };
+}
+
+// --- createScreenWrapper ---
+
+export interface CreateScreenWrapperOptions {
+  activeProfile: Profile | null;
+  profiles: Profile[];
+  isLoading?: boolean;
+  queryClient?: QueryClient;
+}
+
+export interface CreateScreenWrapperResult {
+  wrapper: ComponentType<{ children: ReactNode }>;
+  queryClient: QueryClient;
+}
+
+export function createScreenWrapper(
+  opts: CreateScreenWrapperOptions,
+): CreateScreenWrapperResult {
+  const queryClient = opts.queryClient ?? makeTestQueryClient();
+  const isLoading = opts.isLoading ?? false;
+
+  const profileContextValue: ProfileContextValue = {
+    profiles: opts.profiles,
+    activeProfile: opts.activeProfile,
+    switchProfile: async () => ({ success: true }),
+    isLoading,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        ProfileContext.Provider,
+        { value: profileContextValue },
+        children,
+      ),
+    );
+  }
+
+  return { wrapper: Wrapper, queryClient };
 }
 
 /**

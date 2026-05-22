@@ -498,6 +498,16 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
         recovery: 'go-back',
       };
     }
+    if (
+      effectiveCode === 'EMAIL_NOT_AVAILABLE' ||
+      effectiveCode === 'EMAIL_NOT_VERIFIED'
+    ) {
+      return {
+        message: friendlyMessage(error.message) ?? error.message,
+        category: 'auth',
+        recovery: 'retry',
+      };
+    }
     // Proxy-mode rejection (parent acting on a child profile that can't perform
     // a write op) is a 403 but must NOT trigger sign-out — the user just needs
     // to switch back to their owner profile or skip the action.
@@ -548,6 +558,16 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
         message: friendlyMessage(msg) ?? msg,
         category: 'not-found',
         recovery: 'go-back',
+      };
+    }
+    if (
+      effectiveCode === 'EMAIL_NOT_AVAILABLE' ||
+      effectiveCode === 'EMAIL_NOT_VERIFIED'
+    ) {
+      return {
+        message: friendlyMessage(msg) ?? msg,
+        category: 'auth',
+        recovery: 'retry',
       };
     }
     if (

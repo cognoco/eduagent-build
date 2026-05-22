@@ -815,7 +815,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 confidence: result.confidence || undefined,
                 // [#419] Propagate the server-side readyToFinish flag so the
                 // streaming path parity with processMessage (non-streaming).
-                readyToFinish: result.readyToFinish || undefined,
+                readyToFinish: result.readyToFinish ?? undefined,
               }),
             });
             await markPersisted({
