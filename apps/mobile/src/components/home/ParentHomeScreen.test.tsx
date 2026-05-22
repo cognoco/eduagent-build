@@ -62,6 +62,7 @@ jest.mock(
   () => ({
     useModeSwitch: () => ({
       switchMode: mockSwitchMode,
+      isSwitching: false,
       isSwitchingRef: { current: false },
     }),
   }),

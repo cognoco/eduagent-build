@@ -190,6 +190,54 @@ describe('useModeSwitch', () => {
     clearTimeoutSpy.mockRestore();
   });
 
+  it('is a no-op when MODE_NAV_V0_ENABLED is off', () => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+
+    const { result } = renderHook(
+      () => ({
+        appContext: useAppContext(),
+        modeSwitch: useModeSwitch(),
+      }),
+      { wrapper: makeWrapper() },
+    );
+
+    const modeBefore = result.current.appContext.mode;
+
+    act(() => {
+      result.current.modeSwitch.switchMode('study');
+    });
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.appContext.mode).toBe(modeBefore);
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(result.current.modeSwitch.isSwitchingRef.current).toBe(false);
+    expect(result.current.modeSwitch.isSwitching).toBe(false);
+  });
+
+  it('exposes isSwitching as reactive state for UI feedback', () => {
+    const { result } = renderHook(() => useModeSwitch(), {
+      wrapper: makeWrapper(),
+    });
+
+    expect(result.current.isSwitching).toBe(false);
+
+    act(() => {
+      result.current.switchMode('study');
+    });
+
+    expect(result.current.isSwitching).toBe(true);
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isSwitching).toBe(false);
+  });
+
   it('resets the busy lock even when router.replace throws', () => {
     mockReplace.mockImplementationOnce(() => {
       throw new Error('navigation error');
@@ -213,7 +261,10 @@ describe('useModeSwitch', () => {
       });
     }).toThrow('navigation error');
 
-    // Lock must be cleared even though router.replace threw.
+    // Lock must be cleared even though router.replace threw. The ref is the
+    // authoritative re-entry guard; the matching isSwitching state is a UI
+    // hint whose React commit phase isn't guaranteed to flush when act() is
+    // unwound by a thrown timer callback, so we assert only the ref here.
     expect(result.current.isSwitchingRef.current).toBe(false);
   });
 });
