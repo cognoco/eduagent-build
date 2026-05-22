@@ -855,11 +855,80 @@ describe('Quiz routes', () => {
     });
   });
 
-  describe('POST /v1/quiz/rounds/:id/complete', () => {
-    it('scores the round and persists results', async () => {
+  describe('POST /v1/quiz/rounds/:id/check', () => {
+    it('[WI-89/WI-163] records wrong check attempts before revealing correctAnswer', async () => {
+      const updateSetPayloads: unknown[] = [];
+      const returning = jest.fn().mockResolvedValue([{ id: ACTIVE_ROUND.id }]);
+      const where = jest.fn().mockReturnValue({ returning });
+      const set = jest.fn((payload: unknown) => {
+        updateSetPayloads.push(payload);
+        return { where };
+      });
+      (mockDb as any).update = jest.fn().mockReturnValue({ set });
       (mockDb as any).query.quizRounds.findFirst = jest
         .fn()
         .mockResolvedValue(ACTIVE_ROUND);
+      // [WI-89] /check now wraps persistence in a transaction with re-read.
+      (mockDb as any).transaction = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-1/check',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            questionIndex: 0,
+            answerGiven: 'Salzburg',
+            answerMode: 'multiple_choice',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        correct: false,
+        correctAnswer: 'Vienna',
+      });
+      expect(updateSetPayloads).toContainEqual(
+        expect.objectContaining({
+          results: [
+            expect.objectContaining({
+              questionIndex: 0,
+              correct: false,
+              answerGiven: 'Salzburg',
+              answerMode: 'multiple_choice',
+              timeMs: 5000,
+            }),
+          ],
+        }),
+      );
+    });
+  });
+
+  describe('POST /v1/quiz/rounds/:id/complete', () => {
+    it('scores the round and persists results', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...ACTIVE_ROUND,
+        results: [
+          {
+            questionIndex: 0,
+            correct: true,
+            answerGiven: 'Vienna',
+            timeMs: 5000,
+            answerMode: 'multiple_choice',
+          },
+          {
+            questionIndex: 1,
+            correct: false,
+            answerGiven: 'Munich',
+            timeMs: 5000,
+            answerMode: 'multiple_choice',
+          },
+        ],
+      });
 
       const res = await app.request(
         `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
@@ -872,7 +941,7 @@ describe('Quiz routes', () => {
                 questionIndex: 0,
                 correct: true,
                 answerGiven: 'Vienna',
-                timeMs: 3000,
+                timeMs: 5000,
               },
               {
                 questionIndex: 1,
@@ -889,7 +958,10 @@ describe('Quiz routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.score).toBe(1);
-      expect(body.xpEarned).toBeGreaterThan(0);
+      // With timeMs=5000 (threshold), no timer bonus is awarded — only base XP.
+      // 1 correct * 10 = 10 xpEarned. This reflects actual production behaviour
+      // where /check persists timeMs=5000 (the default).
+      expect(body.xpEarned).toBe(10);
       expect(['perfect', 'great', 'nice']).toContain(body.celebrationTier);
       // [F-040] Results must include the user's submitted answer so the
       // mobile results screen can render "You said: X" on missed-question
@@ -1011,6 +1083,83 @@ describe('Quiz routes', () => {
       );
 
       expect(res.status).toBe(409);
+    });
+
+    it('[WI-89/WI-163] ignores forged completion results after a wrong check attempt', async () => {
+      const updateSetPayloads: unknown[] = [];
+      const returning = jest.fn().mockResolvedValue([{ id: ACTIVE_ROUND.id }]);
+      const where = jest.fn().mockReturnValue({ returning });
+      const set = jest.fn((payload: unknown) => {
+        updateSetPayloads.push(payload);
+        return { where };
+      });
+      (mockDb as any).update = jest.fn().mockReturnValue({ set });
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...ACTIVE_ROUND,
+        total: 1,
+        questions: [ACTIVE_ROUND.questions[0]],
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Salzburg',
+            timeMs: 5000,
+            answerMode: 'multiple_choice',
+          },
+        ],
+      });
+      // [WI-89] Re-override transaction so the callback receives mockDb
+      // directly (with the update mock above), not the metering fixture's
+      // updateImpl spread via createRouteMeteringFixture in beforeEach.
+      (mockDb as any).transaction = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
+
+      const res = await app.request(
+        '/v1/quiz/rounds/round-1/complete',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            results: [
+              {
+                questionIndex: 0,
+                correct: true,
+                answerGiven: 'Vienna',
+                timeMs: 1,
+                answerMode: 'free_text',
+              },
+            ],
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.score).toBe(0);
+      expect(body.xpEarned).toBe(0);
+      expect(body.questionResults).toEqual([
+        expect.objectContaining({
+          questionIndex: 0,
+          correct: false,
+          answerGiven: 'Salzburg',
+          correctAnswer: 'Vienna',
+        }),
+      ]);
+      expect(updateSetPayloads).toContainEqual(
+        expect.objectContaining({
+          score: 0,
+          xpEarned: 0,
+          results: [
+            expect.objectContaining({
+              questionIndex: 0,
+              correct: false,
+              answerGiven: 'Salzburg',
+            }),
+          ],
+        }),
+      );
     });
   });
 

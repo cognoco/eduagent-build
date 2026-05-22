@@ -406,6 +406,50 @@ describe('validateResults (anti-tampering)', () => {
     const validated = validateResults(vocabQuestions, freeTextResult);
     expect(validated).toHaveLength(1);
   });
+
+  it('[WI-89/WI-230] deduplicates duplicate questionIndex entries before scoring and XP', () => {
+    const duplicated: QuestionResult[] = [
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'Lyon',
+        timeMs: 5000,
+        answerMode: 'multiple_choice',
+      },
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 1,
+        answerMode: 'free_text',
+      },
+      {
+        questionIndex: 1,
+        correct: true,
+        answerGiven: 'Berlin',
+        timeMs: 5000,
+        answerMode: 'multiple_choice',
+      },
+    ];
+    const deduplicated: QuestionResult[] = [duplicated[0]!, duplicated[2]!];
+
+    const validatedDuplicated = validateResults(questions, duplicated);
+    const validatedDeduplicated = validateResults(questions, deduplicated);
+
+    expect(validatedDuplicated).toEqual(validatedDeduplicated);
+    expect(validatedDuplicated).toHaveLength(2);
+    expect(validatedDuplicated[0]).toMatchObject({
+      questionIndex: 0,
+      correct: false,
+      answerGiven: 'Lyon',
+    });
+    expect(calculateScore(validatedDuplicated)).toBe(
+      calculateScore(validatedDeduplicated),
+    );
+    expect(calculateXp(validatedDuplicated, questions.length, 'capitals')).toBe(
+      calculateXp(validatedDeduplicated, questions.length, 'capitals'),
+    );
+  });
 });
 
 describe('isAnswerCorrect — guess_who', () => {

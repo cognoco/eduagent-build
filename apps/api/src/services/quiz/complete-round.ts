@@ -1,4 +1,9 @@
-import { createScopedRepository, type Database } from '@eduagent/database';
+import {
+  createScopedRepository,
+  type Database,
+  quizRounds,
+} from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
 import type {
   CompleteRoundResponse,
   QuestionResult,
@@ -165,7 +170,87 @@ export async function checkQuizAnswerWithCorrect(
   if (!question) throw new NotFoundError('Question');
   assertAnswerInOptions(question, answerGiven, answerMode);
   const correct = isAnswerCorrect(question, answerGiven);
+
+  // [WI-89-HIGH] Transactional persistence: wrap read-modify-write so
+  // concurrent /check calls can't lose entries.
+  // Re-reads results inside the tx for authoritative state.
+  // [WI-89-MED] UPDATE also guards on `status = 'active'` — if the round was
+  // concurrently completed, the tx no-ops. The 0-row response below is
+  // harmless because the /check read already returned correct; only the
+  // persisted record is missing, which /complete compensates for by padding.
+  await db.transaction(async (tx) => {
+    const txRepo = createScopedRepository(tx as unknown as Database, profileId);
+    // [WI-89-HIGH] Re-select inside the transaction to prevent lost-update
+    // races. A stale `round.results` (captured before tx.start) could
+    // overwrite a parallel /check's entry.
+    const currentRound = await txRepo.quizRounds.findById(roundId);
+    if (!currentRound || currentRound.status !== 'active') {
+      // [WI-89-MED] Round was completed concurrently or doesn't exist — no-op.
+      return;
+    }
+    const currentResults = (currentRound.results ?? []) as Array<{
+      questionIndex: number;
+    }>;
+    const alreadyAttempted = currentResults.some(
+      (r) => r.questionIndex === questionIndex,
+    );
+    if (!alreadyAttempted) {
+      const attempt: QuestionResult = {
+        questionIndex,
+        correct,
+        answerGiven,
+        timeMs: QUIZ_CONFIG.defaults.timerBonusThresholdMs,
+        answerMode: answerMode ?? 'multiple_choice',
+      };
+      await tx
+        .update(quizRounds)
+        .set({ results: [...currentResults, attempt] })
+        .where(
+          and(
+            eq(quizRounds.id, roundId),
+            eq(quizRounds.profileId, profileId),
+            eq(quizRounds.status, 'active'),
+          ),
+        );
+    }
+  });
+
   return { correct, correctAnswer: question.correctAnswer };
+}
+
+/**
+ * [WI-89-HIGH] For guess_who rounds, merge cluesUsed from client-submitted
+ * results into server-authoritative results so the clue-bonus XP is preserved.
+ *
+ * Only copies cluesUsed when:
+ *   - activityType === 'guess_who'
+ *   - the authoritative entry exists at the same questionIndex
+ *   - the client entry has cluesUsed but the authoritative entry does not
+ *
+ * This is strictly additive — it cannot inflate correctness, score, or
+ * timer bonus. The server still owns `correct` and `answerGiven`.
+ */
+function mergeClientGuessWhoClues(
+  authoritative: QuestionResult[],
+  client: QuestionResult[],
+  activityType: string | undefined,
+): QuestionResult[] {
+  if (activityType !== 'guess_who') return authoritative;
+  const clientMap = new Map<number, Pick<QuestionResult, 'cluesUsed'>>();
+  for (const c of client) {
+    if (c.cluesUsed != null) {
+      clientMap.set(c.questionIndex, { cluesUsed: c.cluesUsed });
+    }
+  }
+
+  const merged = authoritative.map((a) => {
+    if (a.cluesUsed != null) return a;
+    const clientEntry = clientMap.get(a.questionIndex);
+    if (!clientEntry) return a;
+    return { ...a, cluesUsed: clientEntry.cluesUsed };
+  });
+
+  return merged;
 }
 
 /**
@@ -183,10 +268,14 @@ export function validateResults(
   questions: QuizQuestion[],
   clientResults: QuestionResult[],
 ): QuestionResult[] {
+  const seen = new Set<number>();
   const validated: QuestionResult[] = [];
   for (const result of clientResults) {
+    // [WI-89] Deduplicate by questionIndex — first attempt wins.
+    if (seen.has(result.questionIndex)) continue;
     const question = questions[result.questionIndex];
     if (!question) continue;
+    seen.add(result.questionIndex);
     // Drop MC answers for fixed-option question types when the submitted
     // value is not one of the server-known options.
     if (
@@ -341,10 +430,39 @@ export async function completeQuizRound(
 
     const questions = round.questions as QuizQuestion[];
     const total = round.total;
-    const validatedResults = validateResults(questions, results);
-    const droppedResults = results.length - validatedResults.length;
-    const score = calculateScore(validatedResults);
-    const xpEarned = calculateXp(validatedResults, total, round.activityType);
+    // [WI-89] Server-side scoring: derive authoritative results from persisted
+    // check attempts. Client results are ignored for scoring/XP/mastery but
+    // counted for droppedResults so the client knows how many were discarded.
+    // [WI-89] Server-side scoring: derive authoritative results from persisted
+    // check attempts. Client results are ignored for scoring/XP/mastery but
+    // counted for droppedResults so the client knows how many were discarded.
+    const persistentResults = (round.results ?? []) as QuestionResult[];
+    // [WI-89-HIGH] For guess_who rounds, copy cluesUsed from the client
+    // submission into authoritative results so the clue-bonus XP is preserved.
+    // Only merged when the authoritative entry has the same questionIndex and
+    // cluesUsed is present on the client entry but missing on the persisted
+    // one — this is strictly additive and cannot be exploited to inflate
+    // correctness, score, or timer bonus.
+    const authoritativeResults = mergeClientGuessWhoClues(
+      validateResults(questions, persistentResults),
+      results,
+      round.activityType,
+    );
+    // [WI-89-MED] droppedResults counts how many client-submitted entries
+    // do NOT have a matching questionIndex in the authoritative (persisted)
+    // results — i.e. how many client entries were superseded by /check data.
+    const authoritativeSet = new Set(
+      authoritativeResults.map((r) => r.questionIndex),
+    );
+    const droppedResults = results.filter(
+      (r) => !authoritativeSet.has(r.questionIndex),
+    ).length;
+    const score = calculateScore(authoritativeResults);
+    const xpEarned = calculateXp(
+      authoritativeResults,
+      total,
+      round.activityType,
+    );
     const celebrationTier = getCelebrationTier(score, total);
     const completedAt = new Date();
 
@@ -360,7 +478,7 @@ export async function completeQuizRound(
         sourceRoundId: string;
       }
     >();
-    for (const result of validatedResults) {
+    for (const result of authoritativeResults) {
       if (result.correct) continue;
       const question = questions[result.questionIndex];
       if (!question || question.isLibraryItem) continue;
@@ -379,7 +497,7 @@ export async function completeQuizRound(
     // If another concurrent call already completed the round, this UPDATE
     // affects 0 rows → ConflictError.
     const updated = await txRepo.quizRounds.completeActive(roundId, {
-      results: validatedResults,
+      results: authoritativeResults,
       score,
       xpEarned,
       completedAt,
@@ -420,7 +538,7 @@ export async function completeQuizRound(
         const question = questions[index];
         if (question?.type !== 'vocabulary' || !question.vocabularyId) continue;
 
-        const result = validatedResults.find(
+        const result = authoritativeResults.find(
           (entry) => entry.questionIndex === index,
         );
         if (!result) continue;
@@ -450,7 +568,7 @@ export async function completeQuizRound(
         const question = questions[index];
         if (!question) continue;
 
-        const result = validatedResults.find(
+        const result = authoritativeResults.find(
           (entry) => entry.questionIndex === index,
         );
         if (!result) continue;
@@ -516,7 +634,7 @@ export async function completeQuizRound(
       }
 
       // 2. Upsert new mastery items from correct discovery answers
-      for (const result of validatedResults) {
+      for (const result of authoritativeResults) {
         if (!result.correct) continue;
         const question = questions[result.questionIndex];
         if (!question || question.isLibraryItem) continue;
@@ -561,7 +679,7 @@ export async function completeQuizRound(
       }
 
       // 3. Track MC success count for free-text unlock progression
-      for (const result of validatedResults) {
+      for (const result of authoritativeResults) {
         const question = questions[result.questionIndex];
         if (!question || !question.isLibraryItem) continue;
 
@@ -600,9 +718,26 @@ export async function completeQuizRound(
       await txRepo.quizMissedItems.insertMany(Array.from(missedMap.values()));
     }
 
-    // Build per-question results with the correct answer revealed.
-    // Safe to expose now — the round is completed (status = 'completed').
-    const questionResults: ValidatedQuestionResult[] = validatedResults.map(
+    // [WI-89] Use authoritative results (persisted check attempts) so the
+    // correctAnswer shown in the response matches what was actually scored.
+    // [WI-89-MED] Pad with stubs for any question with no persisted attempt.
+    const allQuestionsResult: QuestionResult[] = [...authoritativeResults];
+    const coveredIndices = new Set(
+      authoritativeResults.map((r) => r.questionIndex),
+    );
+    for (let i = 0; i < total; i++) {
+      if (coveredIndices.has(i)) continue;
+      allQuestionsResult.push({
+        questionIndex: i,
+        correct: false,
+        answerGiven: '',
+        timeMs: QUIZ_CONFIG.defaults.timerBonusThresholdMs,
+        answerMode: 'multiple_choice',
+      });
+    }
+    allQuestionsResult.sort((a, b) => a.questionIndex - b.questionIndex);
+
+    const questionResults: ValidatedQuestionResult[] = allQuestionsResult.map(
       (result) => {
         const question = questions[result.questionIndex];
         const entry: ValidatedQuestionResult = {

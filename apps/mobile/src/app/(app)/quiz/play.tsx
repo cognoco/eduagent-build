@@ -113,6 +113,10 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [guessWhoCluesUsed, setGuessWhoCluesUsed] = useState(1);
   const [freeTextAnswer, setFreeTextAnswer] = useState('');
+  // [WI-89] Track which question indices already have a recorded result so
+  // that double-fire events (Guess Who double-tap, stale closure) only
+  // persist the first attempt.
+  const answeredIndicesRef = useRef<Set<number>>(new Set());
 
   const questionStartTimeRef = useRef(Date.now());
   const resultsRef = useRef<QuestionResult[]>([]);
@@ -163,6 +167,9 @@ export default function QuizPlayScreen(): React.ReactElement {
 
     answerSubmittedRef.current = false;
     correctAnswerCapturedRef.current = false;
+    // [WI-89] Clear the answered-set so the next question can accept its
+    // first result.
+    answeredIndicesRef.current = new Set();
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setCorrectAnswer(null);
@@ -331,17 +338,19 @@ export default function QuizPlayScreen(): React.ReactElement {
   const handleGuessWhoResolved = useCallback(
     (result: GuessWhoResolvedResult) => {
       const timeMs = Date.now() - questionStartTimeRef.current;
-      const nextResults: QuestionResult[] = [
-        ...resultsRef.current,
-        {
-          questionIndex: currentIndex,
-          correct: result.correct,
-          answerGiven: result.answerGiven,
-          timeMs,
-          cluesUsed: result.cluesUsed,
-          answerMode: result.answerMode,
-        },
-      ];
+      // [WI-89] First attempt wins — skip when a result already exists for
+      // this questionIndex (race / double-tap guard).
+      if (answeredIndicesRef.current.has(currentIndex)) return;
+      answeredIndicesRef.current.add(currentIndex);
+      const nextResult: QuestionResult = {
+        questionIndex: currentIndex,
+        correct: result.correct,
+        answerGiven: result.answerGiven,
+        timeMs,
+        cluesUsed: result.cluesUsed,
+        answerMode: result.answerMode,
+      };
+      const nextResults = [...resultsRef.current, nextResult];
       resultsRef.current = nextResults;
       setGuessWhoCluesUsed(result.cluesUsed);
       setSelectedAnswer(result.answerGiven);
@@ -566,6 +575,11 @@ export default function QuizPlayScreen(): React.ReactElement {
       Sentry.captureException(err);
       platformAlert("Couldn't check your answer", formatApiError(err));
     }
+
+    // [WI-89] First attempt wins — skip when a result already exists for
+    // this questionIndex (protects against double-submit from stale closures).
+    if (answeredIndicesRef.current.has(questionIndex)) return;
+    answeredIndicesRef.current.add(questionIndex);
 
     const nextResult: QuestionResult = {
       questionIndex,

@@ -62,20 +62,36 @@ jest.mock(
       }) => void;
     }) => {
       const { Pressable, Text } = require('react-native');
+      const resolveResult = {
+        correct: true,
+        answerGiven: 'Nikola Tesla',
+        cluesUsed: 3,
+        answerMode: 'free_text' as const,
+      };
       return (
-        <Pressable
-          onPress={() =>
-            onResolved({
-              correct: true,
-              answerGiven: 'Nikola Tesla',
-              cluesUsed: 3,
-              answerMode: 'free_text',
-            })
-          }
-          testID="guess-who-resolve-correct"
-        >
-          <Text>Resolve Guess Who</Text>
-        </Pressable>
+        <>
+          <Pressable
+            onPress={() => onResolved(resolveResult)}
+            testID="guess-who-resolve-correct"
+          >
+            <Text>Resolve Guess Who</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              // Simulate a race where onResolved fires twice before React
+              // batches the state update (double-tap / stale closure).
+              onResolved(resolveResult);
+              onResolved({
+                ...resolveResult,
+                answerGiven: 'Thomas Edison',
+                cluesUsed: 2,
+              });
+            }}
+            testID="guess-who-resolve-twice"
+          >
+            <Text>Resolve Twice</Text>
+          </Pressable>
+        </>
       );
     },
   }),
@@ -999,6 +1015,112 @@ describe('QuizPlayScreen — no round loaded', () => {
     screen.getByTestId('quiz-play-no-round');
     screen.getByTestId('quiz-play-no-round-retry');
     screen.getByTestId('quiz-play-no-round-home');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-89/WI-282] Duplicate result prevention — both standard answer handling
+// and Guess Who resolution must record at most one QuestionResult per
+// questionIndex, with first attempt winning.
+// ---------------------------------------------------------------------------
+describe('QuizPlayScreen — duplicate result prevention (WI-89)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('[WI-89/WI-282] records only one result when the same Guess Who question resolves twice', async () => {
+    mockRound = {
+      id: 'round-wi-89-duplicate',
+      activityType: 'guess_who' as const,
+      theme: 'Inventors',
+      total: 2,
+      questions: [
+        {
+          type: 'guess_who' as const,
+          clues: ['Clue 1', 'Clue 2', 'Clue 3'],
+          mcFallbackOptions: [
+            'Nikola Tesla',
+            'Thomas Edison',
+            'Marie Curie',
+            'Ada Lovelace',
+          ],
+          funFact: 'Fact.',
+        },
+        {
+          type: 'guess_who' as const,
+          clues: ['Other clue 1', 'Other clue 2', 'Other clue 3'],
+          mcFallbackOptions: [
+            'Albert Einstein',
+            'Isaac Newton',
+            'Alan Turing',
+            'Grace Hopper',
+          ],
+          funFact: 'Other fact.',
+        },
+      ],
+    };
+
+    render(<QuizPlayScreen />);
+
+    // Fire a single press on the double-resolve button — its mock fires
+    // onResolved twice synchronously to simulate a race/double-tap.
+    fireEvent.press(screen.getByTestId('guess-who-resolve-twice'));
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    fireEvent.press(screen.getByTestId('quiz-quit-save'));
+
+    await waitFor(() => {
+      expect(mockCompleteRoundMutate).toHaveBeenCalled();
+    });
+    const submitInput = mockCompleteRoundMutate.mock.calls[0]?.[0];
+    expect(submitInput).toMatchObject({ roundId: 'round-wi-89-duplicate' });
+    expect(submitInput.results).toHaveLength(1);
+    expect(submitInput.results).toEqual([
+      expect.objectContaining({
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Nikola Tesla',
+        answerMode: 'free_text',
+      }),
+    ]);
+  });
+
+  it('[WI-89] records only one result when standard answer submission fires twice for the same question', async () => {
+    mockCheckAnswer.mockResolvedValue({ correct: true });
+    mockRound = {
+      id: 'round-wi-89-dedup-std',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'Germany',
+          options: ['Berlin', 'Munich', 'Hamburg', 'Frankfurt'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    render(<QuizPlayScreen />);
+
+    // Press option-0 once — records first result
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => screen.getByText('Correct'));
+
+    // Press option-0 again while still on the same questionIndex — should
+    // be blocked by the answeredIndicesRef guard.
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+
+    // checkAnswer only fires once; duplicate press is blocked client-side
+    expect(mockCheckAnswer).toHaveBeenCalledTimes(1);
   });
 });
 
