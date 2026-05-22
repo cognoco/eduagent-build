@@ -209,8 +209,9 @@ afterAll(async () => {
 });
 
 describe('Integration: billing lifecycle routes', () => {
-  it('returns free defaults when the account exists without a subscription row', async () => {
+  it('repairs a missing subscription row with the default plus trial', async () => {
     await seedAccount();
+    const plusTier = getTierConfig('plus');
 
     const res = await app.request(
       '/v1/subscription',
@@ -223,19 +224,19 @@ describe('Integration: billing lifecycle routes', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.subscription).toEqual({
-      tier: 'free',
+    expect(body.subscription).toMatchObject({
+      tier: 'plus',
       status: 'trial',
-      trialEndsAt: null,
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
-      monthlyLimit: 100,
+      monthlyLimit: plusTier.monthlyQuota,
       usedThisMonth: 0,
-      remainingQuestions: 100,
-      dailyLimit: 10,
+      remainingQuestions: plusTier.monthlyQuota,
+      dailyLimit: plusTier.dailyLimit,
       usedToday: 0,
-      dailyRemainingQuestions: 10,
+      dailyRemainingQuestions: plusTier.dailyLimit,
     });
+    expect(Date.parse(body.subscription.trialEndsAt)).not.toBeNaN();
   });
 
   it('returns subscription details from the real subscription and quota rows', async () => {
@@ -307,13 +308,14 @@ describe('Integration: billing lifecycle routes', () => {
 
     const subscription = await loadSubscription(account.id);
     expect(subscription).not.toBeUndefined();
-    expect(subscription!.tier).toBe('free');
-    expect(subscription!.status).toBe('active');
+    expect(subscription!.tier).toBe('plus');
+    expect(subscription!.status).toBe('trial');
+    expect(subscription!.trialEndsAt).not.toBeNull();
     expect(subscription!.stripeCustomerId).toBe('cus_checkout');
 
     const quotaPool = await loadQuotaPool(subscription!.id);
     expect(quotaPool).not.toBeUndefined();
-    expect(quotaPool!.monthlyLimit).toBe(100);
+    expect(quotaPool!.monthlyLimit).toBe(getTierConfig('plus').monthlyQuota);
   });
 
   it('cancels a subscription and marks the local row immediately', async () => {
