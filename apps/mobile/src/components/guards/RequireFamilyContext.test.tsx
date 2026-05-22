@@ -5,7 +5,7 @@
 // mode-derivation logic runs. Mock only expo-router (external navigation
 // boundary) and FEATURE_FLAGS (toggled inline, not replaced).
 //
-// Rule: no internal jest.mock('./...') — all internal modules use real impls.
+// Rule: no internal module mocks — all internal modules use real impls.
 
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
