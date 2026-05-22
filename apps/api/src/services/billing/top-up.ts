@@ -6,8 +6,8 @@ import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import {
   topUpCredits,
   type Database,
-  findSubscriptionById,
-  findTopUpByTransactionId,
+  findSubscriptionById__unscoped,
+  findTopUpByTransactionId__unscoped,
 } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ export interface TopUpCreditRow {
 // ---------------------------------------------------------------------------
 
 function mapTopUpCreditRow(
-  row: typeof topUpCredits.$inferSelect
+  row: typeof topUpCredits.$inferSelect,
 ): TopUpCreditRow {
   return {
     id: row.id,
@@ -55,7 +55,7 @@ function mapTopUpCreditRow(
 export async function getTopUpCreditsRemaining(
   db: Database,
   subscriptionId: string,
-  now: Date = new Date()
+  now: Date = new Date(),
 ): Promise<number> {
   const result = await db
     .select({
@@ -66,8 +66,8 @@ export async function getTopUpCreditsRemaining(
       and(
         eq(topUpCredits.subscriptionId, subscriptionId),
         sql`${topUpCredits.remaining} > 0`,
-        sql`${topUpCredits.expiresAt} > ${now}`
-      )
+        sql`${topUpCredits.expiresAt} > ${now}`,
+      ),
     );
 
   return result[0]?.total ?? 0;
@@ -82,9 +82,10 @@ const TOP_UP_EXPIRY_MONTHS = 12;
  */
 export async function isTopUpAlreadyGranted(
   db: Database,
-  transactionId: string
+  transactionId: string,
 ): Promise<boolean> {
-  const existing = await findTopUpByTransactionId(db, transactionId);
+  // safe-caller: RevenueCat IPN webhook — authenticated by signed IPN payload; no user-facing output
+  const existing = await findTopUpByTransactionId__unscoped(db, transactionId);
   return !!existing;
 }
 
@@ -105,10 +106,11 @@ export async function purchaseTopUpCredits(
   subscriptionId: string,
   amount: number,
   now: Date = new Date(),
-  transactionId?: string
+  transactionId?: string,
 ): Promise<TopUpCreditRow | null> {
   // Verify subscription exists and tier is eligible
-  const sub = await findSubscriptionById(db, subscriptionId);
+  // safe-caller: RevenueCat IPN webhook — authenticated by signed IPN payload; subscriptionId from verified payload
+  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
 
   if (!sub || sub.tier === 'free') {
     return null;
@@ -170,13 +172,13 @@ export async function purchaseTopUpCredits(
 export async function findExpiringTopUpCredits(
   db: Database,
   rangeStart: Date,
-  rangeEnd: Date
+  rangeEnd: Date,
 ): Promise<TopUpCreditRow[]> {
   const rows = await db.query.topUpCredits.findMany({
     where: and(
       sql`${topUpCredits.remaining} > 0`,
       gte(topUpCredits.expiresAt, rangeStart),
-      lte(topUpCredits.expiresAt, rangeEnd)
+      lte(topUpCredits.expiresAt, rangeEnd),
     ),
   });
   return rows.map(mapTopUpCreditRow);
@@ -190,7 +192,7 @@ export async function findExpiringTopUpCredits(
 export async function countTopUpPurchasesSinceCycleStart(
   db: Database,
   subscriptionId: string,
-  cycleStart: Date
+  cycleStart: Date,
 ): Promise<number> {
   const result = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -198,8 +200,8 @@ export async function countTopUpPurchasesSinceCycleStart(
     .where(
       and(
         eq(topUpCredits.subscriptionId, subscriptionId),
-        gte(topUpCredits.purchasedAt, cycleStart)
-      )
+        gte(topUpCredits.purchasedAt, cycleStart),
+      ),
     );
   return result[0]?.count ?? 0;
 }

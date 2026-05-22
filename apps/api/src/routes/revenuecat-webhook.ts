@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
@@ -24,6 +25,7 @@ import { getTierConfig } from '../services/subscription';
 import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
+import { safeSend } from '../services/safe-non-core';
 
 const logger = createLogger();
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
@@ -148,25 +150,19 @@ function getTopUpCreditsForProduct(
 
 /**
  * Extracts the tier from a product ID using the product-to-tier map.
- * Falls back to parsing `com.eduagent.<tier>.<interval>` format.
+ * [BUG-444] The regex fallback was removed — it granted entitlement for ANY
+ * product matching `com.eduagent.<tier>.*` prefix, including future trial-only,
+ * marketing, or test products not in the authoritative PRODUCT_TIER_MAP.
+ * Unknown product_ids now hit the Sentry escalation path in callers.
  */
 function extractTierFromProductId(
   productId: string | undefined,
 ): ('plus' | 'family' | 'pro') | null {
   if (!productId) return null;
 
-  // Direct lookup
-  if (productId in PRODUCT_TIER_MAP) {
-    return PRODUCT_TIER_MAP[productId] ?? null;
-  }
-
-  // Fallback: parse com.eduagent.<tier>.<interval>
-  const match = productId.match(/^com\.eduagent\.(plus|family|pro)\./);
-  if (match) {
-    return match[1] as 'plus' | 'family' | 'pro';
-  }
-
-  return null;
+  // Authoritative lookup only — no regex fallback.
+  // Unknown products must be added to PRODUCT_TIER_MAP explicitly.
+  return PRODUCT_TIER_MAP[productId] ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -258,15 +254,27 @@ async function handleRenewal(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
-  const tier = extractTierFromProductId(event.product_id);
+  const eventTier = extractTierFromProductId(event.product_id);
 
-  // RENEWAL after a trial converts status to 'active' and clears trialEndsAt.
-  // This handles both trial-to-paid conversion and regular renewal.
+  // Read existing subscription to detect tier changes and preserve trialEndsAt.
+  // [BUG-453] Only pass tier to the update when it actually changed — RC can
+  // send RENEWAL for a different product, silently changing tier without going
+  // through PRODUCT_CHANGE.
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const tierChanged = eventTier !== null && existingSub?.tier !== eventTier;
+
+  // [BUG-453] RENEWAL during a trial period (period_type === 'TRIAL') must NOT
+  // clear trialEndsAt — the trial is still active. Only wipe it on conversion
+  // (period_type !== 'TRIAL').
+  const isTrial = event.period_type === 'TRIAL';
+
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
     status: 'active',
-    tier: tier ?? undefined,
+    // Only include tier when the event actually signals a different product tier.
+    // Omitting the key entirely prevents any DB write to the tier column.
+    ...(tierChanged && eventTier ? { tier: eventTier } : {}),
     currentPeriodStart: event.purchased_at_ms
       ? new Date(event.purchased_at_ms).toISOString()
       : undefined,
@@ -274,11 +282,14 @@ async function handleRenewal(
       ? new Date(event.expiration_at_ms).toISOString()
       : undefined,
     cancelledAt: null,
-    trialEndsAt: null, // Clear trial end date on conversion / renewal
+    // Preserve trialEndsAt during trial-period renewals by omitting it;
+    // clear it on conversion to active (period_type !== 'TRIAL').
+    ...(isTrial ? {} : { trialEndsAt: null }),
   });
 
-  if (updated && tier) {
-    const tierConfig = getTierConfig(tier);
+  // Only update quota pool when the tier actually changed.
+  if (updated && tierChanged && eventTier) {
+    const tierConfig = getTierConfig(eventTier);
     await updateQuotaPoolLimit(
       db,
       updated.id,
@@ -308,12 +319,20 @@ async function handleCancellation(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
+  // [BUG-445] If the sub was already past_due when the user cancelled, DO NOT
+  // flip it back to 'active' — that would erase the payment-failure signal.
+  // Only promote to 'active' when the current status is active or trial (still
+  // entitled). past_due stays past_due; cancelledAt records the intent.
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const targetStatus: SubscriptionStatus =
+    existingSub?.status === 'past_due' ? 'past_due' : 'active';
+
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
-    // Keep the entitlement active until period end so mobile can render the
-    // correct "Cancelling" state from cancelledAt + active status.
-    status: 'active' as SubscriptionStatus,
+    // Keep the entitlement active (or past_due) until period end so mobile can
+    // render the correct "Cancelling" state from cancelledAt + status.
+    status: targetStatus,
     cancelledAt: new Date().toISOString(),
   });
 
@@ -445,7 +464,7 @@ async function handleBillingIssue(
 }
 
 async function handleSubscriberAlias(
-  _db: Database,
+  db: Database,
   _kv: KVNamespace | undefined,
   event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
@@ -459,6 +478,68 @@ async function handleSubscriberAlias(
     transferredFrom: event.transferred_from,
     transferredTo: event.transferred_to,
   });
+
+  // [BUG-449] Full merge implementation deferred — escalation + event dispatch
+  // unblock visibility. TODO(BUG-449): full merge implementation deferred —
+  // escalation + event dispatch unblock visibility.
+  //
+  // When transferred_from has an existing subscription, credits/entitlements
+  // on that app_user_id are NOT yet migrated to the new identity. Surface
+  // this via Sentry (high severity) and dispatch an Inngest event so a future
+  // migration worker can consume it without data loss.
+  const transferredFrom = event.transferred_from ?? [];
+  if (transferredFrom.length > 0) {
+    // Resolve the transferred_from app_user_id(s) to check for existing subs
+    for (const fromUserId of transferredFrom) {
+      // Skip anonymous IDs — these are the normal alias case (anon→identified)
+      // where no subscription can be held on the anon side.
+      if (fromUserId.startsWith('$')) continue;
+
+      const fromAccount = await findAccountByClerkId(db, fromUserId);
+      if (!fromAccount) continue;
+
+      const fromSub = await getSubscriptionByAccountId(db, fromAccount.id);
+      if (!fromSub) continue;
+
+      // A subscription exists on the transferred_from identity — this is the
+      // revenue-loss scenario. Escalate immediately.
+      captureException(
+        new Error(
+          'SUBSCRIBER_ALIAS: transferred_from has active subscription — merge not implemented',
+        ),
+        {
+          extra: {
+            tag: 'revenuecat.alias.unhandled',
+            severity: 'high',
+            eventId: event.id,
+            fromAppUserId: fromUserId,
+            toAppUserId: event.app_user_id,
+            fromSubscriptionId: fromSub.id,
+            fromSubscriptionTier: fromSub.tier,
+            fromSubscriptionStatus: fromSub.status,
+          },
+        },
+      );
+
+      // Dispatch alias_received so a future migration worker can consume it.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/billing.alias_received',
+            data: {
+              eventId: event.id,
+              fromAppUserId: fromUserId,
+              toAppUserId: event.app_user_id,
+              fromAccountId: fromAccount.id,
+              fromSubscriptionId: fromSub.id,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'revenuecat.alias_received',
+        { eventId: event.id, fromAppUserId: fromUserId },
+      );
+    }
+  }
 }
 
 async function handleProductChange(
@@ -524,17 +605,29 @@ async function handleNonRenewingPurchase(
   const transactionId =
     event.store_transaction_id ?? event.transaction_id ?? null;
 
-  // Reject if no transaction ID — without it we cannot guarantee idempotency
-  // and webhook retries would grant duplicate credits.
+  // [BUG-451] Malformed payload (no transaction ID) → 200 so RevenueCat does
+  // NOT retry. Returning 400 guarantees ~3 days of retry spam because RC
+  // treats any non-2xx as transient. The payload is permanently malformed
+  // (both fields absent simultaneously is a provider-side bug, not a
+  // transient outage), so we ack, skip, and capture to Sentry for ops review.
   if (!transactionId) {
-    // [logging sweep] structured logger so PII fields land as JSON context
     logger.error('[revenuecat] NON_RENEWING_PURCHASE missing transaction ID', {
       eventId: event.id,
       productId: event.product_id,
     });
+    captureException(
+      new Error('RevenueCat NON_RENEWING_PURCHASE missing transaction ID'),
+      {
+        extra: {
+          eventId: event.id,
+          productId: event.product_id,
+          category: 'revenuecat.malformed_payload',
+        },
+      },
+    );
     return {
-      status: 400,
-      body: { received: false, error: 'Missing transaction ID' },
+      status: 200,
+      body: { received: true, skipped: 'missing_transaction_id' },
     };
   }
 
@@ -780,7 +873,7 @@ export const revenuecatWebhookRoute = new Hono<{
     case 'NON_RENEWING_PURCHASE': {
       const result = await handleNonRenewingPurchase(db, kv, event);
       if (result) {
-        return c.json(result.body, result.status as 400 | 403);
+        return c.json(result.body, result.status as ContentfulStatusCode);
       }
       break;
     }

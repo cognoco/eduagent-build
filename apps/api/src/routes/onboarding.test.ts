@@ -333,6 +333,42 @@ describe('onboarding routes', () => {
       expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
     });
 
+    // [BUG-406 / CR-2026-05-19-H1] Break test: a non-owner profile (child on
+    // a parent's account, isOwner: false) must NOT be able to mutate another
+    // child's onboarding fields even when a family_link row exists. Previously
+    // assertParentAccess only checked the link — not whether the caller is the
+    // account owner. assertOwnerAndParentAccess adds that gate.
+    it('[BUG-406] returns 403 when non-owner profile tries to update child language', async () => {
+      const { getProfile } = jest.requireMock('../services/profile');
+      // Caller profile is a child account (isOwner: false)
+      getProfile.mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2008,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+      // Family link exists — the bug was that this was sufficient to grant access
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: 'test-profile-id',
+        childProfileId: CHILD_PROFILE_ID,
+      });
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/language`,
+        {
+          method: 'PATCH',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ conversationLanguage: 'nb' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+    });
+
     it('returns 404 when child profile not found after access granted', async () => {
       mockUpdateConversationLanguage.mockRejectedValueOnce(
         new OnboardingNotFoundError(CHILD_PROFILE_ID),
@@ -536,6 +572,36 @@ describe('onboarding routes', () => {
       expect(mockUpdatePronouns).not.toHaveBeenCalled();
     });
 
+    // [BUG-406 / CR-2026-05-19-H1] Break test: non-owner profile must be blocked.
+    it('[BUG-406] returns 403 when non-owner profile tries to update child pronouns', async () => {
+      const { getProfile } = jest.requireMock('../services/profile');
+      getProfile.mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2008,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: 'test-profile-id',
+        childProfileId: CHILD_PROFILE_ID,
+      });
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/pronouns`,
+        {
+          method: 'PATCH',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ pronouns: 'they/them' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+    });
+
     it('returns 401 without auth', async () => {
       const res = await app.request(
         `/v1/onboarding/${CHILD_PROFILE_ID}/pronouns`,
@@ -731,6 +797,36 @@ describe('onboarding routes', () => {
 
     it('returns 403 when parent does NOT have access to child (IDOR protection)', async () => {
       mockFindFamilyLink.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/interests/context`,
+        {
+          method: 'PATCH',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ interests: validInterests }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateInterestsContext).not.toHaveBeenCalled();
+    });
+
+    // [BUG-406 / CR-2026-05-19-H1] Break test: non-owner profile must be blocked.
+    it('[BUG-406] returns 403 when non-owner profile tries to update child interests', async () => {
+      const { getProfile } = jest.requireMock('../services/profile');
+      getProfile.mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2008,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: 'test-profile-id',
+        childProfileId: CHILD_PROFILE_ID,
+      });
 
       const res = await app.request(
         `/v1/onboarding/${CHILD_PROFILE_ID}/interests/context`,

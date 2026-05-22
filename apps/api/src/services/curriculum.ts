@@ -1992,23 +1992,29 @@ export async function explainTopicOrdering(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) throw new NotFoundError('Subject');
 
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, topicId),
-  });
-  if (!topic) throw new NotFoundError('Topic');
-
-  // Load surrounding topics for context
+  // Load the curriculum first so we can constrain the topic lookup to this
+  // subject's curriculum. Without this constraint the topic SELECT is keyed
+  // solely on topicId, allowing a caller to pass any victim topicId and have
+  // its title fed into the LLM prompt — a cross-account information disclosure.
+  // [BUG-459] Pattern mirrors skipTopic / unskipTopic ownership verification.
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
     orderBy: desc(curricula.version),
   });
+  if (!curriculum) throw new NotFoundError('Curriculum');
 
-  const allTopics = curriculum
-    ? await db.query.curriculumTopics.findMany({
-        where: eq(curriculumTopics.curriculumId, curriculum.id),
-        orderBy: asc(curriculumTopics.sortOrder),
-      })
-    : [];
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: and(
+      eq(curriculumTopics.id, topicId),
+      eq(curriculumTopics.curriculumId, curriculum.id),
+    ),
+  });
+  if (!topic) throw new NotFoundError('Topic');
+
+  const allTopics = await db.query.curriculumTopics.findMany({
+    where: eq(curriculumTopics.curriculumId, curriculum.id),
+    orderBy: asc(curriculumTopics.sortOrder),
+  });
 
   // [PROMPT-INJECT-5] curriculumTopics.title and subjects.name are stored
   // LLM output — sanitize each before interpolation so a crafted title cannot

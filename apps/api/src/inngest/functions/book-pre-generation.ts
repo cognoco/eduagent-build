@@ -5,9 +5,11 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, gt, asc } from 'drizzle-orm';
+import { NonRetriableError } from 'inngest';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { curriculumBooks, profiles } from '@eduagent/database';
+import { curriculumBooks, profiles, subjects } from '@eduagent/database';
+import { bookTopicsGeneratedEventSchema } from '@eduagent/schemas';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 
@@ -31,11 +33,16 @@ export const bookPreGeneration = inngest.createFunction(
   },
   { event: 'app/book.topics-generated' },
   async ({ event, step }) => {
-    const { subjectId, bookId, profileId } = event.data as {
-      subjectId: string;
-      bookId: string;
-      profileId: string;
-    };
+    // [FIX-426] Validate payload at function entry — bare cast allowed a
+    // mis-paired (subjectId, profileId) from an upstream dispatch to proceed
+    // silently. NonRetriableError prevents retry loops on permanent bad data.
+    const parsed = bookTopicsGeneratedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      throw new NonRetriableError(
+        `[book-pre-generation] invalid payload: ${parsed.error.message}`,
+      );
+    }
+    const { subjectId, bookId, profileId } = parsed.data;
 
     // [BUG-779 / J-12] Split into per-book step.run blocks. Inngest caches
     // each step's result by step id, so on retry the books that already
@@ -46,6 +53,23 @@ export const bookPreGeneration = inngest.createFunction(
     // persistBookTopics's idempotency guard kicked in.
     const prep = await step.run('load-pre-generation-context', async () => {
       const db = getStepDatabase();
+
+      // [FIX-426] Parent-chain ownership check: verify subjectId belongs to
+      // profileId before touching any books. Matches canonical pattern in
+      // subject-retry-curriculum.ts:28-33. NonRetriableError here avoids
+      // Inngest retrying a permanently bad event and silently writing topics
+      // under a profile that doesn't own the subject.
+      const subject = await db.query.subjects.findFirst({
+        where: and(
+          eq(subjects.id, subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      });
+      if (!subject) {
+        throw new NonRetriableError(
+          `[book-pre-generation] subject-profile mismatch: subjectId=${subjectId} does not belong to profileId=${profileId}`,
+        );
+      }
 
       const currentBook = await db.query.curriculumBooks.findFirst({
         where: eq(curriculumBooks.id, bookId),

@@ -3,15 +3,17 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+import { createHash } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { accounts, type Database } from '@eduagent/database';
-import { createSubscription } from './billing';
+import { createSubscription, getSubscriptionByAccountId } from './billing';
 import { computeTrialEndDate } from './trial';
 import { getTierConfig } from './subscription';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { safeSend } from './safe-non-core';
 import { inngest } from '../inngest/client';
+import { ConflictError } from '../errors';
 
 const logger = createLogger();
 
@@ -61,6 +63,14 @@ export async function findAccountByClerkId(
 }
 
 /**
+ * One-way SHA-256 of an email address, safe to include in logs and Sentry
+ * extra fields. The full email is never stored outside the accounts table.
+ */
+function hashEmail(email: string): string {
+  return createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+}
+
+/**
  * Finds an account by Clerk user ID or creates one if it doesn't exist.
  *
  * This is the primary entry point for account provisioning. Clerk manages
@@ -76,34 +86,149 @@ export async function findAccountByClerkId(
 export async function findOrCreateAccount(
   db: Database,
   clerkUserId: string,
-  email: string,
+  email: string | undefined,
   timezone?: string | null,
 ): Promise<Account> {
   const existing = await findAccountByClerkId(db, clerkUserId);
-  if (existing) return existing;
+  if (existing) {
+    // [BUG-417] Idempotent trial repair: if this account exists but was created
+    // by a request that failed mid-flight after inserting the account row but
+    // before committing the trial subscription, subsequent requests hit this
+    // branch and skip trial creation. Guard: check for a missing subscription
+    // and provision the trial if absent.
+    const existingSub = await getSubscriptionByAccountId(db, existing.id);
+    if (!existingSub) {
+      // Account exists but has no subscription — race-condition recovery path.
+      logger.warn('account.trial_missing_repair_attempted', {
+        accountId: existing.id,
+        clerkUserId,
+      });
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/account.trial_missing_repair_attempted',
+            data: {
+              accountId: existing.id,
+              clerkUserId,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'account.trial_missing_repair_attempted',
+        { accountId: existing.id, clerkUserId },
+      );
+      try {
+        const plusTier = getTierConfig('plus');
+        const trialEndsAt = computeTrialEndDate(new Date(), timezone);
+        await createSubscription(
+          db,
+          existing.id,
+          'plus',
+          plusTier.monthlyQuota,
+          {
+            status: 'trial',
+            trialEndsAt: trialEndsAt.toISOString(),
+          },
+        );
+      } catch (error) {
+        logger.error('billing.trial_missing_repair_failed', {
+          accountId: existing.id,
+          clerkUserId,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        captureException(error, {
+          profileId: undefined,
+          extra: {
+            flow: 'findOrCreateAccount.trialMissingRepair',
+            accountId: existing.id,
+            clerkUserId,
+          },
+        });
+      }
+    }
+    return existing;
+  }
 
-  // Check if an account with this email already exists but is tied to a
-  // different (stale) Clerk user. This happens when a user deletes their
-  // Clerk account and re-registers with the same email — Clerk assigns a new
-  // clerkUserId but our DB still holds the old row. Reclaim it by updating
-  // the clerkUserId so the user keeps their data (profiles, history, etc.).
-  const existingByEmail = await db.query.accounts.findFirst({
-    where: eq(accounts.email, email),
-  });
+  // [BUG-411] Email-based reclaim is unsafe without out-of-band verification.
+  // If email matches an existing row owned by a DIFFERENT clerkUserId, we
+  // MUST NOT silently rewire — that would hand an attacker the victim's data
+  // whenever they register with the same email on a new Clerk account.
+  //
+  // Safe path: block the attempt with a loud, auditable failure so the
+  // legitimate "I lost my Clerk account" case is handled out-of-band until a
+  // proper confirmation-token flow is built.
+  //
+  // TODO(BUG-411): proper reclaim flow requires out-of-band email verification
+  //   + confirmation token. The attempt is blocked here and dispatched as
+  //   app/account.reclaim_attempt for a future workflow handler to notify the
+  //   original email owner and provide a safe resolution path.
+  if (email) {
+    const existingByEmail = await db.query.accounts.findFirst({
+      where: eq(accounts.email, email),
+    });
 
-  if (existingByEmail && existingByEmail.clerkUserId !== clerkUserId) {
-    const [updated] = await db
-      .update(accounts)
-      .set({ clerkUserId, updatedAt: new Date() })
-      .where(eq(accounts.id, existingByEmail.id))
-      .returning();
-    if (!updated) throw new Error('Account reclaim failed — row disappeared');
-    return mapAccountRow(updated);
+    if (existingByEmail && existingByEmail.clerkUserId !== clerkUserId) {
+      // Hash the email before logging to avoid PII in structured logs / Sentry.
+      const emailHash = hashEmail(email);
+
+      logger.warn('account.reclaim_attempt_blocked', {
+        incomingClerkUserId: clerkUserId,
+        existingClerkUserId: existingByEmail.clerkUserId,
+        emailHash,
+      });
+
+      captureException(
+        new Error(
+          `Account reclaim attempt blocked: email matched existing account with different clerkUserId`,
+        ),
+        {
+          extra: {
+            // tag included in extra so it is queryable in Sentry extras;
+            // a proper scope.setTag would require ErrorContext extension.
+            'account.reclaim_attempt_blocked': true,
+            flow: 'findOrCreateAccount.reclaimBlock',
+            incomingClerkUserId: clerkUserId,
+            existingClerkUserId: existingByEmail.clerkUserId,
+            emailHash,
+          },
+        },
+      );
+
+      // Dispatch non-core event for future workflow (notify original email, etc.)
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/account.reclaim_attempt',
+            data: {
+              incomingClerkUserId: clerkUserId,
+              existingClerkUserId: existingByEmail.clerkUserId,
+              emailHash,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'account.reclaim_attempt',
+        { incomingClerkUserId: clerkUserId, emailHash },
+      );
+
+      throw new ConflictError(
+        'An account with this email already exists. Contact support to recover access.',
+      );
+    }
   }
 
   // onConflictDoNothing guards against the TOCTOU race where two concurrent
   // requests both pass the findFirst check and attempt to insert. The unique
   // constraint on accounts.clerkUserId ensures only one row is created.
+  //
+  // The DB schema requires email NOT NULL. If email is undefined here it means
+  // the caller bypassed the middleware guard (BUG-497) — surface a hard error
+  // rather than silently creating a bad row or masking the misconfiguration.
+  if (!email) {
+    throw new Error(
+      'findOrCreateAccount: email is required for new account creation but was undefined. ' +
+        'Verify the account middleware email_verified guard is in place.',
+    );
+  }
+
   const [row] = await db
     .insert(accounts)
     .values({ clerkUserId, email, timezone: timezone ?? null })

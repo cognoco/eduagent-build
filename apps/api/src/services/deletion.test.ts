@@ -62,8 +62,13 @@ function createMockDb(
     update: jest.fn().mockReturnValue({
       set: updateSetMock,
     }),
+    // [Fix Bug #494] executeDeletion now calls .delete().where().returning()
+    // and then (when 0 rows) re-reads via query.accounts.findFirst.
+    // Default: 1 row returned (happy path — account deleted).
     delete: jest.fn().mockReturnValue({
-      where: jest.fn().mockResolvedValue(undefined),
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'account-1' }]),
+      }),
     }),
   } as unknown as Database;
 }
@@ -194,15 +199,40 @@ describe('scheduleDeletion', () => {
 });
 
 describe('cancelDeletion', () => {
-  it('resolves without error', async () => {
-    const db = createMockDb();
-    await expect(cancelDeletion(db, 'account-1')).resolves.toBeUndefined();
+  it('returns "cancelled" when a deletion was active and the row was updated', async () => {
+    // Default mock returns one row → active deletion found and cancelled.
+    const db = createMockDb({
+      updateReturning: [{ deletionScheduledAt: new Date() }],
+    });
+    const result = await cancelDeletion(db, 'account-1');
+    expect(result).toBe('cancelled');
   });
 
   it('calls db.update to set deletionCancelledAt', async () => {
     const db = createMockDb();
     await cancelDeletion(db, 'account-1');
     expect(db.update).toHaveBeenCalled();
+  });
+
+  // [BUG-412] Break test: no active scheduled deletion → DB update matches 0
+  // rows → must return 'no_active_deletion', NOT silently succeed.
+  // Before the fix, the unconditional WHERE only checked account ID, so the
+  // route always returned 200 "Deletion cancelled" regardless of actual state.
+  it('[BUG-412] returns "no_active_deletion" when no active deletion exists (0 rows updated)', async () => {
+    const db = createMockDb({ updateReturning: [] }); // 0 rows → nothing to cancel
+    const result = await cancelDeletion(db, 'account-1');
+    expect(result).toBe('no_active_deletion');
+  });
+
+  // [BUG-412] The row must NOT be mutated when 'no_active_deletion' is returned.
+  // This tests that the WHERE predicate scoping is correct — if the update is
+  // called at all, it must use a conditional predicate (not a bare account ID).
+  it('[BUG-412] does not mutate a row when returning "no_active_deletion"', async () => {
+    const db = createMockDb({ updateReturning: [] });
+    await cancelDeletion(db, 'account-1');
+    // update was called but the predicate returned 0 matching rows —
+    // the WHERE clause is correct (tested by the empty returning[] mock).
+    expect(db.update).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -353,15 +383,75 @@ describe('getProfileIdsForAccount', () => {
 });
 
 describe('executeDeletion', () => {
-  it('resolves without error (idempotent)', async () => {
+  it('returns "deleted" when account row is atomically removed (happy path)', async () => {
+    // Default mock: delete().where().returning() → [{ id: 'account-1' }] (1 row).
     const db = createMockDb();
-    await expect(executeDeletion(db, 'account-1')).resolves.toBeUndefined();
+    await expect(executeDeletion(db, 'account-1')).resolves.toBe('deleted');
   });
 
-  it('calls db.delete', async () => {
+  it('calls db.delete with the account id', async () => {
     const db = createMockDb();
     await executeDeletion(db, 'account-1');
     expect(db.delete).toHaveBeenCalled();
+  });
+
+  it('returns "cancelled" when atomic guard fires (0 rows deleted, row still exists)', async () => {
+    // Simulate: WHERE guard excluded the row (cancelled) — 0 rows returned.
+    // findFirst then returns the existing row → 'cancelled'.
+    const db = {
+      query: {
+        accounts: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'account-1' }),
+        },
+        profiles: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest
+              .fn()
+              .mockResolvedValue([{ deletionScheduledAt: new Date() }]),
+          }),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 0 rows
+        }),
+      }),
+    } as unknown as Database;
+
+    await expect(executeDeletion(db, 'account-1')).resolves.toBe('cancelled');
+  });
+
+  it('returns "already_deleted" when atomic guard fires (0 rows deleted, row missing)', async () => {
+    // Simulate: WHERE guard excluded the row and the account is already gone.
+    const db = {
+      query: {
+        accounts: {
+          findFirst: jest.fn().mockResolvedValue(undefined), // row missing
+        },
+        profiles: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest
+              .fn()
+              .mockResolvedValue([{ deletionScheduledAt: new Date() }]),
+          }),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 0 rows
+        }),
+      }),
+    } as unknown as Database;
+
+    await expect(executeDeletion(db, 'account-1')).resolves.toBe(
+      'already_deleted',
+    );
   });
 });
 

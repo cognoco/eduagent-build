@@ -39,13 +39,25 @@ export const topicIdSchema = brandedUuid('TopicId');
 export type TopicId = z.infer<typeof topicIdSchema>;
 
 /**
- * Escape hatches — call when handing a brand-checked id to a layer that
- * doesn't know about brands yet (e.g. Drizzle query builders) or when
- * accepting a string from a layer that hasn't been migrated. These are
- * NO-OP at runtime; the cost is only at the type level.
+ * [BUG-579] Validated escape hatches — use at trust boundaries where `id`
+ * comes from user input, an external payload, or any untrusted string.
+ * Throws a ZodError if the value is not a valid UUID, preventing empty
+ * strings, account-IDs, or topic-IDs from being branded as ProfileIds.
  */
-export const asProfileId = (id: string): ProfileId => id as ProfileId;
-export const asSubjectId = (id: string): SubjectId => id as SubjectId;
-export const asSessionId = (id: string): SessionId => id as SessionId;
-export const asBookId = (id: string): BookId => id as BookId;
-export const asTopicId = (id: string): TopicId => id as TopicId;
+export const asProfileId = (id: string): ProfileId => profileIdSchema.parse(id);
+export const asSubjectId = (id: string): SubjectId => subjectIdSchema.parse(id);
+export const asSessionId = (id: string): SessionId => sessionIdSchema.parse(id);
+export const asBookId = (id: string): BookId => bookIdSchema.parse(id);
+export const asTopicId = (id: string): TopicId => topicIdSchema.parse(id);
+
+/**
+ * Unchecked escape hatches — use ONLY when the caller can guarantee the
+ * string is already a valid UUID (e.g. a Drizzle row SELECT'd from a
+ * UUID-typed column, or a value already validated by `asXxxId` upstream).
+ * These are NO-OP at runtime; no UUID validation is performed.
+ */
+export const asProfileIdUnchecked = (id: string): ProfileId => id as ProfileId;
+export const asSubjectIdUnchecked = (id: string): SubjectId => id as SubjectId;
+export const asSessionIdUnchecked = (id: string): SessionId => id as SessionId;
+export const asBookIdUnchecked = (id: string): BookId => id as BookId;
+export const asTopicIdUnchecked = (id: string): TopicId => id as TopicId;

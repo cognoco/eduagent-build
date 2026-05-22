@@ -139,6 +139,49 @@ describe('parseLearnerInput — LLM success path', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [BUG-480] BREAK TEST: extractor finds JSON embedded mid-prose
+// ---------------------------------------------------------------------------
+
+describe('parseLearnerInput — [BUG-480] extractFirstJsonObject', () => {
+  it('succeeds when LLM wraps JSON mid-paragraph', async () => {
+    // Prose before and after the JSON object — greedy regex would have grabbed
+    // from first "{" (in the prose) to last "}" producing broken JSON.
+    const jsonPayload = {
+      explanationEffectiveness: null,
+      interests: ['astronomy'],
+      strengths: null,
+      struggles: null,
+      resolvedTopics: null,
+      communicationNotes: null,
+      engagementLevel: null,
+      confidence: 'high',
+    };
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: `Sure, here is the analysis: ${JSON.stringify(jsonPayload)} Hope that helps!`,
+    } as any);
+    mockApplyAnalysis.mockResolvedValueOnce({
+      fieldsUpdated: ['interests'],
+      notifications: [],
+    });
+
+    const result = await parseLearnerInput(
+      db,
+      profileId,
+      'I love astronomy',
+      'learner',
+    );
+    expect(result.success).toBe(true);
+    expect(mockApplyAnalysis).toHaveBeenCalledWith(
+      db,
+      profileId,
+      expect.objectContaining({ interests: ['astronomy'] }),
+      null,
+      'learner',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Fallback path (LLM failure or invalid response)
 // ---------------------------------------------------------------------------
 

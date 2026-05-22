@@ -8,11 +8,13 @@ import { useSignIn } from '@clerk/clerk-expo';
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
     back: mockBack,
+    push: mockPush,
     canGoBack: jest.fn(() => true),
   }),
 }));
@@ -171,6 +173,118 @@ describe('ForgotPasswordScreen', () => {
     await waitFor(() => {
       screen.getByText('User not found');
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [#511] setActive throws after successful password reset
+  // Break test: assert Retry button is rendered, sessionId preserved,
+  // retry calls setActive again with the same sessionId.
+  // ---------------------------------------------------------------------------
+
+  it('[#511] shows Retry button when setActive throws after reset success', async () => {
+    mockCreate.mockResolvedValue({});
+    mockAttemptFirstFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_reset_fail_123',
+    });
+    mockSetActive.mockRejectedValue(new Error('setActive blew up'));
+
+    render(<ForgotPasswordScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('forgot-password-email'),
+      'test@example.com',
+    );
+    fireEvent.press(screen.getByTestId('send-reset-code-button'));
+
+    await waitFor(() => screen.getByTestId('reset-code'));
+
+    fireEvent.changeText(screen.getByTestId('reset-code'), '123456');
+    fireEvent.changeText(
+      screen.getByTestId('reset-new-password'),
+      'NewPassword1!',
+    );
+    fireEvent.press(screen.getByTestId('reset-password-button'));
+
+    // Retry button must appear; form fields hidden (code is spent)
+    await waitFor(() => screen.getByTestId('reset-retry-activation'));
+    expect(screen.queryByTestId('reset-password-button')).toBeNull();
+    expect(screen.queryByTestId('reset-code')).toBeNull();
+  });
+
+  it('[#511] retry button calls setActive again with the preserved sessionId', async () => {
+    mockCreate.mockResolvedValue({});
+    mockAttemptFirstFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_reset_retry_999',
+    });
+    // First setActive throws; second succeeds
+    mockSetActive
+      .mockRejectedValueOnce(new Error('Transient error'))
+      .mockResolvedValueOnce(undefined);
+
+    render(<ForgotPasswordScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('forgot-password-email'),
+      'test@example.com',
+    );
+    fireEvent.press(screen.getByTestId('send-reset-code-button'));
+
+    await waitFor(() => screen.getByTestId('reset-code'));
+
+    fireEvent.changeText(screen.getByTestId('reset-code'), '654321');
+    fireEvent.changeText(
+      screen.getByTestId('reset-new-password'),
+      'NewPassword1!',
+    );
+    fireEvent.press(screen.getByTestId('reset-password-button'));
+
+    await waitFor(() => screen.getByTestId('reset-retry-activation'));
+
+    // Tap Retry — must call setActive with the SAME session id, not null
+    fireEvent.press(screen.getByTestId('reset-retry-activation'));
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledTimes(2);
+      expect(mockSetActive).toHaveBeenNthCalledWith(2, {
+        session: 'sess_reset_retry_999',
+      });
+    });
+  });
+
+  it('[#511] secondary link navigates to sign-in on permanent setActive failure', async () => {
+    mockCreate.mockResolvedValue({});
+    mockAttemptFirstFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_reset_perm_fail',
+    });
+    mockSetActive.mockRejectedValue(new Error('Permanent failure'));
+
+    render(<ForgotPasswordScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('forgot-password-email'),
+      'test@example.com',
+    );
+    fireEvent.press(screen.getByTestId('send-reset-code-button'));
+
+    await waitFor(() => screen.getByTestId('reset-code'));
+
+    fireEvent.changeText(screen.getByTestId('reset-code'), '111222');
+    fireEvent.changeText(
+      screen.getByTestId('reset-new-password'),
+      'NewPassword1!',
+    );
+    fireEvent.press(screen.getByTestId('reset-password-button'));
+
+    await waitFor(() => screen.getByTestId('reset-continue-to-sign-in'));
+
+    fireEvent.press(screen.getByTestId('reset-continue-to-sign-in'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(auth)/sign-in' }),
+    );
   });
 
   it('displays error on reset failure', async () => {

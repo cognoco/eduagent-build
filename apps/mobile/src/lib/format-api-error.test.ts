@@ -161,10 +161,14 @@ describe('classifyApiError', () => {
     expect(result.message).toContain("That session isn't available anymore");
   });
 
-  // --- HTTP status codes ---
+  // --- Typed errors from customFetch / classifyXhrError [BUG-545] ---
+  // [BUG-545] customFetch and classifyXhrError now always throw typed errors
+  // (UpstreamError, NotFoundError, etc.) instead of plain Error("API error
+  // {status}: …"). These tests assert classification via typed constructors —
+  // the parseApiBody regex path has been removed.
 
-  it('classifies API error 404 as not-found / go-back', () => {
-    const err = new Error('API error 404: {"message":"Session not found"}');
+  it('[BUG-545] classifies NotFoundError as not-found / go-back', () => {
+    const err = new NotFoundError('Session not found');
     const result = classifyApiError(err);
     expect(result.category).toBe('not-found');
     expect(result.recovery).toBe('go-back');
@@ -182,38 +186,47 @@ describe('classifyApiError', () => {
     expect(result.blocksManualEntry).toBe(true);
   });
 
-  it('classifies API error 401 as auth / sign-out', () => {
-    const err = new Error('API error 401: Unauthorized');
+  it('[BUG-545] classifies ForbiddenError (401/403) as auth / sign-out', () => {
+    // customFetch throws ForbiddenError for 403; 401 is handled separately.
+    // Both surface as auth / sign-out via classifyApiError.
+    const err = new ForbiddenError('Unauthorized');
     const result = classifyApiError(err);
     expect(result.category).toBe('auth');
     expect(result.recovery).toBe('sign-out');
   });
 
-  it('classifies API error 403 as auth / sign-out', () => {
-    const err = new Error('API error 403: Forbidden');
-    const result = classifyApiError(err);
-    expect(result.category).toBe('auth');
-    expect(result.recovery).toBe('sign-out');
-  });
-
-  it('classifies API error 429 as quota / retry', () => {
-    const err = new Error('API error 429: {"message":"Rate limit exceeded"}');
+  it('[BUG-545] classifies RateLimitedError as quota / retry', () => {
+    const err = new RateLimitedError('Rate limit exceeded', 'RATE_LIMITED');
     const result = classifyApiError(err);
     expect(result.category).toBe('quota');
     expect(result.recovery).toBe('retry');
   });
 
-  it('classifies API error 500 as server / retry', () => {
-    const err = new Error('API error 500: Internal Server Error');
+  it('[BUG-545] classifies UpstreamError 500 as server / retry', () => {
+    const err = new UpstreamError(
+      'Internal Server Error',
+      'UPSTREAM_ERROR',
+      500,
+    );
     const result = classifyApiError(err);
     expect(result.category).toBe('server');
     expect(result.recovery).toBe('retry');
   });
 
-  it('classifies API error 502 as server / retry', () => {
-    const err = new Error('API error 502: Bad Gateway');
+  it('[BUG-545] classifies UpstreamError 502 as server / retry', () => {
+    const err = new UpstreamError('Bad Gateway', 'UPSTREAM_ERROR', 502);
     const result = classifyApiError(err);
     expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('[BUG-562] BadRequestError from customFetch classifies as unknown / retry', () => {
+    // [BUG-562] 400 responses from customFetch now throw BadRequestError (typed).
+    // classifyApiError maps them to unknown/retry — callers that previously
+    // relied on plain Error("API error 400: …") should use BadRequestError.
+    const err = new BadRequestError('Email is already registered');
+    const result = classifyApiError(err);
+    expect(result.category).toBe('unknown');
     expect(result.recovery).toBe('retry');
   });
 
@@ -405,6 +418,46 @@ describe('classifyApiError', () => {
     expect(result.message).toBe('Profile name must be at least 2 characters');
   });
 
+  // --- [BUG-546] 401 vs 403 recovery distinction ---
+  //
+  // Root cause: the status-based fallback path treated 401 and 403 identically
+  // with recovery:'sign-out'. For 401, triggerAuthExpired() (BUG-547 / wave 1)
+  // already initiates async sign-out; rendering a 'Sign Out' button on top of
+  // an in-progress sign-out creates a double-sign-out + guard race.
+  // Fix: 401 → recovery:'none' (no button; sign-out in progress).
+  //      403 → recovery:'sign-out' (unchanged — genuine forbidden, not session expiry).
+
+  it('[BUG-546 / break-test] plain Error with status=401 → recovery is NOT sign-out', () => {
+    // SSE path: sse.ts throws plain Error with .status=401 after triggerAuthExpired().
+    // Showing a 'Sign Out' button on top of the in-progress sign-out is wrong.
+    const err = Object.assign(new Error('Session expired — signing out'), {
+      status: 401,
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    // [break-test] Pre-fix this was 'sign-out'; must now be 'none' to avoid
+    // double-sign-out race with the already-in-progress triggerAuthExpired().
+    expect(result.recovery).toBe('none');
+    expect(result.recovery).not.toBe('sign-out');
+  });
+
+  it('[BUG-546 / break-test] plain Error with status=403 → recovery is still sign-out', () => {
+    // 403 is a genuine permission failure, not session expiry. Sign-out
+    // recovery remains correct here (no in-progress triggerAuthExpired race).
+    const err = Object.assign(new Error('Forbidden'), { status: 403 });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  it('[BUG-546] 401 error message reflects session-expiry copy', () => {
+    const err = Object.assign(new Error('Session expired — signing out'), {
+      status: 401,
+    });
+    const result = classifyApiError(err);
+    expect(result.message).toContain('session expired');
+  });
+
   // --- SSE idle timeout (interview / chat) [BUG-555] ---
 
   it('classifies SSE idle-timeout error as network / retry with reconnect message [BUG-555]', () => {
@@ -524,54 +577,48 @@ describe('formatApiError', () => {
     );
   });
 
-  // --- Hono RPC API errors (from customFetch in api-client.ts) ---
+  // --- Typed errors from customFetch (UpstreamError / typed classes) [BUG-545] ---
+  // [BUG-545] customFetch always throws typed errors, never plain
+  // Error("API error {status}: …"). Tests now use typed constructors.
 
-  it('returns server message for API error 500', () => {
-    const err = new Error('API error 500: Internal Server Error');
+  it('[BUG-545] returns server message for UpstreamError 500', () => {
+    const err = new UpstreamError(
+      'Internal Server Error',
+      'UPSTREAM_ERROR',
+      500,
+    );
     expect(formatApiError(err)).toBe(
       'Something went wrong on our end. Please try again in a moment.',
     );
   });
 
-  it('returns server message for API error 502 with plain text body', () => {
-    const err = new Error('API error 502: Bad Gateway');
+  it('[BUG-545] returns server message for UpstreamError 502', () => {
+    const err = new UpstreamError('Bad Gateway', 'UPSTREAM_ERROR', 502);
     expect(formatApiError(err)).toBe(
       'Something went wrong on our end. Please try again in a moment.',
     );
   });
 
-  it('extracts JSON message from API error 502 body', () => {
-    const err = new Error(
-      'API error 502: {"code":"INTERNAL_ERROR","message":"Consent email could not be delivered. Please check the email address and try again."}',
-    );
-    expect(formatApiError(err)).toBe(
+  it('[BUG-545] returns generic server message for UpstreamError 502 with INTERNAL_ERROR code', () => {
+    // INTERNAL_ERROR is classified as a server error regardless of message.
+    // The errorCode branch short-circuits before the message passthrough gate.
+    const err = new UpstreamError(
       'Consent email could not be delivered. Please check the email address and try again.',
+      'INTERNAL_ERROR',
+      502,
+    );
+    expect(formatApiError(err)).toBe(
+      'Something went wrong on our end. Please try again in a moment.',
     );
   });
 
-  it('extracts JSON message from API error 400 body', () => {
-    const err = new Error(
-      'API error 400: {"message":"Email is already registered"}',
-    );
+  it('[BUG-545] passes through message from BadRequestError', () => {
+    const err = new BadRequestError('Email is already registered');
     expect(formatApiError(err)).toBe('Email is already registered');
   });
 
-  it('uses plain text body from API error 422', () => {
-    const err = new Error('API error 422: Invalid email format');
-    expect(formatApiError(err)).toBe('Invalid email format');
-  });
-
-  it('returns input message for API error 400 with empty body', () => {
-    const err = new Error('API error 400: ');
-    expect(formatApiError(err)).toBe(
-      "That didn't work. Please check your input and try again.",
-    );
-  });
-
-  it('returns not-found message for API error 404 with unreadable body', () => {
-    const err = new Error('API error 404: {"complex":{"nested":"object"}}');
-    // classifyApiError recognises HTTP 404 and returns the not-found message
-    // even when the body doesn't contain a parseable apiMessage.
+  it('[BUG-545] returns not-found message for NotFoundError', () => {
+    const err = new NotFoundError('Resource not found');
     expect(formatApiError(err)).toBe('That page or item no longer exists.');
   });
 

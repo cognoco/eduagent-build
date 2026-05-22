@@ -8,6 +8,7 @@ import type { KnowledgeInventory, ProgressSummary } from '@eduagent/schemas';
 
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import { assertParentAccess } from './family-access';
 
 export const INACTIVITY_THRESHOLDS = {
   NO_RECENT_ACTIVITY_DAYS: 2,
@@ -161,8 +162,11 @@ export async function generateProgressSummary(input: {
 
 export async function getProgressSummary(
   db: Database,
+  requesterProfileId: string,
   childProfileId: string,
 ): Promise<ProgressSummary> {
+  await assertParentAccess(db, requesterProfileId, childProfileId);
+
   const stored = await db.query.progressSummaries.findFirst({
     where: eq(progressSummaries.profileId, childProfileId),
   });

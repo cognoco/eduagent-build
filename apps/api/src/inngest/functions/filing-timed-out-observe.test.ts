@@ -657,3 +657,31 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
     expect(pushCapture).not.toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// [Bug #424] Idempotency + concurrency config break tests
+//
+// Verifies that filingTimedOutObserve is configured with idempotency and
+// concurrency keys so duplicate events for the same sessionId are deduped
+// by the Inngest runtime rather than running two parallel executions that
+// both increment filingRetryCount.
+//
+// Red→green: before the fix, createFunction was called with only { id, name }.
+// After the fix it carries idempotency and concurrency keyed on sessionId.
+// ---------------------------------------------------------------------------
+describe('[Bug #424] filing-timed-out-observe idempotency + concurrency config', () => {
+  it('has idempotency key set to event.data.sessionId', () => {
+    const config = (filingTimedOutObserve as any).opts;
+    expect(config.idempotency).toBe('event.data.sessionId');
+  });
+
+  it('has concurrency key set to event.data.sessionId with limit 1', () => {
+    const config = (filingTimedOutObserve as any).opts;
+    expect(config.concurrency).toEqual(
+      expect.objectContaining({
+        key: 'event.data.sessionId',
+        limit: 1,
+      }),
+    );
+  });
+});

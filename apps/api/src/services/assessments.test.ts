@@ -28,6 +28,7 @@ import type {
   AssessmentEvaluation,
   AssessmentRecord,
 } from '@eduagent/schemas';
+import { NotFoundError } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
@@ -736,12 +737,24 @@ function createAssessmentMockDb({
   updateReturning = [mockAssessmentRow()] as ReturnType<
     typeof mockAssessmentRow
   >[],
+  // ownershipMatch: what the ownership-verification select returns.
+  // Defaults to [{ id: testTopicId }] so existing tests continue to pass
+  // (topic is owned). Pass [] to simulate an unowned/nonexistent topic.
+  ownershipMatch = [{ id: testTopicId }] as { id: string }[],
 } = {}) {
   const updateReturningFn = jest.fn().mockResolvedValue(updateReturning);
   const updateWhere = jest
     .fn()
     .mockReturnValue({ returning: updateReturningFn });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+  // Ownership check: db.select().from().innerJoin().innerJoin().where().limit()
+  const ownershipChain = {
+    from: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockResolvedValue(ownershipMatch),
+  };
 
   return {
     query: {
@@ -750,6 +763,7 @@ function createAssessmentMockDb({
         findMany: jest.fn().mockResolvedValue(findManyResult),
       },
     },
+    select: jest.fn().mockReturnValue(ownershipChain),
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue(insertReturning),
@@ -821,6 +835,49 @@ describe('createAssessment', () => {
 
     expect(result.createdAt).toBe('2025-01-15T10:00:00.000Z');
     expect(result.updatedAt).toBe('2025-01-15T10:00:00.000Z');
+  });
+
+  it('[BUG-460 / P2 BREAK] throws NotFoundError and does NOT insert when topic is not owned by profileId', async () => {
+    // Break test: BEFORE the fix, createAssessment called db.insert directly
+    // with subjectId/topicId from URL params — no ownership check. An attacker
+    // could POST /subjects/:victimSubject/topics/:victimTopic/assessments with
+    // their own auth token and create assessment rows tagged with victim's IDs.
+    // With the fix, the ownership-verification select returns [] (no match) and
+    // createAssessment must throw NotFoundError before touching db.insert.
+    const row = mockAssessmentRow();
+    // ownershipMatch: [] simulates foreign/nonexistent topic (no ownership match)
+    const db = createAssessmentMockDb({
+      insertReturning: [row],
+      ownershipMatch: [],
+    });
+
+    await expect(
+      createAssessment(
+        db,
+        testProfileId,
+        'attacker-subject-id',
+        'victim-topic-id',
+      ),
+    ).rejects.toThrow(NotFoundError);
+
+    // Insert must never be called — no row written for unowned topic.
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-460 / P2] succeeds when topic is owned by profileId', async () => {
+    const row = mockAssessmentRow();
+    // ownershipMatch: [{ id: testTopicId }] — owned (default)
+    const db = createAssessmentMockDb({ insertReturning: [row] });
+
+    const result = await createAssessment(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId,
+    );
+
+    expect(result.id).toBe(testAssessmentId);
+    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 });
 

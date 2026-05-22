@@ -634,6 +634,36 @@ describe('useRoundDetail', () => {
 
     sharedQc.clear();
   });
+
+  // [BUG-528] Break test: queryKey must include activeProfile.id so that two
+  // profiles with the same roundId cannot share a cache entry.
+  // Pre-fix: queryKey was ['quiz-round-detail', roundId] — two profiles sharing
+  // a roundId (e.g. same curriculum) would receive each other's cached data.
+  it('[break-test] queryKey includes activeProfile.id for profile isolation [BUG-528]', async () => {
+    const { wrapper, queryClient: sharedQc } = createQueryWrapper();
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(mockRound), { status: 200 }),
+    );
+
+    const { result } = renderHook(() => useRoundDetail('round-1'), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const keys = sharedQc.getQueryCache().getAll().map((q) => q.queryKey);
+    const roundDetailKey = keys.find(
+      (k) => Array.isArray(k) && k[0] === 'quiz-round-detail',
+    );
+
+    // Key must be 3 elements: ['quiz-round-detail', roundId, profileId]
+    expect(roundDetailKey).toHaveLength(3);
+    // Third element must be the active profile id, not undefined
+    expect(roundDetailKey![2]).toBe('test-profile-id');
+
+    sharedQc.clear();
+  });
 });
 
 // ---------------------------------------------------------------------------

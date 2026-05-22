@@ -230,40 +230,13 @@ function isNetworkRelated(msg: string): boolean {
   );
 }
 
-function parseApiBody(message: string): {
-  status: number;
-  code?: string;
-  apiMessage?: string;
-} | null {
-  const match = /^API error (\d{3}):\s*(.*)$/s.exec(message);
-  if (!match) {
-    return null;
-  }
-
-  const status = Number(match[1]);
-  const body = match[2]?.trim() ?? '';
-  if (!body) {
-    return { status };
-  }
-
-  try {
-    const parsed = JSON.parse(body) as {
-      message?: string;
-      code?: string;
-      error?: { code?: string; message?: string };
-    };
-    return {
-      status,
-      code: parsed.error?.code ?? parsed.code,
-      apiMessage: parsed.error?.message ?? parsed.message,
-    };
-  } catch {
-    return {
-      status,
-      apiMessage: body.length < 200 ? body : undefined,
-    };
-  }
-}
+// [BUG-545] parseApiBody removed — customFetch and classifyXhrError now always
+// throw typed errors (UpstreamError with code + status fields) instead of plain
+// Error("API error {status}: …"). Classification uses typed shape checks, not
+// regex parsing of formatted message strings. This eliminates the
+// "classify errors before formatting" anti-pattern (see CLAUDE.md Code Quality
+// Guards). The statuses this handled (401, 403, 404, 402, 429, 5xx) are now
+// covered by the UpstreamError instanceof / shape-guard branches above.
 
 /**
  * Structured error classification result.
@@ -593,7 +566,21 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
       const userMsg =
         msg.length < 200 ? (friendlyMessage(msg) ?? msg) : undefined;
 
-      if (status === 401 || status === 403) {
+      // [BUG-546] Distinguish 401 (session expired) from 403 (forbidden).
+      // For 401: triggerAuthExpired() has already initiated async sign-out
+      // (wave 1 / BUG-547). Showing a 'sign-out' recovery button on top of
+      // an in-progress sign-out creates a double-sign-out + guard race.
+      // Use recovery:'none' so no action button is rendered — the in-progress
+      // sign-out will navigate away shortly.
+      // For 403: this is a genuine auth/permission failure; 'sign-out' is correct.
+      if (status === 401) {
+        return {
+          message: i18next.t('errors.sessionExpired'),
+          category: 'auth',
+          recovery: 'none',
+        };
+      }
+      if (status === 403) {
         return {
           message: userMsg ?? i18next.t('errors.forbidden'),
           category: 'auth',
@@ -638,86 +625,13 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
       };
     }
 
-    // 4. HTTP status from "API error {status}: …" (plain Error fallback shape —
-    // emitted for 402 without QUOTA_EXCEEDED code, and any other unclassified
-    // statuses that fall through customFetch).
-    const parsedApiBody = parseApiBody(msg);
-    if (parsedApiBody) {
-      const { status, code, apiMessage } = parsedApiBody;
+    // [BUG-545] Step 4 (parseApiBody regex classifier) removed. customFetch and
+    // classifyXhrError now always throw typed errors (UpstreamError with .code
+    // and .status), so the "API error {status}: …" plain-Error path is dead.
+    // EXCHANGE_LIMIT_EXCEEDED and SUBJECT_INACTIVE codes are handled in the
+    // UpstreamError shape-guard branch above (steps 2–3).
 
-      if (code === 'EXCHANGE_LIMIT_EXCEEDED') {
-        return {
-          message: i18next.t('errors.sessionLimitReached'),
-          category: 'quota',
-          recovery: 'go-back',
-        };
-      }
-
-      if (code === 'SUBJECT_INACTIVE') {
-        const userMsg =
-          apiMessage && apiMessage.length < 200
-            ? (friendlyMessage(apiMessage) ?? apiMessage)
-            : i18next.t('friendlyErrors.subjectPaused');
-        return { message: userMsg, category: 'not-found', recovery: 'go-back' };
-      }
-
-      if (status === 401 || status === 403) {
-        const userMsg =
-          apiMessage && apiMessage.length < 200
-            ? (friendlyMessage(apiMessage) ?? apiMessage)
-            : i18next.t('errors.forbidden');
-        return { message: userMsg, category: 'auth', recovery: 'sign-out' };
-      }
-
-      if (status === 404) {
-        const userMsg =
-          apiMessage && apiMessage.length < 200
-            ? (friendlyMessage(apiMessage) ?? apiMessage)
-            : i18next.t('errors.notFound');
-        return { message: userMsg, category: 'not-found', recovery: 'go-back' };
-      }
-
-      if (status === 429) {
-        const userMsg =
-          apiMessage && apiMessage.length < 200
-            ? (friendlyMessage(apiMessage) ?? apiMessage)
-            : i18next.t('errors.rateLimited');
-        return { message: userMsg, category: 'quota', recovery: 'retry' };
-      }
-
-      if (status >= 500) {
-        const hasUsefulMsg =
-          apiMessage &&
-          apiMessage.length < 200 &&
-          !isGenericServerMessage(apiMessage) &&
-          !isTechnicalMessage(apiMessage);
-        return {
-          message: hasUsefulMsg
-            ? (friendlyMessage(apiMessage) ?? apiMessage)
-            : SERVER_MESSAGE(),
-          category: 'server',
-          recovery: 'retry',
-        };
-      }
-
-      // 4xx client errors — same passthrough gate as the typed
-      // BadRequestError branch so technical / stack / runtime-error shapes
-      // never become chat bubbles.
-      if (apiMessage && shouldPassThroughUserMessage(apiMessage)) {
-        return {
-          message: friendlyMessage(apiMessage) ?? apiMessage,
-          category: 'unknown',
-          recovery: 'retry',
-        };
-      }
-      return {
-        message: i18next.t('errors.badRequest'),
-        category: 'unknown',
-        recovery: 'retry',
-      };
-    }
-
-    // 5. Network keyword heuristics on the raw message
+    // 4. Network keyword heuristics on the raw message
     if (isNetworkRelated(msgLower)) {
       return {
         message: NETWORK_MESSAGE(),

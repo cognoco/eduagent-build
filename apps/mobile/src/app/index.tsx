@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../lib/theme';
+import { Sentry } from '../lib/sentry';
 import { ErrorFallback } from '../components/common';
 
 export default function Index() {
   const { isSignedIn, isLoaded } = useAuth();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const router = useRouter();
 
-  // [M1] Timeout escape for Clerk auth loading spinner
+  // [M1] Timeout escape for Clerk auth loading spinner.
+  // [#508] retryCount bumps when the user taps Retry — useEffect depends on it
+  // so the 15s timer genuinely restarts instead of being a no-op hide.
   const [showTimeout, setShowTimeout] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   useEffect(() => {
     if (isLoaded) {
       setShowTimeout(false);
@@ -20,7 +25,20 @@ export default function Index() {
     }
     const timer = setTimeout(() => setShowTimeout(true), 15_000);
     return () => clearTimeout(timer);
-  }, [isLoaded]);
+    // retryCount is intentionally included: bumping it re-registers the 15s
+    // timer so "Retry" is a real retry, not just hiding the timeout screen.
+  }, [isLoaded, retryCount]);
+
+  const onRetry = () => {
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      message: 'index: Clerk load timeout — user tapped Retry',
+      level: 'warning',
+      data: { retryCount: retryCount + 1 },
+    });
+    setShowTimeout(false);
+    setRetryCount((c) => c + 1);
+  };
 
   if (!isLoaded) {
     if (showTimeout) {
@@ -32,8 +50,13 @@ export default function Index() {
             message={t('auth.index.timeoutMessage')}
             primaryAction={{
               label: t('common.retry'),
-              onPress: () => setShowTimeout(false),
+              onPress: onRetry,
               testID: 'index-timeout-retry',
+            }}
+            secondaryAction={{
+              label: t('auth.index.signInInstead'),
+              onPress: () => router.replace('/(auth)/sign-in'),
+              testID: 'index-timeout-sign-in',
             }}
           />
         </View>

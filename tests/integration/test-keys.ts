@@ -89,6 +89,7 @@ export function signTestJWT(claims?: TestJWTClaims): string {
   const payload: Record<string, unknown> = {
     sub: 'user_test',
     email: 'test@test.com',
+    email_verified: true,
     iss: 'https://clerk.test',
     aud: 'integration-test-audience',
     iat: now,
@@ -110,7 +111,7 @@ export function signTestJWT(claims?: TestJWTClaims): string {
   const signature = sign(
     'sha256',
     Buffer.from(signingInput, 'ascii'),
-    privateKey
+    privateKey,
   );
 
   return `${signingInput}.${base64UrlEncode(signature)}`;
@@ -136,7 +137,7 @@ export function signExpiredJWT(claims?: TestJWTClaims): string {
  */
 export function buildAuthHeaders(
   claims?: TestJWTClaims,
-  profileId?: string
+  profileId?: string,
 ): HeadersInit {
   return {
     Authorization: `Bearer ${signTestJWT(claims)}`,

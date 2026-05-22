@@ -120,7 +120,8 @@ export default function MentorMemoryScreen() {
     };
     const labels = modeLabels[accommodationMode];
     if (!labels) return null;
-    if (ageBracket === 'child') return labels.young;
+    // [BUG-577] AgeBracket 'child' was removed (strictly-11+ product constraint);
+    // 'adolescent' now covers ages 11-17, 'adult' covers 18+.
     if (ageBracket === 'adolescent') return labels.mid;
     return labels.older;
   }, [accommodationMode, activeProfile?.birthYear, t]);

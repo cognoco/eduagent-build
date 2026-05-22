@@ -367,8 +367,33 @@ export const llmResponseEnvelopeSchema = z.object({
   /**
    * The text the learner actually sees. All prose lives here.
    * Nothing else is rendered — no marker, no JSON, nothing.
+   *
+   * Guards (Bug #575):
+   * - max 10 000 chars — prevents multi-MB LLM regressions from persisting.
+   * - no bracketed UPPERCASE tokens like [INTERVIEW_COMPLETE] — legacy marker antipattern.
+   * - no JSON-blob prefix (`{` followed by `"signals"`) — envelope must never
+   *   embed a nested envelope or signals dict in the reply field.
    */
-  reply: z.string().min(1),
+  reply: z
+    .string()
+    .min(1)
+    .max(10000)
+    .refine((val) => !/\[[A-Z_]{2,}\]/.test(val), {
+      message:
+        'reply must not contain bracketed UPPERCASE marker tokens (e.g. [INTERVIEW_COMPLETE]). Use signals.* fields instead.',
+    })
+    .refine(
+      (val) => {
+        const trimmed = val.trimStart();
+        // Reject JSON-blob that starts with { and contains "signals" key —
+        // a dead giveaway that the LLM embedded the envelope inside reply.
+        return !(trimmed.startsWith('{') && trimmed.includes('"signals"'));
+      },
+      {
+        message:
+          'reply must not be a JSON blob containing a "signals" key. Use the envelope top-level fields.',
+      },
+    ),
 
   /**
    * Binary / enum state-machine signals. Each signal has a single

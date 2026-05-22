@@ -1007,6 +1007,26 @@ export function createScopedRepository(db: Database, profileId: string) {
         values: Array<Omit<typeof quizMissedItems.$inferInsert, 'profileId'>>,
       ) {
         if (values.length === 0) return [];
+
+        // [BUG-566] Validate every distinct sourceRoundId belongs to this
+        // profileId. The FK only guarantees the round exists — it does not
+        // guarantee it belongs to the current profile. A caller could supply
+        // a sourceRoundId from a different profile, breaking cross-account
+        // audit invariants.
+        const distinctRoundIds = [
+          ...new Set(values.map((v) => v.sourceRoundId)),
+        ];
+        for (const roundId of distinctRoundIds) {
+          const round = await db.query.quizRounds.findFirst({
+            where: scopedWhere(quizRounds, eq(quizRounds.id, roundId)),
+          });
+          if (!round) {
+            throw new Error(
+              `[BUG-566] quizMissedItems.insertMany: sourceRoundId ${roundId} does not belong to profileId ${profileId}`,
+            );
+          }
+        }
+
         return db
           .insert(quizMissedItems)
           .values(values.map((v) => ({ ...v, profileId })))

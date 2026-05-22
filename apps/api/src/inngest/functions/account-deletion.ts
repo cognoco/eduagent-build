@@ -52,12 +52,23 @@ export const scheduledDeletion = inngest.createFunction(
       return { status: 'cancelled' };
     }
 
-    // Permanently delete all data
-    await step.run('delete-account-data', async () => {
+    // Permanently delete all data.
+    // [Fix Bug #494] executeDeletion now includes an atomic TOCTOU guard:
+    // the DELETE carries the same cancellation predicate as isDeletionCancelled(),
+    // so a cancel that races with this step cannot delete an account that was
+    // just cancelled. The result distinguishes 'deleted', 'cancelled', and
+    // 'already_deleted' so telemetry is accurate.
+    const deletionResult = await step.run('delete-account-data', async () => {
       const db = getStepDatabase();
-      await executeDeletion(db, accountId);
+      return executeDeletion(db, accountId);
     });
 
-    return { status: 'deleted', accountId };
-  }
+    if (deletionResult === 'cancelled') {
+      // Cancellation arrived between the check-cancellation step and the
+      // delete step (TOCTOU window now closed by the atomic guard).
+      return { status: 'cancelled', accountId };
+    }
+
+    return { status: deletionResult, accountId };
+  },
 );

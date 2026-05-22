@@ -1180,9 +1180,34 @@ describe('overdueSubjectSchema', () => {
 describe('overdueTopicsResponseSchema', () => {
   it('accepts empty overdue response', () => {
     expect(
-      overdueTopicsResponseSchema.safeParse({ totalOverdue: 0, subjects: [] })
-        .success,
+      overdueTopicsResponseSchema.safeParse({
+        totalOverdue: 0,
+        subjects: [],
+        truncated: false,
+        displayedCount: 0,
+      }).success,
     ).toBe(true);
+  });
+
+  it('accepts truncated response with displayedCount', () => {
+    expect(
+      overdueTopicsResponseSchema.safeParse({
+        totalOverdue: 501,
+        subjects: [],
+        truncated: true,
+        displayedCount: 500,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects response missing truncated field', () => {
+    expect(
+      overdueTopicsResponseSchema.safeParse({
+        totalOverdue: 0,
+        subjects: [],
+        displayedCount: 0,
+      }).success,
+    ).toBe(false);
   });
 });
 

@@ -1,4 +1,4 @@
-import { createDatabaseModuleMock } from '../test-utils/database-module';
+﻿import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
@@ -1925,18 +1925,33 @@ describe('evaluateRecallQuality', () => {
 // ---------------------------------------------------------------------------
 
 describe('getProfileOverdueCount', () => {
-  it('returns correct count and top topic IDs with nextReviewTopic', async () => {
-    const now = new Date();
-    const overduePast = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
-    const overdueRecent = new Date(now.getTime() - 1 * 60 * 60 * 1000); // 1 hour ago
+  // The new implementation uses db.select for all three parallel queries:
+  //   1. count(*) for overdueCount
+  //   2. top-3 topicIds ordered by nextReviewAt ASC
+  //   3. nearest upcoming (future) review
+  // Each call to db.select() returns a fresh chain; we use mockReturnValueOnce
+  // to deliver the correct result to each call in order.
 
+  function makeSelectChain(resolvedValue: unknown[]) {
+    const chain = {
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue(resolvedValue),
+    };
+    // Promise.all resolves the chain as a thenable after .limit(); for the
+    // count query there is no .orderBy()/.limit() — it resolves directly.
+    // We make the chain itself a thenable so both patterns work.
+    return Object.assign(chain, {
+      then: (
+        resolve: (v: unknown) => unknown,
+        reject?: (e: unknown) => unknown,
+      ) => Promise.resolve(resolvedValue).then(resolve, reject),
+    });
+  }
+
+  it('returns correct count and top topic IDs with nextReviewTopic', async () => {
     const mockRepo = {
-      retentionCards: {
-        findMany: jest.fn().mockResolvedValue([
-          { topicId: 'topic-old', nextReviewAt: overduePast },
-          { topicId: 'topic-recent', nextReviewAt: overdueRecent },
-        ]),
-      },
       subjects: {
         findFirst: jest
           .fn()
@@ -1945,14 +1960,21 @@ describe('getProfileOverdueCount', () => {
     };
     (createScopedRepository as jest.Mock).mockReturnValue(mockRepo);
 
-    const selectChain = {
-      from: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockResolvedValue([]),
-    };
+    // Call order from Promise.all: [countQuery, topCardsQuery, upcomingQuery]
     const db = {
-      select: jest.fn().mockReturnValue(selectChain),
+      select: jest
+        .fn()
+        // 1. count query — resolves to [{ count: 2 }]
+        .mockReturnValueOnce(makeSelectChain([{ count: 2 }]))
+        // 2. top-3 query — resolves to the two overdue cards ordered oldest first
+        .mockReturnValueOnce(
+          makeSelectChain([
+            { topicId: 'topic-old' },
+            { topicId: 'topic-recent' },
+          ]),
+        )
+        // 3. upcoming query — no upcoming reviews
+        .mockReturnValueOnce(makeSelectChain([])),
       query: {
         curriculumTopics: {
           findFirst: jest.fn().mockResolvedValue({
@@ -1973,7 +1995,7 @@ describe('getProfileOverdueCount', () => {
       await getProfileOverdueCount(db, 'profile-1');
 
     expect(overdueCount).toBe(2);
-    // Most overdue first
+    // Most overdue first (DB already returns them ordered by nextReviewAt ASC)
     expect(topTopicIds[0]).toBe('topic-old');
     expect(topTopicIds[1]).toBe('topic-recent');
     expect(nextReviewTopic).toEqual({
@@ -1985,19 +2007,18 @@ describe('getProfileOverdueCount', () => {
   });
 
   it('returns empty state when no overdue cards', async () => {
-    const mockRepo = {
-      retentionCards: { findMany: jest.fn().mockResolvedValue([]) },
-    };
+    const mockRepo = {};
     (createScopedRepository as jest.Mock).mockReturnValue(mockRepo);
 
-    const selectChain = {
-      from: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockResolvedValue([]),
-    };
     const db = {
-      select: jest.fn().mockReturnValue(selectChain),
+      select: jest
+        .fn()
+        // count = 0
+        .mockReturnValueOnce(makeSelectChain([{ count: 0 }]))
+        // top cards = []
+        .mockReturnValueOnce(makeSelectChain([]))
+        // upcoming = []
+        .mockReturnValueOnce(makeSelectChain([])),
     } as unknown as Database;
     const result = await getProfileOverdueCount(db, 'profile-1');
 

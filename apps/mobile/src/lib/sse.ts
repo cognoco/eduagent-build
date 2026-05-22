@@ -12,9 +12,13 @@
  *
  * Used by `useStreamMessage` to pipe real-time LLM tokens into the chat UI.
  */
-import { quotaExceededSchema } from '@eduagent/schemas';
+import {
+  maybeReplayResponseSchema,
+  quotaExceededSchema,
+} from '@eduagent/schemas';
 import {
   BadRequestError,
+  ConsentRequiredError,
   ForbiddenError,
   type IdempotencyReplayBody,
   NetworkError,
@@ -22,6 +26,7 @@ import {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  triggerAuthExpired,
   UpstreamError,
   type QuotaExceededDetails,
 } from './api-client';
@@ -238,6 +243,13 @@ export function streamSSEViaXHR(
   const eventQueue: StreamEvent[] = [];
   let resolve: (() => void) | null = null;
   let done = false;
+  // [BUG-539] Track whether the [DONE] signal was already processed via
+  // onprogress so that the onloadend fallback buffer-replay can be skipped.
+  // Without this flag, if onloadend fires after onprogress already consumed
+  // [DONE], the remaining buffer is re-parsed with a no-op onDone callback
+  // but the generator may have already returned — creating a subtle race where
+  // the final done event is dropped or a duplicate is synthesised.
+  let onDoneFired = false;
   let streamError: Error | null = null;
   let lastIndex = 0;
   let buffer = '';
@@ -315,6 +327,10 @@ export function streamSSEViaXHR(
     buffer += newData;
 
     buffer = parseSSEBuffer(buffer, eventQueue, () => {
+      // [BUG-539] Set onDoneFired BEFORE setting done so that the onloadend
+      // handler can skip its fallback buffer re-parse, preventing a duplicate
+      // done event or dropped final event when onloadend races with onprogress.
+      onDoneFired = true;
       done = true;
       if (idleTimer) {
         clearTimeout(idleTimer);
@@ -360,9 +376,11 @@ export function streamSSEViaXHR(
       return new BadRequestError(apiMessage ?? (responseText || 'Bad request'));
     }
     if (status === 401) {
-      // Session expired mid-stream — surface a typed error so
-      // isReconnectableSessionError can classify it as non-reconnectable and
-      // the UI can show "Session expired" rather than a generic reconnect card.
+      // [BUG-547] Session expired mid-stream — fire the shared auth-expired
+      // callback (same dedup guard as customFetch) so the user is signed out
+      // immediately rather than waiting ~30s for the next non-stream API call.
+      // The callback is registered by the root layout via setOnAuthExpired().
+      triggerAuthExpired();
       const err = new Error(
         apiMessage ?? 'Session expired — please sign in again',
       ) as Error & { status: number };
@@ -377,12 +395,21 @@ export function streamSSEViaXHR(
           quotaExceeded.data.details,
         );
       }
-      return new Error(
-        apiMessage ??
-          `API error ${status}: ${responseText || 'Payment required'}`,
+      // [BUG-545] Non-quota 402: use UpstreamError (not plain Error) so
+      // callers can inspect .status and .code without parsing message strings.
+      return new UpstreamError(
+        apiMessage ?? (responseText || 'Payment required'),
+        code ?? 'UPSTREAM_ERROR',
+        status,
       );
     }
     if (status === 403) {
+      // [BUG-558] Mirror api-client.ts 403 branching: CONSENT_REQUIRED must
+      // surface as ConsentRequiredError so screens route to the consent flow
+      // instead of the sign-out path that ForbiddenError triggers.
+      if (code === 'CONSENT_REQUIRED') {
+        return new ConsentRequiredError(apiMessage ?? undefined, code);
+      }
       return new ForbiddenError(apiMessage ?? undefined, code ?? undefined);
     }
     if (status === 404) {
@@ -419,15 +446,13 @@ export function streamSSEViaXHR(
         status,
       );
     }
-    if (code) {
-      return new UpstreamError(
-        apiMessage ?? (responseText || 'Server error'),
-        code,
-        status,
-      );
-    }
-    return new Error(
-      `API error ${status}: ${responseText || 'request failed'}`,
+    // [BUG-545] Always surface as UpstreamError — plain Error("API error {n}:…")
+    // forces callers to regex-parse formatted message strings to re-derive the
+    // status (violates "Classify errors before formatting" rule).
+    return new UpstreamError(
+      apiMessage ?? (responseText || 'request failed'),
+      code ?? 'UPSTREAM_ERROR',
+      status,
     );
   }
 
@@ -439,21 +464,37 @@ export function streamSSEViaXHR(
       xhr.status < 300 &&
       xhr.getResponseHeader('Idempotency-Replay') === 'true'
     ) {
+      // [BUG-538] Validate the replay response shape before pushing to the
+      // event queue. An unvalidated cast (previous code) allowed malformed
+      // bodies (e.g. empty `{}`) to produce a replay event with
+      // `clientId: undefined`, causing OutboxDrainProvider to call
+      // `markConfirmed` for an entry the server may never have persisted.
+      let replayParsedRaw: unknown;
       try {
-        const parsed = JSON.parse(xhr.responseText || '{}') as Omit<
-          StreamReplayEvent,
-          'type'
-        >;
-        eventQueue.push({
-          type: 'replay',
-          replayed: true,
-          clientId: parsed.clientId,
-          status: 'persisted',
-          assistantTurnReady: parsed.assistantTurnReady,
-          latestExchangeId: parsed.latestExchangeId ?? null,
-        });
+        replayParsedRaw = JSON.parse(xhr.responseText || '{}');
       } catch {
-        streamError = new Error('Malformed idempotency replay response');
+        streamError = new Error(
+          'Malformed idempotency replay response: invalid JSON',
+        );
+        // fall through to done/resolve below
+        replayParsedRaw = null;
+      }
+      if (replayParsedRaw !== null) {
+        const replayResult =
+          maybeReplayResponseSchema.safeParse(replayParsedRaw);
+        if (replayResult.success) {
+          eventQueue.push({
+            type: 'replay',
+            ...replayResult.data,
+          });
+        } else {
+          // Shape validation failed — do NOT push a partial replay event.
+          // Signal a stream error so the consumer knows the replay was not
+          // confirmed and can avoid calling markConfirmed on unverified data.
+          streamError = new Error(
+            'Malformed idempotency replay response: missing required fields',
+          );
+        }
       }
       done = true;
       const r = resolve;
@@ -487,8 +528,10 @@ export function streamSSEViaXHR(
       r?.();
       return;
     }
-    // Parse any remaining buffer data
-    if (buffer) {
+    // [BUG-539] Skip buffer re-parse if [DONE] was already consumed via
+    // onprogress. Re-parsing after the generator has already returned risks
+    // producing a duplicate done event or silently dropping the final event.
+    if (!onDoneFired && buffer) {
       parseSSEBuffer(buffer + '\n', eventQueue, () => {
         // no-op: done flag set below
       });

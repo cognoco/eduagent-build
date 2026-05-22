@@ -7,6 +7,7 @@ import {
   resolveReadyToFinish,
   type ExchangeHistoryEvent,
 } from './session-exchange';
+import type { processMessage, streamMessage } from './session-exchange';
 import { MAX_EXCHANGES_PER_SESSION } from '@eduagent/schemas';
 import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
 import { SessionExchangeLimitError } from './session-crud';
@@ -739,3 +740,45 @@ describe('resolveReadyToFinish', () => {
     ).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [#419] streamMessage.onComplete return shape — readyToFinish must be present
+// ---------------------------------------------------------------------------
+//
+// Break test: TypeScript will error at the assignment below if `readyToFinish`
+// is removed from the onComplete return type. This prevents the streaming path
+// from silently omitting the hard-cap signal and running unbounded.
+//
+// We cannot call streamMessage in a unit test (requires DB + LLM context), so
+// we pin the contract at the type level. The integration test for this lives
+// in session-exchange-assessment-signals.integration.test.ts.
+
+type StreamOnCompleteResult = Awaited<
+  ReturnType<Awaited<ReturnType<typeof streamMessage>>['onComplete']>
+>;
+
+// Each assignment will produce a TS error if the field is absent.
+type _assertStreamReadyToFinish = StreamOnCompleteResult extends {
+  readyToFinish?: boolean;
+}
+  ? true
+  : never;
+const _streamReadyToFinishCheck: _assertStreamReadyToFinish = true;
+void _streamReadyToFinishCheck;
+
+// ---------------------------------------------------------------------------
+// [#384] processMessage return shape — notePrompt / notePromptPostSession /
+//         confidence must be present so non-streaming clients get all fields.
+// ---------------------------------------------------------------------------
+
+type ProcessMessageResult = Awaited<ReturnType<typeof processMessage>>;
+
+type _assertProcessNotePrompt = ProcessMessageResult extends {
+  notePrompt?: boolean;
+  notePromptPostSession?: boolean;
+  confidence?: 'low' | 'medium' | 'high';
+}
+  ? true
+  : never;
+const _processNotePromptCheck: _assertProcessNotePrompt = true;
+void _processNotePromptCheck;

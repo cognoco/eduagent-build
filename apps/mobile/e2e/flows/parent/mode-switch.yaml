@@ -1,0 +1,74 @@
+# Flow P5: Parent Mode Switch — Family <-> My Learning
+# Validates: the parent Home mode chip and the "Go to My Learning" card
+# both drive the Study/Family context switch instead of leaving the user
+# on the same Family surface.
+# Tags: nightly, parent, navigation
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+  - navigation
+---
+# 1. Seed & sign in as parent with a linked child.
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'parent-with-children'
+      API_URL: ${API_URL}
+
+# 2. Family mode opens on Parent Home with the switch chip visible.
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 15000
+
+- assertVisible:
+    id: 'home-mode-chip'
+
+- takeScreenshot: parent-mode-switch-01-family
+
+# 3. The activation card moves the adult into their own learner surface.
+- scrollUntilVisible:
+    element:
+      id: 'parent-home-study-activation-action'
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: 'parent-home-study-activation-action'
+
+- extendedWaitUntil:
+    visible:
+      id: 'learner-screen'
+    timeout: 15000
+
+- assertVisible:
+    id: 'home-mode-chip'
+
+- assertVisible:
+    id: 'tab-library'
+
+- assertNotVisible:
+    id: 'parent-home-screen'
+
+- takeScreenshot: parent-mode-switch-02-my-learning
+
+# 4. The header chip switches back to Family mode.
+- tapOn:
+    id: 'home-mode-chip'
+
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 15000
+
+- assertVisible:
+    id: 'home-mode-chip'
+
+- assertVisible:
+    id: 'parent-home-study-activation'
+
+- assertNotVisible:
+    id: 'learner-screen'
+
+- takeScreenshot: parent-mode-switch-03-family-returned

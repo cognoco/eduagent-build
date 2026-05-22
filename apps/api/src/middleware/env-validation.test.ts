@@ -117,6 +117,62 @@ describe('envValidationMiddleware', () => {
     expect(next).toHaveBeenCalledTimes(2);
   });
 
+  // [BUG-486] Break test: a transient validation failure must NOT permanently
+  // lock the isolate into "validated" state.  The second request with the same
+  // env must still run validation (i.e. not be skipped as a no-op).
+  it('[BUG-486] retries validation on the next request after a transient failure', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const env = {
+      ENVIRONMENT: 'staging',
+      DATABASE_URL: 'postgresql://transient',
+    };
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    // First request: validation throws.
+    const c1 = createMockContext(env);
+    const next1 = jest.fn();
+    mockValidateEnv.mockImplementationOnce(() => {
+      throw new Error('transient failure');
+    });
+    await envValidationMiddleware(c1, next1);
+    expect(next1).not.toHaveBeenCalled();
+    expect(mockValidateEnv).toHaveBeenCalledTimes(1);
+
+    // Second request: validation succeeds.  Must RE-RUN validation, not skip it.
+    const c2 = createMockContext(env);
+    const next2 = jest.fn().mockResolvedValue(undefined);
+    mockValidateEnv.mockReturnValueOnce(env as any);
+    await envValidationMiddleware(c2, next2);
+
+    // validateEnv called again — the failure on request 1 did not permanently
+    // set the "validated" flag.
+    expect(mockValidateEnv).toHaveBeenCalledTimes(2);
+    expect(next2).toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+
+  // [BUG-486] On success, subsequent requests with the SAME env are no-ops.
+  it('[BUG-486] skips validation on the second request after a successful first request', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const env = {
+      ENVIRONMENT: 'staging',
+      DATABASE_URL: 'postgresql://stable',
+    };
+    const c1 = createMockContext(env);
+    const next1 = jest.fn().mockResolvedValue(undefined);
+    mockValidateEnv.mockReturnValue(env as any);
+
+    await envValidationMiddleware(c1, next1);
+    await envValidationMiddleware(
+      createMockContext(env),
+      jest.fn().mockResolvedValue(undefined),
+    );
+
+    // validateEnv called exactly once across both requests.
+    expect(mockValidateEnv).toHaveBeenCalledTimes(1);
+  });
+
   // -------------------------------------------------------------------------
   // Production deploy gate — refuse to serve traffic when a required KV
   // binding (IDEMPOTENCY_KV) is missing without an explicit prelaunch

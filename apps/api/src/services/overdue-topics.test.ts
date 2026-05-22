@@ -19,6 +19,7 @@ import { getOverdueTopicsGrouped } from './overdue-topics';
 
 const profileId = 'test-profile-id';
 const NOW = new Date('2026-05-03T10:00:00.000Z');
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function createSelectChain(resolvedRows: unknown[]) {
   const chain = {
@@ -254,5 +255,78 @@ describe('getOverdueTopicsGrouped', () => {
     const result = await getOverdueTopicsGrouped(db, profileId);
 
     expect(result.subjects[0]?.topics[0]?.overdueDays).toBe(3);
+  });
+
+  it('[BUG-470 / P2 BREAK] sets truncated:true and correct displayedCount when card list hits the 500-card cap', async () => {
+    // Break test: BEFORE the fix, the response had no truncated/displayedCount
+    // fields. For heavy learners with 500+ overdue cards, the UI received 500
+    // displayed cards but totalOverdue was e.g. 1234 — no way to distinguish
+    // "all 1234 displayed" from "only first 500 shown". The response shape is
+    // now extended with truncated:true/false and displayedCount so the mobile
+    // UI can show "500+ overdue" rather than implying the list is complete.
+
+    // Seed 500 cards all pointing at the same topic (simplifies topic/curricula lookup)
+    const cards = Array.from({ length: 500 }, (_, i) => ({
+      topicId: 'topic-1',
+      nextReviewAt: new Date(NOW.getTime() - (i + 1) * DAY_MS),
+      failureCount: 0,
+    }));
+
+    const db = createMockDb({
+      topicsRows: [
+        { id: 'topic-1', title: 'Fractions', curriculumId: 'curriculum-1' },
+      ],
+      curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
+      // Real count is 501 — list is truncated at 500.
+      totalOverdue: 501,
+    });
+
+    setupScopedRepo({
+      retentionCardsFindMany: cards,
+      subjectsFindManyResults: [{ id: 'subject-1', name: 'Math' }],
+    });
+
+    const result = await getOverdueTopicsGrouped(db, profileId);
+
+    expect(result.truncated).toBe(true);
+    expect(result.displayedCount).toBe(500);
+    expect(result.totalOverdue).toBe(501);
+  });
+
+  it('[BUG-470 / P2] sets truncated:false when displayed list is under the cap', async () => {
+    const db = createMockDb({
+      topicsRows: [
+        { id: 'topic-1', title: 'Fractions', curriculumId: 'curriculum-1' },
+      ],
+      curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
+      totalOverdue: 1,
+    });
+
+    setupScopedRepo({
+      retentionCardsFindMany: [
+        {
+          topicId: 'topic-1',
+          nextReviewAt: new Date('2026-04-30T10:00:00.000Z'),
+          failureCount: 0,
+        },
+      ],
+      subjectsFindManyResults: [{ id: 'subject-1', name: 'Math' }],
+    });
+
+    const result = await getOverdueTopicsGrouped(db, profileId);
+
+    expect(result.truncated).toBe(false);
+    expect(result.displayedCount).toBe(1);
+  });
+
+  it('[BUG-470 / P2] sets truncated:false and displayedCount:0 when no overdue cards', async () => {
+    const db = createMockDb({ topicsRows: [], curriculaRows: [] });
+    setupScopedRepo({ retentionCardsFindMany: [] });
+
+    const result = await getOverdueTopicsGrouped(db, profileId);
+
+    expect(result.truncated).toBe(false);
+    expect(result.displayedCount).toBe(0);
+    expect(result.totalOverdue).toBe(0);
   });
 });

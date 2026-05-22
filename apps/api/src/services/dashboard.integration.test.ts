@@ -423,6 +423,20 @@ async function seedConsentState(input: {
   });
 }
 
+async function seedConsentStateWithType(input: {
+  profileId: string;
+  consentType: 'GDPR' | 'COPPA';
+  status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN';
+  respondedAt?: Date | null;
+}): Promise<void> {
+  await db.insert(consentStates).values({
+    profileId: input.profileId,
+    consentType: input.consentType,
+    status: input.status,
+    respondedAt: input.respondedAt ?? null,
+  });
+}
+
 beforeAll(async () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -1677,5 +1691,100 @@ describe('dashboard service integration', () => {
     expect(widenedSummaries.get(childProfileId)!.progress?.topicsMastered).toBe(
       42,
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-466] Break test: batch consent query must use GDPR type only
+  // ---------------------------------------------------------------------------
+
+  it('BUG-466: getChildrenForParent uses GDPR consent status, not newer non-GDPR row', async () => {
+    // Parent + child relationship
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'BUG466-Parent',
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'BUG466-Child',
+      isOwner: false,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    // Older GDPR row: CONSENTED (the correct status to return)
+    await seedConsentStateWithType({
+      profileId: childProfileId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      respondedAt: subtractDays(new Date(), 10),
+    });
+
+    // Newer non-GDPR row (COPPA): WITHDRAWN — must NOT win
+    await seedConsentStateWithType({
+      profileId: childProfileId,
+      consentType: 'COPPA',
+      status: 'WITHDRAWN',
+      respondedAt: subtractDays(new Date(), 1),
+    });
+
+    const subjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'BUG466-Math',
+    });
+    await seedProgressSnapshot({
+      profileId: childProfileId,
+      snapshotDate: isoDate(new Date()),
+      metrics: buildProgressMetrics({ topicsMastered: 3 }),
+    });
+
+    const children = await getChildrenForParent(db, parentProfileId);
+
+    expect(children).toHaveLength(1);
+    // GDPR row (CONSENTED) must be the source of truth.
+    // Before BUG-466 fix, the COPPA WITHDRAWN row (newer requestedAt) would win
+    // and consentStatus would be 'WITHDRAWN' instead of 'CONSENTED'.
+    expect(children[0]!.profileId).toBe(childProfileId);
+    expect(children[0]!.consentStatus).toBe('CONSENTED');
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-465] Break test: child detail consent lookup must use GDPR type only
+  // ---------------------------------------------------------------------------
+
+  it('BUG-465: getChildDetail uses GDPR consent status, not newer non-GDPR row', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'BUG465-Parent',
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'BUG465-Child',
+      isOwner: false,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    // Older GDPR row: CONSENTED
+    await seedConsentStateWithType({
+      profileId: childProfileId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      respondedAt: subtractDays(new Date(), 10),
+    });
+
+    // Newer non-GDPR row (COPPA): WITHDRAWN — must NOT win
+    await seedConsentStateWithType({
+      profileId: childProfileId,
+      consentType: 'COPPA',
+      status: 'WITHDRAWN',
+      respondedAt: subtractDays(new Date(), 1),
+    });
+
+    await seedSubject({
+      profileId: childProfileId,
+      name: 'BUG465-Science',
+    });
+
+    const detail = await getChildDetail(db, parentProfileId, childProfileId);
+
+    expect(detail).not.toBeNull();
+    // GDPR row (CONSENTED) must win — child data must be accessible
+    expect(detail!.consentStatus).toBe('CONSENTED');
+    // If the COPPA WITHDRAWN row won, the detail would be redacted
+    expect(detail!.profileId).toBe(childProfileId);
   });
 });

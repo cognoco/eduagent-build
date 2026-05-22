@@ -1,3 +1,9 @@
+import { eq, and, inArray } from 'drizzle-orm';
+import {
+  sessionEvents,
+  createScopedRepository,
+  type Database,
+} from '@eduagent/database';
 import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
 
 /**
@@ -55,6 +61,59 @@ export interface EvaluationSummary {
   missing: number;
   misconception: number;
   total: number;
+}
+
+/**
+ * [#477] Validate that every `answerEventId` in the LLM-produced evaluation
+ * items belongs to this session, is owned by this profile, and has
+ * `eventType = 'user_message'`.  Returns a validated copy where
+ * `learnerQuote` is replaced with the actual event `content` so that
+ * `validateNoteDraft` operates against real learner text, not LLM-supplied
+ * text.
+ *
+ * Strict mode: if ANY item fails the check, the whole evaluation is rejected
+ * and an error is thrown.  Callers MUST treat a thrown error as
+ * `outcome: 'invalid'` and MUST NOT mark mastery.
+ *
+ * Uses `createScopedRepository(profileId)` so the DB query is automatically
+ * scoped to the owner — cross-profile reads cannot succeed even on a buggy
+ * call.
+ */
+export async function validateEvaluationEventIds(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  evals: ChallengeRoundEvaluationItem[],
+): Promise<ChallengeRoundEvaluationItem[]> {
+  if (evals.length === 0) return [];
+
+  const ids = evals.map((e) => e.answerEventId);
+  const repo = createScopedRepository(db, profileId);
+
+  // Fetch all candidate rows in one query, already scoped by profileId.
+  const rows = await repo.sessionEvents.findMany(
+    and(
+      inArray(sessionEvents.id, ids),
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.eventType, 'user_message'),
+    ),
+  );
+
+  const rowMap = new Map<string, string>(rows.map((r) => [r.id, r.content]));
+
+  // Strict: every id must resolve — a missing or mismatched id is a rejection.
+  const missing = ids.filter((id) => !rowMap.has(id));
+  if (missing.length > 0) {
+    throw new Error(
+      `[#477] challenge_round_evaluation rejected: ${missing.length} answerEventId(s) not found in session ${sessionId} for profileId ${profileId}: ${missing.join(', ')}`,
+    );
+  }
+
+  // Replace learnerQuote with the verified event content.
+  return evals.map((e) => ({
+    ...e,
+    learnerQuote: rowMap.get(e.answerEventId)!,
+  }));
 }
 
 export function decideMasteryAndReview(

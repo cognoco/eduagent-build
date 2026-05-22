@@ -15,6 +15,7 @@ import {
 } from '../services/billing';
 import { getTierConfig } from '../services/subscription';
 import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
+import { claimWebhookId } from './resend-webhook';
 
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
@@ -104,7 +105,37 @@ async function handleSubscriptionEvent(
   eventTimestamp: string,
 ): Promise<void> {
   const status = mapStripeStatus(stripeSubscription.status);
-  if (!status) return;
+  if (!status) {
+    // [#441] Unmapped Stripe status — silent early-return is banned in billing
+    // (CLAUDE.md: "Silent recovery without escalation is banned"). Surface to
+    // Sentry so stuck-in-incomplete scenarios are visible in the dashboard.
+    logger.warn(
+      '[stripe-webhook] handleSubscriptionEvent: unmapped Stripe status — event dropped',
+      {
+        unmappedStatus: stripeSubscription.status,
+        stripeSubscriptionId: stripeSubscription.id,
+        accountId: (
+          stripeSubscription.metadata as Record<string, string> | null
+        )?.accountId,
+      },
+    );
+    captureException(
+      new Error(
+        `Stripe subscription status not mapped: '${stripeSubscription.status}'`,
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.handleSubscriptionEvent.unmapped_status',
+          unmappedStatus: stripeSubscription.status,
+          stripeSubscriptionId: stripeSubscription.id,
+          accountId: (
+            stripeSubscription.metadata as Record<string, string> | null
+          )?.accountId,
+        },
+      },
+    );
+    return;
+  }
   const isExpired = status === 'expired';
 
   const updates: WebhookSubscriptionUpdate = {
@@ -517,7 +548,48 @@ export const stripeWebhookRoute = new Hono<{
   }
 
   switch (event.type) {
-    case 'checkout.session.completed':
+    case 'checkout.session.completed': {
+      // [#450] Atomic idempotency gate — must be the FIRST step before any
+      // billing mutation. Stripe retries on transient 5xx; two concurrent
+      // deliveries of the same checkout.session.completed would both see no
+      // existing subscription row, both call createSubscription, and the
+      // second would crash on UNIQUE(account_id) → Stripe interprets 500 as
+      // retry → loop. INSERT ... ON CONFLICT DO NOTHING is atomic so only one
+      // delivery can claim the event ID; the other returns 200 immediately.
+      const STRIPE_WEBHOOK_SOURCE = 'stripe';
+      const checkoutClaim = await claimWebhookId(
+        db,
+        STRIPE_WEBHOOK_SOURCE,
+        event.id,
+      );
+      if (checkoutClaim === 'replay') {
+        logger.warn(
+          '[stripe-webhook] checkout.session.completed replay detected — already claimed, skipping',
+          { eventId: event.id },
+        );
+        return c.json({ received: true, replayed: true });
+      }
+      if (checkoutClaim === 'unavailable') {
+        // DB gate unavailable — escalate but continue. Silent recovery is banned
+        // (CLAUDE.md). activateSubscriptionFromCheckout has its own ON CONFLICT
+        // guard so a duplicate will be caught at the DB level, but surface the
+        // missing gate so it is queryable.
+        logger.warn(
+          '[stripe-webhook] checkout idempotency DB claim unavailable — continuing without atomic gate',
+          { eventId: event.id },
+        );
+        captureException(
+          new Error(
+            'Stripe checkout.session.completed idempotency DB claim unavailable',
+          ),
+          {
+            extra: {
+              context: 'stripe.webhook.checkout.completed.claim_unavailable',
+              eventId: event.id,
+            },
+          },
+        );
+      }
       await handleCheckoutCompleted(
         db,
         kv,
@@ -525,6 +597,7 @@ export const stripeWebhookRoute = new Hono<{
         eventTimestamp,
       );
       break;
+    }
 
     case 'customer.subscription.created':
     case 'customer.subscription.updated':

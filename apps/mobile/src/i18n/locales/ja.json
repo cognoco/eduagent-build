@@ -38,6 +38,7 @@
     "notFound": "そのページまたは項目は存在しません。",
     "resourceGone": "このリソースは利用できなくなりました。",
     "rateLimited": "制限に達しました。しばらく待ってからもう一度お試しください。",
+    "sessionExpired": "Your session expired — signing you out…",
     "forbidden": "これを表示する権限がありません。",
     "quotaExhausted": "今日のセッションはすべて使用しました。また明日お越しください！",
     "sessionNotFound": "そのセッションは利用できなくなりました。新しいセッションを開始してください。",
@@ -92,7 +93,8 @@
   "auth": {
     "index": {
       "timeoutTitle": "想定より時間がかかっています",
-      "timeoutMessage": "接続を確認して、もう一度お試しください。"
+      "timeoutMessage": "接続を確認して、もう一度お試しください。",
+      "signInInstead": "代わりにサインインする"
     },
     "ssoCallback": {
       "loadingLabel": "サインインを完了中",
@@ -1747,6 +1749,19 @@
       "nudgeA11y": "{{name}}さんにリマインダーを送信",
       "viewAllReports": "すべてのレポートを表示",
       "subjectsTitle": "科目"
+    },
+    "remediation": {
+      "heading": "Try a different approach",
+      "body": "It is completely normal to need another pass at this.",
+      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
+      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
+      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
+      "primaryCta": "Try a different way",
+      "primaryCtaA11y": "Try a different way to learn this topic",
+      "secondaryCta": "Or try again later",
+      "secondaryCtaA11y": "Try this topic again later",
+      "libraryLink": "While you wait, check out your Library",
+      "libraryLinkA11y": "Check out your Library"
     }
   },
   "onboarding": {

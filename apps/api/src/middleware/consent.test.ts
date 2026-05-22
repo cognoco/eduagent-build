@@ -87,16 +87,45 @@ const WITHDRAWN_ADULT_META: ProfileMeta = {
 // ---------------------------------------------------------------------------
 
 describe('consentMiddleware', () => {
+  // [BUG-502] Break test: when profileScopeMiddleware sets the error sentinel
+  // (DB threw during auto-resolve), consentMiddleware must fail closed with 503
+  // rather than treating the absent profileId as an account-level route and
+  // skipping enforcement. This guards against PENDING-consent learners escaping
+  // the consent gate via a transient DB outage on the owner profile lookup.
+  it('[BUG-502] returns 503 when profileScopeError sentinel is set (fails closed, not open)', async () => {
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      // Simulate profileScopeMiddleware setting the error sentinel after a
+      // transient DB failure. profileId is absent (auto-resolve never completed).
+      c.set('profileScopeError' as never, new Error('DB connection lost'));
+      // profileId intentionally left unset — this is the fail-open path we block
+      await next();
+    });
+    app.use('*', consentMiddleware);
+    app.all('*', (c) => c.json({ ok: true }));
+
+    const res = await app.request('/v1/subjects');
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe('SERVICE_UNAVAILABLE');
+  });
+
   it('passes through when no profileId is set (account-level route)', async () => {
     const app = createApp({});
     const res = await app.request('/v1/subjects');
     expect(res.status).toBe(200);
   });
 
-  it('passes through when profileMeta is not set', async () => {
+  // [BUG-408] Break test: when profileId is set but profileMeta is absent, the
+  // middleware must fail closed (500) rather than skip enforcement. A non-error
+  // path where meta wasn't loaded (missing owner row, edge input) must not let
+  // a PENDING-consent learner through.
+  it('[BUG-408] returns 500 when profileId is set but profileMeta is absent (fail closed, not open)', async () => {
     const app = createApp({ profileId: 'p-1' });
     const res = await app.request('/v1/subjects');
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.code).toBe('INTERNAL_SERVER_ERROR');
   });
 
   it('passes through for exempt path /v1/health', async () => {

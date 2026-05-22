@@ -27,6 +27,7 @@ jest.mock(
 let mockLinkedChildren: Profile[] = [];
 let mockDashboardData: DashboardData | undefined;
 let mockParentResumeTarget: LearningResumeTarget | null | undefined;
+const mockSwitchMode = jest.fn();
 
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
@@ -60,7 +61,8 @@ jest.mock(
   '../../lib/use-mode-switch' /* gc1-allow: mode switch invalidates TanStack queries; tests assert home routing only */,
   () => ({
     useModeSwitch: () => ({
-      switchMode: jest.fn(),
+      switchMode: mockSwitchMode,
+      isSwitching: false,
       isSwitchingRef: { current: false },
     }),
   }),
@@ -237,7 +239,7 @@ describe('ParentHomeScreen', () => {
     expect(screen.queryByTestId('child-accommodation-row-child-b')).toBeNull();
   });
 
-  it('routes the child card header to the child profile detail screen', async () => {
+  it('routes the child card header to the child quick progress screen', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
@@ -246,8 +248,23 @@ describe('ParentHomeScreen', () => {
     fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-a', mode: 'progress' },
+    });
+    expect(mockSwitchMode).not.toHaveBeenCalled();
+  });
+
+  it('routes the child initial to child profile settings', async () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    fireEvent.press(screen.getByTestId('parent-home-child-profile-child-a'));
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a', mode: 'settings' },
     });
+    expect(mockSwitchMode).not.toHaveBeenCalled();
   });
 
   it('routes the progress action to the child quick progress screen', async () => {
@@ -261,6 +278,34 @@ describe('ParentHomeScreen', () => {
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a', mode: 'progress' },
     });
+    expect(mockSwitchMode).not.toHaveBeenCalled();
+  });
+
+  it('routes recent child activity to the child quick progress screen', async () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    fireEvent.press(screen.getByTestId('parent-home-recent-child-child-a'));
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-a', mode: 'progress' },
+    });
+    expect(mockSwitchMode).not.toHaveBeenCalled();
+  });
+
+  it('switches to student view only from the explicit My Learning action', async () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    fireEvent.press(screen.getByTestId('parent-home-study-activation-action'));
+
+    expect(mockSwitchMode).toHaveBeenCalledTimes(1);
+    expect(mockSwitchMode).toHaveBeenLastCalledWith('study');
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('routes the reports action to the child reports list', async () => {
@@ -353,12 +398,14 @@ describe('ParentHomeScreen', () => {
     promptCardStyles.forEach((style) => {
       expect(style).toEqual(
         expect.objectContaining({
+          backgroundColor: expect.any(String),
+          borderColor: expect.any(String),
           borderRadius: 30,
+          borderWidth: 1,
           minHeight: 58,
         }),
       );
-      expect(style.backgroundColor).toEqual(expect.stringContaining('rgba('));
-      expect(style.borderWidth).toBeUndefined();
+      expect(style.borderColor).toMatch(/^#[0-9a-f]{8}$/i);
       expect(style.elevation).toBeUndefined();
     });
     expect(
@@ -374,15 +421,25 @@ describe('ParentHomeScreen', () => {
         .accessibilityRole,
     ).toBeUndefined();
     expect(resolvedStyle('parent-home-tonight-icon-child-a-primary')).toEqual(
-      expect.objectContaining({ height: 30, width: 30 }),
+      expect.objectContaining({
+        backgroundColor: expect.any(String),
+        borderColor: expect.any(String),
+        borderWidth: 1,
+        height: 30,
+        width: 30,
+      }),
     );
-    expect(resolvedStyle('parent-home-tonight-text-child-a-primary')).toEqual(
+    const promptTextStyle = resolvedStyle(
+      'parent-home-tonight-text-child-a-primary',
+    );
+    expect(promptTextStyle).toEqual(
       expect.objectContaining({
         fontSize: 15,
         fontWeight: '400',
         lineHeight: 21,
       }),
     );
+    expect(promptTextStyle.backgroundColor).toBeUndefined();
     expect(
       screen.getAllByText('Fractions · 18 min this week').length,
     ).toBeGreaterThan(0);
@@ -506,9 +563,9 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Emma: What made Math click today?');
     screen.getByText('Liam: What would make starting feel easy tonight?');
     expect(
-      resolvedStyle('parent-home-tonight-child-a-primary').backgroundColor,
+      resolvedStyle('parent-home-tonight-child-a-primary').borderColor,
     ).not.toBe(
-      resolvedStyle('parent-home-tonight-child-b-primary').backgroundColor,
+      resolvedStyle('parent-home-tonight-child-b-primary').borderColor,
     );
     expect(
       resolvedStyle('parent-home-check-child-child-a').shadowColor,

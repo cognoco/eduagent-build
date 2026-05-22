@@ -26,6 +26,7 @@ import {
 import { getGreeting, getTimeOfDay } from '../../lib/greeting';
 import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
+import { withOpacity } from '../../lib/color-opacity';
 import { useTheme, useThemeColors } from '../../lib/theme';
 import { getSubjectTintMap } from '../../lib/subject-tints';
 import { type SubjectTint } from '../../lib/design-tokens';
@@ -453,21 +454,23 @@ function ConversationStarterCard({
 }): React.ReactElement {
   const colors = useThemeColors();
   const accent = tint?.solid ?? colors.primary;
-  const bubbleColor = tint?.soft ?? colors.primarySoft;
+  const bubbleBorderColor = withOpacity(accent, 0.34);
 
   return (
     <View
       testID={`parent-home-tonight-${prompt.key}`}
       style={{
-        backgroundColor: bubbleColor,
+        backgroundColor: colors.surface,
+        borderColor: bubbleBorderColor,
         borderRadius: 30,
+        borderWidth: 1,
         minHeight: 58,
       }}
     >
       <View
         style={{
           alignItems: 'center',
-          backgroundColor: bubbleColor,
+          backgroundColor: colors.surface,
           borderRadius: 30,
           flexDirection: 'row',
           paddingHorizontal: 16,
@@ -478,7 +481,9 @@ function ConversationStarterCard({
           testID={`parent-home-tonight-icon-${prompt.key}`}
           style={{
             alignItems: 'center',
-            backgroundColor: bubbleColor,
+            backgroundColor: colors.surface,
+            borderColor: bubbleBorderColor,
+            borderWidth: 1,
             borderRadius: 999,
             height: 30,
             justifyContent: 'center',
@@ -490,7 +495,6 @@ function ConversationStarterCard({
         <Text
           testID={`parent-home-tonight-text-${prompt.key}`}
           style={{
-            backgroundColor: bubbleColor,
             color: colors.textPrimary,
             flex: 1,
             fontSize: 15,
@@ -569,11 +573,15 @@ function ChildCommandCard({
   const colors = useThemeColors();
   const accent = tint?.solid ?? colors.primary;
   const softAccent = tint?.soft ?? colors.primarySoft;
+  const handleOpenProfile = (event?: GestureResponderEvent): void => {
+    event?.stopPropagation();
+    onOpenProfile();
+  };
 
   return (
     <View className="rounded-card px-4 py-4 bg-surface">
       <Pressable
-        onPress={onOpenProfile}
+        onPress={onOpenProgress}
         className="flex-row items-center bg-background rounded-button px-3 py-3"
         style={{
           borderColor: accent + '24',
@@ -586,18 +594,26 @@ function ChildCommandCard({
           ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
         }}
         accessibilityRole="button"
-        accessibilityLabel={child.displayName}
+        accessibilityLabel={`${child.displayName}`}
         testID={`parent-home-check-child-${child.id}`}
       >
-        <View
-          className="w-11 h-11 rounded-full items-center justify-center me-3"
-          style={{ backgroundColor: accent }}
-          accessibilityElementsHidden
+        <Pressable
+          onPress={handleOpenProfile}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`${child.displayName} profile`}
+          testID={`parent-home-child-profile-${child.id}`}
         >
-          <Text className="text-h3 font-bold text-text-inverse">
-            {initialOf(child.displayName)}
-          </Text>
-        </View>
+          <View
+            className="w-11 h-11 rounded-full items-center justify-center me-3"
+            style={{ backgroundColor: accent }}
+            accessibilityElementsHidden
+          >
+            <Text className="text-h3 font-bold text-text-inverse">
+              {initialOf(child.displayName)}
+            </Text>
+          </View>
+        </Pressable>
         <View className="flex-1">
           <Text className="text-h3 font-bold text-text-primary">
             {child.displayName}
@@ -1152,7 +1168,7 @@ export function ParentHomeScreen({
         <RecentChildActivitySection
           childrenProfiles={linkedChildren}
           dashboard={dashboard}
-          onOpenChild={pushChildProfile}
+          onOpenChild={pushChildProgress}
           t={t}
         />
 

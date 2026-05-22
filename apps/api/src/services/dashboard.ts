@@ -825,8 +825,14 @@ export async function getChildrenForParent(
   const xpByProfile = new Map(
     xpResults.map((x) => [x.profileId, x.totalXp ?? 0]),
   );
+  // [BUG-466] Filter to GDPR consent type only. Without this filter the first
+  // row per profileId (ordered by requestedAt desc) could be a non-GDPR row
+  // (e.g. COPPA), making dashboard show the wrong consent status.
   const allConsentStates = await db.query.consentStates.findMany({
-    where: inArray(consentStates.profileId, childProfileIds),
+    where: and(
+      inArray(consentStates.profileId, childProfileIds),
+      eq(consentStates.consentType, 'GDPR'),
+    ),
     orderBy: desc(consentStates.requestedAt),
   });
   const consentByProfile = new Map<
@@ -1055,8 +1061,14 @@ export async function getChildDetail(
     where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
   });
   if (!profile) return null;
+  // [BUG-465] Filter to GDPR consent type only. Without this filter a more
+  // recent non-GDPR row (e.g. COPPA) masks the actual GDPR status, which can
+  // suppress learning metrics or show the wrong consent banner.
   const consentState = await db.query.consentStates.findFirst({
-    where: eq(consentStates.profileId, childProfileId),
+    where: and(
+      eq(consentStates.profileId, childProfileId),
+      eq(consentStates.consentType, 'GDPR'),
+    ),
     orderBy: desc(consentStates.requestedAt),
   });
 

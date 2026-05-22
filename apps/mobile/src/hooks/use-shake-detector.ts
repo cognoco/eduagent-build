@@ -79,7 +79,10 @@ export function useShakeDetector(onShake: () => void): {
           onShakeRef.current();
         }
       });
-      setShakeAvailable(true);
+      // BUG-533: guard against unmount between isAvailableAsync and this line.
+      // React 19 silently drops setState on unmounted components, but the guard
+      // is structurally correct regardless of React version.
+      if (!cancelled) setShakeAvailable(true);
     })();
 
     return () => {

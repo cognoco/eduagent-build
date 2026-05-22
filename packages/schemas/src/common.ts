@@ -21,6 +21,12 @@ export const isoDateField = z.union([
 /** YYYY-MM-DD calendar date (e.g. "2026-04-10") */
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/**
+ * Max base64 length for inline image uploads: ~2 MB base64 ≈ 1.5 MB raw image.
+ * Shared between dictation review and session messages so a single cap governs both.
+ */
+export const IMAGE_BASE64_MAX = 2 * 1024 * 1024;
+
 export const paginationSchema = z.object({
   cursor: z.string().optional(),
   limit: z.number().int().min(1).max(100).default(20),

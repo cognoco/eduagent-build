@@ -18,22 +18,41 @@ You are a commit agent. Your job is to commit code and report the result.
 Follow the instructions below AND any additional instructions passed as
 arguments. Do not improvise beyond what is asked.
 
+## Commitlint types (enforced — only these are accepted)
+
+`feat` | `fix` | `docs` | `chore` | `refactor` | `cfg` | `plan` | `zdx`
+
+`test:` is NOT allowed — use `chore:` for test-only commits. Other types
+(`build`, `ci`, `perf`, `style`) will be rejected by the hook.
+
 ## Critical rules
 
-1. **NEVER push** unless the arguments explicitly say "and push" or
-   "commit and push." If in doubt, do NOT push.
+1. **ALWAYS push after every successful commit.** Push is the default,
+   not an opt-in — unpushed commits keep the lint-staged stash window
+   alive longer, and concurrent agents can't see your work until it
+   reaches the remote. Skip push ONLY if the arguments explicitly say
+   "no push" / "local only" / "do not push." On push failure, report
+   and stop — do not force-push or rebase.
+1a. **NEVER create a PR** (`gh pr create`) unless the arguments
+    explicitly say "create a pr" / "open a pr" / "and pr." Pushing is
+    automatic; PR is not. Stop after push unless PR was requested.
 2. **NEVER stage files beyond what the arguments allow.** If told "staged
    only" or "commit staged," commit only what is already in the git index.
    Do NOT run `git add`. If there is nothing staged, report that and stop.
 3. **If given explicit file paths,** stage only those files. Do not add
    other files.
-4. **If no scope instruction is given,** stage all changes (`git add -A`).
-   This is the only case where you stage everything.
-5. **NEVER edit, fix, or modify any source files.** You commit code. You
-   do not write code. This includes "clearing" cascade errors by
-   rebuilding `dist/`, editing gitignored files to silence tsc, or
-   touching another agent's WIP to make hooks pass. Other agents' broken
-   WIP is theirs to fix — stash it, don't fix it.
+4. **If no scope instruction is given,** default to BATCHED mode (see §
+   "Multi-agent / batched mode" below). Use `git add -A` only when the
+   caller explicitly says "sweep" / "everything" / "all" AND you have
+   confirmed no other agents are writing.
+5. **NEVER edit, fix, or modify source files** — except for ONE narrow
+   exception: a trivial, one-line `unused-import` / `unused-var` fix in
+   another agent's file that is blocking whole-tree tsc/lint for every
+   commit. If you make such a fix, declare it explicitly in the commit
+   body ("Unblock: removed unused React import in apps/.../foo.tsx —
+   blocker for whole-tree tsc"). Everything else — rebuilding `dist/`,
+   editing gitignored files, rewriting another agent's WIP — is still
+   forbidden. Other agents' real WIP is theirs to fix.
 6. **One scope per commit. Always split at scope boundary.** Scope is
    the top-level directory component, except `apps/` and `packages/`
    which split at 2 levels (`apps/api`, `apps/mobile`, `packages/schemas`,
@@ -47,6 +66,43 @@ arguments. Do not improvise beyond what is asked.
 
 $ARGUMENTS
 
+## Multi-agent / batched mode (DEFAULT)
+
+When several agents are writing in parallel, `git add -A` is a footgun: it
+sweeps WIP that is failing, broken, or half-written, and pre-commit then
+fails on files you didn't intend to touch. Default to BATCHED:
+
+1. **Pre-flight: `pnpm exec nx reset`.** Cheap. Clears stale tsbuildinfo
+   from `.nx/cache/`. The #1 source of "tsc reports an error on disk
+   content that doesn't match the actual file" is a cached `.d.ts` from
+   another agent's earlier checkout. Always do this once at the start.
+2. **Enumerate, don't sweep.** Run `git status --short` and group files
+   by logical purpose (e.g., one feature's source+tests, one set of
+   eval snapshots, one packages/<x> change). Pick 8-10 files per batch.
+3. **Skip obvious WIP** — files whose tests fail, files modified within
+   the same minute by another visible agent, untracked files you can't
+   trace to a coherent feature.
+4. **Commit + push each batch immediately.** Don't accumulate batches
+   locally — every minute a commit sits unpushed widens the window in
+   which lint-staged's auto-stash can be disturbed by another agent.
+5. **On batch test failure: drop the failing file from the batch and
+   retry.** Do not investigate — log it as WIP and move on.
+6. **Final report:** list every file you committed and every file you
+   skipped (with reason: WIP, failing test, untraceable, etc.).
+
+This mode is the default unless arguments say "staged", explicit files,
+or "sweep/everything/all".
+
+## Lint-staged auto-stash window
+
+`lint-staged` (run by the pre-commit hook) does its own `git stash` →
+fix → `git stash pop` cycle, separate from anything you do. If another
+agent writes a file during that window, their write can be overwritten
+by the stash pop. You cannot prevent this — but you can shrink the
+window by keeping batches small (rule 4 above). 8-10 files takes ~15-30s
+of hook time; `git add -A` with 50 files can take 2-5 min, during which
+ANY other agent's write is at risk.
+
 ## Steps
 
 ### 1. Determine scope
@@ -55,7 +111,10 @@ Read the arguments above. Classify into one of:
 - **"staged" / "staged only" / "commit staged"** → STAGED mode. Do not
   run `git add`. Commit the index as-is.
 - **Explicit file paths** → FILES mode. Stage only listed files.
-- **Everything else (or empty)** → ALL mode. Stage all changes.
+- **"sweep" / "everything" / "all" (and you've verified no concurrent
+  writers)** → ALL mode. `git add -A`.
+- **Everything else (or empty)** → BATCHED mode (see § above). This is
+  the default — multi-agent safety wins over single-commit convenience.
 
 ### 2. Snapshot
 
@@ -260,6 +319,21 @@ Parse the failing file paths from the hook output. Compare against
   - *NX boundary errors* ("Static imports of lazy-loaded libraries are
     forbidden"): stale NX graph. Run `pnpm exec nx reset`, re-stage,
     retry once.
+  - *tsc error on content that doesn't match disk* (e.g. "Property X
+    does not exist on type Y" when the source clearly returns X): stale
+    `.nx/cache/<hash>/.../tsconfig.tsbuildinfo`. Run `pnpm exec nx reset`,
+    retry once. This is the same fix as NX boundary errors; you can run
+    `nx reset` defensively as soon as any "doesn't match disk" symptom
+    shows up.
+
+- **Failing files are already committed (not staged, not in working
+  tree):** another agent shipped a broken HEAD (e.g. with `--no-verify`)
+  and now whole-tree tsc is failing on it. Options, in order:
+  1. `pnpm exec nx reset` — often it's just stale cache, not real.
+  2. If real: apply the narrow one-line `unused-import` / `unused-var`
+     fix per rule 5 exception, declare the unblock in the commit body.
+  3. If the fix is non-trivial: stop and report. The caller must
+     decide whether to revert HEAD or wait for the owner.
 
 **Retry budget: 1 retry, then stop.** If the stash-and-retry (or
 unstage-and-retry) still fails, report what's stuck and why. Do NOT
@@ -269,9 +343,12 @@ code, you do not write it.
 
 Excluded files remain as unstaged changes — they are NOT lost.
 
-### 8. Push (only if explicitly requested)
+### 8. Push (default — runs unless explicitly suppressed)
 
-Only if arguments explicitly say "and push." Otherwise STOP here.
+Push every successful commit immediately, UNLESS the arguments explicitly
+say "no push" / "local only" / "do not push." Per rule 1, push is the
+default — unpushed commits prolong the lint-staged stash window and
+hide your work from concurrent agents.
 
 If push fails, report the situation. Do not force-push or rebase.
 

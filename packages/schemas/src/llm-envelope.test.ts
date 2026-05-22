@@ -26,6 +26,61 @@ describe('llmResponseEnvelopeSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  // ---------------------------------------------------------------------------
+  // Bug #575 break tests — reply-field hardening
+  // ---------------------------------------------------------------------------
+
+  it('[#575] rejects reply longer than 10 000 characters', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'a'.repeat(10001),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[#575] accepts reply of exactly 10 000 characters', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'a'.repeat(10000),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('[#575] rejects reply containing a bracketed UPPERCASE marker token', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'You did great! [INTERVIEW_COMPLETE]',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[#575] rejects reply containing any [UPPERCASE_TOKEN] pattern', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: '[READY_TO_FINISH] Let us continue.',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[#575] rejects reply that is a JSON blob containing "signals"', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: '{"signals": {"ready_to_finish": true}, "reply": "hi"}',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[#575] accepts ordinary prose with lowercase brackets like [Note: ...]', () => {
+    // Square-bracket notation around non-uppercase content must not be blocked.
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'The formula is [Na+][Cl-] = Ksp. [Note: this is simplified.]',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('[#575] accepts prose with a JSON-looking fragment that lacks "signals"', () => {
+    // A reply starting with { but not containing "signals" is fine (e.g. code examples).
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: '{"name": "Alice", "age": 12} is an example JSON object.',
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('accepts envelope with full signals block', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
       reply: 'Good job!',

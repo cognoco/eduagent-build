@@ -373,10 +373,17 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
       fireEvent.press(screen.getByTestId('archived-continue-topic-cta'));
 
       expect(mockPush).toHaveBeenCalledTimes(1);
+      // [BUG-522] Must navigate to '/(app)/session' (canonical session-entry
+      // route matching topic/[topicId].tsx pattern). '/(app)/session/start'
+      // does not exist and causes a silent Expo Router 404.
       expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/session/start',
-        params: { topicId: 'topic-xyz' },
+        pathname: '/(app)/session',
+        params: { mode: 'learning', topicId: 'topic-xyz' },
       });
+      // Break-test guard: must NOT use the nonexistent /session/start route.
+      expect(mockPush).not.toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/(app)/session/start' }),
+      );
       // Break-test guard: must NOT be a string template.
       expect(mockPush).not.toHaveBeenCalledWith(expect.any(String));
     });

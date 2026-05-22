@@ -69,6 +69,7 @@ const jwtMock = require('./jwt') as {
   verifyJWT: jest.Mock;
   decodeJWTHeader: jest.Mock;
   fetchJWKS: jest.Mock;
+  lookupJWKByKid: jest.Mock;
 };
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,13 @@ describe('authMiddleware', () => {
     jwtMock.decodeJWTHeader.mockReturnValue({ alg: 'RS256', kid: 'test-kid' });
     jwtMock.fetchJWKS.mockResolvedValue({
       keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
+    });
+    // [BUG-492] auth.ts now resolves the signing key via lookupJWKByKid
+    jwtMock.lookupJWKByKid.mockResolvedValue({
+      kty: 'RSA',
+      kid: 'test-kid',
+      n: 'fake-n',
+      e: 'AQAB',
     });
     // Default verifyJWT resolution; individual tests override with mockResolvedValueOnce
     jwtMock.verifyJWT.mockResolvedValue({

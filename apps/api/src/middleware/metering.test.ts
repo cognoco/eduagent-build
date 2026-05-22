@@ -687,6 +687,62 @@ describe('metering middleware', () => {
       expect(fakeKV.storedData('test-account-id')).toBeNull();
     });
 
+    // [BUG-503] Break test — KV delete must happen BEFORE the DB refund write.
+    // If the order is reversed, a concurrent request between the refund write
+    // and the KV delete reads stale post-decrement counters, decrements again,
+    // and writes doubly-decremented values back (persisting phantom usage until
+    // the 24h TTL expires).
+    //
+    // This test records the invocation order of kv.delete and safeRefundQuota
+    // and asserts kv.delete fires first.
+    it('[BUG-503] kv.delete is called BEFORE safeRefundQuota on the refund branch', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 100, dailyLimit: 10, usedToday: 1 }),
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: 8,
+      });
+
+      fakeKV.seed('test-account-id', {
+        subscriptionId: 'sub-1',
+        tier: 'plus',
+        status: 'active',
+        monthlyLimit: 500,
+        usedThisMonth: 101,
+        dailyLimit: 10,
+        usedToday: 2,
+      });
+
+      const callOrder: string[] = [];
+      const kvDeleteMock = fakeKV.namespace.delete as jest.Mock;
+      kvDeleteMock.mockImplementation(async (key: string) => {
+        callOrder.push('kv.delete');
+        fakeKV.store.delete(key); // key is 'sub:test-account-id'
+      });
+      mockSafeRefundQuota.mockImplementation(async () => {
+        callOrder.push('safeRefundQuota');
+        return { refunded: true };
+      });
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
+      );
+
+      expect(res.status).toBe(400);
+      expect(callOrder).toEqual(['kv.delete', 'safeRefundQuota']);
+    });
+
     it('[BUG-623 / A-6] decrements quota for POST /sessions/:id/recall-bridge', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));

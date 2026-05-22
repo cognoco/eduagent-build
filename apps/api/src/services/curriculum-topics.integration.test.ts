@@ -28,6 +28,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { explainTopicOrdering } from './curriculum';
+import { NotFoundError } from '../errors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -63,6 +65,7 @@ const CLERK_PREFIX = `integ-find-later-${RUN_ID}`;
 
 interface SeededBook {
   profileId: string;
+  subjectId: string;
   bookId: string;
   /** topicIds[i] corresponds to sortOrder = i */
   topicIds: string[];
@@ -138,7 +141,12 @@ async function seedBook(
     topicIds.push(row!.id);
   }
 
-  return { profileId: profile!.id, bookId: book!.id, topicIds };
+  return {
+    profileId: profile!.id,
+    subjectId: subject!.id,
+    bookId: book!.id,
+    topicIds,
+  };
 }
 
 async function cleanupByPrefix(database: Database): Promise<void> {
@@ -295,5 +303,32 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     expect(results).toHaveLength(2);
     expect(results[0]!.id).toBe(tree.topicIds[1]);
     expect(results[1]!.id).toBe(tree.topicIds[2]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-459] Break test: explainTopicOrdering must not leak cross-account topic title
+// ---------------------------------------------------------------------------
+
+describe('[BUG-459] explainTopicOrdering cross-account topic disclosure (integration)', () => {
+  it('throws NotFoundError when topicId belongs to a different profile', async () => {
+    // Profile A owns subjectA and topicA.
+    const treeA = await seedBook(db, 'BUG459-A', ['TopicA-Secret']);
+    // Profile B owns subjectB and topicB.
+    const treeB = await seedBook(db, 'BUG459-B', ['TopicB-Innocent']);
+
+    // Profile B attempts to call explainTopicOrdering on their own subject
+    // but passes Profile A's topicId. Before the fix, topicA's title would be
+    // loaded and fed into the LLM prompt — an information disclosure. After
+    // the fix the topic lookup is constrained to subjectB's curriculum, so the
+    // topic is not found and the function throws NotFoundError.
+    await expect(
+      explainTopicOrdering(
+        db,
+        treeB.profileId,
+        treeB.subjectId,
+        treeA.topicIds[0]!,
+      ),
+    ).rejects.toThrow(NotFoundError);
   });
 });

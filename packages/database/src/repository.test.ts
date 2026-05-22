@@ -544,6 +544,104 @@ describe('createScopedRepository', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // [BUG-566 / P2-MOD] quizMissedItems.insertMany — sourceRoundId ownership
+  //
+  // The FK on source_round_id only guarantees the round exists in the DB, not
+  // that it belongs to the current profile. A caller passing a cross-profile
+  // sourceRoundId would silently create rows with an ownership mismatch.
+  //
+  // Break test: profile A tries to insert missed items with a sourceRoundId
+  // that belongs to profile B (findFirst returns null for profile A's scope) →
+  // the batch must be rejected and no rows inserted.
+  // ---------------------------------------------------------------------------
+
+  describe('[BUG-566] quizMissedItems.insertMany — cross-profile sourceRoundId rejected', () => {
+    it('throws when sourceRoundId does not belong to this profileId', async () => {
+      // findFirst returns null → round not found under profileId (profile B's round)
+      const findFirst = jest.fn().mockResolvedValue(null);
+      const insertFn = jest.fn();
+
+      const db = {
+        query: new Proxy(
+          {},
+          {
+            get: () => ({
+              findFirst,
+              findMany: jest.fn().mockResolvedValue([]),
+            }),
+          },
+        ),
+        insert: jest.fn(() => ({
+          values: jest.fn(() => ({
+            returning: insertFn,
+          })),
+        })),
+      } as unknown as Database;
+
+      const PROFILE_A = '01933b3c-0000-7000-8000-000000000001';
+      const PROFILE_B_ROUND = '01933b3c-ffff-7000-8000-000000000099';
+
+      const repo = createScopedRepository(db, PROFILE_A);
+
+      await expect(
+        repo.quizMissedItems.insertMany([
+          {
+            activityType: 'capitals',
+            questionText: 'What is the capital of France?',
+            correctAnswer: 'Paris',
+            sourceRoundId: PROFILE_B_ROUND,
+          },
+        ]),
+      ).rejects.toThrow(/sourceRoundId.*does not belong to profileId/);
+
+      // The insert must NOT have been called — batch aborted before DB write
+      expect(insertFn).not.toHaveBeenCalled();
+    });
+
+    it('succeeds when all sourceRoundIds belong to this profileId', async () => {
+      const ownRound = {
+        id: 'round-owned-by-profile-a',
+        profileId: TEST_PROFILE_ID,
+      };
+      const findFirst = jest.fn().mockResolvedValue(ownRound);
+      const returningFn = jest
+        .fn()
+        .mockResolvedValue([{ id: 'missed-item-1' }]);
+
+      const db = {
+        query: new Proxy(
+          {},
+          {
+            get: () => ({
+              findFirst,
+              findMany: jest.fn().mockResolvedValue([]),
+            }),
+          },
+        ),
+        insert: jest.fn(() => ({
+          values: jest.fn(() => ({
+            returning: returningFn,
+          })),
+        })),
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      const result = await repo.quizMissedItems.insertMany([
+        {
+          activityType: 'capitals',
+          questionText: 'What is the capital of Germany?',
+          correctAnswer: 'Berlin',
+          sourceRoundId: ownRound.id,
+        },
+      ]);
+
+      expect(result).toEqual([{ id: 'missed-item-1' }]);
+      expect(returningFn).toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // [BUG-218 / P1-HIGH] topicSuggestions.findByBook — TOCTOU break test
   //
   // The pre-fix implementation issued two sequential queries:

@@ -11,6 +11,11 @@ export type AppVariables = {
   account: Account;
   profileId: string | undefined;
   profileMeta: ProfileMeta | undefined;
+  /**
+   * [BUG-502 / BUG-487] Set by profileScopeMiddleware when auto-resolve throws
+   * a transient error. Downstream consent middleware reads this to fail closed.
+   */
+  profileScopeError: Error | undefined;
   subscriptionId: string | undefined;
   subscriptionTier: SubscriptionTier | undefined;
   llmTier: LLMTier | undefined;

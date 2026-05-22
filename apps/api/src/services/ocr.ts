@@ -136,7 +136,16 @@ export class GeminiOcrProvider implements OcrProvider {
 // Factory + DI
 // ---------------------------------------------------------------------------
 
-let _provider: OcrProvider | null = null;
+// [BUG-489 / P2] The module-global singleton was removed. Previously,
+// `_provider` was set on the first call and reused for the entire CF Worker
+// isolate lifetime. If a test-seed warmup request set `allowStub:true` first,
+// all subsequent production requests in that isolate silently used StubOcrProvider.
+// The fix: build the provider per-call from the explicit args — construction is
+// cheap (no network calls), and the lifetime mismatch with isolate reuse is gone.
+// DI override via `setOcrProvider` is retained for integration tests that need
+// a deterministic provider pinned across multiple calls.
+
+let _overrideProvider: OcrProvider | null = null;
 
 /**
  * Returns the current OCR provider.
@@ -148,23 +157,27 @@ let _provider: OcrProvider | null = null;
  * When `useRouter` is falsy and `allowStub` is true, returns StubOcrProvider
  * (for tests only). Otherwise throws — fails closed so production never
  * silently serves fake OCR results.
+ *
+ * Provider is built fresh per-call (no module-global cache) so the provider
+ * mode cannot be locked in by an earlier request in the same isolate.
+ * Exception: a DI override set via `setOcrProvider` takes precedence and IS
+ * cached — it is only used in tests to pin a specific provider instance.
  */
 export function getOcrProvider(
   useRouter?: boolean | string,
   allowStub?: boolean,
 ): OcrProvider {
-  if (_provider) {
-    return _provider;
+  // DI override takes precedence — only used in tests.
+  if (_overrideProvider) {
+    return _overrideProvider;
   }
 
   if (useRouter) {
-    _provider = new GeminiOcrProvider();
-    return _provider;
+    return new GeminiOcrProvider();
   }
 
   if (allowStub) {
-    _provider = new StubOcrProvider();
-    return _provider;
+    return new StubOcrProvider();
   }
 
   throw new Error(
@@ -174,12 +187,12 @@ export function getOcrProvider(
 
 /** Sets the OCR provider (for DI / testing). */
 export function setOcrProvider(provider: OcrProvider): void {
-  _provider = provider;
+  _overrideProvider = provider;
 }
 
 /** Resets to default provider (for test cleanup). */
 export function resetOcrProvider(): void {
-  _provider = null;
+  _overrideProvider = null;
 }
 
 /**

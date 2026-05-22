@@ -1,6 +1,6 @@
 import type { Database } from '@eduagent/database';
 import { dataExportSchema } from '@eduagent/schemas';
-import { generateExport } from './export';
+import { generateExport, serializeDates } from './export';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 
@@ -330,6 +330,117 @@ describe('generateExport', () => {
     );
     expect(userRow).toBeDefined();
     expect(userRow!['content']).toBe('What is gravity?');
+  });
+
+  // [BUG-413] Break tests: Drizzle / neon-serverless returns raw Date objects.
+  // Without serializeDates, the export payload carries Date objects in rows
+  // that were cast as `Record<string, unknown>[]`.  These are NOT ISO strings
+  // and cause inconsistent behaviour (zod z.unknown() accepts them silently,
+  // but strict consumers and JSON.stringify produce different results).
+  describe('[BUG-413] Date serialisation in raw-cast GDPR tables', () => {
+    it('serializeDates converts Date values to ISO strings', () => {
+      const date = new Date('2025-06-01T12:00:00.000Z');
+      const row = { id: 'x', createdAt: date, name: 'Alice', count: 5 };
+      const result = serializeDates(row);
+      expect(result['createdAt']).toBe('2025-06-01T12:00:00.000Z');
+      expect(result['id']).toBe('x');
+      expect(result['name']).toBe('Alice');
+      expect(result['count']).toBe(5);
+    });
+
+    it('serializeDates leaves non-Date values unchanged (strings, numbers, nulls)', () => {
+      const row = {
+        id: 'abc',
+        score: 42,
+        label: 'math',
+        missing: null,
+        flag: true,
+      };
+      const result = serializeDates(row);
+      expect(result).toEqual(row);
+    });
+
+    it('exports subjects rows with Date columns as ISO strings (not Date objects)', async () => {
+      const profileRow = mockProfileRow('p1', 'Alice');
+      const date = new Date('2025-03-10T08:30:00.000Z');
+      // Simulate a Drizzle row that carries a raw Date object (neon-serverless).
+      const subjectRow = {
+        id: 'sub-1',
+        profileId: 'p1',
+        name: 'Biology',
+        createdAt: date,
+        updatedAt: date,
+      };
+      const db = createMockDb({
+        profiles: [profileRow],
+        subjects: [subjectRow as unknown as Record<string, unknown>],
+      });
+
+      const result = await generateExport(db, 'account-1');
+
+      expect(result.subjects).toHaveLength(1);
+      const exported = (result.subjects as Record<string, unknown>[])[0]!;
+      // Without BUG-413 fix: createdAt would be a Date object, not a string.
+      expect(typeof exported['createdAt']).toBe('string');
+      expect(exported['createdAt']).toBe('2025-03-10T08:30:00.000Z');
+      expect(exported['updatedAt']).toBe('2025-03-10T08:30:00.000Z');
+    });
+
+    it('exports learningSessions rows with Date columns as ISO strings', async () => {
+      const profileRow = mockProfileRow('p1', 'Alice');
+      const date = new Date('2025-04-15T09:00:00.000Z');
+      const sessionRow = {
+        id: 'ses-1',
+        profileId: 'p1',
+        startedAt: date,
+        endedAt: date,
+        createdAt: date,
+      };
+      const db = createMockDb({
+        profiles: [profileRow],
+        learningSessions: [sessionRow as unknown as Record<string, unknown>],
+      });
+
+      const result = await generateExport(db, 'account-1');
+
+      const sessions = result.learningSessions as Record<string, unknown>[];
+      expect(sessions).toHaveLength(1);
+      // All Date fields must be ISO strings, not Date objects.
+      expect(typeof sessions[0]!['startedAt']).toBe('string');
+      expect(sessions[0]!['startedAt']).toBe('2025-04-15T09:00:00.000Z');
+      expect(sessions[0]!['endedAt']).toBe('2025-04-15T09:00:00.000Z');
+    });
+
+    it('dataExportSchema.parse succeeds on export with Date-carrying raw subscriptions row', async () => {
+      // subscriptions are account-scoped (not profile-scoped), so they are
+      // always queried regardless of profileIds — ideal for a Date-serialisation
+      // schema-parse test that doesn't depend on profileSchema.
+      const date = new Date('2025-05-01T00:00:00.000Z');
+      const subscriptionRow = {
+        id: 'sub-1',
+        accountId: 'account-1',
+        plan: 'plus',
+        createdAt: date,
+        updatedAt: date,
+        expiresAt: date,
+      };
+      const db = createMockDb({
+        profiles: [],
+        subscriptions: [subscriptionRow as unknown as Record<string, unknown>],
+      });
+
+      const result = await generateExport(db, 'account-1');
+      // Without BUG-413 fix, Date objects would pass through as-is.
+      // With the fix, the serialized row has ISO string dates.
+      const subs = result.subscriptions as Record<string, unknown>[];
+      expect(subs).toHaveLength(1);
+      expect(typeof subs[0]!['createdAt']).toBe('string');
+      expect(subs[0]!['createdAt']).toBe('2025-05-01T00:00:00.000Z');
+
+      // Schema parse must also succeed — no raw Date objects in the payload.
+      const parsed = dataExportSchema.safeParse(result);
+      expect(parsed.success).toBe(true);
+    });
   });
 
   it('returns empty arrays for GDPR tables when no profiles exist', async () => {

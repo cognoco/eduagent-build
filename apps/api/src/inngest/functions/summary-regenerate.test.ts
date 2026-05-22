@@ -66,11 +66,21 @@ jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import { NonRetriableError } from 'inngest';
 import {
   sessionSummaryCreate,
   sessionSummaryRegenerate,
+  learnerRecapRegenerate,
 } from './summary-regenerate';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+// Use valid v4 UUIDs — summaryEventPayloadSchema validates uuid format (RFC 4122)
+const PROFILE_ID = 'a1b2c3d4-e5f6-4111-8111-a1b2c3d4e5f6';
+const SESSION_ID = 'b2c3d4e5-f6a1-4222-8222-b2c3d4e5f6a1';
+const SUBJECT_ID = 'c3d4e5f6-a1b2-4333-8333-c3d4e5f6a1b2';
+const TOPIC_ID = 'd4e5f6a1-b2c3-4444-8444-d4e5f6a1b2c3';
+const SUMMARY_ID = 'e5f6a1b2-c3d4-4555-8555-e5f6a1b2c3d4';
+const TIMESTAMP = '2026-01-01T00:00:00.000Z';
 
 describe('summary-regenerate handlers', () => {
   beforeEach(() => {
@@ -79,7 +89,7 @@ describe('summary-regenerate handlers', () => {
   });
 
   it('creates a missing summary row and emits app/session.summary.generated', async () => {
-    mockCreatePendingSessionSummary.mockResolvedValue({ id: 'summary-1' });
+    mockCreatePendingSessionSummary.mockResolvedValue({ id: SUMMARY_ID });
     mockGenerateAndStoreLlmSummary.mockResolvedValue({
       narrative:
         'Worked through algebra and balancing equations while checking each inverse operation.',
@@ -94,16 +104,17 @@ describe('summary-regenerate handlers', () => {
     const result = await handler({
       event: {
         data: {
-          profileId: 'profile-1',
-          sessionId: 'session-1',
-          subjectId: 'subject-1',
-          topicId: 'topic-1',
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
+          timestamp: TIMESTAMP,
         },
       },
       step,
     });
 
-    expect(result).toEqual({ status: 'completed', summaryId: 'summary-1' });
+    expect(result).toEqual({ status: 'completed', summaryId: SUMMARY_ID });
     expect(sendEventCalls).toEqual(
       expect.arrayContaining([
         {
@@ -111,9 +122,9 @@ describe('summary-regenerate handlers', () => {
           payload: expect.objectContaining({
             name: 'app/session.summary.generated',
             data: expect.objectContaining({
-              sessionSummaryId: 'summary-1',
-              profileId: 'profile-1',
-              sessionId: 'session-1',
+              sessionSummaryId: SUMMARY_ID,
+              profileId: PROFILE_ID,
+              sessionId: SESSION_ID,
             }),
           }),
         },
@@ -129,11 +140,12 @@ describe('summary-regenerate handlers', () => {
     const result = await handler({
       event: {
         data: {
-          profileId: 'profile-1',
-          sessionId: 'session-1',
-          sessionSummaryId: 'summary-1',
-          subjectId: 'subject-1',
-          topicId: 'topic-1',
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          sessionSummaryId: SUMMARY_ID,
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
+          timestamp: TIMESTAMP,
         },
       },
       step,
@@ -150,13 +162,133 @@ describe('summary-regenerate handlers', () => {
           payload: expect.objectContaining({
             name: 'app/session.summary.failed',
             data: expect.objectContaining({
-              sessionSummaryId: 'summary-1',
-              profileId: 'profile-1',
-              sessionId: 'session-1',
+              sessionSummaryId: SUMMARY_ID,
+              profileId: PROFILE_ID,
+              sessionId: SESSION_ID,
             }),
           }),
         },
       ]),
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // [FIX-425] Break tests — payload validation for sessionSummaryRegenerate
+  // ---------------------------------------------------------------------------
+
+  describe('[FIX-425] sessionSummaryRegenerate payload validation', () => {
+    it('throws NonRetriableError and skips LLM when profileId is not a UUID', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (sessionSummaryRegenerate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: {
+              profileId: 'not-a-uuid',
+              sessionId: SESSION_ID,
+              sessionSummaryId: SUMMARY_ID,
+              timestamp: TIMESTAMP,
+            },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateAndStoreLlmSummary).not.toHaveBeenCalled();
+    });
+
+    it('throws NonRetriableError and skips LLM when sessionId is missing', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (sessionSummaryRegenerate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: {
+              profileId: PROFILE_ID,
+              sessionSummaryId: SUMMARY_ID,
+              timestamp: TIMESTAMP,
+            },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateAndStoreLlmSummary).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [FIX-428] Break tests — payload validation for sessionSummaryCreate
+  // ---------------------------------------------------------------------------
+
+  describe('[FIX-428] sessionSummaryCreate payload validation', () => {
+    it('throws NonRetriableError and skips LLM when profileId is not a UUID', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (sessionSummaryCreate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: {
+              profileId: 'not-a-uuid',
+              sessionId: SESSION_ID,
+              timestamp: TIMESTAMP,
+            },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockCreatePendingSessionSummary).not.toHaveBeenCalled();
+      expect(mockGenerateAndStoreLlmSummary).not.toHaveBeenCalled();
+    });
+
+    it('throws NonRetriableError and skips LLM when sessionId is missing', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (sessionSummaryCreate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: { profileId: PROFILE_ID, timestamp: TIMESTAMP },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockCreatePendingSessionSummary).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [FIX-429] Break tests — payload validation for learnerRecapRegenerate
+  // ---------------------------------------------------------------------------
+
+  describe('[FIX-429] learnerRecapRegenerate payload validation', () => {
+    it('throws NonRetriableError and skips LLM recap when profileId is not a UUID', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (learnerRecapRegenerate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: {
+              profileId: 'not-a-uuid',
+              sessionId: SESSION_ID,
+              timestamp: TIMESTAMP,
+            },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateLearnerRecap).not.toHaveBeenCalled();
+    });
+
+    it('throws NonRetriableError and skips LLM recap when sessionId is missing', async () => {
+      const { step } = createInngestStepRunner();
+      const handler = (learnerRecapRegenerate as any).fn;
+      await expect(
+        handler({
+          event: {
+            data: { profileId: PROFILE_ID, timestamp: TIMESTAMP },
+          },
+          step,
+        }),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateLearnerRecap).not.toHaveBeenCalled();
+    });
   });
 });

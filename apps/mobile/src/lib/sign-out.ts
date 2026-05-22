@@ -33,7 +33,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { clearTransitionState } from './auth-transition';
 import { clearPendingAuthRedirect } from './pending-auth-redirect';
-import { setActiveProfileId, setProxyMode } from './api-client';
+import { setActiveProfileId, setProxyMode, resetAuthExpiredGuard } from './api-client';
 
 export interface SignOutWithCleanupParams {
   /** Clerk's `signOut` function — obtain via `useClerk()` or `useAuth()`. */
@@ -92,5 +92,13 @@ export async function signOutWithCleanup(
   // user inside their session.
   await clearProfileSecureStorageOnSignOut(profileIds);
 
-  await clerkSignOut();
+  // [BUG-560] Reset the auth-expired guard in a finally block so the flag is
+  // cleared regardless of whether clerkSignOut succeeds or throws. Without
+  // this, _authExpiredFiring stays true permanently after sign-out, silently
+  // swallowing all subsequent 401s for the next signed-in user.
+  try {
+    await clerkSignOut();
+  } finally {
+    resetAuthExpiredGuard();
+  }
 }

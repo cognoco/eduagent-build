@@ -2,6 +2,25 @@
 // Profile Service Tests
 // ---------------------------------------------------------------------------
 
+// [BUG-410] Mocks for escalation path in findOwnerProfile fallback.
+// captureException and inngest.send are external-boundary calls; safeSend is
+// internal but wraps the Inngest client which IS an external boundary.
+const mockCaptureException = jest.fn();
+jest.mock(
+  './sentry' /* gc1-allow: external-boundary mock for sentry escalation */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
+
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+jest.mock(
+  '../inngest/client' /* gc1-allow: external-boundary mock for Inngest dispatch */,
+  () => ({
+    inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
+  }),
+);
+
 jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./consent') as typeof import('./consent');
   return {
@@ -35,6 +54,7 @@ import type { Database } from '@eduagent/database';
 import {
   listProfiles,
   createProfile,
+  findOwnerProfile,
   getProfile,
   updateProfile,
   switchProfile,
@@ -434,6 +454,131 @@ describe('switchProfile', () => {
     const result = await switchProfile(db, 'profile-123', 'account-123');
 
     expect(result).toEqual({ profileId: 'profile-123' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findOwnerProfile — [BUG-410] fallback must NOT elevate isOwner to true
+// ---------------------------------------------------------------------------
+
+describe('findOwnerProfile', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('[BREAK][BUG-410] returns null when account has no profiles at all', async () => {
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await findOwnerProfile(db, 'account-123');
+    expect(result).toBeNull();
+  });
+
+  it('[BREAK][BUG-410] returns owner profile with isOwner:true when DB row is marked as owner', async () => {
+    const ownerRow = mockProfileRow({ id: 'owner-1', isOwner: true });
+    let callCount = 0;
+    const db = {
+      query: {
+        profiles: {
+          // First call: owner query → returns ownerRow
+          findFirst: jest.fn().mockImplementation(() => {
+            callCount++;
+            if (callCount === 1) return Promise.resolve(ownerRow);
+            return Promise.resolve(undefined);
+          }),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await findOwnerProfile(db, 'account-123');
+    expect(result).not.toBeNull();
+    expect(result!.isOwner).toBe(true);
+    // No escalation — a clean owner row should not trigger captureException
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockInngestSend).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK][BUG-410] when no owner row exists but a fallback profile does, returned meta has isOwner:false (never elevated)', async () => {
+    // No owner row (isOwner=true query returns undefined), but a fallback row exists.
+    const fallbackRow = mockProfileRow({ id: 'non-owner-1', isOwner: false });
+    let callCount = 0;
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest.fn().mockImplementation(() => {
+            callCount++;
+            if (callCount === 1) return Promise.resolve(undefined); // owner query → nothing
+            return Promise.resolve(fallbackRow); // fallback query → non-owner row
+          }),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await findOwnerProfile(db, 'account-123');
+    expect(result).not.toBeNull();
+    // [BUG-410] Core assertion: fallback must NOT force isOwner to true.
+    expect(result!.isOwner).toBe(false);
+  });
+
+  it('[BREAK][BUG-410] when fallback fires, captureException is called with profile.owner_resolution_fallback tag', async () => {
+    const fallbackRow = mockProfileRow({ id: 'non-owner-1', isOwner: false });
+    let callCount = 0;
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest.fn().mockImplementation(() => {
+            callCount++;
+            if (callCount === 1) return Promise.resolve(undefined);
+            return Promise.resolve(fallbackRow);
+          }),
+        },
+      },
+    } as unknown as Database;
+
+    await findOwnerProfile(db, 'account-123');
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          tag: 'profile.owner_resolution_fallback',
+          accountId: 'account-123',
+        }),
+      }),
+    );
+  });
+
+  it('[BREAK][BUG-410] when fallback fires, safeSend dispatches app/profile.no_owner_resolved event', async () => {
+    const fallbackRow = mockProfileRow({ id: 'non-owner-1', isOwner: false });
+    let callCount = 0;
+    const db = {
+      query: {
+        profiles: {
+          findFirst: jest.fn().mockImplementation(() => {
+            callCount++;
+            if (callCount === 1) return Promise.resolve(undefined);
+            return Promise.resolve(fallbackRow);
+          }),
+        },
+      },
+    } as unknown as Database;
+
+    await findOwnerProfile(db, 'account-123');
+
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/profile.no_owner_resolved',
+        data: expect.objectContaining({
+          accountId: 'account-123',
+          fallbackProfileId: 'non-owner-1',
+        }),
+      }),
+    );
   });
 });
 

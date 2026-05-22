@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { verificationTypeSchema } from './assessments.ts';
-import { isoDateField } from './common.ts';
+import { IMAGE_BASE64_MAX, isoDateField } from './common.ts';
 import { challengeRoundEvaluationItemSchema } from './llm-envelope.ts';
 import {
   celebrationReasonSchema,
@@ -297,7 +297,7 @@ export const sessionMessageSchema = z
     /** FR228: Homework mode — "Help me solve it" or "Check my answer" */
     homeworkMode: homeworkModeSchema.optional(),
     /** Base64-encoded image to send alongside the message (homework photos) */
-    imageBase64: z.string().max(2_000_000).optional(),
+    imageBase64: z.string().max(IMAGE_BASE64_MAX).optional(),
     /** MIME type of the attached image */
     imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
   })

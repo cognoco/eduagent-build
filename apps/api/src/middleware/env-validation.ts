@@ -21,11 +21,38 @@ type EnvValidationEnv = {
   Bindings: Record<string, string | undefined> & ProductionBindings;
 };
 
-let validated = false;
+// [BUG-486] Replace the simple `validated` boolean with an env-key hash so
+// that:
+//  (a) a transient validation failure on request N does NOT permanently lock
+//      the isolate into "validated" state — the hash stays null and request
+//      N+1 retries validation.
+//  (b) if the Worker is reused across different env objects (preview → prod)
+//      the new env is validated fresh.
+//
+// Strategy: hash the env bindings that are meaningful for validation into a
+// string.  After SUCCESSFUL validation, store the hash.  On failure, leave
+// the hash unset so the next request retries.  The hash is only updated
+// AFTER the full validation block passes — there is no try/finally flip.
+let _validatedEnvHash: string | null = null;
+
+function _envValidationHash(
+  env: Record<string, string | undefined> & Partial<ProductionBindings>,
+): string {
+  // Use DATABASE_URL + ENVIRONMENT as the minimal discriminator — these are
+  // the two values that change between environments and trigger re-validation.
+  // Separator `|` is safe: URLs and environment names never contain it.
+  return `${env['DATABASE_URL'] ?? ''}|${env['ENVIRONMENT'] ?? ''}`;
+}
 
 export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
   async (c, next): Promise<Response | void> => {
-    if (!validated) {
+    // app.request() in tests can run without bindings (c.env === undefined).
+    // Guard before computing the hash so the optional-chain path below is the
+    // single source of truth for "no env, skip validation".
+    const env = (c.env ?? {}) as Record<string, string | undefined>;
+    const currentHash = _envValidationHash(env);
+
+    if (_validatedEnvHash !== currentHash) {
       // Skip in tests and local development — tests mock bindings selectively,
       // and Wrangler local bindings can differ slightly from deployed envs.
       // Optional chain on c.env: app.request() tests run without bindings.
@@ -44,6 +71,8 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
               ? err.message
               : 'Environment validation failed';
           logger.error('[env-validation]', { message });
+          // [BUG-486] Do NOT update _validatedEnvHash on failure — next
+          // request with the same env will retry validation.
           return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
         }
 
@@ -60,6 +89,8 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
             event: 'env-validation.binding_gate_failed',
             missing: bindingResult.missing,
           });
+          // [BUG-486] Do NOT update _validatedEnvHash — binding failures are
+          // retried on the next request (binding may become available).
           return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
         }
         if (bindingResult.overrideApplied) {
@@ -75,7 +106,12 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
           );
         }
       }
-      validated = true;
+      // [BUG-486] Hash is updated ONLY after the full validation block
+      // succeeds.  A failed validation leaves the hash unset so the next
+      // request retries — unlike the old boolean which flipped to `true`
+      // even when the validation block was bypassed (test/dev) making the
+      // "only validates once" test pass vacuously.
+      _validatedEnvHash = currentHash;
     }
     await next();
   },
@@ -83,5 +119,5 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
 
 /** Reset validation state — only for testing */
 export function resetEnvValidation(): void {
-  validated = false;
+  _validatedEnvHash = null;
 }

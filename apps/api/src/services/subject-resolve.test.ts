@@ -6,6 +6,28 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const mockCaptureException = jest.fn();
+const mockLoggerWarn = jest.fn();
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./logger') as typeof import('./logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: jest.fn(),
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
+
 import { resolveSubjectName } from './subject-resolve';
 import { routeAndCall } from './llm';
 
@@ -187,6 +209,44 @@ describe('resolveSubjectName', () => {
     expect(result.status).toBe('corrected');
     expect(result.resolvedName).toBe('Physics');
     expect(result.suggestions).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-462] Break tests — JSON parse error is observable, fallback still returned
+  // ---------------------------------------------------------------------------
+
+  describe('[BUG-462] captureException + logger.warn on JSON parse failure', () => {
+    it('calls captureException with subject-resolve.fallback context when JSON.parse throws', async () => {
+      // extractFirstJsonObject walks brace depth and returns the first balanced
+      // {…} substring. JSON.parse will throw if the substring is not valid JSON,
+      // e.g. {"status": undefined} — `undefined` is a valid JS identifier but
+      // not valid JSON, so the walker returns a balanced string and JSON.parse
+      // throws SyntaxError. This triggers the catch branch.
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: '{"status": undefined}',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+        stopReason: 'stop',
+      });
+
+      const result = await resolveSubjectName('Physics');
+
+      // Fallback preserved
+      expect(result.status).toBe('no_match');
+      expect(result.resolvedName).toBeNull();
+
+      // Error is now visible — not swallowed silently
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'subject-resolve.fallback',
+          }),
+        }),
+      );
+      expect(mockLoggerWarn).toHaveBeenCalled();
+    });
   });
 
   // [PROMPT-INJECT-3] Break tests: rawInput was previously passed as the

@@ -606,7 +606,7 @@ export default function ChildDetailScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { profiles } = useProfile();
+  const { profiles, isLoading: isProfileLoading } = useProfile();
   const { profileId: rawProfileId, mode: rawMode } = useLocalSearchParams<{
     profileId: string;
     mode?: string;
@@ -729,52 +729,7 @@ export default function ChildDetailScreen(): React.ReactElement {
     );
   }
 
-  const detailUnavailable =
-    (!isLoading && childDetail === null && !child) ||
-    (isError && !child && !dashboardQuery.isLoading);
-
-  if (detailUnavailable) {
-    return (
-      <View
-        className="flex-1 bg-background items-center justify-center px-6"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-        testID="child-profile-unavailable"
-      >
-        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          {t('parentView.index.profileNoLongerAvailable')}
-        </Text>
-        <Text className="text-body text-text-secondary text-center mb-6">
-          {t('parentView.index.profileRemovedOrNoAccess')}
-        </Text>
-        {isError ? (
-          <Pressable
-            onPress={() => void refetch()}
-            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.tryAgain')}
-            testID="child-profile-retry"
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              {t('common.tryAgain')}
-            </Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          onPress={() => router.replace(FAMILY_HOME_PATH as Href)}
-          className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-          accessibilityRole="button"
-          accessibilityLabel={t('parentView.index.backToDashboard')}
-          testID="child-profile-back"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            {t('parentView.index.backToDashboard')}
-          </Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (profiles.length > 0 && !isOwnedProfile) {
+  if (!isProfileLoading && profiles.length > 0 && !isOwnedProfile) {
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-5"
@@ -791,6 +746,50 @@ export default function ChildDetailScreen(): React.ReactElement {
         >
           <Text className="text-text-inverse text-body font-semibold">
             {t('common.back')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const hasKnownChildProfile = child != null || ownedProfile != null;
+  const detailUnavailable =
+    (!isLoading && childDetail === null && !hasKnownChildProfile) ||
+    (isError && !hasKnownChildProfile && !dashboardQuery.isLoading);
+
+  if (detailUnavailable) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="child-profile-unavailable"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          {t('parentView.index.profileNoLongerAvailable')}
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          {t('parentView.index.profileRemovedOrNoAccess')}
+        </Text>
+        <Pressable
+          onPress={() => void refetch()}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.tryAgain')}
+          testID="child-profile-retry"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {t('common.tryAgain')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.replace(FAMILY_HOME_PATH as Href)}
+          className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={t('parentView.index.backToDashboard')}
+          testID="child-profile-back"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            {t('parentView.index.backToDashboard')}
           </Text>
         </Pressable>
       </View>

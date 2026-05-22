@@ -97,6 +97,20 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const mockSafeSend = jest.fn().mockResolvedValue(undefined);
+jest.mock(
+  '../services/safe-non-core' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/safe-non-core',
+    ) as typeof import('../services/safe-non-core');
+    return {
+      ...actual,
+      safeSend: (...args: unknown[]) => mockSafeSend(...args),
+    };
+  },
+);
+
 const mockCaptureException = jest.fn();
 
 jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
@@ -208,6 +222,7 @@ function makeRequest(
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSafeSend.mockResolvedValue(undefined);
 
   (findAccountByClerkId as jest.Mock).mockResolvedValue({
     id: 'acc-1',
@@ -694,6 +709,25 @@ describe('RENEWAL', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
+  // [BUG-447] BREAK TEST: when updateSubscriptionFromRevenuecatWebhook throws
+  // (invalid transition), handleRenewal must NOT call updateQuotaPoolLimit.
+  // Pre-fix, the function returned the existing row, callers treated that as
+  // success and updated quota — tier divergence. Post-fix, the throw propagates
+  // and the route returns 500 (unhandled), never reaching updateQuotaPoolLimit.
+  it('[BUG-447] does NOT call updateQuotaPoolLimit when update throws on invalid transition', async () => {
+    (
+      updateSubscriptionFromRevenuecatWebhook as jest.Mock
+    ).mockRejectedValueOnce(
+      new Error('Invalid subscription transition: expired -> active'),
+    );
+
+    const res = await makeRequest(makeWebhookPayload('RENEWAL'));
+
+    // 500 from the propagated throw — the critical assertion is no quota update
+    expect([500, 502]).toContain(res.status);
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+  });
+
   it('converts trial to active on RENEWAL after trial', async () => {
     // Simulate existing subscription in trial state
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
@@ -721,6 +755,90 @@ describe('RENEWAL', () => {
       }),
     );
   });
+
+  // [BUG-453] BREAK TEST: RENEWAL with period_type=TRIAL must NOT wipe trialEndsAt.
+  // Pre-fix, trialEndsAt was unconditionally set to null on every RENEWAL,
+  // including those that RC sends during trial periods. Post-fix, trialEndsAt
+  // is preserved (passed as undefined) when period_type === 'TRIAL'.
+  // Reverting the fix (always passing trialEndsAt: null) makes this test fail.
+  it('[BUG-453] RENEWAL during trial period preserves trialEndsAt — does NOT wipe it', async () => {
+    const trialEnd = new Date(Date.now() + 7 * 86400000).toISOString();
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({
+        status: 'trial',
+        trialEndsAt: trialEnd,
+      }),
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('RENEWAL', {
+        period_type: 'TRIAL',
+        product_id: 'com.eduagent.plus.monthly',
+        expiration_at_ms: Date.now() + 7 * 86400000,
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // trialEndsAt must NOT be set to null — it should be absent (undefined)
+    // so the DB column is left untouched.
+    const callArgs = (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mock
+      .calls[0];
+    expect(callArgs[2]).not.toMatchObject({ trialEndsAt: null });
+    expect(callArgs[2]).toMatchObject({ status: 'active' });
+  });
+
+  // [BUG-453] BREAK TEST: RENEWAL with a different product tier must call
+  // updateQuotaPoolLimit for the new tier. Pre-fix, updateQuotaPoolLimit was
+  // called whenever a tier was present (regardless of change), but the tier was
+  // always passed to the update even when unchanged — leading to quota drift
+  // when RC sent RENEWAL for a same-tier product. Post-fix, quota pool is only
+  // updated when the tier actually changed.
+  it('[BUG-453] RENEWAL with tier change calls updateQuotaPoolLimit for new tier', async () => {
+    // Existing sub is 'plus'; event signals 'pro' → tier changed
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ tier: 'plus', status: 'active' }),
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('RENEWAL', {
+        period_type: 'NORMAL',
+        product_id: 'com.eduagent.pro.monthly',
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // updateSubscriptionFromRevenuecatWebhook must receive the new tier
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ tier: 'pro' }),
+    );
+    // Quota pool must be updated for the new tier
+    expect(updateQuotaPoolLimit).toHaveBeenCalled();
+  });
+
+  // [BUG-453] RENEWAL with same tier must NOT call updateQuotaPoolLimit.
+  it('[BUG-453] RENEWAL with same tier does NOT call updateQuotaPoolLimit', async () => {
+    // Existing sub is 'plus'; event also signals 'plus' → no tier change
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ tier: 'plus', status: 'active' }),
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('RENEWAL', {
+        period_type: 'NORMAL',
+        product_id: 'com.eduagent.plus.monthly',
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // Tier is unchanged → quota pool must NOT be touched
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+    // tier must NOT be passed to update (no spurious tier write)
+    const callArgs = (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mock
+      .calls[0];
+    expect(callArgs[2]).not.toHaveProperty('tier');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -746,6 +864,34 @@ describe('CANCELLATION', () => {
     const res = await makeRequest(makeWebhookPayload('CANCELLATION'));
     expect(res.status).toBe(200);
     expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
+  // [BUG-445] BREAK TEST: cancellation on a past_due subscription must NOT
+  // flip status to 'active' — that would erase the payment-failure signal and
+  // make the user appear entitled when they have an outstanding payment issue.
+  // Pre-fix, status was unconditionally set to 'active'. Post-fix, past_due
+  // stays past_due; only cancelledAt is added. Reverting the fix (always using
+  // status: 'active') makes this test fail.
+  it('[BUG-445] cancellation on past_due subscription keeps status past_due, sets cancelledAt', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'past_due' }),
+    );
+
+    const res = await makeRequest(makeWebhookPayload('CANCELLATION'));
+    expect(res.status).toBe(200);
+
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        status: 'past_due',
+        cancelledAt: expect.any(String),
+      }),
+    );
+    // Must not resurrect to active
+    const callArgs = (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mock
+      .calls[0];
+    expect(callArgs[2].status).not.toBe('active');
   });
 });
 
@@ -912,6 +1058,27 @@ describe('BILLING_ISSUE', () => {
     expect(res.status).toBe(200);
     expect(inngest.send).not.toHaveBeenCalled();
   });
+
+  // [BUG-442] BREAK TEST: BILLING_ISSUE on a trial subscription must reach
+  // updateSubscriptionFromRevenuecatWebhook with status='past_due'. Pre-fix,
+  // trial->past_due was missing from VALID_TRANSITIONS so the update function
+  // would throw (post BUG-447 throw-fix), effectively silencing the billing
+  // issue. With trial->past_due now valid, the update succeeds and the
+  // resulting status is 'past_due', not still 'trial'.
+  it('[BUG-442] BILLING_ISSUE on trial subscription calls update with status=past_due', async () => {
+    (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'past_due' }),
+    );
+
+    const res = await makeRequest(makeWebhookPayload('BILLING_ISSUE'));
+    expect(res.status).toBe(200);
+
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ status: 'past_due' }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -974,6 +1141,136 @@ describe('SUBSCRIBER_ALIAS', () => {
       infoSpy.mockRestore();
     }
   });
+
+  // [BUG-449] BREAK TEST: when SUBSCRIBER_ALIAS arrives and transferred_from
+  // has an existing subscription, captureException MUST be called with the
+  // high-severity tag (revenuecat.alias.unhandled), and safeSend MUST be
+  // called to dispatch the app/billing.alias_received event. Pre-fix,
+  // handleSubscriberAlias only logged — silent revenue loss.
+  it('[BUG-449] calls captureException with high-severity tag when transferred_from has subscription', async () => {
+    // transferred_from user has an existing subscription
+    (findAccountByClerkId as jest.Mock).mockImplementation(
+      (_db: unknown, userId: string) => {
+        if (userId === 'old_clerk_user') {
+          return Promise.resolve({
+            id: 'acc-old',
+            clerkUserId: 'old_clerk_user',
+          });
+        }
+        // The main app_user_id resolves to acc-1 (default mock)
+        return Promise.resolve({ id: 'acc-1', clerkUserId: userId });
+      },
+    );
+    (getSubscriptionByAccountId as jest.Mock).mockImplementation(
+      (_db: unknown, accountId: string) => {
+        if (accountId === 'acc-old') {
+          return Promise.resolve(
+            mockSubscriptionRow({
+              id: 'sub-old',
+              accountId: 'acc-old',
+              tier: 'plus',
+              status: 'active',
+            }),
+          );
+        }
+        return Promise.resolve(mockSubscriptionRow());
+      },
+    );
+
+    mockCaptureException.mockClear();
+    mockSafeSend.mockClear();
+
+    const res = await makeRequest(
+      makeWebhookPayload('SUBSCRIBER_ALIAS', {
+        app_user_id: 'new_clerk_user',
+        transferred_from: ['old_clerk_user'],
+        transferred_to: ['new_clerk_user'],
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // captureException must be called with the high-severity alias tag
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          tag: 'revenuecat.alias.unhandled',
+          severity: 'high',
+          fromAppUserId: 'old_clerk_user',
+        }),
+      }),
+    );
+
+    // safeSend must be called to dispatch the alias_received event
+    expect(mockSafeSend).toHaveBeenCalledWith(
+      expect.any(Function),
+      'revenuecat.alias_received',
+      expect.objectContaining({ fromAppUserId: 'old_clerk_user' }),
+    );
+  });
+
+  it('[BUG-449] does NOT escalate when transferred_from is anonymous ($RCAnonymousID)', async () => {
+    mockCaptureException.mockClear();
+    mockSafeSend.mockClear();
+
+    const res = await makeRequest(
+      makeWebhookPayload('SUBSCRIBER_ALIAS', {
+        app_user_id: 'new_clerk_user',
+        transferred_from: ['$RCAnonymousID:abc123'],
+        transferred_to: ['new_clerk_user'],
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // Anonymous transferred_from — no subscription can exist there, no escalation
+    expect(mockCaptureException).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ tag: 'revenuecat.alias.unhandled' }),
+      }),
+    );
+    expect(mockSafeSend).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-449] does NOT escalate when transferred_from has no subscription', async () => {
+    (findAccountByClerkId as jest.Mock).mockImplementation(
+      (_db: unknown, userId: string) => {
+        if (userId === 'old_clerk_user') {
+          return Promise.resolve({
+            id: 'acc-old',
+            clerkUserId: 'old_clerk_user',
+          });
+        }
+        return Promise.resolve({ id: 'acc-1', clerkUserId: userId });
+      },
+    );
+    // transferred_from account exists but has no subscription
+    (getSubscriptionByAccountId as jest.Mock).mockImplementation(
+      (_db: unknown, accountId: string) => {
+        if (accountId === 'acc-old') return Promise.resolve(null);
+        return Promise.resolve(mockSubscriptionRow());
+      },
+    );
+
+    mockCaptureException.mockClear();
+    mockSafeSend.mockClear();
+
+    const res = await makeRequest(
+      makeWebhookPayload('SUBSCRIBER_ALIAS', {
+        app_user_id: 'new_clerk_user',
+        transferred_from: ['old_clerk_user'],
+        transferred_to: ['new_clerk_user'],
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockSafeSend).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ tag: 'revenuecat.alias.unhandled' }),
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1018,6 +1315,63 @@ describe('PRODUCT_CHANGE', () => {
     );
     expect(res.status).toBe(200);
     expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+  });
+
+  // [BUG-446] BREAK TEST: PRODUCT_CHANGE on an expired subscription must NOT
+  // call updateQuotaPoolLimit. With the wave-3 fix in place (BUG-447),
+  // updateSubscriptionFromRevenuecatWebhook throws on the invalid
+  // expired->active transition. The throw propagates from handleProductChange,
+  // skipping the `if (updated)` branch that contains updateQuotaPoolLimit.
+  // Pre-fix (before the throw was introduced), the function returned the existing
+  // row and callers proceeded to call updateQuotaPoolLimit — divergent billing state.
+  // Reverting the throw in updateSubscriptionFromRevenuecatWebhook makes this fail.
+  it('[BUG-446] PRODUCT_CHANGE on expired subscription does NOT call updateQuotaPoolLimit', async () => {
+    (
+      updateSubscriptionFromRevenuecatWebhook as jest.Mock
+    ).mockRejectedValueOnce(
+      new Error('Invalid subscription transition: expired -> active'),
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('PRODUCT_CHANGE', {
+        product_id: 'com.eduagent.plus.monthly',
+        new_product_id: 'com.eduagent.family.monthly',
+      }),
+    );
+
+    // 500 from the propagated throw — critical assertion is no quota update
+    expect([500, 502]).toContain(res.status);
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+  });
+
+  // [BUG-444] BREAK TEST: a product_id with the correct prefix pattern but NOT
+  // in PRODUCT_TIER_MAP must NOT be recognized as a paid tier. The regex
+  // fallback granted entitlement for any com.eduagent.<tier>.* product —
+  // including experimental/trial-only/marketing products. Post-fix, only
+  // explicit PRODUCT_TIER_MAP entries grant entitlement; unknown products route
+  // to the Sentry escalation path. Reverting the fix (re-adding the regex
+  // fallback) makes this test fail.
+  it('[BUG-444] product_id NOT in PRODUCT_TIER_MAP is rejected even if prefix matches', async () => {
+    // com.eduagent.plus.experimental matches the old regex but is not in the map
+    const res = await makeRequest(
+      makeWebhookPayload('INITIAL_PURCHASE', {
+        product_id: 'com.eduagent.plus.experimental',
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    // Must NOT activate a subscription — unknown product
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+
+    // Must escalate to Sentry so the unknown product is surfaced immediately
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          productId: 'com.eduagent.plus.experimental',
+        }),
+      }),
+    );
   });
 });
 
@@ -1178,18 +1532,31 @@ describe('NON_RENEWING_PURCHASE', () => {
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
   });
 
-  it('rejects when both transaction IDs are missing (prevents duplicate credits)', async () => {
+  // [BUG-451] Missing transaction ID returns 200 (not 400) so RevenueCat does
+  // NOT retry for 72h. The payload is permanently malformed — both fields absent
+  // simultaneously is a provider-side bug. We ack, skip, and escalate to Sentry.
+  it('acks (200) when both transaction IDs are missing to prevent RC retry storm [BUG-451]', async () => {
     const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
       product_id: 'com.eduagent.topup.500',
       // no store_transaction_id or transaction_id
     });
 
     const res = await makeRequest(payload);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.received).toBe(false);
-    expect(body.error).toBe('Missing transaction ID');
+    expect(body.received).toBe(true);
+    expect(body.skipped).toBe('missing_transaction_id');
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+
+    // Sentry must be notified — category in extra (tags is not in ErrorContext)
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          category: 'revenuecat.malformed_payload',
+        }),
+      }),
+    );
   });
 
   it('falls back to transaction_id when store_transaction_id is absent', async () => {

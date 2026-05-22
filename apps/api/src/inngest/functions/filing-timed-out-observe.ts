@@ -22,6 +22,15 @@ export const filingTimedOutObserve = inngest.createFunction(
   {
     id: 'filing-timed-out-observe',
     name: 'Filing timed-out observer + active reconciliation',
+    // [FIX-INNGEST-BUG-424] Idempotency: duplicate app/session.filing_timed_out
+    // events (operator replay, double-dispatch, backfill re-fire) dedup within
+    // 24 h so only one execution runs per sessionId. concurrency(limit:1)
+    // serialises any concurrent runs that arrive before Inngest can deduplicate
+    // them, preventing parallel mark-pending-and-claim-retry-slot calls from
+    // incrementing filingRetryCount twice and dispatching two app/filing.retry
+    // events for the same session.
+    idempotency: 'event.data.sessionId',
+    concurrency: { key: 'event.data.sessionId', limit: 1 },
   },
   { event: 'app/session.filing_timed_out' },
   async ({ event, step }) => {
@@ -33,7 +42,7 @@ export const filingTimedOutObserve = inngest.createFunction(
       const session = await db.query.learningSessions.findFirst({
         where: and(
           eq(learningSessions.id, sessionId),
-          eq(learningSessions.profileId, profileId)
+          eq(learningSessions.profileId, profileId),
         ),
       });
       const [{ count: eventCount } = { count: 0 }] = await db
@@ -76,7 +85,7 @@ export const filingTimedOutObserve = inngest.createFunction(
       return db.query.learningSessions.findFirst({
         where: and(
           eq(learningSessions.id, sessionId),
-          eq(learningSessions.profileId, profileId)
+          eq(learningSessions.profileId, profileId),
         ),
       });
     });
@@ -97,8 +106,8 @@ export const filingTimedOutObserve = inngest.createFunction(
             .where(
               and(
                 eq(learningSessions.id, sessionId),
-                eq(learningSessions.profileId, profileId)
-              )
+                eq(learningSessions.profileId, profileId),
+              ),
             );
         });
       }
@@ -132,14 +141,14 @@ export const filingTimedOutObserve = inngest.createFunction(
             and(
               eq(learningSessions.id, sessionId),
               eq(learningSessions.profileId, profileId),
-              lt(learningSessions.filingRetryCount, MAX_FILING_RETRIES)
-            )
+              lt(learningSessions.filingRetryCount, MAX_FILING_RETRIES),
+            ),
           )
           .returning({
             filingRetryCount: learningSessions.filingRetryCount,
           });
         return result[0]?.filingRetryCount ?? null;
-      }
+      },
     );
 
     if (attemptNumber != null) {
@@ -181,8 +190,8 @@ export const filingTimedOutObserve = inngest.createFunction(
           .where(
             and(
               eq(learningSessions.id, sessionId),
-              eq(learningSessions.profileId, profileId)
-            )
+              eq(learningSessions.profileId, profileId),
+            ),
           );
       });
 
@@ -213,8 +222,8 @@ export const filingTimedOutObserve = inngest.createFunction(
           and(
             eq(learningSessions.id, sessionId),
             eq(learningSessions.profileId, profileId),
-            eq(learningSessions.filingStatus, 'filing_pending')
-          )
+            eq(learningSessions.filingStatus, 'filing_pending'),
+          ),
         )
         .returning({ id: learningSessions.id });
       return result.length > 0;
@@ -229,7 +238,7 @@ export const filingTimedOutObserve = inngest.createFunction(
       // against Inngest run history. [CR-FIL-SILENT-01]
       logger.info(
         '[filing-timed-out-observe] mark-failed no-op: status already advanced, treating as recovered_after_window',
-        { sessionId, profileId }
+        { sessionId, profileId },
       );
 
       // [H-2] Wrap parse + sendEvent inside step.run so that a Zod parse error
@@ -248,7 +257,7 @@ export const filingTimedOutObserve = inngest.createFunction(
         const currentRow = await db.query.learningSessions.findFirst({
           where: and(
             eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId)
+            eq(learningSessions.profileId, profileId),
           ),
         });
 
@@ -259,7 +268,7 @@ export const filingTimedOutObserve = inngest.createFunction(
               sessionId,
               profileId,
               filingStatus: currentRow?.filingStatus ?? 'row_missing',
-            }
+            },
           );
           return { emitted: false, reason: 'not_recovered' };
         }
@@ -286,7 +295,7 @@ export const filingTimedOutObserve = inngest.createFunction(
           });
           logger.warn(
             '[filing-timed-out-observe] filingResolvedEventSchema parse failed — recovered_after_window event not emitted',
-            { sessionId, profileId }
+            { sessionId, profileId },
           );
           return { emitted: false, reason: 'parse_error' };
         }
@@ -315,7 +324,7 @@ export const filingTimedOutObserve = inngest.createFunction(
         db,
         profileId,
         'session_filing_failed',
-        24
+        24,
       );
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' };
@@ -346,7 +355,7 @@ export const filingTimedOutObserve = inngest.createFunction(
     });
 
     const escalation = new Error(
-      `filing-timed-out-observe: retry failed for session ${sessionId}`
+      `filing-timed-out-observe: retry failed for session ${sessionId}`,
     );
     captureException(escalation, {
       profileId,
@@ -359,5 +368,5 @@ export const filingTimedOutObserve = inngest.createFunction(
     });
 
     return { resolution: 'unrecoverable' as const, snapshot };
-  }
+  },
 );

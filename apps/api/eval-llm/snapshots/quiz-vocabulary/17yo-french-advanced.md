@@ -27,7 +27,7 @@
 ```json
 {
   "discoveryCount": 6,
-  "ageBracket": "adult",
+  "ageBracket": "adolescent",
   "recentAnswers": [
     "l'angoisse",
     "le fardeau",

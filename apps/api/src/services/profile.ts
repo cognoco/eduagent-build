@@ -6,6 +6,9 @@
 import { eq, and, asc, sql, isNull } from 'drizzle-orm';
 import { profiles, familyLinks, type Database } from '@eduagent/database';
 import { createLogger } from './logger';
+import { captureException } from './sentry';
+import { safeSend } from './safe-non-core';
+import { inngest } from '../inngest/client';
 
 const logger = createLogger();
 import type {
@@ -111,6 +114,25 @@ export async function listProfiles(
 }
 
 /**
+ * Returns the count of non-archived profiles for an account.
+ * Used by POST /profiles to distinguish first-profile creation (count === 0)
+ * from an existing-account scenario where profileMeta absence means a broken
+ * state rather than an empty account.
+ *
+ * [BUG-407] Lightweight O(1) count — does not load consent or profile data.
+ */
+export async function countProfiles(
+  db: Database,
+  accountId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(profiles)
+    .where(and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)));
+  return Number(row?.count ?? 0);
+}
+
+/**
  * Finds the owner profile for an account.
  * Used by profile-scope middleware to auto-resolve profileId when X-Profile-Id
  * header is absent, preventing the broken `account.id` fallback.
@@ -137,21 +159,49 @@ export async function findOwnerProfile(
     return mapProfileRow(ownerRow, consentStatus);
   }
 
-  // Fallback: no owner flag set — pick first profile (defensive edge case).
-  // A brand-new account can legitimately have no profiles yet, so only warn
-  // after we know there is a profile row to fall back to.
+  // [BUG-410] Fallback: no owner flag set — account is in a corrupt/inconsistent
+  // state. Check whether any profiles exist at all before deciding how to respond.
+  //
+  // IMPORTANT: We return the fallback row with its ACTUAL isOwner flag (false),
+  // NOT with isOwner forced to true. The caller (profile-scope.ts) must propagate
+  // this flag faithfully — granting owner privileges to a non-owner profile is
+  // the exact bug we are fixing here.
+  //
+  // We still escalate aggressively: captureException (high severity) + safeSend
+  // an Inngest event so the missing-owner-row is alertable in production.
   const fallbackRow = await db.query.profiles.findFirst({
     where: and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
     orderBy: [asc(profiles.createdAt)],
   });
   if (!fallbackRow) return null;
-  logger.warn(
-    '[findOwnerProfile] No owner profile for account, falling back to oldest profile',
-    {
-      accountId,
-    },
+
+  // Escalate: missing owner row is a data-integrity anomaly, not a normal edge case.
+  const noOwnerErr = new Error(
+    `[findOwnerProfile] No owner profile found for account ${accountId}; falling back to oldest profile. isOwner will remain false — caller must not elevate.`,
   );
+  logger.warn(noOwnerErr.message, {
+    accountId,
+    fallbackProfileId: fallbackRow.id,
+  });
+  captureException(noOwnerErr, {
+    extra: {
+      tag: 'profile.owner_resolution_fallback',
+      accountId,
+      fallbackProfileId: fallbackRow.id,
+    },
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/profile.no_owner_resolved',
+        data: { accountId, fallbackProfileId: fallbackRow.id },
+      }),
+    'findOwnerProfile.no_owner_resolved',
+    { accountId, fallbackProfileId: fallbackRow.id },
+  );
+
   const consentStatus = await getConsentStatus(db, fallbackRow.id);
+  // Return with actual isOwner (false) — do NOT force to true.
   return mapProfileRow(fallbackRow, consentStatus);
 }
 

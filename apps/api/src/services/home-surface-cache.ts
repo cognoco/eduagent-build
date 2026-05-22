@@ -165,16 +165,19 @@ export async function readHomeSurfaceCacheData(
 }
 
 /**
- * Atomically read-modify-write the home surface cache for a profile.
+ * Core read-modify-write body for the home surface cache.
  *
- * Wraps the operation in a transaction with SELECT FOR UPDATE to prevent
- * concurrent requests from silently overwriting each other's updates
- * (e.g., lost interaction counter increments). Bug #25.
+ * Operates directly on the provided `db` handle — which may be either a root
+ * Database or a transaction handle cast via `tx as unknown as Database`. Does
+ * NOT open its own transaction; the caller is responsible for wrapping if
+ * atomicity is required.
  *
- * For the first-write case (no row yet), an idempotent INSERT … ON CONFLICT
- * DO NOTHING ensures a row exists before locking.
+ * [BUG-467] Extracted so callers that already hold a transaction (e.g.
+ * `queueCelebration`) can pass their `txDb` without causing a nested
+ * `db.transaction()` call, which on neon-serverless either throws or silently
+ * degrades the inner SELECT FOR UPDATE.
  */
-export async function mergeHomeSurfaceCacheData(
+async function mergeHomeSurfaceCacheDataInTx(
   db: Database,
   profileId: string,
   merge: (current: HomeSurfaceCacheData) => HomeSurfaceCacheData,
@@ -183,67 +186,106 @@ export async function mergeHomeSurfaceCacheData(
     expiresAt?: Date;
   }
 ): Promise<HomeSurfaceCacheData> {
+  // Ensure a row exists so SELECT FOR UPDATE has something to lock.
+  // ON CONFLICT DO NOTHING is idempotent for concurrent first-writes.
+  const defaultData = normalizeHomeSurfaceCacheData(undefined, profileId);
+  await db
+    .insert(coachingCardCache)
+    .values({
+      profileId,
+      cardData: defaultData,
+      pendingCelebrations: [] as PendingCelebration[],
+      expiresAt: new Date(Date.now() + HOME_SURFACE_TTL_MS),
+    })
+    .onConflictDoNothing({ target: coachingCardCache.profileId });
+
+  // Acquire row-level lock — blocks concurrent merges for this profile
+  // until this transaction commits.
+  const [lockedRow] = await db
+    .select()
+    .from(coachingCardCache)
+    .where(eq(coachingCardCache.profileId, profileId))
+    .for('update');
+
+  const now = new Date();
+  const current = lockedRow
+    ? normalizeHomeSurfaceCacheData(lockedRow.cardData, profileId)
+    : defaultData;
+  const next: HomeSurfaceCacheData = {
+    ...merge(current),
+    kind: HOME_SURFACE_CACHE_KIND,
+    cachedAt: now.toISOString(),
+  };
+  const expiresAt =
+    options?.expiresAt ?? new Date(now.getTime() + HOME_SURFACE_TTL_MS);
+
+  await db
+    .update(coachingCardCache)
+    .set({
+      cardData: next,
+      pendingCelebrations:
+        options?.pendingCelebrations ??
+        lockedRow?.pendingCelebrations ??
+        ([] as PendingCelebration[]),
+      expiresAt,
+      updatedAt: now,
+    })
+    .where(eq(coachingCardCache.profileId, profileId));
+
+  return next;
+}
+
+/**
+ * Atomically read-modify-write the home surface cache for a profile.
+ *
+ * Wraps the operation in a transaction with SELECT FOR UPDATE to prevent
+ * concurrent requests from silently overwriting each other's updates
+ * (e.g., lost interaction counter increments). Bug #25.
+ *
+ * For the first-write case (no row yet), an idempotent INSERT … ON CONFLICT
+ * DO NOTHING ensures a row exists before locking.
+ *
+ * When called from within an existing transaction, pass the transaction handle
+ * cast as Database and set `options.inTransaction = true` to skip the inner
+ * `db.transaction()` wrapper. [BUG-467] Without this, neon-serverless throws
+ * on nested transactions or silently degrades the SELECT FOR UPDATE row lock.
+ */
+export async function mergeHomeSurfaceCacheData(
+  db: Database,
+  profileId: string,
+  merge: (current: HomeSurfaceCacheData) => HomeSurfaceCacheData,
+  options?: {
+    pendingCelebrations?: PendingCelebration[];
+    expiresAt?: Date;
+    /** Set true when `db` is already a transaction handle. Skips the inner
+     *  db.transaction() wrapper to avoid nested transactions on neon-serverless. */
+    inTransaction?: boolean;
+  }
+): Promise<HomeSurfaceCacheData> {
+  if (options?.inTransaction) {
+    // Caller already holds a transaction — run the body directly on the
+    // provided handle so we do not open a nested transaction.
+    return mergeHomeSurfaceCacheDataInTx(db, profileId, merge, options);
+  }
+
   return db.transaction(async (tx) => {
-    // Ensure a row exists so SELECT FOR UPDATE has something to lock.
-    // ON CONFLICT DO NOTHING is idempotent for concurrent first-writes.
-    const defaultData = normalizeHomeSurfaceCacheData(undefined, profileId);
-    await tx
-      .insert(coachingCardCache)
-      .values({
-        profileId,
-        cardData: defaultData,
-        pendingCelebrations: [] as PendingCelebration[],
-        expiresAt: new Date(Date.now() + HOME_SURFACE_TTL_MS),
-      })
-      .onConflictDoNothing({ target: coachingCardCache.profileId });
-
-    // Acquire row-level lock — blocks concurrent merges for this profile
-    // until this transaction commits.
-    const [lockedRow] = await tx
-      .select()
-      .from(coachingCardCache)
-      .where(eq(coachingCardCache.profileId, profileId))
-      .for('update');
-
-    const now = new Date();
-    const current = lockedRow
-      ? normalizeHomeSurfaceCacheData(lockedRow.cardData, profileId)
-      : defaultData;
-    const next: HomeSurfaceCacheData = {
-      ...merge(current),
-      kind: HOME_SURFACE_CACHE_KIND,
-      cachedAt: now.toISOString(),
-    };
-    const expiresAt =
-      options?.expiresAt ?? new Date(now.getTime() + HOME_SURFACE_TTL_MS);
-
-    await tx
-      .update(coachingCardCache)
-      .set({
-        cardData: next,
-        pendingCelebrations:
-          options?.pendingCelebrations ??
-          lockedRow?.pendingCelebrations ??
-          ([] as PendingCelebration[]),
-        expiresAt,
-        updatedAt: now,
-      })
-      .where(eq(coachingCardCache.profileId, profileId));
-
-    return next;
+    const txDb = tx as unknown as Database;
+    return mergeHomeSurfaceCacheDataInTx(txDb, profileId, merge, options);
   });
 }
 
 export async function writeHomeSurfacePendingCelebrations(
   db: Database,
   profileId: string,
-  pendingCelebrations: PendingCelebration[]
+  pendingCelebrations: PendingCelebration[],
+  options?: { inTransaction?: boolean }
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + HOME_SURFACE_TTL_MS);
 
   await mergeHomeSurfaceCacheData(db, profileId, (current) => current, {
     pendingCelebrations,
     expiresAt,
+    inTransaction: options?.inTransaction,
   });
 }
 

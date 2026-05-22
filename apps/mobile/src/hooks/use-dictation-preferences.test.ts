@@ -123,4 +123,72 @@ describe('useDictationPreferences', () => {
 
     expect(mockSet).not.toHaveBeenCalled();
   });
+
+  // [BUG-530] Break test: stale state must not be visible on profile switch
+  it('resets pace and punctuation to defaults immediately on profileId change before async read resolves', async () => {
+    // Profile A has pace=fast stored
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === 'dictation-pace-profile-A') return 'fast';
+      if (key === 'dictation-punctuation-profile-A') return 'false';
+      // Profile B has nothing stored — reads resolve to null (default)
+      return null;
+    });
+
+    const { result, rerender } = renderHook(
+      ({ profileId }: { profileId: string }) =>
+        useDictationPreferences(profileId),
+      { initialProps: { profileId: 'profile-A' } },
+    );
+
+    // Let profile A's reads complete
+    await act(() => Promise.resolve());
+    expect(result.current.pace).toBe('fast');
+    expect(result.current.punctuationReadAloud).toBe(false);
+
+    // Switch to profile B; reads are async, but state must reset synchronously
+    rerender({ profileId: 'profile-B' });
+
+    // Before any microtasks — defaults must be visible immediately
+    expect(result.current.pace).toBe('slow');
+    expect(result.current.punctuationReadAloud).toBe(true);
+
+    // After profile B's reads complete — still defaults (nothing stored for B)
+    await act(() => Promise.resolve());
+    expect(result.current.pace).toBe('slow');
+    expect(result.current.punctuationReadAloud).toBe(true);
+  });
+
+  // [BUG-530] Race guard: an older in-flight read must not overwrite the reset
+  it('ignores results from reads cancelled by a profileId change', async () => {
+    let resolveProfileA!: (value: string | null) => void;
+    const profileAPromise = new Promise<string | null>((res) => {
+      resolveProfileA = res;
+    });
+
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === 'dictation-pace-profile-A') return profileAPromise;
+      return null;
+    });
+
+    const { result, rerender } = renderHook(
+      ({ profileId }: { profileId: string }) =>
+        useDictationPreferences(profileId),
+      { initialProps: { profileId: 'profile-A' } },
+    );
+
+    // Switch to profile B before profile A's read resolves
+    rerender({ profileId: 'profile-B' });
+
+    // Reset is visible
+    expect(result.current.pace).toBe('slow');
+
+    // Now resolve profile A's stale read with 'fast'
+    await act(async () => {
+      resolveProfileA('fast');
+      await Promise.resolve();
+    });
+
+    // Stale result must be ignored — pace stays at default 'slow'
+    expect(result.current.pace).toBe('slow');
+  });
 });

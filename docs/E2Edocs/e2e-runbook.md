@@ -342,3 +342,53 @@ requirements without empirical evidence.
   `apps/mobile/e2e/scripts/seed-and-run.sh`
 - **Pre-flight infra health script (do not modify):**
   `apps/mobile/e2e/scripts/e2e-preflight.sh`
+
+---
+
+## SUBJECT-16 / SUBJECT-17: Conversation language and pronouns (Playwright web)
+
+Added 2026-05-22. Covers the flow-inventory rows that were previously blocked
+by unstable onboarding paths on the flow-review branch.
+
+### SUBJECT-16: Conversation-language picker
+
+**Background:** The dedicated onboarding `language-picker` screen was deleted
+on 2026-05-06 (plan: `docs/_archive/plans/done/2026-05-06-mentor-language-from-ui.md`).
+The profile's `conversationLanguage` is now auto-synced from the app UI language
+via `useMentorLanguageSync`. The user-visible control is the "App Language"
+bottom-sheet picker in **More → Account → App Language** (requires
+`FEATURE_FLAGS.I18N_ENABLED = true`, which is the default).
+
+**Playwright spec:** `apps/mobile/e2e-web/flows/journeys/j24-subject16-conversation-language.spec.ts`
+
+**Seed scenario:** `onboarding-complete` (adult learner, consented, one subject).
+
+**Coverage:**
+- More → Account screen shows the `settings-app-language` row
+- Tapping the row opens the bottom-sheet picker (`app-language-backdrop` visible)
+- Language preset options have testIDs `language-option-<code>` (en, de, etc.)
+- Selecting a language (de) closes the sheet
+- Dismiss via close button keeps account screen accessible
+
+### SUBJECT-17: Pronouns picker
+
+**Route:** `/(app)/onboarding/pronouns` (reachable via `page.goto('/onboarding/pronouns')`
+after sign-in, identical to the pattern used in j22 for retention direct routes).
+
+**Age gate:** Learners below `PRONOUNS_PROMPT_MIN_AGE` (13) are silently
+forwarded by a `useEffect`. The `onboarding-complete` seed uses
+`LEARNER_BIRTH_YEAR = currentYear - 17`, so the gate never fires.
+
+**Playwright spec:** `apps/mobile/e2e-web/flows/journeys/j25-subject17-pronouns-picker.spec.ts`
+
+**Seed scenario:** `onboarding-complete`.
+
+**Coverage:**
+- Three preset options visible (`pronouns-option-she-her`, `pronouns-option-he-him`,
+  `pronouns-option-they-them`)
+- "Other" card visible (`pronouns-option-other`)
+- Selecting Other reveals free-text input (`pronouns-custom-input`)
+- Continue disabled when Other selected but input empty
+- Continue enabled after typing a custom value
+- Continue enabled when a preset is selected
+- Skip button visible, enabled, and navigates away

@@ -2,6 +2,19 @@
 // Stripe Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
+jest.mock(
+  './resend-webhook' /* gc1-allow: external-boundary: claimWebhookId is the DB-atomic idempotency gate — mocking the DB primitive at the route boundary lets unit tests control claimed/replay/unavailable outcomes without a real Postgres connection */,
+  () => {
+    const actual = jest.requireActual(
+      './resend-webhook',
+    ) as typeof import('./resend-webhook');
+    return {
+      ...actual,
+      claimWebhookId: jest.fn(),
+    };
+  },
+);
+
 jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/stripe',
@@ -106,6 +119,7 @@ import {
 } from '../services/billing';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
+import { claimWebhookId } from './resend-webhook';
 
 // ---------------------------------------------------------------------------
 // Test app with mock db middleware
@@ -218,6 +232,8 @@ beforeEach(() => {
     mockUpdatedSubscription(),
   );
   (updateQuotaPoolLimit as jest.Mock).mockResolvedValue(undefined);
+  // Default: first delivery is claimed (most tests don't exercise the replay path)
+  (claimWebhookId as jest.Mock).mockResolvedValue('claimed');
 });
 
 // ---------------------------------------------------------------------------
@@ -823,6 +839,51 @@ describe('invoice.payment_succeeded', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
+  // [BUG-443] BREAK TEST: payment_succeeded on a cancelled subscription must
+  // flip status to 'active' AND update lastStripeEventTimestamp. Pre-fix,
+  // 'cancelled->active' was not in VALID_TRANSITIONS so updateSubscriptionFromWebhook
+  // threw, leaving the user paying but stuck in 'cancelled' with
+  // lastStripeEventTimestamp NOT updated — every subsequent event re-processed
+  // indefinitely. Post-fix the transition is valid. Reverting the
+  // 'cancelled->active' addition to VALID_TRANSITIONS makes this test fail.
+  it('[BUG-443] payment_succeeded on cancelled sub flips to active and updates timestamp', async () => {
+    // updateSubscriptionFromWebhook uses the real isValidTransition from
+    // subscription.ts (pattern-a mock spreads requireActual). Return a
+    // cancelled subscription row so the handler encounters 'cancelled->active'.
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({ status: 'active' }),
+    );
+
+    const invoice = makeInvoice();
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('invoice.payment_succeeded', invoice),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    // updateSubscriptionFromWebhook must be called with status: 'active'
+    // and a lastStripeEventTimestamp (proves the timestamp was updated).
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'sub_stripe_123',
+      expect.objectContaining({
+        status: 'active',
+        lastStripeEventTimestamp: expect.any(String),
+      }),
+    );
+    // KV cache must also be refreshed
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
   // [ultrareview finding] If Stripe SDK v21 (or later) refactors the invoice
   // payload again, extractSubscriptionIdFromInvoice() returns undefined and
   // we silently skip re-activating the subscription — stuck in past_due with
@@ -1028,13 +1089,12 @@ describe('checkout.session.completed', () => {
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
 
-  // [BUG-119] Duplicate checkout.session.completed must be safe. Stripe
-  // redelivers completed webhooks (retry on transient 5xx, manual re-send
-  // via dashboard, account-level webhook replays). The previous suite had
-  // NO route-level coverage for the "same event arrives twice" path;
-  // downstream guarantee lives in activateSubscriptionFromCheckout but no
-  // test pinned that contract at the route surface.
-  it('handles duplicate checkout.session.completed safely (idempotent) [BUG-119]', async () => {
+  // [#450 break test] Duplicate checkout.session.completed is intercepted at
+  // the route level by the claimWebhookId atomic gate BEFORE handleCheckoutCompleted
+  // is invoked. First delivery is claimed and proceeds; second delivery is a
+  // replay and returns 200 immediately without invoking activateSubscriptionFromCheckout.
+  // This prevents the UNIQUE(account_id) crash → 500 → Stripe retry loop.
+  it('blocks duplicate checkout.session.completed at idempotency gate — second call does NOT invoke createSubscription [#450]', async () => {
     const session = makeCheckoutSession();
     const event = makeStripeEvent('checkout.session.completed', session);
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
@@ -1042,6 +1102,8 @@ describe('checkout.session.completed', () => {
       mockUpdatedSubscription(),
     );
 
+    // First delivery: claim succeeds
+    (claimWebhookId as jest.Mock).mockResolvedValueOnce('claimed');
     const res1 = await app.request(
       '/stripe/webhook',
       {
@@ -1052,7 +1114,10 @@ describe('checkout.session.completed', () => {
       TEST_ENV,
     );
     expect(res1.status).toBe(200);
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledTimes(1);
 
+    // Second delivery: replay detected — gate blocks processing
+    (claimWebhookId as jest.Mock).mockResolvedValueOnce('replay');
     const res2 = await app.request(
       '/stripe/webhook',
       {
@@ -1063,27 +1128,46 @@ describe('checkout.session.completed', () => {
       TEST_ENV,
     );
     expect(res2.status).toBe(200);
+    const body2 = await res2.json();
+    expect(body2.replayed).toBe(true);
 
-    // Both attempts call into the activator; the activator is the
-    // idempotency boundary and was called with identical args both times.
-    expect(activateSubscriptionFromCheckout).toHaveBeenCalledTimes(2);
-    expect(activateSubscriptionFromCheckout).toHaveBeenNthCalledWith(
-      1,
-      mockDb,
-      'acc-1',
-      'sub_stripe_123',
-      'plus',
-      expect.any(String),
-    );
-    expect(activateSubscriptionFromCheckout).toHaveBeenNthCalledWith(
-      2,
-      mockDb,
-      'acc-1',
-      'sub_stripe_123',
-      'plus',
-      expect.any(String),
-    );
+    // activateSubscriptionFromCheckout must NOT be called a second time
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledTimes(1);
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  // [#450] When the idempotency DB is unavailable, the route logs + escalates
+  // to Sentry but continues to process (activateSubscriptionFromCheckout has
+  // its own DB-level conflict guard). Silent recovery is banned.
+  it('escalates unavailable idempotency DB to Sentry but continues processing [#450]', async () => {
+    const session = makeCheckoutSession();
+    const event = makeStripeEvent('checkout.session.completed', session);
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+    (claimWebhookId as jest.Mock).mockResolvedValueOnce('unavailable');
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    // Processing continues despite unavailable gate
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledTimes(1);
+    // Escalation is required — silent recovery is banned in billing
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.checkout.completed.claim_unavailable',
+          eventId: event.id,
+        }),
+      }),
+    );
   });
 
   // [BUG-119 + BUG-111] Divergent checkout.session.completed: two events with
@@ -1258,6 +1342,49 @@ describe('tier metadata in subscription events', () => {
 
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
+
+  // [#448 break test] When a subscription expires AND there is no tier metadata
+  // (e.g. metadata was never stamped, or Stripe drops it on expiry events),
+  // the quota pool MUST still be reset to free-tier limits. The
+  // `if (isExpired)` branch runs unconditionally — `else if (tier)` is only
+  // for non-expired tier-change events. This test guards against a regression
+  // where the expired branch is accidentally gated on tier presence, which
+  // would leave the user with 700 questions/month after their subscription
+  // expired.
+  it('resets quota pool to free-tier limits when subscription expires with no tier metadata [#448]', async () => {
+    // No metadata on this subscription — tier will be null
+    const stripeSub = makeSubscription({
+      status: 'unpaid', // maps to 'expired'
+      metadata: {},
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub),
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    // Subscription row must reflect free tier
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'sub_stripe_123',
+      expect.objectContaining({ status: 'expired', tier: 'free' }),
+    );
+    // Quota pool MUST be reset to free-tier limits regardless of missing tier metadata
+    expect(updateQuotaPoolLimit).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      100, // free monthlyQuota from mock getTierConfig
+      10, // free dailyLimit from mock getTierConfig
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1282,6 +1409,85 @@ describe('unknown event types', () => {
 
     expect(res.status).toBe(200);
     expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unmapped Stripe subscription status [#441]
+// ---------------------------------------------------------------------------
+
+describe('unmapped Stripe subscription status [#441]', () => {
+  // [#441 break test] Stripe emits statuses like 'incomplete' and 'paused'
+  // that are not mapped in mapStripeStatus. The previous code silently
+  // early-returned with no log, no Sentry, no metric — a user stuck in
+  // 'incomplete' for hours was invisible.
+  // CLAUDE.md: "Silent recovery without escalation is banned" in billing.
+  it('emits logger.warn and captureException for unmapped status (incomplete) [#441]', async () => {
+    const stripeSub = makeSubscription({
+      status: 'incomplete', // not in mapStripeStatus switch — returns null
+      metadata: { accountId: 'acc-1' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    // Must still return 200 so Stripe doesn't retry
+    expect(res.status).toBe(200);
+    // No DB mutation — event was not processable
+    expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+    // Escalation is required — unmapped status must NOT be silently swallowed
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.handleSubscriptionEvent.unmapped_status',
+          unmappedStatus: 'incomplete',
+          stripeSubscriptionId: 'sub_stripe_123',
+        }),
+      }),
+    );
+  });
+
+  it('emits logger.warn and captureException for unmapped status (paused) [#441]', async () => {
+    const stripeSub = makeSubscription({
+      status: 'paused',
+      metadata: { accountId: 'acc-2' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.created', stripeSub),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.handleSubscriptionEvent.unmapped_status',
+          unmappedStatus: 'paused',
+        }),
+      }),
+    );
   });
 });
 

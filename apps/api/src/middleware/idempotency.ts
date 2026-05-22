@@ -9,7 +9,6 @@ import {
 import { lookupAssistantTurnState } from '../services/idempotency-assistant-state';
 import { addBreadcrumb, captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
-import { inngest } from '../inngest/client';
 
 const logger = createLogger();
 
@@ -37,7 +36,7 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
           code: ERROR_CODES.INVALID_IDEMPOTENCY_KEY,
           message: `Idempotency-Key exceeds ${MAX_IDEMPOTENCY_KEY_LENGTH} characters`,
         },
-        400
+        400,
       );
     }
 
@@ -46,7 +45,7 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
       addBreadcrumb(
         'idempotency preflight skipped: profile missing',
         'idempotency',
-        'warning'
+        'warning',
       );
       await next();
       return;
@@ -57,7 +56,7 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
       addBreadcrumb(
         'idempotency preflight skipped: binding missing',
         'idempotency',
-        'warning'
+        'warning',
       );
       await next();
       return;
@@ -66,12 +65,15 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
     let existing: string | null = null;
     try {
       existing = await kv.get(
-        buildIdempotencyCacheKey(profileId, options.flow, key)
+        buildIdempotencyCacheKey(profileId, options.flow, key),
       );
     } catch (err) {
-      // Auth-adjacent silent recovery: continue to handler rather than failing
-      // the request, but emit a queryable counter so KV outages surface in
-      // metrics. (CLAUDE.md: "Silent recovery without escalation is banned.")
+      // [BUG-498] KV read failure → degrade safely with 503 + Retry-After.
+      // Proceeding to the handler on a KV outage admits duplicate writes:
+      // CF KV is eventually-consistent (up to 60 s), so a "missing key" on a
+      // parallel request that just wrote it is indistinguishable from a genuine
+      // first-write. Returning 503 is strictly safer — the caller retries the
+      // whole request and the idempotency invariant is preserved.
       addBreadcrumb('idempotency preflight lookup failed', 'idempotency');
       logger.warn('[idempotency] preflight KV read failed', {
         event: 'idempotency.preflight_lookup_failed',
@@ -85,18 +87,19 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
           context: 'idempotency.preflight.get',
           flow: options.flow,
           key,
+          severity: 'high',
         },
       });
-      inngest
-        .send({
-          name: 'app/idempotency.preflight_lookup_failed',
-          data: { profileId, flow: options.flow },
-        })
-        .catch(() => {
-          // Fire-and-forget: failure already captured above via captureException.
-        });
-      await next();
-      return;
+      // Retry-After: 5 s is a conservative window for a transient KV blip.
+      c.header('Retry-After', '5');
+      return c.json(
+        {
+          code: ERROR_CODES.INTERNAL_ERROR,
+          message:
+            'Idempotency check temporarily unavailable. Please retry with the same Idempotency-Key.',
+        },
+        503,
+      );
     }
 
     if (!existing) {

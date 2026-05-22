@@ -100,9 +100,24 @@ export interface DraftValidationResult {
   reason?: DraftValidationReason;
 }
 
+/**
+ * [BUG-483] `validateNoteDraft` now accepts an optional `verifiedEventContents`
+ * argument.  When supplied, the lexical-overlap guard tokenizes the VERIFIED
+ * event content (real learner text from the database, as retrieved by
+ * `validateEvaluationEventIds`) instead of `solidLearnerQuotes` (the LLM's
+ * paraphrase).  This closes the last-mile attack surface where the LLM could
+ * supply a paraphrase that overlaps with its own draft (~1.0 overlap), making
+ * the guard a no-op for value substitution.
+ *
+ * When `verifiedEventContents` is not supplied (legacy / test calls), the guard
+ * falls back to tokenizing `solidLearnerQuotes` — same behaviour as before.
+ * Callers in the challenge-round pipeline MUST pass `verifiedEventContents`
+ * sourced from `validateEvaluationEventIds` output.
+ */
 export function validateNoteDraft(
   draft: string,
   solidLearnerQuotes: string[],
+  verifiedEventContents?: string[],
 ): DraftValidationResult {
   if (!draft.trim()) {
     return { ok: false, overlapRatio: 0, reason: 'empty' };
@@ -111,7 +126,14 @@ export function validateNoteDraft(
   if (draftTokens.size === 0) {
     return { ok: false, overlapRatio: 0, reason: 'no_content_tokens' };
   }
-  const learnerTokens = tokenize(solidLearnerQuotes.join(' '));
+  // [BUG-483] Use verified event content for tokenization when available.
+  // If verifiedEventContents is supplied, the guard measures overlap against
+  // actual learner words from the DB — not the LLM's own paraphrase.
+  const sourceForTokenization =
+    verifiedEventContents != null && verifiedEventContents.length > 0
+      ? verifiedEventContents
+      : solidLearnerQuotes;
+  const learnerTokens = tokenize(sourceForTokenization.join(' '));
 
   let overlap = 0;
   for (const tok of draftTokens) {

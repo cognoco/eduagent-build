@@ -2630,18 +2630,16 @@ describe('updateSubscriptionFromRevenuecatWebhook — invalid transition', () =>
     });
     const db = createMockDb({ subscriptionFindFirst: existing });
 
-    const result = await updateSubscriptionFromRevenuecatWebhook(
-      db,
-      accountId,
-      {
+    // [BUG-447] Function now throws on rejected transition instead of silently
+    // returning existing — prevents caller (handleRenewal etc.) from proceeding
+    // to updateQuotaPoolLimit with a tier that never landed on the subscription row.
+    await expect(
+      updateSubscriptionFromRevenuecatWebhook(db, accountId, {
         status: 'active', // expired -> active is invalid
         eventId: 'new-event',
-      },
-    );
+      }),
+    ).rejects.toThrow(/Invalid subscription transition/);
 
-    // Should return existing subscription without updating
-    expect(result).not.toBeNull();
-    expect(result!.status).toBe('expired');
     expect(db.update).not.toHaveBeenCalled();
 
     // [1C.3] captureException must fire on rejected transition

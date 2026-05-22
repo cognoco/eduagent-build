@@ -94,6 +94,13 @@ interface CachedJWKS {
 
 const jwksCacheByUrl = new Map<string, CachedJWKS>();
 
+// [BUG-492] Per-URL in-flight dedup for forced re-fetches triggered by a
+// kid-not-found miss. When Clerk rotates signing keys, multiple concurrent
+// requests for new-kid tokens would otherwise each fire an independent
+// upstream fetch. This map holds a single in-flight Promise per URL so all
+// concurrent callers await the same network request.
+const jwksRefetchInFlight = new Map<string, Promise<JWKS>>();
+
 export async function fetchJWKS(url: string): Promise<JWKS> {
   const now = Date.now();
   const cached = jwksCacheByUrl.get(url);
@@ -120,10 +127,76 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
 }
 
 /**
- * Exported for testing — allows tests to clear the in-memory JWKS cache.
+ * Force a network re-fetch of JWKS, bypassing and replacing the cache.
+ * Concurrent callers for the same URL await a single in-flight request
+ * (deduped via jwksRefetchInFlight).
+ */
+async function fetchJWKSForced(url: string): Promise<JWKS> {
+  const existing = jwksRefetchInFlight.get(url);
+  if (existing) {
+    return existing;
+  }
+  const promise = (async (): Promise<JWKS> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
+    let res: Response;
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!res.ok) {
+      throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`);
+    }
+    const jwks = (await res.json()) as JWKS;
+    jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: Date.now() });
+    return jwks;
+  })().finally(() => {
+    jwksRefetchInFlight.delete(url);
+  });
+  jwksRefetchInFlight.set(url, promise);
+  return promise;
+}
+
+/**
+ * Looks up the JWK matching `kid` from the given JWKS URL.
+ *
+ * Industry-standard key-rotation pattern:
+ *   1. Check the cached JWKS first.
+ *   2. If the kid is absent (Clerk rotated keys since last fetch), force a
+ *      single TTL-ignoring re-fetch (deduped across concurrent requests).
+ *   3. If kid is still missing after re-fetch, throw — the token is invalid.
+ *
+ * Only missing-kid triggers a re-fetch. All other verification failures
+ * (bad signature, expired token, etc.) propagate immediately without an
+ * extra network round-trip.
+ *
+ * Exported for testing.
+ */
+export async function lookupJWKByKid(url: string, kid: string): Promise<JWK> {
+  const jwks = await fetchJWKS(url);
+  const found = jwks.keys.find((k) => k.kid === kid);
+  if (found) {
+    return found;
+  }
+
+  // kid not in cached JWKS — Clerk may have rotated keys. Re-fetch once.
+  const refreshed = await fetchJWKSForced(url);
+  const foundAfterRefresh = refreshed.keys.find((k) => k.kid === kid);
+  if (foundAfterRefresh) {
+    return foundAfterRefresh;
+  }
+
+  throw new Error(`No matching JWK found for kid: ${kid}`);
+}
+
+/**
+ * Exported for testing — allows tests to clear the in-memory JWKS cache
+ * and any pending re-fetch dedup state.
  */
 export function clearJWKSCache(): void {
   jwksCacheByUrl.clear();
+  jwksRefetchInFlight.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +215,7 @@ async function importRSAPublicKey(jwk: JWK): Promise<CryptoKey> {
     } as JsonWebKey,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
-    ['verify']
+    ['verify'],
   );
 }
 
@@ -156,7 +229,7 @@ export interface VerifyJWTOptions {
 export async function verifyJWT(
   token: string,
   jwk: JWK,
-  options?: VerifyJWTOptions
+  options?: VerifyJWTOptions,
 ): Promise<JWTPayload> {
   const parts = token.split('.');
   if (parts.length !== 3) {
@@ -167,7 +240,7 @@ export async function verifyJWT(
 
   if (!headerB64 || !payloadB64 || !signatureB64) {
     throw new Error(
-      'Invalid JWT: missing header, payload, or signature segment'
+      'Invalid JWT: missing header, payload, or signature segment',
     );
   }
 
@@ -182,7 +255,7 @@ export async function verifyJWT(
     'RSASSA-PKCS1-v1_5',
     cryptoKey,
     signature as Uint8Array<ArrayBuffer>,
-    data
+    data,
   );
 
   if (!valid) {
@@ -208,7 +281,7 @@ export async function verifyJWT(
       throw new Error(
         `Invalid JWT: issuer mismatch (expected ${options.issuer}, got ${
           payload.iss ?? 'none'
-        })`
+        })`,
       );
     }
   }
@@ -217,14 +290,14 @@ export async function verifyJWT(
   if (options?.audience) {
     if (payload.aud === undefined) {
       throw new Error(
-        `Invalid JWT: missing audience claim (expected ${options.audience})`
+        `Invalid JWT: missing audience claim (expected ${options.audience})`,
       );
     }
 
     const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     if (!audiences.includes(options.audience)) {
       throw new Error(
-        `Invalid JWT: audience mismatch (expected ${options.audience})`
+        `Invalid JWT: audience mismatch (expected ${options.audience})`,
       );
     }
   }

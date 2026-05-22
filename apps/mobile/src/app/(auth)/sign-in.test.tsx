@@ -5,7 +5,7 @@ import {
   waitFor,
   act,
 } from '@testing-library/react-native';
-import { useSignIn, useSSO } from '@clerk/clerk-expo';
+import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 
@@ -1119,6 +1119,64 @@ describe('SignInScreen', () => {
 
       expect(mockReplace).not.toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // [#509] transitionStuck "Try again" must call clerk.signOut() BEFORE
+  // clearing form state.  Break test: verify signOut is called first.
+  // ---------------------------------------------------------------------------
+
+  describe('[#509] transitionStuck Try again calls clerk.signOut before clearing state', () => {
+    const mockClerkSignOut = jest.fn();
+
+    beforeEach(() => {
+      (useClerk as jest.Mock).mockReturnValue({
+        signOut: mockClerkSignOut,
+        isSignedIn: false,
+      });
+      mockClerkSignOut.mockResolvedValue(undefined);
+    });
+
+    it('[#509] tapping Try again calls clerk.signOut() before clearing state', async () => {
+      // Pre-mark the session as activated so SignInScreen mounts directly in
+      // the isTransitioning=true state. This avoids needing async sign-in to
+      // fire, letting us use fake timers from the start to control phase-1.
+      const {
+        markSessionActivated: markTransition,
+      } = require('../../lib/auth-transition');
+      markTransition();
+
+      jest.useFakeTimers();
+      try {
+        (useClerk as jest.Mock).mockReturnValue({
+          signOut: mockClerkSignOut,
+          isSignedIn: false,
+        });
+
+        render(<SignInScreen />);
+
+        // Should show the spinner (isTransitioning=true from pre-marked state)
+        screen.getByTestId('sign-in-transitioning');
+
+        // Advance past SESSION_TRANSITION_MS (8s) so phase-1 fires → stuck screen
+        await act(async () => {
+          jest.advanceTimersByTime(8_500);
+        });
+
+        await waitFor(() => screen.getByTestId('sign-in-stuck-retry'));
+
+        // Tap Try again
+        await act(async () => {
+          fireEvent.press(screen.getByTestId('sign-in-stuck-retry'));
+        });
+
+        // clerk.signOut() must have been called (fired before state reset)
+        await waitFor(() => {
+          expect(mockClerkSignOut).toHaveBeenCalledTimes(1);
+        });
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });

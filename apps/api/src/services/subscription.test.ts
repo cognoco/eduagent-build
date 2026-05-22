@@ -73,6 +73,15 @@ describe('isValidTransition', () => {
     expect(isValidTransition('trial', 'expired')).toBe(true);
   });
 
+  // [BUG-442] BREAK TEST: handleBillingIssue and handlePaymentFailed both set
+  // status='past_due'. If trial->past_due is missing from VALID_TRANSITIONS,
+  // isValidTransition('trial','past_due') returns false, the update function
+  // throws (post BUG-447 fix), and the user remains in 'trial' despite a failed
+  // payment — the billing issue is silently lost. The transition must be valid.
+  it('[BUG-442] allows trial -> past_due (payment failed before trial converts)', () => {
+    expect(isValidTransition('trial', 'past_due')).toBe(true);
+  });
+
   it('allows active -> past_due', () => {
     expect(isValidTransition('active', 'past_due')).toBe(true);
   });
@@ -91,6 +100,17 @@ describe('isValidTransition', () => {
 
   it('allows cancelled -> expired', () => {
     expect(isValidTransition('cancelled', 'expired')).toBe(true);
+  });
+
+  // [BUG-443] BREAK TEST: Stripe portal uncancel (cancel_at_period_end=false)
+  // reverses a cancellation, emitting customer.subscription.updated with
+  // status='active'. payment_succeeded on a cancelled sub also re-activates.
+  // Pre-fix, 'cancelled->active' was missing from VALID_TRANSITIONS so
+  // updateSubscriptionFromWebhook would throw, leaving the user paying but
+  // stuck in cancelled with lastStripeEventTimestamp NOT updated — the next
+  // event re-processes indefinitely. Post-fix the transition is valid.
+  it('[BUG-443] allows cancelled -> active (Stripe portal uncancel / payment_succeeded)', () => {
+    expect(isValidTransition('cancelled', 'active')).toBe(true);
   });
 
   it('rejects expired -> anything (terminal state)', () => {

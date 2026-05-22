@@ -134,22 +134,47 @@ describe('queryKeys mode-scoped factories', () => {
     ]);
   });
 
-  it('matches session keys across modes for invalidation', () => {
+  it('matches session keys across modes for the same profileId [BUG-553]', () => {
     expect(
-      queryKeys.sessions.matchAnyMode(sessionId)(
+      queryKeys.sessions.matchAnyMode(sessionId, profileId)(
         queryKeys.sessions.detail('study', sessionId, profileId),
       ),
     ).toBe(true);
     expect(
-      queryKeys.sessions.matchTranscriptAnyMode(sessionId)(
+      queryKeys.sessions.matchTranscriptAnyMode(sessionId, profileId)(
         queryKeys.sessions.transcript('family', sessionId, profileId),
       ),
     ).toBe(true);
     expect(
-      queryKeys.sessions.matchSummaryAnyMode(sessionId)(
+      queryKeys.sessions.matchSummaryAnyMode(sessionId, profileId)(
         queryKeys.sessions.summary('family', sessionId, profileId),
       ),
     ).toBe(true);
+  });
+
+  // [BUG-553] Break test: matchers must NOT match keys from a different profileId.
+  // Pre-fix, matchAnyMode(sessionId) matched any profileId sharing the same
+  // sessionId — invalidating User A's cache when User B triggered a mutation.
+  it('[break-test] rejects session keys with a different profileId [BUG-553]', () => {
+    const otherProfileId = 'prof-other';
+
+    expect(
+      queryKeys.sessions.matchAnyMode(sessionId, profileId)(
+        queryKeys.sessions.detail('study', sessionId, otherProfileId),
+      ),
+    ).toBe(false);
+
+    expect(
+      queryKeys.sessions.matchTranscriptAnyMode(sessionId, profileId)(
+        queryKeys.sessions.transcript('family', sessionId, otherProfileId),
+      ),
+    ).toBe(false);
+
+    expect(
+      queryKeys.sessions.matchSummaryAnyMode(sessionId, profileId)(
+        queryKeys.sessions.summary('family', sessionId, otherProfileId),
+      ),
+    ).toBe(false);
   });
 });
 

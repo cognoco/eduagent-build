@@ -177,8 +177,12 @@ export default function SessionTranscriptScreen() {
             const topicId = transcript.data.summary.topicId;
             if (!topicId) return;
             router.push({
-              pathname: '/(app)/session/start',
-              params: { topicId },
+              // [BUG-522] '/(app)/session/start' does not exist — Expo Router
+              // returns a silent 404/no-op. Use the canonical session-entry
+              // route matching topic/[topicId].tsx:451 and
+              // session-summary/[sessionId].tsx pattern.
+              pathname: '/(app)/session',
+              params: { mode: 'learning', topicId },
             });
           }}
         />

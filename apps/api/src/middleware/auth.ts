@@ -1,6 +1,6 @@
 import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
-import { decodeJWTHeader, fetchJWKS, verifyJWT } from './jwt';
+import { decodeJWTHeader, lookupJWKByKid, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
 import { captureException, addBreadcrumb } from '../services/sentry';
 import { createLogger } from '../services/logger';
@@ -14,6 +14,8 @@ const logger = createLogger();
 export interface AuthUser {
   userId: string;
   email?: string;
+  /** True only when Clerk's email_verified claim is explicitly true in the JWT. */
+  emailVerified?: boolean;
 }
 
 export type AuthEnv = {
@@ -73,7 +75,7 @@ async function verifyClerkJWT(
   token: string,
   jwksUrl: string | undefined,
   audience: string | undefined,
-): Promise<{ sub: string; email?: string }> {
+): Promise<{ sub: string; email?: string; emailVerified: boolean }> {
   if (!jwksUrl) {
     throw new Error('CLERK_JWKS_URL is not configured');
   }
@@ -97,12 +99,11 @@ async function verifyClerkJWT(
     throw new Error('JWT header missing kid');
   }
 
-  // Fetch JWKS and locate the matching key
-  const jwks = await fetchJWKS(jwksUrl);
-  const jwk: JWK | undefined = jwks.keys.find((k) => k.kid === header.kid);
-  if (!jwk) {
-    throw new Error(`No matching JWK found for kid: ${header.kid}`);
-  }
+  // [BUG-492] lookupJWKByKid handles key-rotation: if kid is absent from the
+  // cached JWKS, it forces a single re-fetch (deduped across concurrent
+  // requests) before throwing. This prevents up to 10-minute auth failures
+  // after Clerk key rotation.
+  const jwk: JWK = await lookupJWKByKid(jwksUrl, header.kid);
 
   // Verify signature and validate claims (issuer + audience)
   const issuer = deriveIssuerFromJwksUrl(jwksUrl);
@@ -111,6 +112,7 @@ async function verifyClerkJWT(
   return {
     sub: payload.sub,
     email: payload.email as string | undefined,
+    emailVerified: payload.email_verified === true,
   };
 }
 
@@ -145,6 +147,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
     c.set('user', {
       userId: result.sub,
       email: result.email,
+      emailVerified: result.emailVerified,
     });
     return next();
   } catch (err) {

@@ -77,7 +77,7 @@ export const usageSchema = z
     renewsAtLabel: z.string().nullable().optional(),
     perProfileAvailableSince: z.string().datetime().optional(),
   })
-  .passthrough();
+  .strip();
 export type Usage = z.infer<typeof usageSchema>;
 
 export const checkoutResponseSchema = z.object({

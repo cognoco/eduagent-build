@@ -4,6 +4,10 @@ import {
   processConsentResponse,
   getChildNameByToken,
 } from '../services/consent';
+import {
+  isConsentRespondRateLimited,
+  CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS,
+} from './consent';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 
 // ---------------------------------------------------------------------------
@@ -134,7 +138,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     c.header('X-Content-Type-Options', 'nosniff');
     c.header(
       'Content-Security-Policy',
-      "default-src 'self'; style-src 'unsafe-inline'; script-src 'none'"
+      "default-src 'self'; style-src 'unsafe-inline'; script-src 'none'",
     );
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   })
@@ -153,9 +157,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           'Invalid Link',
           `<h1 class="error">Invalid link</h1>
            <p>This consent link is missing required information. Please check your email for the correct link.</p>
-           ${errorActionHtml()}`
+           ${errorActionHtml()}`,
         ),
-        400
+        400,
       );
     }
 
@@ -169,9 +173,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           `<h1 class="error">Link expired or invalid</h1>
            <p>This consent link has expired or is no longer valid.</p>
            <p>Ask your child to resend the consent request from the app.</p>
-           ${errorActionHtml()}`
+           ${errorActionHtml()}`,
         ),
-        404
+        404,
       );
     }
 
@@ -183,10 +187,10 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         'Parental Consent',
         `<h1>Consent required for ${escapeHtml(childName)}</h1>
          <p>${escapeHtml(
-           childName
+           childName,
          )} wants to use MentoMate, an AI-powered learning platform. Under applicable privacy regulations, we need your consent.</p>
          <p>By approving, you allow us to process ${escapeHtml(
-           childName
+           childName,
          )}'s learning data to provide personalised tutoring.</p>
          <form method="POST" action="${confirmUrl}" style="display:contents">
            <input type="hidden" name="token" value="${escapeHtml(token)}" />
@@ -194,12 +198,12 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
            <button type="submit" class="btn btn-primary">Approve</button>
          </form>
          <a href="${basePath}/consent-page/deny-confirm?token=${encodeURIComponent(
-          token
-        )}" class="btn btn-danger">
+           token,
+         )}" class="btn btn-danger">
            Deny
          </a>
-         <p class="info">You can withdraw consent at any time from the parent dashboard in the app.</p>`
-      )
+         <p class="info">You can withdraw consent at any time from the parent dashboard in the app.</p>`,
+      ),
     );
   })
 
@@ -217,9 +221,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           'Invalid Link',
           `<h1 class="error">Invalid link</h1>
            <p>This consent link is missing required information. Please check your email for the correct link.</p>
-           ${errorActionHtml()}`
+           ${errorActionHtml()}`,
         ),
-        400
+        400,
       );
     }
 
@@ -233,16 +237,16 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           `<h1 class="error">Link expired or invalid</h1>
            <p>This consent link has expired or is no longer valid.</p>
            <p>Ask your child to resend the consent request from the app.</p>
-           ${errorActionHtml()}`
+           ${errorActionHtml()}`,
         ),
-        404
+        404,
       );
     }
 
     const basePath = c.req.path.replace('/consent-page/deny-confirm', '');
     const confirmDenyUrl = `${basePath}/consent-page/confirm`;
     const backUrl = `${basePath}/consent-page?token=${encodeURIComponent(
-      token
+      token,
     )}`;
 
     return c.html(
@@ -250,7 +254,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         'Confirm Denial',
         `<h1>Are you sure?</h1>
          <p>${escapeHtml(
-           childName
+           childName,
          )}'s account and all learning data will be permanently deleted. This cannot be undone.</p>
          <form method="POST" action="${confirmDenyUrl}" style="display:contents">
            <input type="hidden" name="token" value="${escapeHtml(token)}" />
@@ -259,8 +263,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
          </form>
          <a href="${backUrl}" class="btn btn-secondary">
            Go back
-         </a>`
-      )
+         </a>`,
+      ),
     );
   })
 
@@ -282,14 +286,38 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         pageLayout(
           'Invalid Link',
           `<h1 class="error">Invalid link</h1>
-           <p>This link is missing required information.</p>`
+           <p>This link is missing required information.</p>`,
         ),
-        400
+        400,
       );
     }
 
     const approved = approvedParam === 'true';
     const db = c.get('db');
+
+    // [BUG-491] Apply the same IP-based sliding-window rate limit as
+    // /consent/respond (consent.ts). Both endpoints perform expensive DB
+    // lookups and destructive mutations (profile delete on denial). Shared
+    // limiter state lives in consent.ts; same 30/hr cap, same Retry-After.
+    const ipKey =
+      c.req.header('cf-connecting-ip') ??
+      c.req.header('x-forwarded-for') ??
+      'unknown';
+    if (isConsentRespondRateLimited(ipKey)) {
+      const retryAfterSecs = Math.ceil(
+        CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000,
+      );
+      c.header('Retry-After', String(retryAfterSecs));
+      return c.html(
+        pageLayout(
+          'Too Many Requests',
+          `<h1 class="error">Too many requests</h1>
+           <p>You have submitted too many consent responses. Please try again later.</p>
+           ${errorActionHtml()}`,
+        ),
+        429,
+      );
+    }
 
     try {
       // Fetch child name BEFORE processing — denial deletes the profile
@@ -303,7 +331,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
             'Family Account Ready',
             `<h1>Family account ready!</h1>
              <p>${escapeHtml(
-               childName
+               childName,
              )}'s account is now active. They can start learning right away.</p>
              <a href="mentomate://home" class="btn btn-primary">
                See ${escapeHtml(childName)}'s Progress
@@ -316,8 +344,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
                <p>Download the app for the best experience</p>
                <a href="https://play.google.com/store/apps/details?id=com.mentomate.app" class="btn btn-secondary">Google Play</a>
                <a href="https://apps.apple.com/app/mentomate/id6741906959" class="btn btn-secondary">App Store</a>
-             </div>`
-          )
+             </div>`,
+          ),
         );
       }
 
@@ -327,14 +355,14 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           'Consent Declined',
           `<h1>Consent declined</h1>
            <p>${escapeHtml(
-             childName
+             childName,
            )}'s account will be removed. Their data will not be processed.</p>
            <p class="info">If this was a mistake, your child can send a new consent request from the app.</p>
            <a href="mentomate://home" class="btn btn-secondary">
              Back to MentoMate
            </a>
-           <p class="info">You may now close this tab.</p>`
-        )
+           <p class="info">You may now close this tab.</p>`,
+        ),
       );
     } catch (error) {
       if (error instanceof Error && error.message === 'Invalid consent token') {
@@ -344,9 +372,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
             `<h1 class="error">Link expired or invalid</h1>
              <p>This consent link has expired or has already been used.</p>
              <p>Ask your child to resend the consent request from the app.</p>
-             ${errorActionHtml()}`
+             ${errorActionHtml()}`,
           ),
-          404
+          404,
         );
       }
       throw error;

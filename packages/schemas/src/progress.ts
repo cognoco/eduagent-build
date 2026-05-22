@@ -580,6 +580,13 @@ export type OverdueSubject = z.infer<typeof overdueSubjectSchema>;
 export const overdueTopicsResponseSchema = z.object({
   totalOverdue: z.number().int().min(0),
   subjects: z.array(overdueSubjectSchema),
+  // [BUG-470 / P2] Truncation indicator — true when the displayed list is a
+  // cap-limited subset of the total overdue backlog. Mobile UI uses this to
+  // show a "500+ overdue" badge rather than implying the listed items are all.
+  truncated: z.boolean(),
+  // displayedCount: count of cards in the capped list (≤ 500). Redundant with
+  // summing subjects[*].topics.length but surfaced explicitly for UI clarity.
+  displayedCount: z.number().int().min(0),
 });
 export type OverdueTopicsResponse = z.infer<typeof overdueTopicsResponseSchema>;
 

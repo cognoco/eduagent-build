@@ -640,6 +640,28 @@ describe('ChildDetailScreen — profile overview', () => {
     screen.getByText('Programming');
   });
 
+  it('keeps child profile settings open when the linked profile exists but detail data is unavailable', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockUseChildDetail.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseDashboard.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-profile-unavailable')).toBeNull();
+    screen.getByTestId('child-detail-scroll');
+    screen.getByText('Emma');
+    screen.getByTestId('mentor-memory-link');
+    screen.getByTestId('child-profile-details');
+  });
+
   it('routes subject and report surfaces from child detail', () => {
     render(<ChildDetailScreen />);
 

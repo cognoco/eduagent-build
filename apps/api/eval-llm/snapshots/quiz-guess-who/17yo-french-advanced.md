@@ -27,7 +27,7 @@
 ```json
 {
   "discoveryCount": 4,
-  "ageBracket": "adult",
+  "ageBracket": "adolescent",
   "recentAnswers": [
     "Jean-Paul Sartre",
     "Albert Camus"

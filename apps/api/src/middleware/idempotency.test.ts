@@ -220,7 +220,11 @@ describe('idempotencyPreflight middleware', () => {
   });
 
   describe('key present, KV.get throws', () => {
-    it('passes through to downstream handler, calls captureException and addBreadcrumb', async () => {
+    // [BUG-498] Break test: KV read failure must return 503 + Retry-After, NOT
+    // pass through to the handler. Letting the handler run on a KV outage
+    // admits duplicate writes because CF KV is eventually-consistent (up to
+    // 60 s) — a parallel request's "just-written" key looks like a missing key.
+    it('returns 503 with Retry-After, does NOT call next(), calls captureException and addBreadcrumb [BUG-498]', async () => {
       const app = createApp({ profileId: 'profile-1' });
       const kvError = new Error('KV network failure');
       const kv = makeKv({ get: jest.fn().mockRejectedValue(kvError) });
@@ -234,9 +238,13 @@ describe('idempotencyPreflight middleware', () => {
         { IDEMPOTENCY_KV: kv },
       );
 
-      expect(res.status).toBe(200);
+      // Must degrade to 503 — NOT pass through to the handler (which returns 200)
+      expect(res.status).toBe(503);
+      expect(res.headers.get('Retry-After')).toBe('5');
       const body = await res.json();
-      expect(body).toEqual({ ok: true });
+      expect(body).toMatchObject({ code: 'INTERNAL_ERROR' });
+
+      // Sentry must be notified with high severity context
       expect(mockCaptureException).toHaveBeenCalledWith(
         kvError,
         expect.objectContaining({
@@ -245,6 +253,7 @@ describe('idempotencyPreflight middleware', () => {
             context: 'idempotency.preflight.get',
             flow: 'session',
             key: 'abc-123',
+            severity: 'high',
           }),
         }),
       );
@@ -252,6 +261,25 @@ describe('idempotencyPreflight middleware', () => {
         'idempotency preflight lookup failed',
         'idempotency',
       );
+    });
+
+    it('happy path preserved: KV.get returns null → calls next() normally', async () => {
+      const app = createApp({ profileId: 'profile-1' });
+      const kv = makeKv({ get: jest.fn().mockResolvedValue(null) });
+
+      const res = await app.request(
+        '/test',
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': 'abc-123' },
+        },
+        { IDEMPOTENCY_KV: kv },
+      );
+
+      // Genuine first-write (null → no existing key) must proceed to handler
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ ok: true });
     });
   });
 

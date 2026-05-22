@@ -18,6 +18,7 @@ import { markSessionActivated } from '../../lib/auth-transition';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
+import { Sentry } from '../../lib/sentry';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -39,6 +40,13 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  // [#511] Preserved after setActive() throws so the retry button can re-attempt
+  // without the user having to redo the whole reset flow. The code is single-use
+  // in Clerk, so the form fields are NOT re-shown — only the retry / fallback
+  // sign-in buttons are presented.
+  const [pendingActivationSessionId, setPendingActivationSessionId] = useState<
+    string | null
+  >(null);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
   const {
     scrollRef: resetScrollRef,
@@ -83,12 +91,25 @@ export default function ForgotPasswordScreen() {
       });
 
       if (result.status === 'complete') {
+        const sessionId = result.createdSessionId;
         try {
-          await setActive({ session: result.createdSessionId });
+          await setActive({ session: sessionId });
           markSessionActivated();
-        } catch {
+          setPendingActivationSessionId(null);
+        } catch (activateErr) {
+          // [#511] setActive threw after a successful server-side reset.
+          // Store the sessionId so the retry button can re-attempt setActive
+          // without losing it across re-renders. The reset code is single-use
+          // in Clerk, so re-attempting the form is not possible.
+          Sentry.addBreadcrumb({
+            category: 'auth',
+            message: 'forgot-password: setActive threw after successful reset',
+            level: 'warning',
+            data: { sessionId, error: String(activateErr) },
+          });
+          setPendingActivationSessionId(sessionId);
           setError(
-            'Could not activate your session. Please try signing in again.',
+            'Your password was reset but we could not sign you in automatically.',
           );
           return;
         }
@@ -102,6 +123,32 @@ export default function ForgotPasswordScreen() {
       setLoading(false);
     }
   }, [isLoaded, canSubmitReset, signIn, setActive, code, newPassword]);
+
+  // [#511] Retry setActive with the preserved sessionId after a transient failure.
+  const onRetryActivation = useCallback(async () => {
+    if (!isLoaded || !pendingActivationSessionId) return;
+
+    setError('');
+    setLoading(true);
+
+    try {
+      await setActive({ session: pendingActivationSessionId });
+      markSessionActivated();
+      setPendingActivationSessionId(null);
+    } catch (err) {
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: 'forgot-password: retry setActive also threw',
+        level: 'error',
+        data: { error: String(err) },
+      });
+      setError(
+        'Still unable to sign you in. Use the link below to sign in with your new password.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoaded, pendingActivationSessionId, setActive]);
 
   const onResendCode = useCallback(async () => {
     if (!isLoaded || resending) return;
@@ -126,6 +173,7 @@ export default function ForgotPasswordScreen() {
     setCode('');
     setNewPassword('');
     setError('');
+    setPendingActivationSessionId(null);
   }, []);
 
   if (pendingReset) {
@@ -179,80 +227,111 @@ export default function ForgotPasswordScreen() {
             </View>
           )}
 
-          <View onLayout={onResetFieldLayout('code')}>
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Reset code
-            </Text>
-            <TextInput
-              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-              placeholder="Enter 6-digit code"
-              placeholderTextColor={colors.muted}
-              keyboardType="number-pad"
-              value={code}
-              onChangeText={setCode}
-              editable={!loading}
-              testID="reset-code"
-              onFocus={onResetFieldFocus('code')}
-            />
-          </View>
-
-          <View onLayout={onResetFieldLayout('password')}>
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              New password
-            </Text>
-            <View className="mb-6">
-              <PasswordInput
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder="Enter new password"
-                editable={!loading}
-                testID="reset-new-password"
-                showRequirements
-                onSubmitEditing={onResetPress}
-                onFocus={onResetFieldFocus('password')}
+          {/* [#511] setActive threw after successful server-side reset.
+              The reset code is single-use in Clerk; the form fields are
+              inoperable. Show retry + fallback navigation instead. */}
+          {pendingActivationSessionId !== null ? (
+            <View className="gap-3">
+              <Button
+                variant="primary"
+                label="Try Again"
+                onPress={() => void onRetryActivation()}
+                loading={loading}
+                testID="reset-retry-activation"
               />
+              <View className="flex-row justify-center mt-2">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Sign in with your new password"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(auth)/sign-in',
+                      params: { notice: 'reset_success' },
+                    })
+                  }
+                  testID="reset-continue-to-sign-in"
+                />
+              </View>
             </View>
-          </View>
+          ) : (
+            <>
+              <View onLayout={onResetFieldLayout('code')}>
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  Reset code
+                </Text>
+                <TextInput
+                  className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+                  placeholder="Enter 6-digit code"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="number-pad"
+                  value={code}
+                  onChangeText={setCode}
+                  editable={!loading}
+                  testID="reset-code"
+                  onFocus={onResetFieldFocus('code')}
+                />
+              </View>
 
-          <Button
-            variant="primary"
-            label="Reset password"
-            onPress={onResetPress}
-            disabled={!canSubmitReset}
-            loading={loading}
-            testID="reset-password-button"
-          />
+              <View onLayout={onResetFieldLayout('password')}>
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  New password
+                </Text>
+                <View className="mb-6">
+                  <PasswordInput
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="Enter new password"
+                    editable={!loading}
+                    testID="reset-new-password"
+                    showRequirements
+                    onSubmitEditing={onResetPress}
+                    onFocus={onResetFieldFocus('password')}
+                  />
+                </View>
+              </View>
 
-          <View className="flex-row justify-center mt-4">
-            <Button
-              variant="tertiary"
-              size="small"
-              label="Resend code"
-              onPress={onResendCode}
-              loading={resending}
-              testID="reset-resend-code"
-            />
-          </View>
+              <Button
+                variant="primary"
+                label="Reset password"
+                onPress={onResetPress}
+                disabled={!canSubmitReset}
+                loading={loading}
+                testID="reset-password-button"
+              />
 
-          <View className="flex-row justify-center mt-2">
-            <Button
-              variant="tertiary"
-              size="small"
-              label="Use a different email"
-              onPress={onBackFromReset}
-              testID="reset-back-from-code"
-            />
-          </View>
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Resend code"
+                  onPress={onResendCode}
+                  loading={resending}
+                  testID="reset-resend-code"
+                />
+              </View>
 
-          <View className="flex-row justify-center mt-2">
-            <Button
-              variant="tertiary"
-              size="small"
-              label="Back to sign in"
-              onPress={() => router.push('/(auth)/sign-in')}
-              testID="reset-back-to-sign-in"
-            />
-          </View>
+              <View className="flex-row justify-center mt-2">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Use a different email"
+                  onPress={onBackFromReset}
+                  testID="reset-back-from-code"
+                />
+              </View>
+
+              <View className="flex-row justify-center mt-2">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Back to sign in"
+                  onPress={() => router.push('/(auth)/sign-in')}
+                  testID="reset-back-to-sign-in"
+                />
+              </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     );

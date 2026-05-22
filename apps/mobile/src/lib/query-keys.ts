@@ -262,14 +262,31 @@ export const queryKeys = {
       profileId: string | undefined,
     ) => ['parking-lot', mode, 'topic', subjectId, topicId, profileId] as const,
 
-    matchAnyMode: (sessionId: string) => (queryKey: readonly unknown[]) =>
-      queryKey[0] === 'session' && queryKey[2] === sessionId,
+    // [BUG-553] profileId is required so invalidation never crosses account
+    // boundaries on a shared device. The previous single-argument form matched
+    // by sessionId only — it would invalidate User A's session cache when User B
+    // triggered a mutation using the same sessionId. All call sites must pass
+    // the active profile's id as the second argument.
+    matchAnyMode:
+      (sessionId: string, profileId: string | undefined) =>
+      (queryKey: readonly unknown[]) =>
+        queryKey[0] === 'session' &&
+        queryKey[2] === sessionId &&
+        queryKey[3] === profileId,
 
-    matchTranscriptAnyMode: (sessionId: string) => (queryKey: readonly unknown[]) =>
-      queryKey[0] === 'session-transcript' && queryKey[2] === sessionId,
+    matchTranscriptAnyMode:
+      (sessionId: string, profileId: string | undefined) =>
+      (queryKey: readonly unknown[]) =>
+        queryKey[0] === 'session-transcript' &&
+        queryKey[2] === sessionId &&
+        queryKey[3] === profileId,
 
-    matchSummaryAnyMode: (sessionId: string) => (queryKey: readonly unknown[]) =>
-      queryKey[0] === 'session-summary' && queryKey[2] === sessionId,
+    matchSummaryAnyMode:
+      (sessionId: string, profileId: string | undefined) =>
+      (queryKey: readonly unknown[]) =>
+        queryKey[0] === 'session-summary' &&
+        queryKey[2] === sessionId &&
+        queryKey[3] === profileId,
   },
 
   // ------------------------------------------------------------------

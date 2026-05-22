@@ -38,6 +38,7 @@
     "notFound": "Esa página o elemento ya no existe.",
     "resourceGone": "Este recurso ya no está disponible.",
     "rateLimited": "Has alcanzado el límite. Espera un momento e inténtalo de nuevo.",
+    "sessionExpired": "Your session expired — signing you out…",
     "forbidden": "No tienes permiso para ver esto.",
     "quotaExhausted": "Has agotado tus sesiones por hoy. ¡Vuelve mañana!",
     "sessionNotFound": "Esa sesión ya no está disponible. Inicia una nueva.",
@@ -92,7 +93,8 @@
   "auth": {
     "index": {
       "timeoutTitle": "Tardando más de lo esperado",
-      "timeoutMessage": "Revisa tu conexión e inténtalo de nuevo."
+      "timeoutMessage": "Revisa tu conexión e inténtalo de nuevo.",
+      "signInInstead": "Iniciar sesión en su lugar"
     },
     "ssoCallback": {
       "loadingLabel": "Finalizando inicio de sesión",
@@ -1747,6 +1749,19 @@
       "nudgeA11y": "Enviar un recordatorio a {{name}}",
       "viewAllReports": "Ver todos los informes",
       "subjectsTitle": "Materias"
+    },
+    "remediation": {
+      "heading": "Try a different approach",
+      "body": "It is completely normal to need another pass at this.",
+      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
+      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
+      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
+      "primaryCta": "Try a different way",
+      "primaryCtaA11y": "Try a different way to learn this topic",
+      "secondaryCta": "Or try again later",
+      "secondaryCtaA11y": "Try this topic again later",
+      "libraryLink": "While you wait, check out your Library",
+      "libraryLinkA11y": "Check out your Library"
     }
   },
   "onboarding": {

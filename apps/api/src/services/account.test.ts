@@ -12,11 +12,23 @@ const mockCreateSubscription = jest.fn().mockResolvedValue({
   tier: 'plus',
   status: 'trial',
 });
+// [BUG-417] getSubscriptionByAccountId is now called on the existing-account
+// branch to detect a missing trial subscription. Default: return a stub
+// subscription so existing tests that take the findFirst path (account found)
+// do not trigger the repair path. BUG-417 tests override this per-test.
+const mockGetSubscriptionByAccountId = jest.fn().mockResolvedValue({
+  id: 'sub-existing',
+  accountId: 'acc-1',
+  tier: 'plus',
+  status: 'trial',
+});
 jest.mock('./billing' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./billing') as typeof import('./billing');
   return {
     ...actual,
     createSubscription: (...args: unknown[]) => mockCreateSubscription(...args),
+    getSubscriptionByAccountId: (...args: unknown[]) =>
+      mockGetSubscriptionByAccountId(...args),
   };
 });
 
@@ -457,48 +469,243 @@ describe('findOrCreateAccount', () => {
     });
   });
 
-  it('reclaims account when email exists with a different clerkUserId', async () => {
-    const staleRow = mockAccountRow({
-      id: 'acc-existing',
-      clerkUserId: 'clerk_old_deleted',
-      email: 'returning@example.com',
+  // [BREAK — BUG-411] Email-reuse silent rewire is an account-takeover vector.
+  // When email matches an existing account with a DIFFERENT clerkUserId, the
+  // service must block the attempt loudly rather than silently reassigning the
+  // existing account to the incoming Clerk identity.
+  describe('[BUG-411] email-reuse reclaim block', () => {
+    function makeReclaimDb(staleRow: ReturnType<typeof mockAccountRow>) {
+      const mockFindFirst = jest
+        .fn()
+        // 1st call: findAccountByClerkId → not found (new clerkUserId)
+        .mockResolvedValueOnce(undefined)
+        // 2nd call: email lookup → found stale row
+        .mockResolvedValueOnce(staleRow);
+
+      return {
+        db: {
+          query: { accounts: { findFirst: mockFindFirst } },
+          insert: jest.fn(),
+          update: jest.fn(),
+        } as unknown as Database,
+        mockFindFirst,
+      };
+    }
+
+    it('[BREAK][BUG-411] throws ConflictError instead of silently rewiring', async () => {
+      const staleRow = mockAccountRow({
+        id: 'acc-existing',
+        clerkUserId: 'clerk_old_deleted',
+        email: 'returning@example.com',
+      });
+      const { db } = makeReclaimDb(staleRow);
+
+      await expect(
+        findOrCreateAccount(
+          db,
+          'clerk_new_reregistered',
+          'returning@example.com',
+        ),
+      ).rejects.toThrow('An account with this email already exists');
+
+      // Must NOT update the existing row (no silent rewire)
+      expect(db.update).not.toHaveBeenCalled();
+      // Must NOT insert a new row
+      expect(db.insert).not.toHaveBeenCalled();
     });
-    const updatedRow = {
-      ...staleRow,
-      clerkUserId: 'clerk_new_reregistered',
-      updatedAt: new Date(),
-    };
 
-    const mockFindFirst = jest
-      .fn()
-      // 1st call: findAccountByClerkId → not found (new clerkUserId)
-      .mockResolvedValueOnce(undefined)
-      // 2nd call: email lookup → found stale row
-      .mockResolvedValueOnce(staleRow);
+    it('[BREAK][BUG-411] calls captureException with reclaim_attempt_blocked tag', async () => {
+      const staleRow = mockAccountRow({
+        id: 'acc-existing',
+        clerkUserId: 'clerk_old_deleted',
+        email: 'returning@example.com',
+      });
+      const { db } = makeReclaimDb(staleRow);
 
-    const mockReturning = jest.fn().mockResolvedValue([updatedRow]);
-    const mockWhere = jest.fn().mockReturnValue({ returning: mockReturning });
-    const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
+      await expect(
+        findOrCreateAccount(
+          db,
+          'clerk_new_reregistered',
+          'returning@example.com',
+        ),
+      ).rejects.toThrow();
 
-    const db = {
-      query: { accounts: { findFirst: mockFindFirst } },
-      insert: jest.fn(),
-      update: jest.fn().mockReturnValue({ set: mockSet }),
-    } as unknown as Database;
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            'account.reclaim_attempt_blocked': true,
+            flow: 'findOrCreateAccount.reclaimBlock',
+            incomingClerkUserId: 'clerk_new_reregistered',
+            existingClerkUserId: 'clerk_old_deleted',
+          }),
+        }),
+      );
+    });
 
-    const result = await findOrCreateAccount(
-      db,
-      'clerk_new_reregistered',
-      'returning@example.com',
-    );
+    it('[BREAK][BUG-411] dispatches app/account.reclaim_attempt via safeSend', async () => {
+      const staleRow = mockAccountRow({
+        id: 'acc-existing',
+        clerkUserId: 'clerk_old_deleted',
+        email: 'returning@example.com',
+      });
+      const { db } = makeReclaimDb(staleRow);
 
-    expect(result.id).toBe('acc-existing');
-    expect(result.clerkUserId).toBe('clerk_new_reregistered');
-    expect(result.email).toBe('returning@example.com');
-    // Should update, not insert
-    expect(db.update).toHaveBeenCalled();
-    expect(db.insert).not.toHaveBeenCalled();
-    // Should NOT create a new trial subscription — the account already has one
-    expect(mockCreateSubscription).not.toHaveBeenCalled();
+      await expect(
+        findOrCreateAccount(
+          db,
+          'clerk_new_reregistered',
+          'returning@example.com',
+        ),
+      ).rejects.toThrow();
+
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/account.reclaim_attempt',
+          data: expect.objectContaining({
+            incomingClerkUserId: 'clerk_new_reregistered',
+            existingClerkUserId: 'clerk_old_deleted',
+            emailHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+            timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          }),
+        }),
+      );
+    });
+
+    it('does not block when email matches the same clerkUserId (no collision)', async () => {
+      // Exercises: findAccountByClerkId miss, email lookup returns the same
+      // clerkUserId → guard should NOT fire. Falls through to insert path.
+      const ownRow = mockAccountRow({
+        id: 'acc-own',
+        clerkUserId: 'clerk_same',
+        email: 'same@example.com',
+      });
+
+      const db = {
+        query: {
+          accounts: {
+            findFirst: jest
+              .fn()
+              .mockResolvedValueOnce(undefined) // clerkUserId lookup → miss
+              .mockResolvedValueOnce(ownRow), // email lookup → same clerkUserId, no block
+          },
+        },
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            onConflictDoNothing: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([ownRow]),
+            }),
+          }),
+        }),
+      } as unknown as Database;
+
+      // Should not throw — email matches same clerkUserId, falls through to insert
+      const result = await findOrCreateAccount(
+        db,
+        'clerk_same',
+        'same@example.com',
+      );
+      expect(result.id).toBe('acc-own');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+  });
+
+  // [BUG-417] BREAK TESTS: concurrent first-request race skips trial subscription.
+  // When two concurrent requests both pass the initial findFirst check (account
+  // not found), one wins the DB insert and creates the trial. If the winning
+  // request fails mid-flight after inserting the account row but before the trial
+  // subscription is committed, the losing request then finds `existing != null`
+  // and returned early — leaving an account without a trial subscription.
+  // Post-fix: when findOrCreateAccount finds an existing account but no
+  // subscription, it attempts to repair by creating the trial idempotently.
+  describe('[BUG-417] idempotent trial repair for accounts missing a subscription', () => {
+    function makeMissingTrialDb(
+      accountRow: ReturnType<typeof mockAccountRow>,
+    ): Database {
+      return {
+        query: {
+          accounts: {
+            findFirst: jest.fn().mockResolvedValue(accountRow),
+          },
+        },
+        // insert should not be called (account already exists)
+        insert: jest.fn(),
+      } as unknown as Database;
+    }
+
+    it('[BREAK] account seeded without subscription gets trial created on next findOrCreate call', async () => {
+      // Simulate: account exists (race winner created it), but sub is missing
+      // (the winner crashed before trial insertion committed).
+      mockGetSubscriptionByAccountId.mockResolvedValueOnce(null); // no sub
+      mockCreateSubscription.mockResolvedValueOnce({
+        id: 'sub-repaired',
+        accountId: 'acc-1',
+        tier: 'plus',
+        status: 'trial',
+      });
+
+      const accountWithNoSub = mockAccountRow({ id: 'acc-1' });
+      const db = makeMissingTrialDb(accountWithNoSub);
+
+      const result = await findOrCreateAccount(
+        db,
+        'clerk_user_123',
+        'user@example.com',
+      );
+
+      expect(result.id).toBe('acc-1');
+      // Trial must have been created in the repair path
+      expect(mockCreateSubscription).toHaveBeenCalledWith(
+        db,
+        'acc-1',
+        'plus',
+        expect.any(Number),
+        expect.objectContaining({
+          status: 'trial',
+          trialEndsAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        }),
+      );
+    });
+
+    it('[BREAK] repair path emits app/account.trial_missing_repair_attempted via safeSend for observability', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValueOnce(null); // no sub
+
+      const accountWithNoSub = mockAccountRow({ id: 'acc-1' });
+      const db = makeMissingTrialDb(accountWithNoSub);
+
+      await findOrCreateAccount(db, 'clerk_user_123', 'user@example.com');
+
+      // The safeSend dispatch must include the accountId and clerkUserId
+      // so on-call can query how often this race fires in the last 24h.
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/account.trial_missing_repair_attempted',
+          data: expect.objectContaining({
+            accountId: 'acc-1',
+            clerkUserId: 'clerk_user_123',
+            timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          }),
+        }),
+      );
+    });
+
+    it('does NOT trigger repair when account has an existing subscription', async () => {
+      // Default mock already returns a subscription — no repair should fire
+      mockGetSubscriptionByAccountId.mockResolvedValueOnce({
+        id: 'sub-existing',
+        accountId: 'acc-1',
+        tier: 'plus',
+        status: 'active',
+      });
+
+      const accountWithSub = mockAccountRow({ id: 'acc-1' });
+      const db = makeMissingTrialDb(accountWithSub);
+
+      await findOrCreateAccount(db, 'clerk_user_123', 'user@example.com');
+
+      // No repair — subscription already present
+      expect(mockCreateSubscription).not.toHaveBeenCalled();
+      expect(mockInngestSend).not.toHaveBeenCalled();
+    });
   });
 });

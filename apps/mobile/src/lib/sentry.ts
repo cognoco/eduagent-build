@@ -150,20 +150,30 @@ function calculateAge(birthYear: number): number {
 }
 
 /**
- * Evaluates whether Sentry should be enabled for the given profile.
+ * Evaluates whether Sentry should be enabled for the given profile and sets
+ * the active Sentry user scope.
+ *
+ * [BUG-555] On profile switch (parent↔child proxy mode), Sentry events must
+ * report under the active profile's identity. `Sentry.setUser` is called here
+ * with `{ id: profileId }` so every enable/disable path updates the scope.
+ * Only profileId is sent — no name or email to avoid PII leakage.
  *
  * @param birthYear - Profile birth year or null
  * @param consentStatus - Current consent status or null
+ * @param profileId - Active profile ID for Sentry user scope, or null
  */
 export function evaluateSentryForProfile(
   birthYear: number | null,
   consentStatus: string | null,
+  profileId: string | null = null,
 ): void {
   if (!getSentryDsn()) return;
 
   // No birth year → can't determine age → enable (adult assumed)
   if (birthYear == null) {
     enableSentry();
+    // [BUG-555] Update user scope to reflect the active profile.
+    Sentry.setUser(profileId ? { id: profileId } : null);
     return;
   }
 
@@ -173,8 +183,11 @@ export function evaluateSentryForProfile(
     // Under 13: only enable if consent is CONSENTED
     if (consentStatus === 'CONSENTED') {
       enableSentry();
+      // [BUG-555] Update user scope to reflect the active profile.
+      Sentry.setUser(profileId ? { id: profileId } : null);
     } else {
       disableSentry();
+      // disableSentry() already calls Sentry.setUser(null)
     }
   } else if (
     age <= 16 &&
@@ -182,9 +195,12 @@ export function evaluateSentryForProfile(
   ) {
     // 13–16 with withdrawn/pending consent: disable — parent opted out of data processing
     disableSentry();
+    // disableSentry() already calls Sentry.setUser(null)
   } else {
     // 13–16 with active consent, or 17+: enable
     enableSentry();
+    // [BUG-555] Update user scope to reflect the active profile.
+    Sentry.setUser(profileId ? { id: profileId } : null);
   }
 }
 

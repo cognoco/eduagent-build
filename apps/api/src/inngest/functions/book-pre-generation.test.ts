@@ -7,6 +7,7 @@ const mockDb: Record<string, any> = {
   query: {
     curriculumBooks: { findFirst: jest.fn().mockResolvedValue(null) },
     profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+    subjects: { findFirst: jest.fn().mockResolvedValue(null) },
   },
   select: jest.fn(),
 };
@@ -33,6 +34,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
       sortOrder: col('sortOrder'),
     },
     profiles: { id: col('id'), birthYear: col('birthYear') },
+    subjects: { id: col('id'), profileId: col('profileId') },
   },
 });
 
@@ -88,6 +90,7 @@ jest.mock(
   },
 );
 
+import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { bookPreGeneration } from './book-pre-generation';
 
@@ -109,20 +112,34 @@ async function executeSteps(
   return { result, runCalls };
 }
 
+// Use valid v4 UUIDs — bookTopicsGeneratedEventSchema validates uuid format (RFC 4122)
+const SUBJECT_ID = 'a1b2c3d4-e5f6-4111-8111-a1b2c3d4e5f6';
+const BOOK_ID = 'b2c3d4e5-f6a1-4222-8222-b2c3d4e5f6a1';
+const PROFILE_ID = 'c3d4e5f6-a1b2-4333-8333-c3d4e5f6a1b2';
+
 function createEventData(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
-    subjectId: 'subject-001',
-    bookId: 'book-001',
-    profileId: 'profile-001',
+    subjectId: SUBJECT_ID,
+    bookId: BOOK_ID,
+    profileId: PROFILE_ID,
     ...overrides,
   };
+}
+
+/** Return a subject row that passes the [FIX-426] ownership check. */
+function mockValidSubjectOwnership(): void {
+  mockDb.query.subjects.findFirst.mockResolvedValueOnce({
+    id: SUBJECT_ID,
+    profileId: PROFILE_ID,
+  });
 }
 
 function resetMockDb(): void {
   mockDb.query.curriculumBooks.findFirst.mockReset().mockResolvedValue(null);
   mockDb.query.profiles.findFirst.mockReset().mockResolvedValue(null);
+  mockDb.query.subjects.findFirst.mockReset().mockResolvedValue(null);
   mockSelectChain.limit.mockReset().mockResolvedValue([]);
   // Re-wire the chain
   mockSelectChain.from.mockReturnThis();
@@ -166,8 +183,69 @@ describe('bookPreGeneration', () => {
     );
   });
 
+  // ---------------------------------------------------------------------------
+  // [FIX-426] Break tests — payload validation + ownership guard
+  // ---------------------------------------------------------------------------
+
+  describe('[FIX-426] payload validation', () => {
+    it('throws NonRetriableError and skips LLM when profileId is not a UUID', async () => {
+      await expect(
+        executeSteps(createEventData({ profileId: 'not-a-uuid' })),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+    });
+
+    it('throws NonRetriableError and skips LLM when subjectId is missing', async () => {
+      const { subjectId: _omit, ...withoutSubjectId } =
+        createEventData() as any;
+      await expect(executeSteps(withoutSubjectId)).rejects.toThrow(
+        NonRetriableError,
+      );
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+    });
+
+    it('throws NonRetriableError and skips LLM when bookId is not a UUID', async () => {
+      await expect(
+        executeSteps(createEventData({ bookId: 'bad-book-id' })),
+      ).rejects.toThrow(NonRetriableError);
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('[FIX-426] ownership guard', () => {
+    it('throws NonRetriableError when subjectId does not belong to profileId — no topics inserted', async () => {
+      // Break test: subjects.findFirst returns null — mis-paired event.
+      // Revert fix to observe: removing the ownership check lets the function
+      // proceed and call generateBookTopics with a foreign subject.
+      mockDb.query.subjects.findFirst.mockResolvedValueOnce(null);
+
+      await expect(executeSteps(createEventData())).rejects.toThrow(
+        NonRetriableError,
+      );
+      // No LLM call and no DB write — ownership check short-circuits before any work
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+      expect(mockPersistBookTopics).not.toHaveBeenCalled();
+    });
+
+    it('proceeds normally when subjectId belongs to profileId', async () => {
+      // Ownership passes → book not found → skipped (not an error)
+      mockValidSubjectOwnership();
+      // curriculumBooks.findFirst returns null → 'book not found' early exit (default)
+
+      const { result } = await executeSteps(createEventData());
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'skipped',
+          reason: 'book not found',
+        }),
+      );
+    });
+  });
+
   describe('early return conditions', () => {
     it('returns skipped when current book is not found', async () => {
+      mockValidSubjectOwnership();
       // Default mock: curriculumBooks.findFirst returns null
       const { result } = await executeSteps(createEventData());
 
@@ -182,9 +260,10 @@ describe('bookPreGeneration', () => {
     });
 
     it('returns skipped when no unbuilt books remain', async () => {
+      mockValidSubjectOwnership();
       // Current book exists
       mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce({
-        id: 'book-001',
+        id: BOOK_ID,
         sortOrder: 1,
       });
       // select chain returns empty array (default) — no next books
@@ -204,14 +283,15 @@ describe('bookPreGeneration', () => {
 
   describe('pre-generation for next books', () => {
     it('generates topics for the next books and persists them', async () => {
+      mockValidSubjectOwnership();
       // [BUG-779] findFirst is now called twice: once for current book in
       // prep step, once per next book in the per-book step (topicsGenerated
       // re-check). Provide both responses in order.
       mockDb.query.curriculumBooks.findFirst
         .mockResolvedValueOnce({
-          id: 'book-001',
+          id: BOOK_ID,
           sortOrder: 1,
-          subjectId: 'subject-001',
+          subjectId: SUBJECT_ID,
         })
         .mockResolvedValueOnce({
           id: 'book-002',
@@ -225,7 +305,7 @@ describe('bookPreGeneration', () => {
 
       // Profile found with birthYear
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
+        id: PROFILE_ID,
         birthYear: 2014,
       });
 
@@ -246,8 +326,8 @@ describe('bookPreGeneration', () => {
       );
       expect(mockPersistBookTopics).toHaveBeenCalledWith(
         expect.anything(), // db
-        'profile-001',
-        'subject-001',
+        PROFILE_ID,
+        SUBJECT_ID,
         'book-002',
         expect.any(Array), // topics
         expect.any(Array), // connections
@@ -255,8 +335,9 @@ describe('bookPreGeneration', () => {
     });
 
     it('generates topics for up to 2 next books', async () => {
+      mockValidSubjectOwnership();
       mockDb.query.curriculumBooks.findFirst
-        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({ id: BOOK_ID, sortOrder: 1 })
         .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
@@ -274,7 +355,7 @@ describe('bookPreGeneration', () => {
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
+        id: PROFILE_ID,
         birthYear: 2015,
       });
 
@@ -293,8 +374,9 @@ describe('bookPreGeneration', () => {
 
   describe('missing profile fallback', () => {
     it('defaults to age 12 when profile is not found', async () => {
+      mockValidSubjectOwnership();
       mockDb.query.curriculumBooks.findFirst
-        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({ id: BOOK_ID, sortOrder: 1 })
         .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
@@ -320,8 +402,9 @@ describe('bookPreGeneration', () => {
 
   describe('error handling', () => {
     it('propagates errors from generateBookTopics', async () => {
+      mockValidSubjectOwnership();
       mockDb.query.curriculumBooks.findFirst
-        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({ id: BOOK_ID, sortOrder: 1 })
         .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
@@ -333,7 +416,7 @@ describe('bookPreGeneration', () => {
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
+        id: PROFILE_ID,
         birthYear: 2014,
       });
 
@@ -347,8 +430,9 @@ describe('bookPreGeneration', () => {
     });
 
     it('propagates errors from persistBookTopics', async () => {
+      mockValidSubjectOwnership();
       mockDb.query.curriculumBooks.findFirst
-        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({ id: BOOK_ID, sortOrder: 1 })
         .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
@@ -360,7 +444,7 @@ describe('bookPreGeneration', () => {
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
+        id: PROFILE_ID,
         birthYear: 2014,
       });
 
@@ -374,8 +458,9 @@ describe('bookPreGeneration', () => {
     });
 
     it('uses empty string for null book description', async () => {
+      mockValidSubjectOwnership();
       mockDb.query.curriculumBooks.findFirst
-        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({ id: BOOK_ID, sortOrder: 1 })
         .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
@@ -387,7 +472,7 @@ describe('bookPreGeneration', () => {
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
+        id: PROFILE_ID,
         birthYear: 2014,
       });
 
@@ -407,8 +492,9 @@ describe('bookPreGeneration', () => {
       // chose to re-run a successful step (e.g. step id changes between
       // deploys, or a parallel pre-gen flow already filled this book),
       // the in-step re-check prevents a wasted LLM call.
+      mockValidSubjectOwnership();
       mockDb.query.curriculumBooks.findFirst
-        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({ id: BOOK_ID, sortOrder: 1 })
         // Per-book re-check returns topicsGenerated=true — must short-circuit.
         .mockResolvedValueOnce({
           id: 'book-002',
@@ -421,7 +507,7 @@ describe('bookPreGeneration', () => {
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
+        id: PROFILE_ID,
         birthYear: 2014,
       });
 
@@ -442,8 +528,9 @@ describe('bookPreGeneration', () => {
       // ever regressed to a single shared step.run id, Inngest's step cache
       // would conflate book-002 and book-003, replaying the wrong work on
       // retry. Asserting the literal step ids guards that contract.
+      mockValidSubjectOwnership();
       mockDb.query.curriculumBooks.findFirst
-        .mockResolvedValueOnce({ id: 'book-001', sortOrder: 1 })
+        .mockResolvedValueOnce({ id: BOOK_ID, sortOrder: 1 })
         .mockResolvedValueOnce({
           id: 'book-002',
           title: 'Ancient Greece',
@@ -461,7 +548,7 @@ describe('bookPreGeneration', () => {
       mockSelectChain.limit.mockResolvedValueOnce(nextBooks);
 
       mockDb.query.profiles.findFirst.mockResolvedValueOnce({
-        id: 'profile-001',
+        id: PROFILE_ID,
         birthYear: 2014,
       });
 

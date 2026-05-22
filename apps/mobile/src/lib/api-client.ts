@@ -84,6 +84,25 @@ export function resetAuthExpiredGuard(): void {
   _authExpiredFiring = false;
 }
 
+/**
+ * [BUG-547] Shared auth-expired trigger — fires the registered onAuthExpired
+ * callback with the same dedup guard used by customFetch. Call this from any
+ * code path that receives a 401 outside of customFetch (e.g. the SSE XHR path)
+ * so token expiry is handled consistently regardless of whether the request
+ * was streaming or not.
+ *
+ * Returns true if the callback was fired, false if it was suppressed by the
+ * dedup guard (already firing) or if no callback is registered.
+ */
+export function triggerAuthExpired(): boolean {
+  if (_onAuthExpired && !_authExpiredFiring) {
+    _authExpiredFiring = true;
+    _onAuthExpired();
+    return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Active profile ID — set by ProfileProvider, read by customFetch.
 // [BUG-520] Decouples api-client from profile.ts to break the circular
@@ -304,17 +323,16 @@ export function useApiClient(): ApiClient {
           );
         }
 
-        // [F-Q-01] For 5xx (and any unhandled 4xx), use UpstreamError when a
-        // structured code is present, otherwise fall back to a plain Error.
-        if (code) {
-          throw new UpstreamError(
-            apiMessage ?? (errBody || res.statusText),
-            code,
-            res.status,
-          );
-        }
-        throw new Error(
-          `API error ${res.status}: ${errBody || res.statusText}`,
+        // [F-Q-01 / BUG-545] Always throw UpstreamError for unhandled status
+        // codes — plain Error("API error {status}: …") is an anti-pattern that
+        // forces callers to regex-parse a formatted message string to re-derive
+        // the status code (violates "Classify errors before formatting" rule).
+        // UpstreamError carries code + status fields that callers can inspect
+        // directly without touching the message string.
+        throw new UpstreamError(
+          apiMessage ?? (errBody || res.statusText),
+          code ?? 'UPSTREAM_ERROR',
+          res.status,
         );
       }
 

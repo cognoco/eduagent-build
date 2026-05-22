@@ -62,7 +62,7 @@ import { safeSend } from '../services/safe-non-core';
 //      enumeration if the token format is ever weakened.
 // If traffic grows or the token format changes, revisit with a Durable
 // Object-backed limiter (CF Workers RPC pattern).
-const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+export const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const CONSENT_RESPOND_RATE_LIMIT_MAX = 30;
 const CONSENT_RESPOND_MAP_MAX_ENTRIES = 10_000;
 const consentRespondTimestamps = new Map<string, number[]>();
@@ -71,7 +71,7 @@ export function __resetConsentRespondRateLimit(): void {
   consentRespondTimestamps.clear();
 }
 
-function isConsentRespondRateLimited(ipKey: string): boolean {
+export function isConsentRespondRateLimited(ipKey: string): boolean {
   const now = Date.now();
   const cutoff = now - CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS;
   const existing = consentRespondTimestamps.get(ipKey);

@@ -239,6 +239,12 @@ export default [
   // is dropped by last-match-wins semantics.
   {
     files: ['apps/api/src/routes/**/*.ts'],
+    // Test files legitimately import drizzle-orm for seed/teardown helpers —
+    // the restriction targets production route handlers only.
+    ignores: [
+      'apps/api/src/routes/**/*.test.ts',
+      'apps/api/src/routes/**/*.integration.test.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

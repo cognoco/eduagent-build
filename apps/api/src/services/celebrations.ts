@@ -116,10 +116,15 @@ export async function queueCelebration(
   await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
 
+    // [BUG-467] Pass inTransaction:true so writeHomeSurfacePendingCelebrations
+    // does not open a nested db.transaction inside this one. On neon-serverless
+    // a nested transaction either throws or silently degrades the SELECT FOR
+    // UPDATE row lock that serialises concurrent celebration writes.
     await writeHomeSurfacePendingCelebrations(
       txDb,
       profileId,
       pendingCelebrations,
+      { inTransaction: true },
     );
 
     if (!hasDuplicate) {

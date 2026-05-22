@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   AppState,
 } from 'react-native';
-import { useSignIn, useSSO } from '@clerk/clerk-expo';
+import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as SecureStore from '../../lib/secure-storage';
@@ -211,6 +211,7 @@ function formatUnsupportedVerificationMessage(strategies: string[]): string {
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { signOut: clerkSignOut, isSignedIn: isClerkSignedIn } = useClerk();
   const router = useRouter();
   const params = useLocalSearchParams<{
     redirectTo?: string | string[];
@@ -979,19 +980,40 @@ export default function SignInScreen() {
               label: 'Try again',
               testID: 'sign-in-stuck-retry',
               onPress: () => {
-                clearTransitionState();
-                setTransitionStuck(false);
-                setIsTransitioning(false);
+                // [#509] Sign out Clerk's in-memory session before resetting
+                // form state. Without this, Clerk holds the active session and
+                // re-submitting credentials can silently re-trigger the
+                // transition or fail with "session exists". If isSignedIn is
+                // still true after signOut (race), redirect home instead.
+                void clerkSignOut()
+                  .catch(() => {
+                    /* signOut failure is non-fatal here — still reset form */
+                  })
+                  .finally(() => {
+                    if (isClerkSignedIn) {
+                      router.replace('/(app)/home');
+                      return;
+                    }
+                    clearTransitionState();
+                    setTransitionStuck(false);
+                    setIsTransitioning(false);
+                  });
               },
             }}
             secondaryAction={{
               label: 'Sign up',
               testID: 'sign-in-stuck-signup',
               onPress: () => {
-                clearTransitionState();
-                setTransitionStuck(false);
-                setIsTransitioning(false);
-                router.replace('/(auth)/sign-up');
+                void clerkSignOut()
+                  .catch(() => {
+                    /* non-fatal */
+                  })
+                  .finally(() => {
+                    clearTransitionState();
+                    setTransitionStuck(false);
+                    setIsTransitioning(false);
+                    router.replace('/(auth)/sign-up');
+                  });
               },
             }}
           />

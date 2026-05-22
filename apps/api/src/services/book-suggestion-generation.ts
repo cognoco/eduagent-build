@@ -10,7 +10,7 @@ import {
 import { bookSuggestionGenerationResultSchema } from '@eduagent/schemas';
 
 import { getLanguageByCode } from '../data/languages';
-import { routeAndCall, type ChatMessage } from './llm';
+import { routeAndCall, extractFirstJsonObject, type ChatMessage } from './llm';
 import { sanitizeXmlValue } from './llm/sanitize';
 import { areEquivalentBookTitles } from './curriculum';
 import { createLogger } from './logger';
@@ -370,9 +370,11 @@ Generate the suggestions now.`;
 }
 
 export function extractBookSuggestionJson(response: string): unknown {
-  const objectMatch = response.match(/\{[\s\S]*\}/);
-  if (!objectMatch) throw new Error('LLM response did not contain JSON');
-  const jsonText = objectMatch[0];
+  // [BUG-461] Replace greedy /\{[\s\S]*\}/ with brace-depth walker so prose
+  // between two JSON blocks or markdown fences no longer produces an ill-formed
+  // concatenated string.
+  const jsonText = extractFirstJsonObject(response);
+  if (!jsonText) throw new Error('LLM response did not contain JSON');
   try {
     return JSON.parse(jsonText);
   } catch (error) {

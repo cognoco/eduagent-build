@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { IMAGE_BASE64_MAX } from './common.ts';
+
 // --- Shared types ---
 
 export const dictationSentenceSchema = z.object({
@@ -81,11 +83,8 @@ export type RecordDictationResultInput = z.infer<
 
 // --- dictation review input (vision-based grading) ---
 
-/** Max base64 length: ~2 MB base64 ≈ 1.5 MB raw image */
-const MAX_BASE64_LENGTH = 2 * 1024 * 1024;
-
 export const dictationReviewInputSchema = z.object({
-  imageBase64: z.string().min(1).max(MAX_BASE64_LENGTH),
+  imageBase64: z.string().min(1).max(IMAGE_BASE64_MAX),
   imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   sentences: z.array(dictationSentenceSchema).min(1),
   language: z.string().min(2).max(10),

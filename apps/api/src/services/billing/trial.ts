@@ -7,7 +7,7 @@ import {
   subscriptions,
   quotaPools,
   type Database,
-  findQuotaPool,
+  findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
@@ -50,7 +50,8 @@ export async function downgradeQuotaPool(
 ): Promise<void> {
   // Only update pools that haven't already been downgraded to this limit.
   // This prevents retries from resetting usage counters for already-transitioned subscriptions.
-  const currentPool = await findQuotaPool(db, subscriptionId);
+  // safe-caller: cron/system function iterating over all subscriptions — no user-facing output
+  const currentPool = await findQuotaPool__unscoped(db, subscriptionId);
   if (currentPool && currentPool.monthlyLimit === monthlyLimit) {
     return; // Already at target tier — skip to preserve usage counters
   }

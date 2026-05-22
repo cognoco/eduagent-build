@@ -304,4 +304,99 @@ describe('SignUpScreen', () => {
       expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_openai' });
     });
   });
+
+  // CR-2026-05-21-105 — break test: ssoSignIn.status set means an existing
+  // account was matched by the OAuth provider. The fix must redirect to
+  // sign-in rather than silently showing a generic error.
+  it('redirects to sign-in when SSO matches an existing account needing verification', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: null,
+      signIn: {
+        status: 'needs_first_factor',
+        supportedFirstFactors: [{ strategy: 'totp' }],
+      },
+      signUp: null,
+    });
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(screen.getByTestId('sign-up-google-sso'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/(auth)/sign-in' }),
+      );
+    });
+
+    // Must NOT show generic silent error — user is redirected, not trapped.
+    expect(
+      screen.queryByText('Sign-up could not be completed. Please try again.'),
+    ).toBeNull();
+  });
+
+  // CR-2026-05-21-105 — missing fields from the sign-up object surface a
+  // concrete actionable message naming the fields, not the generic fallback.
+  it('shows missing-fields error when ssoSignUp has missingFields', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: null,
+      signIn: null,
+      signUp: {
+        status: 'missing_requirements',
+        missingFields: ['phone_number'],
+        createdSessionId: null,
+      },
+    });
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(screen.getByTestId('sign-up-google-sso'));
+
+    await waitFor(() => {
+      screen.getByText(
+        'Sign-up needs more information: phone_number. Please sign up with email instead.',
+      );
+    });
+
+    // Must NOT redirect — user stays on screen with actionable message.
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  // CR-2026-05-21-105 — incomplete ssoSignUp without missingFields shows
+  // a provider-specific message rather than the generic fallback.
+  it('shows provider-specific error when ssoSignUp status is incomplete without missingFields', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: null,
+      signIn: null,
+      signUp: {
+        status: 'abandoned',
+        missingFields: [],
+        createdSessionId: null,
+      },
+    });
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(screen.getByTestId('sign-up-google-sso'));
+
+    await waitFor(() => {
+      screen.getByText(
+        'Sign-up via Google needs additional information. Please sign up with email instead.',
+      );
+    });
+  });
 });

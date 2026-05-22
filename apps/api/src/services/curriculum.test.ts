@@ -789,9 +789,26 @@ describe('explainTopicOrdering', () => {
     ).rejects.toThrow('Subject not found');
   });
 
-  it('throws when topic is not found', async () => {
+  it('throws when curriculum is not found for the subject', async () => {
+    // [BUG-459] Curriculum is now fetched before topic so ownership is verified
+    // through the subject→curriculum chain before any topic data is read.
     const db = createMockDb({
       subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: undefined,
+    });
+    await expect(
+      explainTopicOrdering(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
+    ).rejects.toThrow('Curriculum not found');
+  });
+
+  it('throws when topic is not found (or belongs to another profile)', async () => {
+    // [BUG-459] curriculum must exist for its own subject so the topic lookup
+    // can be scoped to curriculum.id. If topicFindFirst returns undefined (the
+    // topic does not belong to this curriculum), the function must throw "Topic
+    // not found" rather than leaking the topic title from another profile.
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
       topicFindFirst: undefined,
     });
     await expect(

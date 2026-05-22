@@ -15,6 +15,7 @@ import { captureException } from './sentry';
 import { createLogger } from './logger';
 import { recordPracticeActivityEvent } from './practice-activity-events';
 import { buildAppHelpDirectReply, isAppHelpQuery } from './app-help-map';
+import { NotFoundError } from '../errors';
 import type {
   VerificationDepth,
   QuickCheckContext,
@@ -689,6 +690,31 @@ export async function createAssessment(
   topicId: string,
   sessionId?: string,
 ): Promise<AssessmentRecord> {
+  // [BUG-460 / P2] Verify ownership before insert — subjectId/topicId come
+  // from URL params and were previously inserted without verification, allowing
+  // an attacker to tag their own assessment rows with victim's subjectId/topicId.
+  // Parent-chain join: curriculumTopics → curricula → subjects.profileId.
+  // This mirrors the pattern in loadAssessmentTopicContext above (same tables).
+  // Intentionally vague error — don't reveal whether topic exists but is unowned
+  // vs. does not exist at all (prevents enumeration).
+  const [owned] = await db
+    .select({ id: curriculumTopics.id })
+    .from(curriculumTopics)
+    .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
+    .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
+    .where(
+      and(
+        eq(curriculumTopics.id, topicId),
+        eq(curricula.subjectId, subjectId),
+        eq(subjects.profileId, profileId),
+      ),
+    )
+    .limit(1);
+
+  if (!owned) {
+    throw new NotFoundError('Topic');
+  }
+
   // Write: raw drizzle insert with profileId bound in values — correct pattern.
   // createScopedRepository only provides read methods (findFirst/findMany).
   const [row] = await db

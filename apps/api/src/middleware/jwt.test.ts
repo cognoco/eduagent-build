@@ -7,6 +7,7 @@ import {
   decodeJWTPayload,
   fetchJWKS,
   clearJWKSCache,
+  lookupJWKByKid,
   verifyJWT,
 } from './jwt';
 
@@ -233,6 +234,134 @@ describe('fetchJWKS', () => {
     }) as unknown as typeof fetch;
 
     await expect(fetchJWKS(JWKS_URL)).rejects.toThrow('Failed to fetch JWKS');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lookupJWKByKid — key-rotation re-fetch (BUG-492)
+// When Clerk rotates signing keys, the cached JWKS is stale. A kid-not-found
+// miss must trigger exactly one forced re-fetch; if the kid is present in the
+// refreshed JWKS the lookup succeeds.  A second miss (kid genuinely absent)
+// must throw without further network calls.
+// ---------------------------------------------------------------------------
+
+describe('lookupJWKByKid', () => {
+  const JWKS_URL = 'https://clerk.dev/.well-known/jwks.json';
+
+  const OLD_KEY = {
+    kty: 'RSA',
+    kid: 'old-key',
+    alg: 'RS256',
+    n: 'old-n',
+    e: 'AQAB',
+  };
+  const NEW_KEY = {
+    kty: 'RSA',
+    kid: 'new-key',
+    alg: 'RS256',
+    n: 'new-n',
+    e: 'AQAB',
+  };
+
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    clearJWKSCache();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  // [BUG-492] Break test: stale cache contains old-key only; token signed with
+  // new-key. First fetchJWKS (cache miss) returns stale set → kid absent →
+  // force re-fetch returns updated set with new-key → lookup succeeds.
+  it('[BUG-492] re-fetches JWKS when kid is absent from cached keys, then finds the key', async () => {
+    // Seed cache with old-key only (simulates pre-rotation state).
+    // We prime the cache by making a first fetch return the stale JWKS.
+    globalThis.fetch = jest
+      .fn()
+      // First call (fetchJWKS initial fill): old key only
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY] }),
+      } as unknown as Response)
+      // Second call (forced re-fetch on kid miss): new key present
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY, NEW_KEY] }),
+      } as unknown as Response) as unknown as typeof fetch;
+
+    // Warm the cache with old-key.
+    await fetchJWKS(JWKS_URL);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+    // Now look up new-key — should trigger one re-fetch and succeed.
+    const jwk = await lookupJWKByKid(JWKS_URL, 'new-key');
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(jwk.kid).toBe('new-key');
+  });
+
+  it('[BUG-492] returns cached key immediately when kid is already present (no extra fetch)', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ keys: [OLD_KEY] }),
+    } as unknown as Response) as unknown as typeof fetch;
+
+    await fetchJWKS(JWKS_URL); // warm cache
+    const jwk = await lookupJWKByKid(JWKS_URL, 'old-key');
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1); // no extra fetch
+    expect(jwk.kid).toBe('old-key');
+  });
+
+  it('[BUG-492] throws when kid is absent even after re-fetch (token is genuinely invalid)', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY] }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY] }),
+      } as unknown as Response) as unknown as typeof fetch;
+
+    await fetchJWKS(JWKS_URL); // warm cache with old-key
+    await expect(lookupJWKByKid(JWKS_URL, 'ghost-key')).rejects.toThrow(
+      'No matching JWK found for kid: ghost-key',
+    );
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2); // one normal + one forced
+  });
+
+  it('[BUG-492] concurrent lookups for same missing kid share one re-fetch (dedup)', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY] }),
+      } as unknown as Response)
+      // Only ONE additional fetch should fire for N concurrent lookups
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ keys: [OLD_KEY, NEW_KEY] }),
+      } as unknown as Response) as unknown as typeof fetch;
+
+    await fetchJWKS(JWKS_URL); // warm cache (1 fetch used)
+
+    // Fire 3 concurrent lookups for the missing kid.
+    const results = await Promise.all([
+      lookupJWKByKid(JWKS_URL, 'new-key'),
+      lookupJWKByKid(JWKS_URL, 'new-key'),
+      lookupJWKByKid(JWKS_URL, 'new-key'),
+    ]);
+
+    // Total fetch calls: 1 (warm) + 1 (single forced re-fetch) = 2.
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    for (const jwk of results) {
+      expect(jwk.kid).toBe('new-key');
+    }
   });
 });
 

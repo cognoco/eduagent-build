@@ -67,7 +67,10 @@ export const orphanPersistFailedEventSchema = z.object({
   draftId: z.string().uuid(),
   route: z.string(),
   reason: z.string().nullable(),
-  error: z.string(),
+  // Callers must scrub PII before constructing this message — raw transcript
+  // fragments, image URLs with tokens, or retried message bodies must not be
+  // included. Cap prevents unbounded payloads in Inngest observability sinks.
+  error: z.string().max(2000),
 });
 export type OrphanPersistFailedEvent = z.infer<
   typeof orphanPersistFailedEventSchema
@@ -194,8 +197,38 @@ export type ClassificationSkippedEvent = z.infer<
 export const classificationFailedEventSchema = z.object({
   sessionId: z.string().optional(),
   exchangeCount: z.number().optional(),
-  error: z.string().optional(),
+  // Callers must scrub PII before constructing this message — raw transcript
+  // fragments, image URLs with tokens, or retried message bodies must not be
+  // included. Cap prevents unbounded payloads in Inngest observability sinks.
+  error: z.string().max(2000).optional(),
 });
 export type ClassificationFailedEvent = z.infer<
   typeof classificationFailedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Summary / Learner-Recap events (#428, #429)
+// ---------------------------------------------------------------------------
+
+export const summaryEventPayloadSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  timestamp: z.string().datetime(),
+  subjectId: z.string().uuid().nullable().optional(),
+  topicId: z.string().uuid().nullable().optional(),
+  sessionSummaryId: z.string().uuid().optional(),
+});
+export type SummaryEventPayload = z.infer<typeof summaryEventPayloadSchema>;
+
+// ---------------------------------------------------------------------------
+// Book pre-generation event (#426)
+// ---------------------------------------------------------------------------
+
+export const bookTopicsGeneratedEventSchema = z.object({
+  subjectId: z.string().uuid(),
+  bookId: z.string().uuid(),
+  profileId: z.string().uuid(),
+});
+export type BookTopicsGeneratedEvent = z.infer<
+  typeof bookTopicsGeneratedEventSchema
 >;

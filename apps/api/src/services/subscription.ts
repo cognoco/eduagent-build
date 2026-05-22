@@ -99,12 +99,14 @@ export const AI_UPGRADE_ADDON: AIUpgradeConfig = {
 const VALID_TRANSITIONS = new Set([
   'trial->active',
   'trial->expired',
+  'trial->past_due', // [BUG-442] handleBillingIssue / handlePaymentFailed set past_due; trial must be reachable
   'active->past_due',
   'active->cancelled',
   'active->expired', // Stripe customer.subscription.deleted (immediate cancellation)
   'past_due->active',
   'past_due->cancelled',
   'past_due->expired', // Stripe customer.subscription.deleted while past_due
+  'cancelled->active', // [BUG-443] Stripe portal uncancel (cancel_at_period_end=false) reverses cancellation; payment_succeeded on a cancelled sub re-activates it
   'cancelled->expired',
 ]);
 
@@ -121,7 +123,7 @@ export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
  * Checks whether a status transition is valid in the subscription state machine.
  *
  * Valid transitions:
- * - trial -> active, expired
+ * - trial -> active, expired, past_due (payment failed before trial converts)
  * - active -> past_due, cancelled, expired
  * - past_due -> active, cancelled, expired
  * - cancelled -> expired

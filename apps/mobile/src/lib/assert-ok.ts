@@ -1,4 +1,14 @@
-import { ConflictError } from './api-errors';
+import {
+  BadRequestError,
+  ConflictError,
+  ConsentRequiredError,
+  ForbiddenError,
+  QuotaExceededError,
+  RateLimitedError,
+  ResourceGoneError,
+  UpstreamError,
+} from './api-errors';
+import { quotaExceededSchema } from '@eduagent/schemas';
 
 /**
  * Asserts that an API response is successful (2xx status).
@@ -62,22 +72,107 @@ export async function assertOk<T extends Response>(
     }
   }
 
-  if (res.status === 409) {
-    const error = new ConflictError(message) as ConflictError &
-      ApiResponseError;
-    error.status = res.status;
-    if (code) {
-      error.code = code;
-    }
-    if (details !== undefined) {
-      error.details = details;
-    }
-    if (bodyText) {
-      error.bodyText = bodyText;
-    }
-    throw error;
+  // [BUG-544] Mirror customFetch's full typed-error hierarchy so Hono RPC
+  // calls through assertOk get the same typed errors as customFetch calls.
+  // Previously only 409 was mapped; everything else became a generic Error
+  // with a status property, causing 403 → sign-out instead of go-back, etc.
+  if (res.status === 400) {
+    throw attachResponseFields(
+      new BadRequestError(message),
+      res.status,
+      code,
+      details,
+      bodyText,
+    );
   }
 
+  if (res.status === 402) {
+    // Try to parse as a quota-exceeded structured body first
+    if (bodyText) {
+      try {
+        const rawParsed: unknown = JSON.parse(bodyText);
+        const quotaResult = quotaExceededSchema.safeParse(rawParsed);
+        if (quotaResult.success) {
+          throw new QuotaExceededError(
+            quotaResult.data.message,
+            quotaResult.data.details,
+          );
+        }
+      } catch (e) {
+        // Re-throw if it's a QuotaExceededError we just constructed
+        if (e instanceof QuotaExceededError) throw e;
+        // Otherwise fall through to UpstreamError
+      }
+    }
+    throw attachResponseFields(
+      new UpstreamError(message, code ?? 'PAYMENT_REQUIRED', 402),
+      res.status,
+      code,
+      details,
+      bodyText,
+    );
+  }
+
+  if (res.status === 403) {
+    if (code === 'CONSENT_REQUIRED') {
+      throw attachResponseFields(
+        new ConsentRequiredError(message, code),
+        res.status,
+        code,
+        details,
+        bodyText,
+      );
+    }
+    throw attachResponseFields(
+      new ForbiddenError(message, code ?? undefined),
+      res.status,
+      code,
+      details,
+      bodyText,
+    );
+  }
+
+  if (res.status === 409) {
+    throw attachResponseFields(
+      new ConflictError(message),
+      res.status,
+      code,
+      details,
+      bodyText,
+    );
+  }
+
+  if (res.status === 410) {
+    throw attachResponseFields(
+      new ResourceGoneError(message, code ?? undefined, details),
+      res.status,
+      code,
+      details,
+      bodyText,
+    );
+  }
+
+  if (res.status === 429) {
+    throw attachResponseFields(
+      new RateLimitedError(message, code ?? undefined, undefined, undefined),
+      res.status,
+      code,
+      details,
+      bodyText,
+    );
+  }
+
+  if (res.status >= 500) {
+    throw attachResponseFields(
+      new UpstreamError(message, code ?? 'UPSTREAM_ERROR', res.status),
+      res.status,
+      code,
+      details,
+      bodyText,
+    );
+  }
+
+  // Remaining unhandled status codes
   const error = new Error(message) as ApiResponseError;
   error.name = 'ApiResponseError';
   error.status = res.status;
@@ -91,4 +186,20 @@ export async function assertOk<T extends Response>(
     error.bodyText = bodyText;
   }
   throw error;
+}
+
+/** Attach ApiResponseError fields to any typed error subclass. */
+function attachResponseFields<T extends Error>(
+  err: T,
+  status: number,
+  code: string | undefined,
+  details: unknown,
+  bodyText: string | undefined,
+): T & ApiResponseError {
+  const apiErr = err as T & ApiResponseError;
+  apiErr.status = status;
+  if (code) apiErr.code = code;
+  if (details !== undefined) apiErr.details = details;
+  if (bodyText) apiErr.bodyText = bodyText;
+  return apiErr;
 }

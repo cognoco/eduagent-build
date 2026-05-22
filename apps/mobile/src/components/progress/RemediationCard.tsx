@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
 
 interface RemediationCardProps {
@@ -10,19 +11,6 @@ interface RemediationCardProps {
   onBookPress?: () => void;
 }
 
-function getCooldownMessage(remainingMs: number): string {
-  const totalMinutes = Math.ceil(remainingMs / 60_000);
-  const hours = Math.floor(totalMinutes / 60);
-
-  if (hours < 1) {
-    return `You can try again in ${totalMinutes} minutes — go do something fun!`;
-  }
-  if (hours <= 4) {
-    return `You can try again in about ${hours} hours — your brain needs a real break!`;
-  }
-  return 'Come back tomorrow and try fresh!';
-}
-
 export function RemediationCard({
   retentionStatus,
   cooldownEndsAt,
@@ -30,6 +18,7 @@ export function RemediationCard({
   onRelearnTopic,
   onBookPress,
 }: RemediationCardProps) {
+  const { t } = useTranslation();
   const [remainingMs, setRemainingMs] = useState(() => {
     if (!cooldownEndsAt) return 0;
     return Math.max(0, new Date(cooldownEndsAt).getTime() - Date.now());
@@ -58,6 +47,20 @@ export function RemediationCard({
 
   const cooldownActive = remainingMs > 0;
 
+  function getCooldownMessage(): string {
+    const totalMinutes = Math.ceil(remainingMs / 60_000);
+    const hours = Math.floor(totalMinutes / 60);
+    if (hours < 1) {
+      return t('progress.remediation.cooldownMinutes', {
+        minutes: totalMinutes,
+      });
+    }
+    if (hours <= 4) {
+      return t('progress.remediation.cooldownHours', { hours });
+    }
+    return t('progress.remediation.cooldownTomorrow');
+  }
+
   return (
     <View
       className="bg-surface-elevated rounded-card p-4 mt-4"
@@ -66,18 +69,17 @@ export function RemediationCard({
       <View className="flex-row items-center justify-between mb-3">
         <RetentionSignal status={retentionStatus} />
         <Text className="text-body-sm font-medium text-text-secondary">
-          Let&apos;s try something new!
+          {t('progress.remediation.heading')}
         </Text>
       </View>
 
       <Text className="text-body-sm text-text-secondary mb-2">
-        Don&apos;t worry — it&apos;s totally normal to need another go.
-        Let&apos;s find what works for you!
+        {t('progress.remediation.body')}
       </Text>
 
       {cooldownActive && (
         <Text className="text-body-sm text-text-secondary mb-4">
-          {getCooldownMessage(remainingMs)}
+          {getCooldownMessage()}
         </Text>
       )}
 
@@ -85,11 +87,11 @@ export function RemediationCard({
         onPress={onRelearnTopic}
         className="bg-primary rounded-button py-3 items-center mb-2"
         testID="relearn-topic-button"
-        accessibilityLabel="Try a different way"
+        accessibilityLabel={t('progress.remediation.primaryCtaA11y')}
         accessibilityRole="button"
       >
         <Text className="text-body-sm font-semibold text-text-inverse">
-          Try a different way
+          {t('progress.remediation.primaryCta')}
         </Text>
       </Pressable>
       <Pressable
@@ -97,7 +99,7 @@ export function RemediationCard({
         disabled={cooldownActive}
         className="py-3 items-center"
         testID="review-retest-button"
-        accessibilityLabel="Or try again later"
+        accessibilityLabel={t('progress.remediation.secondaryCtaA11y')}
         accessibilityRole="button"
       >
         <Text
@@ -107,7 +109,7 @@ export function RemediationCard({
               : 'text-primary font-medium'
           }`}
         >
-          Or try again later
+          {t('progress.remediation.secondaryCta')}
         </Text>
       </Pressable>
 
@@ -116,11 +118,11 @@ export function RemediationCard({
           onPress={onBookPress}
           className="mt-2 py-2 items-center"
           testID="remediation-book-link"
-          accessibilityLabel="Check out your Library"
+          accessibilityLabel={t('progress.remediation.libraryLinkA11y')}
           accessibilityRole="link"
         >
           <Text className="text-body-sm text-primary">
-            While you wait, check out your Library
+            {t('progress.remediation.libraryLink')}
           </Text>
         </Pressable>
       )}

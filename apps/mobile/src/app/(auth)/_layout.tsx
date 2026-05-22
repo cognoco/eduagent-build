@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Stack,
   useGlobalSearchParams,
@@ -54,14 +54,25 @@ export default function AuthRoutesLayout() {
       : (peekPendingAuthRedirect() ?? resolvedRedirectTarget),
   );
   const lastRedirectedPathRef = useRef<string | null>(null);
+  // [BUG-506] Track redirectTargetRef.current in state so the effect below
+  // re-runs when a freshly-arrived deep-link changes the target while the user
+  // is already signed in. Refs don't trigger effect re-runs on their own.
+  const [effectiveTarget, setEffectiveTarget] = useState(
+    () => redirectTargetRef.current,
+  );
 
   if (redirectTarget) {
     // Preserve the original deep-link target across the signed-in transition.
     // Expo Router clears auth-route search params during the handoff, and
     // falling back to /home here breaks W-03 deep-link restoration on web.
-    redirectTargetRef.current = rememberPendingAuthRedirect(
-      resolvedRedirectTarget,
-    );
+    const remembered = rememberPendingAuthRedirect(resolvedRedirectTarget);
+    if (remembered !== redirectTargetRef.current) {
+      redirectTargetRef.current = remembered;
+      // setEffectiveTarget during render (before commit) is the React-approved
+      // pattern for a render-derived state update — avoids an extra paint while
+      // still making the new value visible to the effect below.
+      setEffectiveTarget(remembered);
+    }
   }
 
   useEffect(() => {
@@ -70,13 +81,13 @@ export default function AuthRoutesLayout() {
       return;
     }
 
-    if (lastRedirectedPathRef.current === redirectTargetRef.current) {
+    if (lastRedirectedPathRef.current === effectiveTarget) {
       return;
     }
 
-    lastRedirectedPathRef.current = redirectTargetRef.current;
-    router.replace(redirectTargetRef.current as Href);
-  }, [isLoaded, isSignedIn, router]);
+    lastRedirectedPathRef.current = effectiveTarget;
+    router.replace(effectiveTarget as Href);
+  }, [isLoaded, isSignedIn, router, effectiveTarget]);
 
   if (!isLoaded) return null;
   if (isSignedIn) {

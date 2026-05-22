@@ -3,10 +3,11 @@ import {
   type MemorySource,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
-import { routeAndCall, type ChatMessage } from './llm';
+import { routeAndCall, extractFirstJsonObject, type ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
 import { applyAnalysis } from './learner-profile';
 import { createLogger } from './logger';
+import { captureException } from './sentry';
 
 const logger = createLogger();
 
@@ -44,7 +45,7 @@ export interface ParseLearnerInputResult {
 
 function fallbackAnalysis(
   text: string,
-  source: MemorySource
+  source: MemorySource,
 ): Parameters<typeof applyAnalysis>[2] {
   const trimmed = text.trim();
   const lowered = trimmed.toLowerCase();
@@ -57,14 +58,14 @@ function fallbackAnalysis(
   const notes: string[] = [];
 
   const interestMatch = trimmed.match(
-    /\b(?:i like|i love|i enjoy|i'm into|i am into)\s+(.+)/i
+    /\b(?:i like|i love|i enjoy|i'm into|i am into)\s+(.+)/i,
   );
   if (interestMatch?.[1]) {
     interests.push(interestMatch[1].trim().replace(/[.!?]+$/, ''));
   }
 
   const struggleMatch = trimmed.match(
-    /\b(?:i struggle with|i find|i get stuck on)\s+(.+)/i
+    /\b(?:i struggle with|i find|i get stuck on)\s+(.+)/i,
   );
   if (struggleMatch?.[1]) {
     struggles.push({
@@ -100,7 +101,7 @@ function fallbackAnalysis(
 
 async function parseLearnerInputToAnalysis(
   text: string,
-  source: MemorySource
+  source: MemorySource,
 ): Promise<Parameters<typeof applyAnalysis>[2]> {
   // [PROMPT-INJECT-8] text is raw learner/parent note. Entity-encode so a
   // crafted note containing </learner_input> cannot escape the wrapping tag.
@@ -109,20 +110,40 @@ async function parseLearnerInputToAnalysis(
     {
       role: 'user',
       content: `Source: ${source}\n<learner_input>${escapeXml(
-        text.trim()
+        text.trim(),
       )}</learner_input>`,
     },
   ];
 
   try {
     const result = await routeAndCall(messages, 1, {});
-    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // [BUG-480] Replace greedy regex with brace-depth walker so prose
+    // containing "{...}" mid-paragraph doesn't corrupt the extraction.
+    const jsonStr = extractFirstJsonObject(result.response);
+    if (!jsonStr) {
       return fallbackAnalysis(text, source);
     }
-    const parsed = JSON.parse(jsonMatch[0]) as unknown;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      captureException(parseErr, {
+        extra: {
+          site: 'parseLearnerInputToAnalysis.jsonParse',
+          rawResponseTrunc: result.response.slice(0, 200),
+        },
+      });
+      return fallbackAnalysis(text, source);
+    }
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) {
+      captureException(new Error('learner-input schema validation failed'), {
+        extra: {
+          site: 'parseLearnerInputToAnalysis.safeParse',
+          issues: validated.error.issues,
+          rawResponseTrunc: result.response.slice(0, 200),
+        },
+      });
       return fallbackAnalysis(text, source);
     }
     return {
@@ -157,7 +178,7 @@ export async function parseLearnerInput(
   db: Database,
   profileId: string,
   text: string,
-  source: MemorySource
+  source: MemorySource,
 ): Promise<ParseLearnerInputResult> {
   try {
     const analysis = await parseLearnerInputToAnalysis(text, source);

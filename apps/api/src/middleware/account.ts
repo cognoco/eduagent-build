@@ -7,8 +7,11 @@ import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { findOrCreateAccount, type Account } from '../services/account';
 import { withTransientDatabaseRetry } from '../services/transient-db-retry';
+import { createLogger } from '../services/logger';
 import type { AuthUser } from './auth';
 import type { Database } from '@eduagent/database';
+
+const logger = createLogger();
 
 export type AccountEnv = {
   Variables: { user: AuthUser; db: Database; account: Account };
@@ -36,11 +39,37 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
       );
     }
 
+    // [BUG-497] Reject when Clerk has not explicitly attested the email as
+    // verified. An unverified email may reflect an attacker-controlled value
+    // injected via a session template, or a mid-session email change before
+    // the token was reissued. Using an unverified email to create or look up
+    // an account row risks identity confusion: clerkUserId is the canonical
+    // identity anchor; email is supplementary and MUST be attested.
+    //
+    // Note: emailVerified === undefined means the claim was absent from the
+    // JWT (e.g. session template omits it). We treat absence as unverified.
+    if (user.emailVerified !== true) {
+      logger.info('account.middleware.email_not_verified', {
+        clerkUserId: user.userId,
+        emailVerified: user.emailVerified,
+      });
+      return c.json(
+        {
+          code: ERROR_CODES.UNAUTHORIZED,
+          message:
+            'Email not verified. Please verify your email address and try again.',
+        },
+        401,
+      );
+    }
+
     const db = c.get('db');
-    const email = user.email; // narrowed: !user.email guard above ensures this is defined
+    // email is verified (emailVerified === true) and non-empty (guarded above)
+    const verifiedEmail = user.email;
+
     const account = await withTransientDatabaseRetry(
       'accountMiddleware.findOrCreateAccount',
-      () => findOrCreateAccount(db, user.userId, email),
+      () => findOrCreateAccount(db, user.userId, verifiedEmail),
     );
     c.set('account', account);
     return next();
