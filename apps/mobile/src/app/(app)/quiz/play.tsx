@@ -36,6 +36,7 @@ import { Sentry } from '../../../lib/sentry';
 import { useQuizFlow } from './_layout';
 import {
   GuessWhoQuestion,
+  type GuessWhoCheckOptions,
   type GuessWhoResolvedResult,
 } from '../../../components/quiz/GuessWhoQuestion';
 import { RewardBurst } from '../../../components/common/RewardBurst';
@@ -53,6 +54,27 @@ function formatElapsedTime(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function appendFirstQuestionResult(
+  results: QuestionResult[],
+  nextResult: QuestionResult,
+): QuestionResult[] {
+  const existingIndex = results.findIndex(
+    (result) => result.questionIndex === nextResult.questionIndex,
+  );
+
+  if (existingIndex === -1) {
+    return [...results, nextResult];
+  }
+
+  if (!nextResult.disputed || results[existingIndex]?.disputed) {
+    return results;
+  }
+
+  return results.map((result, index) =>
+    index === existingIndex ? { ...result, disputed: true } : result,
+  );
 }
 
 export default function QuizPlayScreen(): React.ReactElement {
@@ -297,14 +319,18 @@ export default function QuizPlayScreen(): React.ReactElement {
   // every mutation state transition (idle → pending → success → idle).
   const checkAnswerMutateAsync = checkAnswer.mutateAsync;
   const handleCheckGuessWhoAnswer = useCallback(
-    async (answerGiven: string): Promise<boolean> => {
+    async (
+      answerGiven: string,
+      options: GuessWhoCheckOptions,
+    ): Promise<boolean> => {
       try {
         const result = await checkAnswerMutateAsync({
           roundId,
           questionIndex: currentIndex,
           answerGiven,
-          // guess_who is always free-text input
-          answerMode: 'free_text',
+          answerMode: options.answerMode,
+          finalAttempt: options.finalAttempt,
+          cluesUsed: options.cluesUsed,
         });
         if (!result.correct && result.correctAnswer) {
           correctAnswerCapturedRef.current = true;
@@ -330,18 +356,18 @@ export default function QuizPlayScreen(): React.ReactElement {
   // compounding with the unstable checkAnswer dep to trigger re-render storms.
   const handleGuessWhoResolved = useCallback(
     (result: GuessWhoResolvedResult) => {
+      if (answerState !== 'unanswered' || answerSubmittedRef.current) return;
+      answerSubmittedRef.current = true;
+
       const timeMs = Date.now() - questionStartTimeRef.current;
-      const nextResults: QuestionResult[] = [
-        ...resultsRef.current,
-        {
-          questionIndex: currentIndex,
-          correct: result.correct,
-          answerGiven: result.answerGiven,
-          timeMs,
-          cluesUsed: result.cluesUsed,
-          answerMode: result.answerMode,
-        },
-      ];
+      const nextResults = appendFirstQuestionResult(resultsRef.current, {
+        questionIndex: currentIndex,
+        correct: result.correct,
+        answerGiven: result.answerGiven,
+        timeMs,
+        cluesUsed: result.cluesUsed,
+        answerMode: result.answerMode,
+      });
       resultsRef.current = nextResults;
       setGuessWhoCluesUsed(result.cluesUsed);
       setSelectedAnswer(result.answerGiven);
@@ -373,8 +399,9 @@ export default function QuizPlayScreen(): React.ReactElement {
           roundId,
           questionIndex: currentIndex,
           answerGiven: result.answerGiven,
-          // guess_who background correctAnswer fetch is always free_text
-          answerMode: 'free_text',
+          answerMode: result.answerMode,
+          finalAttempt: true,
+          cluesUsed: result.cluesUsed,
         })
           .then((checkResult) => {
             if (checkResult.correctAnswer) {
@@ -393,6 +420,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       }
     },
     [
+      answerState,
       checkAnswerMutateAsync,
       currentIndex,
       roundId,
@@ -575,7 +603,10 @@ export default function QuizPlayScreen(): React.ReactElement {
       answerMode,
     };
 
-    const nextResults = [...resultsRef.current, nextResult];
+    const nextResults = appendFirstQuestionResult(
+      resultsRef.current,
+      nextResult,
+    );
     resultsRef.current = nextResults;
     setAnswerState(correct ? 'correct' : 'wrong');
     setShowContinueHint(false);

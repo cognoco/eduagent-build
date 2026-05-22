@@ -317,6 +317,27 @@ describe('validateResults (anti-tampering)', () => {
     expect(validated[0]?.questionIndex).toBe(0);
   });
 
+  it('[BREAK/WI-230] keeps only the first result for each questionIndex', () => {
+    const duplicated: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 100 },
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 100 },
+      { questionIndex: 1, correct: true, answerGiven: 'Berlin', timeMs: 100 },
+    ];
+    const deduplicated: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 100 },
+      { questionIndex: 1, correct: true, answerGiven: 'Berlin', timeMs: 100 },
+    ];
+
+    const validated = validateResults(questions, duplicated);
+
+    expect(validated).toHaveLength(2);
+    expect(validated.map((result) => result.questionIndex)).toEqual([0, 1]);
+    expect(calculateScore(validated)).toBe(calculateScore(deduplicated));
+    expect(calculateXp(validated, questions.length)).toBe(
+      calculateXp(deduplicated, questions.length),
+    );
+  });
+
   // [BUG-STALE-OPTIONS] validateResults must drop MC results where
   // answerGiven is not in the server-known options — this is the final
   // defense layer against stale-options race results reaching the score.

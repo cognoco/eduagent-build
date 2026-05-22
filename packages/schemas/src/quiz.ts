@@ -156,6 +156,11 @@ export const questionCheckInputSchema = z.object({
   // answers are actually in question.options, catching stale-options race
   // conditions on the client before they corrupt the score.
   answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
+  // [WI-89] Guess Who has intermediate probe guesses. Wrong probes should be
+  // recorded for integrity but must not reveal the final answer or count as
+  // the first final scoring attempt.
+  finalAttempt: z.boolean().optional(),
+  cluesUsed: z.number().int().min(0).max(5).optional(),
 });
 export type QuestionCheckInput = z.infer<typeof questionCheckInputSchema>;
 
