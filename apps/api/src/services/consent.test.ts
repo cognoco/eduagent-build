@@ -1,7 +1,9 @@
 import type { Database } from '@eduagent/database';
 import {
   calculateAge,
+  calculateAgeFromParts,
   checkConsentRequired,
+  checkConsentRequiredFromDate,
   createGrantedConsentState,
   createPendingConsentState,
   requestConsent,
@@ -839,5 +841,92 @@ describe('revokeConsent — nudge-suppression branch', () => {
       'simulated DB rollback',
     );
     expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-297 — calculateAgeFromParts (exact age from full birth date)
+// ---------------------------------------------------------------------------
+
+describe('calculateAgeFromParts', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('returns exact age when birthday has already passed this year', () => {
+    // Born 2010-01-01; today is 2026-06-15 → exact age 16
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2010, 1, 1)).toBe(16);
+  });
+
+  it('returns one less than year-only age when birthday is still to come this year', () => {
+    // Born 2015-12-31; today is 2026-05-24 → birthday not yet reached → exact age 10
+    // Year-only would give 2026 - 2015 = 11
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2015, 12, 31)).toBe(10);
+  });
+
+  it('[boundary] born exactly on today → counts as birthday reached, age = year-diff', () => {
+    // Born 2013-05-24; today is 2026-05-24 → exact age 13
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2013, 5, 24)).toBe(13);
+  });
+
+  it('falls back to year-only calculation when month and day are not provided', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2013)).toBe(2026 - 2013);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-297 — checkConsentRequiredFromDate (exact consent check)
+// ---------------------------------------------------------------------------
+
+describe('checkConsentRequiredFromDate', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('[break-test] child still 10 (birthday later this year) is flagged belowMinimumAge', () => {
+    // birthYear = currentYear - 11, but birthday is Dec 31 → exact age still 10
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const birthYear = 2015; // 2026 - 2015 = 11 by year-only, but birthday Dec 31 → exact 10
+    const result = checkConsentRequiredFromDate(birthYear, 12, 31);
+    expect(result.belowMinimumAge).toBe(true);
+    expect(result.required).toBe(true);
+    expect(result.age).toBe(10);
+  });
+
+  it('child exactly 11 today (birthday today) is allowed with GDPR required', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const result = checkConsentRequiredFromDate(2015, 5, 24);
+    expect(result.belowMinimumAge).toBeUndefined();
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
+    expect(result.age).toBe(11);
+  });
+
+  it('child aged 16 with full date is still consent-required', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const result = checkConsentRequiredFromDate(2010, 1, 1);
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
+    expect(result.age).toBe(16);
+  });
+
+  it('adult aged 17 is not consent-required', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const result = checkConsentRequiredFromDate(2009, 1, 1);
+    expect(result.required).toBe(false);
+    expect(result.consentType).toBeNull();
+  });
+
+  it('falls back to year-only when month/day not supplied', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    // year-only: 2026 - 2015 = 11 → belowMinimumAge is NOT set (age >= MINIMUM_AGE)
+    const result = checkConsentRequiredFromDate(2015);
+    expect(result.belowMinimumAge).toBeUndefined();
+    expect(result.required).toBe(true);
+    expect(result.age).toBe(11);
   });
 });

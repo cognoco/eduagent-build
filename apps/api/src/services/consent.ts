@@ -139,12 +139,68 @@ export function calculateAge(birthYear: number): number {
   return new Date().getUTCFullYear() - birthYear;
 }
 
+/** Minimum age to use the platform (PRD line 386: "Ages 6-10 Out of Scope") */
+export const MINIMUM_AGE = 11;
+
+/**
+ * Calculates exact age from a full birth date (year, month 1-based, day) and
+ * the current UTC date.
+ *
+ * Subtracts 1 if today is before this year's birthday — i.e., the child has
+ * not yet had their birthday this calendar year.
+ *
+ * Month is 1-based (January = 1). When month or day are not supplied, falls
+ * back to the same year-only approximation as calculateAge().
+ */
+export function calculateAgeFromParts(
+  birthYear: number,
+  birthMonth?: number,
+  birthDay?: number,
+): number {
+  const now = new Date();
+  const yearDiff = now.getUTCFullYear() - birthYear;
+  if (birthMonth == null || birthDay == null) {
+    return yearDiff;
+  }
+  // 1-based month → 0-based for Date constructor
+  const birthdayThisYear = new Date(
+    Date.UTC(now.getUTCFullYear(), birthMonth - 1, birthDay),
+  );
+  return now < birthdayThisYear ? yearDiff - 1 : yearDiff;
+}
+
+/**
+ * Determines whether parental consent is required using an exact birth date
+ * when month and day are available, falling back to year-only otherwise.
+ *
+ * Applies the same thresholds as checkConsentRequired():
+ * - age < MINIMUM_AGE  → belowMinimumAge + GDPR required
+ * - age <= 16          → GDPR required
+ * - age > 16           → not required
+ */
+export function checkConsentRequiredFromDate(
+  birthYear: number,
+  birthMonth?: number,
+  birthDay?: number,
+): {
+  required: boolean;
+  consentType: ConsentType | null;
+  belowMinimumAge?: boolean;
+  age: number;
+} {
+  const age = calculateAgeFromParts(birthYear, birthMonth, birthDay);
+  if (age < MINIMUM_AGE) {
+    return { required: true, consentType: 'GDPR', belowMinimumAge: true, age };
+  }
+  if (age <= 16) {
+    return { required: true, consentType: 'GDPR', age };
+  }
+  return { required: false, consentType: null, age };
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
-
-/** Minimum age to use the platform (PRD line 386: "Ages 6-10 Out of Scope") */
-export const MINIMUM_AGE = 11;
 
 /**
  * Determines whether parental consent is required based on age alone.
