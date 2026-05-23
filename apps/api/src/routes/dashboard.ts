@@ -206,6 +206,10 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     assertOwnerProfile(c);
 
     try {
+      // GUARD: Do NOT move assertOwnerProfile() inside this try — every
+      // ForbiddenError thrown here is converted to 404 below to preserve the
+      // IDOR contract. Non-owners must continue to surface as 403 via the
+      // global error handler, not as 404.
       // Defense-in-depth: route-entry parent-link check before the service.
       // getChildTopicSnapshotForParent also calls assertParentAccess.
       await assertParentAccess(db, parentProfileId, childProfileId);

@@ -980,6 +980,12 @@ describe('dashboard routes', () => {
 
       expect(res.status).toBe(404);
       expect(res.status).not.toBe(403);
+      // Body shape contract: must be the typed apiError envelope so mobile
+      // classifiers bucket this the same way they bucket every other 404. A
+      // regression that emits a bare-text 404 or wrong code would still pass
+      // a status-only check.
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toMatchObject({ code: ERROR_CODES.NOT_FOUND });
     });
   });
 });
