@@ -210,4 +210,82 @@ describe('Integration: WI-156 — learner-profile child consent gate', () => {
     const body = await res.json();
     expect(body.code).toBe('FORBIDDEN');
   });
+
+  // [WI-82] Erasure/disable routes must NOT be consent-gated: a parent must be
+  // able to exercise GDPR erasure (DELETE /all) even after withdrawing consent.
+  // Conversely, new-processing routes (POST /tell) must still 403.
+  it('[WI-82] DELETE /v1/learner-profile/:childId/all → NOT 403 when child consent is WITHDRAWN (erasure allowed)', async () => {
+    const parentProfile = await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: PARENT_USER,
+      displayName: 'Parent Owner',
+      birthYear: 1985,
+    });
+
+    const childProfileId = await createChildProfileDirect(
+      parentProfile.id,
+      'Erasure Child',
+      2012,
+    );
+    await seedFamilyLink(parentProfile.id, childProfileId);
+    await setChildConsentStatus(childProfileId, 'WITHDRAWN');
+
+    const res = await app.request(
+      `/v1/learner-profile/${childProfileId}/all`,
+      {
+        method: 'DELETE',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER.userId, email: PARENT_USER.email },
+          parentProfile.id,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    // Must NOT be 403 from the consent gate. Any success status (200/204) is
+    // acceptable — there is no learning profile to delete, so the service
+    // returns success having deleted 0 rows.
+    expect(res.status).not.toBe(403);
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it('[WI-82] POST /v1/learner-profile/:childId/tell → 403 when child consent is WITHDRAWN (new processing still blocked)', async () => {
+    const parentProfile = await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: PARENT_USER,
+      displayName: 'Parent Owner',
+      birthYear: 1985,
+    });
+
+    const childProfileId = await createChildProfileDirect(
+      parentProfile.id,
+      'Tell Child',
+      2012,
+    );
+    await seedFamilyLink(parentProfile.id, childProfileId);
+    await setChildConsentStatus(childProfileId, 'WITHDRAWN');
+
+    const res = await app.request(
+      `/v1/learner-profile/${childProfileId}/tell`,
+      {
+        method: 'POST',
+        headers: {
+          ...buildAuthHeaders(
+            { sub: PARENT_USER.userId, email: PARENT_USER.email },
+            parentProfile.id,
+          ),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: 'likes drawing' }),
+      },
+      TEST_ENV,
+    );
+
+    // POST /tell is new processing — consent gate must still block it.
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('FORBIDDEN');
+  });
 });
