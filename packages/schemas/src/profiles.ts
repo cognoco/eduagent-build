@@ -55,6 +55,11 @@ export const birthYearSchema = z
 export const profileCreateSchema = z.object({
   displayName: z.string().min(1).max(50),
   birthYear: birthYearSchema,
+  // WI-297: Optional full birth date components for exact age calculation.
+  // Persisted only as birthYear in the DB — these are used server-side to
+  // compute consent requirements precisely (avoids year-only overestimation).
+  birthMonth: z.number().int().min(1).max(12).optional(),
+  birthDay: z.number().int().min(1).max(31).optional(),
   avatarUrl: z.string().url().optional(),
   location: locationSchema.optional(),
   conversationLanguage: conversationLanguageSchema.optional(),
@@ -63,14 +68,16 @@ export const profileCreateSchema = z.object({
 
 export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 
-// Mirrors profileCreateSchema minus birthYear/location. When you add a new
-// field to profileCreateSchema that should be user-editable post-onboarding,
-// it auto-flows through .partial() — but if it should also be patchable via
-// the dedicated single-field onboarding endpoints below, add a parallel
-// onboarding*PatchSchema. Keep these in sync.
+// Mirrors profileCreateSchema minus birthYear/location/birthMonth/birthDay.
+// When you add a new field to profileCreateSchema that should be user-editable
+// post-onboarding, it auto-flows through .partial() — but if it should also be
+// patchable via the dedicated single-field onboarding endpoints below, add a
+// parallel onboarding*PatchSchema. Keep these in sync.
+// NOTE: birthMonth/birthDay are create-only (used for exact age calculation at
+// creation, never persisted); they must not appear in PATCH payloads.
 export const profileUpdateSchema = profileCreateSchema
   .partial()
-  .omit({ birthYear: true, location: true })
+  .omit({ birthYear: true, location: true, birthMonth: true, birthDay: true })
   .strict();
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
