@@ -13,6 +13,17 @@
 
 import { generateKeyPairSync, createPublicKey, sign } from 'node:crypto';
 
+// Fail-closed if anything in production accidentally imports this module
+// (misconfigured bundler alias, barrel re-export, etc.). Signing test JWTs
+// with a key generated at module load would silently mint tokens that the
+// real verifier trusts.
+if (process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'test-utils/auth/test-jwt must never be imported in production. ' +
+      'Check the import chain for an accidental barrel or alias.',
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Key pair — generated once per test run
 // ---------------------------------------------------------------------------
