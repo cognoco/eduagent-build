@@ -8,6 +8,7 @@ import type {
 import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
+import { captureException } from '../sentry';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { safeWrite, type DeferredActivityEvent } from '../safe-non-core';
 import { reviewVocabulary } from '../vocabulary';
@@ -556,6 +557,13 @@ export async function completeQuizRound(
             roundId,
             itemKey,
             error: err instanceof Error ? err.message : 'unknown',
+          });
+          captureException(err, {
+            extra: {
+              surface: 'quiz.mastery_upsert',
+              roundId,
+              profileId,
+            },
           });
         }
       }

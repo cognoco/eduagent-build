@@ -138,6 +138,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
             error: err instanceof Error ? err.message : String(err),
           });
           captureException(err, {
+            tags: { surface: 'profile_scope.auto_resolve_failure' },
             extra: {
               context: 'profile-scope.auto_resolve_owner',
               accountId: account.id,

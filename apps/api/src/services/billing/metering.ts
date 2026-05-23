@@ -156,8 +156,13 @@ export async function decrementQuota(
     }
   }
 
-  // 1. Try monthly quota — atomic: succeeds only if monthly AND daily limits allow
-  const monthlyUpdated = await db.transaction(async (tx) => {
+  // 1. Try monthly quota — atomic: succeeds only if monthly AND daily limits allow.
+  // [CR-2026-05-19-M11] The discrimination re-read (why did the UPDATE fail?) is
+  // performed INSIDE the same transaction so it sees a consistent snapshot with the
+  // UPDATE attempt. A daily-reset cron firing between the UPDATE and an out-of-
+  // transaction re-read would flip usedToday back to 0, making the caller fall
+  // through to the top-up path even though the user had actually hit the daily cap.
+  const monthlyTxResult = await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(quotaPools)
       .set({
@@ -176,10 +181,21 @@ export async function decrementQuota(
     if (updated && profileId) {
       await recordUsageEvent(tx, subscriptionId, profileId, 1);
     }
-    return updated;
+    if (updated) {
+      return { updated, pool: null } as const;
+    }
+    // UPDATE failed — read the pool inside this same transaction so the
+    // discrimination sees the same snapshot (no cron race window).
+    // safe-caller: metering hot-path — subscriptionId sourced from the profile's own subscription row, already verified at middleware
+    const failPool = await findQuotaPool__unscoped(
+      tx as unknown as Database,
+      subscriptionId,
+    );
+    return { updated: null, pool: failPool } as const;
   });
 
-  if (monthlyUpdated) {
+  if (monthlyTxResult.updated) {
+    const monthlyUpdated = monthlyTxResult.updated;
     return {
       success: true,
       source: 'monthly',
@@ -193,9 +209,8 @@ export async function decrementQuota(
     };
   }
 
-  // Atomic update failed — determine why (daily vs monthly)
-  // safe-caller: metering hot-path — subscriptionId sourced from the profile's own subscription row, already verified at middleware
-  const pool = await findQuotaPool__unscoped(db, subscriptionId);
+  // Atomic update failed — use the pool snapshot read inside the same transaction.
+  const pool = monthlyTxResult.pool;
 
   if (!pool) {
     return {

@@ -417,6 +417,22 @@ jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [CR-2026-05-19-M1] safeSend mock — embed.skipped counter dispatch must be
+// observable. Unit test — Inngest client unavailable in Jest env.
+const mockSafeSend = jest.fn().mockResolvedValue(undefined);
+jest.mock(
+  '../../services/safe-non-core' /* gc1-allow: unit test — Inngest client unavailable in Jest env */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/safe-non-core',
+    ) as typeof import('../../services/safe-non-core');
+    return {
+      ...actual,
+      safeSend: (...args: unknown[]) => mockSafeSend(...args),
+    };
+  },
+);
+
 // Learner-profile service — mocked so the analyze-learner-profile step can
 // be driven through its consent gate without hitting the real LLM or DB.
 // Default return: pending consent, so the step short-circuits (matches the
@@ -2358,5 +2374,119 @@ describe('embedNewFactsForProfile', () => {
     expect(mockDb.update).not.toHaveBeenCalled();
     expect(result.embedded).toBe(0);
     expect(result.scanned).toBe(0);
+  });
+});
+
+// [CR-2026-05-19-M1] Break tests — embed failure observability escalation.
+// Expected classes (invalid_input, no_voyage_key) must emit safeSend counter,
+// NOT captureException. Unexpected classes must captureException.
+describe('embedNewFactsForProfile embed failure observability [CR-2026-05-19-M1]', () => {
+  const PROFILE_ID_OBS = '00000000-0000-4000-8000-000000000088';
+
+  function makeDbWithRows(
+    rows: { id: string; text: string; category: string }[],
+  ): Database {
+    return {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(rows),
+            }),
+          }),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+  }
+
+  beforeEach(() => {
+    mockCaptureException.mockClear();
+    mockSafeSend.mockClear();
+  });
+
+  it('[BREAK] invalid_input failure emits safeSend counter, NOT captureException', async () => {
+    const mockDb = makeDbWithRows([
+      { id: 'fact-1', text: 'some text that triggers 4xx', category: 'pref' },
+    ]);
+    const mockEmbedder = jest.fn().mockResolvedValue({
+      ok: false,
+      class: 'invalid_input',
+      reason: 'invalid_input',
+      message: 'Voyage 400: invalid input',
+    });
+
+    const result = await embedNewFactsForProfile(
+      mockDb,
+      PROFILE_ID_OBS,
+      mockEmbedder,
+    );
+
+    expect(result.failed).toBe(1);
+    // safeSend counter must fire for queryable skip rate
+    expect(mockSafeSend).toHaveBeenCalledTimes(1);
+    expect(mockSafeSend).toHaveBeenCalledWith(
+      expect.any(Function),
+      'memory_facts.embed_on_write.skipped',
+      expect.objectContaining({
+        profileId: PROFILE_ID_OBS,
+        reason: 'invalid_input',
+      }),
+    );
+    // captureException must NOT fire — invalid_input is an expected/documented class
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] no_voyage_key failure emits safeSend counter, NOT captureException', async () => {
+    const mockDb = makeDbWithRows([
+      { id: 'fact-2', text: 'some text', category: 'fact' },
+    ]);
+    const mockEmbedder = jest.fn().mockResolvedValue({
+      ok: false,
+      class: 'no_voyage_key',
+      reason: 'no_voyage_key',
+      message: 'No Voyage API key configured',
+    });
+
+    await embedNewFactsForProfile(mockDb, PROFILE_ID_OBS, mockEmbedder);
+
+    expect(mockSafeSend).toHaveBeenCalledWith(
+      expect.any(Function),
+      'memory_facts.embed_on_write.skipped',
+      expect.objectContaining({ reason: 'no_voyage_key' }),
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] transient failure captureExceptions with surface tag, does NOT call safeSend', async () => {
+    const mockDb = makeDbWithRows([
+      { id: 'fact-3', text: 'some text', category: 'fact' },
+    ]);
+    const mockEmbedder = jest.fn().mockResolvedValue({
+      ok: false,
+      class: 'transient',
+      reason: 'transient',
+      message: 'Voyage 503: service unavailable',
+    });
+
+    await embedNewFactsForProfile(mockDb, PROFILE_ID_OBS, mockEmbedder);
+
+    // captureException must fire for unexpected failure classes
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'session_completed.embed_new_facts',
+          profileId: PROFILE_ID_OBS,
+          failureClass: 'transient',
+        }),
+      }),
+    );
+    // safeSend must NOT fire for unexpected failure classes
+    expect(mockSafeSend).not.toHaveBeenCalled();
   });
 });

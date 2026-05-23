@@ -45,6 +45,8 @@ export interface WebhookSubscriptionUpdate {
   currentPeriodEnd?: string;
   cancelledAt?: string | null;
   lastStripeEventTimestamp: string;
+  /** [CR-2026-05-19-M11] Stripe event-ID for exact-duplicate dedup inside transaction. */
+  stripeEventId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +54,7 @@ export interface WebhookSubscriptionUpdate {
 // ---------------------------------------------------------------------------
 
 export function mapSubscriptionRow(
-  row: typeof subscriptions.$inferSelect
+  row: typeof subscriptions.$inferSelect,
 ): SubscriptionRow {
   return {
     id: row.id,
@@ -73,7 +75,7 @@ export function mapSubscriptionRow(
 }
 
 export function mapQuotaPoolRow(
-  row: typeof quotaPools.$inferSelect
+  row: typeof quotaPools.$inferSelect,
 ): QuotaPoolRow {
   return {
     id: row.id,

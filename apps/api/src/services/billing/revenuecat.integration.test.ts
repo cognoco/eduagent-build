@@ -357,6 +357,57 @@ describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => 
     expect(poolAfter!.monthlyLimit).toBe(limitBefore);
   });
 
+  // [BREAK CR-2026-05-19-M11] Two concurrent deliveries of the same event ID
+  // must result in exactly ONE write. Pre-fix: both calls could race past the
+  // isRevenuecatEventProcessed() read (both saw "not processed") and both
+  // attempt the UPDATE — divergent billing state if they differ on setValues.
+  // Post-fix: the idempotency check + UPDATE are inside a single db.transaction(),
+  // and the partial unique index on (accountId, lastRevenuecatEventId) provides
+  // the storage-layer guarantee. The second writer's UPDATE is rejected.
+  it('[BREAK CR-2026-05-19-M11] concurrent same-event deliveries write only once', async () => {
+    const account = await seedAccount(1);
+    await seedSubscription(account.id, { tier: 'plus', status: 'active' });
+    const eventId = 'evt-concurrent-dedup-001';
+
+    // Fire two identical event deliveries concurrently
+    const [r1, r2] = await Promise.all([
+      updateSubscriptionFromRevenuecatWebhook(
+        createIntegrationDb(),
+        account.id,
+        {
+          eventId,
+          tier: 'family',
+          eventTimestampMs: 1_710_000_000_000,
+        },
+      ),
+      updateSubscriptionFromRevenuecatWebhook(
+        createIntegrationDb(),
+        account.id,
+        {
+          eventId,
+          tier: 'family',
+          eventTimestampMs: 1_710_000_000_000,
+        },
+      ),
+    ]);
+
+    // Both must succeed (return non-null) — the second is an idempotent return
+    expect(r1).not.toBeNull();
+    expect(r2).not.toBeNull();
+
+    // Exactly one write happened — the event stamp matches the eventId
+    const row = await loadSubscription(account.id);
+    expect(row!.lastRevenuecatEventId).toBe(eventId);
+    expect(row!.tier).toBe('family');
+
+    // Only one subscription row exists for this account
+    const db = createIntegrationDb();
+    const rows = await db.query.subscriptions.findMany({
+      where: eq(subscriptions.accountId, account.id),
+    });
+    expect(rows).toHaveLength(1);
+  });
+
   it('sets cancelledAt when cancelledAt is provided', async () => {
     const account = await seedAccount(1);
     await seedSubscription(account.id, { status: 'active' });

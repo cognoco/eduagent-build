@@ -48,10 +48,31 @@ import {
   type CachedSubscriptionStatus,
 } from '../services/kv';
 import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
 import { safeSend } from '../services/safe-non-core';
 import { inngest } from '../inngest/client';
 
 const logger = createLogger();
+
+/**
+ * [CR-2026-05-19-M1] Escalate a KV failure to Sentry so ops can filter and
+ * alert on billing KV outages. `logger.warn` alone cannot answer "how many
+ * times did this fire in the last 24 h" in Sentry queries.
+ *
+ * Not exported — shared only by the three safeXxxKV helpers in this file.
+ */
+function captureKvFailure(
+  err: unknown,
+  ctx: { op: 'read' | 'write' | 'delete'; accountId: string },
+): void {
+  captureException(err, {
+    extra: {
+      surface: 'billing.kv',
+      op: ctx.op,
+      accountId: ctx.accountId,
+    },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -346,6 +367,7 @@ async function safeWriteKV(
       accountId,
       error: error instanceof Error ? error.message : String(error),
     });
+    captureKvFailure(error, { op: 'write', accountId });
   }
 }
 
@@ -370,6 +392,7 @@ async function safeDeleteKV(kv: KVNamespace, accountId: string): Promise<void> {
         error: error instanceof Error ? error.message : String(error),
       },
     );
+    captureKvFailure(error, { op: 'delete', accountId });
   }
 }
 

@@ -11,6 +11,8 @@ export interface ErrorContext {
   requestPath?: string;
   /** Arbitrary metadata attached as Sentry extras (e.g. sessionId, subjectId). */
   extra?: Record<string, unknown>;
+  /** Sentry tags for faceted search (e.g. { surface: 'billing.kv' }). */
+  tags?: Record<string, string | number | boolean>;
 }
 
 /**
@@ -33,6 +35,11 @@ export function captureException(err: unknown, context?: ErrorContext): void {
     if (context?.extra) {
       for (const [key, value] of Object.entries(context.extra)) {
         scope.setExtra(key, value);
+      }
+    }
+    if (context?.tags) {
+      for (const [key, value] of Object.entries(context.tags)) {
+        scope.setTag(key, value);
       }
     }
     Sentry.captureException(err);
@@ -60,6 +67,11 @@ export function captureMessage(
     if (context?.extra) {
       for (const [key, value] of Object.entries(context.extra)) {
         scope.setExtra(key, value);
+      }
+    }
+    if (context?.tags) {
+      for (const [key, value] of Object.entries(context.tags)) {
+        scope.setTag(key, value);
       }
     }
     Sentry.captureMessage(message, context?.level ?? 'info');

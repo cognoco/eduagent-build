@@ -30,6 +30,7 @@ import {
   processTeachBackCompletion,
 } from '../../services/verification-completion';
 import * as sentry from '../../services/sentry';
+import { safeSend } from '../../services/safe-non-core';
 import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
 import {
@@ -123,6 +124,40 @@ export async function embedNewFactsForProfile(
         category: row.category,
         reason: result.reason,
       });
+      // [CR-2026-05-19-M1] Observability: expected/documented failure classes
+      // (`invalid_input` = Voyage 4xx poison-pill; `no_voyage_key` = missing
+      // config) should NOT go to Sentry (they are not bugs), but we still need
+      // a queryable counter so ops can measure the skip rate without digging
+      // through raw logs. All other failure classes are unexpected and DO get
+      // Sentry escalation so they page on sustained transient/rate-limit spikes.
+      if (
+        result.class === 'invalid_input' ||
+        result.class === 'no_voyage_key'
+      ) {
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/embed.skipped',
+              data: {
+                profileId,
+                reason: result.reason,
+                category: row.category,
+              },
+            }),
+          'memory_facts.embed_on_write.skipped',
+          { profileId, reason: result.reason },
+        );
+      } else {
+        sentry.captureException(new Error(result.message), {
+          extra: {
+            surface: 'session_completed.embed_new_facts',
+            profileId,
+            category: row.category,
+            failureClass: result.class,
+            reason: result.reason,
+          },
+        });
+      }
       continue;
     }
 

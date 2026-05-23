@@ -103,6 +103,7 @@ async function handleSubscriptionEvent(
   kv: KVNamespace | undefined,
   stripeSubscription: Stripe.Subscription,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const status = mapStripeStatus(stripeSubscription.status);
   if (!status) {
@@ -141,6 +142,8 @@ async function handleSubscriptionEvent(
   const updates: WebhookSubscriptionUpdate = {
     status,
     lastStripeEventTimestamp: eventTimestamp,
+    // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+    stripeEventId,
   };
 
   // Extract tier from subscription metadata (stamped during checkout)
@@ -213,12 +216,15 @@ async function handleSubscriptionDeleted(
   kv: KVNamespace | undefined,
   stripeSubscription: Stripe.Subscription,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const updates: WebhookSubscriptionUpdate = {
     status: 'expired',
     tier: 'free',
     cancelledAt: new Date().toISOString(),
     lastStripeEventTimestamp: eventTimestamp,
+    // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+    stripeEventId,
   };
 
   const updated = await updateSubscriptionFromWebhook(
@@ -318,6 +324,7 @@ async function handlePaymentFailed(
   kv: KVNamespace | undefined,
   invoice: Stripe.Invoice,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
@@ -357,6 +364,8 @@ async function handlePaymentFailed(
     {
       status: 'past_due',
       lastStripeEventTimestamp: eventTimestamp,
+      // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+      stripeEventId,
     },
   );
 
@@ -394,6 +403,7 @@ async function handlePaymentSucceeded(
   kv: KVNamespace | undefined,
   invoice: Stripe.Invoice,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
@@ -432,6 +442,8 @@ async function handlePaymentSucceeded(
     {
       status: 'active',
       lastStripeEventTimestamp: eventTimestamp,
+      // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+      stripeEventId,
     },
   );
 
@@ -613,6 +625,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Subscription,
         eventTimestamp,
+        event.id,
       );
       break;
 
@@ -622,6 +635,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Subscription,
         eventTimestamp,
+        event.id,
       );
       break;
 
@@ -631,6 +645,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Invoice,
         eventTimestamp,
+        event.id,
       );
       break;
 
@@ -640,6 +655,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Invoice,
         eventTimestamp,
+        event.id,
       );
       break;
   }
