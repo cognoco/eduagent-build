@@ -43,6 +43,7 @@ const EXEMPT_SCREENS: string[] = [
   '(app)/home.tsx',
   '(app)/own-learning.tsx', // Visible bottom tab (parent's "My Learning" tab)
   '(app)/library.tsx',
+  '(app)/recaps.tsx', // Visible bottom tab (Family V1 recaps tab)
   '(app)/more/index.tsx',
   '(app)/more/notifications.tsx', // Native Stack header provides back
   '(app)/more/account.tsx', // Native Stack header provides back
