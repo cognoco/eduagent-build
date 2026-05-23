@@ -1,6 +1,6 @@
  # Parallel Code Review
 
-  Five reviewers in parallel, then fix every finding locally. Built on the same dispatch pattern as
+  Five reviewers review in parallel, then they fix every finding locally. Built on the same dispatch pattern as
   `superpowers:requesting-code-review` but fan-out instead of single-shot, with a coordinator-owned fix loop afterward.
 
   **Core principle:** five lenses catch what one misses; the coordinator owns the fixes; nothing leaves the working tree.
@@ -62,7 +62,7 @@
 
   Step 3 — Synthesize findings (coordinator)
 
-  When all 5 return:
+  Process as the agents return, do not wait for all to be finished. 
   1. Deduplicate — multiple reviewers often catch the same Critical
   2. Resolve conflicts — if two reviewers disagree, read the code and decide; cite file:line in the decision
   3. Do checks of the reported findings, have deep related code understanding. 
