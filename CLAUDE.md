@@ -26,12 +26,14 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 
 > **Hard constraint for the V0 → V1 migration.** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) is supported product behavior and **must not regress** across any nav-contract PR. The V0 helpers (`resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` in `apps/mobile/src/app/(app)/_layout.tsx:120-180`) and the V0-off short-circuits in `app-context.tsx:37, 44, 61` stay alive when V1 ships. `resolveNavigationContract` wiring is gated behind a separate `MODE_NAV_V1_ENABLED` flag and never replaces the V0-off fallback. See the "Hard Constraint" section of the navigation-contract spec for the full flag matrix and test requirement.
 
-**Tab shape** controls which tabs appear — only two shapes exist:
+**Tab shape** controls which tabs appear. Two shapes (guardian / learner), but the guardian shape changes between V0 and V1:
 
-| Tab shape | Who | Tabs | Home |
-|---|---|---|---|
-| **guardian** | Owner with linked children | all 5 (home, own-learning, library, progress, more) | `ParentHomeScreen` (mentoring hub) |
-| **learner** | Everyone else (solo owner OR child on parent's account) | 4 (home, library, progress, more — NO own-learning) | `LearnerScreen` |
+| Tab shape | Who | Tabs (V0 — `MODE_NAV_V1_ENABLED=false`) | Tabs (V1 — `MODE_NAV_V1_ENABLED=true`) | Home |
+|---|---|---|---|---|
+| **guardian** | Owner with linked children, mode=family | 5: home, own-learning, library, progress, more | 4: home, recaps, progress, more | `ParentHomeScreen` (mentoring hub) |
+| **learner** | Everyone else (solo owner OR child on parent's account) | 4: home, library, progress, more | 4: home, library, progress, more | `LearnerScreen` |
+
+The V1 guardian redesign replaces `own-learning` + `library` with a single `recaps` tab — this is the source of truth. The sets live in `apps/mobile/src/lib/navigation-contract.ts`: `STUDY_TABS` (learner), `FAMILY_TABS` (V1 guardian), `LEGACY_GUARDIAN_TABS` (V0 guardian). The V0 5-tab shape is still the production default and must not regress — see the hard-constraint note above.
 
 Note: `home.tsx` always mounts `<LearnerScreen>`. The decision to render `ParentHomeScreen` vs the learner home happens **inside** `LearnerScreen.tsx` (around the `showParentHome && !isParentProxy && (mode === 'family' || hasLinkedChildren || isFamilyPlanOwner)` branch). `home.tsx` is not a branching point.
 
