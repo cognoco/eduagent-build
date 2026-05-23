@@ -744,7 +744,19 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
     completedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    results: null,
+    // [WI-89] completeQuizRound scores from the persisted /check attempts in
+    // `round.results`, not from the `results` param. Seed the recorded final
+    // attempt so validatedResults is non-empty and the mastery upsert path
+    // (the subject of this escalation test) is actually exercised.
+    results: [
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 2000,
+        finalAttempt: true,
+      },
+    ],
     metadata: null,
   };
 
