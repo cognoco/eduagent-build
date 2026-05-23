@@ -287,6 +287,62 @@ describe('onboarding routes', () => {
       expect(res.status).toBe(400);
       expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
     });
+
+    // [CR-2026-05-21-011] Break test: a non-owner (child) profile must NOT be
+    // able to PATCH conversationLanguage on its own profile. The tutor language
+    // is an account-level setting owned by the parent.
+    it('[CR-2026-05-21-011] returns 403 when non-owner profile tries to PATCH conversationLanguage', async () => {
+      const { getProfile } = jest.requireMock('../services/profile');
+      // Caller is a child profile (isOwner: false)
+      getProfile.mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2010,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+
+      const res = await app.request(
+        '/v1/onboarding/language',
+        {
+          method: 'PATCH',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ conversationLanguage: 'nb' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+    });
+
+    // [CR-2026-05-21-011] Positive companion: an owner profile can still PATCH
+    // conversationLanguage successfully.
+    it('[CR-2026-05-21-011] returns 200 when owner profile PATCHes conversationLanguage', async () => {
+      mockUpdateConversationLanguage.mockResolvedValueOnce(undefined);
+      // Default mock already returns isOwner: true — no override needed.
+
+      const res = await app.request(
+        '/v1/onboarding/language',
+        {
+          method: 'PATCH',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ conversationLanguage: 'de' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(mockUpdateConversationLanguage).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        'test-account-id',
+        'de',
+      );
+    });
   });
 
   // ---- PATCH /v1/onboarding/:profileId/language (parent-on-behalf) ---------
