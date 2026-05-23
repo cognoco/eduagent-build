@@ -12,21 +12,21 @@ describe('shouldReportQueryErrorToSentry', () => {
     expect(shouldReportQueryErrorToSentry(new RateLimitedError())).toBe(false);
   });
 
-  // CR-144: 5xx UpstreamError suppression (server already captures via CR-091)
-  it('suppresses UpstreamError with status 500', () => {
+  // CR-144: keep generic 5xx client reports for screen/device context.
+  it('keeps reporting UpstreamError with status 500', () => {
     expect(
       shouldReportQueryErrorToSentry(
         new UpstreamError('Internal error', 'INTERNAL_ERROR', 500),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('suppresses UpstreamError with status 502', () => {
+  it('keeps reporting UpstreamError with status 502', () => {
     expect(
       shouldReportQueryErrorToSentry(
         new UpstreamError('Bad gateway', 'UPSTREAM_ERROR', 502),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('suppresses typed transient database 503 query errors', () => {
@@ -39,12 +39,23 @@ describe('shouldReportQueryErrorToSentry', () => {
     expect(shouldReportQueryErrorToSentry(error)).toBe(false);
   });
 
-  it('suppresses upstream-shaped 5xx errors when class identity is lost', () => {
+  it('keeps reporting upstream-shaped 5xx errors when class identity is lost', () => {
     const error = {
       name: 'UpstreamError',
       message: 'Bad gateway',
       code: 'UPSTREAM_ERROR',
       status: 502,
+    };
+
+    expect(shouldReportQueryErrorToSentry(error)).toBe(true);
+  });
+
+  it('suppresses upstream-shaped transient database 503 errors when class identity is lost', () => {
+    const error = {
+      name: 'UpstreamError',
+      message: 'Database temporarily unavailable — please retry',
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
     };
 
     expect(shouldReportQueryErrorToSentry(error)).toBe(false);

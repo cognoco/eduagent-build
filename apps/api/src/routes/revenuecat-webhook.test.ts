@@ -125,7 +125,7 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 
 import { Hono } from 'hono';
 import {
-  MAX_REVENUECAT_EVENT_AGE_MS,
+  LATE_REVENUECAT_EVENT_OBSERVATION_MS,
   revenuecatWebhookRoute,
 } from './revenuecat-webhook';
 import type { AppVariables } from '../types/hono';
@@ -553,16 +553,16 @@ describe('idempotency', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Stale event guard [CR-049]
+// Late event observation [CR-049]
 // ---------------------------------------------------------------------------
 
-describe('stale event guard [CR-049]', () => {
-  // [CR-049 break test] An event with event_timestamp_ms more than 48h in the
-  // past must be silently acknowledged (200) without mutating state. Returning
-  // 4xx would cause RevenueCat to retry for up to 3 days. Pre-fix, the route
-  // had no age guard and would process arbitrarily old replayed events.
-  it('[CR-049] acks stale event (>48h) with 200 and does not mutate state', async () => {
-    const staleTimestampMs = Date.now() - MAX_REVENUECAT_EVENT_AGE_MS - 60_000;
+describe('late event observation [CR-049]', () => {
+  // [CR-049 regression test] A late-but-not-superseded event must still be
+  // processed. RevenueCat may deliver delayed subscription events; returning
+  // 200 while dropping them would permanently lose entitlement repairs.
+  it('[CR-049] processes late events after idempotency allows them', async () => {
+    const staleTimestampMs =
+      Date.now() - LATE_REVENUECAT_EVENT_OBSERVATION_MS - 60_000;
     const payload = makeWebhookPayload('RENEWAL', {
       event_timestamp_ms: staleTimestampMs,
     });
@@ -571,14 +571,14 @@ describe('stale event guard [CR-049]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.received).toBe(true);
-    expect(body.stale).toBe(true);
-    // No state mutation — the event was dropped silently.
-    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
-    expect(ensureFreeSubscription).not.toHaveBeenCalled();
+    expect(body.stale).toBeUndefined();
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    expect(ensureFreeSubscription).toHaveBeenCalled();
   });
 
   it('[CR-049] processes recent events normally (within 48h window)', async () => {
-    const recentTimestampMs = Date.now() - MAX_REVENUECAT_EVENT_AGE_MS + 60_000;
+    const recentTimestampMs =
+      Date.now() - LATE_REVENUECAT_EVENT_OBSERVATION_MS + 60_000;
     const payload = makeWebhookPayload('RENEWAL', {
       event_timestamp_ms: recentTimestampMs,
     });

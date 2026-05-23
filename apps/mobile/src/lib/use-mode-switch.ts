@@ -43,7 +43,12 @@ export function useModeSwitch(): {
 
   const switchMode = useCallback(
     (nextMode: AppMode): void => {
-      if (!FEATURE_FLAGS.MODE_NAV_V0_ENABLED) return;
+      if (
+        !FEATURE_FLAGS.MODE_NAV_V0_ENABLED &&
+        !FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+      ) {
+        return;
+      }
       const currentMode = modeRef.current;
       if (isSwitchingRef.current || currentMode === nextMode) return;
       isSwitchingRef.current = true;

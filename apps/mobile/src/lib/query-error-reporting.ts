@@ -1,12 +1,17 @@
-import { NetworkError, RateLimitedError, UpstreamError } from './api-errors';
+import { NetworkError, RateLimitedError } from './api-errors';
 
-function isUpstream5xxLike(error: unknown): boolean {
+function isTransientServiceUnavailableLike(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
-  const candidate = error as { name?: unknown; status?: unknown };
+  const candidate = error as {
+    code?: unknown;
+    name?: unknown;
+    status?: unknown;
+  };
   return (
     candidate.name === 'UpstreamError' &&
     typeof candidate.status === 'number' &&
-    candidate.status >= 500
+    candidate.status === 503 &&
+    candidate.code === 'SERVICE_UNAVAILABLE'
   );
 }
 
@@ -18,13 +23,10 @@ export function shouldReportQueryErrorToSentry(error: unknown): boolean {
   // 429s are expected rate-limit responses; the server already tracks them.
   if (error instanceof RateLimitedError) return false;
 
-  // 5xx upstream errors are already captured server-side (CR-091). Suppress
-  // duplicate client-side capture to avoid double-counting.
-  if (error instanceof UpstreamError && error.status >= 500) return false;
-
-  // Shape-match fallback for cases where class identity is lost across module
-  // boundaries (e.g. serialisation round-trips).
-  if (isUpstream5xxLike(error)) return false;
+  // Suppress the known transient 503 class that the server captures and users
+  // recover from by retrying. Keep reporting other 5xx responses from the
+  // client so Sentry preserves screen/device context.
+  if (isTransientServiceUnavailableLike(error)) return false;
 
   return true;
 }

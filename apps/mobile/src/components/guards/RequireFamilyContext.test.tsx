@@ -238,11 +238,21 @@ describe('RequireFamilyContext [PARENT-03]', () => {
   // Kill switch — feature flag off bypasses the guard
   // -------------------------------------------------------------------------
 
-  it('renders children without any guard when MODE_NAV_V0_ENABLED=false', () => {
+  it('renders children without any guard when both mode navigation flags are off', () => {
     renderGuard(soloAdult, [soloAdult], /* featureFlagEnabled */ false);
 
     expect(screen.getByTestId('child-sentinel')).toBeTruthy();
     expect(screen.queryByTestId('family-route-blocked')).toBeNull();
+  });
+
+  it('keeps the guard active when V1 is enabled and V0 is disabled', () => {
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      true;
+
+    renderGuard(soloAdult, [soloAdult], /* featureFlagEnabled */ false);
+
+    expect(screen.queryByTestId('child-sentinel')).toBeNull();
+    expect(screen.getByTestId('family-route-blocked')).toBeTruthy();
   });
 
   // -------------------------------------------------------------------------
