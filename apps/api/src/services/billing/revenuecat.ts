@@ -18,10 +18,7 @@ import { createLogger } from '../logger';
 import { mapSubscriptionRow, type SubscriptionRow } from './types';
 
 const logger = createLogger();
-import {
-  updateQuotaPoolLimit,
-  getSubscriptionByAccountId,
-} from './subscription-core';
+import { getSubscriptionByAccountId } from './subscription-core';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -346,21 +343,32 @@ export async function activateSubscriptionFromRevenuecat(
   // BD-02: explicitly clear trialEndsAt on non-trial re-activation
   setValues.trialEndsAt = isTrial && trialEndsAt ? new Date(trialEndsAt) : null;
 
-  const [updated] = await db
-    .update(subscriptions)
-    .set(setValues)
-    .where(eq(subscriptions.id, existing.id))
-    .returning();
+  // [CR-2026-05-19-M3 / atomicity] Both the subscription update and the quota
+  // pool update must be atomic — a process death between the two would leave
+  // subscriptions.tier at the new value while the quota pool still carries the
+  // old limit (billing leak). Wrap in a transaction so both commit or neither does.
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(subscriptions)
+      .set(setValues)
+      .where(eq(subscriptions.id, existing.id))
+      .returning();
 
-  // Update quota pool limit to match the new tier
-  await updateQuotaPoolLimit(
-    db,
-    existing.id,
-    tierConfig.monthlyQuota,
-    tierConfig.dailyLimit,
-  );
+    if (!row)
+      throw new Error('Subscription update (revenuecat) did not return a row');
 
-  if (!updated)
-    throw new Error('Subscription update (revenuecat) did not return a row');
+    // Update quota pool limit to match the new tier (inside same tx)
+    await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit: tierConfig.monthlyQuota,
+        dailyLimit: tierConfig.dailyLimit,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.subscriptionId, existing.id));
+
+    return row;
+  });
+
   return mapSubscriptionRow(updated);
 }
