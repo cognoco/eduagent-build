@@ -35,10 +35,9 @@ function legacyCompletionKey(
   localDate: string,
   mode: string,
 ): string {
-  const hex = createHash('sha256')
+  const hex = createHash('md5')
     .update(`dictation-result:${profileId}:${localDate}:${mode}`)
     .digest('hex')
-    .slice(0, 32)
     .split('');
   hex[12] = '5';
   hex[16] = ((parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
