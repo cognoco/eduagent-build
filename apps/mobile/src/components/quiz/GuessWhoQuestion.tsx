@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { ClientQuizQuestion } from '@eduagent/schemas';
+import type { ClientQuizQuestion, QuestionCheckInput } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 
 type ClientGuessWhoQuestion = Extract<
@@ -21,6 +21,11 @@ export interface GuessWhoResolvedResult {
   cluesUsed: number;
   answerMode: 'free_text' | 'multiple_choice';
 }
+
+export type GuessWhoCheckOptions = Pick<
+  QuestionCheckInput,
+  'answerMode' | 'finalAttempt' | 'cluesUsed'
+>;
 
 function shuffle<T>(items: T[]): T[] {
   const shuffled = [...items];
@@ -52,7 +57,10 @@ function getHintMessage(
 
 interface GuessWhoQuestionProps {
   question: ClientGuessWhoQuestion;
-  onCheckAnswer: (answerGiven: string) => Promise<boolean>;
+  onCheckAnswer: (
+    answerGiven: string,
+    options: GuessWhoCheckOptions,
+  ) => Promise<boolean>;
   onResolved: (result: GuessWhoResolvedResult) => void;
 }
 
@@ -99,7 +107,11 @@ export function GuessWhoQuestion({
     setIsChecking(true);
 
     try {
-      const correct = await onCheckAnswer(normalizedGuess);
+      const correct = await onCheckAnswer(normalizedGuess, {
+        answerMode: 'free_text',
+        finalAttempt: isFinalClue,
+        cluesUsed: visibleClueCount,
+      });
 
       if (correct) {
         resolveFreeText(true, normalizedGuess);
@@ -135,10 +147,23 @@ export function GuessWhoQuestion({
     }
   }
 
-  function handleRevealNextClue() {
+  async function handleRevealNextClue() {
     Keyboard.dismiss();
 
     if (isFinalClue) {
+      if (isChecking) return;
+      setIsChecking(true);
+      try {
+        await onCheckAnswer('[skipped]', {
+          answerMode: 'free_text',
+          finalAttempt: true,
+          cluesUsed: visibleClueCount,
+        });
+      } catch {
+        // The play screen will surface check failures; a skip remains wrong.
+      } finally {
+        setIsChecking(false);
+      }
       resolveFreeText(false, '[skipped]');
       return;
     }
@@ -153,7 +178,11 @@ export function GuessWhoQuestion({
     setIsChecking(true);
 
     try {
-      const correct = await onCheckAnswer(option);
+      const correct = await onCheckAnswer(option, {
+        answerMode: 'multiple_choice',
+        finalAttempt: true,
+        cluesUsed: visibleClueCount,
+      });
       onResolved({
         correct,
         answerGiven: option,

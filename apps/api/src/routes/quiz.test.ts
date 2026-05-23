@@ -221,6 +221,34 @@ const ACTIVE_ROUND = {
   ],
   total: 2,
   status: 'active' as const,
+  createdAt: new Date('2026-05-22T10:00:00.000Z'),
+};
+
+const ACTIVE_GUESS_WHO_ROUND = {
+  id: 'a0000000-0000-4000-a000-000000000001',
+  profileId: 'test-profile-id',
+  activityType: 'guess_who',
+  theme: 'Inventors',
+  questions: [
+    {
+      type: 'guess_who',
+      canonicalName: 'Nikola Tesla',
+      correctAnswer: 'Nikola Tesla',
+      acceptedAliases: ['Tesla'],
+      clues: ['One', 'Two', 'Three', 'Four', 'Five'],
+      mcFallbackOptions: [
+        'Nikola Tesla',
+        'Ada Lovelace',
+        'Grace Hopper',
+        'Alan Turing',
+      ],
+      funFact: 'Fact',
+      isLibraryItem: false,
+    },
+  ],
+  total: 1,
+  status: 'active' as const,
+  createdAt: new Date('2026-05-22T10:00:00.000Z'),
 };
 
 // [F-032] Fixture for a completed round — same shape as ACTIVE_ROUND plus
@@ -856,10 +884,76 @@ describe('Quiz routes', () => {
   });
 
   describe('POST /v1/quiz/rounds/:id/complete', () => {
-    it('scores the round and persists results', async () => {
+    it('[BREAK/WI-163] check records wrong attempts before revealing correctAnswer', async () => {
       (mockDb as any).query.quizRounds.findFirst = jest
         .fn()
         .mockResolvedValue(ACTIVE_ROUND);
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_1}/check`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            questionIndex: 0,
+            answerGiven: 'Salzburg',
+            answerMode: 'multiple_choice',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ correct: false, correctAnswer: 'Vienna' });
+      expect((mockDb as any).update).toHaveBeenCalled();
+    });
+
+    it('[BREAK/WI-163] does not reveal correctAnswer for non-final Guess Who probes', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_GUESS_WHO_ROUND);
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_1}/check`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            questionIndex: 0,
+            answerGiven: 'Ada Lovelace',
+            answerMode: 'free_text',
+            finalAttempt: false,
+            cluesUsed: 1,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ correct: false });
+      expect((mockDb as any).update).toHaveBeenCalled();
+    });
+
+    it('scores the round and persists results', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...ACTIVE_ROUND,
+        results: [
+          {
+            questionIndex: 0,
+            correct: true,
+            answerGiven: 'Vienna',
+            timeMs: 3000,
+          },
+          {
+            questionIndex: 1,
+            correct: false,
+            answerGiven: 'Munich',
+            timeMs: 5000,
+          },
+        ],
+      });
 
       const res = await app.request(
         `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
@@ -907,6 +1001,52 @@ describe('Quiz routes', () => {
           }),
         }),
       );
+    });
+
+    it('[BREAK/WI-163] complete scores from recorded attempts, not forged request results', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...ACTIVE_ROUND,
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Salzburg',
+            timeMs: 3000,
+            answerMode: 'multiple_choice',
+          },
+        ],
+      });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_1}/complete`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            results: [
+              {
+                questionIndex: 0,
+                correct: true,
+                answerGiven: 'Vienna',
+                timeMs: 1,
+                answerMode: 'multiple_choice',
+              },
+            ],
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.score).toBe(0);
+      expect(body.xpEarned).toBe(0);
+      expect(body.questionResults[0]).toMatchObject({
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'Salzburg',
+        correctAnswer: 'Vienna',
+      });
     });
 
     it('returns 400 for empty results', async () => {
