@@ -5,7 +5,7 @@
 // markSubscriptionCancelled, updateQuotaPoolLimit, activateSubscriptionFromCheckout
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   subscriptions,
@@ -234,14 +234,44 @@ export async function updateSubscriptionFromWebhook(
         : null;
     }
 
+    // Concurrent-delivery defense: under READ COMMITTED two transactions can
+    // both see lastStripeEventId !== updates.stripeEventId at SELECT time and
+    // both proceed to UPDATE the same row (last-writer-wins). Adding the
+    // event-ID predicate makes the second UPDATE re-evaluate against the
+    // post-commit row and return 0 rows, so we can detect the duplicate and
+    // return the existing snapshot instead of double-writing.
+    const whereParts = [eq(subscriptions.id, existing.id)];
+    if (updates.stripeEventId) {
+      whereParts.push(
+        or(
+          isNull(subscriptions.lastStripeEventId),
+          ne(subscriptions.lastStripeEventId, updates.stripeEventId),
+        )!,
+      );
+    }
+
     const [updated] = await tx
       .update(subscriptions)
       .set(setValues)
-      .where(eq(subscriptions.id, existing.id))
+      .where(and(...whereParts))
       .returning();
 
-    if (!updated)
+    if (!updated) {
+      // 0 rows returned most likely means a concurrent delivery already
+      // stamped this stripeEventId. Re-read and confirm before short-circuiting.
+      const recheck = await findSubscriptionByStripeId__unscoped(
+        tx as unknown as Database,
+        stripeSubscriptionId,
+      );
+      if (
+        recheck &&
+        updates.stripeEventId &&
+        recheck.lastStripeEventId === updates.stripeEventId
+      ) {
+        return mapSubscriptionRow(recheck);
+      }
       throw new Error('Subscription webhook update did not return a row');
+    }
     return mapSubscriptionRow(updated);
   });
 }

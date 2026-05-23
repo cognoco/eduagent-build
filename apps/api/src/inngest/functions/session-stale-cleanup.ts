@@ -79,12 +79,21 @@ export const sessionStaleCleanup = inngest.createFunction(
       },
     );
 
+    // [CR-2026-05-21-029] Cutoff/timestamp are memoized inside step.run so the
+    // function's return value is stable across Inngest replays. Computing them
+    // outside (as `new Date(Date.now() ...)`) would drift on every re-execution
+    // of the function, defeating the same fix that this file applies above.
+    const returnMeta = await step.run('return-metadata', async () => ({
+      cutoff: new Date(Date.now() - STALE_MINUTES * 60 * 1000).toISOString(),
+      timestamp: new Date().toISOString(),
+    }));
+
     return {
       status: 'completed',
       closedCount: closedSessions.length,
       abandonedQuizRounds: abandonedRounds,
-      cutoff: new Date(Date.now() - STALE_MINUTES * 60 * 1000).toISOString(),
-      timestamp: new Date().toISOString(),
+      cutoff: returnMeta.cutoff,
+      timestamp: returnMeta.timestamp,
     };
   },
 );

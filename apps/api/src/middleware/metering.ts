@@ -350,6 +350,7 @@ async function safeReadKV(
       accountId,
       error: error instanceof Error ? error.message : String(error),
     });
+    captureKvFailure(error, { op: 'read', accountId });
     return null; // KV unavailable — fall through to DB
   }
 }

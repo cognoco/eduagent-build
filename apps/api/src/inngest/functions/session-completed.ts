@@ -130,6 +130,15 @@ export async function embedNewFactsForProfile(
       // a queryable counter so ops can measure the skip rate without digging
       // through raw logs. All other failure classes are unexpected and DO get
       // Sentry escalation so they page on sustained transient/rate-limit spikes.
+      //
+      // KNOWN-LIMITATION: this helper is invoked from inside a step.run, so on
+      // step retry the same rows (still embedding=NULL) re-scan and re-emit
+      // `app/embed.skipped`. The metric is inflated by the retry multiplier
+      // (default 3 → up to 4× per skipped row). Acceptable because the event
+      // is observability-only; a future refactor should return `skipped[]`
+      // from this function and let the caller emit via step.sendEvent (which
+      // Inngest memoizes across retries). Sentry's own fingerprint dedup
+      // handles the `captureException` path below.
       if (
         result.class === 'invalid_input' ||
         result.class === 'no_voyage_key'
