@@ -14,6 +14,21 @@ if [ -z "$prompt" ]; then
   exit 0
 fi
 
+# Skip when the user is operating on existing code rather than editing it.
+# These verbs/nouns indicate commit/review/sync work, not new design — the
+# pre-flight enumeration would block the agent from completing the operation.
+if echo "$prompt" | grep -qiE '\b(commit|commits|committing|push|pushing|pushed|merge|merging|merged|rebase|rebasing|revert|reverting|cherry-?pick|stash|stashing|amend|amending|PR|PRs|pull request|pull requests|review|reviewing|/commit|/ship|/fix-ci)\b'; then
+  exit 0
+fi
+
+# Skip when the work is editing docs/logs/config rather than code.
+# Pre-flight enumeration doesn't apply to README updates, memory edits,
+# adding a log line, or tweaking a json config — the state-matrix concern
+# doesn't exist for these surfaces.
+if echo "$prompt" | grep -qiE '\.(md|mdx|log|txt|json|ya?ml)\b|\b(README|CHANGELOG|docs/|documentation|memory|MEMORY\.md|CLAUDE\.md|console\.log|logger\.|log line|log entry|logging line|telemetry line)\b'; then
+  exit 0
+fi
+
 # Narrow keyword list — tune if too noisy or too quiet.
 # Word-boundary anchors on V0/V1 to avoid matching e.g. "iOS 16".
 if echo "$prompt" | grep -qiE 'MODE_NAV_V[01]|feature[ _.-]?flag|profile[ _.-]?shape|mode[ _.-]switch|route[ _.-]guard|auth[ _.-]gate|nav[ _.-]contract|\bV0\b|\bV1\b'; then
