@@ -83,6 +83,7 @@ export interface NavigationGates {
   showCelebrationsChildEditor: boolean;
   showMentorMemoryChildConsent: boolean;
   showInlineStudyInvite: boolean;
+  showLearnThisToo: boolean;
   progressScope: 'self' | 'children';
 }
 
@@ -282,6 +283,11 @@ export function resolveNavigationContract(
     subscriptionReady &&
     context.activeProfile !== null;
   const childEditorGate = ownerRole && familyShape && !context.isParentProxy;
+  const learnThisTooGate =
+    ownerRole &&
+    familyShape &&
+    !context.isParentProxy &&
+    context.activeProfile?.hasFamilyLinks === true;
 
   const gates: NavigationGates = {
     sessionIsOwner: ownerRole && !context.isParentProxy,
@@ -296,6 +302,7 @@ export function resolveNavigationContract(
     showCelebrationsChildEditor: childEditorGate,
     showMentorMemoryChildConsent: childEditorGate,
     showInlineStudyInvite: ownerRole && familyCapable && !context.isParentProxy,
+    showLearnThisToo: learnThisTooGate,
     progressScope: familyShape ? 'children' : 'self',
   };
 

@@ -331,10 +331,15 @@ export function MessageBubble({
                 // The Markdown lib's StyleSheet.create() styles can be
                 // overridden by Android force-dark; NativeWind classes
                 // bypass that because they resolve via CSS variables.
+                // The inline `style.color` is the same safety net described
+                // on `buildMarkdownStyles` — without it these custom rules
+                // bypass the fallback and bubble text can render invisibly
+                // during NativeWind/theme desync windows.
                 inline: (node: { key: string }, children: React.ReactNode) => (
                   <Text
                     key={node.key}
                     className="text-text-primary text-body leading-relaxed"
+                    style={{ color: colors.textPrimary }}
                   >
                     {children}
                   </Text>
@@ -346,6 +351,7 @@ export function MessageBubble({
                   <Text
                     key={node.key}
                     className="text-text-primary text-body leading-relaxed"
+                    style={{ color: colors.textPrimary }}
                   >
                     {children}
                   </Text>
@@ -357,7 +363,10 @@ export function MessageBubble({
             {streaming && <BlinkingCursor />}
           </View>
         ) : (
-          <Text className="text-body leading-relaxed text-text-inverse">
+          <Text
+            className="text-body leading-relaxed text-text-inverse"
+            style={{ color: colors.textInverse }}
+          >
             {displayContent}
           </Text>
         )}

@@ -64,8 +64,8 @@ export interface SwitchProfileResult {
 
 export interface SwitchProfileOptions {
   /**
-   * [ACCOUNT-04] Set to true ONLY when the parent explicitly chooses "View
-   * account" for a child profile (the proxy-confirm-modal in profiles.tsx).
+   * [ACCOUNT-04] Set to true ONLY from retained internal/test proxy paths.
+   * Normal parent review enters parent-native child routes instead.
    *
    * A plain profile switch (e.g. child switching to their own slot) MUST NOT
    * pass proxyMode:true — that conflates "parent viewing as child" with
@@ -218,9 +218,9 @@ export function ProfileProvider({
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [isRestoringId, setIsRestoringId] = useState(true);
   const [profileWasRemoved, setProfileWasRemoved] = useState(false);
-  // [ACCOUNT-04] Explicit proxy flag — true only when the parent confirmed
-  // "View account" via the proxy-confirm-modal. Plain profile switches never
-  // set this. Initialised to false; restored from SecureStore on cold start.
+  // [ACCOUNT-04] Explicit proxy flag — true only when retained internal/test
+  // paths request it. Plain profile switches never set this. Initialised to
+  // false; restored from SecureStore on cold start.
   const [isExplicitProxyMode, setIsExplicitProxyMode] = useState(false);
 
   // On mount: restore saved profile ID from SecureStore
@@ -334,9 +334,10 @@ export function ProfileProvider({
       }
 
       // [ACCOUNT-04] Proxy mode is driven by explicit caller intent, NOT derived
-      // from profile shape. Only the proxy-confirm-modal in profiles.tsx passes
-      // proxyMode:true. All plain profile switches (child switching to their own
-      // slot, switchBack from ProxyBanner, etc.) default to false.
+      // from profile shape. User-facing parent review now uses parent-native
+      // child routes; retained internal/test callers can still pass
+      // proxyMode:true. All plain profile switches (child switching to their
+      // own slot, switchBack from ProxyBanner, etc.) default to false.
       const nextIsParentProxy = options?.proxyMode === true;
 
       // Persist the explicit proxy flag alongside the active profile ID so the

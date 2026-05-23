@@ -87,10 +87,12 @@ export default function RecapsScreen(): React.ReactElement {
                     recap.topicTitle ?? recap.subjectName ?? recap.displayTitle,
                 })}
                 onPress={() => {
-                  router.push({
-                    pathname: '/(app)/child/[profileId]',
-                    params: { profileId: recap.childProfileId },
-                  } as Href);
+                  // Single push: the child/[profileId]/_layout exports
+                  // unstable_settings.initialRouteName='index', so the
+                  // synthesized ancestor lands on index. Pushing the parent
+                  // first would create a 3-deep stack and require two Back
+                  // presses to return to Recaps (same anti-pattern fixed in
+                  // shelf/[subjectId]/book/[bookId].tsx for CR-2026-05-21-120).
                   router.push({
                     pathname: '/(app)/child/[profileId]/session/[sessionId]',
                     params: {

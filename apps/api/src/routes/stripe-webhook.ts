@@ -103,6 +103,7 @@ async function handleSubscriptionEvent(
   kv: KVNamespace | undefined,
   stripeSubscription: Stripe.Subscription,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const status = mapStripeStatus(stripeSubscription.status);
   if (!status) {
@@ -141,6 +142,8 @@ async function handleSubscriptionEvent(
   const updates: WebhookSubscriptionUpdate = {
     status,
     lastStripeEventTimestamp: eventTimestamp,
+    // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+    stripeEventId,
   };
 
   // Extract tier from subscription metadata (stamped during checkout)
@@ -171,31 +174,46 @@ async function handleSubscriptionEvent(
     ).toISOString();
   }
 
-  const updated = await updateSubscriptionFromWebhook(
-    db,
-    stripeSubscription.id,
-    updates,
-  );
+  // [CR-2026-05-19-M3] SITE 3: Wrap updateSubscriptionFromWebhook + updateQuotaPoolLimit
+  // in a single outer transaction so a process death between the two writes
+  // cannot leave subscription.status updated while quota pool limits are stale
+  // (tier/quota divergence). M11's inner transaction inside updateSubscriptionFromWebhook
+  // becomes a savepoint inside this outer transaction — Postgres handles nested
+  // transactions as savepoints correctly.
+  const updated = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    const result = await updateSubscriptionFromWebhook(
+      txDb,
+      stripeSubscription.id,
+      updates,
+    );
+
+    if (result) {
+      if (isExpired) {
+        const freeTier = getTierConfig('free');
+        await updateQuotaPoolLimit(
+          txDb,
+          result.id,
+          freeTier.monthlyQuota,
+          freeTier.dailyLimit,
+        );
+      } else if (tier) {
+        // If tier metadata present, sync quota pool limit to new tier
+        const tierConfig = getTierConfig(tier);
+        await updateQuotaPoolLimit(
+          txDb,
+          result.id,
+          tierConfig.monthlyQuota,
+          tierConfig.dailyLimit,
+        );
+      }
+    }
+
+    return result;
+  });
 
   if (updated) {
-    if (isExpired) {
-      const freeTier = getTierConfig('free');
-      await updateQuotaPoolLimit(
-        db,
-        updated.id,
-        freeTier.monthlyQuota,
-        freeTier.dailyLimit,
-      );
-    } else if (tier) {
-      // If tier metadata present, sync quota pool limit to new tier
-      const tierConfig = getTierConfig(tier);
-      await updateQuotaPoolLimit(
-        db,
-        updated.id,
-        tierConfig.monthlyQuota,
-        tierConfig.dailyLimit,
-      );
-    }
     await safeRefreshKvCache(
       kv,
       db,
@@ -213,28 +231,45 @@ async function handleSubscriptionDeleted(
   kv: KVNamespace | undefined,
   stripeSubscription: Stripe.Subscription,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const updates: WebhookSubscriptionUpdate = {
     status: 'expired',
     tier: 'free',
     cancelledAt: new Date().toISOString(),
     lastStripeEventTimestamp: eventTimestamp,
+    // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+    stripeEventId,
   };
 
-  const updated = await updateSubscriptionFromWebhook(
-    db,
-    stripeSubscription.id,
-    updates,
-  );
+  // [CR-2026-05-19-M3] SITE 3 (handleSubscriptionDeleted): Outer transaction
+  // ensures subscription.status='expired' and quota pool downgrade commit
+  // atomically. M11's inner dedup transaction in updateSubscriptionFromWebhook
+  // nests as a savepoint. KV cache refresh is intentionally outside the tx
+  // (KV is not part of the Postgres commit).
+  const updated = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    const result = await updateSubscriptionFromWebhook(
+      txDb,
+      stripeSubscription.id,
+      updates,
+    );
+
+    if (result) {
+      const freeTier = getTierConfig('free');
+      await updateQuotaPoolLimit(
+        txDb,
+        result.id,
+        freeTier.monthlyQuota,
+        freeTier.dailyLimit,
+      );
+    }
+
+    return result;
+  });
 
   if (updated) {
-    const freeTier = getTierConfig('free');
-    await updateQuotaPoolLimit(
-      db,
-      updated.id,
-      freeTier.monthlyQuota,
-      freeTier.dailyLimit,
-    );
     await safeRefreshKvCache(
       kv,
       db,
@@ -318,6 +353,7 @@ async function handlePaymentFailed(
   kv: KVNamespace | undefined,
   invoice: Stripe.Invoice,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
@@ -357,6 +393,8 @@ async function handlePaymentFailed(
     {
       status: 'past_due',
       lastStripeEventTimestamp: eventTimestamp,
+      // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+      stripeEventId,
     },
   );
 
@@ -394,6 +432,7 @@ async function handlePaymentSucceeded(
   kv: KVNamespace | undefined,
   invoice: Stripe.Invoice,
   eventTimestamp: string,
+  stripeEventId: string,
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
@@ -432,6 +471,8 @@ async function handlePaymentSucceeded(
     {
       status: 'active',
       lastStripeEventTimestamp: eventTimestamp,
+      // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
+      stripeEventId,
     },
   );
 
@@ -613,6 +654,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Subscription,
         eventTimestamp,
+        event.id,
       );
       break;
 
@@ -622,6 +664,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Subscription,
         eventTimestamp,
+        event.id,
       );
       break;
 
@@ -631,6 +674,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Invoice,
         eventTimestamp,
+        event.id,
       );
       break;
 
@@ -640,6 +684,7 @@ export const stripeWebhookRoute = new Hono<{
         kv,
         event.data.object as Stripe.Invoice,
         eventTimestamp,
+        event.id,
       );
       break;
   }

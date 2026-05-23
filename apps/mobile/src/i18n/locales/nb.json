@@ -1301,7 +1301,7 @@
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",
     "permissionPrompt": "Ta et bilde av leksene dine, så hjelper jeg deg med å løse dem trinn for trinn.",
-    "permissionDenied": "Kameratilgang ble nektet. Du kan aktivere den i enhetens innstillinger for å fotografere lekseoppgaver.",
+    "permissionDenied": "Kameratilgangen ble slått av. Telefonen lar oss ikke spørre på nytt — trykk «Åpne innstillinger» og slå på kameraet for denne appen.",
     "openSettings": "Åpne innstillinger",
     "openSettingsLabel": "Åpne enhetsinnstillinger",
     "allowCamera": "Tillat kamera",

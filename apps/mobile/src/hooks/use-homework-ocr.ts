@@ -17,6 +17,7 @@ import {
   trackHomeworkOcrGateShortcircuit,
   type HomeworkOcrGateSource,
 } from '../lib/analytics';
+import { Sentry } from '../lib/sentry';
 
 /**
  * Check whether the ML Kit native module is linked in this build.
@@ -121,8 +122,31 @@ function hasStrongHomeworkCue(text: string): boolean {
   );
 }
 
+// Detect ML Kit OCR garble that the homework-cue gate would otherwise wave
+// through. Handwritten math frequently comes back as something like
+// "S - 3+ z" — passes hasStrongHomeworkCue (contains a digit) and squeaks
+// past isLikelyHomework (only 2 letter-runs, so the avg-letter-run-length
+// guard at letterRuns.length >= 3 doesn't fire). The result: noisy local
+// text is accepted and the LLM is never consulted, even though the LLM
+// would read the original photo correctly. Heuristic: when the text has
+// letters but the average letter-run length is below 2 characters, those
+// "letters" are almost certainly noise rather than words — escalate to the
+// server LLM. Pure math/symbol input (no letter runs) is unaffected.
+function looksLikeOcrGarble(text: string): boolean {
+  const contentText = stripListMarkers(text);
+  const letterRuns = contentText.match(/\p{L}+/gu) ?? [];
+  if (letterRuns.length === 0) return false;
+  const avgLetterRunLength =
+    letterRuns.reduce((sum, run) => sum + run.length, 0) / letterRuns.length;
+  return avgLetterRunLength < 2;
+}
+
 function shouldEscalateLocalOcr(text: string, confidence?: number): boolean {
   if (confidence != null && confidence < 0.75) {
+    return true;
+  }
+
+  if (looksLikeOcrGarble(text)) {
     return true;
   }
 
@@ -342,7 +366,18 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         if ((err as { name?: string } | null)?.name === 'AbortError') {
           return null;
         }
+        // Silent recovery ban (CLAUDE.md fix-development rule): the user sees
+        // a generic "couldn't read" error when the server LLM path fails for
+        // any reason (missing GEMINI_API_KEY → 500, network error, malformed
+        // response → 502, auth → 401). Without Sentry, the LLM appears
+        // "disconnected" but we have no visibility. Capture so we can triage.
         console.error('[OCR] Server fallback failed:', err);
+        Sentry.captureException(err, {
+          tags: {
+            component: 'use-homework-ocr',
+            action: 'server-fallback',
+          },
+        });
         return null;
       }
     },

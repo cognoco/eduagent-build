@@ -5,7 +5,7 @@
 // markSubscriptionCancelled, updateQuotaPoolLimit, activateSubscriptionFromCheckout
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   subscriptions,
@@ -130,93 +130,150 @@ export async function createSubscription(
  * Idempotent update from a Stripe webhook event.
  * Skips the update if `lastStripeEventTimestamp` is newer than the incoming event,
  * preventing out-of-order event processing.
+ *
+ * [CR-2026-05-19-M11] The idempotency check (event-ID dedup + timestamp ordering)
+ * and the write are wrapped in a single `db.transaction()` so two concurrent
+ * deliveries of the same Stripe event cannot both see "not yet processed" and
+ * both write. The partial unique index on (accountId, lastStripeEventId) provides
+ * the storage-layer guarantee; the transaction ensures the read coherence.
  */
 export async function updateSubscriptionFromWebhook(
   db: Database,
   stripeSubscriptionId: string,
   updates: WebhookSubscriptionUpdate,
 ): Promise<SubscriptionRow | null> {
-  // Load current row (BD-10: via standalone helper — keyed by Stripe ID, not accountId)
-  // safe-caller: Stripe webhook — authenticated by Stripe event signature; keyed by external Stripe ID
-  const existing = await findSubscriptionByStripeId__unscoped(
-    db,
-    stripeSubscriptionId,
-  );
+  return db.transaction(async (tx) => {
+    // Load current row inside the transaction (BD-10: via standalone helper —
+    // keyed by Stripe ID, not accountId).
+    // Known Drizzle pattern: PgTransaction → Database cast (see feedback_drizzle_transaction_cast.md)
+    // safe-caller: Stripe webhook — authenticated by Stripe event signature; keyed by external Stripe ID
+    const existing = await findSubscriptionByStripeId__unscoped(
+      tx as unknown as Database,
+      stripeSubscriptionId,
+    );
 
-  if (!existing) {
-    return null;
-  }
+    if (!existing) {
+      return null;
+    }
 
-  // Idempotency check: skip if incoming event is older (NaN-safe) [1C.6]
-  if (existing.lastStripeEventTimestamp) {
-    const existingTs = existing.lastStripeEventTimestamp.getTime();
-    const incomingTs = new Date(updates.lastStripeEventTimestamp).getTime();
+    // [CR-2026-05-19-M11] Exact-duplicate event-ID dedup INSIDE the transaction
+    // so the check and write are coherent. Same event ID means already processed.
     if (
-      !Number.isNaN(existingTs) &&
-      !Number.isNaN(incomingTs) &&
-      incomingTs <= existingTs
+      updates.stripeEventId &&
+      existing.lastStripeEventId === updates.stripeEventId
     ) {
       return mapSubscriptionRow(existing);
     }
-  }
 
-  const setValues: Record<string, unknown> = {
-    lastStripeEventTimestamp: new Date(updates.lastStripeEventTimestamp),
-    updatedAt: new Date(),
-  };
-
-  if (updates.tier !== undefined) {
-    setValues.tier = updates.tier;
-  }
-  if (updates.status !== undefined && updates.status !== existing.status) {
-    if (!isValidTransition(existing.status, updates.status)) {
-      // [BUG-447] Throw so callers do NOT proceed to updateQuotaPoolLimit.
-      // Returning the existing row silently caused quota pool to reflect
-      // newTier while subscription.tier stayed at oldTier — divergent billing
-      // state. Throwing surfaces the problem and prevents the downstream
-      // quota update from firing. Mirror of the fix in revenuecat.ts.
-      const transitionErr = new Error(
-        `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`,
-      );
-      logger.error('Invalid Stripe subscription transition — aborting update', {
-        from: existing.status,
-        to: updates.status,
-        subscriptionId: existing.id,
-        tag: 'billing.invalid_transition',
-      });
-      captureException(transitionErr, {
-        extra: {
-          subscriptionId: existing.id,
-          fromStatus: existing.status,
-          toStatus: updates.status,
-          tag: 'billing.invalid_transition',
-        },
-      });
-      throw transitionErr;
+    // Idempotency check: skip if incoming event is older (NaN-safe) [1C.6]
+    if (existing.lastStripeEventTimestamp) {
+      const existingTs = existing.lastStripeEventTimestamp.getTime();
+      const incomingTs = new Date(updates.lastStripeEventTimestamp).getTime();
+      if (
+        !Number.isNaN(existingTs) &&
+        !Number.isNaN(incomingTs) &&
+        incomingTs <= existingTs
+      ) {
+        return mapSubscriptionRow(existing);
+      }
     }
-    setValues.status = updates.status;
-  }
-  if (updates.currentPeriodStart !== undefined) {
-    setValues.currentPeriodStart = new Date(updates.currentPeriodStart);
-  }
-  if (updates.currentPeriodEnd !== undefined) {
-    setValues.currentPeriodEnd = new Date(updates.currentPeriodEnd);
-  }
-  if (updates.cancelledAt !== undefined) {
-    setValues.cancelledAt = updates.cancelledAt
-      ? new Date(updates.cancelledAt)
-      : null;
-  }
 
-  const [updated] = await db
-    .update(subscriptions)
-    .set(setValues)
-    .where(eq(subscriptions.id, existing.id))
-    .returning();
+    const setValues: Record<string, unknown> = {
+      lastStripeEventTimestamp: new Date(updates.lastStripeEventTimestamp),
+      updatedAt: new Date(),
+    };
 
-  if (!updated)
-    throw new Error('Subscription webhook update did not return a row');
-  return mapSubscriptionRow(updated);
+    // [CR-2026-05-19-M11] Stamp event ID for atomic dedup on next delivery.
+    if (updates.stripeEventId) {
+      setValues.lastStripeEventId = updates.stripeEventId;
+    }
+
+    if (updates.tier !== undefined) {
+      setValues.tier = updates.tier;
+    }
+    if (updates.status !== undefined && updates.status !== existing.status) {
+      if (!isValidTransition(existing.status, updates.status)) {
+        // [BUG-447] Throw so callers do NOT proceed to updateQuotaPoolLimit.
+        // Returning the existing row silently caused quota pool to reflect
+        // newTier while subscription.tier stayed at oldTier — divergent billing
+        // state. Throwing surfaces the problem and prevents the downstream
+        // quota update from firing. Mirror of the fix in revenuecat.ts.
+        const transitionErr = new Error(
+          `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`,
+        );
+        logger.error(
+          'Invalid Stripe subscription transition — aborting update',
+          {
+            from: existing.status,
+            to: updates.status,
+            subscriptionId: existing.id,
+            tag: 'billing.invalid_transition',
+          },
+        );
+        captureException(transitionErr, {
+          extra: {
+            subscriptionId: existing.id,
+            fromStatus: existing.status,
+            toStatus: updates.status,
+            tag: 'billing.invalid_transition',
+          },
+        });
+        throw transitionErr;
+      }
+      setValues.status = updates.status;
+    }
+    if (updates.currentPeriodStart !== undefined) {
+      setValues.currentPeriodStart = new Date(updates.currentPeriodStart);
+    }
+    if (updates.currentPeriodEnd !== undefined) {
+      setValues.currentPeriodEnd = new Date(updates.currentPeriodEnd);
+    }
+    if (updates.cancelledAt !== undefined) {
+      setValues.cancelledAt = updates.cancelledAt
+        ? new Date(updates.cancelledAt)
+        : null;
+    }
+
+    // Concurrent-delivery defense: under READ COMMITTED two transactions can
+    // both see lastStripeEventId !== updates.stripeEventId at SELECT time and
+    // both proceed to UPDATE the same row (last-writer-wins). Adding the
+    // event-ID predicate makes the second UPDATE re-evaluate against the
+    // post-commit row and return 0 rows, so we can detect the duplicate and
+    // return the existing snapshot instead of double-writing.
+    const whereParts = [eq(subscriptions.id, existing.id)];
+    if (updates.stripeEventId) {
+      whereParts.push(
+        or(
+          isNull(subscriptions.lastStripeEventId),
+          ne(subscriptions.lastStripeEventId, updates.stripeEventId),
+        )!,
+      );
+    }
+
+    const [updated] = await tx
+      .update(subscriptions)
+      .set(setValues)
+      .where(and(...whereParts))
+      .returning();
+
+    if (!updated) {
+      // 0 rows returned most likely means a concurrent delivery already
+      // stamped this stripeEventId. Re-read and confirm before short-circuiting.
+      const recheck = await findSubscriptionByStripeId__unscoped(
+        tx as unknown as Database,
+        stripeSubscriptionId,
+      );
+      if (
+        recheck &&
+        updates.stripeEventId &&
+        recheck.lastStripeEventId === updates.stripeEventId
+      ) {
+        return mapSubscriptionRow(recheck);
+      }
+      throw new Error('Subscription webhook update did not return a row');
+    }
+    return mapSubscriptionRow(updated);
+  });
 }
 
 // ---------------------------------------------------------------------------

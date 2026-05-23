@@ -403,6 +403,54 @@ describe('Quota metering (integration)', () => {
     expect(pool!.usedToday).toBe(1);
   });
 
+  // [BREAK CR-2026-05-19-M11] Daily-cap discrimination must use the in-transaction
+  // pool snapshot, not a second out-of-transaction read. Pre-fix: if a daily-reset
+  // cron fired between the monthly UPDATE (which fails) and the separate re-read,
+  // usedToday would flip to 0, making the caller fall through to the top-up path
+  // even though the daily cap was hit. Post-fix: the re-read is inside the same
+  // transaction as the UPDATE attempt, so it sees the same consistent snapshot —
+  // daily cap = hit → daily_exceeded, not top_up.
+  //
+  // This test covers the state that WOULD have been misread pre-fix:
+  // usedToday >= dailyLimit (cap hit) AND usedThisMonth >= monthlyLimit (monthly
+  // exhausted) AND a top-up is available. If the pool snapshot were re-read
+  // outside the tx with usedToday=0 the test would instead return top_up.
+  it('[BREAK CR-2026-05-19-M11] daily-cap discrimination uses in-transaction pool snapshot (cron-race safety)', async () => {
+    const freeTier = getTierConfig('free');
+    const dailyLimit = freeTier.dailyLimit!;
+    const monthlyLimit = freeTier.monthlyQuota;
+
+    const account = await seedAccount(0); // reuse slot 0 — cleaned in beforeEach
+    const seeded = await seedSubscriptionWithQuota({
+      accountId: account.id,
+      tier: 'free',
+      monthlyLimit,
+      usedThisMonth: monthlyLimit, // monthly exhausted
+      dailyLimit,
+      usedToday: dailyLimit, // daily cap already hit
+    });
+    // A top-up is available — if the re-read race fires, this would be consumed
+    await seedTopUpCredit({
+      subscriptionId: seeded.subscription.id,
+      amount: 5,
+      remaining: 5,
+    });
+
+    const result = await decrementQuota(
+      createIntegrationDb(),
+      seeded.subscription.id,
+    );
+
+    // Must be daily_exceeded — NOT top_up (which would happen if usedToday were
+    // misread as 0 by an out-of-transaction re-read racing with the daily-reset cron).
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('daily_exceeded');
+
+    // Top-up credit must be untouched (not consumed by the wrong branch).
+    const topUps = await loadTopUps(seeded.subscription.id);
+    expect(topUps[0]!.remaining).toBe(5);
+  });
+
   it('concurrent decrements do not over-consume', async () => {
     // Set remaining=1 → fire 5 concurrent decrementQuota calls
     // Exactly 1 should succeed, 4 should get quota_exceeded

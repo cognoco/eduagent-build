@@ -1219,10 +1219,26 @@ export async function refreshProgressSnapshot(
   // [CR-2026-05-21-070] try/catch is inside the loop so one failing enqueue
   // does not abort celebrations for all subsequent milestones in the batch.
   if (insertedMilestones.length > 0) {
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
-      columns: { birthYear: true },
-    });
+    // [CR-2026-05-21-070 follow-up] The snapshot has already been persisted at
+    // upsertProgressSnapshot above; if this lookup throws on a transient Neon
+    // hiccup we must not propagate a 500 to the cron caller (it would retry
+    // and re-run the whole pipeline). Degrade to the default age fallback and
+    // let the per-milestone try/catch below isolate the actual celebration
+    // sends.
+    let profile: { birthYear: number | null } | undefined;
+    try {
+      profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profileId),
+        columns: { birthYear: true },
+      });
+    } catch (err) {
+      captureException(err, {
+        extra: {
+          tag: 'snapshot.celebration_age_lookup_failed',
+          profileId,
+        },
+      });
+    }
     const age = new Date().getFullYear() - (profile?.birthYear ?? 2015);
 
     let celebrationSucceeded = 0;

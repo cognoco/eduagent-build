@@ -132,6 +132,7 @@ describe('resolveNavigationContract matrix', () => {
         iconName: 'School',
         showAddChild: true,
         showInlineStudyInvite: false,
+        showLearnThisToo: false,
         progressScope: 'self',
         reason: 'family-intent-without-family-links',
       },
@@ -153,6 +154,7 @@ describe('resolveNavigationContract matrix', () => {
         iconName: 'School',
         showAddChild: true,
         showInlineStudyInvite: true,
+        showLearnThisToo: false,
         progressScope: 'self',
         reason: 'explicit-study',
       },
@@ -174,6 +176,7 @@ describe('resolveNavigationContract matrix', () => {
         iconName: 'Users',
         showAddChild: true,
         showInlineStudyInvite: true,
+        showLearnThisToo: true,
         progressScope: 'children',
         reason: 'explicit-family',
       },
@@ -195,6 +198,7 @@ describe('resolveNavigationContract matrix', () => {
         iconName: 'Users',
         showAddChild: true,
         showInlineStudyInvite: true,
+        showLearnThisToo: true,
         progressScope: 'children',
         reason: 'profile-default-family',
       },
@@ -217,6 +221,7 @@ describe('resolveNavigationContract matrix', () => {
         iconName: 'School',
         showAddChild: false,
         showInlineStudyInvite: false,
+        showLearnThisToo: false,
         progressScope: 'self',
         reason: 'parent-proxy',
       },
@@ -239,6 +244,7 @@ describe('resolveNavigationContract matrix', () => {
         iconName: 'School',
         showAddChild: false,
         showInlineStudyInvite: false,
+        showLearnThisToo: false,
         progressScope: 'self',
         reason: 'child-study-only',
       },
@@ -263,6 +269,7 @@ describe('resolveNavigationContract matrix', () => {
         iconName: 'School',
         showAddChild: false,
         showInlineStudyInvite: false,
+        showLearnThisToo: false,
         progressScope: 'self',
         reason: 'profile-loading',
       },
@@ -284,6 +291,7 @@ describe('resolveNavigationContract matrix', () => {
     expect(contract.gates.showInlineStudyInvite).toBe(
       expected.showInlineStudyInvite,
     );
+    expect(contract.gates.showLearnThisToo).toBe(expected.showLearnThisToo);
     expect(contract.gates.progressScope).toBe(expected.progressScope);
     expect(contract.diagnostic).toMatchObject({
       activeProfileId: context.activeProfile?.id ?? null,
@@ -340,6 +348,7 @@ describe('resolveNavigationContract gates', () => {
         showCelebrationsChildEditor: true,
         showExportDelete: true,
         showFamilyChildActivity: true,
+        showLearnThisToo: true,
         showMentorMemoryChildConsent: true,
         showProgressProfilePicker: true,
         showRemoveFamilyMember: true,
@@ -371,6 +380,7 @@ describe('resolveNavigationContract gates', () => {
         showCelebrationsChildEditor: false,
         showExportDelete: false,
         showFamilyChildActivity: false,
+        showLearnThisToo: false,
         showMentorMemoryChildConsent: false,
         showProgressProfilePicker: false,
         showRemoveFamilyMember: false,
@@ -395,6 +405,40 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.shape).toBe('study');
     expect(contract.gates.showAddChild).toBe(false);
     expect(contract.gates.showBilling).toBe(true);
+  });
+
+  it('requires the server family-link flag before surfacing Add to my learning', () => {
+    const localFamilyAdult = makeProfile({
+      id: '00000000-0000-7000-a000-000000000103',
+      defaultAppContext: 'family',
+      hasFamilyLinks: false,
+    });
+
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: localFamilyAdult,
+        appContext: 'family',
+        profiles: [localFamilyAdult, child],
+      }),
+    );
+
+    expect(contract.shape).toBe('family');
+    expect(contract.isFamilyCapable).toBe(true);
+    expect(contract.gates.showLearnThisToo).toBe(false);
+  });
+
+  it('keeps Add to my learning hidden when V1 navigation is disabled', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        flags: { MODE_NAV_V1_ENABLED: false },
+        profiles: [familyAdult, child],
+      }),
+    );
+
+    expect(contract.diagnostic.reason).toBe('v1-disabled');
+    expect(contract.gates.showLearnThisToo).toBe(false);
   });
 });
 
@@ -644,5 +688,6 @@ describe('resolveNavigationContract V0 preservation', () => {
 
     expectTabs(contract, legacyGuardianTabs);
     expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
+    expect(contract.gates.showLearnThisToo).toBe(false);
   });
 });

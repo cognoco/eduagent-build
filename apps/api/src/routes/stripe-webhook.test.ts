@@ -125,7 +125,15 @@ import { claimWebhookId } from './resend-webhook';
 // Test app with mock db middleware
 // ---------------------------------------------------------------------------
 
-const mockDb = {} as any;
+// handleSubscriptionEvent/handleSubscriptionDeleted now wrap billing
+// calls in db.transaction(). The billing functions are mocked at module
+// level so they don't use tx; we just need transaction to execute the
+// callback so the mocked functions are invoked normally.
+const mockDb = {
+  transaction: jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
+} as any;
 const mockKv = { put: jest.fn(), get: jest.fn() } as any;
 
 const app = new Hono<{ Variables: AppVariables }>()

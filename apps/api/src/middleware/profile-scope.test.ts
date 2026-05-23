@@ -205,9 +205,11 @@ describe('profileScopeMiddleware', () => {
       error: 'DB connection lost',
     });
 
-    // Sentry escalation: real exception object + queryable context tag
+    // Sentry escalation: real exception object + queryable surface tag
+    // [CR-2026-05-19-M1] tags.surface allows ops to filter/alert in Sentry.
     expect(captureException).toHaveBeenCalledTimes(1);
     expect(captureException).toHaveBeenCalledWith(dbError, {
+      tags: { surface: 'profile_scope.auto_resolve_failure' },
       extra: {
         context: 'profile-scope.auto_resolve_owner',
         accountId: 'test-account-id',
