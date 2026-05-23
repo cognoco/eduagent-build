@@ -73,6 +73,40 @@ describe('checkGithubWorkflowSecurity', () => {
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
   });
 
+  it('rejects mutable external reusable workflow refs', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-reusable-workflow.yml',
+      `
+      name: Bad reusable workflow
+      on: pull_request
+      jobs:
+        delegated:
+          uses: owner/repo/.github/workflows/test.yml@main
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'owner/repo/.github/workflows/test.yml@main must be pinned to a 40-character SHA',
+    );
+  });
+
+  it('allows external reusable workflow refs pinned to immutable SHAs', () => {
+    writeFixture(
+      root,
+      '.github/workflows/good-reusable-workflow.yml',
+      `
+      name: Good reusable workflow
+      on: pull_request
+      jobs:
+        delegated:
+          uses: owner/repo/.github/workflows/test.yml@34e114876b0b11c390a56381ad16ebd13914f8d5
+      `,
+    );
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
   it('rejects local actions that receive secrets in pull_request workflows', () => {
     writeFixture(
       root,

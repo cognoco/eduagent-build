@@ -252,6 +252,9 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
   for (const [, job] of jobs) {
     const inheritedSecrets =
       workflowEnvHasSecrets || containsSecretReference(job.env);
+    const jobUsesViolation = validateActionRef(file, job);
+    if (jobUsesViolation) violations.push(jobUsesViolation);
+
     const workflowRunViolation = validateWorkflowRunJob(
       file,
       workflowRun,
