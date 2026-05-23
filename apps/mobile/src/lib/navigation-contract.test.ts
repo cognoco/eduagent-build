@@ -767,3 +767,103 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
 });
+
+describe('navigation-contract totality (fuzzed inputs never throw)', () => {
+  const flagsCases: ReadonlyArray<ProfileContext['flags']> = [
+    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: false },
+    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: false },
+    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
+    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: true },
+  ];
+  const appContexts: ReadonlyArray<ProfileContext['appContext']> = [
+    null,
+    'study',
+    'family',
+  ];
+  const proxies: ReadonlyArray<boolean> = [true, false];
+  const subs: ReadonlyArray<ProfileContext['subscription']> = [
+    { status: 'loading', tier: null },
+    { status: 'ready', tier: 'free' },
+    { status: 'ready', tier: 'family' },
+  ];
+  const profileShapes: ReadonlyArray<ProfileContext['activeProfile']> = [
+    null,
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa1',
+      isOwner: true,
+      birthYear: 1985,
+      hasFamilyLinks: false,
+    }),
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa2',
+      isOwner: true,
+      birthYear: 1985,
+      hasFamilyLinks: true,
+    }),
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa3',
+      isOwner: false,
+      birthYear: CHILD_BIRTH_YEAR,
+      hasFamilyLinks: false,
+      linkCreatedAt: ISO,
+    }),
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa4',
+      isOwner: true,
+      birthYear: CHILD_BIRTH_YEAR,
+      hasFamilyLinks: false,
+    }),
+  ];
+  const roles: ReadonlyArray<ProfileContext['role']> = [
+    'owner',
+    'impersonated-child',
+    'child',
+    null,
+  ];
+  const probeRoutes: ReadonlyArray<RouteKey> = [
+    'home',
+    'library',
+    'recaps',
+    'progress',
+    'session',
+    'topic/relearn',
+    'child/[profileId]',
+    'child/[profileId]/curriculum',
+    'subscription',
+    'more/account',
+  ];
+
+  it('every cross-product returns a complete contract without throwing', () => {
+    let count = 0;
+    for (const flags of flagsCases) {
+      for (const appContext of appContexts) {
+        for (const isParentProxy of proxies) {
+          for (const subscription of subs) {
+            for (const activeProfile of profileShapes) {
+              for (const role of roles) {
+                count += 1;
+                const contract = resolveNavigationContract({
+                  activeProfile,
+                  profiles: activeProfile ? [activeProfile] : [],
+                  isParentProxy,
+                  appContext,
+                  role,
+                  subscription,
+                  flags,
+                });
+                expect(contract.visibleTabs.size).toBeGreaterThan(0);
+                expect(['study', 'family']).toContain(contract.shape);
+                expect(contract.diagnostic.reason).toBeDefined();
+                for (const route of probeRoutes) {
+                  expect(() => contract.canEnter(route)).not.toThrow();
+                  expect(() => contract.isSurfaced(route)).not.toThrow();
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(count).toBeGreaterThan(500);
+  });
+});
