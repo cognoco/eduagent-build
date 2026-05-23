@@ -12,17 +12,36 @@ type MaintenanceEnv = {
   };
 };
 
+// Private domain-separation label — not a secret, not caller-visible.
+// Mirrors the canonical HMAC compare pattern at
+// apps/api/src/routes/revenuecat-webhook.ts:59 (constantTimeCompare).
+const HMAC_COMPARISON_LABEL = 'eduagent-maintenance-hmac-comparison-v1';
+
+/**
+ * HMAC-based constant-time comparison. Both inputs are hashed with SHA-256
+ * HMAC before XOR comparison, producing fixed-length 32-byte digests
+ * regardless of input length. This eliminates the length-leak timing
+ * side-channel — no early-exit on length mismatch.
+ */
 async function constantTimeEqual(a: string, b: string): Promise<boolean> {
   const encoder = new TextEncoder();
-  const left = encoder.encode(a);
-  const right = encoder.encode(b);
-  if (left.length !== right.length) return false;
+  const hmacKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(HMAC_COMPARISON_LABEL),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
 
-  const digestA = await crypto.subtle.digest('SHA-256', left);
-  const digestB = await crypto.subtle.digest('SHA-256', right);
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.sign('HMAC', hmacKey, encoder.encode(a)),
+    crypto.subtle.sign('HMAC', hmacKey, encoder.encode(b)),
+  ]);
+
   const bytesA = new Uint8Array(digestA);
   const bytesB = new Uint8Array(digestB);
 
+  // Fixed-length XOR — always 32 bytes, constant time.
   let diff = 0;
   for (let i = 0; i < bytesA.length; i += 1) {
     diff |= (bytesA[i] as number) ^ (bytesB[i] as number);

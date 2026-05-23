@@ -9,13 +9,18 @@ import {
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 const col = (name: string) => ({ name });
-const chainable = () => ({
-  from: () => ({
-    where: () => ({
-      orderBy: () => ({ limit: () => Promise.resolve([]) }),
-      limit: () => Promise.resolve([]),
-    }),
+// Joinable terminal: supports both direct .where()/.limit() (no joins)
+// and chained .innerJoin().innerJoin()...where()/.limit() (loadTopicTitle's
+// topics ⋈ books ⋈ subjects parent-chain ownership check, H3.2).
+const joinable = (): any => ({
+  innerJoin: () => joinable(),
+  where: () => ({
+    orderBy: () => ({ limit: () => Promise.resolve([]) }),
+    limit: () => Promise.resolve([]),
   }),
+});
+const chainable = () => ({
+  from: () => joinable(),
 });
 const mockSessionCompletedDb = createTransactionalMockDb({
   query: {
@@ -75,7 +80,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
       topicId: col('topicId'),
       repetitions: col('repetitions'),
     },
-    curriculumTopics: { id: col('id'), title: col('title') },
+    curriculumTopics: {
+      id: col('id'),
+      title: col('title'),
+      bookId: col('bookId'),
+    },
+    curriculumBooks: { id: col('id'), subjectId: col('subjectId') },
     learningProfiles: { profileId: col('profileId') },
     learningSessions: { id: col('id'), profileId: col('profileId') },
     memoryFacts: {
@@ -1012,13 +1022,15 @@ describe('sessionCompleted', () => {
       resetDatabaseUrl();
       // Override the createDatabase mock to return a db with the desired subject
       (createDatabase as jest.Mock).mockImplementationOnce(() => {
-        const chainable = () => ({
-          from: () => ({
-            where: () => ({
-              orderBy: () => ({ limit: () => Promise.resolve([]) }),
-              limit: () => Promise.resolve([]),
-            }),
+        const joinable = (): any => ({
+          innerJoin: () => joinable(),
+          where: () => ({
+            orderBy: () => ({ limit: () => Promise.resolve([]) }),
+            limit: () => Promise.resolve([]),
           }),
+        });
+        const chainable = () => ({
+          from: () => joinable(),
         });
         const db: Record<string, unknown> = {
           query: {

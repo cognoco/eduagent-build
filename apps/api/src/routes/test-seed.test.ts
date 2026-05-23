@@ -100,6 +100,26 @@ describe('[BUG-725 / SEC-9] /__test/llm-ping environment guard', () => {
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
   });
 
+  // ----- Break-test for fail-open ENVIRONMENT guard ---------------------
+  // The previous middleware only blocked the literal string 'production'.
+  // If ENVIRONMENT was unset (e.g., partial Doppler sync), /__test/* routes
+  // were reachable in production. The fix inverts the check to allow only
+  // recognised non-production environments ('development', 'staging') and
+  // rejects everything else, including `undefined`.
+  it('[break-test] rejects when ENVIRONMENT is undefined (fail-closed)', async () => {
+    const res = await callPing({ ENVIRONMENT: undefined });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { message?: string };
+    expect(body.message).toMatch(/Not available in production/);
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it('[break-test] rejects unrecognised ENVIRONMENT values (fail-closed)', async () => {
+    const res = await callPing({ ENVIRONMENT: 'preview' });
+    expect(res.status).toBe(403);
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
   it('allows staging only when LLM_PING_ENABLED is exactly "true"', async () => {
     mockRouteAndCall.mockResolvedValue({
       provider: 'mock',

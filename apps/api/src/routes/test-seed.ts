@@ -60,10 +60,15 @@ export const testSeedRoutes = new Hono<TestEnv>();
 // Environment + secret guard — protects ALL /__test/* routes
 // ---------------------------------------------------------------------------
 testSeedRoutes.use('/__test/*', async (c, next) => {
-  if (c.env.ENVIRONMENT === 'production') {
+  // Fail-closed: only allow recognised non-production environments.
+  // If ENVIRONMENT is undefined (e.g., a partial Doppler sync in production),
+  // treat the request as production (403). Previously the guard only blocked
+  // the literal string 'production', so an unset binding silently allowed
+  // /__test/* routes through.
+  if (c.env.ENVIRONMENT !== 'development' && c.env.ENVIRONMENT !== 'staging') {
     return c.json(
       { code: ERROR_CODES.FORBIDDEN, message: 'Not available in production' },
-      403
+      403,
     );
   }
 
@@ -79,7 +84,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
         message:
           'TEST_SEED_SECRET must be configured on non-development environments',
       },
-      403
+      403,
     );
   }
 
@@ -94,7 +99,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
       encoder.encode('test-seed-compare'),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ['sign']
+      ['sign'],
     );
     const [digestA, digestB] = await Promise.all([
       crypto.subtle.sign('HMAC', hmacKey, encoder.encode(headerSecret)),
@@ -112,7 +117,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
           code: ERROR_CODES.FORBIDDEN,
           message: 'Invalid or missing test secret',
         },
-        403
+        403,
       );
     }
   }
@@ -136,7 +141,7 @@ testSeedRoutes.post(
     };
     const result = await seedScenario(db, scenario, email, seedEnv);
     return c.json(result, 201);
-  }
+  },
 );
 
 testSeedRoutes.post('/__test/reset', async (c) => {
@@ -226,7 +231,7 @@ testSeedRoutes.get('/__test/llm-ping', async (c) => {
         message:
           'LLM ping is dev-only by default. Set LLM_PING_ENABLED=true to opt in on this environment.',
       },
-      403
+      403,
     );
   }
 
@@ -273,7 +278,7 @@ testSeedRoutes.get('/__test/llm-ping', async (c) => {
         error: err instanceof Error ? err.message : String(err),
         registeredProviders: providers,
       },
-      500
+      500,
     );
   }
 });
