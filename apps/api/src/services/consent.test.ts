@@ -7,6 +7,7 @@ import {
   requestConsent,
   processConsentResponse,
   getConsentStatus,
+  isGdprProcessingAllowed,
   revokeConsent,
   EmailDeliveryError,
 } from './consent';
@@ -157,6 +158,36 @@ describe('calculateAge', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:30:00.000Z'));
     expect(calculateAge(2010)).toBe(16);
   });
+});
+
+// ---------------------------------------------------------------------------
+// isGdprProcessingAllowed (WI-82: shared async-processing consent gate)
+// ---------------------------------------------------------------------------
+
+describe('isGdprProcessingAllowed', () => {
+  const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('allows processing when no consent row exists (pre-consent-flow account)', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    await expect(isGdprProcessingAllowed(db, PROFILE_ID)).resolves.toBe(true);
+  });
+
+  it('allows processing when the latest GDPR consent is CONSENTED', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({ status: 'CONSENTED' }),
+    });
+    await expect(isGdprProcessingAllowed(db, PROFILE_ID)).resolves.toBe(true);
+  });
+
+  it.each(['PENDING', 'PARENTAL_CONSENT_REQUESTED', 'WITHDRAWN'] as const)(
+    'blocks processing when the latest GDPR consent is %s',
+    async (status) => {
+      const db = createMockDb({ findFirstResult: mockConsentRow({ status }) });
+      await expect(isGdprProcessingAllowed(db, PROFILE_ID)).resolves.toBe(
+        false,
+      );
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

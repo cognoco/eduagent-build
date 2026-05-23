@@ -3,6 +3,7 @@ const mockDb: Record<string, any> = {
     curriculumBooks: { findFirst: jest.fn().mockResolvedValue(null) },
     profiles: { findFirst: jest.fn().mockResolvedValue(null) },
     subjects: { findFirst: jest.fn().mockResolvedValue(null) },
+    consentStates: { findFirst: jest.fn() },
   },
 };
 
@@ -21,6 +22,11 @@ const mockDatabaseModule = createDatabaseModuleMock({
     },
     profiles: { id: col('id'), birthYear: col('birthYear') },
     subjects: { id: col('id'), profileId: col('profileId') },
+    consentStates: {
+      profileId: col('profileId'),
+      consentType: col('consentType'),
+      requestedAt: col('requestedAt'),
+    },
   },
 });
 
@@ -135,6 +141,9 @@ describe('subjectPrewarmCurriculum', () => {
       id: subjectId,
       profileId,
     });
+    mockDb.query.consentStates.findFirst
+      .mockReset()
+      .mockResolvedValue(undefined);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -280,6 +289,48 @@ describe('subjectPrewarmCurriculum', () => {
         bookTitle: 'Tea',
         learnerAge: 12,
       },
+    });
+  });
+
+  // [WI-82] GDPR consent gate — background job must re-check consent at execution time
+  describe('GDPR consent gate', () => {
+    it.each([
+      ['WITHDRAWN', { status: 'WITHDRAWN' }],
+      ['PENDING', { status: 'PENDING' }],
+      ['PARENTAL_CONSENT_REQUESTED', { status: 'PARENTAL_CONSENT_REQUESTED' }],
+    ])(
+      'skips and returns consent_not_granted when consent status is %s',
+      async (_label, consentRow) => {
+        mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
+          createBook({ topicsGenerated: false }),
+        );
+        mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+
+        const { result } = await execute(createEventData());
+
+        expect(result).toEqual({
+          status: 'skipped',
+          reason: 'consent_not_granted',
+        });
+        expect(generateBookTopicsSpy).not.toHaveBeenCalled();
+        expect(persistBookTopicsSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    it('proceeds normally when consent status is CONSENTED', async () => {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
+        .mockResolvedValueOnce(createBook({ topicsGenerated: true }));
+      mockDb.query.consentStates.findFirst.mockResolvedValue({
+        status: 'CONSENTED',
+      });
+
+      const { result } = await execute(createEventData());
+
+      expect(result).toMatchObject({ status: 'completed', subjectId, bookId });
+      expect(generateBookTopicsSpy).toHaveBeenCalled();
+      expect(persistBookTopicsSpy).toHaveBeenCalled();
     });
   });
 });

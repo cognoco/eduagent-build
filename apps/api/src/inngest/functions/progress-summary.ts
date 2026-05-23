@@ -11,6 +11,7 @@ import {
   generateProgressSummary,
   upsertProgressSummary,
 } from '../../services/progress-summary';
+import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 
 export const progressSummaryGeneration = inngest.createFunction(
@@ -38,6 +39,14 @@ export const progressSummaryGeneration = inngest.createFunction(
         columns: { id: true },
       });
       if (!parentLink) return null;
+
+      // [WI-82] Re-check current GDPR consent at execution time. This job runs
+      // outside the HTTP consent middleware; a queued event must not send learner
+      // data to the LLM or persist derived data for a profile whose consent is
+      // no longer granted.
+      if (!(await isGdprProcessingAllowed(db, profileId))) {
+        return { consentDenied: true as const };
+      }
 
       const profile = await db.query.profiles.findFirst({
         where: eq(profiles.id, profileId),
@@ -81,12 +90,22 @@ export const progressSummaryGeneration = inngest.createFunction(
     if (!context) {
       return { status: 'skipped', reason: 'not a linked child or no session' };
     }
+    if ('consentDenied' in context && context.consentDenied) {
+      return { status: 'skipped', reason: 'consent_not_granted' };
+    }
+
+    const ctx = context as {
+      childName: string;
+      latestSessionId: string;
+      latestSessionAt: string;
+      inventory: Awaited<ReturnType<typeof buildKnowledgeInventory>>;
+    };
 
     const summary = await step.run('generate-summary', async () => {
       try {
         return await generateProgressSummary({
-          ...context,
-          latestSessionAt: new Date(context.latestSessionAt),
+          ...ctx,
+          latestSessionAt: new Date(ctx.latestSessionAt),
         });
       } catch (error) {
         captureException(error, {
@@ -98,8 +117,8 @@ export const progressSummaryGeneration = inngest.createFunction(
           },
         });
         return deterministicProgressSummaryFallback(
-          context.childName,
-          new Date(context.latestSessionAt),
+          ctx.childName,
+          new Date(ctx.latestSessionAt),
         );
       }
     });
@@ -109,15 +128,15 @@ export const progressSummaryGeneration = inngest.createFunction(
       await upsertProgressSummary(db, {
         childProfileId: profileId,
         summary,
-        basedOnLastSessionAt: new Date(context.latestSessionAt),
-        latestSessionId: context.latestSessionId,
+        basedOnLastSessionAt: new Date(ctx.latestSessionAt),
+        latestSessionId: ctx.latestSessionId,
       });
     });
 
     return {
       status: 'generated',
       profileId,
-      latestSessionId: context.latestSessionId,
+      latestSessionId: ctx.latestSessionId,
     };
   },
 );

@@ -10,6 +10,7 @@ import {
   subjects,
 } from '@eduagent/database';
 import { routeAndCall } from '../../services/llm';
+import { isGdprProcessingAllowed } from '../../services/consent';
 import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
 import { captureException } from '../../services/sentry';
@@ -103,6 +104,15 @@ export const postSessionSuggestions = inngest.createFunction(
       });
       if (!ownerSubject)
         return { status: 'skipped' as const, reason: 'ownership mismatch' };
+
+      // [WI-116] Re-check current GDPR consent at execution time. This job runs
+      // on the Inngest endpoint, outside the HTTP consent middleware, so a
+      // filing event queued before consent withdrawal (or a replay) must not
+      // send learner curriculum data to the LLM or persist derived suggestions
+      // for a profile whose consent is no longer granted.
+      if (!(await isGdprProcessingAllowed(db, profileId))) {
+        return { status: 'skipped' as const, reason: 'consent_not_granted' };
+      }
 
       const existingTopics = await db.query.curriculumTopics.findMany({
         where: eq(curriculumTopics.bookId, bookId),

@@ -8,6 +8,7 @@ import { getStepDatabase } from '../helpers';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 import { getProfileAge } from '../../services/profile';
+import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 
 async function loadBook(
@@ -58,6 +59,15 @@ export const subjectRetryCurriculum = inngest.createFunction(
       if (book.topicsGenerated) {
         return { status: 'already-generated' as const };
       }
+
+      // [WI-82] Re-check current GDPR consent at execution time. This job runs
+      // outside the HTTP consent middleware; a queued event must not load learner
+      // age data, call the LLM, or persist derived topics for a profile whose
+      // consent is no longer granted.
+      if (!(await isGdprProcessingAllowed(db, profileId))) {
+        return { status: 'consent-blocked' as const };
+      }
+
       return {
         status: 'pending' as const,
         bookTitle: book.title,
@@ -68,6 +78,9 @@ export const subjectRetryCurriculum = inngest.createFunction(
 
     if (context.status === 'already-generated') {
       return { status: 'already-generated', subjectId, bookId };
+    }
+    if (context.status === 'consent-blocked') {
+      return { status: 'skipped', reason: 'consent_not_granted' };
     }
 
     await step.run('retry-generate-and-persist', async () => {

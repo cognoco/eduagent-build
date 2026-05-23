@@ -499,6 +499,35 @@ export async function getConsentStatus(
 }
 
 /**
+ * Whether async/background processing of a profile's learner data is currently
+ * permitted by GDPR consent state.
+ *
+ * Centralizes the guard that was previously duplicated inline across cron and
+ * notification paths (WI-82). Background jobs run outside the HTTP consent
+ * middleware, so each must re-check current consent at execution time before
+ * sending learner data to an LLM/external provider or persisting derived data.
+ *
+ * Semantics (matches the pre-existing inline guards):
+ * - no GDPR consent row ⇒ allowed (pre-consent-flow account, treated as not
+ *   yet gated)
+ * - latest GDPR row is `CONSENTED` ⇒ allowed
+ * - `PENDING` / `PARENTAL_CONSENT_REQUESTED` / `WITHDRAWN` ⇒ blocked
+ */
+export async function isGdprProcessingAllowed(
+  db: Database,
+  profileId: string,
+): Promise<boolean> {
+  const row = await db.query.consentStates.findFirst({
+    where: and(
+      eq(consentStates.profileId, profileId),
+      eq(consentStates.consentType, 'GDPR'),
+    ),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  return row == null || row.status === 'CONSENTED';
+}
+
+/**
  * Looks up a child's display name from a consent token.
  * Used by the web consent page to personalise the approval screen.
  * Returns null if the token is invalid or the profile doesn't exist.
