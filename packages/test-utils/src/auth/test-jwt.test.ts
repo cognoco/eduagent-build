@@ -135,6 +135,17 @@ describe('signTestJwt', () => {
     expect(payload.sub).toBe('user_custom');
     expect(payload.email).toBe('custom@test.com');
   });
+
+  // [CR-2026-05-21-184] undefined in caller payload must not delete defaults.
+  it('preserves defaults when caller passes undefined values', () => {
+    const token = signTestJwt({ sub: undefined, email: undefined });
+    const payloadB64 = token.split('.')[1]!;
+    const payload = JSON.parse(
+      Buffer.from(payloadB64, 'base64url').toString('utf8'),
+    );
+    expect(payload.sub).toBe('user_test');
+    expect(payload.email).toBe('test@example.com');
+  });
 });
 
 // ---------------------------------------------------------------------------

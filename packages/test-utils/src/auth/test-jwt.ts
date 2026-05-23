@@ -120,20 +120,24 @@ export function signTestJwt(payload: Partial<JWTPayload> = {}): string {
     kid: TEST_KID,
   };
 
+  // [CR-2026-05-21-184] Filter undefined out of the caller's payload BEFORE
+  // spreading so `{ sub: undefined }` preserves the default rather than
+  // silently deleting `sub`. Spread overwrites with undefined; a post-spread
+  // delete then drops the default too — inverse of what the caller intends.
+  const filteredPayload: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (value !== undefined) {
+      filteredPayload[key] = value;
+    }
+  }
+
   const claims: Record<string, unknown> = {
     sub: 'user_test',
     email: 'test@example.com',
     iat: now,
     exp: now + 3600,
-    ...payload,
+    ...filteredPayload,
   };
-
-  // Remove undefined values so they don't appear as `null` in the token
-  for (const key of Object.keys(claims)) {
-    if (claims[key] === undefined) {
-      delete claims[key];
-    }
-  }
 
   const headerB64 = base64UrlEncode(JSON.stringify(header));
   const payloadB64 = base64UrlEncode(JSON.stringify(claims));
