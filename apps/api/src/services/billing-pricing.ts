@@ -53,3 +53,17 @@ export function resolveTierFromPriceId(
   }
   return null;
 }
+
+/**
+ * True when at least one STRIPE_PRICE_* binding is configured — i.e. Stripe
+ * billing is live in this environment. Lets callers distinguish a genuine
+ * price/tier drift (pricing configured but a price is unmapped → alert) from
+ * the dormant state (no prices configured → expected, don't alert). Stripe
+ * billing being live always implies these are set, since checkout-session
+ * creation (resolvePriceId) requires them.
+ */
+export function isStripePricingConfigured(env: StripePriceEnv): boolean {
+  return PAID_TIERS.some((tier) =>
+    INTERVALS.some((interval) => !!resolvePriceId(env, tier, interval)),
+  );
+}

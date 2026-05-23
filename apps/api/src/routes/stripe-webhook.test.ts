@@ -1797,4 +1797,88 @@ describe('subscription tier verified against purchased price [WI-85]', () => {
       }),
     );
   });
+
+  it('keeps the metadata tier WITHOUT a Sentry alert when Stripe pricing is unconfigured (dormant)', async () => {
+    // No STRIPE_PRICE_* configured → pricing dormant. The metadata tier is the
+    // only available source, so it is applied, but this is the expected steady
+    // state — it must NOT fire a per-webhook Sentry alert (alert fatigue).
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent(
+        'customer.subscription.updated',
+        subWithPriceAndTier('price_anything', 'pro'),
+      ),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV, // no STRIPE_PRICE_* keys
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub_stripe_123',
+      expect.objectContaining({ tier: 'pro' }),
+    );
+    expect(captureException).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.tier_unverifiable',
+        }),
+      }),
+    );
+  });
+
+  it('derives the tier from a paid-tier line item even when it is not items.data[0]', async () => {
+    // An add-on/unmapped item sits ahead of the real plan price. The scan must
+    // find the plus price rather than trusting the first line item.
+    const sub = makeSubscription({
+      status: 'active',
+      metadata: { tier: 'plus' },
+      items: {
+        data: [
+          {
+            price: { id: 'price_addon_unmapped' },
+            current_period_start: 1700000000,
+            current_period_end: 1702592000,
+          },
+          { price: { id: PRICE_PLUS_MONTHLY } },
+        ],
+      },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', sub),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      { ...TEST_ENV, STRIPE_PRICE_PLUS_MONTHLY: PRICE_PLUS_MONTHLY },
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub_stripe_123',
+      expect.objectContaining({ tier: 'plus' }),
+    );
+    expect(captureException).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.tier_mismatch',
+        }),
+      }),
+    );
+  });
 });

@@ -16,6 +16,7 @@ import {
 import { getTierConfig } from '../services/subscription';
 import {
   resolveTierFromPriceId,
+  isStripePricingConfigured,
   type StripePriceEnv,
 } from '../services/billing-pricing';
 import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
@@ -159,13 +160,29 @@ async function handleSubscriptionEvent(
   const metadataTier = extractPaidTier(
     stripeSubscription.metadata as Record<string, string> | undefined,
   );
-  const priceId = stripeSubscription.items?.data?.[0]?.price?.id;
-  const priceTier = resolveTierFromPriceId(env, priceId);
+  // Scan all line items for the first price that maps to a paid tier — Stripe
+  // does not guarantee items.data ordering, and add-on/proration items can sit
+  // ahead of the plan price, so trusting data[0] blindly would derive the wrong
+  // tier. (resolveTierFromPriceId tolerates undefined ids.)
+  const itemPriceIds = (stripeSubscription.items?.data ?? [])
+    .map((item) => item.price?.id)
+    .filter((id): id is string => !!id);
+  let priceTier = null as ReturnType<typeof resolveTierFromPriceId>;
+  for (const candidate of itemPriceIds) {
+    const mapped = resolveTierFromPriceId(env, candidate);
+    if (mapped) {
+      priceTier = mapped;
+      break;
+    }
+  }
+  const priceId = itemPriceIds[0];
 
   // Price wins. Fall back to metadata only when the price is not mapped to a
-  // configured tier (legacy/unmapped) — and alert in both divergent cases.
+  // configured tier (legacy/unmapped).
   const effectiveTier = priceTier ?? metadataTier;
   if (priceTier && metadataTier && priceTier !== metadataTier) {
+    // Genuine divergence: the purchased price contradicts the stamped tier.
+    // Price is authoritative; alert so the bad metadata source is fixed.
     captureException(
       new Error(
         `Stripe subscription tier mismatch: metadata='${metadataTier}' but purchased price maps to '${priceTier}'`,
@@ -181,19 +198,34 @@ async function handleSubscriptionEvent(
       },
     );
   } else if (!priceTier && metadataTier) {
-    captureException(
-      new Error(
-        `Stripe subscription tier could not be verified against a configured price (metadata='${metadataTier}', priceId='${priceId ?? 'none'}')`,
-      ),
-      {
-        extra: {
-          context: 'stripe.webhook.tier_unverifiable',
+    // The metadata tier could not be confirmed against a configured price.
+    // Only a genuine anomaly when pricing IS configured (a live price that maps
+    // to no tier — real drift). When pricing is unconfigured (Stripe dormant),
+    // this is the expected steady state, so log rather than burn Sentry quota
+    // on every webhook (mirrors the auth-middleware Sentry discipline).
+    if (isStripePricingConfigured(env)) {
+      captureException(
+        new Error(
+          `Stripe subscription tier could not be verified against a configured price (metadata='${metadataTier}', priceId='${priceId ?? 'none'}')`,
+        ),
+        {
+          extra: {
+            context: 'stripe.webhook.tier_unverifiable',
+            stripeSubscriptionId: stripeSubscription.id,
+            metadataTier,
+            priceId,
+          },
+        },
+      );
+    } else {
+      logger.warn(
+        '[stripe-webhook] tier not verified against price — Stripe pricing not configured in this environment',
+        {
           stripeSubscriptionId: stripeSubscription.id,
           metadataTier,
-          priceId,
         },
-      },
-    );
+      );
+    }
   }
 
   if (isExpired) {
@@ -334,6 +366,13 @@ async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
   eventTimestamp: string,
 ): Promise<void> {
+  // [WI-85 / WI-175] checkout.session.completed trusts metadata.tier by design:
+  // at checkout-session creation (routes/billing.ts) the price line item and
+  // metadata.tier both derive from the same authenticated `tier`
+  // (resolvePriceId binds tier → price), so they cannot diverge here. Any later
+  // operator/dashboard mutation of the subscription's tier flows through
+  // customer.subscription.updated, which IS price-verified in
+  // handleSubscriptionEvent above.
   const metadata = session.metadata as Record<string, string> | undefined;
   const accountId = metadata?.accountId;
   const tier = extractPaidTier(metadata);
