@@ -9,7 +9,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/scope-keyword-check.sh",
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scope-keyword-check.sh\"; [ -f \"$f\" ] && bash \"$f\" || true",
             "timeout": 5
           }
         ]
