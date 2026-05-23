@@ -52,8 +52,6 @@ export function buildMasterySm2Input(existing: {
 
 const logger = createLogger();
 
-type AnswerMode = 'free_text' | 'multiple_choice';
-
 type RecordedQuestionResult = QuestionResult & {
   checkedAt?: string;
   finalAttempt?: boolean;
@@ -226,7 +224,7 @@ export async function checkQuizAnswerWithCorrect(
   roundId: string,
   questionIndex: number,
   answerGiven: string,
-  answerMode?: AnswerMode,
+  answerMode?: NonNullable<QuestionResult['answerMode']>,
   finalAttempt?: boolean,
   cluesUsed?: number,
 ): Promise<{ correct: boolean; correctAnswer?: string }> {
