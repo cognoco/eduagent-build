@@ -21,16 +21,26 @@ permissions:
 jobs:
   # Lightweight gate: skip the expensive Playwright suite when the PR only
   # touches docs, configs, or workflow files unrelated to the app.
-  # Runs in ~5s on a shared runner (no checkout needed).
   changes:
     runs-on: ubuntu-latest
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
     steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
       - name: Check for relevant file changes
         id: check
         env:
-          GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "should-run=true" >> "$GITHUB_OUTPUT"
@@ -38,7 +48,7 @@ jobs:
             exit 0
           fi
 
-          FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+          FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
 
           SHOULD_RUN=false
           while IFS= read -r f; do
