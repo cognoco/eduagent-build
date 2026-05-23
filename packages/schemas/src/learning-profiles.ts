@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const explanationStyleSchema = z.enum([
   'stories',
@@ -92,7 +93,7 @@ export type StrengthEntry = z.infer<typeof strengthEntrySchema>;
 export const focusAreaEntrySchema = z.object({
   subject: z.string().nullable(),
   topic: z.string(),
-  lastSeen: z.string().datetime(),
+  lastSeen: isoDateField,
   attempts: z.number().int().min(1),
   confidence: confidenceLevelSchema,
   source: memorySourceSchema.optional(),
@@ -121,32 +122,20 @@ export const learningProfileSchema = z.object({
   effectivenessSessionCount: z.number().int().default(0),
   memoryEnabled: z.boolean(),
   memoryConsentStatus: memoryConsentStatusSchema.default('pending'),
-  consentPromptDismissedAt: z.string().datetime().nullable().optional(),
+  consentPromptDismissedAt: isoDateField.nullable().optional(),
   memoryCollectionEnabled: z.boolean().default(false),
   memoryInjectionEnabled: z.boolean().default(true),
   accommodationMode: accommodationModeSchema.default('none'),
   recentlyResolvedTopics: z.array(z.string()).default([]),
   version: z.number().int(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 export type LearningProfile = z.infer<typeof learningProfileSchema>;
 
-// Accepts ISO string or Date (from Drizzle DB rows) and normalises to string.
-const _lpDateField = z.union([
-  z.string().datetime(),
-  z.date().transform((d) => d.toISOString()),
-]);
-
-// Response-facing schema: tolerates Drizzle Date objects on timestamp columns.
-export const learningProfileResponseSchema = learningProfileSchema.extend({
-  consentPromptDismissedAt: z
-    .union([_lpDateField, z.null()])
-    .nullable()
-    .optional(),
-  createdAt: _lpDateField,
-  updatedAt: _lpDateField,
-});
+// Response-facing schema: now that learningProfileSchema uses isoDateField for
+// timestamp columns, this is a straight alias kept for backward compatibility.
+export const learningProfileResponseSchema = learningProfileSchema;
 export type LearningProfileResponse = z.infer<
   typeof learningProfileResponseSchema
 >;
