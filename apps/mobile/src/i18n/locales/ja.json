@@ -1301,7 +1301,7 @@
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",
     "permissionPrompt": "宿題の写真を撮れば、一歩ずつ解くのを手伝います。",
-    "permissionDenied": "カメラへのアクセスが拒否されました。宿題の問題を撮影するには、デバイスの設定で有効にしてください。",
+    "permissionDenied": "カメラへのアクセスがオフになっています。端末側で再リクエストできないため、「設定を開く」をタップして、このアプリのカメラを有効にしてください。",
     "openSettings": "設定を開く",
     "openSettingsLabel": "デバイスの設定を開く",
     "allowCamera": "カメラを許可",

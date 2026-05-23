@@ -1301,7 +1301,7 @@
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",
     "permissionPrompt": "Mach ein Foto von deinen Hausaufgaben und ich helfe dir, sie Schritt für Schritt zu lösen.",
-    "permissionDenied": "Der Kamerazugriff wurde verweigert. Du kannst ihn in den Geräteeinstellungen aktivieren, um Hausaufgaben zu fotografieren.",
+    "permissionDenied": "Der Kamerazugriff wurde deaktiviert. Dein Handy lässt uns nicht erneut fragen — tippe auf „Einstellungen öffnen“ und aktiviere die Kamera für diese App.",
     "openSettings": "Einstellungen öffnen",
     "openSettingsLabel": "Geräteeinstellungen öffnen",
     "allowCamera": "Kamera erlauben",

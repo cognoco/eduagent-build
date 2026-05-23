@@ -85,6 +85,19 @@ jest.mock(
   }),
 );
 
+const mockSetMode = jest.fn();
+jest.mock(
+  '../lib/app-context', // gc1-allow: ProfilesScreen only needs the mode setter boundary for row-tap navigation assertions
+  () => ({
+    ...jest.requireActual('../lib/app-context'),
+    useAppContext: () => ({
+      mode: 'study',
+      setMode: mockSetMode,
+      familyCapable: true,
+    }),
+  }),
+);
+
 const mockMutate = jest.fn();
 jest.mock(
   '../hooks/use-profiles', // gc1-allow: hook requires QueryClient + Clerk auth context not available in unit test
@@ -171,7 +184,7 @@ describe('ProfilesScreen', () => {
     screen.getByTestId('profile-active-check');
   });
 
-  it('shows confirmation before switching from owner to child', async () => {
+  it('opens a child row in the parent-native child settings view', () => {
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: ownerProfile,
@@ -183,26 +196,17 @@ describe('ProfilesScreen', () => {
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
 
-    screen.getByTestId('proxy-confirm-modal');
-    screen.getByText("Viewing Alex's account");
     expect(mockSwitchProfile).not.toHaveBeenCalled();
-
-    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
-
-    // [ACCOUNT-04] Proxy confirmation must pass proxyMode:true so ProfileProvider
-    // sets the explicit proxy flag — NOT derived from profile shape.
-    await waitFor(() => {
-      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id', {
-        proxyMode: true,
-      });
+    expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
+    expect(mockSetMode).toHaveBeenCalledWith('family');
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-id', mode: 'settings' },
     });
-
-    await waitFor(() => {
-      expect(mockBack).toHaveBeenCalled();
-    });
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
-  it('cancels parent-to-child proxy confirmation without switching', () => {
+  it('does not expose a normal UI path into child proxy mode', () => {
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: ownerProfile,
@@ -213,12 +217,12 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
-    screen.getByTestId('proxy-confirm-modal');
 
-    fireEvent.press(screen.getByTestId('proxy-confirm-cancel'));
-
+    expect(mockSetMode).toHaveBeenCalledWith('family');
     expect(mockSwitchProfile).not.toHaveBeenCalled();
     expect(screen.queryByText("Viewing Alex's account")).toBeNull();
+    expect(screen.queryByTestId('proxy-confirm-view')).toBeNull();
+    expect(screen.queryByTestId('proxy-confirm-cancel')).toBeNull();
   });
 
   it('switches immediately when a child taps the owner row', async () => {
@@ -236,6 +240,7 @@ describe('ProfilesScreen', () => {
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
     });
+    expect(mockSetMode).not.toHaveBeenCalled();
     expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
   });
 
@@ -331,7 +336,7 @@ describe('ProfilesScreen', () => {
     screen.getByTestId('profiles-loading');
   });
 
-  it('replaces home after switching when there is no back history', async () => {
+  it('replaces the profiles modal when opening a child row', () => {
     mockCanGoBack.mockReturnValue(false);
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
@@ -343,17 +348,12 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
-    fireEvent.press(screen.getByTestId('proxy-confirm-view'));
 
-    // [ACCOUNT-04] Proxy confirmation must pass proxyMode:true.
-    await waitFor(() => {
-      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id', {
-        proxyMode: true,
-      });
-    });
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockSetMode).toHaveBeenCalledWith('family');
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-id', mode: 'settings' },
     });
   });
 

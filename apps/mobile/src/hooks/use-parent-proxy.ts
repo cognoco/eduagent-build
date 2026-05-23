@@ -11,10 +11,10 @@ export interface ParentProxyState {
  * [ACCOUNT-04] Returns proxy state based on the EXPLICIT proxy flag set in
  * ProfileContext — NOT derived from profile shape.
  *
- * Proxy mode is true only when a parent deliberately chose "View account"
- * via the proxy-confirm-modal in profiles.tsx (which calls
- * switchProfile(id, { proxyMode: true })). A plain profile switch always
- * clears proxy mode so a non-owner profile sees normal learner UI.
+ * Proxy mode is true only when a retained internal/test path deliberately
+ * calls switchProfile(id, { proxyMode: true }). Normal user-facing child
+ * review paths use parent-native child routes instead. A plain profile switch
+ * always clears proxy mode so a non-owner profile sees normal learner UI.
  *
  * SecureStore persistence and setProxyMode (api-client module var) are now
  * owned by ProfileProvider.switchProfile so they share a single write path.

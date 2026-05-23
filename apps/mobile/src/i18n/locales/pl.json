@@ -1326,7 +1326,7 @@
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",
     "permissionPrompt": "Zrób zdjęcie swojej pracy domowej, a ja pomogę Ci ją rozwiązać krok po kroku.",
-    "permissionDenied": "Odmówiono dostępu do aparatu. Możesz go włączyć w ustawieniach urządzenia, aby fotografować zadania domowe.",
+    "permissionDenied": "Dostęp do aparatu został wyłączony. Telefon nie pozwala nam zapytać ponownie — dotknij „Otwórz Ustawienia” i włącz aparat dla tej aplikacji.",
     "openSettings": "Otwórz Ustawienia",
     "openSettingsLabel": "Otwórz ustawienia urządzenia",
     "allowCamera": "Zezwól na aparat",

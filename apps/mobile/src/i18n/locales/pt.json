@@ -1326,7 +1326,7 @@
   "homework": {
     "permissionTitle": "É necessário acesso à câmera",
     "permissionPrompt": "Tire uma foto do seu dever de casa e eu te ajudarei a resolvê-lo passo a passo.",
-    "permissionDenied": "O acesso à câmera foi negado. Você pode habilitá-lo nas configurações do seu dispositivo para fotografar os problemas do dever de casa.",
+    "permissionDenied": "O acesso à câmera foi desativado. Seu telefone não nos deixa perguntar de novo — toque em «Abrir Configurações» e ative a câmera para este app.",
     "openSettings": "Abrir Configurações",
     "openSettingsLabel": "Abrir configurações do dispositivo",
     "allowCamera": "Permitir Câmera",

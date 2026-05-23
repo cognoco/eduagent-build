@@ -77,9 +77,9 @@ describe('useParentProxy', () => {
     expect(result.current.parentProfile).toEqual(ownerProfile);
   });
 
-  it('returns isParentProxy=true when explicit proxy mode is set (parent confirmed view-account modal)', () => {
-    // This is the legitimate proxy path: parent tapped child profile,
-    // confirmed "View account" modal → switchProfile(id, { proxyMode: true }).
+  it('returns isParentProxy=true when explicit proxy mode is set by a retained path', () => {
+    // Retained internal/test proxy path:
+    // switchProfile(id, { proxyMode: true }).
     const { wrapper } = createHookWrapper({
       activeProfile: childProfile,
       profiles: [ownerProfile, childProfile],

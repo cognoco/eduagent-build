@@ -195,7 +195,7 @@ export default function CreateProfileScreen() {
         // Show confirmation — parent stays on their own profile
         platformAlert(
           'Profile created',
-          `${trimmedName}'s profile is ready. You can switch to it from the Profiles screen.`,
+          `${trimmedName}'s profile is ready. You can open it from Family mode.`,
         );
         return;
       }

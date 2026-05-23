@@ -24,6 +24,7 @@ import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren, useProfile } from '../../lib/profile';
 import {
   LEARNER_HOME_RETURN_TO,
+  homeHrefForReturnTo,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
 import {
@@ -392,14 +393,20 @@ export function LearnerScreen({
 
   const openIntentAction = useCallback(
     (route: HomeIntentAction['route']): void => {
-      // [CR-2026-05-19-H29] Previously this seeded the back stack by pushing
-      // `homeHref` before the camera route. That logic was load-bearing when
-      // openIntentAction could be called from somewhere other than Home, but
-      // LearnerScreen IS the Home tab — the user is already on Home when this
-      // fires, so the extra push created a duplicate stack entry (back from
-      // camera → home → home again). Just push the leaf; Expo Router's tab
-      // navigator already falls back to the first tab route on `router.back()`
-      // for cross-stack pushes (see CLAUDE.md "cross-tab router.push" rules).
+      // Cross-tab push to a non-tab route (camera) synthesizes a 1-deep stack;
+      // router.back() then falls through to the tabs navigator's first-route
+      // (Home), which for guardians renders FamilyHome. Seed the back-stack
+      // with the calling tab's href ONLY when LearnerScreen is NOT mounted at
+      // Home (i.e., the own-learning tab via OwnLearningScreen). At Home, the
+      // seed would duplicate the stack entry (back: camera → home → home) —
+      // that's the H29 case [CR-2026-05-19-H29] this conditional preserves.
+      if (
+        route === '/(app)/homework/camera' &&
+        returnToTab !== LEARNER_HOME_RETURN_TO
+      ) {
+        router.push(homeHrefForReturnTo(returnToTab));
+      }
+
       router.push({
         pathname: route,
         params:
@@ -408,7 +415,7 @@ export function LearnerScreen({
             : returnParams,
       } as Href);
     },
-    [returnParams],
+    [returnParams, returnToTab],
   );
 
   if (isLoading) {

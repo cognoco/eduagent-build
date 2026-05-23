@@ -255,7 +255,7 @@ describe('usePushTokenRegistration', () => {
   it('does not register the parent device while viewing as a child', async () => {
     // [ACCOUNT-04] Proxy must be explicitly set — plain profile switch to a
     // non-owner slot does NOT set proxy. This test simulates the explicit proxy
-    // path (parent confirmed "View account" modal).
+    // path (retained internal/test proxy mode).
     const ownerProfile = createTestProfile({
       id: 'owner-profile',
       isOwner: true,

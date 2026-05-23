@@ -1371,7 +1371,7 @@
   "homework": {
     "permissionTitle": "Camera Access Needed",
     "permissionPrompt": "Snap a picture of your homework and I'll help you solve it step by step.",
-    "permissionDenied": "Camera access was denied. You can enable it in your device settings to photograph homework problems.",
+    "permissionDenied": "Camera access was turned off. Your phone won't let us ask again — tap Open Settings, then turn the camera on for this app.",
     "openSettings": "Open Settings",
     "openSettingsLabel": "Open device settings",
     "allowCamera": "Allow Camera",
