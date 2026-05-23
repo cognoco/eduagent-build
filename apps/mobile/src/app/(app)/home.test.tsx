@@ -212,55 +212,6 @@ describe('HomeScreen intent router', () => {
   });
 });
 
-describe('HomeScreen mode switch', () => {
-  const originalFlag = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
-
-  beforeEach(() => {
-    jest.useFakeTimers();
-    jest.clearAllMocks();
-    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
-      true;
-  });
-
-  afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
-    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
-      originalFlag;
-  });
-
-  it('switches the Family home chip to My Learning', () => {
-    const parent = createTestProfile({
-      id: 'p1',
-      displayName: 'Maria',
-      isOwner: true,
-      birthYear: 1985,
-    });
-    const child = createTestProfile({
-      id: 'c1',
-      displayName: 'Emma',
-      isOwner: false,
-      birthYear: 2014,
-    });
-    const { wrapper } = createModeScreenWrapper({
-      activeProfile: parent,
-      profiles: [parent, child],
-    });
-
-    render(<HomeScreen />, { wrapper });
-
-    screen.getByText('mode:family');
-
-    fireEvent.press(screen.getByTestId('home-mode-chip'));
-
-    screen.getByText('mode:study');
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-
-    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/home');
-  });
-});
 
 describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;

@@ -186,16 +186,8 @@ export default function HomeScreen(): React.ReactElement {
       <LearnerScreen
         profiles={profiles}
         activeProfile={activeProfile}
-        mode={
-          FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-            ? navigationContract.effectiveAppContext
-            : legacyMode
-        }
-        showParentHome={
-          FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-            ? navigationContract.home.screen === 'FamilyHome'
-            : true
-        }
+        mode={legacyMode}
+        showParentHome={true}
       />
       {CelebrationOverlay}
       {firstNotice && visibleNoticeId === firstNotice.id ? (
