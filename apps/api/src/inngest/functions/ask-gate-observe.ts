@@ -40,7 +40,7 @@ function summarizeReason(reason: unknown) {
   };
 }
 
-function sanitizeDecisionRawData(rawData: unknown) {
+function summarizeRawPayload(rawData: unknown) {
   if (!isRecord(rawData)) {
     return { payloadType: Array.isArray(rawData) ? 'array' : typeof rawData };
   }
@@ -48,6 +48,16 @@ function sanitizeDecisionRawData(rawData: unknown) {
   return {
     payloadType: 'object',
     fieldCount: Object.keys(rawData).length,
+  };
+}
+
+function sanitizeDecisionRawData(rawData: unknown) {
+  if (!isRecord(rawData)) {
+    return summarizeRawPayload(rawData);
+  }
+
+  return {
+    ...summarizeRawPayload(rawData),
     ...summarizeReason(rawData.reason),
   };
 }
@@ -105,15 +115,16 @@ export const askGateTimeoutObserve = inngest.createFunction(
   async ({ event }) => {
     const parseResult = askGateTimeoutEventSchema.safeParse(event.data);
     if (!parseResult.success) {
+      const rawData = summarizeRawPayload(event.data);
       logger.error('ask.gate_timeout.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data, // non-PII: sessionId is an internal ID; no user-identifying fields in payload
+        rawData,
       });
       captureException(
         new Error(
           '[ask-gate-timeout] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+        { extra: { issues: parseResult.error.issues, rawData } },
       );
       return { status: 'schema_error' as const };
     }

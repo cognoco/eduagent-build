@@ -307,6 +307,29 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
     expect(entry?.level).toBe('error');
   });
 
+  it('[BREAK / WI-83] does not log or capture arbitrary timeout schema-drift fields', async () => {
+    await invoke(askGateTimeoutObserve, {
+      sessionId: 123,
+      exchangeCount: 'many',
+      debug: 'learner=student@example.com bearer=secret-token',
+    } as unknown as Record<string, unknown>);
+
+    const entry = lastJsonLine(consoleErrorSpy);
+    const serializedLog = JSON.stringify(entry);
+    const serializedCapture = JSON.stringify(mockCaptureException.mock.calls);
+
+    expect(serializedLog).not.toContain('student@example.com');
+    expect(serializedLog).not.toContain('secret-token');
+    expect(serializedCapture).not.toContain('student@example.com');
+    expect(serializedCapture).not.toContain('secret-token');
+    expect(entry?.context).toMatchObject({
+      rawData: {
+        payloadType: 'object',
+        fieldCount: 3,
+      },
+    });
+  });
+
   // [BREAK / BUG-312] Same Sentry-escalation contract for the timeout
   // observer; without this the schema-drift signal lives only in console logs.
   it('[BREAK / BUG-312] captures schema drift to Sentry exactly once with payload context', async () => {
