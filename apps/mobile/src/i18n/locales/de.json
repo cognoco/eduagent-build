@@ -1966,8 +1966,8 @@
       "withdraw": "Widerrufen",
       "curriculumTitle": "Lehrplan",
       "curriculumSubtitle": "Entdecke die Fächer und Themen von {{name}}",
-      "curriculumNotAvailableTitle": "This child's curriculum is not available",
-      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
+      "curriculumNotAvailableTitle": "Der Lehrplan dieses Kindes ist nicht verfügbar",
+      "curriculumNotAvailableBody": "Sie können nur Lehrpläne für Kinder einsehen, die mit Ihrem Familienkonto verknüpft sind."
     },
     "mentorMemory": {
       "title": "Mentor-Gedächtnis",

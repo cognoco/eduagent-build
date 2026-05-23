@@ -70,7 +70,8 @@
 
   Step 4 — Address findings (coordinator only)
 
-Each agent can own their findings and fix them.
+The coordinator owns the fix loop after collecting all agent findings.
+Agents report findings only; edits stay serialized under the coordinator's ownership.
 
   For each fix:
   - Confirm the file is in the branch diff, not in the WIP-from-other-agents set

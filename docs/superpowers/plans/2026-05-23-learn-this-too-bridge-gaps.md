@@ -40,7 +40,7 @@ A grounded review against the code on branch `nav-dependency` (NOT `finalize-con
 
 **Goal:** Close the remaining concrete gaps between `docs/specs/2026-05-23-learn-this-too-bridge.md` and the code currently on branch `nav-dependency`: resolve the actual source-child name in the relearn header, add the missing service/hook/integration/E2E tests, and broaden API state-matrix coverage. (Task 1 — wiring `<AddToMyLearningButton>` into child topic detail — was already shipped in commit `1d952851a` and is therefore removed from the executable plan; see [C1] above.)
 
-**Architecture:** All seven gaps are additive — no behavior changes to the existing bridge transaction in `apps/api/src/services/family-bridge.ts` and no new routes. UI changes are limited to (a) wiring `<AddToMyLearningButton>` into the existing `child/[profileId]/topic/[topicId]` screen with the `gates.showLearnThisToo` contract guard, and (b) threading `childProfileId` through the `Open` URL so the relearn header can resolve the name with the same `useLinkedChildren()` helper that powers `<TopicProvenance>`. Test work is split into four files: a service-level matrix in `family-bridge.test.ts` (covers the divergent/in-progress/completed/forceCopy/idempotency branches under a real Drizzle-mock), a hook test in `use-clone-from-child.test.ts`, and two new integration tests that exercise the real Postgres path (one happy + GDPR-cascade follow-up).
+**Architecture:** The remaining gaps are additive — no behavior changes to the existing bridge transaction in `apps/api/src/services/family-bridge.ts` and no new routes. The remaining UI work threads `childProfileId` through the `Open` URL so the relearn header can resolve the name with the same `useLinkedChildren()` helper that powers `<TopicProvenance>`. Test work is split into four files: a service-level matrix in `family-bridge.test.ts` (covers the divergent/in-progress/completed/forceCopy/idempotency branches under a real Drizzle-mock), a hook test in `use-clone-from-child.test.ts`, and two new integration tests that exercise the real Postgres path (one happy + GDPR-cascade follow-up).
 
 **Tech Stack:** TypeScript, Hono (API), React Native + Expo Router (mobile), Drizzle ORM, React Query, Jest + React Native Testing Library, Maestro (E2E), Postgres (Neon).
 
@@ -48,7 +48,7 @@ A grounded review against the code on branch `nav-dependency` (NOT `finalize-con
 
 | Gap (from user) | Spec reference | Task |
 |---|---|---|
-| No child curriculum trigger surface wired | §UI Flow → Trigger placement (row 2 of table) | Task 1 |
+| No child curriculum trigger surface wired | §UI Flow → Trigger placement (row 2 of table) | Task 1 (already done; historical only) |
 | Relearn header generic, not resolved to child name | §Relearn Screen Adjustments §3 | Task 2 |
 | No `use-clone-from-child.test.ts` | §Mobile Implementation → Test coverage | Task 3 |
 | No `tests/integration/family-bridge.integration.test.ts` | §Mobile Implementation → Test coverage; §Implementation Sequence Step 2 | Task 5 |
@@ -358,9 +358,13 @@ jest.mock('expo-router', () => ({
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 
 const mockProfileId = 'adult-1';
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({ activeProfile: { id: mockProfileId } }),
-}));
+jest.mock('../lib/profile', () => {
+  const actual = jest.requireActual('../lib/profile');
+  return {
+    ...actual,
+    useProfile: () => ({ activeProfile: { id: mockProfileId } }),
+  };
+});
 
 const mockTrack = jest.fn();
 jest.mock('../lib/analytics', () => ({

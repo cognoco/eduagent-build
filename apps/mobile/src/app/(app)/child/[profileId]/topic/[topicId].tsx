@@ -259,14 +259,16 @@ export default function TopicDetailScreen() {
           })()}
         </View>
 
-        <AddToMyLearningButton
-          childProfileId={profileId ?? ''}
-          childDisplayName={childName ?? 'your child'}
-          subjectName={subjectName}
-          topicId={topicId}
-          topicTitle={title}
-          triggerPath={`/child/${profileId ?? ''}/curriculum/topic/${topicId ?? ''}`}
-        />
+        {profileId && topicId ? (
+          <AddToMyLearningButton
+            childProfileId={profileId}
+            childDisplayName={childName ?? 'your child'}
+            subjectName={subjectName}
+            topicId={topicId}
+            topicTitle={title}
+            triggerPath={`/child/${profileId}/curriculum/topic/${topicId}`}
+          />
+        ) : null}
 
         {/* Recent fluency-drill scores for this topic, when any have been
             recorded. Strip-style render keeps it scannable; tap-through and

@@ -179,7 +179,7 @@ export default function ChildCurriculumScreen(): React.ReactElement {
   ) {
     return (
       <NotLinkedEmptyState
-        onPress={() => router.replace('/(app)/recaps' as Href)}
+        onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH as Href)}
       />
     );
   }

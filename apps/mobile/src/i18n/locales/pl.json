@@ -1991,8 +1991,8 @@
       "withdraw": "Wycofaj",
       "curriculumTitle": "Program nauczania",
       "curriculumSubtitle": "Przeglądaj przedmioty i tematy użytkownika {{name}}",
-      "curriculumNotAvailableTitle": "This child's curriculum is not available",
-      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
+      "curriculumNotAvailableTitle": "Program nauczania tego dziecka nie jest dostępny",
+      "curriculumNotAvailableBody": "Możesz przeglądać program nauczania tylko dla dzieci powiązanych z Twoim kontem rodzinnym."
     },
     "mentorMemory": {
       "title": "Pamięć mentora",

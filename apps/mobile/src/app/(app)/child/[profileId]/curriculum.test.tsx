@@ -165,6 +165,10 @@ describe('ChildCurriculumScreen', () => {
 
     fireEvent.press(screen.getByTestId('child-curriculum-not-linked-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/recaps');
+    const { goBackOrReplace } = require('../../../../lib/navigation');
+    expect(goBackOrReplace).toHaveBeenCalledWith(
+      expect.objectContaining({ replace: mockReplace }),
+      '/(app)/home',
+    );
   });
 });

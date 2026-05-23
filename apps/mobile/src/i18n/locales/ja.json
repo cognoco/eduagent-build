@@ -1966,8 +1966,8 @@
       "withdraw": "撤回",
       "curriculumTitle": "カリキュラム",
       "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧",
-      "curriculumNotAvailableTitle": "This child's curriculum is not available",
-      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
+      "curriculumNotAvailableTitle": "このお子さまのカリキュラムは利用できません",
+      "curriculumNotAvailableBody": "ご家族アカウントに紐づいているお子さまのカリキュラムのみ確認できます。"
     },
     "mentorMemory": {
       "title": "メンターの記憶",

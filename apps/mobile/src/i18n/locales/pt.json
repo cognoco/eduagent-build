@@ -1991,8 +1991,8 @@
       "withdraw": "Retirar",
       "curriculumTitle": "Currículo",
       "curriculumSubtitle": "Explore as disciplinas e os tópicos de {{name}}",
-      "curriculumNotAvailableTitle": "This child's curriculum is not available",
-      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
+      "curriculumNotAvailableTitle": "O currículo desta criança não está disponível",
+      "curriculumNotAvailableBody": "Você só pode visualizar o currículo de crianças vinculadas à sua conta familiar."
     },
     "mentorMemory": {
       "title": "Memória do mentor",

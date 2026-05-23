@@ -1966,8 +1966,8 @@
       "withdraw": "Trekk tilbake",
       "curriculumTitle": "Læreplan",
       "curriculumSubtitle": "Utforsk {{name}}s fag og emner",
-      "curriculumNotAvailableTitle": "This child's curriculum is not available",
-      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
+      "curriculumNotAvailableTitle": "Dette barnets læreplan er ikke tilgjengelig",
+      "curriculumNotAvailableBody": "Du kan bare se læreplanen for barn som er knyttet til familiekontoen din."
     },
     "mentorMemory": {
       "title": "Mentorens minne",
