@@ -8,7 +8,9 @@ import {
 import { setActiveProfileId } from '../lib/api-client';
 import { ProfileContext, type ProfileContextValue } from '../lib/profile';
 import {
+  triggerSurface,
   useCloneFromChild,
+  type BridgeTriggerSurface,
   type CloneFromChildArgs,
 } from './use-clone-from-child';
 
@@ -364,5 +366,76 @@ describe('useCloneFromChild', () => {
         }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Trigger-surface path-to-surface mapping
+//
+// The analytics consumer slices bridge taps by `triggerSurface`. The union
+// is exported so callers (entry-surface screens) can construct typed
+// triggerPaths, and so adding a new entry surface forces an exhaustive
+// update here — silent drift to a new string would break every dashboard
+// downstream.
+// ---------------------------------------------------------------------------
+
+describe('triggerSurface', () => {
+  const cases: Array<{
+    label: string;
+    triggerPath: string;
+    expected: BridgeTriggerSurface;
+  }> = [
+    {
+      label: 'recaps detail screen',
+      triggerPath: '/recaps/abc-123',
+      expected: 'recaps_detail',
+    },
+    {
+      label: 'child curriculum detail',
+      triggerPath: `/child/${CHILD_PROFILE_ID}/curriculum/subj-1`,
+      expected: 'child_curriculum_detail',
+    },
+    {
+      label: 'child curriculum landing (trailing /curriculum)',
+      triggerPath: `/child/${CHILD_PROFILE_ID}/curriculum`,
+      expected: 'child_curriculum_detail',
+    },
+    {
+      label: 'child session detail',
+      triggerPath: `/child/${CHILD_PROFILE_ID}/session/sess-9`,
+      expected: 'child_session_detail',
+    },
+    {
+      label: 'family progress (top level)',
+      triggerPath: '/progress',
+      expected: 'family_progress',
+    },
+    {
+      label: 'family progress (deep)',
+      triggerPath: '/progress/children',
+      expected: 'family_progress',
+    },
+    {
+      label: 'child detail fallback',
+      triggerPath: `/child/${CHILD_PROFILE_ID}`,
+      expected: 'family_child',
+    },
+    {
+      label: 'unknown surface defaults to family_child',
+      triggerPath: '/some/other/path',
+      expected: 'family_child',
+    },
+  ];
+
+  it.each(cases)('maps $label to $expected', ({ triggerPath, expected }) => {
+    expect(triggerSurface(triggerPath)).toBe(expected);
+  });
+
+  it('return type is the BridgeTriggerSurface union (compile-time check)', () => {
+    // Type-level guard: if the union widens to `string`, the assignment
+    // below becomes lossless and we lose the exhaustiveness signal. The
+    // runtime check is incidental — the real value is the typed assignment.
+    const surface: BridgeTriggerSurface = triggerSurface('/recaps/x');
+    expect(surface).toBe('recaps_detail');
   });
 });

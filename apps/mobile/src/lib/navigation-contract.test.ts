@@ -752,8 +752,8 @@ describe('resolveNavigationContract snapshot surface', () => {
   });
 });
 
-describe('resolveNavigationContract V0 preservation', () => {
-  it('preserves the legacy 5-tab guardian shell when both navigation flags are off', () => {
+describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint)', () => {
+  it('returns LEGACY_GUARDIAN_TABS (5 tabs) when both flags are off and profile is family-capable', () => {
     const contract = resolveNavigationContract(
       makeContext({
         activeProfile: familyAdult,
@@ -763,11 +763,30 @@ describe('resolveNavigationContract V0 preservation', () => {
           MODE_NAV_V1_ENABLED: false,
         },
         profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
       }),
     );
 
     expectTabs(contract, legacyGuardianTabs);
     expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
+    expect(contract.gates.showLearnThisToo).toBe(false);
+  });
+
+  it('reports v1-disabled (and does not enter the legacy-5-tab path) when V0 flag is on and V1 is off', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: null,
+        flags: {
+          MODE_NAV_V0_ENABLED: true,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.diagnostic.reason).toBe('v1-disabled');
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
 });

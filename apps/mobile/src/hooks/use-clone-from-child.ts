@@ -64,7 +64,21 @@ export type CloneToast = {
   secondaryAction?: CloneToastAction;
 };
 
-function triggerSurface(triggerPath: string): string {
+// Local union — the analytics event consumer (Mixpanel / warehouse) groups
+// bridge taps by this dimension. Promoting to a typed union means a new entry
+// surface that forgets to extend this union becomes a TypeScript error at
+// the function return, not a silent drift to `string` that ships to prod
+// looking like a new value. Spec audit-trail line in
+// docs/specs/2026-05-23-learn-this-too-bridge.md §Authorization point 6 is
+// derived from this union (it is the source of truth, not the spec).
+export type BridgeTriggerSurface =
+  | 'recaps_detail'
+  | 'child_curriculum_detail'
+  | 'child_session_detail'
+  | 'family_progress'
+  | 'family_child';
+
+export function triggerSurface(triggerPath: string): BridgeTriggerSurface {
   if (triggerPath.startsWith('/recaps/')) return 'recaps_detail';
   if (triggerPath.includes('/session/')) return 'child_session_detail';
   if (

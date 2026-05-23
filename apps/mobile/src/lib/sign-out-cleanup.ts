@@ -31,8 +31,17 @@ import { sanitizeSecureStoreKey } from './secure-storage';
 export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // EarlyAdopterCard.tsx — DISMISSED_KEY: `earlyAdopterDismissed_${profileId}`
   (id) => `earlyAdopterDismissed_${id}`,
-  // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey: sanitized `bookmark-nudge-shown_${profileId}` (colon replaced by _)
+  // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey writes the dot-separator
+  // form post-2026-05-23 (commit 8803082f8). The colon-sanitized form is the
+  // legacy variant the writer's getLegacyBookmarkNudgeKey reads as a fallback;
+  // we wipe it here too so it doesn't persist forever on devices that
+  // dismissed under the old key. [CR-2026-05-21-143]
+  (id) => sanitizeSecureStoreKey(`bookmark-nudge-shown.${id}`),
   (id) => sanitizeSecureStoreKey(`bookmark-nudge-shown:${id}`),
+  // Raw un-sanitized colon variant: defensive against any pre-sanitization
+  // writer that landed before sanitizeSecureStoreKey was introduced. iOS
+  // would have rejected this key; Android may have accepted it.
+  (id) => `bookmark-nudge-shown:${id}`,
   // use-dictation-preferences.ts — getPaceKey + getPunctKey
   (id) => `dictation-pace-${id}`,
   (id) => `dictation-punctuation-${id}`,

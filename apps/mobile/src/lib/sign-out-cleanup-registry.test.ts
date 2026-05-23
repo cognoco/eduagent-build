@@ -177,9 +177,10 @@ function isCoveredByPerProfileShape(rawArg: string): boolean {
       [/^getPunctKey\([^)]*\)$/, (s) => `dictation-punctuation-${s}`],
       [
         /^getBookmarkNudgeKey\([^)]*\)$/,
-        (s) =>
-          // Mirror the sanitization of `bookmark-nudge-shown:${id}` -- colon is replaced by _.
-          `bookmark-nudge-shown:${s}`.replace(/[^a-zA-Z0-9._-]/g, '_'),
+        // Mirror BookmarkNudgeTooltip.tsx writer: `${KEY_PREFIX}.${profileId}`
+        // (commit 8803082f8 — switched from `:` to `.` separator). The dot is
+        // already in the SecureStore-safe set so sanitize() is a no-op.
+        (s) => `bookmark-nudge-shown.${s}`.replace(/[^a-zA-Z0-9._-]/g, '_'),
       ],
       [
         /^getRecoveryKey\([^)]*\)$/,
