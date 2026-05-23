@@ -213,7 +213,7 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain('reliable_for_facts="true"');
     expect(prompt).toContain('never show it, source IDs');
     expect(prompt).toContain(
-      'ordinary low-stakes general knowledge questions at rungs 1-3',
+      'ordinary low-stakes general knowledge questions at rungs 1-4',
     );
     expect(prompt).toContain(
       'Do NOT use "general_knowledge" for homework answers',
