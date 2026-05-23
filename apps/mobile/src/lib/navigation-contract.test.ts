@@ -60,6 +60,12 @@ const child = makeProfile({
   isOwner: false,
   linkCreatedAt: ISO,
 });
+const underAgeOwnerWithLinks = makeProfile({
+  id: '00000000-0000-7000-a000-000000000301',
+  birthYear: CHILD_BIRTH_YEAR,
+  defaultAppContext: 'family',
+  hasFamilyLinks: true,
+});
 const linkedChildParams = { profileId: child.id };
 const unlinkedChildParams = {
   profileId: '00000000-0000-7000-a000-000000000299',
@@ -131,6 +137,28 @@ describe('resolveNavigationContract matrix', () => {
         titleKey: 'tabs.myLearning',
         iconName: 'School',
         showAddChild: true,
+        showInlineStudyInvite: false,
+        showLearnThisToo: false,
+        progressScope: 'self',
+        reason: 'family-intent-without-family-links',
+      },
+    },
+    {
+      name: 'under-18 owner with family links is Study-only',
+      context: makeContext({
+        activeProfile: underAgeOwnerWithLinks,
+        appContext: 'family',
+        profiles: [underAgeOwnerWithLinks, child],
+      }),
+      expected: {
+        shape: 'study',
+        effectiveAppContext: 'study',
+        isFamilyCapable: false,
+        tabs: studyTabs,
+        homeScreen: 'LearnerHome',
+        titleKey: 'tabs.myLearning',
+        iconName: 'School',
+        showAddChild: false,
         showInlineStudyInvite: false,
         showLearnThisToo: false,
         progressScope: 'self',
@@ -407,7 +435,7 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.gates.showBilling).toBe(true);
   });
 
-  it('requires the server family-link flag before surfacing Add to my learning', () => {
+  it('does not infer V1 family capability from the local child profile list', () => {
     const localFamilyAdult = makeProfile({
       id: '00000000-0000-7000-a000-000000000103',
       defaultAppContext: 'family',
@@ -422,9 +450,10 @@ describe('resolveNavigationContract gates', () => {
       }),
     );
 
-    expect(contract.shape).toBe('family');
-    expect(contract.isFamilyCapable).toBe(true);
+    expect(contract.shape).toBe('study');
+    expect(contract.isFamilyCapable).toBe(false);
     expect(contract.gates.showLearnThisToo).toBe(false);
+    expect(contract.canEnter('recaps')).toBe(false);
   });
 
   it('keeps Add to my learning hidden when V1 navigation is disabled', () => {
@@ -475,12 +504,17 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'home', canEnter: true, isSurfaced: true },
       { route: 'library', canEnter: true, isSurfaced: true },
       { route: 'recaps', canEnter: false, isSurfaced: false },
+      { route: 'recaps/[recapId]', canEnter: false, isSurfaced: false },
+      { route: 'progress/saved', canEnter: true, isSurfaced: true },
+      { route: 'progress/vocabulary', canEnter: true, isSurfaced: true },
       { route: 'session', canEnter: true, isSurfaced: true },
       { route: 'homework', canEnter: true, isSurfaced: true },
       { route: 'dictation', canEnter: true, isSurfaced: true },
       { route: 'quiz', canEnter: true, isSurfaced: true },
       { route: 'practice', canEnter: true, isSurfaced: true },
       { route: 'mentor-memory', canEnter: true, isSurfaced: true },
+      { route: 'more/account', canEnter: true, isSurfaced: true },
+      { route: 'more/privacy', canEnter: true, isSurfaced: true },
       {
         route: 'child/[profileId]',
         params: linkedChildParams,
@@ -504,6 +538,9 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'home', canEnter: true, isSurfaced: true },
       { route: 'library', canEnter: false, isSurfaced: false },
       { route: 'recaps', canEnter: true, isSurfaced: true },
+      { route: 'recaps/[recapId]', canEnter: true, isSurfaced: true },
+      { route: 'progress/saved', canEnter: false, isSurfaced: false },
+      { route: 'progress/vocabulary', canEnter: false, isSurfaced: false },
       { route: 'session', canEnter: true, isSurfaced: false },
       { route: 'homework', canEnter: true, isSurfaced: false },
       { route: 'dictation', canEnter: true, isSurfaced: false },
@@ -542,6 +579,8 @@ describe('resolveNavigationContract route predicates', () => {
       },
       { route: 'topic/relearn', canEnter: true, isSurfaced: false },
       { route: 'subscription', canEnter: true, isSurfaced: true },
+      { route: 'more/account', canEnter: true, isSurfaced: true },
+      { route: 'more/privacy', canEnter: true, isSurfaced: true },
     ]);
   });
 
@@ -563,7 +602,10 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'home', canEnter: true, isSurfaced: true },
       { route: 'library', canEnter: true, isSurfaced: true },
       { route: 'progress', canEnter: true, isSurfaced: true },
+      { route: 'progress/saved', canEnter: false, isSurfaced: false },
+      { route: 'progress/vocabulary', canEnter: false, isSurfaced: false },
       { route: 'recaps', canEnter: false, isSurfaced: false },
+      { route: 'recaps/[recapId]', canEnter: false, isSurfaced: false },
       { route: 'session', canEnter: false, isSurfaced: false },
       { route: 'homework', canEnter: false, isSurfaced: false },
       { route: 'dictation', canEnter: false, isSurfaced: false },
@@ -583,6 +625,8 @@ describe('resolveNavigationContract route predicates', () => {
         isSurfaced: false,
       },
       { route: 'subscription', canEnter: false, isSurfaced: false },
+      { route: 'more/account', canEnter: false, isSurfaced: false },
+      { route: 'more/privacy', canEnter: false, isSurfaced: false },
     ]);
   });
 });
