@@ -647,12 +647,32 @@ describe('CameraScreen', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('shows close button that calls router.back()', () => {
+  // handleClose replaces with the explicit returnTo target rather than
+  // calling router.back(); see camera.tsx handleClose. Reason: camera is
+  // entered via cross-tab push (1-deep stack) so back() falls through to
+  // the tabs first-route — which for guardians is FamilyHome, not the tab
+  // they came from. Replace makes close/back deterministic.
+  it('close button replaces to learner home by default', () => {
     const { getByTestId } = render(<CameraScreen />, {
       wrapper: createWrapper(),
     });
     fireEvent.press(getByTestId('close-button'));
-    expect(mockRouter.back).toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('close button replaces to returnTo target when set', () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      subjectId: 'sub-123',
+      subjectName: 'Mathematics',
+      returnTo: 'own-learning',
+    });
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+    fireEvent.press(getByTestId('close-button'));
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/own-learning');
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
   // ---- Processing phase ----

@@ -136,13 +136,19 @@ export function SubjectResolutionAccessory({
   };
   const typedSubjectDisabled =
     isStreaming || pendingClassification || createSubject.isPending;
+  const hasSuggestedSubject = Boolean(
+    pendingSubjectResolution.suggestedSubjectName,
+  );
+  const hasResolutionChips =
+    hasSuggestedSubject ||
+    pendingSubjectResolution.candidates.length > 0 ||
+    Boolean(pendingSubjectResolution.resolveSuggestions?.length);
 
   return (
     <View
       className="bg-surface border-t border-surface-elevated px-4 py-3"
       style={{
-        paddingBottom:
-          pendingSubjectResolution.candidates.length === 0 ? 16 : undefined,
+        paddingBottom: hasResolutionChips ? undefined : 16,
       }}
     >
       <Text className="text-body-sm font-semibold text-text-primary">
@@ -151,32 +157,14 @@ export function SubjectResolutionAccessory({
       <Text className="text-body-sm text-text-secondary mt-1 mb-3">
         {pendingSubjectResolution.prompt}
       </Text>
-      {pendingSubjectResolution.candidates.length > 0 ? (
+      {hasResolutionChips ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 8 }}
           testID="session-subject-resolution"
         >
-          {pendingSubjectResolution.candidates.map((candidate) => (
-            <Pressable
-              key={candidate.subjectId}
-              onPress={() => void handleResolveSubject(candidate)}
-              disabled={isStreaming || pendingClassification}
-              className="rounded-full bg-surface-elevated px-4 py-2"
-              accessibilityRole="button"
-              accessibilityLabel={`Choose ${candidate.subjectName}`}
-              accessibilityState={{
-                disabled: isStreaming || pendingClassification,
-              }}
-              testID={`subject-resolution-${candidate.subjectId}`}
-            >
-              <Text className="text-body-sm font-semibold text-text-primary">
-                {candidate.subjectName}
-              </Text>
-            </Pressable>
-          ))}
-          {/* BUG-233: When classifier suggests a subject, offer to create it inline */}
+          {/* BUG-233: Show the named suggested subject first so the prompt's CTA is visible. */}
           {pendingSubjectResolution.suggestedSubjectName && (
             <Pressable
               onPress={() => void handleCreateSuggestedSubject()}
@@ -201,6 +189,24 @@ export function SubjectResolutionAccessory({
               </Text>
             </Pressable>
           )}
+          {pendingSubjectResolution.candidates.map((candidate) => (
+            <Pressable
+              key={candidate.subjectId}
+              onPress={() => void handleResolveSubject(candidate)}
+              disabled={isStreaming || pendingClassification}
+              className="rounded-full bg-surface-elevated px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Choose ${candidate.subjectName}`}
+              accessibilityState={{
+                disabled: isStreaming || pendingClassification,
+              }}
+              testID={`subject-resolution-${candidate.subjectId}`}
+            >
+              <Text className="text-body-sm font-semibold text-text-primary">
+                {candidate.subjectName}
+              </Text>
+            </Pressable>
+          ))}
           {/* Render rich suggestions from the resolve API */}
           {pendingSubjectResolution.resolveSuggestions?.map((suggestion) => (
             <Pressable

@@ -107,10 +107,45 @@ function stripListMarkers(text: string): string {
     .join('\n');
 }
 
+// Real homework math has digits/operators in STANDALONE tokens (e.g., "5",
+// "+", "x²", "12.5"). ML Kit garble like "Shob608rgg" has a digit run buried
+// inside a letter run — that should NOT count as a math cue, otherwise any
+// confidently-misread handwriting passes the gate as long as it contains a
+// stray digit. Require ≥2 math-like tokens to constitute a math expression.
+function hasMathExpression(text: string): boolean {
+  const tokens = text.split(/\s+/).filter(Boolean);
+  let mathCount = 0;
+  for (const rawToken of tokens) {
+    const token = rawToken.replace(/[.,;]+$/, '');
+    if (!token) continue;
+    // Pure digit run (with optional decimal)
+    if (/^\d+(?:\.\d+)?$/.test(token)) {
+      mathCount++;
+      continue;
+    }
+    // Pure operator run
+    if (/^[+\-−×*·÷/=<>≤≥±²³]+$/.test(token)) {
+      mathCount++;
+      continue;
+    }
+    // Algebra-shaped token: only letters, digits, and math symbols, with at
+    // least one digit AND no run of letters longer than 2 chars (rules out
+    // garble like "Shob608rgg" while admitting "5x", "2y²", "x=10", "3a+b").
+    if (
+      /^[\p{L}\d+\-−×*·÷/=<>≤≥±²³.()]+$/u.test(token) &&
+      /\d/.test(token) &&
+      !/\p{L}{3,}/u.test(token)
+    ) {
+      mathCount++;
+    }
+  }
+  return mathCount >= 2;
+}
+
 function hasStrongHomeworkCue(text: string): boolean {
   const contentText = stripListMarkers(text);
 
-  if (/\d/.test(contentText) || /[+\-−×*·÷/=<>≤≥±²³]/.test(contentText)) {
+  if (hasMathExpression(contentText)) {
     return true;
   }
 
@@ -151,17 +186,15 @@ function shouldEscalateLocalOcr(text: string, confidence?: number): boolean {
     return true;
   }
 
-  if (hasStrongHomeworkCue(text)) {
-    return false;
-  }
-
-  const words = getWordCount(text);
-  const nonEmptyLines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean).length;
-
-  return words > 0 && words <= 8 && nonEmptyLines <= 5;
+  // If the text has NO strong homework cue (no standalone math tokens, no
+  // question/colon punctuation, no homework verb), the ML Kit output isn't
+  // recognisably homework. Escalate to the server LLM regardless of length —
+  // previously this only escalated for short results (≤8 words / ≤5 lines),
+  // which let long confident-but-garbled outputs through (e.g., handwriting
+  // misread as "Rad / meol bs / Homo mino Shob608rgg / ..." passes only
+  // because of the embedded digit; with hasMathExpression that no longer
+  // counts as a cue, and now the length gate doesn't either).
+  return !hasStrongHomeworkCue(text);
 }
 
 function getLocalConfidence(result: unknown): number | undefined {

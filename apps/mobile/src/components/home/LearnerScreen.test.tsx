@@ -13,8 +13,6 @@ import {
 import {
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
-  OWN_LEARNING_HREF,
-  OWN_LEARNING_RETURN_TO,
 } from '../../lib/navigation';
 
 let mockLinkedChildren: Array<{
@@ -666,32 +664,6 @@ describe('LearnerScreen', () => {
     });
     // Guard against regression: home href must NOT be pushed before camera.
     expect(mockPush).not.toHaveBeenCalledWith(LEARNER_HOME_HREF);
-  });
-
-  // Break test: when LearnerScreen is mounted at the own-learning tab (via
-  // OwnLearningScreen, returnToTab='own-learning'), the Homework action must
-  // pre-seed the back-stack with the own-learning href so router.back() from
-  // camera returns to own-learning instead of falling through to the tabs'
-  // first-route (Home → FamilyHome for guardians). Reverting this guard
-  // re-introduces the guardian back-nav regression from H29.
-  it('seeds own-learning before camera when mounted at own-learning tab', async () => {
-    render(
-      <LearnerScreen
-        {...defaultProps}
-        showParentHome={false}
-        returnToTab={OWN_LEARNING_RETURN_TO}
-      />,
-      { wrapper: Wrapper },
-    );
-
-    await waitFor(() => screen.getByTestId('home-action-homework'));
-    fireEvent.press(screen.getByTestId('home-action-homework'));
-    expect(mockPush).toHaveBeenCalledTimes(2);
-    expect(mockPush).toHaveBeenNthCalledWith(1, OWN_LEARNING_HREF);
-    expect(mockPush).toHaveBeenNthCalledWith(2, {
-      pathname: '/(app)/homework/camera',
-      params: { returnTo: OWN_LEARNING_RETURN_TO },
-    });
   });
 
   it('shows coach band from resume target', async () => {

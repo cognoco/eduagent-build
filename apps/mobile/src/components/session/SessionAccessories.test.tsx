@@ -207,6 +207,68 @@ describe('SubjectResolutionAccessory typed subject override', () => {
       getByTestId('subject-resolution-custom-submit').props.accessibilityState,
     ).toEqual({ disabled: true });
   });
+
+  it('puts the suggested new subject before enrolled subject candidates', () => {
+    const { toJSON } = render(
+      <SubjectResolutionAccessory
+        {...(baseProps as any)}
+        pendingSubjectResolution={{
+          ...baseProps.pendingSubjectResolution,
+          suggestedSubjectName: 'Philosophy',
+          candidates: [
+            { subjectId: 's1', subjectName: 'Business Studies' },
+            { subjectId: 's2', subjectName: 'History' },
+          ],
+        }}
+      />,
+    );
+
+    const testIds: string[] = [];
+    const collectTestIds = (node: unknown) => {
+      if (!node || typeof node === 'string') return;
+      if (Array.isArray(node)) {
+        node.forEach(collectTestIds);
+        return;
+      }
+      const treeNode = node as {
+        props?: { testID?: unknown };
+        children?: unknown;
+      };
+      if (typeof treeNode.props?.testID === 'string') {
+        testIds.push(treeNode.props.testID);
+      }
+      collectTestIds(treeNode.children);
+    };
+    collectTestIds(toJSON());
+
+    const scrollIndex = testIds.indexOf('session-subject-resolution');
+    expect(scrollIndex).toBeGreaterThanOrEqual(0);
+    expect(testIds.slice(scrollIndex + 1, scrollIndex + 4)).toEqual([
+      'subject-resolution-create-new',
+      'subject-resolution-s1',
+      'subject-resolution-s2',
+    ]);
+  });
+
+  it('offers the suggested new subject even when there are no candidates', () => {
+    const handleCreateSuggestedSubject = jest.fn();
+    const { getByTestId, getByText } = render(
+      <SubjectResolutionAccessory
+        {...(baseProps as any)}
+        pendingSubjectResolution={{
+          ...baseProps.pendingSubjectResolution,
+          suggestedSubjectName: 'Philosophy',
+          candidates: [],
+        }}
+        handleCreateSuggestedSubject={handleCreateSuggestedSubject}
+      />,
+    );
+
+    getByText('+ Philosophy');
+    fireEvent.press(getByTestId('subject-resolution-create-new'));
+
+    expect(handleCreateSuggestedSubject).toHaveBeenCalledTimes(1);
+  });
 });
 
 // M6: Zero-problems homework fallback must have an escape action
