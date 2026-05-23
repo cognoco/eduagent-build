@@ -53,13 +53,19 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
     const currentHash = _envValidationHash(env);
 
     if (_validatedEnvHash !== currentHash) {
-      // Skip in tests and local development — tests mock bindings selectively,
-      // and Wrangler local bindings can differ slightly from deployed envs.
-      // Optional chain on c.env: app.request() tests run without bindings.
-      if (
-        process.env['NODE_ENV'] !== 'test' &&
-        c.env?.ENVIRONMENT !== 'development'
-      ) {
+      // Skip entirely in test environments — tests mock bindings selectively
+      // and rarely provide the full set.  All other environments (including
+      // local Wrangler dev) run the full Zod schema validation so
+      // misconfigured bindings surface immediately rather than as cryptic
+      // errors on the first DB query.
+      //
+      // [CR-2026-05-21-099] Previously this block was gated on
+      //   process.env['NODE_ENV'] !== 'test' && c.env?.ENVIRONMENT !== 'development'
+      // which silently skipped Zod validation in Wrangler dev.  The fix:
+      //   (1) validateEnv (Zod) — always run when NODE_ENV !== 'test'.
+      //   (2) validateProductionBindings — also always called; it has its own
+      //       internal ENVIRONMENT guard and returns early for non-production.
+      if (process.env['NODE_ENV'] !== 'test') {
         let parsedEnv: Env;
         try {
           parsedEnv = validateEnv(
