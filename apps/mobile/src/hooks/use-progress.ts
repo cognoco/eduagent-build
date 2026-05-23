@@ -41,11 +41,13 @@ import {
 } from '@eduagent/schemas';
 import { useApiClient, ForbiddenError, NotFoundError } from '../lib/api-client';
 import { useAppContext } from '../lib/app-context';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { Sentry } from '../lib/sentry';
+import { useNavigationDataScopeContract } from './use-navigation-contract';
 
 export interface NextReviewTopic {
   topicId: string;
@@ -60,6 +62,24 @@ export interface ReviewSummary {
 }
 
 export type { OverdueTopic, OverdueSubject, OverdueTopicsResponse };
+
+function useProgressNavigationScope(): {
+  activeProfile: ReturnType<typeof useProfile>['activeProfile'];
+  mode: ReturnType<typeof useAppContext>['mode'];
+  canAccessFamilyChildData: boolean;
+} {
+  const { activeProfile } = useProfile();
+  const { mode: legacyMode } = useAppContext();
+  const navigationContract = useNavigationDataScopeContract();
+  const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.effectiveAppContext
+    : legacyMode;
+  const canAccessFamilyChildData = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showFamilyChildActivity
+    : legacyMode !== 'study' && activeProfile?.isOwner === true;
+
+  return { activeProfile, mode, canAccessFamilyChildData };
+}
 
 export function useSubjectProgress(
   subjectId: string,
@@ -439,8 +459,8 @@ export function useProfileSessions(
   profileId: string | undefined,
 ): UseQueryResult<ChildSession[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.profileSessions(
@@ -471,9 +491,7 @@ export function useProfileSessions(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id ||
-        ((mode === null || mode === 'family') &&
-          activeProfile.isOwner === true)),
+      (profileId === activeProfile.id || canAccessFamilyChildData),
   });
 }
 
@@ -518,8 +536,8 @@ export function useProfileReports(
   profileId: string | undefined,
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.profileReports(
@@ -547,9 +565,7 @@ export function useProfileReports(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id ||
-        ((mode === null || mode === 'family') &&
-          activeProfile.isOwner === true)),
+      (profileId === activeProfile.id || canAccessFamilyChildData),
   });
 }
 
@@ -557,8 +573,8 @@ export function useProfileWeeklyReports(
   profileId: string | undefined,
 ): UseQueryResult<WeeklyReportSummary[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.profileWeeklyReports(
@@ -591,9 +607,7 @@ export function useProfileWeeklyReports(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id ||
-        ((mode === null || mode === 'family') &&
-          activeProfile.isOwner === true)),
+      (profileId === activeProfile.id || canAccessFamilyChildData),
   });
 }
 
@@ -643,8 +657,8 @@ export function useChildInventory(
   options?: { enabled?: boolean },
 ): UseQueryResult<KnowledgeInventory | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childInventory(mode, childProfileId),
@@ -668,9 +682,8 @@ export function useChildInventory(
     },
     enabled:
       (options?.enabled ?? true) &&
-      mode !== 'study' &&
       !!activeProfile &&
-      activeProfile.isOwner === true &&
+      canAccessFamilyChildData &&
       !!childProfileId,
   });
 }
@@ -680,8 +693,8 @@ export function useChildProgressSummary(
   options?: { enabled?: boolean },
 ): UseQueryResult<ProgressSummary | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childProgressSummary(mode, childProfileId),
@@ -712,9 +725,8 @@ export function useChildProgressSummary(
     },
     enabled:
       (options?.enabled ?? true) &&
-      mode !== 'study' &&
       !!activeProfile &&
-      activeProfile.isOwner === true &&
+      canAccessFamilyChildData &&
       !!childProfileId,
   });
 }
@@ -723,8 +735,8 @@ export function useChildReports(
   childProfileId: string | undefined,
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childReports(mode, childProfileId),
@@ -742,11 +754,7 @@ export function useChildReports(
         cleanup();
       }
     },
-    enabled:
-      mode !== 'study' &&
-      !!activeProfile &&
-      activeProfile.isOwner === true &&
-      !!childProfileId,
+    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
   });
 }
 
@@ -755,8 +763,8 @@ export function useChildReportDetail(
   reportId: string | undefined,
 ): UseQueryResult<MonthlyReportRecord | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childReportDetail(
@@ -788,9 +796,8 @@ export function useChildReportDetail(
       }
     },
     enabled:
-      mode !== 'study' &&
       !!activeProfile &&
-      activeProfile.isOwner === true &&
+      canAccessFamilyChildData &&
       !!childProfileId &&
       !!reportId,
   });
@@ -884,8 +891,8 @@ export function useChildWeeklyReports(
   childProfileId: string | undefined,
 ): UseQueryResult<WeeklyReportSummary[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childWeeklyReports(mode, childProfileId),
@@ -931,11 +938,7 @@ export function useChildWeeklyReports(
         cleanup();
       }
     },
-    enabled:
-      mode !== 'study' &&
-      !!activeProfile &&
-      activeProfile.isOwner === true &&
-      !!childProfileId,
+    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
   });
 }
 
@@ -948,8 +951,8 @@ export function useChildWeeklyReportDetail(
   reportId: string | undefined,
 ): UseQueryResult<WeeklyReportRecord | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childWeeklyReportDetail(
@@ -981,9 +984,8 @@ export function useChildWeeklyReportDetail(
       }
     },
     enabled:
-      mode !== 'study' &&
       !!activeProfile &&
-      activeProfile.isOwner === true &&
+      canAccessFamilyChildData &&
       !!childProfileId &&
       !!reportId,
   });

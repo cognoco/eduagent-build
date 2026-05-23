@@ -25,6 +25,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 
@@ -47,6 +48,7 @@ import {
 } from '../../hooks/use-revenuecat';
 import { useNotifyParentSubscribe } from '../../hooks/use-settings';
 import { useXpSummary } from '../../hooks/use-streaks';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { track } from '../../lib/analytics';
 
 // ---------------------------------------------------------------------------
@@ -622,6 +624,7 @@ function SubscriptionContent(): React.ReactElement | null {
   const router = useRouter();
   const colors = useThemeColors();
   const { activeProfile, profiles = [] } = useProfile();
+  const navigationContract = useNavigationContract();
   const client = useApiClient();
   const { t } = useTranslation();
 
@@ -646,9 +649,16 @@ function SubscriptionContent(): React.ReactElement | null {
     useFamilySubscription(subscription?.tier === 'family');
   const byokWaitlist = useJoinByokWaitlist();
   const removeFamilyProfile = useRemoveFamilyProfile();
-  const linkedChildCount = activeProfile?.isOwner
-    ? profiles.filter((profile) => profile.id !== activeProfile.id).length
-    : 0;
+  const canUseOwnerBillingGates = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showBilling
+    : activeProfile?.isOwner === true;
+  const canRemoveFamilyMember = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showRemoveFamilyMember
+    : activeProfile?.isOwner === true;
+  const linkedChildCount =
+    canUseOwnerBillingGates && activeProfile
+      ? profiles.filter((profile) => profile.id !== activeProfile.id).length
+      : 0;
   const breakdownAnalytics = {
     is_owner: activeProfile?.isOwner === true,
     breakdown_section_visible: Boolean(usage?.byProfile?.length),
@@ -1492,7 +1502,7 @@ function SubscriptionContent(): React.ReactElement | null {
                           testID={`usage-profile-${row.profile_id}`}
                         >
                           <Text className="text-caption text-text-secondary">
-                            {row.is_self && activeProfile?.isOwner
+                            {row.is_self && canUseOwnerBillingGates
                               ? 'Your share'
                               : row.is_self
                                 ? 'Your usage'
@@ -1587,7 +1597,7 @@ function SubscriptionContent(): React.ReactElement | null {
                           ? `${member.displayName} (owner)`
                           : member.displayName}
                       </Text>
-                      {activeProfile?.isOwner === true && !member.isOwner ? (
+                      {canRemoveFamilyMember && !member.isOwner ? (
                         <Pressable
                           onPress={() =>
                             handleRemoveFamilyProfile(

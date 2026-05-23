@@ -1357,6 +1357,25 @@ describe('BookScreen', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
+  it('[CR-2026-05-21-120] bookmarks button pushes to progress/saved exactly once, not twice', () => {
+    // Before the fix, handleSubjectBookmarksPress issued two pushes:
+    //   1. router.push('/(app)/progress')          ← seeds extra history entry
+    //   2. requestAnimationFrame → router.push('/(app)/progress/saved')
+    // This caused the user to need TWO Back presses to return to the shelf.
+    // The fix collapses to a single push because progress/_layout.tsx exports
+    // unstable_settings = { initialRouteName: 'index' }, seeding the parent
+    // automatically on cross-tab entry.
+    const { getByTestId } = render(<BookScreen />);
+
+    fireEvent.press(getByTestId('book-subject-bookmarks'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/progress/saved',
+      params: { subjectId: 'sub-1' },
+    });
+  });
+
   it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', () => {
     (Sentry.addBreadcrumb as jest.Mock).mockClear();
 

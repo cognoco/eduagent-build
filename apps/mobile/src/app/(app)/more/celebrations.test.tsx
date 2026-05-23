@@ -56,6 +56,17 @@ jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins contract gates without the full app provider tree */,
+  () => ({
+    useNavigationContract: () => ({
+      gates: {
+        showCelebrationsChildEditor: mockActiveProfile?.isOwner === true,
+      },
+    }),
+  }),
+);
+
+jest.mock(
   '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
   () => ({
     useCelebrationLevel: () => ({

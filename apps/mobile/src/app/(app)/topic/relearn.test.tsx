@@ -31,24 +31,40 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../hooks/use-progress', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  useOverdueTopics: () => mockOverdueTopicsReturn,
-}));
-
-jest.mock('../../../hooks/use-retention', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  useStartRelearn: () => ({
-    mutate: mockMutate,
-    isPending: false,
+jest.mock(
+  '../../../hooks/use-progress' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useOverdueTopics: () => mockOverdueTopicsReturn,
   }),
-  useTeachingPreference: () => mockTeachingPreferenceReturn,
-}));
+);
 
-jest.mock('../../../hooks/use-parent-proxy', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  useParentProxy: () => ({ isParentProxy: mockIsParentProxy }),
-}));
+jest.mock(
+  '../../../hooks/use-retention' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useStartRelearn: () => ({
+      mutate: mockMutate,
+      isPending: false,
+    }),
+    useTeachingPreference: () => mockTeachingPreferenceReturn,
+  }),
+);
+
+jest.mock(
+  '../../../hooks/use-parent-proxy' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useParentProxy: () => ({ isParentProxy: mockIsParentProxy }),
+  }),
+);
+
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins route-entry contract without the full app provider tree */,
+  () => ({
+    useNavigationContract: () => ({
+      canEnter: () => !mockIsParentProxy,
+      gates: {},
+    }),
+  }),
+);
 
 jest.mock('../../../lib/profile', () => ({
   ...jest.requireActual('../../../lib/profile'),
@@ -57,12 +73,14 @@ jest.mock('../../../lib/profile', () => ({
   }),
 }));
 
-jest.mock('../../../lib/navigation', () => ({
-  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
-  goBackOrReplace: (...args: unknown[]) => mockBack(...args),
-  homeHrefForReturnTo: (returnTo: string | undefined) =>
-    returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
-}));
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockBack(...args),
+    homeHrefForReturnTo: (returnTo: string | undefined) =>
+      returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
+  }),
+);
 
 const RelearnScreen = require('./relearn').default;
 

@@ -31,7 +31,7 @@ import {
   PRACTICE_RETURN_TO,
 } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
-import { useParentProxy } from '../../../hooks/use-parent-proxy';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useTheme, useThemeColors } from '../../../lib/theme';
 import { getSubjectTint } from '../../../lib/subject-tints';
@@ -299,7 +299,7 @@ export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
-  const { isParentProxy } = useParentProxy();
+  const navigationContract = useNavigationContract();
   const { colorScheme } = useTheme();
   const colors = usePracticeColors();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
@@ -438,7 +438,9 @@ export default function PracticeScreen(): React.ReactElement {
     router.push('/(app)/library' as Href);
   };
 
-  if (isParentProxy) return <Redirect href="/(app)/home" />;
+  if (!navigationContract.canEnter('practice')) {
+    return <Redirect href="/(app)/home" />;
+  }
 
   return (
     <ScrollView

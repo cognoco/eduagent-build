@@ -7,12 +7,14 @@ import { useTranslation } from 'react-i18next';
 import type { CelebrationLevel } from '@eduagent/schemas';
 
 import { useProfile } from '../../../lib/profile';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useCelebrationLevel,
   useChildCelebrationLevel,
   useUpdateCelebrationLevel,
   useUpdateChildCelebrationLevel,
 } from '../../../hooks/use-settings';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
@@ -24,6 +26,7 @@ export default function CelebrationsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { activeProfile, profiles } = useProfile();
+  const navigationContract = useNavigationContract();
   const { childProfileId } = useLocalSearchParams<{
     childProfileId?: string;
   }>();
@@ -33,7 +36,9 @@ export default function CelebrationsScreen(): React.ReactElement {
     : undefined;
   const canEditChildPreferences =
     isChildMode &&
-    activeProfile?.isOwner === true &&
+    (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+      ? navigationContract.gates.showCelebrationsChildEditor
+      : activeProfile?.isOwner === true) &&
     childProfile?.isOwner === false;
 
   const selfCelebration = useCelebrationLevel();

@@ -47,6 +47,7 @@ import { useResolveSubject } from '../../../hooks/use-resolve-subject';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStreaks } from '../../../hooks/use-streaks';
 import { useActiveSessionForTopic } from '../../../hooks/use-progress';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   useTotalTopicsCompleted,
   useIsFirstSession,
@@ -171,6 +172,7 @@ function SessionScreenInner() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
+  const navigationContract = useNavigationContract();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -1104,7 +1106,7 @@ function SessionScreenInner() {
         messageFeedback,
         bookmarkState,
         quotaError,
-        isOwner: activeProfile?.isOwner === true,
+        isOwner: navigationContract.gates.sessionIsOwner,
         stage: conversationStage,
         handleQuickChip,
         handleMessageFeedback,

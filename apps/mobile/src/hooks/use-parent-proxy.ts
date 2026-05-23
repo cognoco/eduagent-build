@@ -20,7 +20,7 @@ export interface ParentProxyState {
  * owned by ProfileProvider.switchProfile so they share a single write path.
  */
 export function useParentProxy(): ParentProxyState {
-  const { profiles, activeProfile, isExplicitProxyMode } = useProfile();
+  const { profiles = [], activeProfile, isExplicitProxyMode } = useProfile();
 
   const parentProfile = useMemo(
     () => profiles.find((profile) => profile.isOwner) ?? null,
