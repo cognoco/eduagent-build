@@ -125,10 +125,10 @@ Implement a TypeScript verifier that:
 - Recursively scans `.github/workflows/*.{yml,yaml}` and `.github/actions/**/action.{yml,yaml}`.
 - Parses YAML with the existing `yaml` package.
 - Walks all step objects.
-- Allows local actions with `uses: ./...` only when no `with:` or `env:` value references `secrets.`.
+- Allows local actions with `uses: ./...` in `pull_request` and `pull_request_target` workflows only when no inherited workflow/job `env:`, step `with:`, or step `env:` value references `secrets.`.
 - Allows external actions only when the ref after `@` matches `/^[a-f0-9]{40}$/`.
-- Rejects `curl ... | sh`, `curl ... | bash`, `wget ... | sh`, and `wget ... | bash` unless the same step includes `sha256sum -c`.
-- Rejects workflows triggered by `workflow_run` when a job both checks out `github.event.workflow_run.head_sha` and has any `secrets.` reference in the same job.
+- Rejects `curl ... | sh`, `curl ... | bash`, `wget ... | sh`, and `wget ... | bash`.
+- Rejects workflows triggered by `workflow_run` when a job both checks out `github.event.workflow_run.head_sha` and has any `secrets.` reference in inherited workflow/job `env:`, step `with:`, or step `env:` unless the job has a strict positive skip-output guard.
 
 Expose a pure helper for tests:
 
@@ -289,18 +289,18 @@ Expected: no PR/workflow_run secret-exposure findings remain; installer findings
 - Modify: `.github/workflows/e2e-web.yml`
 - Modify: `.github/workflows/mobile-ci.yml`
 
-- [ ] **Step 1: Replace Doppler installer steps with checksum-verified release install**
+- [ ] **Step 1: Replace Doppler installer steps with SHA-pinned release install**
 
-Use a shell block that downloads a fixed release asset and matching `checksums.txt` from `DopplerHQ/cli`, verifies it, then installs the binary. The implementation must include `sha256sum -c` in the step so the verifier can prove the safety property.
+Use a shell block that downloads a fixed release asset from `DopplerHQ/cli`, verifies it against an in-repo SHA256 value, then installs the binary. The implementation must include `sha256sum -c` in the step so the verifier can prove the safety property.
 
 Expected shape:
 
 ```bash
 DOPPLER_VERSION="3.76.0"
 DOPPLER_ARCHIVE="doppler_${DOPPLER_VERSION}_linux_amd64.tar.gz"
+DOPPLER_SHA256="04f1ff30ed162d7af1dba7f11ad6a37ef35099de86a7ec6e261b64b1b337a3f3"
 curl -fsSLO "https://github.com/DopplerHQ/cli/releases/download/${DOPPLER_VERSION}/${DOPPLER_ARCHIVE}"
-curl -fsSLO "https://github.com/DopplerHQ/cli/releases/download/${DOPPLER_VERSION}/checksums.txt"
-grep " ${DOPPLER_ARCHIVE}$" checksums.txt | sha256sum -c -
+echo "${DOPPLER_SHA256}  ${DOPPLER_ARCHIVE}" | sha256sum -c -
 sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
 doppler --version
 ```
@@ -398,7 +398,7 @@ function summarizeReason(reason: string | undefined) {
 }
 ```
 
-Replace `reason: data.reason ?? null` in the info log with `...summarizeReason(data.reason)`. Keep `reason` out of return values and Sentry extras except schema-drift payloads already covered by separate escalation tests.
+Replace `reason: data.reason ?? null` in the info log with `...summarizeReason(data.reason)`. Keep raw schema-drift payload fields out of return values, logs, and Sentry extras; expose only payload shape metadata plus the reason summary.
 
 - [ ] **Step 4: Run test and verify GREEN**
 

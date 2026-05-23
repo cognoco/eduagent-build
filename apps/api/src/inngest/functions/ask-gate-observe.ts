@@ -45,10 +45,10 @@ function sanitizeDecisionRawData(rawData: unknown) {
     return { payloadType: Array.isArray(rawData) ? 'array' : typeof rawData };
   }
 
-  const { reason, ...rest } = rawData;
   return {
-    ...rest,
-    ...summarizeReason(reason),
+    payloadType: 'object',
+    fieldCount: Object.keys(rawData).length,
+    ...summarizeReason(rawData.reason),
   };
 }
 

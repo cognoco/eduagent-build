@@ -48,6 +48,12 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function unwrapGithubExpression(value: string): string {
+  const trimmed = value.trim();
+  const expression = trimmed.match(/^\$\{\{\s*([\s\S]*?)\s*\}\}$/);
+  return (expression?.[1] ?? trimmed).trim();
+}
+
 function getWorkflowOn(parsed: Record<string, unknown>): unknown {
   // The `yaml` package uses YAML 1.2 by default where `on` remains a string.
   // Keep the boolean fallback for portability if parser options change.
@@ -179,18 +185,21 @@ function validateWorkflowRunJob(
   file: string,
   workflowRun: boolean,
   job: Record<string, unknown>,
+  inheritedSecrets: boolean,
   pullRequestSkipOutputs: Set<string>,
 ) {
   if (!workflowRun) return null;
   const jobText = stringify(job);
   if (
     jobText.includes('github.event.workflow_run.head_sha') &&
-    containsSecretReference(job)
+    (inheritedSecrets || containsSecretReference(job))
   ) {
-    const jobIf = stringify(job.if);
+    const jobIf = unwrapGithubExpression(stringify(job.if));
     if (
       [...pullRequestSkipOutputs].some((output) =>
-        new RegExp(`${escapeRegExp(output)}\\s*==\\s*['"]true['"]`).test(jobIf),
+        new RegExp(`^${escapeRegExp(output)}\\s*==\\s*['"]true['"]$`).test(
+          jobIf,
+        ),
       )
     ) {
       return null;
@@ -225,7 +234,9 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
   if (!isRecord(parsed)) return violations;
 
   const workflowOn = getWorkflowOn(parsed);
-  const pullRequestWorkflow = hasEvent(workflowOn, 'pull_request');
+  const pullRequestWorkflow =
+    hasEvent(workflowOn, 'pull_request') ||
+    hasEvent(workflowOn, 'pull_request_target');
   const workflowRun = hasEvent(workflowOn, 'workflow_run');
   const jobs = getJobEntries(parsed);
   const pullRequestSkipOutputs = collectPullRequestSkipOutputs(jobs);
@@ -245,6 +256,7 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
       file,
       workflowRun,
       job,
+      inheritedSecrets,
       pullRequestSkipOutputs,
     );
     if (workflowRunViolation) violations.push(workflowRunViolation);

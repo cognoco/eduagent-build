@@ -158,6 +158,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Checkout trusted base action definitions
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -165,6 +166,7 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .trusted-actions
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Run Claude Code Review (token 1)
         id: review-1

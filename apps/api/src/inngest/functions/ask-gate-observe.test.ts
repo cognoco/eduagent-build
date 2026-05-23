@@ -202,6 +202,31 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     });
   });
 
+  it('[BREAK / WI-83] does not log or capture arbitrary schema-drift fields', async () => {
+    await invoke(askGateDecisionObserve, {
+      sessionId: 123,
+      reason: 'contains email=parent@example.com token=secret',
+      debug: 'learner=student@example.com bearer=secret-token',
+    } as unknown as Record<string, unknown>);
+
+    const entry = lastJsonLine(consoleErrorSpy);
+    const serializedLog = JSON.stringify(entry);
+    const serializedCapture = JSON.stringify(mockCaptureException.mock.calls);
+
+    expect(serializedLog).not.toContain('student@example.com');
+    expect(serializedLog).not.toContain('secret-token');
+    expect(serializedCapture).not.toContain('student@example.com');
+    expect(serializedCapture).not.toContain('secret-token');
+    expect(entry?.context).toMatchObject({
+      rawData: {
+        payloadType: 'object',
+        fieldCount: 3,
+        reasonPresent: true,
+        reasonLength: 'contains email=parent@example.com token=secret'.length,
+      },
+    });
+  });
+
   // [BREAK / BUG-312] Schema drift must escalate to Sentry — silent
   // logger.error alone fails the CLAUDE.md "Silent recovery without
   // escalation" rule. Pinned to "called exactly once" so a future refactor

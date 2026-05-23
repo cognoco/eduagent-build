@@ -117,6 +117,28 @@ describe('checkGithubWorkflowSecurity', () => {
     );
   });
 
+  it('rejects local actions that receive secrets in pull_request_target workflows', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-local-secret-target.yml',
+      `
+      name: Bad local secret target
+      on: pull_request_target
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: ./.github/actions/claude-review
+              with:
+                oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'local action receives secrets in a pull_request workflow',
+    );
+  });
+
   it('allows local actions without secrets in pull_request workflows', () => {
     writeFixture(
       root,
@@ -255,6 +277,33 @@ describe('checkGithubWorkflowSecurity', () => {
     );
   });
 
+  it('rejects workflow_run jobs that inherit workflow-level secret env while checking out head code', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-workflow-run-workflow-env.yml',
+      `
+      name: Bad workflow run workflow env
+      on:
+        workflow_run:
+          workflows: ["CI"]
+      env:
+        TEST_SEED_SECRET: \${{ secrets.TEST_SEED_SECRET }}
+      jobs:
+        e2e:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+              with:
+                ref: \${{ github.event.workflow_run.head_sha }}
+            - run: pnpm test:e2e
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'workflow_run exposes secrets while checking out head_sha',
+    );
+  });
+
   it('allows workflow_run jobs that skip pull_request runs before secret-backed jobs', () => {
     writeFixture(
       root,
@@ -322,6 +371,47 @@ describe('checkGithubWorkflowSecurity', () => {
         e2e:
           needs: check-changes
           if: needs.check-changes.outputs.run-mobile-e2e == 'false'
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+              with:
+                ref: \${{ github.event.workflow_run.head_sha }}
+            - run: pnpm test:e2e
+              env:
+                TEST_SEED_SECRET: \${{ secrets.TEST_SEED_SECRET }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'workflow_run exposes secrets while checking out head_sha',
+    );
+  });
+
+  it('rejects workflow_run jobs with bypassable pull_request skip-output conditions', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-workflow-run-bypassable-skip.yml',
+      `
+      name: Bad workflow run bypassable skip
+      on:
+        workflow_run:
+          workflows: ["CI"]
+      jobs:
+        check-changes:
+          runs-on: ubuntu-latest
+          outputs:
+            run-mobile-e2e: \${{ steps.analyze.outputs.run-mobile-e2e }}
+          steps:
+            - name: Analyze changed file types
+              id: analyze
+              run: |
+                if [ "\${{ github.event_name }}" = "workflow_run" ] && [ "\${{ github.event.workflow_run.event }}" = "pull_request" ]; then
+                  echo "run-mobile-e2e=false" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+        e2e:
+          needs: check-changes
+          if: always() || needs.check-changes.outputs.run-mobile-e2e == 'true'
           runs-on: ubuntu-latest
           steps:
             - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
