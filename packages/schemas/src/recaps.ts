@@ -1,0 +1,43 @@
+import { z } from 'zod';
+
+import { engagementSignalSchema } from './sessions';
+
+const recapSessionTypeSchema = z.enum(['learning', 'homework', 'interleaved']);
+
+export const recapsQuerySchema = z.object({
+  childProfileId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type RecapsQuery = z.infer<typeof recapsQuerySchema>;
+
+export const recapListItemSchema = z.object({
+  recapId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  childProfileId: z.string().uuid(),
+  childDisplayName: z.string(),
+  subjectId: z.string().uuid(),
+  subjectName: z.string().nullable(),
+  topicId: z.string().uuid().nullable(),
+  topicTitle: z.string().nullable(),
+  sessionType: recapSessionTypeSchema,
+  startedAt: z.string().datetime(),
+  endedAt: z.string().datetime().nullable(),
+  exchangeCount: z.number().int().min(0),
+  displayTitle: z.string(),
+  displaySummary: z.string().nullable(),
+  highlight: z.string().nullable(),
+  narrative: z.string().nullable(),
+  conversationPrompt: z.string().nullable(),
+  engagementSignal: engagementSignalSchema.nullable(),
+});
+export type RecapListItem = z.infer<typeof recapListItemSchema>;
+
+export const recapsResponseSchema = z.object({
+  recaps: z.array(recapListItemSchema),
+});
+export type RecapsResponse = z.infer<typeof recapsResponseSchema>;
+
+export const recapDetailResponseSchema = z.object({
+  recap: recapListItemSchema,
+});
+export type RecapDetailResponse = z.infer<typeof recapDetailResponseSchema>;
