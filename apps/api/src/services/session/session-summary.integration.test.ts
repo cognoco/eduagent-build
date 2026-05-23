@@ -7,33 +7,21 @@
  * doubled XP. Post-fix: advisory lock + transaction gate serialises concurrent
  * calls; the second sees the already-submitted row and returns it idempotently.
  *
- * No mocks of internal services or database — real DB only.
- * External boundaries: LLM (evaluateSummary) is NOT called in these tests
- * because submitSummary is called after the evaluation is done externally;
- * we exercise the DB-side race directly via the service function.
+ * No mocks of internal services or database — real DB only. The external LLM
+ * boundary uses the provider registry fixture so routeAndCall remains real.
  *
- * NOTE: evaluateSummary is an external LLM call. In integration tests we
- * cannot stub it without internal mocks. We instead test the idempotency
- * invariant by exercising the INSERT+lock path directly through a real DB
- * and relying on the unique-lock behaviour for the second concurrent call.
+ * The test verifies the idempotency invariant by exercising the INSERT+lock
+ * path directly through a real DB and relying on the unique-lock behaviour for
+ * the second concurrent call.
  * The test verifies that after two concurrent calls, XP is awarded at most
  * once (reflectionMultiplierApplied is true on exactly 1 xp_ledger row).
  */
-
-const mockRouteAndCall = jest.fn();
-
-jest.mock('../llm' /* gc1-allow: external LLM boundary */, () => {
-  const actual = jest.requireActual('../llm');
-  return {
-    ...actual,
-    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-  };
-});
 
 import { eq, inArray, like } from 'drizzle-orm';
 import {
   accounts,
   createDatabase,
+  curricula,
   curriculumBooks,
   curriculumTopics,
   learningSessions,
@@ -46,6 +34,11 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { generateUUIDv7 } from '@eduagent/database';
+import {
+  llmStructuredJson,
+  registerLlmProviderFixture,
+} from '../../test-utils/llm-provider-fixtures';
+import { _resetCircuits } from '../llm';
 import { submitSummary } from './session-summary';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -105,14 +98,26 @@ async function seedFullSessionWithXpEntry(): Promise<{
     .values({ profileId: profile!.id, name: 'Mathematics' })
     .returning();
 
+  const [curriculum] = await db
+    .insert(curricula)
+    .values({ subjectId: subject!.id, version: 1 })
+    .returning();
+
   const [book] = await db
     .insert(curriculumBooks)
-    .values({ subjectId: subject!.id, title: 'Algebra I' })
+    .values({ subjectId: subject!.id, title: 'Algebra I', sortOrder: 0 })
     .returning();
 
   const [topic] = await db
     .insert(curriculumTopics)
-    .values({ bookId: book!.id, title: 'Linear Equations' })
+    .values({
+      curriculumId: curriculum!.id,
+      bookId: book!.id,
+      title: 'Linear Equations',
+      description: 'Solve equations with one variable.',
+      sortOrder: 0,
+      estimatedMinutes: 20,
+    })
     .returning();
 
   const [session] = await db
@@ -161,20 +166,38 @@ async function cleanupByPrefix() {
 describeIfDb(
   'submitSummary concurrent idempotency [CR-2026-05-19-M3 SITE 1]',
   () => {
-    beforeEach(async () => {
-      mockRouteAndCall.mockReset();
-      mockRouteAndCall.mockResolvedValue({
-        response: JSON.stringify({
+    let llmFixture: ReturnType<typeof registerLlmProviderFixture> | undefined;
+
+    beforeAll(() => {
+      _resetCircuits();
+      llmFixture = registerLlmProviderFixture({
+        chatResponse: llmStructuredJson({
           feedback: 'Good work',
           hasUnderstandingGaps: false,
           gapAreas: [],
           isAccepted: true,
         }),
       });
+    });
+
+    beforeEach(async () => {
+      _resetCircuits();
+      llmFixture?.clearCalls();
+      llmFixture?.clearChatError();
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'Good work',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
       await cleanupByPrefix();
     });
 
     afterAll(async () => {
+      llmFixture?.dispose();
+      _resetCircuits();
       await cleanupByPrefix();
     });
 
