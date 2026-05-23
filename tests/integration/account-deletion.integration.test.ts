@@ -651,6 +651,7 @@ describe('Integration: account deletion cascade', () => {
       // ---- Dictation ----
       await db.insert(dictationResults).values({
         profileId,
+        completionKey: 'a0000000-0000-5000-8000-000000000001',
         date: '2026-05-20',
         sentenceCount: 5,
         mode: 'homework',
