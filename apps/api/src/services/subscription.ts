@@ -126,7 +126,7 @@ export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
  * - trial -> active, expired, past_due (payment failed before trial converts)
  * - active -> past_due, cancelled, expired
  * - past_due -> active, cancelled, expired
- * - cancelled -> expired
+ * - cancelled -> active, expired
  *
  * Invalid: expired -> anything, trial -> cancelled (must go through active first)
  */

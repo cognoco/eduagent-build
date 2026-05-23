@@ -398,27 +398,30 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('logs error and returns existing row on invalid transition (no throw)', async () => {
+  it('throws on invalid transition so callers do not continue quota updates', async () => {
     const db = createIntegrationDb();
     const acct = await seedAccount('webhook-invalid-transition');
     await db.insert(subscriptions).values({
       accountId: acct.id,
       tier: 'plus',
-      status: 'cancelled',
+      status: 'expired',
       stripeSubscriptionId: 'sub_invalid_001',
       lastStripeEventTimestamp: new Date('2026-01-01T00:00:00.000Z'),
     });
 
-    // cancelled -> active is not a valid transition in the state machine
+    // expired -> active is not a valid transition in the state machine
     const ts = new Date('2026-06-20T00:00:00.000Z').toISOString();
-    const result = await updateSubscriptionFromWebhook(db, 'sub_invalid_001', {
-      status: 'active',
-      lastStripeEventTimestamp: ts,
-    });
+    await expect(
+      updateSubscriptionFromWebhook(db, 'sub_invalid_001', {
+        status: 'active',
+        lastStripeEventTimestamp: ts,
+      }),
+    ).rejects.toThrow(/Invalid Stripe subscription transition/);
 
-    // Should not throw — logs + Sentry + returns existing row
-    expect(result).not.toBeNull();
-    expect(result!.status).toBe('cancelled');
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('expired');
   });
 });
 
