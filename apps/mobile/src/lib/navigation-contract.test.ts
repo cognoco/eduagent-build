@@ -490,6 +490,12 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'quiz', canEnter: true, isSurfaced: true },
       { route: 'practice', canEnter: true, isSurfaced: true },
       { route: 'mentor-memory', canEnter: true, isSurfaced: true },
+      {
+        route: 'topic/relearn',
+        params: { for: 'child' },
+        canEnter: false,
+        isSurfaced: false,
+      },
       { route: 'more/account', canEnter: true, isSurfaced: true },
       { route: 'more/privacy', canEnter: true, isSurfaced: true },
       {
@@ -555,6 +561,12 @@ describe('resolveNavigationContract route predicates', () => {
         isSurfaced: false,
       },
       { route: 'topic/relearn', canEnter: true, isSurfaced: false },
+      {
+        route: 'topic/relearn',
+        params: { for: 'child' },
+        canEnter: true,
+        isSurfaced: false,
+      },
       { route: 'subscription', canEnter: true, isSurfaced: true },
       { route: 'more/account', canEnter: true, isSurfaced: true },
       { route: 'more/privacy', canEnter: true, isSurfaced: true },

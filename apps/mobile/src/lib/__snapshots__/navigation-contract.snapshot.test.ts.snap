@@ -14,6 +14,7 @@ exports[`navigation-contract matrix snapshot row-1: Adult owner, no family links
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "hidden",
@@ -65,6 +66,7 @@ exports[`navigation-contract matrix snapshot row-1: Adult owner, no family links
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -94,6 +96,7 @@ exports[`navigation-contract matrix snapshot row-2: Adult owner, no family links
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "hidden",
@@ -145,6 +148,7 @@ exports[`navigation-contract matrix snapshot row-2: Adult owner, no family links
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -174,6 +178,7 @@ exports[`navigation-contract matrix snapshot row-3: Adult owner, family-capable,
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "global-header",
@@ -227,6 +232,7 @@ exports[`navigation-contract matrix snapshot row-3: Adult owner, family-capable,
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -256,6 +262,7 @@ exports[`navigation-contract matrix snapshot row-4: Adult owner, family-capable,
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": true,
   },
   "chrome": {
     "modeSwitcher": "global-header",
@@ -309,6 +316,7 @@ exports[`navigation-contract matrix snapshot row-4: Adult owner, family-capable,
     "session": false,
     "subscription": true,
     "topic/relearn": false,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "family",
@@ -338,6 +346,7 @@ exports[`navigation-contract matrix snapshot row-5: Adult owner, family-capable,
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": true,
   },
   "chrome": {
     "modeSwitcher": "global-header",
@@ -391,6 +400,7 @@ exports[`navigation-contract matrix snapshot row-5: Adult owner, family-capable,
     "session": false,
     "subscription": true,
     "topic/relearn": false,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "family",
@@ -420,6 +430,7 @@ exports[`navigation-contract matrix snapshot row-6: Adult owner, family-capable,
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "global-header",
@@ -473,6 +484,7 @@ exports[`navigation-contract matrix snapshot row-6: Adult owner, family-capable,
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -502,6 +514,7 @@ exports[`navigation-contract matrix snapshot row-7: Parent proxy active 1`] = `
     "session": false,
     "subscription": false,
     "topic/relearn": false,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "hidden",
@@ -555,6 +568,7 @@ exports[`navigation-contract matrix snapshot row-7: Parent proxy active 1`] = `
     "session": false,
     "subscription": false,
     "topic/relearn": false,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -583,6 +597,7 @@ exports[`navigation-contract matrix snapshot row-8: Child profile on shared pare
     "session": true,
     "subscription": false,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "hidden",
@@ -634,6 +649,7 @@ exports[`navigation-contract matrix snapshot row-8: Child profile on shared pare
     "session": true,
     "subscription": false,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -663,6 +679,7 @@ exports[`navigation-contract matrix snapshot row-9: Solo child owner 1`] = `
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "hidden",
@@ -714,6 +731,7 @@ exports[`navigation-contract matrix snapshot row-9: Solo child owner 1`] = `
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -743,6 +761,7 @@ exports[`navigation-contract matrix snapshot row-10: Profile not loaded 1`] = `
     "session": false,
     "subscription": false,
     "topic/relearn": false,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "hidden",
@@ -794,6 +813,7 @@ exports[`navigation-contract matrix snapshot row-10: Profile not loaded 1`] = `
     "session": false,
     "subscription": false,
     "topic/relearn": false,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",
@@ -823,6 +843,7 @@ exports[`navigation-contract matrix snapshot row-v0-flags-off: V0 hard constrain
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
     "modeSwitcher": "hidden",
@@ -876,6 +897,7 @@ exports[`navigation-contract matrix snapshot row-v0-flags-off: V0 hard constrain
     "session": true,
     "subscription": true,
     "topic/relearn": true,
+    "topic/relearn:{"for":"child"}": false,
   },
   "queryScope": {
     "appContext": "study",

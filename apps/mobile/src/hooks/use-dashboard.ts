@@ -56,28 +56,31 @@ interface ChildSessionDetail {
 function useDashboardNavigationScope(): {
   activeProfile: ReturnType<typeof useProfile>['activeProfile'];
   mode: ReturnType<typeof useAppContext>['mode'];
+  profileId: string | undefined;
   canAccessFamilyChildData: boolean;
 } {
   const { activeProfile } = useProfile();
   const { mode: legacyMode } = useAppContext();
   const navigationContract = useNavigationDataScopeContract();
   const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.effectiveAppContext
+    ? navigationContract.queryScope.appContext
     : legacyMode;
+  const profileId = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? (navigationContract.queryScope.profileId ?? undefined)
+    : activeProfile?.id;
   const canAccessFamilyChildData = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.gates.showFamilyChildActivity
     : legacyMode !== 'study' && activeProfile?.isOwner === true;
 
-  return { activeProfile, mode, canAccessFamilyChildData };
+  return { activeProfile, mode, profileId, canAccessFamilyChildData };
 }
 
 export function useDashboard(): UseQueryResult<DashboardData> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useDashboardNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.dashboard.root(mode, activeProfile?.id),
+    queryKey: queryKeys.dashboard.root(mode, profileId),
     queryFn: async ({ signal: querySignal }): Promise<DashboardData> => {
       // Bug #7 fix: combine TanStack Query's cancellation signal with a
       // 10s timeout so the request aborts if the API is unreachable,
@@ -124,8 +127,7 @@ export function useAckNotice(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { mode, profileId } = useDashboardNavigationScope();
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
@@ -137,7 +139,7 @@ export function useAckNotice(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.root(mode, activeProfile?.id),
+        queryKey: queryKeys.dashboard.root(mode, profileId),
       });
     },
   });

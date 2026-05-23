@@ -57,6 +57,7 @@ const STANDARD_PROBES: ReadonlyArray<{
   { route: 'progress/saved' },
   { route: 'session' },
   { route: 'topic/relearn' },
+  { route: 'topic/relearn', params: { for: 'child' } },
   { route: 'child/[profileId]', params: { profileId: LINKED_CHILD_ID } },
   {
     route: 'child/[profileId]/curriculum',

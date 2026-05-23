@@ -330,6 +330,15 @@ export function resolveNavigationContract(
       return familyShape && isLinkedChildRoute(params, linkedChildIds);
     }
 
+    if (route === 'topic/relearn') {
+      if (params?.for === 'child') {
+        // Learn-this-too bridge: source child context is read-only; writes are
+        // scoped to the adult family owner in their own learning context.
+        return familyShape && ownerRole && !context.isParentProxy;
+      }
+      return familyShape ? ownerRole : true;
+    }
+
     if (LEARNING_ROUTES.has(route)) {
       return familyShape ? ownerRole : true;
     }
