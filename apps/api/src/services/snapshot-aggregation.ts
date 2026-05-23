@@ -43,10 +43,10 @@ import { detectMilestones, storeMilestones } from './milestone-detection';
 import { computeWeeklyDeltas } from './progress-helpers';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
-
-const logger = createLogger();
 import { withTransientDatabaseRetry } from './transient-db-retry';
 import { generateWeeklyReportData } from './weekly-report';
+
+const logger = createLogger();
 
 type SubjectRow = typeof subjects.$inferSelect;
 type TopicRow = typeof curriculumTopics.$inferSelect;
