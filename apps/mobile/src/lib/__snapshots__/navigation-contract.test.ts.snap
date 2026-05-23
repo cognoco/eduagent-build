@@ -47,6 +47,10 @@ exports[`resolveNavigationContract snapshot surface captures the PR 1 contract s
         "canEnter": false,
         "isSurfaced": false,
       },
+      "childCurriculum": {
+        "canEnter": false,
+        "isSurfaced": false,
+      },
       "library": {
         "canEnter": true,
         "isSurfaced": true,
@@ -119,6 +123,10 @@ exports[`resolveNavigationContract snapshot surface captures the PR 1 contract s
         "canEnter": true,
         "isSurfaced": true,
       },
+      "childCurriculum": {
+        "canEnter": true,
+        "isSurfaced": true,
+      },
       "library": {
         "canEnter": false,
         "isSurfaced": false,
@@ -186,6 +194,10 @@ exports[`resolveNavigationContract snapshot surface captures the PR 1 contract s
     },
     "routeSurface": {
       "child": {
+        "canEnter": false,
+        "isSurfaced": false,
+      },
+      "childCurriculum": {
         "canEnter": false,
         "isSurfaced": false,
       },
@@ -261,6 +273,10 @@ exports[`resolveNavigationContract snapshot surface captures the PR 1 contract s
         "canEnter": false,
         "isSurfaced": false,
       },
+      "childCurriculum": {
+        "canEnter": false,
+        "isSurfaced": false,
+      },
       "library": {
         "canEnter": true,
         "isSurfaced": true,
@@ -329,6 +345,10 @@ exports[`resolveNavigationContract snapshot surface captures the PR 1 contract s
     },
     "routeSurface": {
       "child": {
+        "canEnter": false,
+        "isSurfaced": false,
+      },
+      "childCurriculum": {
         "canEnter": false,
         "isSurfaced": false,
       },

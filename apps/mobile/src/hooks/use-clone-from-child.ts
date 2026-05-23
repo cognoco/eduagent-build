@@ -37,6 +37,7 @@ export type CloneFromChildArgs = {
 };
 
 type OpenTarget = {
+  childProfileId: string;
   topicId: string;
   subjectId: string;
   topicTitle?: string | null;
@@ -162,6 +163,7 @@ export function useCloneFromChild(): {
       router.push({
         pathname: '/(app)/topic/relearn',
         params: {
+          childProfileId: target.childProfileId,
           topicId: target.topicId,
           subjectId: target.subjectId,
           ...(target.topicTitle ? { topicName: target.topicTitle } : {}),
@@ -246,6 +248,7 @@ export function useCloneFromChild(): {
       }
 
       const target: OpenTarget = {
+        childProfileId: args.childProfileId,
         topicId: result.topicId,
         subjectId: result.subjectId,
         topicTitle: args.topicTitle,

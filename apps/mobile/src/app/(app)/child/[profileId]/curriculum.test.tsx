@@ -155,12 +155,16 @@ describe('ChildCurriculumScreen', () => {
     expect(screen.queryByTestId('child-curriculum-error')).toBeNull();
   });
 
-  it('redirects when the navigation contract blocks the child curriculum route', () => {
+  it('shows a not-linked state when the navigation contract blocks the child curriculum route', () => {
     mockCanEnter.mockReturnValue(false);
 
     render(<ChildCurriculumScreen />);
 
-    screen.getByTestId('redirect-target');
-    screen.getByText('/(app)/home');
+    screen.getByTestId('child-curriculum-not-linked');
+    screen.getByText("This child's curriculum is not available");
+
+    fireEvent.press(screen.getByTestId('child-curriculum-not-linked-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/recaps');
   });
 });

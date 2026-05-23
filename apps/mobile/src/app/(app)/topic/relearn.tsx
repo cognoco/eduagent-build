@@ -23,7 +23,7 @@ import {
   type OverdueSubject,
   type OverdueTopic,
 } from '../../../hooks/use-progress';
-import { useProfile } from '../../../lib/profile';
+import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
@@ -129,6 +129,7 @@ export default function RelearnScreen() {
     returnTo?: string | string[];
     returnId?: string | string[];
     source?: string | string[];
+    childProfileId?: string | string[];
   }>();
   const routeTopicId = firstParam(params.topicId);
   const routeSubjectId = firstParam(params.subjectId);
@@ -137,12 +138,14 @@ export default function RelearnScreen() {
   const returnTo = firstParam(params.returnTo);
   const returnId = firstParam(params.returnId);
   const source = firstParam(params.source);
+  const sourceChildProfileId = firstParam(params.childProfileId);
   const isParentBridgeSource = source === 'parent_bridge';
 
   const directEntry = Boolean(routeTopicId && routeSubjectId);
   const startRelearn = useStartRelearn();
   const overdueTopics = useOverdueTopics();
   const { activeProfile } = useProfile();
+  const linkedChildren = useLinkedChildren();
   const navigationContract = useNavigationContract();
   const ageBracket =
     activeProfile?.birthYear != null
@@ -181,6 +184,17 @@ export default function RelearnScreen() {
   const effectiveSubjectId = selectedSubject?.subjectId ?? routeSubjectId;
   const teachingPreference = useTeachingPreference(effectiveSubjectId);
   const preferredMethod = teachingPreference.data?.method ?? null;
+  const sourceChild = useMemo(
+    () =>
+      sourceChildProfileId
+        ? (linkedChildren.find((child) => child.id === sourceChildProfileId) ??
+          null)
+        : null,
+    [linkedChildren, sourceChildProfileId],
+  );
+  const parentBridgeHeaderText = sourceChild?.displayName
+    ? `Added from ${sourceChild.displayName}'s learning.`
+    : "Added from a child's learning.";
 
   useEffect(() => {
     if (
@@ -573,7 +587,7 @@ export default function RelearnScreen() {
               testID="relearn-parent-bridge-header"
             >
               <Text className="text-body-sm font-semibold text-text-primary">
-                Added from your child's learning.
+                {parentBridgeHeaderText}
               </Text>
             </View>
           ) : null}

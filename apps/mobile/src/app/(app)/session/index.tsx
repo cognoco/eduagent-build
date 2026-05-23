@@ -1132,7 +1132,7 @@ function SessionScreenInner() {
     });
 
   return (
-    <View className="flex-1">
+    <View className="flex-1" testID="session-screen">
       <ChatShell
         title={modeConfig.title}
         subtitle={subtitle}

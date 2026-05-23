@@ -15,6 +15,7 @@ let mockSearchParams: Record<string, string> = {};
 let mockOverdueTopicsReturn: Record<string, unknown> = {};
 let mockTeachingPreferenceReturn: Record<string, unknown> = {};
 let mockIsParentProxy = false;
+let mockLinkedChildren: Array<{ id: string; displayName: string }> = [];
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -75,6 +76,7 @@ jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: { id: 'owner-id', isOwner: true, birthYear: null },
   }),
+  useLinkedChildren: () => mockLinkedChildren,
 }));
 
 jest.mock(
@@ -139,6 +141,7 @@ describe('RelearnScreen', () => {
     jest.clearAllMocks();
     mockSearchParams = {};
     mockIsParentProxy = false;
+    mockLinkedChildren = [{ id: 'child-1', displayName: 'Ada' }];
     mockOverdueTopicsReturn = {
       data: makeOverdueData(),
       isLoading: false,
@@ -200,6 +203,45 @@ describe('RelearnScreen', () => {
 
     screen.getByTestId('relearn-method-visual_diagrams');
     screen.getByText('Usual method');
+  });
+
+  it('shows the source child name for parent-bridge direct entry', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
+      source: 'parent_bridge',
+      childProfileId: 'child-1',
+    };
+
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    screen.getByTestId('relearn-parent-bridge-header');
+    screen.getByText("Added from Ada's learning.");
+  });
+
+  it('uses generic source copy when the bridge child is missing locally', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
+      source: 'parent_bridge',
+      childProfileId: 'deleted-child',
+    };
+
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    screen.getByText("Added from a child's learning.");
   });
 
   it('moves from the topic phase to the method phase when a topic is selected', async () => {

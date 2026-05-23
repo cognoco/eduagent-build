@@ -8,12 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { DashboardChild } from '@eduagent/schemas';
-import {
-  Redirect,
-  useLocalSearchParams,
-  useRouter,
-  type Href,
-} from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -111,6 +106,46 @@ function SubjectRow({
   );
 }
 
+function NotLinkedEmptyState({
+  onPress,
+}: {
+  onPress: () => void;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      className="flex-1 items-center justify-center bg-background px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="child-curriculum-not-linked"
+    >
+      <Text className="mb-2 text-center text-h3 font-semibold text-text-primary">
+        {t('parentView.index.curriculumNotAvailableTitle', {
+          defaultValue: "This child's curriculum is not available",
+        })}
+      </Text>
+      <Text className="mb-6 text-center text-body text-text-secondary">
+        {t('parentView.index.curriculumNotAvailableBody', {
+          defaultValue:
+            'You can only review curriculum for children linked to your family account.',
+        })}
+      </Text>
+      <Pressable
+        onPress={onPress}
+        className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
+        accessibilityRole="button"
+        accessibilityLabel={t('tabs.children')}
+        testID="child-curriculum-not-linked-back"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          {t('tabs.children')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function ChildCurriculumScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -142,7 +177,11 @@ export default function ChildCurriculumScreen(): React.ReactElement {
     profileId &&
     !navigationContract.canEnter('child/[profileId]/curriculum', { profileId })
   ) {
-    return <Redirect href="/(app)/home" />;
+    return (
+      <NotLinkedEmptyState
+        onPress={() => router.replace('/(app)/recaps' as Href)}
+      />
+    );
   }
 
   if (!profileId) {

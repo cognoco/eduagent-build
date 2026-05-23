@@ -90,12 +90,20 @@ jest.mock(
 
 const mockUseChildDetail = jest.fn();
 const mockUseDashboard = jest.fn();
+const mockIsSurfaced = jest.fn(() => true);
 
 jest.mock(
   '../../../../hooks/use-dashboard' /* gc1-allow: query hooks require API client and QueryClientProvider; route rendering owns response handling */,
   () => ({
     useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
     useDashboard: (...args: unknown[]) => mockUseDashboard(...args),
+  }),
+);
+
+jest.mock(
+  '../../../../hooks/use-navigation-contract' /* gc1-allow: route test controls contract surfacing without app context providers */,
+  () => ({
+    useNavigationContract: () => ({ isSurfaced: mockIsSurfaced }),
   }),
 );
 
@@ -160,6 +168,7 @@ const { default: ChildDetailScreen } = require('./index') as {
 
 function setupDefaultMocks() {
   mockLocalSearchParams = { profileId: 'child-001' };
+  mockIsSurfaced.mockReturnValue(true);
 
   mockUseDashboard.mockReturnValue({
     data: undefined,
@@ -666,6 +675,10 @@ describe('ChildDetailScreen — profile overview', () => {
   it('routes subject and report surfaces from child detail', () => {
     render(<ChildDetailScreen />);
 
+    expect(mockIsSurfaced).toHaveBeenCalledWith(
+      'child/[profileId]/curriculum',
+      { profileId: 'child-001' },
+    );
     fireEvent.press(screen.getByTestId('child-curriculum-link'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/curriculum',
@@ -690,6 +703,15 @@ describe('ChildDetailScreen — profile overview', () => {
         childName: 'Emma',
       },
     });
+  });
+
+  it('hides curriculum when the navigation contract does not surface it', () => {
+    mockIsSurfaced.mockReturnValue(false);
+
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-curriculum-link')).toBeNull();
+    screen.getByTestId('child-reports-link');
   });
 
   it('renders parent consent management for a consented child', () => {
