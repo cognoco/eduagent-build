@@ -31,6 +31,8 @@ Four documents describe the same audience axis with different vocabularies. Tran
 
 The fact that "two shapes" means `guardian/learner` in CLAUDE.md and `study/family` in the navigation-contract spec is **intentional**: CLAUDE.md is V0 reality; the spec is FULL target.
 
+> See CLAUDE.md 'Profile Shapes' table for the V0-vs-V1 tab count difference.
+
 ## Audience Access Labels
 
 | Label | Meaning |
@@ -137,7 +139,7 @@ This register mirrors every flow ID currently listed in mobile-app-flow-inventor
 | HOME-02 | Parent gateway home | [master-directory/home/HOME-02.md](master-directory/home/HOME-02.md) | `Family-only` | Draft |
 | HOME-03 | Parent tabs and parent-mode navigation | [master-directory/home/HOME-03.md](master-directory/home/HOME-03.md) | `Family-only` | Draft |
 | HOME-04 | Animated splash and initial shell | Not created | TBD | Not mapped |
-| HOME-05 | Empty first-user state (no subjects yet) — surfaced through the learner home action set; CTA `home-action-study-new` deep-links into `/create-subject` (updated 2026-05-14; old `home-add-subject-tile`/`home-add-first-subject` IDs no longer match) | Not created | TBD | Not mapped |
+| HOME-05 | Empty first-user state (no subjects yet) — surfaced through the learner home action set; CTA `home-action-study-new` is the primary entry; `home-add-subject-tile` / `home-add-first-subject` IDs remain in the empty-subjects branch | Not created | TBD | Not mapped |
 | HOME-06 | Resume interrupted session (driven by SecureStore session-recovery marker + `useContinueSuggestion`; surfaced as the active-subject card or a recovery affordance on the home carousel) | Not created | TBD | Not mapped |
 | HOME-07 | Add-first-child gate for parent owners on family/pro plans without a child profile yet — "Add a child to get started" branch on parent home; CTA navigates to `/create-profile` | [master-directory/home/HOME-07.md](master-directory/home/HOME-07.md) | `Family-only` | Draft |
 | HOME-08 | Home loading-timeout fallback | [master-directory/home/HOME-08.md](master-directory/home/HOME-08.md) | `Shared different scope` | Draft |
@@ -213,7 +215,7 @@ This register mirrors every flow ID currently listed in mobile-app-flow-inventor
 | HOMEWORK-05 | Gallery import (pick existing photo instead of camera capture) | Not created | TBD | Not mapped |
 | HOMEWORK-06 | Image pass-through to multimodal LLM (vision) for richer help | Not created | TBD | Not mapped |
 | HOMEWORK-07 | Camera permission onboarding — first-request prompt and permanently-denied Settings-redirect state; auto-refreshes permission on return from OS Settings so camera unlocks without a manual restart | Not created | TBD | Not mapped |
-| PARENT-01 | Parent dashboard (parents only — solo accounts without linked children render `LearnerScreen`, not a dashboard). `MetricInfoDot` + `SamplePreview` parent components active across child detail / session / topic surfaces (commit 02e4c519) | Not created | TBD | Not mapped |
+| PARENT-01 | Parent dashboard (parents only — solo accounts without linked children render `LearnerScreen`, not a dashboard). `MetricInfoDot` + `SamplePreview` parent components active across child detail / session / topic surfaces (commit 02e4c519). Route `/(app)/dashboard` is a permanent redirect to `/(app)/home`; the parent home surface is rendered by `ParentHomeScreen` branch inside `LearnerScreen`. | Not created | TBD | Not mapped |
 | PARENT-02 | Multi-child dashboard | Not created | TBD | Not mapped |
 | PARENT-03 | Child detail drill-down | [master-directory/parent/PARENT-03.md](master-directory/parent/PARENT-03.md) | `Family-only` | Draft |
 | PARENT-04 | Child subject -> topic drill-down | Not created | TBD | Not mapped |
@@ -256,6 +258,15 @@ This register mirrors every flow ID currently listed in mobile-app-flow-inventor
 | CC-16 | HMR-safe error type guards in `format-api-error.ts` (BUG-947) | Not created | TBD | Not mapped |
 | CC-17 | Profile-as-lens navigation pattern (commit a72ebfac) | Not created | TBD | Not mapped |
 | CC-18 | Stable FlatList refs (PERF-10, commit 088640c8) | Not created | TBD | Not mapped |
+
+## Recently Shipped Routes Without Canonical Flow IDs
+
+The following routes exist in `apps/mobile/src/app/(app)/` but have not yet been assigned flow IDs in the Complete Flow Register above. They should be assigned IDs in the next inventory pass.
+
+| Route | Notes |
+| --- | --- |
+| `/(app)/progress/reports/` (`reports/index.tsx` + `reports/[reportId].tsx`) | Child report list and detail; covered under PARENT-06 as entry point but never assigned a standalone student-facing ID |
+| `/(app)/progress/weekly-report/[weeklyReportId]` | Push-driven weekly report detail; covered under PARENT-13 as entry point |
 
 ## Full Expansion Rule
 

@@ -175,6 +175,7 @@ Tap any subject → jump to that subject's coaching recommendation. The AI still
 ### Platform Strategy
 
 - Expo (React Native): iOS, Android, Web from single codebase
+- **Build target:** iOS and Android are the active ship targets; Expo Web is supported by the codebase but not actively shipped for v1.0 (deferred per PRD).
 - Touch-first mobile design, responsive web as secondary
 - Camera integration required for MVP (homework photo input)
 - Voice input: architecture-ready from MVP, ships v1.1
@@ -382,6 +383,8 @@ parentTheme = vars({ '--color-primary': '...', '--color-background': '...', ... 
 ```
 
 Components use semantic class names throughout (`bg-background`, `text-primary`, `border-accent`). When a teen logs in, apply teen variables. When a parent logs in, swap to parent variables. Same components, different visual personality.
+
+> **Implementation note (2026-05-23):** The per-persona named exports above (`teenTheme`, `adultTheme`, `parentTheme`) were not carried forward. The shipped implementation uses `tokens: Record<'light' | 'dark', ThemeTokens>` in `apps/mobile/src/lib/design-tokens.ts` — a two-scheme (light/dark) token map with five accent presets (teal/electric/hotpink/emerald/amber). NativeWind CSS variable injection via `vars()` is applied in `(app)/_layout.tsx`. The semantic class contract described here (e.g., `bg-background`, `text-primary`) is correctly implemented.
 
 ### Semantic Design Token Set
 

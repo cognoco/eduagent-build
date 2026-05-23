@@ -22,8 +22,7 @@ files_to_modify:
   - apps/mobile/src/hooks/use-profiles.ts
   - apps/mobile/src/lib/analytics.ts
   - apps/mobile/src/lib/profile.ts
-  - apps/api/drizzle/00NN_profiles_default_app_context.sql
-  - apps/api/drizzle/00NN_profiles_default_app_context.rollback.md
+  - apps/api/drizzle/0089_ancient_naoko.sql
   - apps/api/src/routes/profiles.ts
   - apps/api/src/routes/recaps.ts
   - apps/api/src/services/profile.ts
@@ -45,6 +44,8 @@ test_patterns:
 # Tech-Spec: Study And Family Mode Navigation
 
 **Created:** 2026-05-19
+
+> **Status (2026-05-23):** Foundation complete (migration `0089_ancient_naoko.sql`, `profiles.default_app_context`, `hasFamilyLinks` schema, `navigation-contract.ts` scaffolding, Recaps route+API). Task 1 (V0 `TabShape` rename) NOT executed — V0 still uses `'guardian'|'learner'`, V1 uses parallel `computeModeVisibleTabs()` path behind `MODE_NAV_V1_ENABLED`. `FAMILY_MODE_TABS` in `(app)/_layout.tsx` still `{home, progress, more}` (missing `recaps`). Tasks 6, 12, 13, 16-20 status varies; see implementation notes.
 
 > **Hard constraint (added 2026-05-22).** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) **must keep working** across every PR in this migration. V0 helpers and V0-off short-circuits stay alive when V1 ships; the new contract is gated behind a separate `MODE_NAV_V1_ENABLED` flag. See the "Hard Constraint — Preserve 5-Tab Mode Across All Increments" section of `docs/specs/2026-05-21-navigation-contract.md` for the full flag matrix, load-bearing files, and the required regression test.
 
@@ -189,8 +190,8 @@ ALTER TABLE profiles
 
 Implementation files:
 
-- Migration: `apps/api/drizzle/00NN_profiles_default_app_context.sql` using the next available migration number.
-- Rollback: `apps/api/drizzle/00NN_profiles_default_app_context.rollback.md`.
+- Migration: `apps/api/drizzle/0089_ancient_naoko.sql` (applied).
+- Rollback: see migration meta journal for rollback procedure.
 - Drizzle schema: add `defaultAppContext: text('default_app_context')` to `packages/database/src/schema/profiles.ts`.
 - Shared schema: add `appContextSchema = z.enum(['study', 'family'])`, `defaultAppContext: appContextSchema.nullable().default(null)`, and `hasFamilyLinks: z.boolean().default(false)` to `packages/schemas/src/profiles.ts`.
 - Profile mapper: include `defaultAppContext` and `hasFamilyLinks` in `mapProfileRow()` / `listProfiles()`.

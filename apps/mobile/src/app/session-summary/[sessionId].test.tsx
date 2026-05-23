@@ -1686,10 +1686,13 @@ describe('SessionSummaryScreen', () => {
       const card = await screen.findByTestId('topic-suggestion-card');
       fireEvent.press(card);
 
+      // [S5-H1] Suggestion push must include bookId and subjectId so the topic
+      // screen receives the correct book/subject context.
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/topic/[topicId]',
         params: {
           topicId: '11111111-1111-1111-1111-111111111111',
+          bookId: '22222222-2222-2222-2222-222222222222',
           subjectId: 'subject-uuid-1',
         },
       });

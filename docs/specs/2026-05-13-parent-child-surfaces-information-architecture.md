@@ -33,6 +33,8 @@ test_patterns:
 
 **Created:** 2026-05-13
 
+> **Status (2026-05-23):** Tasks 4 (progress summary contract with activityState, basedOnLastSessionAt, nudgeRecommended) and 5 (Inngest generation function) implemented. Tasks 2, 7 implementation status TBD.
+
 ## Overview
 
 ### Problem Statement

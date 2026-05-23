@@ -3,7 +3,7 @@
 Consolidated checklist of everything that must be done before MentoMate goes live.
 Items are grouped by category and ordered by priority within each group.
 
-Last updated: 2026-05-15
+Last updated: 2026-05-23
 
 ---
 
@@ -53,7 +53,7 @@ Last updated: 2026-05-15
 - [ ] **Verify production database migration path**
   - `deploy.yml` runs committed migrations against the selected target after DB host verification and before `wrangler deploy`
   - Do not run `drizzle-kit push` against staging or production
-  - If deploying outside `deploy.yml`, point `DATABASE_URL` at production Neon and run `pnpm --filter @eduagent/database db:migrate` before deploying the Workers bundle
+  - If deploying outside `deploy.yml`, point `DATABASE_URL` at production Neon and run `pnpm exec drizzle-kit migrate` before deploying the Workers bundle
 
 - [ ] **Verify KV namespace bindings** in `wrangler.toml [env.production]`:
   - `SUBSCRIPTION_KV`: `cde9f81f19a34022b6dc6951928a0511`
@@ -114,11 +114,11 @@ Ref: `docs/plans/order.md` Tier 3 — explicitly marked "before launch"
 
 ## Code Quality & Test Debt
 
-- [x] **EP15-C2: Epic 15 test coverage** — RESOLVED 2026-04-19. All 8 original gaps filled. 220 new tests added: snapshot-aggregation.test.ts (35), monthly-report.test.ts (50), daily-snapshot.test.ts (17), weekly-progress-push.test.ts (40), monthly-report-cron.test.ts (37), progress/[subjectId].test.tsx (41). All passing.
-- [x] **EP15-C3: Step ordering decision** — RESOLVED 2026-04-19. Pipelines are independent (computeProgressMetrics never reads learning_profiles). Latency-first order confirmed correct; plan AD6 amended. See `session-completed.ts:515-518`.
-- [x] **EP15-C4: Session-complete debounce** (AR-13) — RESOLVED 2026-04-19. `RefreshProgressSnapshotOptions.sessionEndedAt` implemented in `snapshot-aggregation.ts:965-1000`. `getLatestSnapshot` returns `updatedAt`. `session-completed.ts:531` passes timestamp.
-- [ ] **Progressive disclosure** — plan written 2026-04-14, zero code changes (~1 day)
-- [ ] **Freeform-filing retry** — one missing Inngest function; failed freeform filing silently drops session
+- [x] **EP15-C2: Epic 15 test coverage** — RESOLVED 2026-04-19. All 8 original gaps filled. 273 tests across coverage files: snapshot-aggregation.test.ts (54), monthly-report.test.ts (56), daily-snapshot.test.ts (11), weekly-progress-push.test.ts (50), monthly-report-cron.test.ts (50), progress/[subjectId]/index.test.tsx (52). All passing.
+- [x] **EP15-C3: Step ordering decision** — RESOLVED 2026-04-19. Pipelines are independent (computeProgressMetrics never reads learning_profiles). Latency-first order confirmed correct; plan AD6 amended. See `session-completed.ts:793-795`.
+- [x] **EP15-C4: Session-complete debounce** (AR-13) — RESOLVED 2026-04-19. `RefreshProgressSnapshotOptions.sessionEndedAt` implemented in `snapshot-aggregation.ts:1161`. `getLatestSnapshot` returns `updatedAt`. `session-completed.ts:808-809` passes timestamp.
+- [x] **Progressive disclosure** — Implemented in `apps/mobile/src/lib/progressive-disclosure.ts` (`isNewLearner`, `PROGRESSIVE_DISCLOSURE_THRESHOLD`).
+- [x] **Freeform-filing retry** — `freeformFilingRetry` implemented in `apps/api/src/inngest/functions/freeform-filing.ts` (id: `freeform-filing-retry`).
 - [ ] **Epic 16 test gaps** — ~90% of planned tests missing (cap eviction, stale demotion, struggle resolution)
 
 ---
@@ -129,12 +129,12 @@ Ref: `docs/superpowers/plans/2026-04-19-pre-launch-ux-fixes.md`
 
 ### Already Fixed (verified in codebase)
 
-- [x] **F-Q-08** Quiz quit confirm dialog — `platformAlert` in `quiz/play.tsx:159-168`
-- [x] **F-042** Interview deadlock — `MAX_INTERVIEW_EXCHANGES=4` hard cap in `interview.ts:399`
-- [x] **F-009** Topic deep-link — `useResolveTopicSubject` in `topic/[topicId].tsx:161-165`
-- [x] **F-Q-02** Wrong answer reveal — green highlight in `quiz/play.tsx:392-393`
-- [x] **F-Q-12** Challenge banner auto-advance — timer removed in `quiz/launch.tsx:117-119`
-- [x] **F-Q-13** Quiz timer label — timer hidden in `quiz/play.tsx:456-459`
+- [x] **F-Q-08** Quiz quit confirm dialog — Modal via `setQuitConfirmVisible` in `quiz/play.tsx:252-267` (web fallback uses `platformAlert`; see comment at line 252).
+- [x] **F-042** Interview deadlock — `MAX_INTERVIEW_EXCHANGES=4` hard cap in `services/exchanges.ts:63`.
+- [x] **F-009** Topic deep-link — `useResolveTopicSubject` in `topic/[topicId].tsx:292`.
+- [x] **F-Q-02** Wrong answer reveal — green highlight (`bg-success/20 border border-success`) in `quiz/play.tsx:671-686`.
+- [x] **F-Q-12** Challenge banner auto-advance — timer removed in `quiz/launch.tsx:242`.
+- [x] **F-Q-13** Quiz timer label — BUG-928 amended the F-Q-13 fix: timer is now shown as count-up (not countdown) for motivational feedback. See `quiz/play.tsx:107-112` (decision note) and line 774 (render). The original "hide timer" fix was superseded.
 
 ### Fixed in this pass
 
@@ -173,7 +173,7 @@ Ref: `docs/superpowers/plans/2026-04-19-pre-launch-ux-fixes.md`
 
 ## Nice-to-Have (Post-Launch OK)
 
-- [x] EP15-I1: Weekly push fan-out — RESOLVED. Fan-out pattern implemented in `weekly-progress-push.ts` (see `[EP15-I1 AR-9]` comment, lines 53-69). Timezone-aware delivery via `isLocalHour9`.
+- [x] EP15-I1: Weekly push fan-out — RESOLVED. Fan-out pattern implemented in `weekly-progress-push.ts` (see `[EP15-I1 AR-9]` comment, line 216). Timezone-aware delivery via `isLocalHour9`.
 - [x] EP15-I2: `vocabularyLearned` rename — RESOLVED 2026-04-19. Schema fully uses `vocabularyTotal`. Mobile label changed to "Total words". Monthly report delta computed correctly.
 - [x] EP15-I5: Parent-access denial returns null instead of 403 — RESOLVED 2026-04-19. `assertParentAccess` throws `ForbiddenError` → global handler returns HTTP 403. All 10 dashboard child-scoped endpoints protected.
 - [ ] Missing mobile screens (3E.1-3E.4): teach-back, evaluate-challenge, word summaries, decay viz

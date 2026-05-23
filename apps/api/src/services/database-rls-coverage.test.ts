@@ -17,6 +17,7 @@ import {
   OWNER_SCOPED_TABLES,
   OR_SCOPED_TABLES,
   ALL_RLS_TABLES,
+  EXPLICITLY_EXCLUDED_TABLES,
   RLS_TABLE_META,
 } from './database-rls-coverage';
 
@@ -62,5 +63,85 @@ describe('database-rls-coverage manifest', () => {
     expect(meta).toBeDefined();
     // family_links uses an OR policy: parent_profile_id OR child_profile_id
     expect(meta!.policyType).toBe('or-both-fk-cols');
+  });
+});
+
+/**
+ * Omission guard (S3-M2 closeout)
+ *
+ * Every profile-scoped table known to exist in the schema must appear in either
+ * ALL_RLS_TABLES (has a policy) or EXPLICITLY_EXCLUDED_TABLES (RLS enabled but
+ * policy not yet added, with a documented tracking item).
+ *
+ * Update KNOWN_PROFILE_TABLES when adding new profile-scoped tables.
+ * Verified against schema by Worker B 2026-05-21.
+ */
+
+// The full set of tables that carry personal profile data (profile_id or
+// owner_profile_id foreign key to profiles). This list is the source of truth
+// for the omission guard — any new table with a profileId/ownerProfileId FK
+// must be added here AND to either ALL_RLS_TABLES or EXPLICITLY_EXCLUDED_TABLES.
+const KNOWN_PROFILE_TABLES: readonly string[] = [
+  // Profile-scoped (profile_id FK)
+  'assessments',
+  'retention_cards',
+  'needs_deepening_topics',
+  'teaching_preferences',
+  'consent_states',
+  'subjects',
+  'curriculum_adaptations',
+  'learning_sessions',
+  'session_events',
+  'session_summaries',
+  'parking_lot_items',
+  'streaks',
+  'xp_ledger',
+  'notification_log',
+  'notification_preferences',
+  'learning_modes',
+  'coaching_card_cache',
+  'vocabulary',
+  'vocabulary_retention_cards',
+  'session_embeddings',
+  'dictation_results',
+  'learning_profiles',
+  'progress_snapshots',
+  'milestones',
+  'monthly_reports',
+  'topic_notes',
+  'memory_facts',
+  'memory_dedup_decisions',
+  'nudges',
+  'quiz_rounds',
+  'quiz_missed_items',
+  'quiz_mastery_items',
+  'bookmarks',
+  'progress_summaries',
+  'support_messages',
+  'weekly_reports',
+  'practice_activity_events',
+  'celebration_events',
+  'onboarding_drafts',
+  'challenge_round_cooldowns',
+  'usage_events',
+  // Owner-scoped (owner_profile_id FK)
+  'withdrawal_archive_preferences',
+  'pending_notices',
+  'family_preferences',
+  // OR-scoped (parent_profile_id OR child_profile_id)
+  'family_links',
+] as const;
+
+describe('database-rls-coverage omission guard (S3-M2)', () => {
+  it('every known profile-scoped table appears in ALL_RLS_TABLES or EXPLICITLY_EXCLUDED_TABLES', () => {
+    const covered = new Set([...ALL_RLS_TABLES, ...EXPLICITLY_EXCLUDED_TABLES]);
+    const missing = KNOWN_PROFILE_TABLES.filter((t) => !covered.has(t));
+    expect(missing).toEqual([]);
+  });
+
+  it('EXPLICITLY_EXCLUDED_TABLES entries are not in ALL_RLS_TABLES', () => {
+    const allRlsSet = new Set(ALL_RLS_TABLES);
+    const overlap = EXPLICITLY_EXCLUDED_TABLES.filter((t) => allRlsSet.has(t));
+    expect(overlap).toHaveLength(0);
   });
 });

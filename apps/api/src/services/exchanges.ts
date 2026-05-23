@@ -35,6 +35,7 @@ import type { LLMTier } from './subscription';
 import {
   buildSystemPrompt as _buildSystemPrompt,
   resolveAgeBracket,
+  allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
 
@@ -452,19 +453,9 @@ function addSourceEvidence(
   });
 }
 
-function allowsGeneralKnowledgeSource(context: ExchangeContext): boolean {
-  const mode = context.effectiveMode;
-  return (
-    context.sessionType === 'learning' &&
-    context.escalationRung <= 3 &&
-    context.pedagogyMode !== 'four_strands' &&
-    mode !== 'review' &&
-    mode !== 'practice' &&
-    mode !== 'recitation' &&
-    context.verificationType !== 'evaluate' &&
-    context.verificationType !== 'teach_back'
-  );
-}
+// S2-H1: allowsGeneralKnowledgeSource is imported from exchange-prompts.ts (canonical).
+// Re-exported here so callers that use exchanges.ts as their surface still find it.
+export { allowsGeneralKnowledgeSource } from './exchange-prompts';
 
 function looksLikeDeterministicProblem(text: string): boolean {
   return (

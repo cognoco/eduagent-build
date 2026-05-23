@@ -667,6 +667,26 @@ export default function ProgressScreen(): React.ReactElement {
     handleRefreshRef.current = handleRefresh;
   }, [handleRefresh]);
 
+  // [S5-H2] Load progress metrics on mount so the recall-queue chip is visible
+  // without requiring a pull-to-refresh first. Best-effort: silent on failure
+  // (pull-to-refresh will retry with a user-visible alert).
+  const hasMountedMetricsRef = useRef(false);
+  useEffect(() => {
+    if (hasMountedMetricsRef.current || !isViewingSelf) return;
+    hasMountedMetricsRef.current = true;
+    void (async () => {
+      try {
+        const result = await refreshProgressSnapshot();
+        if (result?.metrics) {
+          setProgressMetrics(result.metrics);
+        }
+      } catch {
+        // Silent — mount-time metrics load is best-effort only.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isViewingSelf]);
+
   useFocusEffect(
     useCallback(() => {
       if (!hasFocusedOnceRef.current) {

@@ -1,5 +1,7 @@
 # Progress Tab — "Currently Working On" + Self-View Polish
 
+> **Status (2026-05-23):** Partially implemented. Schema additions (`currentlyWorkingOn`, `thisWeekMini`) in `packages/schemas/src/snapshots.ts` ✅. API helper `getCurrentlyWorkingOn` in `apps/api/src/services/learner-profile.ts` ✅. Consumed in `progress/index.tsx` as `fallbackItems` prop ✅. Standalone `CurrentlyWorkingOnCard` component NOT created. D-PT-18 (`newLearner` gate removal) ✅. Other report card improvements (highlights/nextSteps rendering in `MonthlyReportCard`/`WeeklyReportCard`) unverified.
+
 **Date:** 2026-05-09
 **Branch:** `ux-cleanup`
 **Status:** Spec — ready to implement

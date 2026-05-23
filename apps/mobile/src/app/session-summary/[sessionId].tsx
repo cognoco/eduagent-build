@@ -1172,7 +1172,13 @@ export default function SessionSummaryScreen() {
                     pathname: '/(app)/topic/[topicId]',
                     params: {
                       topicId: suggestion.id,
-                      subjectId: filedSubjectId ?? subjectId,
+                      // [S5-H1] Pass bookId + subjectId so the topic screen
+                      // can pre-select the correct book and subject context,
+                      // matching the direct-navigation path from the shelf.
+                      bookId: suggestion.bookId,
+                      ...((filedSubjectId ?? subjectId)
+                        ? { subjectId: filedSubjectId ?? subjectId }
+                        : {}),
                     },
                   } as Href)
                 }

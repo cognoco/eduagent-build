@@ -9,6 +9,11 @@
  * Profile-scoped tables: the RLS USING predicate references `profile_id`.
  * Owner-scoped tables:   the RLS USING predicate references `owner_profile_id`.
  * Special tables (family_links): OR across both FK columns — see RLS_TABLE_META.
+ *
+ * Tables with RLS ENABLED but no USING policy yet (cannot appear in
+ * ALL_RLS_TABLES — the integration test would fail). See EXPLICITLY_EXCLUDED_TABLES
+ * below; each entry needs a follow-up migration to add its `*_profile_isolation`
+ * policy before it can graduate into ALL_RLS_TABLES.
  */
 
 export type RlsTableMeta = {
@@ -67,6 +72,10 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   'progress_summaries',
   'support_messages',
   'weekly_reports',
+  // Added migration 0072 (practice_activity_events, celebration_events): policies
+  // existed since 0072 but were omitted from the manifest (S3-C2 fix).
+  'practice_activity_events',
+  'celebration_events',
 ] as const;
 
 /**
@@ -75,6 +84,9 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
 export const OWNER_SCOPED_TABLES: readonly string[] = [
   'withdrawal_archive_preferences',
   'pending_notices',
+  // Added S3-C1 (manifest drift): policy created in migration 0066 but
+  // omitted from this manifest. See drizzle/0066_enable_rls_pending_tables.sql.
+  'family_preferences',
 ] as const;
 
 /**
@@ -84,8 +96,25 @@ export const OWNER_SCOPED_TABLES: readonly string[] = [
 export const OR_SCOPED_TABLES: readonly string[] = ['family_links'] as const;
 
 /**
- * All tables that have an RLS policy as of migration 0085.
- * Note: family_preferences has a policy from migration 0066 and is included here.
+ * Tables with RLS ENABLED but intentionally excluded from ALL_RLS_TABLES because
+ * they do not yet have a USING policy. Adding them to ALL_RLS_TABLES would cause
+ * the integration test to fail. Each entry must document the open tracking item.
+ */
+export const EXPLICITLY_EXCLUDED_TABLES: readonly string[] = [
+  // RLS enabled in migration 0027 (notification_preferences) / 0027
+  // (onboarding_drafts) / 0060 (usage_events) / 0080 (challenge_round_cooldowns).
+  // No USING policy yet — every entry below needs a dedicated migration to
+  // add `*_profile_isolation` (or equivalent) before it can move to ALL_RLS_TABLES.
+  'notification_preferences',
+  'onboarding_drafts',
+  'usage_events',
+  'challenge_round_cooldowns',
+] as const;
+
+/**
+ * All tables that have an RLS policy as of migration 0085 (inclusive).
+ * Covers policies from migrations 0027, 0029, 0058, 0066, 0071, 0072, 0085.
+ * Note: family_preferences policy was created in 0066 (S3-C1 manifest drift).
  */
 export const ALL_RLS_TABLES: readonly string[] = [
   ...PROFILE_SCOPED_TABLES,

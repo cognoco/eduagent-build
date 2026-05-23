@@ -2,6 +2,8 @@
 
 **Date:** 2026-05-12
 **Status:** Ready for implementation
+
+> **Status (2026-05-23):** Steps 1-4 implemented (Add note in session tools, NoteInput placeholder prop, BookmarkCard with topic surfacing, API topicId filter). Step 5 (library search bookmark results) not implemented.
 **Source:** Product discussion and code audit on the active session chat, notes, bookmarks, and Library surfaces.
 
 ## Thesis

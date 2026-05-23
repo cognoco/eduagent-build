@@ -1,5 +1,7 @@
 # Chat Notes And Bookmarks Implementation Plan
 
+> **Status (2026-05-23):** PR 1 ✅ complete (Add note in session tools, NoteInput placeholder, BookmarkCard with topic surfacing, API topicId filter). PR 2 (library search bookmark results) status unverified.
+
 > **For agentic workers:** Implement task-by-task. Keep the first PR focused on chat `Add note`, bookmark discoverability, and topic-page bookmark surfacing. Library-search bookmark results may be a second PR if the API contract change grows.
 
 **Goal:** Make note-taking central in the active chat session while keeping `I'm Done` separate, preserve message-level bookmarks, and make both notes and bookmarks discoverable under topics in Library.
@@ -54,7 +56,7 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/hooks/use-bookmarks.ts` — add optional `topicId` query support if API filtering is chosen.
 - `apps/mobile/src/app/(app)/topic/[topicId].tsx` — render `Saved from chat` bookmarks section near notes.
 - `apps/mobile/src/app/(app)/topic/[topicId].test.tsx` — cover bookmark section present/absent.
-- `apps/mobile/src/i18n/locales/en.json` and generated locale files — add i18n keys (mandatory, not optional — all user-visible strings in this area use `t()`): `session.accessories.addNote`, `session.notePrompt.chatPlaceholder` (`Summarize this in your own words...`), `library.topic.savedFromChat`.
+- `apps/mobile/src/i18n/locales/en.json` and generated locale files — add i18n keys (mandatory, not optional — all user-visible strings in this area use `t()`): `session.accessories.addNote`, `session.notePrompt.chatPlaceholder` (`Summarize this in your own words...`), `library.topic.bookmarks.savedFromChat`.
 
 ### PR 1 API Files (Required — client-side filtering is not viable)
 
@@ -98,16 +100,16 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/components/session/SessionAccessories.test.tsx`
 - `apps/mobile/src/app/(app)/session/index.tsx`
 
-- [ ] Extend `SessionToolAccessoryProps` with `onAddNote?: () => void`.
-- [ ] Render `Add note` (label via `t('session.accessories.addNote')`, add key to `en.json`) before secondary chips only when `stage === 'teaching'` and `onAddNote` is provided.
-- [ ] Style `Add note` as primary within the strip: icon `document-text-outline`, semantic primary/accent classes, and `min-h-[44px]`.
-- [ ] Keep `Switch topic` and `Park it` as existing utility chips.
-- [ ] Disable `Add note` while `isStreaming`.
-- [ ] Wire `onAddNote={() => setShowNoteInput(true)}` from `session/index.tsx`.
-- [ ] Test: teaching stage renders all three actions.
-- [ ] Test: non-teaching stages render no tool strip.
-- [ ] Test: tapping `Add note` calls `onAddNote`.
-- [ ] Test: streaming disables the action.
+- [x] Extend `SessionToolAccessoryProps` with `onAddNote?: () => void`.
+- [x] Render `Add note` (label via `t('session.accessories.addNote')`, add key to `en.json`) before secondary chips only when `stage === 'teaching'` and `onAddNote` is provided.
+- [x] Style `Add note` as primary within the strip: icon `document-text-outline`, semantic primary/accent classes, and `min-h-[44px]`.
+- [x] Keep `Switch topic` and `Park it` as existing utility chips.
+- [x] Disable `Add note` while `isStreaming`.
+- [x] Wire `onAddNote={() => setShowNoteInput(true)}` from `session/index.tsx`.
+- [x] Test: teaching stage renders all three actions.
+- [x] Test: non-teaching stages render no tool strip.
+- [x] Test: tapping `Add note` calls `onAddNote`.
+- [x] Test: streaming disables the action.
 
 ### Task 2: Tune chat note composer copy
 
@@ -119,13 +121,13 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/components/session/SessionFooter.test.tsx`
 - locale files if copy is localized in this area
 
-- [ ] Add optional `placeholder?: string` prop to `NoteInput`.
-- [ ] Keep default placeholder as `Write your note...`.
-- [ ] Pass `t('session.notePrompt.chatPlaceholder')` when `NoteInput` is rendered from `SessionFooter` (add key to `en.json`: `"chatPlaceholder": "Summarize this in your own words..."`).
-- [ ] Preserve mic, save, cancel, max length, saving state, and empty validation.
-- [ ] Test: default placeholder still renders for normal note input.
-- [ ] Test: custom placeholder renders from session footer.
-- [ ] Test: existing save payload remains `{ topicId, content, sessionId }`.
+- [x] Add optional `placeholder?: string` prop to `NoteInput`.
+- [x] Keep default placeholder as `Write your note...`.
+- [x] Pass `t('session.notePrompt.chatPlaceholder')` when `NoteInput` is rendered from `SessionFooter` (add key to `en.json`: `"chatPlaceholder": "Summarize this in your own words..."`).
+- [x] Preserve mic, save, cancel, max length, saving state, and empty validation.
+- [x] Test: default placeholder still renders for normal note input.
+- [x] Test: custom placeholder renders from session footer.
+- [x] Test: existing save payload remains `{ topicId, content, sessionId }`.
 
 ### Task 3: Preserve `I'm Done` separation
 
@@ -134,11 +136,11 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/app/(app)/session/index.tsx`
 - existing session tests if needed
 
-- [ ] Do not move `endSessionButton`.
-- [ ] Verify note composer open/closed state does not hide `I'm Done`.
-- [ ] Verify session close behavior is unchanged.
-- [ ] If an existing test can cover this cheaply, add assertion that `end-session-button` remains rendered after opening note input.
-- [ ] Note: `HomeworkModeChips` in `SessionAccessories.tsx` has its own `I'm Done` chips (`testID="finish-homework-early-chip"`, `testID="finish-homework-chip"`) — these are separate from `endSessionButton` and must remain untouched.
+- [x] Do not move `endSessionButton`.
+- [x] Verify note composer open/closed state does not hide `I'm Done`.
+- [x] Verify session close behavior is unchanged.
+- [x] If an existing test can cover this cheaply, add assertion that `end-session-button` remains rendered after opening note input.
+- [x] Note: `HomeworkModeChips` in `SessionAccessories.tsx` has its own `I'm Done` chips (`testID="finish-homework-early-chip"`, `testID="finish-homework-chip"`) — these are separate from `endSessionButton` and must remain untouched.
 
 ### Task 4: Improve bookmark action discoverability
 
@@ -147,12 +149,12 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/components/session/SessionMessageActions.tsx`
 - `apps/mobile/src/components/session/SessionMessageActions.test.tsx`
 
-- [ ] Increase bookmark icon size from 20px to 22px.
-- [ ] Ensure pressable has at least `min-h-[36px] min-w-[36px]`.
-- [ ] Preserve accessibility labels: `Bookmark this response` and `Remove bookmark`.
-- [ ] Preserve optimistic toggle behavior in `session/index.tsx`.
-- [ ] Test: bookmark toggle still renders for assistant messages with `eventId`.
-- [ ] Test: bookmark toggle remains absent without `eventId`.
+- [x] Increase bookmark icon size from 20px to 22px.
+- [x] Ensure pressable has at least `min-h-[36px] min-w-[36px]`.
+- [x] Preserve accessibility labels: `Bookmark this response` and `Remove bookmark`.
+- [x] Preserve optimistic toggle behavior in `session/index.tsx`.
+- [x] Test: bookmark toggle still renders for assistant messages with `eventId`.
+- [x] Test: bookmark toggle remains absent without `eventId`.
 
 ### Task 5: Add topic-page bookmark card
 
@@ -161,12 +163,12 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/components/library/BookmarkCard.tsx`
 - `apps/mobile/src/components/library/BookmarkCard.test.tsx`
 
-- [ ] Create a compact semantic-token card/row for saved chat bookmarks. Structure it to visually parallel `InlineNoteCard` (same `sourceLine`/`content`/icon/press shape) so notes and bookmarks look like related saved-item types on the topic page — not two unrelated components. Do not reuse `InlineNoteCard` directly; bookmarks have no expand/collapse and use a bookmark icon rather than a note icon.
-- [ ] Props should include `bookmarkId`, `content`, `createdAt`, optional `sourceLine` (pre-formatted display string, e.g. subject/topic/date), optional `onPress`, and `testID`.
-- [ ] Render bookmark icon, truncated content excerpt, and source/date line.
-- [ ] Use semantic classes/tokens; no hardcoded hex.
-- [ ] Test: renders content excerpt and source line.
-- [ ] Test: calls `onPress` when pressed.
+- [x] Create a compact semantic-token card/row for saved chat bookmarks. Structure it to visually parallel `InlineNoteCard` (same `sourceLine`/`content`/icon/press shape) so notes and bookmarks look like related saved-item types on the topic page — not two unrelated components. Do not reuse `InlineNoteCard` directly; bookmarks have no expand/collapse and use a bookmark icon rather than a note icon.
+- [x] Props should include `bookmarkId`, `content`, `createdAt`, optional `sourceLine` (pre-formatted display string, e.g. subject/topic/date), optional `onPress`, and `testID`.
+- [x] Render bookmark icon, truncated content excerpt, and source/date line.
+- [x] Use semantic classes/tokens; no hardcoded hex.
+- [x] Test: renders content excerpt and source line.
+- [x] Test: calls `onPress` when pressed.
 
 ### Task 6: Surface bookmarks under topics
 
@@ -176,15 +178,15 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/app/(app)/topic/[topicId].tsx`
 - `apps/mobile/src/app/(app)/topic/[topicId].test.tsx`
 
-- [ ] Use server-side `topicId` filter: extend `useBookmarks` to accept `topicId` and pass it to the API route (see required API files above). Client-side filtering is not acceptable — `useBookmarks` is paginated and only page 1 would be visible, silently missing bookmarks on subsequent pages.
-- [ ] Query bookmarks once `subjectId` and `topicId` are known.
-- [ ] Render `Saved from chat` section near existing notes using `t('library.topic.savedFromChat')` (add key to `en.json`).
-- [ ] Hide section entirely when no topic-scoped bookmarks exist.
-- [ ] Route bookmark press to `/session-summary/[sessionId]` or existing transcript/summary behavior.
-- [ ] Test: topic page shows saved bookmark content when bookmark belongs to topic.
-- [ ] Test: topic page hides bookmark section when no bookmarks match.
-- [ ] Test: bookmark with `topicId = null` does not render under topic.
-- [ ] Test: mock data containing a bookmark with a mismatched `topicId` does not appear in the section (verifies `useBookmarks` scoping and the `topicId` filter are both exercised).
+- [x] Use server-side `topicId` filter: extend `useBookmarks` to accept `topicId` and pass it to the API route (see required API files above). Client-side filtering is not acceptable — `useBookmarks` is paginated and only page 1 would be visible, silently missing bookmarks on subsequent pages.
+- [x] Query bookmarks once `subjectId` and `topicId` are known.
+- [x] Render `Saved from chat` section near existing notes using `t('library.topic.bookmarks.savedFromChat')` (add key to `en.json`).
+- [x] Hide section entirely when no topic-scoped bookmarks exist.
+- [x] Route bookmark press to `/session-summary/[sessionId]` or existing transcript/summary behavior.
+- [x] Test: topic page shows saved bookmark content when bookmark belongs to topic.
+- [x] Test: topic page hides bookmark section when no bookmarks match.
+- [x] Test: bookmark with `topicId = null` does not render under topic.
+- [x] Test: mock data containing a bookmark with a mismatched `topicId` does not appear in the section (verifies `useBookmarks` scoping and the `topicId` filter are both exercised).
 
 ### Task 7: PR 1 validation
 

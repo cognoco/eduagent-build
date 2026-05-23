@@ -2,6 +2,8 @@
 
 **Date:** 2026-05-12 (last refreshed 2026-05-19)
 **Status:** Framework complete (Phases 0-4); P0 drained; P1/P2 grew during W1-W17 coverage-hardening swarm (2026-05-16/18) — see "Reality Drift 2026-05-19" below. Cleanup work resumes on `test-coverage-hardening`.
+
+> **Note (2026-05-23):** Inventory counts in this file are point-in-time snapshots. Regenerate with `pnpm exec tsx scripts/generate-internal-mock-cleanup-inventory.ts` for current state.
 **Goal:** Reduce internal mocks that hide route/service/background-job contract drift while preserving true external boundary shims.
 
 ## Why

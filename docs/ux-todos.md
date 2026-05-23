@@ -1,6 +1,7 @@
 # UX TODOs — Rolling List
 
 Created: 2026-04-26
+Last updated: 2026-05-23
 Status: **rolling** — add findings as we walk the app. Plan + prioritize later.
 
 ## How this doc works
@@ -21,22 +22,22 @@ Status: **rolling** — add findings as we walk the app. Plan + prioritize later
 
 | Pri | Item | Where | Notes |
 |-----|------|-------|-------|
-| M | Promote `"Your personal library"` subtitle to **all** users (not just guardians). Sets the metaphor expectation up front, helps explain why books appear over time. | `apps/mobile/src/app/(app)/library.tsx:534` | Today only the guardian branch shows it. |
+| M | Promote `"Your personal library"` subtitle to **all** users. Sets the metaphor expectation up front, helps explain why books appear over time. | `apps/mobile/src/app/(app)/library.tsx:776-793` | Both branches now render a subtitle (guardian and non-guardian). The remaining work is ensuring the non-guardian copy uses the same "personal library" metaphor framing. |
 | M | Rename the `pick-book` entry-point copy: "Pick a book" → "Add a book" / "Find a book" / "What do you want to learn?" The verb should match the act of *commissioning* a new book, not selecting from inventory. | `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx` and all referrers | Naming is the only crack in the library metaphor — books exist *because* you learn, not before. |
 
 ### Empty / broken states
 
 | Pri | Item | Where | Notes |
 |-----|------|-------|-------|
-| H | Shelf empty state has no actionable escape — only "Go back." Add Retry / Regenerate / "Tell me what's happening" + a real timeout + a progress signal. Today's copy ("still being built, check back soon") commits to a happy-path assumption that lies if curriculum gen failed. | `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx:349` | Project rule: every screen state must have an action beyond retreat. |
-| H | Library `Books` tab empty state needs causal-arrow copy: *"Books appear as you learn — start a topic to put your first book on the shelf."* Today there's nothing useful for new users. | `apps/mobile/src/components/library/BooksTab.tsx` empty branch | Reinforces the metaphor instead of contradicting it. |
+| H | Shelf empty state — review copy and escalation path. The state now has a "Pick a book" primary CTA, Retry, and Go Back (`shelf/[subjectId]/index.tsx:396-459`). Remaining: when `bookSuggestions.length === 0`, copy still says "still being built, check back soon" — consider adding a "Tell me what's happening" escalation or inline error diagnosis for curriculum-gen failures. | `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx:396-459` | Partial fix shipped (BUG-868); escalation copy for truly empty state still passive. |
+| H | Library empty state for new users needs causal-arrow copy: *"Books appear as you learn — start a topic to put your first book on the shelf."* Today there's nothing useful for new users. | `apps/mobile/src/app/(app)/library.tsx` (no separate BooksTab component — library is a single list view) | Reinforces the metaphor instead of contradicting it. |
 | M | Add a "just started" celebratory empty state to mirror the existing "all complete" celebration. Currently `library.tsx:590-624` only handles the finished state. | `apps/mobile/src/app/(app)/library.tsx` | Bookend the experience — first book and last book both deserve copy. |
 
 ### Data parity across surfaces
 
 | Pri | Item | Where | Notes |
 |-----|------|-------|-------|
-| H | The retention endpoint that powers the Library **Topics tab** does not return the `chapter` text field — so the tab strips chapter context. The same chapter shown grouped under "The Energy Transformation" on the book screen appears flat (no section header) in the Topics tab. Fix: API includes `chapter` in the response; mobile drops the `chapter: null` hardcode. | API: `apps/api/src/services/retention-data.ts:266`. Mobile: `apps/mobile/src/app/(app)/library.tsx:211` and `SubjectRetentionTopic` interface (~line 54). | ~3 lines total, large UX gain. Components already accept `chapter` (test fixtures use it). |
+| H | The retention endpoint that powers the Library **Topics tab** does not return the `chapter` text field — so the tab strips chapter context. The same chapter shown grouped under "The Energy Transformation" on the book screen appears flat (no section header) in the Topics tab. Fix: API includes `chapter` in the response; mobile `LibraryRetentionTopic` type (from `@eduagent/schemas`) should expose it. | API: `apps/api/src/services/retention-data.ts` (aggregation query). Mobile type: `LibraryRetentionTopic` from `@eduagent/schemas` (imported in `library.tsx:29`). | ~3 lines total, large UX gain. Components already accept `chapter` (test fixtures use it). |
 
 ### Book screen — overload + duplication
 
@@ -44,14 +45,14 @@ Status: **rolling** — add findings as we walk the app. Plan + prioritize later
 |-----|------|-------|-------|
 | H | Book screen shows the same chapter (currently called "topic") in **multiple sections** — Up Next + its section group in Later, for example. Suppress duplicates: a chapter rendered as Continue/Started/Up Next/Done should not also appear inside the Later list. | `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx` Sections 2-6 | Visible in screenshot 2026-04-26: "The Plant's Powerhouse: Chloroplasts" appears in Up next *and* in Later/Green Factories. |
 | M | "X / Y not started" counter on section groups (Later) contradicts itself when one of the chapters in the group is the Up Next or Continue Now. Counter should reflect actual mixed state, or the buckets should be mutually exclusive. | same file, Section 6 (Later) | "The Green Factories — 2 / 2 not started" in screenshot, but its first chapter *is* Up Next. |
-| H | **Book screen reorg under Pattern Y:** the book screen drops most of its 10 sections and becomes a clean **chapter list** with per-chapter progress. Tapping a chapter opens a new **Chapter screen** (currently does not exist) that holds the Continue / Started / Up next / Done content for *that* chapter. Sessions and notes move to a History sub-route or to per-chapter views. Drives down book screen from 1,399 lines to <300. | `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx` (existing) + new `chapter/[id]` route | Decided 2026-04-26 (see decisions log: Pattern Y). Implementation approach (A: URL by name / B: chapters DB table / C: synthesised slugs) pending. |
+| H | **Book screen reorg under Pattern Y:** the book screen drops most of its 10 sections and becomes a clean **chapter list** with per-chapter progress. Tapping a chapter opens a new **Chapter screen** (currently does not exist) that holds the Continue / Started / Up next / Done content for *that* chapter. Sessions and notes move to a History sub-route or to per-chapter views. Drives down book screen from 2,060 lines to <300. | `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx` (existing) + new `chapter/[id]` route | Decided 2026-04-26 (see decisions log: Pattern Y). Implementation approach (A: URL by name / B: chapters DB table / C: synthesised slugs) pending. |
 
 ### Lifecycle / management
 
 | Pri | Item | Where | Notes |
 |-----|------|-------|-------|
-| L | `Manage` modal only handles subjects (pause / archive / restore). Consider book-level and chapter-level controls — hide outgrown books, archive a stale chapter. | `apps/mobile/src/app/(app)/library.tsx:629-770` | Lower priority — depends on whether users actually outgrow individual books. |
-| L | Consider whether the **Books** tab should be visible *before* the first book exists, or auto-collapse to a guidance card. | `apps/mobile/src/components/library/LibraryTabs.tsx` | Tied to the empty-state question above. |
+| L | `Manage` modal only handles subjects (pause / archive / restore). Consider book-level and chapter-level controls — hide outgrown books, archive a stale chapter. | `apps/mobile/src/app/(app)/library.tsx:1009` | Lower priority — depends on whether users actually outgrow individual books. |
+| L | Consider whether the library should auto-collapse to a guidance card before the first book exists. | `apps/mobile/src/app/(app)/library.tsx` (no separate LibraryTabs component) | Tied to the empty-state question above. |
 
 ### Dropped (considered, decided against)
 
@@ -74,7 +75,7 @@ Status: **rolling** — add findings as we walk the app. Plan + prioritize later
 | Pri | Item | Notes |
 |-----|------|-------|
 | H | "More" tab is doing dual duty as settings *and* a route junction (`subscription`, `mentor-memory`, `dashboard`, **`practice`**). Practice especially shouldn't be hidden — it's a core learning surface. Decide: promote Practice to a tab, merge it into Library, or restructure More. |
-| H | Session header shows an internal `Independent / Guided` tutor-rung badge even though learners cannot choose it. Replace the visible badge with the user-controlled `Explorer / Challenge mode` preference currently buried under More, ideally as a small selector/sheet. Keep the adaptive rung internal/debug-only unless it becomes actionable. | Current badge: `apps/mobile/src/app/(app)/session/index.tsx:1274`. User preference lives in `apps/mobile/src/app/(app)/more.tsx:569` via `useLearningMode()`. Confirm whether learning-mode changes affect the next AI turn immediately or only future sessions before final copy. |
+| H | Session header: verify whether any tutor-rung badge is still visible to learners. `session/index.tsx` is 1,246 lines and shows no `Independent / Guided` badge in current code — badge may have been removed. User learning-mode preference is in `apps/mobile/src/app/(app)/more/learning-preferences.tsx` (via `LearningModeOption` component, no `useLearningMode` hook). Confirm whether a visible rung indicator exists before actioning. | `apps/mobile/src/app/(app)/session/index.tsx`, `apps/mobile/src/app/(app)/more/learning-preferences.tsx` | Original badge ref (`session/index.tsx:1274`) is past end-of-file — badge likely already removed. |
 | H | First-run gates feel like an obstacle course (consent → post-approval → permission setup → app). Add a progress indicator ("Step 2 of 3") across gates so users see they're nearly there. |
 | H | Verify full-screen flows (`session`, `homework`, `dictation`, `quiz`, `shelf`, `onboarding`) all have **escape hatches** mid-flow. Tab bar is hidden in these routes — per the dead-end-audit rule, every state needs an action. |
 | M | Parent ↔ child proxy: parent has no obvious *entry point* on their own home — it's adapted implicitly. Consider a "switch to child" shortcut for daily use. |

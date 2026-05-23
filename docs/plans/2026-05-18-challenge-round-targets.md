@@ -5,8 +5,9 @@
 > may not start until this doc is signed off and the named plan tasks have been
 > updated to cite the targets chosen here.
 
-**Status:** Draft for review. Produced from a codebase-existence spike against
-`origin/main` at commit `3584e279d`.
+**Status:** Decisions implemented (mostly). CRIT-1 (`mastery_challenge_verified_at` column on assessments) ✅. CRIT-2 (`needs_deepening_topics` extensions: source/concept/misconception/correction) ✅. CRIT-4 (`struggleStatusSchema` extracted in `packages/schemas/src/struggle-status.ts`) ✅. CRIT-3 (helper renames in `session-crud.ts`: `persistSessionMetadata` export) and ROUTING-1..5 (`llmRoutingRung` field, rung floor in `session-exchange.ts`) require code verification — not found as of 2026-05-23.
+
+Produced from a codebase-existence spike against `origin/main` at commit `3584e279d`.
 
 **Scope:** Storage targets, helper-name reconciliation, schema export
 placement, and Challenge Round LLM routing policy. No code changes ship with
@@ -371,7 +372,4 @@ needs to redo the lookup.
 
 ---
 
-**Sign-off required:** Once approved, the eight amendments above are landed
-into `docs/plans/2026-05-18-challenge-round-into-note.md` and Phase 1
-implementation begins with Task 1 (envelope schema) and Task 3 Step 0
-(struggleStatusSchema extraction).
+_Sign-off received; this doc is now a historical decision record._
