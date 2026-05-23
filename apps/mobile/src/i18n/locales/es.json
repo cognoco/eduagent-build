@@ -2307,7 +2307,11 @@
     "progress": "Progreso",
     "progressLabel": "Progreso",
     "more": "Más",
-    "moreLabel": "Más"
+    "moreLabel": "Más",
+    "children": "Hijos",
+    "childrenLabel": "Hijos",
+    "recaps": "Resúmenes",
+    "recapsLabel": "Resúmenes"
   },
   "ocrTimeout": "La lectura tardó demasiado — inténtalo de nuevo",
   "permissionTitle": "Se necesita acceso a la cámara",
@@ -2588,5 +2592,15 @@
       "noRoundsYet": "Sin rondas aún",
       "hintOpenHistory": "Abre el historial de quiz"
     }
+  },
+  "recaps": {
+    "title": "Resúmenes",
+    "subtitle": "Momentos de aprendizaje recientes de tu familia.",
+    "emptyTitle": "Aún no hay resúmenes",
+    "emptyBody": "Las sesiones completadas aparecerán aquí cuando haya algo que resumir.",
+    "errorTitle": "No se pudieron cargar los resúmenes",
+    "errorMessage": "Inténtalo de nuevo en un momento.",
+    "summaryPending": "Se está preparando un resumen para esta sesión.",
+    "openRecapLabel": "Abrir el resumen de {{child}} para {{title}}"
   }
 }

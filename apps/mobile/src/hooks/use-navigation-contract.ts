@@ -16,7 +16,9 @@ export function useNavigationContract(): NavigationContract {
   const { mode } = useAppContext();
   const { isParentProxy } = useParentProxy();
   const role = useActiveProfileRole();
-  const subscription = useSubscriptionStatus();
+  const subscription = useSubscriptionStatus({
+    enabled: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
+  });
   const subscriptionData = subscription.data;
 
   return useMemo(

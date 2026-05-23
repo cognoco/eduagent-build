@@ -2332,7 +2332,11 @@
     "progress": "Postępy",
     "progressLabel": "Postępy",
     "more": "Więcej",
-    "moreLabel": "Więcej"
+    "moreLabel": "Więcej",
+    "children": "Dzieci",
+    "childrenLabel": "Dzieci",
+    "recaps": "Podsumowania",
+    "recapsLabel": "Podsumowania"
   },
   "ocrTimeout": "Odczyt trwał zbyt długo — spróbuj ponownie",
   "permissionTitle": "Wymagany dostęp do aparatu",
@@ -2588,5 +2592,15 @@
       "noRoundsYet": "Brak rund",
       "hintOpenHistory": "Otwiera historię quizów"
     }
+  },
+  "recaps": {
+    "title": "Podsumowania",
+    "subtitle": "Ostatnie postępy w nauce Twojej rodziny.",
+    "emptyTitle": "Brak podsumowań",
+    "emptyBody": "Ukończone sesje pojawią się tutaj, gdy będzie co podsumować.",
+    "errorTitle": "Nie udało się wczytać podsumowań",
+    "errorMessage": "Spróbuj ponownie za chwilę.",
+    "summaryPending": "Podsumowanie tej sesji jest jeszcze przygotowywane.",
+    "openRecapLabel": "Otwórz podsumowanie {{child}} dla {{title}}"
   }
 }

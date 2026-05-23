@@ -19,6 +19,14 @@ const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
   '/learner-profile': { profile: { accommodationMode: 'none' } },
   '/settings/celebration-level': { celebrationLevel: 'all' },
+  '/subscription/status': {
+    status: {
+      tier: 'family',
+      status: 'active',
+      monthlyLimit: 700,
+      usedThisMonth: 0,
+    },
+  },
 });
 
 jest.mock(

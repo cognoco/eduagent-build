@@ -150,7 +150,9 @@ export interface SubscriptionStatusData {
   usedThisMonth: number;
 }
 
-export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> {
+export function useSubscriptionStatus(options?: {
+  enabled?: boolean;
+}): UseQueryResult<SubscriptionStatusData> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -170,7 +172,7 @@ export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> 
         cleanup();
       }
     },
-    enabled: !!activeProfile,
+    enabled: !!activeProfile && (options?.enabled ?? true),
     staleTime: 60_000, // 1 min — fast endpoint, no need for aggressive refetching
   });
 }

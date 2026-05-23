@@ -2307,7 +2307,11 @@
     "progress": "進捗",
     "progressLabel": "進捗",
     "more": "その他",
-    "moreLabel": "その他"
+    "moreLabel": "その他",
+    "children": "お子様",
+    "childrenLabel": "お子様",
+    "recaps": "ふりかえり",
+    "recapsLabel": "ふりかえり"
   },
   "ocrTimeout": "読み取りに時間がかかりすぎました — もう一度お試しください",
   "permissionTitle": "カメラへのアクセスが必要です",
@@ -2588,5 +2592,15 @@
       "noRoundsYet": "まだラウンドなし",
       "hintOpenHistory": "クイズの履歴を開く"
     }
+  },
+  "recaps": {
+    "title": "ふりかえり",
+    "subtitle": "ご家族の最近の学習の記録です。",
+    "emptyTitle": "ふりかえりはまだありません",
+    "emptyBody": "完了したセッションは、要約が作成されるとここに表示されます。",
+    "errorTitle": "ふりかえりを読み込めませんでした",
+    "errorMessage": "しばらくしてからもう一度お試しください。",
+    "summaryPending": "このセッションのふりかえりは現在準備中です。",
+    "openRecapLabel": "{{child}}さんの{{title}}のふりかえりを開く"
   }
 }

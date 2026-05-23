@@ -272,6 +272,7 @@ export function resolveNavigationContract(
 
   const familyShape = shape === 'family';
   const addChildGate =
+    isAdultOwner(context.activeProfile) &&
     ownerRole &&
     !context.isParentProxy &&
     subscriptionReady &&

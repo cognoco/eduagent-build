@@ -21,6 +21,18 @@ jest.mock(
   }),
 );
 
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: depends on profile + parentProxy context */,
+  () => ({
+    useNavigationContract: () => ({
+      gates: {
+        showExportDelete: mockRole === 'owner',
+        showRemoveFamilyMember: mockRole === 'owner',
+      },
+    }),
+  }),
+);
+
 let mockLinkedChildren: { id: string; displayName: string }[] = [];
 
 jest.mock(

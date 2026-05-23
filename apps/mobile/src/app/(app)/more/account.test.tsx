@@ -58,6 +58,18 @@ jest.mock(
   }),
 );
 
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: depends on profile + parentProxy context */,
+  () => ({
+    useNavigationContract: () => ({
+      gates: {
+        showAccountSecurity: mockActiveProfile?.isOwner === true,
+        showBilling: mockRole === 'owner',
+      },
+    }),
+  }),
+);
+
 let mockSubscriptionData: { tier: string } | undefined = { tier: 'plus' };
 
 jest.mock(
@@ -232,7 +244,8 @@ describe('AccountScreen', () => {
     expect(queryByTestId('more-row-subscription')).toBeNull();
   });
 
-  it('hides account security section for non-owner', () => {
+  it('hides account security section and billing row for non-owner', () => {
+    mockRole = 'child';
     mockActiveProfile = {
       id: 'profile-2',
       displayName: 'Sam',
@@ -242,6 +255,9 @@ describe('AccountScreen', () => {
       wrapper: createWrapper(),
     });
     expect(queryByTestId('account-security-section')).toBeNull();
+    // Break test: billing must also be hidden for non-owners (child on parent account).
+    // A child seeing billing UI would be a CRITICAL security/UX violation.
+    expect(queryByTestId('more-row-subscription')).toBeNull();
   });
 
   it('displays displayName from activeProfile', () => {

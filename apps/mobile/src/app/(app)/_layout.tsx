@@ -56,7 +56,9 @@ import {
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import type { NavigationContract } from '../../lib/navigation-contract';
 import {
   getPreviewState,
   setPreviewState,
@@ -207,9 +209,59 @@ const iconMap: Record<
   Home: { focused: 'home', default: 'home-outline' },
   School: { focused: 'school', default: 'school-outline' },
   Book: { focused: 'book', default: 'book-outline' },
+  Recaps: { focused: 'albums', default: 'albums-outline' },
   Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
+  Users: { focused: 'people', default: 'people-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
+
+type HomeTabPresentation = {
+  titleKey: 'tabs.children' | 'tabs.familyHub' | 'tabs.myLearning';
+  accessibilityLabelKey:
+    | 'tabs.childrenLabel'
+    | 'tabs.familyHubLabel'
+    | 'tabs.myLearningLabel';
+  iconName: 'Home' | 'School' | 'Users';
+};
+
+export function resolveContractHomeTabPresentation(
+  home: NavigationContract['home'],
+): HomeTabPresentation {
+  if (home.screen === 'FamilyHome') {
+    return {
+      titleKey: 'tabs.children',
+      accessibilityLabelKey: 'tabs.childrenLabel',
+      iconName: home.iconName,
+    };
+  }
+
+  return {
+    titleKey: 'tabs.myLearning',
+    accessibilityLabelKey: 'tabs.myLearningLabel',
+    iconName: home.iconName,
+  };
+}
+
+export function resolveShellVisibleTabs({
+  familyCapable,
+  isParentProxy,
+  mode,
+  navigationContract,
+  tabShape,
+  useContract,
+}: {
+  familyCapable: boolean;
+  isParentProxy: boolean;
+  mode: AppMode | null;
+  navigationContract: Pick<NavigationContract, 'visibleTabs'>;
+  tabShape: TabShape;
+  useContract: boolean;
+}): Set<string> {
+  if (useContract) return new Set(navigationContract.visibleTabs);
+  if (isParentProxy) return computeVisibleTabs(tabShape, true);
+  if (familyCapable && mode !== null) return computeModeVisibleTabs(mode);
+  return computeVisibleTabs(tabShape, false);
+}
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const colors = useThemeColors();
@@ -2035,17 +2087,27 @@ export default function AppLayout() {
   const { mode, familyCapable } = useAppContext();
   const proxyColors = getProxyChromeColors(colors);
   const role = useActiveProfileRole();
+  const navigationContract = useNavigationContract();
   const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
-  const visibleTabs = React.useMemo(() => {
-    if (isParentProxy) return computeVisibleTabs(tabShape, true);
-    if (familyCapable && mode !== null) return computeModeVisibleTabs(mode);
-    return computeVisibleTabs(tabShape, false);
-  }, [familyCapable, isParentProxy, mode, tabShape]);
-  const homeTabPresentation = resolveHomeTabPresentation(
-    tabShape,
-    isParentProxy,
-    familyCapable ? mode : null,
+  const visibleTabs = React.useMemo(
+    () =>
+      resolveShellVisibleTabs({
+        familyCapable,
+        isParentProxy,
+        mode,
+        navigationContract,
+        tabShape,
+        useContract: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
+      }),
+    [familyCapable, isParentProxy, mode, navigationContract, tabShape],
   );
+  const homeTabPresentation = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? resolveContractHomeTabPresentation(navigationContract.home)
+    : resolveHomeTabPresentation(
+        tabShape,
+        isParentProxy,
+        familyCapable ? mode : null,
+      );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -2546,6 +2608,17 @@ export default function AppLayout() {
               tabBarAccessibilityLabel: t('tabs.libraryLabel'),
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="Book" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="recaps"
+            options={{
+              title: t('tabs.recaps'),
+              tabBarButtonTestID: 'tab-recaps',
+              tabBarAccessibilityLabel: t('tabs.recapsLabel'),
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Recaps" focused={focused} />
               ),
             }}
           />
