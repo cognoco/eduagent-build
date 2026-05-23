@@ -2,7 +2,7 @@
 
 > **Status:** Draft  
 > **Access label:** Family-only  
-> **Last mapped:** 2026-05-22  
+> **Last mapped:** 2026-05-23  
 > **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/_layout.tsx`, `apps/mobile/src/app/(app)/home.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/lib/app-context.tsx`, `apps/mobile/src/lib/profile.ts`
 
 ## Purpose
@@ -32,7 +32,7 @@ The product target is Family-only: this flow owns parent-mode navigation. Curren
 | Current Family home tab | `/(app)/home` -> `ParentHomeScreen` when `mode === 'family'` | No | Yes | Target still has Family home, but under contract and with server-backed capability. |
 | Current Family progress tab | `/(app)/progress` | Study self progress | Family child progress | In Family V0, tab is shared route with child selector/child APIs. |
 | Current Family More tab | `/(app)/more` | Yes, self/account settings | Yes, family/account settings | Rows are still gated inside screens rather than by a single contract. |
-| Target Recaps tab | `/(app)/recaps` | No | Target yes | Required by FULL contract but route/API do not exist yet; must not be surfaced as a dead tab. |
+| Target Recaps tab | `/(app)/recaps` | No | Yes in V1 | Minimal route/API exists in the navigation-contract branch and opens parent-native child session detail for full context. |
 | Legacy guardian own-learning tab | `/(app)/own-learning` | No | Legacy/transition only | V0 guardian shape exposes this, but FULL target removes top-level `own-learning`; Study itself becomes adult self-learning. |
 | Legacy guardian library tab | `/(app)/library` | Yes | Legacy/transition only | FULL target says Family child curriculum should use child routes, not top-level adult Library. |
 | Child card progress action | `/(app)/child/[profileId]?mode=progress` | No | Yes | Parent-native linked-child drill-down from `ParentHomeScreen`. |
@@ -55,7 +55,7 @@ The product target is Family-only: this flow owns parent-mode navigation. Curren
 | --- | --- |
 | Loading | Least-surprising Study-safe shell until active profile/capability is known. Do not flash Family-only tabs to non-family users. |
 | Empty | Adult with no linked children stays in Study-safe shell with optional Family setup CTA. Current `ParentHomeScreen` has `add-first-child-screen`, but target says setup is not an app context. |
-| Success | Family-capable adult in Family sees Family home, child progress/recap/report routes, More, and a clear bridge back to Study. Current V0 lacks Recaps and uses `home`, `progress`, `more`. |
+| Success | Family-capable adult in Family sees Family home, child progress/recap/report routes, More, and a clear bridge back to Study. V1 adds Recaps; V0 still uses the legacy tab shape. |
 | Error/recovery | Route failures should recover to context root: Family home or Recaps for Family routes, Study home for Study routes. Child access failures should show protected/not-found recovery, not fallback to proxy. |
 | No access | Child/non-owner, solo child owner, adult without family links, and profile-not-loaded states should not see Family tabs. Tampered child IDs must fail server-side and in route guards. |
 
@@ -72,7 +72,7 @@ The product target is Family-only: this flow owns parent-mode navigation. Curren
 | Type | Link or ID | Note |
 | --- | --- | --- |
 | Product drift | Reconciled navigation contract | Current Family V0 tabs are `home`, `progress`, `more`; target Family tabs are `home`, `recaps`, `progress`, `more`. |
-| Missing surface | Recaps | `/(app)/recaps` route/API/schema do not exist. The tab must not be surfaced until a route exists or an explicit tracked stub is added. |
+| Verification gap | Recaps | Minimal `/(app)/recaps` route/API/schema now exist in the navigation-contract branch; dedicated Maestro coverage still needs to be added or folded into `parent-tabs.yaml`. |
 | Legacy drift | Guardian tabs | `GUARDIAN_TABS` still include `own-learning` and `library`; FULL target removes top-level `own-learning` and excludes top-level Library from Family. |
 | Capability drift | Client-side family inference | Current family capability is derived from the local profile list; target requires server-backed `hasFamilyLinks` and `profiles.default_app_context`. |
 | Proxy drift | Parent proxy normality | Proxy still affects tab visibility and can be entered through profile switching paths. Target says normal parent review must be parent-native. |

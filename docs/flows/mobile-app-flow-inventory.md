@@ -1,8 +1,8 @@
-> **STATUS: ACTIVE** — canonical mobile flow inventory. Updated 2026-05-14.
+> **STATUS: ACTIVE** — canonical mobile flow inventory. Updated 2026-05-23.
 
 # Mobile App Flow Inventory
 
-Current-state flow map for the Expo mobile app as of 2026-05-14.
+Current-state flow map for the Expo mobile app as of 2026-05-23.
 
 Source of truth used for this inventory:
 - `apps/mobile/src/app/**`
@@ -49,6 +49,7 @@ Two large changes reshape the inventory:
 17. **Subscription trial state + tier comparison cards (BUG-966 / BUG-917).** Trial banner and "Trial" status badge surface when `subscription.status === 'trial'`. Family / Pro tier static comparison cards render in PLANS for existing Family/Pro customers (no purchase action — preserves BUG-899).
 18. **New full-flow E2E coverage, with 2026-05-14 correction.** `dictation/dictation-full-flow.yaml`, `quiz/quiz-full-flow.yaml`, `progress/progress-analytics.yaml`, `progress/vocabulary-browser.yaml`, `learning/vocabulary-flow.yaml`, `learning/book-detail.yaml`, `learning/session-summary.yaml`, `learning/voice-mode-controls.yaml`, `parent/child-mentor-memory.yaml` (+ `-populated`), `parent/child-report-detail.yaml`, `parent/child-reports-empty.yaml`, `account/learner-mentor-memory.yaml` (+ `-populated`), `account/more-tab-navigation.yaml`, `account/settings-toggles.yaml`, `auth/sso-buttons.yaml`, `consent/consent-deny-confirmation.yaml`, `onboarding/onboarding-fast-path.yaml`, `onboarding/onboarding-fast-path-language.yaml`, and `account/app-language-edit.yaml`. Earlier obsolete onboarding-extras, tutor-language, and settings-language YAML references were removed because those files do not exist in `apps/mobile/e2e/flows`.
 19. **Quiz robustness fixes.** BUG-929 / CR-PR129-M4 reset `answerState`, `selectedAnswer`, `freeTextAnswer`, `guessWhoCluesUsed`, and the per-question timer in the same React batch on advance. BUG-932 shows the first clue (truncated) as the Guess Who row prompt in round detail. BUG-891 labels the vocab quiz card as "<lang> basics" when the learner has fewer than 5 personal words. BUG-892 replaces the web `window.confirm` quit with an in-app Modal. BUG-941 stripping is applied at the chat-bubble render boundary.
+20. **Navigation contract V1 shell slice.** The in-progress V1 Study/Family contract adds a Family `recaps` tab and a minimal Recaps feed backed by existing child session recap fields. V0 guardian fallback remains a supported five-tab shell (`home`, `own-learning`, `library`, `progress`, `more`) when both mode-navigation flags are off.
 
 ## Status legend
 
@@ -120,8 +121,8 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | ID | Flow | Primary routes / entry points | Coverage |
 | --- | --- | --- | --- |
 | HOME-01 | Learner home — redesigned (commit 435a7b89): subject-tint carousel (`home-subject-carousel`, `home-subject-card-{id}`), add-subject tile (`home-add-subject-tile`), empty-subjects state (`home-empty-subjects`, `home-add-first-subject`), Ask Anything bar (`home-ask-anything`), quick-action row (`home-action-study-new`, `home-action-homework`, `home-action-practice`), CoachBand (gated by `FEATURE_FLAGS.COACH_BAND_ENABLED`). Replaces the previous IntentCard pattern | `/(app)/home` via `LearnerScreen` | Covered indirectly by many learning and subject flows |
-| HOME-02 | Parent gateway home | `/(app)/home` via `ParentGateway` | `e2e/flows/parent/parent-tabs.yaml`, `e2e/flows/parent/parent-dashboard.yaml` |
-| HOME-03 | Parent tabs and parent-mode navigation | `/(app)` tab shell, `/(app)/home`, `/(app)/library`, `/(app)/progress`, `/(app)/more` | `e2e/flows/parent/parent-tabs.yaml` |
+| HOME-02 | Parent gateway home | `/(app)/home` via `ParentHomeScreen` / Family home contract | `e2e/flows/parent/parent-tabs.yaml`, `e2e/flows/parent/parent-dashboard.yaml` |
+| HOME-03 | Parent tabs and parent-mode navigation | V1 Family shell: `/(app)/home`, `/(app)/recaps`, `/(app)/progress`, `/(app)/more`; V0 guardian fallback still includes `/(app)/own-learning` and `/(app)/library` | `e2e/flows/parent/parent-tabs.yaml` — needs re-run/repair for the V1 Recaps tab |
 | HOME-04 | Animated splash and initial shell | root `_layout.tsx` splash / launch experience | `e2e/flows/edge/animated-splash.yaml` |
 | HOME-05 | Empty first-user state (no subjects yet) — surfaced through the learner home action set; CTA `home-action-study-new` deep-links into `/create-subject` (updated 2026-05-14; old `home-add-subject-tile`/`home-add-first-subject` IDs no longer match) | `LearnerScreen` empty-subjects branch | `e2e/flows/edge/empty-first-user.yaml` |
 | HOME-06 | Resume interrupted session (driven by SecureStore session-recovery marker + `useContinueSuggestion`; surfaced as the active-subject card or a recovery affordance on the home carousel) | `LearnerScreen` continue affordance | Code-only |
@@ -240,7 +241,7 @@ Dictation is a five-screen flow under `/(app)/dictation` with its own React cont
 | PARENT-08 | Subject raw-input audit for parents | parent drill-down / raw input review surfaces | `e2e/flows/parent/subject-raw-input-audit.yaml` |
 | PARENT-09 | Guided label tooltip | parent dashboard or parent report surfaces | `e2e/flows/parent/guided-label-tooltip.yaml` |
 | PARENT-10 | Parent child-topic "Understanding" card (plain-English mastery label) with data-gated Retention card | `/(app)/child/[profileId]/topic/[topicId]` | Code-only — testIDs `topic-understanding-card` (replaces `topic-mastery-card`), `topic-retention-card`; labels from `getUnderstandingLabel` and `getParentRetentionInfo` in `apps/mobile/src/lib/parent-vocab.ts` |
-| PARENT-11 | Parent child-session recap: narrative block, highlight block, Conversation prompt with copy-to-clipboard (Copied! / Copy failed states), and `EngagementChip` (curious / stuck / breezing / focused / scattered) | `/(app)/child/[profileId]/session/[sessionId]` | `e2e/flows/parent/child-session-recap.yaml` (populated), `e2e/flows/parent/child-session-recap-empty.yaml` |
+| PARENT-11 | Parent child-session recap: narrative block, highlight block, Conversation prompt with copy-to-clipboard (Copied! / Copy failed states), and `EngagementChip` (curious / stuck / breezing / focused / scattered). The V1 Family Recaps feed reuses these session recap fields and opens the existing parent-native child session detail route. | `/(app)/recaps`, `/(app)/child/[profileId]/session/[sessionId]` | `e2e/flows/parent/child-session-recap.yaml` (populated), `e2e/flows/parent/child-session-recap-empty.yaml`; dedicated Recaps tab flow not yet added |
 | PARENT-12 | Parent child-subject detail retention badges gated on data presence | `/(app)/child/[profileId]/subjects/[subjectId]` | `e2e/flows/parent/child-subject-retention.yaml` (badges present), `e2e/flows/parent/child-subject-no-retention.yaml` (suppressed) |
 | PARENT-13 | Child weekly report detail — push-notification-driven weekly progress screen (sessions, time on app, topics-mastered metrics for a given week); marks report viewed on mount | `/(app)/child/[profileId]/weekly-report/[weeklyReportId]` | `e2e/flows/parent/child-weekly-report.yaml` |
 

@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
-import { engagementSignalSchema } from './sessions';
-
-const recapSessionTypeSchema = z.enum(['learning', 'homework', 'interleaved']);
+import { isoDateField } from './common.ts';
+import { engagementSignalSchema, sessionTypeSchema } from './sessions';
 
 export const recapsQuerySchema = z.object({
   childProfileId: z.string().uuid().optional(),
@@ -19,9 +18,9 @@ export const recapListItemSchema = z.object({
   subjectName: z.string().nullable(),
   topicId: z.string().uuid().nullable(),
   topicTitle: z.string().nullable(),
-  sessionType: recapSessionTypeSchema,
-  startedAt: z.string().datetime(),
-  endedAt: z.string().datetime().nullable(),
+  sessionType: sessionTypeSchema,
+  startedAt: isoDateField,
+  endedAt: isoDateField.nullable(),
   exchangeCount: z.number().int().min(0),
   displayTitle: z.string(),
   displaySummary: z.string().nullable(),

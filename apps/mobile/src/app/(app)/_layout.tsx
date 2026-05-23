@@ -938,9 +938,10 @@ function ProfileBasicsStep({
           createdOwnerProfileId: parent.id,
         });
 
+        const cachedParent = parent;
         queryClient.setQueriesData<Profile[]>(
           { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
-          (old) => (old ? [...old, parent!] : [parent!]),
+          (old) => (old ? [...old, cachedParent] : [cachedParent]),
         );
       }
 
@@ -960,9 +961,10 @@ function ProfileBasicsStep({
           const data = (await res.json()) as { profile: Profile };
           child = data.profile;
 
+          const cachedChild = child;
           queryClient.setQueriesData<Profile[]>(
             { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
-            (old) => (old ? [...old, child!] : [child!]),
+            (old) => (old ? [...old, cachedChild] : [cachedChild]),
           );
         } catch (childErr) {
           // [AC 9] Keep parent. Surface retryable child error inline.
@@ -1368,9 +1370,9 @@ function SaveWizardGate({
         </View>
       )}
 
-      {step === 2 && (
+      {step === 2 && target && (
         <ProfileBasicsStep
-          target={target!}
+          target={target}
           previewState={previewState}
           onComplete={(c) => {
             setCreated(c);
@@ -1379,9 +1381,9 @@ function SaveWizardGate({
         />
       )}
 
-      {step === 3 && created && (
+      {step === 3 && target && created && (
         <ConfirmStep
-          target={target!}
+          target={target}
           previewState={previewState}
           created={created}
           router={router}

@@ -30,8 +30,8 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock(
-  '../../lib/api-client',
-  /* gc1-allow: test boundary - avoids real Hono fetch client and network calls */ () =>
+  '../../lib/api-client' /* gc1-allow: test boundary - avoids real Hono fetch client and network calls */,
+  () =>
     require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 

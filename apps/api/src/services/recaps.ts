@@ -1,5 +1,6 @@
 import type { Database } from '@eduagent/database';
 import type { RecapListItem } from '@eduagent/schemas';
+import { ForbiddenError } from '../errors';
 
 import {
   getChildSessionDetail,
@@ -50,9 +51,14 @@ export async function listRecapsForParent(
     ? children.filter((child) => child.profileId === options.childProfileId)
     : children;
 
+  // [H1-RECAP-IDOR] If a specific childProfileId was requested but that child
+  // is not in the parent's family-link set, fail with 403 immediately.
+  // Previously this fell through to a getChildSessions() call whose only
+  // purpose was to invoke assertParentAccess as a side-effect, leaving a
+  // dead `return []` after a line that always throws. Explicit guard is
+  // clearer and does not depend on getChildSessions' internal IDOR logic.
   if (options.childProfileId && selectedChildren.length === 0) {
-    await getChildSessions(db, parentProfileId, options.childProfileId);
-    return [];
+    throw new ForbiddenError('You do not have access to this child profile.');
   }
 
   const sessionsByChild = await Promise.all(
