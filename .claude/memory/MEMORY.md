@@ -104,6 +104,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Core Learning Philosophy
 
 - [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands pedagogy mode (alongside socratic). Vocabulary CRUD, CEFR levels, language-progress routes.
+- [project_freeform_library_filing_decision.md](project_freeform_library_filing_decision.md) — Ask Anything saves sessions by default; Library filing is separate, auto-file when confident, keep-out-of-Library remains available.
 - [project_language_assessments_production_first.md](project_language_assessments_production_first.md) — Language reviews must test production/translation/tiny exchanges, not abstract topic summaries or culture-ish "idea of a greeting" prompts.
 - [feedback_never_lock_topics.md](feedback_never_lock_topics.md) — NEVER lock/block topics. Prerequisites advisory.
 - [feedback_never_force_add_child.md](feedback_never_force_add_child.md) — Never force add-child. Solo/skip path always available for parent accounts.
