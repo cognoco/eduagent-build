@@ -419,6 +419,29 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile).toBeNull();
   });
 
+  it('[BREAK] keeps cached profiles usable when a background profile refetch fails', async () => {
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Server error' }), {
+        status: 500,
+      }),
+    );
+
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: ['profiles'] });
+    });
+
+    expect(result.current.profiles).toEqual(mockProfiles);
+    expect(result.current.activeProfile?.id).toBe('owner-id');
+    expect(result.current.profileLoadError).toBeNull();
+  });
+
   it('[BREAK] clears mentomate_parent_home_seen on sign-out', async () => {
     await clearProfileSecureStorageOnSignOut(['owner-id']);
     const deletedKeys = jest

@@ -1,11 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
-import { QueryClient } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
-  createHookWrapper,
   createTestProfile,
   getRequestJsonBody,
 } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId } from '../lib/api-client';
+import { ProfileContext, type ProfileContextValue } from '../lib/profile';
 import {
   useCloneFromChild,
   type CloneFromChildArgs,
@@ -46,15 +47,38 @@ const FORCE_REQUEST_ID = '550e8400-e29b-41d4-a716-446655440015';
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const wrapper = createHookWrapper({
-    activeProfile: createTestProfile({
-      id: ADULT_PROFILE_ID,
-      birthYear: 1985,
-      isOwner: true,
-    }),
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { gcTime: 0 },
+    },
   });
-  queryClient = wrapper.queryClient;
-  return wrapper.wrapper;
+
+  const activeProfile = createTestProfile({
+    id: ADULT_PROFILE_ID,
+    birthYear: 1985,
+    isOwner: true,
+  });
+  const profileContextValue: ProfileContextValue = {
+    profiles: [activeProfile],
+    activeProfile,
+    isExplicitProxyMode: false,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ProfileContext.Provider value={profileContextValue}>
+          {children}
+        </ProfileContext.Provider>
+      </QueryClientProvider>
+    );
+  };
 }
 
 function cloneArgs(

@@ -206,12 +206,13 @@ export function ProfileProvider({
 }: {
   children: ReactNode;
 }): ReactNode {
-  const {
-    data: profiles = [],
-    isLoading: isProfilesLoading,
-    isFetching: isProfilesFetching,
-    error: profileLoadError,
-  } = useProfiles();
+  const profilesQuery = useProfiles();
+  const profiles = profilesQuery.data ?? [];
+  const isProfilesLoading = profilesQuery.isLoading;
+  const isProfilesFetching = profilesQuery.isFetching;
+  // A stale-while-refetch failure should not eject a signed-in user from the
+  // app when we still have a usable profile list in cache.
+  const profileLoadError = profiles.length === 0 ? profilesQuery.error : null;
   const client = useApiClient();
   const queryClient = useQueryClient();
 
