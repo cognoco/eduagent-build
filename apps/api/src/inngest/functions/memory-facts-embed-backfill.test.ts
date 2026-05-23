@@ -204,4 +204,77 @@ describe('memoryFactsEmbedBackfill [WI-113] consent-eligibility filter', () => {
     expect(calledWith).toContain(rowA.text);
     expect(calledWith).not.toContain(rowB.text);
   });
+
+  // [BUG-366 / WI-82] Cursor guard: ineligible row after a retryable failure
+  // must NOT advance the cursor past the failed-but-eligible row.
+  //
+  // Setup:
+  //   batch-0  = exactly BATCH_SIZE (100) rows so `scanned < BATCH_SIZE`
+  //              does NOT trigger an early break, letting the outer loop
+  //              evaluate the no-progress-halt condition.
+  //   rows[0]  = rowA, eligible profile — generateEmbedding throws 429
+  //              → rate_limited (retryable) → haltedByRetryableFailure = true
+  //   rows[1..99] = rowB..rowLast, ALL ineligible profiles
+  //
+  // Fixed behaviour: haltedByRetryableFailure is true when the ineligible
+  // rows are processed, so lastSafeAdvanceId stays at the initial cursor
+  // (null). batch.lastId = null → outer lastId === previousLastId (both null)
+  // → no-progress halt fires → batch-1 is never attempted.
+  // db.select is called exactly 3 times: count-backlog, batch-0 candidates,
+  // batch-0 eligibility.
+  //
+  // Buggy behaviour (pre-fix): ineligible-skip advances lastSafeAdvanceId
+  // unconditionally → batch.lastId = rowLast.id → lastId !== previousLastId
+  // → no halt → batch-1 attempted → db.select called ≥4 times.
+  it('[BUG-366] ineligible row after retryable failure does not advance cursor past the failed row', async () => {
+    const rowA = {
+      id: 'fact-eee-00',
+      profileId: 'profile-rate-limited',
+      category: 'interest',
+      text: 'into robotics',
+    };
+
+    // 99 ineligible rows sorted after rowA (ids fact-eee-01 … fact-eee-99)
+    const ineligibleRows = Array.from({ length: 99 }, (_, i) => ({
+      id: `fact-eee-${String(i + 1).padStart(2, '0')}`,
+      profileId: `profile-ineligible-${i}`,
+      category: 'interest',
+      text: `filler text ${i}`,
+    }));
+    const allBatchRows = [rowA, ...ineligibleRows]; // exactly 100 = BATCH_SIZE
+
+    // generateEmbedding for rowA throws a 429 → embedFactText returns
+    // { ok: false, class: 'rate_limited', ... } — NOT in
+    // NON_RETRYABLE_FAILURE_CLASSES → sets haltedByRetryableFailure = true.
+    mockGenerateEmbedding.mockRejectedValue(
+      new Error('Voyage AI embedding request failed (429): rate limited'),
+    );
+
+    // backlog = 200 > BATCH_SIZE (100) so the outer loop would run batch-1
+    // unless the no-progress halt fires.
+    mockDb.select
+      // Select 1: count-backlog
+      .mockReturnValueOnce(makeSelectChain([{ count: 200 }]))
+      // Select 2: batch-0 candidate rows (full 100-row batch)
+      .mockReturnValueOnce(makeSelectChain(allBatchRows))
+      // Select 3: batch-0 eligibility — only rowA qualifies
+      .mockReturnValueOnce(
+        makeSelectChain([{ profileId: 'profile-rate-limited' }]),
+      );
+    // No batch-1 stubs. If the loop reaches batch-1, mockDb.select() returns
+    // undefined and the SUT throws — making the regression visible.
+
+    await execute();
+
+    // With the fix: no-progress halt fires after batch-0 → db.select called
+    // exactly 3 times (count + batch-0 candidates + batch-0 eligibility).
+    // With the bug: batch-1 is attempted → db.select called ≥4 times.
+    expect(mockDb.select.mock.calls).toHaveLength(3);
+
+    // generateEmbedding was never called for ineligible rows.
+    const calledWithTexts = mockGenerateEmbedding.mock.calls.map(
+      ([text]: [string]) => text,
+    );
+    expect(calledWithTexts).not.toContain('filler text 0');
+  });
 });

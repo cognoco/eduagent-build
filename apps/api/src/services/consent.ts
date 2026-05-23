@@ -568,8 +568,15 @@ export async function refreshConsentToken(
       expiresAt: newExpiresAt,
       updatedAt: new Date(),
     })
-    .where(eq(consentStates.profileId, profileId))
-    .returning();
+    // Scope to the GDPR row: (profileId, consentType) is unique, so without the
+    // consentType predicate this would clobber a coexisting COPPA row and write
+    // the same token to both, breaking the token-uniqueness the lookup relies on.
+    .where(
+      and(
+        eq(consentStates.profileId, profileId),
+        eq(consentStates.consentType, 'GDPR'),
+      ),
+    );
 
   return newToken;
 }

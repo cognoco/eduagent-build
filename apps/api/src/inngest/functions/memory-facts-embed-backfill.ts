@@ -155,9 +155,15 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
           for (const row of rows) {
             // [WI-113] Skip rows whose profile lost consent or was archived
             // after the fact was written. Advance the cursor past this row so
-            // it doesn't block the batch (same treatment as non-retryable).
+            // it doesn't block the batch (same treatment as non-retryable) —
+            // but ONLY while the cursor hasn't already been pinned by a
+            // retryable failure earlier in this batch, otherwise an ineligible
+            // row sorted after a failed-but-eligible row would skip the latter
+            // and strand it un-retried (defeats the BUG-366 halt mechanism).
             if (!eligibleProfileIds.has(row.profileId)) {
-              lastSafeAdvanceId = row.id;
+              if (!haltedByRetryableFailure) {
+                lastSafeAdvanceId = row.id;
+              }
               continue;
             }
             logger.info('[memory_facts.embed_backfill] row attempted', {

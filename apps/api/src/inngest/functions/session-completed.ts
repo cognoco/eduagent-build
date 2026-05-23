@@ -25,6 +25,7 @@ import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { insertSessionXpEntry } from '../../services/xp';
 import { extractAndStoreHomeworkSummary } from '../../services/homework-summary';
 import { updateMedianResponseSeconds } from '../../services/settings';
+import { isGdprProcessingAllowed } from '../../services/consent';
 import {
   processEvaluateCompletion,
   processTeachBackCompletion,
@@ -1245,6 +1246,17 @@ export const sessionCompleted = inngest.createFunction(
               existingProfile.memoryConsentStatus !== 'granted' ||
               existingProfile.memoryCollectionEnabled === false
             ) {
+              return;
+            }
+
+            // [WI-221] GDPR regulatory-consent gate at the processing site,
+            // BEFORE the transcript is sent to the LLM. revokeConsent sets GDPR
+            // status to WITHDRAWN without clearing memoryConsentStatus, so the
+            // memory gate above is insufficient: without this a withdrawn-but-
+            // memory-granted profile's transcript would still be transmitted to
+            // the external LLM provider (the regulated processing act under GDPR
+            // Art. 7(3)) before applyAnalysis later blocks only the write.
+            if (!(await isGdprProcessingAllowed(db, profileId))) {
               return;
             }
 
