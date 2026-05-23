@@ -269,6 +269,13 @@ if hit '(eslint\.config|\.lintstagedrc|^\.husky/|tsconfig.*\.json$)'; then
   add_cmd fast  "pnpm exec tsc --build"      "Full incremental typecheck"
 fi
 
+# ── TypeScript Source ────────────────────────────────────────────────────
+TS_SRC=$(filter_files '\.(ts|tsx)$' | grep -vE '\.test\.(ts|tsx)$|\.spec\.(ts|tsx)$|\.integration\.(ts|tsx)$' || true)
+if [[ -n "$TS_SRC" ]]; then
+  CLASSES+=("typescript")
+  add_cmd fast  "pnpm exec tsc --build"      "Full incremental typecheck"
+fi
+
 # ── Retention Package ────────────────────────────────────────────────────
 if hit '^packages/retention/src/'; then
   CLASSES+=("retention")
