@@ -168,14 +168,18 @@ async function handleSubscriptionEvent(
     .map((item) => item.price?.id)
     .filter((id): id is string => !!id);
   let priceTier = null as ReturnType<typeof resolveTierFromPriceId>;
+  let matchedPriceId: string | undefined;
   for (const candidate of itemPriceIds) {
     const mapped = resolveTierFromPriceId(env, candidate);
     if (mapped) {
       priceTier = mapped;
+      matchedPriceId = candidate;
       break;
     }
   }
-  const priceId = itemPriceIds[0];
+  // For diagnostics, report the matched plan price when one mapped; otherwise
+  // the first line item (the relevant id in the unverifiable case).
+  const priceId = matchedPriceId ?? itemPriceIds[0];
 
   // Price wins. Fall back to metadata only when the price is not mapped to a
   // configured tier (legacy/unmapped).

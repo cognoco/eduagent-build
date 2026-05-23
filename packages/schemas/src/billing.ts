@@ -3,6 +3,13 @@ import { z } from 'zod';
 export const subscriptionTierSchema = z.enum(['free', 'plus', 'family', 'pro']);
 export type SubscriptionTier = z.infer<typeof subscriptionTierSchema>;
 
+/** Paid tiers (the purchasable subset of SubscriptionTier — excludes 'free'). */
+export const paidTierSchema = z.enum(['plus', 'family', 'pro']);
+export type PaidTier = z.infer<typeof paidTierSchema>;
+
+export const billingIntervalSchema = z.enum(['monthly', 'yearly']);
+export type BillingInterval = z.infer<typeof billingIntervalSchema>;
+
 export const subscriptionStatusSchema = z.enum([
   'trial',
   'active',
@@ -28,8 +35,8 @@ export const subscriptionSchema = z.object({
 export type Subscription = z.infer<typeof subscriptionSchema>;
 
 export const checkoutRequestSchema = z.object({
-  tier: z.enum(['plus', 'family', 'pro']),
-  interval: z.enum(['monthly', 'yearly']),
+  tier: paidTierSchema,
+  interval: billingIntervalSchema,
 });
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 

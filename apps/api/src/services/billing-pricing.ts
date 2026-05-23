@@ -9,8 +9,7 @@
 // (routes/stripe-webhook.ts) cannot drift — drift between the two is the root
 // of [WI-85 / WI-175] (entitlements granted from unverified metadata).
 
-export type PaidTier = 'plus' | 'family' | 'pro';
-export type BillingInterval = 'monthly' | 'yearly';
+import type { PaidTier, BillingInterval } from '@eduagent/schemas';
 
 const PAID_TIERS: readonly PaidTier[] = ['plus', 'family', 'pro'];
 const INTERVALS: readonly BillingInterval[] = ['monthly', 'yearly'];
