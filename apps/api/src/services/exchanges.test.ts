@@ -175,6 +175,9 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain(
       'use confidence-gated general knowledge only when factual_confidence is at least 0.88',
     );
+    expect(prompt).toContain(
+      'Before every factual reply, privately check your own factual confidence',
+    );
     expect(prompt).toContain('explain → verify → next concept');
     // Old guidance should be gone
     expect(prompt).not.toContain(
@@ -1638,23 +1641,25 @@ describe('source provenance audit', () => {
     expect(audit.reliableReliedOnSourceIds).toEqual([]);
   });
 
-  it('allows 0.88+ general knowledge for ordinary rung 1-3 questions', () => {
+  it('allows 0.88+ general knowledge for ordinary rung 1-4 questions', () => {
     const sourceEvidence = buildExchangeSourceEvidence(
       {
         ...baseContext,
         topicTitle: undefined,
         topicDescription: undefined,
-        escalationRung: 1,
+        escalationRung: 4,
         effectiveMode: 'freeform',
       },
       'Tell me about yucca palms',
     );
 
+    expect(sourceEvidence.some((s) => s.id === 'general_knowledge')).toBe(true);
+
     const audit = auditExchangeSources(
       {
         relied_on: ['general_knowledge'],
         insufficient: false,
-        factual_confidence: 0.91,
+        factual_confidence: 0.88,
         reason: 'Common plant facts.',
       },
       sourceEvidence,
@@ -1861,7 +1866,7 @@ describe('source provenance audit', () => {
       { relied_on: ['learner_message'], insufficient: false },
       buildExchangeSourceEvidence(
         { ...baseContext, topicTitle: undefined, topicDescription: undefined },
-        'Tell me a historical fact without source material.',
+        'Tell me a historical fact.',
       ),
     );
 
@@ -1889,12 +1894,13 @@ describe('source provenance audit', () => {
     );
 
     expect(audit.status).toBe('unsupported_sources');
-    expect(safe.response).toMatch(/source-check question/i);
+    expect(safe.response).toMatch(/reliable source material/i);
+    expect(safe.response).not.toMatch(/source-check question/i);
     expect(safe.sourceAudit.status).toBe('insufficient_reliable_sources');
     expect(safe.sourceAudit.unsupportedSourceIds).toEqual(['current_topic']);
   });
 
-  it('standardizes intentional no-source replies into useful non-factual guidance', () => {
+  it('does not call ordinary why/how/was wording a source-check question', () => {
     const audit = auditExchangeSources(
       {
         relied_on: ['learner_message'],
@@ -1912,9 +1918,56 @@ describe('source provenance audit', () => {
       audit,
     );
 
+    expect(safe.response).toMatch(/reliable source material/i);
+    expect(safe.response).not.toMatch(/source-check question/i);
+    expect(safe.response).not.toMatch(/should not answer it from memory/i);
+    expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
+  });
+
+  it('reserves source-check wording for explicit source requests', () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'No trusted history source was provided.',
+      },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'What source supports this claim?',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Please share your source material.',
+      audit,
+    );
+
     expect(safe.response).toMatch(/source-check question/i);
     expect(safe.response).toMatch(/should not answer it from memory/i);
     expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
+  });
+
+  it('does not turn learner thanks into a source-check fallback', () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'No trusted history source was provided.',
+      },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'Thank you. That was useful',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Please share your source material.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/You're welcome/i);
+    expect(safe.response).not.toMatch(/source-check question/i);
+    expect(safe.response).not.toMatch(/reliable source material/i);
   });
 
   it('removes source-bound example terms that are not present in reliable source excerpts', () => {

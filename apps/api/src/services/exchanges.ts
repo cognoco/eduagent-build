@@ -590,7 +590,7 @@ export function buildExchangeSourceEvidence(
       reliability: 'model_general_knowledge',
       label: 'Confidence-gated general knowledge',
       excerpt:
-        'Allowed for ordinary low-stakes general knowledge in rung 1-3 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims.',
+        'Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims.',
       reliableForFacts: true,
     });
   }
@@ -797,6 +797,40 @@ function truncateForReply(value: string | undefined, maxChars = 160): string {
     : compact;
 }
 
+function normalizeAcknowledgementClause(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isAcknowledgementOnlyTurn(value: string): boolean {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (!compact) return false;
+  if (/[?]/.test(compact)) return false;
+
+  const clauses = compact
+    .split(/[.!;,]+|\s+-\s+/)
+    .map(normalizeAcknowledgementClause)
+    .filter(Boolean);
+  if (clauses.length === 0 || clauses.length > 3) return false;
+
+  return clauses.every(
+    (clause) =>
+      /^(thank you|thanks|thx|ty|ok|okay|yes|yep|yeah|got it|i got it|i see|i understand|makes sense|that makes sense|this makes sense|sounds good|cool|perfect|great|nice|good|fine|alright|all right)$/.test(
+        clause,
+      ) ||
+      /^(that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/.test(
+        clause,
+      ) ||
+      /^(thank you|thanks|thx|ty) (that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/.test(
+        clause,
+      ),
+  );
+}
+
 function buildUnsupportedFactualReply(
   sourceAudit: ExchangeSourceAudit,
 ): string {
@@ -804,6 +838,10 @@ function buildUnsupportedFactualReply(
     getSourceEvidenceExcerpt(sourceAudit, 'learner_message'),
   );
   const lower = learnerQuestion.toLowerCase();
+
+  if (isAcknowledgementOnlyTurn(learnerQuestion)) {
+    return "You're welcome. Want to keep going with this, or end here?";
+  }
 
   if (/\b(remember|takeaway|summary|recap)\b/.test(lower)) {
     return (
@@ -826,7 +864,11 @@ function buildUnsupportedFactualReply(
     );
   }
 
-  if (/\b(is|was|were|mostly|because|why|how)\b/.test(lower)) {
+  if (
+    /\b(source|sources|reference|references|textbook|worksheet|passage|photo|image|according to|based on|from this|from the text|quote|cite|citation|evidence)\b/.test(
+      lower,
+    )
+  ) {
     return (
       "That's a source-check question, so I should not answer it from memory. " +
       "Share the textbook passage, worksheet, photo, or trusted source, and we'll check what claim it supports and what evidence it gives."
