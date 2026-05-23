@@ -95,9 +95,12 @@ describe('topicRelevanceSchema', () => {
 });
 
 describe('curriculumTopicSourceSchema', () => {
-  it.each(['generated', 'user'])('accepts source "%s"', (source) => {
-    expect(curriculumTopicSourceSchema.parse(source)).toBe(source);
-  });
+  it.each(['generated', 'user', 'parent_bridge'])(
+    'accepts source "%s"',
+    (source) => {
+      expect(curriculumTopicSourceSchema.parse(source)).toBe(source);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
