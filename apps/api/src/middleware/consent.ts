@@ -32,7 +32,6 @@ const EXEMPT_PREFIXES = [
   '/v1/health',
   '/v1/auth/',
   '/v1/consent/',
-  '/v1/onboarding/',
   '/v1/billing/',
   '/v1/stripe/',
   '/v1/revenuecat/webhook',
@@ -40,6 +39,24 @@ const EXEMPT_PREFIXES = [
   '/v1/__test/',
   '/v1/maintenance/',
 ];
+
+/**
+ * [WI-130] /v1/onboarding exemption is method-scoped.
+ *
+ * The old EXEMPT_PREFIXES entry `/v1/onboarding/` matched ALL methods, so a
+ * PENDING/WITHDRAWN under-17 profile could PATCH /v1/onboarding/* personal-data
+ * writes (pronouns, interests, language) bypassing the consent gate.
+ *
+ * Correct policy:
+ *   GET  /v1/onboarding/*  → exempt (reads: dimensions status etc.)
+ *   POST/PATCH/PUT/DELETE  → GATED  (personal-data writes)
+ */
+function isOnboardingExempt(path: string, method: string): boolean {
+  if (!path.startsWith('/v1/onboarding/') && path !== '/v1/onboarding') {
+    return false;
+  }
+  return method.toUpperCase() === 'GET';
+}
 
 /**
  * [CR-2026-05-21-085] /v1/profiles exemption is method-scoped.
@@ -68,6 +85,7 @@ function isProfilesExempt(path: string, method: string): boolean {
 }
 
 function isExempt(path: string, method: string): boolean {
+  if (isOnboardingExempt(path, method)) return true;
   if (isProfilesExempt(path, method)) return true;
   // [CR-096] Guard against prefix-collision bugs (e.g. `/health` matching
   // `/healthcheck-something`). Exact match OR path is a sub-route of the
