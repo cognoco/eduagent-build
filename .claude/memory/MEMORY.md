@@ -51,6 +51,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
 - [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
 - [feedback_no_pr_unless_asked.md](feedback_no_pr_unless_asked.md) — NEVER create a PR unless explicitly asked.
+- [feedback_use_gh_cli_for_prs.md](feedback_use_gh_cli_for_prs.md) — Use `gh` CLI for PR status, checks, logs, and review workflows by default.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
 - [feedback_partial_staging_stash.md](feedback_partial_staging_stash.md) — Pre-commit tests full working tree; stash in-progress files before partial commits.
