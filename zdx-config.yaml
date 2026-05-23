@@ -34,6 +34,14 @@ zdx:
   # gates) for early trial runs — drop it once the pipeline is proven.
   validate:
     command: "bash scripts/check-change-class.sh --run --fast"
+    # Selector for `doppler run` wrap applied by zdx-validate.sh and zdx-push.sh
+    # when DOPPLER_TOKEN is present in the daemon's env. Lets test/hook child
+    # processes see DATABASE_URL etc. without committing secrets or modifying
+    # the daemon's env per-project. If omitted (or DOPPLER_TOKEN missing), the
+    # wrap is silently skipped and the command runs without injected secrets.
+    doppler:
+      project: mentomate
+      config: dev
 
   conformance:
     deviations: []

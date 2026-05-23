@@ -77,6 +77,8 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Deployment & Secrets
 
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars synced via `pnpm env:sync`.
+- [doppler-secrets.md](doppler-secrets.md) — Test secret resolution: project `mentomate`, configs `dev/stg/prd`. `DATABASE_URL` and friends needed by `*.test.ts` files that include integration paths. Archon's validate/push wrap via `doppler run`.
+- [load-database-env-windows-hardcode.md](load-database-env-windows-hardcode.md) — `packages/test-utils/.../load-database-env.ts` hardcodes Windows Doppler path; macOS/Linux must use external `doppler run` wrap.
 - [feedback_ota_env_vars.md](feedback_ota_env_vars.md) — Manual OTA must set target env vars explicitly.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
 - [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
