@@ -189,7 +189,12 @@ export function useCloneFromChild(): {
   const dismissToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
-    if (!toast) return undefined;
+    // Error toasts carry recovery actions (Try again, Upgrade, See linked
+    // children) — they must persist until the user takes an action or
+    // dismisses, otherwise the recovery affordance is invisible to anyone
+    // not staring at the screen. Success toasts (Undo / Open) still
+    // auto-dismiss after 5s.
+    if (!toast || toast.kind === 'error') return undefined;
     const timer = setTimeout(() => setToast(null), 5000);
     return () => clearTimeout(timer);
   }, [toast]);
