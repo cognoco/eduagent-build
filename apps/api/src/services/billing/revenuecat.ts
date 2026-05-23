@@ -358,14 +358,18 @@ export async function activateSubscriptionFromRevenuecat(
       throw new Error('Subscription update (revenuecat) did not return a row');
 
     // Update quota pool limit to match the new tier (inside same tx)
-    await tx
+    const [quotaPool] = await tx
       .update(quotaPools)
       .set({
         monthlyLimit: tierConfig.monthlyQuota,
         dailyLimit: tierConfig.dailyLimit,
         updatedAt: new Date(),
       })
-      .where(eq(quotaPools.subscriptionId, existing.id));
+      .where(eq(quotaPools.subscriptionId, existing.id))
+      .returning({ id: quotaPools.id });
+
+    if (!quotaPool)
+      throw new Error('Quota pool update (revenuecat) did not return a row');
 
     return row;
   });

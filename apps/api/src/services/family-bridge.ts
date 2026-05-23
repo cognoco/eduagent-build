@@ -563,24 +563,42 @@ export async function undoCloneFromChild(
     return { deleted: { topic: false } };
   }
 
-  const [session] = await db
+  const [deletedTopic] = await db
+    .delete(curriculumTopics)
+    .where(
+      and(
+        eq(curriculumTopics.id, topic.id),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${learningSessions}
+          WHERE ${learningSessions.profileId} = ${adultProfileId}
+            AND ${learningSessions.topicId} = ${topic.id}
+        )`,
+      ),
+    )
+    .returning({ id: curriculumTopics.id });
+
+  if (deletedTopic) {
+    return { deleted: { topic: true } };
+  }
+
+  const [sessionStarted] = await db
     .select({ id: learningSessions.id })
     .from(learningSessions)
     .where(
       and(
         eq(learningSessions.profileId, adultProfileId),
-        eq(learningSessions.topicId, createdIds.topicId),
+        eq(learningSessions.topicId, topic.id),
       ),
     )
     .limit(1);
 
-  if (session) {
+  if (sessionStarted) {
     return {
       deleted: { topic: false },
       reason: 'session_started',
     };
   }
 
-  await db.delete(curriculumTopics).where(eq(curriculumTopics.id, topic.id));
-  return { deleted: { topic: true } };
+  return { deleted: { topic: false } };
 }

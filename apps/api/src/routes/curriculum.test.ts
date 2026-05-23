@@ -307,6 +307,27 @@ describe('curriculum routes', () => {
       expect(mockCloneTopicFromChild).not.toHaveBeenCalled();
     });
 
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+      expect(mockCloneTopicFromChild).not.toHaveBeenCalled();
+    });
+
     it('returns 404 for missing or inaccessible source topics', async () => {
       mockCloneTopicFromChild.mockRejectedValueOnce(new NotFoundError('Topic'));
 
@@ -392,6 +413,45 @@ describe('curriculum routes', () => {
         deleted: { topic: false },
         reason: 'session_started',
       });
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: TOPIC_ID },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+      expect(mockUndoCloneFromChild).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid createdIds before calling the bridge service', async () => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: 'not-a-uuid' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockUndoCloneFromChild).not.toHaveBeenCalled();
     });
   });
 
