@@ -11,6 +11,7 @@ import { consentStates } from '@eduagent/database';
 import {
   getConsentStatus,
   getProfileConsentState,
+  refreshConsentToken,
 } from '../../services/consent';
 import {
   sendEmail,
@@ -77,14 +78,18 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      const { parentEmail, consentToken } = await lookupConsentDetails();
-      if (!parentEmail || !consentToken) return;
+      const { parentEmail } = await lookupConsentDetails();
+      if (!parentEmail) return;
+      // [DS-020] Refresh token before embedding in link — the original token
+      // from requestConsent expires after 7 days, making the day-7 link
+      // race-prone. A fresh token extends the window so the parent can act.
+      const freshToken = await refreshConsentToken(db, profileId);
       await sendEmail(
         formatConsentReminderEmail(
           parentEmail,
           'your child',
           23,
-          buildTokenUrl(consentToken),
+          buildTokenUrl(freshToken),
         ),
         emailOpts('day-7'),
       );
@@ -96,14 +101,17 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      const { parentEmail, consentToken } = await lookupConsentDetails();
-      if (!parentEmail || !consentToken) return;
+      const { parentEmail } = await lookupConsentDetails();
+      if (!parentEmail) return;
+      // [DS-020] Refresh token before embedding in link — without this the
+      // day-14 link is always expired (token minted at day-0 had 7-day TTL).
+      const freshToken = await refreshConsentToken(db, profileId);
       await sendEmail(
         formatConsentReminderEmail(
           parentEmail,
           'your child',
           16,
-          buildTokenUrl(consentToken),
+          buildTokenUrl(freshToken),
         ),
         emailOpts('day-14'),
       );

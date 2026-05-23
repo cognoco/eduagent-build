@@ -9,7 +9,9 @@ import {
   getConsentStatus,
   isGdprProcessingAllowed,
   revokeConsent,
+  refreshConsentToken,
   EmailDeliveryError,
+  ConsentTokenExpiredError,
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -47,6 +49,8 @@ function mockConsentRow(
       | 'CONSENTED'
       | 'WITHDRAWN';
     parentEmail: string | null;
+    expiresAt: Date | null;
+    consentToken: string | null;
   }>,
 ) {
   return {
@@ -57,7 +61,9 @@ function mockConsentRow(
     parentEmail: overrides?.parentEmail ?? 'parent@example.com',
     requestedAt: NOW,
     respondedAt: null,
-    expiresAt: null,
+    expiresAt: overrides?.expiresAt !== undefined ? overrides.expiresAt : null,
+    consentToken:
+      overrides?.consentToken !== undefined ? overrides.consentToken : null,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -610,6 +616,95 @@ describe('createGrantedConsentState', () => {
     await expect(
       createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID),
     ).rejects.toThrow('Insert into consentStates did not return a row');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processConsentResponse — token expiry (DS-020 regression)
+// ---------------------------------------------------------------------------
+
+describe('processConsentResponse — token expiry', () => {
+  it('[DS-020 RED→GREEN] rejects a token whose expiresAt is in the past', async () => {
+    const expiredRow = mockConsentRow({
+      expiresAt: new Date(Date.now() - 1000), // 1 second ago
+    });
+    const db = createMockDb({ findFirstResult: expiredRow });
+
+    await expect(
+      processConsentResponse(db, 'expired-token', true),
+    ).rejects.toThrow(ConsentTokenExpiredError);
+  });
+
+  it('[DS-020] accepts a token whose expiresAt is in the future', async () => {
+    const freshRow = mockConsentRow({
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+    const db = createMockDb({ findFirstResult: freshRow });
+    const result = await processConsentResponse(db, 'fresh-token', true);
+
+    expect(result.status).toBe('CONSENTED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// refreshConsentToken (DS-020 fix)
+// ---------------------------------------------------------------------------
+
+describe('refreshConsentToken', () => {
+  const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('[DS-020] updates consentToken and expiresAt in the DB', async () => {
+    const existingRow = mockConsentRow();
+    // updateReturning will resolve with the existing row but we only need
+    // the update chain to be called — the function returns the NEW token
+    // (generated inline), not the row token.
+    const db = createMockDb({ findFirstResult: existingRow });
+
+    const newToken = await refreshConsentToken(db, PROFILE_ID);
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(typeof newToken).toBe('string');
+    expect(newToken.length).toBeGreaterThan(0);
+  });
+
+  it('[DS-020] returned token differs from any prior stale token', async () => {
+    const staleToken = 'stale-token-from-7-days-ago';
+    const existingRow = mockConsentRow({ consentToken: staleToken });
+    const db = createMockDb({ findFirstResult: existingRow });
+
+    const newToken = await refreshConsentToken(db, PROFILE_ID);
+
+    // The function generates a fresh UUID — it will virtually never equal
+    // the static stale value.
+    expect(newToken).not.toBe(staleToken);
+  });
+
+  it('[DS-020] sets expiresAt at least 14 days into the future (covers day-14 reminder window)', async () => {
+    const existingRow = mockConsentRow();
+    const db = createMockDb({ findFirstResult: existingRow });
+
+    const before = Date.now();
+    await refreshConsentToken(db, PROFILE_ID);
+    const after = Date.now();
+
+    // Inspect what was passed to db.update().set(...)
+    const setCall = (db.update as jest.Mock).mock.results[0]!.value
+      .set as jest.Mock;
+    const setArgs = setCall.mock.calls[0]![0] as {
+      expiresAt: Date;
+      consentToken: string;
+    };
+
+    expect(setArgs.expiresAt).toBeInstanceOf(Date);
+    // Must expire at least 14 days from now (so a parent clicking the day-14 link is in time)
+    const minExpiry = new Date(before + 14 * 24 * 60 * 60 * 1000);
+    const maxExpiry = new Date(after + 30 * 24 * 60 * 60 * 1000);
+    expect(setArgs.expiresAt.getTime()).toBeGreaterThanOrEqual(
+      minExpiry.getTime(),
+    );
+    expect(setArgs.expiresAt.getTime()).toBeLessThanOrEqual(
+      maxExpiry.getTime(),
+    );
   });
 });
 

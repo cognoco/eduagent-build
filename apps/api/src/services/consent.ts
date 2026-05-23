@@ -481,6 +481,44 @@ export async function processConsentResponse(
 }
 
 /**
+ * Refreshes the consent token and its expiry for a profile.
+ *
+ * Called by the consent-reminder workflow before embedding an approval link
+ * in each reminder email. Tokens minted by `requestConsent` expire after 7
+ * days (PRD line 414). The day-7 reminder link is race-prone and the day-14
+ * link is always expired without this refresh — parents who click a stale
+ * link receive a ConsentTokenExpiredError and cannot approve (DS-020).
+ *
+ * Sets expiresAt to 16 days from now so the link is valid for the full
+ * reminder window (day-14 reminder + 2-day click buffer) without running
+ * past the day-30 auto-delete cutoff.
+ *
+ * Returns the new token so the caller can build the approval URL without a
+ * second round-trip. Reads no PII from the event payload (invariant upheld).
+ */
+export async function refreshConsentToken(
+  db: Database,
+  profileId: string,
+): Promise<string> {
+  const newToken = crypto.randomUUID();
+  // 16 days: covers day-14 reminder window plus a 2-day click buffer,
+  // and stays well within the day-30 auto-delete cutoff.
+  const newExpiresAt = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
+
+  await db
+    .update(consentStates)
+    .set({
+      consentToken: newToken,
+      expiresAt: newExpiresAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(consentStates.profileId, profileId))
+    .returning();
+
+  return newToken;
+}
+
+/**
  * Returns the current consent status for a profile (latest consent record).
  *
  * Uses raw db query with explicit profileId filter because the consent flow

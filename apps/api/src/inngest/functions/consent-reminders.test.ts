@@ -1,5 +1,8 @@
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileConsentState = jest.fn();
+const mockRefreshConsentToken = jest
+  .fn()
+  .mockResolvedValue('refreshed-token-xyz');
 const mockDeleteProfileIfNoConsent = jest.fn().mockResolvedValue(true);
 const mockSendEmail = jest.fn();
 const mockFormatConsentReminderEmail = jest.fn(
@@ -45,6 +48,8 @@ jest.mock(
       getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
       getProfileConsentState: (...args: unknown[]) =>
         mockGetProfileConsentState(...args),
+      refreshConsentToken: (...args: unknown[]) =>
+        mockRefreshConsentToken(...args),
     };
   },
 );
@@ -175,8 +180,10 @@ describe('consentReminder', () => {
   it('passes the built tokenUrl into both the formatter and the email body', async () => {
     await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
 
+    // After DS-020 fix: refreshConsentToken returns 'refreshed-token-xyz'
+    // so the URL is built from the refreshed token, not the DB-read stale token.
     const expectedTokenUrl =
-      'https://api.mentomate.com/v1/consent-page?token=test-token-abc123';
+      'https://api.mentomate.com/v1/consent-page?token=refreshed-token-xyz';
 
     // Day 7 + Day 14 reminders go through formatConsentReminderEmail —
     // each call must receive the built tokenUrl as its 4th arg.
@@ -195,6 +202,31 @@ describe('consentReminder', () => {
       | undefined;
     expect(day7Email?.body).toContain(expectedTokenUrl);
     expect(day14Email?.body).toContain(expectedTokenUrl);
+  });
+
+  // [DS-020] Regression: token embedded in day-7 and day-14 reminder links
+  // must be refreshed before use so the link is valid when the parent clicks it.
+  // Pre-fix: lookupConsentDetails() read the stale (possibly expired) DB token.
+  // Post-fix: refreshConsentToken() is called before building each URL.
+  it('[DS-020] refreshes the consent token before building day-7 and day-14 reminder URLs', async () => {
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
+
+    // refreshConsentToken must be called once per reminder that embeds a link
+    // (day-7 and day-14) — NOT for day-25 (no link) and NOT for day-30 (delete).
+    expect(mockRefreshConsentToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('[DS-020] day-14 reminder URL uses the refreshed token, not the stale DB token', async () => {
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
+
+    const day14Email = mockSendEmail.mock.calls[1]?.[0] as
+      | { body?: string }
+      | undefined;
+
+    // The refreshed token 'refreshed-token-xyz' must appear in the day-14 email body.
+    expect(day14Email?.body).toContain('refreshed-token-xyz');
+    // The stale DB token must NOT appear — proves we are not reading the old token.
+    expect(day14Email?.body).not.toContain('test-token-abc123');
   });
 
   it('stops sending when consent is granted mid-sequence', async () => {
