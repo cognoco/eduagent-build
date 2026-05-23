@@ -9,6 +9,7 @@ export interface Violation {
 
 const SHA_REF = /^[a-f0-9]{40}$/;
 const YAML_FILE = /\.ya?ml$/;
+const SECRET_REFERENCE = /secrets\s*(\.|\[)/;
 
 function listYamlFiles(rootDir: string, relativeDir: string): string[] {
   const absDir = join(rootDir, relativeDir);
@@ -40,7 +41,11 @@ function stringify(value: unknown): string {
 }
 
 function containsSecretReference(value: unknown): boolean {
-  return stringify(value).includes('secrets.');
+  return SECRET_REFERENCE.test(stringify(value));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function getWorkflowOn(parsed: Record<string, unknown>): unknown {
@@ -180,10 +185,14 @@ function validateWorkflowRunJob(
   const jobText = stringify(job);
   if (
     jobText.includes('github.event.workflow_run.head_sha') &&
-    jobText.includes('secrets.')
+    containsSecretReference(job)
   ) {
     const jobIf = stringify(job.if);
-    if ([...pullRequestSkipOutputs].some((output) => jobIf.includes(output))) {
+    if (
+      [...pullRequestSkipOutputs].some((output) =>
+        new RegExp(`${escapeRegExp(output)}\\s*==\\s*['"]true['"]`).test(jobIf),
+      )
+    ) {
       return null;
     }
 

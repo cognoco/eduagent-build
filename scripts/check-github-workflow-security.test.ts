@@ -95,6 +95,28 @@ describe('checkGithubWorkflowSecurity', () => {
     );
   });
 
+  it('rejects local actions that receive bracket-style secrets in pull_request workflows', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-local-bracket-secret.yml',
+      `
+      name: Bad local bracket secret
+      on: pull_request
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: ./.github/actions/claude-review
+              with:
+                oauth_token: \${{ secrets['CLAUDE_CODE_OAUTH_TOKEN'] }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'local action receives secrets in a pull_request workflow',
+    );
+  });
+
   it('allows local actions without secrets in pull_request workflows', () => {
     writeFixture(
       root,
@@ -206,6 +228,33 @@ describe('checkGithubWorkflowSecurity', () => {
     );
   });
 
+  it('rejects workflow_run jobs that expose bracket-style secrets to pull_request head code', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-workflow-run-bracket-secret.yml',
+      `
+      name: Bad workflow run bracket secret
+      on:
+        workflow_run:
+          workflows: ["CI"]
+      jobs:
+        e2e:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+              with:
+                ref: \${{ github.event.workflow_run.head_sha }}
+            - run: echo "$TEST_SEED_SECRET"
+              env:
+                TEST_SEED_SECRET: \${{ secrets['TEST_SEED_SECRET'] }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'workflow_run exposes secrets while checking out head_sha',
+    );
+  });
+
   it('allows workflow_run jobs that skip pull_request runs before secret-backed jobs', () => {
     writeFixture(
       root,
@@ -246,6 +295,47 @@ describe('checkGithubWorkflowSecurity', () => {
     );
 
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  it('rejects workflow_run jobs with inverted pull_request skip-output conditions', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-workflow-run-inverted-skip.yml',
+      `
+      name: Bad workflow run inverted skip
+      on:
+        workflow_run:
+          workflows: ["CI"]
+      jobs:
+        check-changes:
+          runs-on: ubuntu-latest
+          outputs:
+            run-mobile-e2e: \${{ steps.analyze.outputs.run-mobile-e2e }}
+          steps:
+            - name: Analyze changed file types
+              id: analyze
+              run: |
+                if [ "\${{ github.event_name }}" = "workflow_run" ] && [ "\${{ github.event.workflow_run.event }}" = "pull_request" ]; then
+                  echo "run-mobile-e2e=false" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+        e2e:
+          needs: check-changes
+          if: needs.check-changes.outputs.run-mobile-e2e == 'false'
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+              with:
+                ref: \${{ github.event.workflow_run.head_sha }}
+            - run: pnpm test:e2e
+              env:
+                TEST_SEED_SECRET: \${{ secrets.TEST_SEED_SECRET }}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'workflow_run exposes secrets while checking out head_sha',
+    );
   });
 
   it('allows workflow_run jobs that do not expose secrets', () => {
