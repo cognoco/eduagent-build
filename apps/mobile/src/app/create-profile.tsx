@@ -160,10 +160,14 @@ export default function CreateProfileScreen() {
     try {
       const body = {
         displayName: trimmedName,
-        // birthDate is non-null here (guarded above) — read birthYear from
+        // birthDate is non-null here (guarded above) — read birth fields from
         // the narrowed value rather than the outer `birthYear` derivation,
         // which TS sees as `number | null`.
+        // WI-297: Submit full birth date so the server can compute exact age
+        // (avoids year-only overestimation of the age gate).
         birthYear: birthDate.getFullYear(),
+        birthMonth: birthDate.getMonth() + 1, // getMonth() is 0-based
+        birthDay: birthDate.getDate(),
       };
 
       const res = await client.profiles.$post({ json: body });
