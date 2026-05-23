@@ -13,8 +13,6 @@ import {
   createTestProfile,
   cleanupScreen,
 } from '../../../test-utils/screen-render-harness';
-import { AppContextProvider } from '../../lib/app-context';
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 
 const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
@@ -120,19 +118,6 @@ afterEach(() => {
   (globalThis as unknown as { fetch: typeof fetch }).fetch = originalFetch;
 });
 
-function createModeScreenWrapper(
-  options: Parameters<typeof createScreenWrapper>[0],
-) {
-  const { wrapper: BaseWrapper, ...rest } = createScreenWrapper(options);
-  const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <BaseWrapper>
-      <AppContextProvider>{children}</AppContextProvider>
-    </BaseWrapper>
-  );
-
-  return { wrapper: Wrapper, ...rest };
-}
-
 describe('HomeScreen intent router', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -211,7 +196,6 @@ describe('HomeScreen intent router', () => {
     expect(screen.queryByTestId('learner-screen')).toBeNull();
   });
 });
-
 
 describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;

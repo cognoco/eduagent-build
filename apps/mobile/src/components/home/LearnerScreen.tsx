@@ -33,6 +33,7 @@ import {
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { getSubjectTint, getSubjectTintMap } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
@@ -127,6 +128,7 @@ export function LearnerScreen({
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { data: subscription } = useSubscription();
   const { switchProfile, isExplicitProxyMode } = useProfile();
+  const navigationContract = useNavigationContract();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
@@ -474,13 +476,15 @@ export function LearnerScreen({
     activeProfile?.isOwner === true &&
     (subscription?.tier === 'family' || subscription?.tier === 'pro');
 
-  if (
-    showParentHome &&
-    !isParentProxy &&
-    (FEATURE_FLAGS.MODE_NAV_V0_ENABLED
+  const familyHomeFromContract =
+    navigationContract.home.screen === 'FamilyHome';
+  const shouldShowFamilyHome = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? familyHomeFromContract
+    : FEATURE_FLAGS.MODE_NAV_V0_ENABLED
       ? mode === 'family'
-      : hasLinkedChildren || isFamilyPlanOwner)
-  ) {
+      : hasLinkedChildren || isFamilyPlanOwner;
+
+  if (showParentHome && !isParentProxy && shouldShowFamilyHome) {
     return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
   }
 

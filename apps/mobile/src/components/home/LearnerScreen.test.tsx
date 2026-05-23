@@ -25,6 +25,21 @@ const mockSwitchProfile = jest.fn(async () => ({ success: true }));
 // [ACCOUNT-04] Explicit proxy flag — controls isExplicitProxyMode in the mock
 // profile context. Must be set to true only for proxy-mode test cases.
 let mockIsExplicitProxyMode = false;
+let mockContractHomeScreen: 'LearnerHome' | 'FamilyHome' = 'LearnerHome';
+
+jest.mock('../../hooks/use-navigation-contract', () => ({
+  useNavigationContract: () => ({
+    home: {
+      screen: mockContractHomeScreen,
+      titleKey: 'tabs.myLearning',
+      iconName: 'School',
+    },
+    chrome: { modeSwitcher: 'hidden', proxyBanner: 'hidden' },
+    gates: { sessionIsOwner: true },
+    canEnter: () => true,
+    isSurfaced: () => true,
+  }),
+}));
 
 const mockFetch = createRoutedMockFetch({
   '/coaching-card': { coldStart: false, card: null, fallback: null },
@@ -274,6 +289,7 @@ describe('LearnerScreen', () => {
     mockSubscriptionTier = 'plus';
     mockSwitchProfile.mockResolvedValue({ success: true });
     mockIsExplicitProxyMode = false;
+    mockContractHomeScreen = 'LearnerHome';
     Wrapper = createWrapper();
   });
 
@@ -448,6 +464,50 @@ describe('LearnerScreen', () => {
       screen.getByTestId('add-first-child-screen-primary');
       screen.getByText('Your family dashboard starts here');
     });
+  });
+
+  // [NAV-CONTRACT-W3] When V1 flag is on, LearnerScreen derives FamilyHome from
+  // the navigation contract (home.screen === 'FamilyHome') instead of the legacy
+  // mode/hasLinkedChildren heuristic.
+  it('[V1] shows ParentHomeScreen when contract resolves FamilyHome and proxy is off', async () => {
+    mockContractHomeScreen = 'FamilyHome';
+    mockIsExplicitProxyMode = false;
+    mockLinkedChildren = [{ id: 'c1', displayName: 'Kid', isOwner: false }];
+
+    // Patch MODE_NAV_V1_ENABLED for the duration of this test only.
+    // Safe in CJS/sequential Jest — patch is synchronous and restored in finally.
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V1_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }
+      ).MODE_NAV_V1_ENABLED = true;
+
+      render(
+        <LearnerScreen
+          profiles={[
+            { id: 'owner-id', displayName: 'Parent', isOwner: true },
+            { id: 'c1', displayName: 'Kid', isOwner: false },
+          ]}
+          activeProfile={{
+            id: 'owner-id',
+            displayName: 'Parent',
+            isOwner: true,
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await waitFor(() => {
+        screen.getByTestId('parent-home-screen');
+      });
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }
+      ).MODE_NAV_V1_ENABLED = original;
+    }
   });
 
   it('shows task-first intent choices when subjects exist', async () => {

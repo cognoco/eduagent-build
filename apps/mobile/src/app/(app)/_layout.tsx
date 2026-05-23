@@ -47,6 +47,7 @@ import {
 import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback, GateContent } from '../../components/common';
+import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
 import { goBackOrReplace } from '../../lib/navigation';
 import { track } from '../../lib/analytics';
 import { useSubjects } from '../../hooks/use-subjects';
@@ -2546,6 +2547,7 @@ export default function AppLayout() {
             onSwitchBack={() => void switchProfile(parentProfile.id)}
           />
         )}
+        <ModeSwitcher />
         {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in visibleTabs render a tab button.
            Everything else is auto-hidden via screenOptions defaults.
