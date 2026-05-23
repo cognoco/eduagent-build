@@ -8,6 +8,7 @@ import {
   curriculumTopics,
   curricula,
   learningSessions,
+  subjects,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -60,7 +61,7 @@ export class NoInterleavedTopicsError extends Error {
 export async function selectInterleavedTopics(
   db: Database,
   profileId: string,
-  opts?: InterleavedSessionStartInput
+  opts?: InterleavedSessionStartInput,
 ): Promise<InterleavedTopic[]> {
   const topicCount = opts?.topicCount ?? 5;
   const subjectId = opts?.subjectId;
@@ -74,6 +75,13 @@ export async function selectInterleavedTopics(
   // Filter to subject if provided
   let candidateCards = allCards;
   if (subjectId) {
+    // CR-018: verify ownership before reading curricula/topics — prevents
+    // attacker-controllable subjectId acting as an existence-check oracle.
+    const ownedSubject = await repo.subjects.findFirst(
+      eq(subjects.id, subjectId),
+    );
+    if (!ownedSubject) return [];
+
     const curriculum = await db.query.curricula.findFirst({
       where: eq(curricula.subjectId, subjectId),
     });
@@ -90,10 +98,10 @@ export async function selectInterleavedTopics(
 
   // Split into due and not-yet-due
   const dueCards = candidateCards.filter(
-    (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime()
+    (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime(),
   );
   const notDueCards = candidateCards.filter(
-    (c) => !c.nextReviewAt || c.nextReviewAt.getTime() > now.getTime()
+    (c) => !c.nextReviewAt || c.nextReviewAt.getTime() > now.getTime(),
   );
 
   // Randomize due cards
@@ -136,7 +144,9 @@ export async function selectInterleavedTopics(
     const topic = topicMap.get(card.topicId);
     return {
       topicId: card.topicId,
-      subjectId: topic ? curriculumToSubject.get(topic.curriculumId) ?? '' : '',
+      subjectId: topic
+        ? (curriculumToSubject.get(topic.curriculumId) ?? '')
+        : '',
       topicTitle: topic?.title ?? 'Unknown topic',
       isStable: isTopicStable(card.consecutiveSuccesses),
       consecutiveSuccesses: card.consecutiveSuccesses,
@@ -158,7 +168,7 @@ export async function selectInterleavedTopics(
 export async function startInterleavedSession(
   db: Database,
   profileId: string,
-  opts?: InterleavedSessionStartInput
+  opts?: InterleavedSessionStartInput,
 ): Promise<{
   sessionId: string;
   topics: InterleavedTopic[];

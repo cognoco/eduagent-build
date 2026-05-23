@@ -404,6 +404,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
     // providers simultaneously. limit=25 mirrors the cadence already used for
     // weekly-self-report fan-out and keeps DB + provider pressure bounded.
     concurrency: { limit: 25 },
+    // [CR-2026-05-21-033] Dedup duplicate fan-out fires within the 24h Inngest
+    // window so the LLM/snapshot math (which runs BEFORE the notificationLog
+    // dedup inside prepare-weekly-progress-digest) is skipped on re-runs.
+    idempotency: 'event.data.parentId + "-" + event.data.reportWeekStart',
   },
   { event: 'app/weekly-progress-push.generate' },
   async ({ event, step }) => {

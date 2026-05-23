@@ -279,6 +279,13 @@ describe('dailySnapshotRefresh', () => {
     );
   });
 
+  // [CR-2026-05-21-035] Idempotency dedupes per profileId within Inngest's
+  // 24h window — matches cron cadence so replays don't re-run DB queries.
+  it('[CR-2026-05-21-035] has idempotency keyed on event.data.profileId', () => {
+    const config = (dailySnapshotRefresh as any).opts;
+    expect(config.idempotency).toBe('event.data.profileId');
+  });
+
   it('calls refreshProgressSnapshot for an existing profile and returns completed status', async () => {
     mockRefreshProgressSnapshot.mockResolvedValue({
       snapshotDate: '2026-04-19',

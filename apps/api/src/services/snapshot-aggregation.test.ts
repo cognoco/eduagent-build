@@ -45,6 +45,21 @@ jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const loggerWarnMock = jest.fn();
+
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./logger') as typeof import('./logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      warn: (...args: unknown[]) => loggerWarnMock(...args),
+      info: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
+
 import type { Database } from '@eduagent/database';
 import {
   subjects,
@@ -1212,6 +1227,43 @@ describe('refreshProgressSnapshot', () => {
     // refreshProgressSnapshot must not propagate the celebration error
     await expect(refreshProgressSnapshot(db, profileId)).resolves.toEqual(
       expect.objectContaining({}),
+    );
+  });
+
+  // [CR-2026-05-21-070] Red-green regression: one failing enqueue must NOT
+  // prevent subsequent milestones from being enqueued.
+  it('[CR-070] continues celebrating subsequent milestones after first queueCelebration throws', async () => {
+    const makeMilestone = (id: string) => ({
+      id,
+      profileId,
+      milestoneType: 'session_count' as const,
+      threshold: 1,
+      subjectId: null,
+      bookId: null,
+      metadata: null,
+      celebratedAt: null,
+      createdAt: new Date().toISOString(),
+    });
+    // Three milestones: first throws, second and third must still be attempted.
+    (storeMilestones as jest.Mock).mockResolvedValue([
+      makeMilestone('ms-a'),
+      makeMilestone('ms-b'),
+      makeMilestone('ms-c'),
+    ]);
+    (queueCelebration as jest.Mock)
+      .mockRejectedValueOnce(new Error('first fails'))
+      .mockResolvedValue(undefined);
+
+    const db = createSnapshotDb({ findFirst: undefined });
+
+    await refreshProgressSnapshot(db, profileId);
+
+    // All three milestones must have been attempted.
+    expect(queueCelebration).toHaveBeenCalledTimes(3);
+    // Partial-failure warn must have fired.
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'celebration.batch_partial_failure',
+      expect.objectContaining({ profileId, total: 3, succeeded: 2, failed: 1 }),
     );
   });
 

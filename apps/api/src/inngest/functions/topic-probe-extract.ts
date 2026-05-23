@@ -280,6 +280,7 @@ export const topicProbeExtract = inngest.createFunction(
   {
     id: 'topic-probe-extract',
     retries: 2,
+    idempotency: 'event.data.sessionId + "-" + event.data.topicId',
     onFailure: async ({
       event,
       error,

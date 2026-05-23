@@ -26,15 +26,19 @@ export const quotaReset = inngest.createFunction(
   { id: 'quota-reset', name: 'Reset daily + monthly quotas' },
   { cron: '0 1 * * *' }, // Daily at 01:00 UTC (after trial-expiry at midnight)
   async ({ step }) => {
-    const now = new Date();
-
     // Single Inngest step so the transaction does not span step boundaries
     // (Inngest may retry individual steps independently). Within the step we
     // open ONE transaction and run both resets to give them a consistent
     // snapshot.
-    const { dailyResetCount, monthlyResetCount } = await step.run(
+    //
+    // [CR-2026-05-21-032] `now` is computed INSIDE step.run so Inngest memoises
+    // it with the step's cached result. On retry the replayed cached value is
+    // used, preventing a later wall-clock from picking up cycles that expired
+    // between attempts. Mirror of the BUG-189 pattern in transcript-purge-cron.ts.
+    const { dailyResetCount, monthlyResetCount, timestamp } = await step.run(
       'reset-daily-and-cycles',
       async () => {
+        const now = new Date();
         const db = getStepDatabase();
         return db.transaction(async (tx) => {
           // Order matters: daily first captures every `used_today > 0` row
@@ -50,6 +54,7 @@ export const quotaReset = inngest.createFunction(
           return {
             dailyResetCount: dailyCount,
             monthlyResetCount: monthlyCount,
+            timestamp: now.toISOString(),
           };
         });
       },
@@ -59,7 +64,7 @@ export const quotaReset = inngest.createFunction(
       status: 'completed',
       dailyResetCount,
       monthlyResetCount,
-      timestamp: now.toISOString(),
+      timestamp,
     };
   },
 );

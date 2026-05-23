@@ -174,6 +174,9 @@ export async function fetchPriorTopics(
   profileId: string,
   subjectId: string,
 ): Promise<PriorTopic[]> {
+  // [CR-059] Ownership guard: join subjects so subjects.profileId must match
+  // the caller's profileId. This structurally blocks cross-profile reads even
+  // if the learningSessions.profileId predicate below were ever dropped.
   const rows = await db
     .select({
       topicId: learningSessions.topicId,
@@ -182,6 +185,7 @@ export async function fetchPriorTopics(
       endedAt: learningSessions.endedAt,
     })
     .from(learningSessions)
+    .innerJoin(subjects, eq(subjects.id, learningSessions.subjectId))
     .innerJoin(
       curriculumTopics,
       eq(curriculumTopics.id, learningSessions.topicId),
@@ -195,6 +199,7 @@ export async function fetchPriorTopics(
     )
     .where(
       and(
+        eq(subjects.profileId, profileId),
         eq(learningSessions.profileId, profileId),
         eq(learningSessions.subjectId, subjectId),
         eq(learningSessions.status, 'completed'),
@@ -257,6 +262,11 @@ export async function fetchCrossSubjectHighlights(
     .innerJoin(subjects, eq(subjects.id, learningSessions.subjectId))
     .where(
       and(
+        // [CR-059] Ownership guard: subjects.profileId must match caller's
+        // profileId — mirrors the same two-predicate defence added to
+        // fetchPriorTopics so cross-profile reads are blocked structurally
+        // even if the learningSessions.profileId predicate were ever dropped.
+        eq(subjects.profileId, profileId),
         eq(learningSessions.profileId, profileId),
         eq(learningSessions.status, 'completed'),
         ne(learningSessions.subjectId, currentSubjectId),

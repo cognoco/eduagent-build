@@ -1,11 +1,14 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
   recapDetailResponseSchema,
   recapsQuerySchema,
   recapsResponseSchema,
 } from '@eduagent/schemas';
+
+const recapParamsSchema = z.object({ recapId: z.string().uuid() });
 
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -38,17 +41,18 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     });
     return c.json(recapsResponseSchema.parse({ recaps }));
   })
-  .get('/recaps/:recapId', async (c) => {
-    assertOwnerProfile(c);
+  .get(
+    '/recaps/:recapId',
+    zValidator('param', recapParamsSchema),
+    async (c) => {
+      assertOwnerProfile(c);
 
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
-    const recap = await getRecapForParent(
-      db,
-      parentProfileId,
-      c.req.param('recapId'),
-    );
+      const db = c.get('db');
+      const parentProfileId = requireProfileId(c.get('profileId'));
+      const { recapId } = c.req.valid('param');
+      const recap = await getRecapForParent(db, parentProfileId, recapId);
 
-    if (!recap) return notFound(c, 'Recap not found');
-    return c.json(recapDetailResponseSchema.parse({ recap }));
-  });
+      if (!recap) return notFound(c, 'Recap not found');
+      return c.json(recapDetailResponseSchema.parse({ recap }));
+    },
+  );
