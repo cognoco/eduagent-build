@@ -32,7 +32,8 @@ test('J-03 parent can switch between Family and My Learning @smoke', async ({
   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 60_000,
   });
-  await expect(page.getByTestId('home-mode-chip')).toBeVisible();
+  await expect(page.getByTestId('mode-switcher')).toBeVisible();
+  await expect(page.getByTestId('mode-switcher-family')).toBeVisible();
 
   await pressableClick(page.getByTestId('parent-home-study-activation-action'));
 
@@ -41,7 +42,7 @@ test('J-03 parent can switch between Family and My Learning @smoke', async ({
   });
   await expect(page.getByTestId('parent-home-screen')).toHaveCount(0);
 
-  await pressableClick(page.getByTestId('home-mode-chip'));
+  await pressableClick(page.getByTestId('mode-switcher-family'));
 
   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 30_000,

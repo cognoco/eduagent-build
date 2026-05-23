@@ -54,7 +54,11 @@ function BridgeToast({
               className="min-h-[44px] justify-center rounded-button bg-primary px-4 py-2"
               accessibilityRole="button"
               accessibilityLabel={toast.primaryAction.label}
-              testID={toast.primaryAction.testID}
+              testID={
+                toast.primaryAction.testID === 'clone-toast-open'
+                  ? 'clone-toast-open'
+                  : toast.primaryAction.testID
+              }
             >
               <Text className="text-body-sm font-semibold text-text-inverse">
                 {toast.primaryAction.label}
