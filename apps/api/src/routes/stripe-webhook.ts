@@ -15,8 +15,7 @@ import {
 } from '../services/billing';
 import { getTierConfig } from '../services/subscription';
 import {
-  resolveTierFromPriceId,
-  isStripePricingConfigured,
+  verifySubscriptionTier,
   type StripePriceEnv,
 } from '../services/billing-pricing';
 import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
@@ -156,80 +155,63 @@ async function handleSubscriptionEvent(
   // Stripe price, not the metadata stamped at checkout. Subscription metadata is
   // operator/dashboard-mutable and can diverge from the line item if a
   // checkout-wiring bug stamps the wrong tier — trusting it grants entitlements
-  // the customer did not pay for. The purchased price is Stripe-authoritative.
-  const metadataTier = extractPaidTier(
-    stripeSubscription.metadata as Record<string, string> | undefined,
-  );
-  // Scan all line items for the first price that maps to a paid tier — Stripe
-  // does not guarantee items.data ordering, and add-on/proration items can sit
-  // ahead of the plan price, so trusting data[0] blindly would derive the wrong
-  // tier. (resolveTierFromPriceId tolerates undefined ids.)
+  // the customer did not pay for. The decision logic lives in the service
+  // (verifySubscriptionTier); the route owns only the resulting alert emission.
   const itemPriceIds = (stripeSubscription.items?.data ?? [])
     .map((item) => item.price?.id)
     .filter((id): id is string => !!id);
-  let priceTier = null as ReturnType<typeof resolveTierFromPriceId>;
-  let matchedPriceId: string | undefined;
-  for (const candidate of itemPriceIds) {
-    const mapped = resolveTierFromPriceId(env, candidate);
-    if (mapped) {
-      priceTier = mapped;
-      matchedPriceId = candidate;
-      break;
-    }
-  }
-  // For diagnostics, report the matched plan price when one mapped; otherwise
-  // the first line item (the relevant id in the unverifiable case).
-  const priceId = matchedPriceId ?? itemPriceIds[0];
+  const verifiedTier = verifySubscriptionTier(
+    env,
+    extractPaidTier(
+      stripeSubscription.metadata as Record<string, string> | undefined,
+    ),
+    itemPriceIds,
+  );
+  const effectiveTier = verifiedTier.effectiveTier;
 
-  // Price wins. Fall back to metadata only when the price is not mapped to a
-  // configured tier (legacy/unmapped).
-  const effectiveTier = priceTier ?? metadataTier;
-  if (priceTier && metadataTier && priceTier !== metadataTier) {
+  if (verifiedTier.status === 'mismatch') {
     // Genuine divergence: the purchased price contradicts the stamped tier.
     // Price is authoritative; alert so the bad metadata source is fixed.
     captureException(
       new Error(
-        `Stripe subscription tier mismatch: metadata='${metadataTier}' but purchased price maps to '${priceTier}'`,
+        `Stripe subscription tier mismatch: metadata='${verifiedTier.metadataTier}' but purchased price maps to '${verifiedTier.priceTier}'`,
       ),
       {
         extra: {
           context: 'stripe.webhook.tier_mismatch',
           stripeSubscriptionId: stripeSubscription.id,
-          metadataTier,
-          priceTier,
-          priceId,
+          metadataTier: verifiedTier.metadataTier,
+          priceTier: verifiedTier.priceTier,
+          priceId: verifiedTier.priceId,
         },
       },
     );
-  } else if (!priceTier && metadataTier) {
-    // The metadata tier could not be confirmed against a configured price.
-    // Only a genuine anomaly when pricing IS configured (a live price that maps
-    // to no tier — real drift). When pricing is unconfigured (Stripe dormant),
-    // this is the expected steady state, so log rather than burn Sentry quota
-    // on every webhook (mirrors the auth-middleware Sentry discipline).
-    if (isStripePricingConfigured(env)) {
-      captureException(
-        new Error(
-          `Stripe subscription tier could not be verified against a configured price (metadata='${metadataTier}', priceId='${priceId ?? 'none'}')`,
-        ),
-        {
-          extra: {
-            context: 'stripe.webhook.tier_unverifiable',
-            stripeSubscriptionId: stripeSubscription.id,
-            metadataTier,
-            priceId,
-          },
-        },
-      );
-    } else {
-      logger.warn(
-        '[stripe-webhook] tier not verified against price — Stripe pricing not configured in this environment',
-        {
+  } else if (verifiedTier.status === 'unverifiable') {
+    // Pricing IS configured but a live price maps to no tier — genuine drift.
+    captureException(
+      new Error(
+        `Stripe subscription tier could not be verified against a configured price (metadata='${verifiedTier.metadataTier}', priceId='${verifiedTier.priceId ?? 'none'}')`,
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.tier_unverifiable',
           stripeSubscriptionId: stripeSubscription.id,
-          metadataTier,
+          metadataTier: verifiedTier.metadataTier,
+          priceId: verifiedTier.priceId,
         },
-      );
-    }
+      },
+    );
+  } else if (verifiedTier.status === 'unconfigured') {
+    // Stripe pricing not configured (dormant) — expected steady state, so log
+    // rather than burn Sentry quota on every webhook (mirrors auth-middleware
+    // Sentry discipline).
+    logger.warn(
+      '[stripe-webhook] tier not verified against price — Stripe pricing not configured in this environment',
+      {
+        stripeSubscriptionId: stripeSubscription.id,
+        metadataTier: verifiedTier.metadataTier,
+      },
+    );
   }
 
   if (isExpired) {

@@ -66,3 +66,57 @@ export function isStripePricingConfigured(env: StripePriceEnv): boolean {
     INTERVALS.some((interval) => !!resolvePriceId(env, tier, interval)),
   );
 }
+
+export interface TierVerification {
+  /** Tier to grant — the price-authoritative tier, else the metadata fallback. */
+  effectiveTier: PaidTier | null;
+  /**
+   * - `ok`: price verified the tier (or there was nothing to verify).
+   * - `mismatch`: a mapped price disagrees with the metadata tier (price wins).
+   * - `unverifiable`: metadata tier present but no line item maps to a tier,
+   *   while pricing IS configured — genuine drift, worth alerting.
+   * - `unconfigured`: metadata tier present but no STRIPE_PRICE_* configured
+   *   (Stripe dormant) — expected steady state, not an anomaly.
+   */
+  status: 'ok' | 'mismatch' | 'unverifiable' | 'unconfigured';
+  priceTier: PaidTier | null;
+  metadataTier: PaidTier | null;
+  /** Matched plan price when one mapped, else the first line-item price. */
+  priceId: string | undefined;
+}
+
+/**
+ * Decide the authoritative subscription tier from the actually-purchased price,
+ * falling back to the checkout-stamped metadata tier only when no line item
+ * maps to a configured price. Pure (no I/O) so the route layer can emit the
+ * appropriate Sentry/log signal from `status` and stay unit-testable [WI-175].
+ */
+export function verifySubscriptionTier(
+  env: StripePriceEnv,
+  metadataTier: PaidTier | null,
+  itemPriceIds: readonly string[],
+): TierVerification {
+  // Scan all line items — Stripe does not guarantee items.data ordering, and
+  // add-on/proration items can precede the plan price.
+  let priceTier: PaidTier | null = null;
+  let matchedPriceId: string | undefined;
+  for (const candidate of itemPriceIds) {
+    const mapped = resolveTierFromPriceId(env, candidate);
+    if (mapped) {
+      priceTier = mapped;
+      matchedPriceId = candidate;
+      break;
+    }
+  }
+  const priceId = matchedPriceId ?? itemPriceIds[0];
+  const effectiveTier = priceTier ?? metadataTier;
+
+  let status: TierVerification['status'] = 'ok';
+  if (priceTier && metadataTier && priceTier !== metadataTier) {
+    status = 'mismatch';
+  } else if (!priceTier && metadataTier) {
+    status = isStripePricingConfigured(env) ? 'unverifiable' : 'unconfigured';
+  }
+
+  return { effectiveTier, status, priceTier, metadataTier, priceId };
+}
