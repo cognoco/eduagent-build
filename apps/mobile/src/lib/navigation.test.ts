@@ -7,6 +7,14 @@ import {
   LEARNER_HOME_RETURN_TO,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
+  FAMILY_RECAPS_HREF,
+  FAMILY_RECAPS_RETURN_TO,
+  FAMILY_PROGRESS_HREF,
+  FAMILY_PROGRESS_RETURN_TO,
+  STUDY_PROGRESS_HREF,
+  STUDY_PROGRESS_RETURN_TO,
+  FAMILY_CHILDREN_HREF,
+  FAMILY_CHILDREN_RETURN_TO,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -30,6 +38,32 @@ describe('homeHrefForReturnTo', () => {
 
   it('returns the practice href when returnTo === PRACTICE_RETURN_TO', () => {
     expect(homeHrefForReturnTo(PRACTICE_RETURN_TO)).toBe(PRACTICE_HREF);
+  });
+
+  it('resolves Family and Study context return tokens', () => {
+    expect(homeHrefForReturnTo(FAMILY_RECAPS_RETURN_TO)).toBe(
+      FAMILY_RECAPS_HREF,
+    );
+    expect(homeHrefForReturnTo(FAMILY_PROGRESS_RETURN_TO)).toBe(
+      FAMILY_PROGRESS_HREF,
+    );
+    expect(homeHrefForReturnTo(STUDY_PROGRESS_RETURN_TO)).toBe(
+      STUDY_PROGRESS_HREF,
+    );
+    expect(homeHrefForReturnTo(FAMILY_CHILDREN_RETURN_TO)).toBe(
+      FAMILY_CHILDREN_HREF,
+    );
+  });
+
+  it('resolves Family return tokens with context ids to deep hrefs', () => {
+    expect(homeHrefForReturnTo(FAMILY_RECAPS_RETURN_TO, 'recap-1')).toEqual({
+      pathname: '/(app)/recaps/[recapId]',
+      params: { recapId: 'recap-1' },
+    });
+    expect(homeHrefForReturnTo(FAMILY_CHILDREN_RETURN_TO, 'child-1')).toEqual({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-1' },
+    });
   });
 
   it('falls back to the family home for any other value', () => {

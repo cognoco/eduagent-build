@@ -341,6 +341,12 @@ export const queryKeys = {
       profileId: string | undefined,
       childProfileId: string | undefined,
     ) => ['recaps', mode, profileId, childProfileId ?? null] as const,
+
+    detail: (
+      mode: ModeSegment,
+      profileId: string | undefined,
+      recapId: string | undefined,
+    ) => ['recaps', mode, profileId, 'detail', recapId] as const,
   },
 
   // ------------------------------------------------------------------

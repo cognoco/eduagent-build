@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { withOpacity } from '../../lib/color-opacity';
 import type { TopicRelevance } from '@eduagent/schemas';
+import { TopicProvenance } from './TopicProvenance';
 
 interface TopicStatusRowProps {
   state: 'continue-now' | 'started' | 'up-next' | 'done' | 'later';
@@ -12,6 +13,8 @@ interface TopicStatusRowProps {
   sessionCount?: number;
   /** When present and not 'core', renders a small relevance label */
   relevance?: TopicRelevance;
+  sourceChildProfileId?: string | null;
+  createdAt?: string | Date | null;
   onPress: () => void;
   testID?: string;
 }
@@ -39,6 +42,8 @@ export function TopicStatusRow({
   chapterName,
   sessionCount,
   relevance,
+  sourceChildProfileId,
+  createdAt,
   onPress,
   testID,
 }: TopicStatusRowProps) {
@@ -217,6 +222,10 @@ export function TopicStatusRow({
               {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
             </Text>
           ) : null}
+          <TopicProvenance
+            sourceChildProfileId={sourceChildProfileId}
+            createdAt={createdAt}
+          />
         </View>
       </View>
     </Pressable>

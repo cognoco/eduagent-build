@@ -1,0 +1,185 @@
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ErrorFallback } from '../../../components/common';
+import { AddToMyLearningButton } from '../../../components/family/AddToMyLearningButton';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { useRecap } from '../../../hooks/use-recaps';
+import {
+  FAMILY_RECAPS_HREF,
+  FAMILY_RECAPS_RETURN_TO,
+  goBackOrReplace,
+} from '../../../lib/navigation';
+import { firstParam } from '../../../lib/route-params';
+import { formatRelativeDate } from '../../../lib/format-relative-date';
+
+export default function RecapDetailScreen(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ recapId?: string | string[] }>();
+  const recapId = firstParam(params.recapId);
+  const navigationContract = useNavigationContract();
+  const recapQuery = useRecap(recapId);
+
+  if (!navigationContract.canEnter('recaps/[recapId]')) {
+    return <Redirect href="/(app)/home" />;
+  }
+
+  const handleBack = (): void => {
+    goBackOrReplace(router, FAMILY_RECAPS_HREF as Href);
+  };
+
+  const handleOpenChildSession = (): void => {
+    const recap = recapQuery.data;
+    if (!recap) return;
+
+    router.push({
+      pathname: '/(app)/child/[profileId]/session/[sessionId]',
+      params: {
+        profileId: recap.childProfileId,
+        sessionId: recap.sessionId,
+        returnTo: FAMILY_RECAPS_RETURN_TO,
+        returnId: recap.recapId,
+      },
+    } as Href);
+  };
+
+  return (
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="recap-detail-screen"
+    >
+      <ScrollView
+        className="flex-1 px-5"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+      >
+        <View className="mt-4 flex-row items-center">
+          <Pressable
+            onPress={handleBack}
+            className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Back to recaps"
+            testID="recap-detail-back"
+          >
+            <Ionicons name="arrow-back" size={24} />
+          </Pressable>
+          <Text className="flex-1 text-h2 font-bold text-text-primary">
+            Session recap
+          </Text>
+        </View>
+
+        {recapQuery.isLoading ? (
+          <View className="py-16 items-center" testID="recap-detail-loading">
+            <ActivityIndicator size="large" />
+          </View>
+        ) : recapQuery.isError ? (
+          <View className="mt-4">
+            <ErrorFallback
+              title="We could not load this recap"
+              message="Try again, or head back to the recaps list."
+              primaryAction={{
+                label: 'Try again',
+                onPress: () => void recapQuery.refetch(),
+                testID: 'recap-detail-retry',
+              }}
+              secondaryAction={{
+                label: 'Back to recaps',
+                onPress: handleBack,
+                testID: 'recap-detail-error-back',
+              }}
+              testID="recap-detail-error"
+            />
+          </View>
+        ) : !recapQuery.data ? (
+          <View className="mt-4">
+            <ErrorFallback
+              title="Recap not found"
+              message="This recap is no longer available."
+              primaryAction={{
+                label: 'Back to recaps',
+                onPress: handleBack,
+                testID: 'recap-detail-not-found-back',
+              }}
+              testID="recap-detail-not-found"
+            />
+          </View>
+        ) : (
+          <View className="mt-4">
+            <Text className="text-body-sm font-semibold text-primary">
+              {recapQuery.data.childDisplayName}
+            </Text>
+            <Text className="mt-1 text-h1 font-bold text-text-primary">
+              {recapQuery.data.topicTitle ??
+                recapQuery.data.subjectName ??
+                recapQuery.data.displayTitle}
+            </Text>
+            <Text className="mt-2 text-caption text-text-secondary">
+              {formatRelativeDate(recapQuery.data.startedAt)}
+              {recapQuery.data.exchangeCount > 0
+                ? ` - ${recapQuery.data.exchangeCount} exchanges`
+                : ''}
+            </Text>
+
+            <View className="mt-5 rounded-card border border-border bg-surface px-4 py-4">
+              <Text className="text-caption font-semibold text-text-secondary">
+                What happened
+              </Text>
+              <Text className="mt-2 text-body text-text-primary leading-relaxed">
+                {recapQuery.data.narrative ??
+                  recapQuery.data.displaySummary ??
+                  recapQuery.data.highlight ??
+                  'This recap is still being prepared.'}
+              </Text>
+            </View>
+
+            {recapQuery.data.conversationPrompt ? (
+              <View className="mt-3 rounded-card border border-border bg-surface px-4 py-4">
+                <Text className="text-caption font-semibold text-text-secondary">
+                  Try asking
+                </Text>
+                <Text className="mt-2 text-body text-text-primary leading-relaxed">
+                  {recapQuery.data.conversationPrompt}
+                </Text>
+              </View>
+            ) : null}
+
+            <AddToMyLearningButton
+              childProfileId={recapQuery.data.childProfileId}
+              childDisplayName={recapQuery.data.childDisplayName}
+              subjectName={recapQuery.data.subjectName}
+              topicId={recapQuery.data.topicId}
+              topicTitle={recapQuery.data.topicTitle}
+              triggerPath={`/recaps/${recapQuery.data.recapId}`}
+            />
+
+            <Pressable
+              onPress={handleOpenChildSession}
+              className="mt-4 min-h-[48px] items-center justify-center rounded-button bg-surface px-4 py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Open child session"
+              testID="recap-detail-open-session"
+            >
+              <Text className="text-body font-semibold text-primary">
+                Open child session
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}

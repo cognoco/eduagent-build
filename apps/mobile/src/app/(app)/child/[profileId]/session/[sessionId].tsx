@@ -10,11 +10,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
-import { goBackOrReplace } from '../../../../../lib/navigation';
+import {
+  useChildDetail,
+  useChildSessionDetail,
+} from '../../../../../hooks/use-dashboard';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+} from '../../../../../lib/navigation';
+import { firstParam } from '../../../../../lib/route-params';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 import { useThemeColors } from '../../../../../lib/theme';
+import { AddToMyLearningButton } from '../../../../../components/family/AddToMyLearningButton';
 let Clipboard: typeof import('expo-clipboard') | null = null;
 try {
   Clipboard = require('expo-clipboard');
@@ -46,15 +54,15 @@ export default function SessionDetailScreen() {
     'idle',
   );
   const params = useLocalSearchParams<{
-    profileId: string;
-    sessionId: string;
+    profileId: string | string[];
+    sessionId: string | string[];
+    returnTo?: string | string[];
+    returnId?: string | string[];
   }>();
-  const profileId = Array.isArray(params.profileId)
-    ? params.profileId[0]
-    : params.profileId;
-  const sessionId = Array.isArray(params.sessionId)
-    ? params.sessionId[0]
-    : params.sessionId;
+  const profileId = firstParam(params.profileId);
+  const sessionId = firstParam(params.sessionId);
+  const returnTo = firstParam(params.returnTo);
+  const returnId = firstParam(params.returnId);
 
   const {
     data: session,
@@ -62,6 +70,17 @@ export default function SessionDetailScreen() {
     isError,
     refetch,
   } = useChildSessionDetail(profileId, sessionId);
+  const childDetailQuery = useChildDetail(profileId);
+  const backFallbackHref =
+    returnTo != null
+      ? homeHrefForReturnTo(returnTo, returnId)
+      : profileId
+        ? ({
+            pathname: '/(app)/child/[profileId]',
+            params: { profileId },
+          } as Href)
+        : ('/(app)/home' as Href);
+  const handleBack = () => goBackOrReplace(router, backFallbackHref);
 
   useEffect(() => {
     if (copyState === 'idle') return undefined;
@@ -109,9 +128,7 @@ export default function SessionDetailScreen() {
             action on every error state, not just Retry. */}
         <Pressable
           testID="error-go-back"
-          onPress={() =>
-            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
-          }
+          onPress={handleBack}
           className="mt-3 px-6 py-3"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
@@ -135,9 +152,7 @@ export default function SessionDetailScreen() {
           {t('parentView.session.sessionNoLongerAvailable')}
         </Text>
         <Pressable
-          onPress={() =>
-            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
-          }
+          onPress={handleBack}
           className="mt-4 rounded-lg bg-primary px-6 py-3"
         >
           <Text className="text-text-inverse font-medium">
@@ -183,9 +198,7 @@ export default function SessionDetailScreen() {
       {/* Header */}
       <View className="px-4 pt-4">
         <Pressable
-          onPress={() =>
-            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
-          }
+          onPress={handleBack}
           className="mb-4 flex-row items-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
@@ -329,9 +342,7 @@ export default function SessionDetailScreen() {
             {t('parentView.session.noRecapBody')}
           </Text>
           <Pressable
-            onPress={() =>
-              goBackOrReplace(router, `/(app)/child/${profileId}` as const)
-            }
+            onPress={handleBack}
             className="mt-4 self-start rounded-lg bg-primary px-4 py-3"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
@@ -343,6 +354,17 @@ export default function SessionDetailScreen() {
           </Pressable>
         </View>
       )}
+
+      <View className="mx-4 mt-4">
+        <AddToMyLearningButton
+          childProfileId={profileId ?? ''}
+          childDisplayName={childDetailQuery.data?.displayName ?? 'your child'}
+          subjectName={session.subjectName}
+          topicId={session.topicId}
+          topicTitle={session.topicTitle}
+          triggerPath={`/child/${profileId ?? ''}/session/${sessionId ?? ''}`}
+        />
+      </View>
 
       {/* Summary */}
       <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
@@ -405,9 +427,7 @@ export default function SessionDetailScreen() {
           </Pressable>
         ) : null}
         <Pressable
-          onPress={() =>
-            goBackOrReplace(router, `/(app)/child/${profileId}` as const)
-          }
+          onPress={handleBack}
           className="rounded-lg px-4 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('parentView.session.backToChildProfile')}

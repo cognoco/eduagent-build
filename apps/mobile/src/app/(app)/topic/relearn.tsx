@@ -127,12 +127,17 @@ export default function RelearnScreen() {
     topicName?: string | string[];
     subjectName?: string | string[];
     returnTo?: string | string[];
+    returnId?: string | string[];
+    source?: string | string[];
   }>();
   const routeTopicId = firstParam(params.topicId);
   const routeSubjectId = firstParam(params.subjectId);
   const routeTopicName = firstParam(params.topicName);
   const routeSubjectName = firstParam(params.subjectName);
   const returnTo = firstParam(params.returnTo);
+  const returnId = firstParam(params.returnId);
+  const source = firstParam(params.source);
+  const isParentBridgeSource = source === 'parent_bridge';
 
   const directEntry = Boolean(routeTopicId && routeSubjectId);
   const startRelearn = useStartRelearn();
@@ -208,12 +213,12 @@ export default function RelearnScreen() {
 
   const handleLeave = useCallback(() => {
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo) as Href);
+      router.replace(homeHrefForReturnTo(returnTo, returnId) as Href);
       return;
     }
 
     goBackOrReplace(router, '/(app)/library' as const);
-  }, [returnTo, router]);
+  }, [returnId, returnTo, router]);
 
   const handleBack = useCallback(() => {
     setError(null);
@@ -296,6 +301,7 @@ export default function RelearnScreen() {
               mode: 'relearn',
               ...(result.recap ? { recap: result.recap } : {}),
               ...(returnTo ? { returnTo } : {}),
+              ...(returnId ? { returnId } : {}),
             },
           } as Href);
         },
@@ -314,6 +320,7 @@ export default function RelearnScreen() {
       routeTopicId,
       routeTopicName,
       returnTo,
+      returnId,
       router,
       selectedTopic,
       startRelearn,
@@ -560,6 +567,16 @@ export default function RelearnScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
           testID="relearn-method-phase"
         >
+          {isParentBridgeSource ? (
+            <View
+              className="mb-4 rounded-card border border-primary/20 bg-primary/10 px-4 py-3"
+              testID="relearn-parent-bridge-header"
+            >
+              <Text className="text-body-sm font-semibold text-text-primary">
+                Added from your child's learning.
+              </Text>
+            </View>
+          ) : null}
           <Text className="mb-4 text-body text-text-secondary">
             {copy.methodIntro}
           </Text>
