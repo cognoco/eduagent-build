@@ -163,6 +163,16 @@ export default function AccommodationScreen(): React.ReactElement {
                   {t('common.retry')}
                 </Text>
               </Pressable>
+              <Pressable
+                onPress={handleBack}
+                className="self-start mt-2"
+                accessibilityRole="button"
+                testID="accommodation-mode-error-back"
+              >
+                <Text className="text-caption text-text-secondary">
+                  {t('common.goBack')}
+                </Text>
+              </Pressable>
             </View>
           ) : (
             <View className="bg-surface rounded-card px-4 py-4 mb-2">

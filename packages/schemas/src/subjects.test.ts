@@ -28,6 +28,8 @@ import {
   curriculumAdaptRequestSchema,
   curriculumAdaptResponseSchema,
   subjectClassifyResultSchema,
+  subjectClassifyLlmResponseSchema,
+  subjectSuggestLlmResponseSchema,
   subjectResponseSchema,
   subjectListResponseSchema,
   createSubjectWithStructureResponseSchema,
@@ -1050,6 +1052,8 @@ describe('schema export presence', () => {
     expect(curriculumTopicAddResponseSchema).toBeDefined();
     expect(curriculumAdaptSignalSchema).toBeDefined();
     expect(subjectClassifyResultSchema).toBeDefined();
+    expect(subjectClassifyLlmResponseSchema).toBeDefined();
+    expect(subjectSuggestLlmResponseSchema).toBeDefined();
     expect(bookSuggestionsResponseSchema).toBeDefined();
     expect(topicSuggestionSchema).toBeDefined();
     expect(MAX_GENERATED_SUBJECT_BOOKS).toBeGreaterThan(0);

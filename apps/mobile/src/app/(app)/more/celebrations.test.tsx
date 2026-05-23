@@ -22,6 +22,8 @@ let mockProfiles: Array<{
 let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'big_only';
 let mockChildCelebrationLevel: 'all' | 'big_only' | 'off' | undefined =
   'big_only';
+let mockCelebrationIsError = false;
+const mockCelebrationRefetch = jest.fn();
 let mockSearchParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
@@ -72,6 +74,8 @@ jest.mock(
     useCelebrationLevel: () => ({
       data: mockCelebrationLevel,
       isLoading: false,
+      isError: mockCelebrationIsError,
+      refetch: mockCelebrationRefetch,
     }),
     useUpdateCelebrationLevel: () => ({
       mutate: mockCelebrationLevelMutate,
@@ -80,6 +84,8 @@ jest.mock(
     useChildCelebrationLevel: () => ({
       data: mockChildCelebrationLevel,
       isLoading: false,
+      isError: false,
+      refetch: mockCelebrationRefetch,
     }),
     useUpdateChildCelebrationLevel: () => ({
       mutate: mockChildCelebrationLevelMutate,
@@ -109,6 +115,7 @@ describe('CelebrationsScreen', () => {
     mockProfiles = [mockActiveProfile];
     mockCelebrationLevel = 'big_only';
     mockChildCelebrationLevel = 'big_only';
+    mockCelebrationIsError = false;
     mockSearchParams = {};
     mockCanGoBack.mockReturnValue(false);
   });
@@ -201,5 +208,40 @@ describe('CelebrationsScreen', () => {
     render(<CelebrationsScreen />);
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+  });
+
+  it('renders an error block with retry and go-back when the celebration query fails', () => {
+    mockCelebrationLevel = undefined;
+    mockCelebrationIsError = true;
+
+    render(<CelebrationsScreen />);
+
+    screen.getByTestId('celebrations-retry');
+    screen.getByTestId('celebrations-error-back');
+    expect(screen.queryByTestId('celebration-level-all')).toBeNull();
+  });
+
+  it('calls refetch when the retry button is pressed in the error state', () => {
+    mockCelebrationLevel = undefined;
+    mockCelebrationIsError = true;
+
+    render(<CelebrationsScreen />);
+
+    fireEvent.press(screen.getByTestId('celebrations-retry'));
+
+    expect(mockCelebrationRefetch).toHaveBeenCalled();
+  });
+
+  it('calls goBackOrReplace when the go-back button is pressed in the error state', () => {
+    mockCelebrationLevel = undefined;
+    mockCelebrationIsError = true;
+    mockCanGoBack.mockReturnValue(false);
+
+    render(<CelebrationsScreen />);
+
+    fireEvent.press(screen.getByTestId('celebrations-error-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/more/accommodation');
+    expect(mockBack).not.toHaveBeenCalled();
   });
 });

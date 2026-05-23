@@ -193,6 +193,22 @@ describe('AccommodationScreen', () => {
     expect(mockLearnerProfileRefetch).toHaveBeenCalled();
   });
 
+  it('renders a go-back button in the error state and calls goBackOrReplace on press', () => {
+    mockLearnerProfile = null;
+    mockLearnerProfileError = true;
+    mockCanGoBack.mockReturnValue(false);
+
+    render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('accommodation-mode-error-back');
+    fireEvent.press(screen.getByTestId('accommodation-mode-error-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith(
+      '/(app)/more/learning-preferences',
+    );
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
   it('toggles the "Not sure which to pick?" guide', () => {
     render(<AccommodationScreen />, { wrapper: createWrapper() });
 

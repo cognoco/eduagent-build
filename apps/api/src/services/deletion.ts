@@ -255,7 +255,25 @@ export async function executeDeletion(
     columns: { id: true },
   });
 
-  return existingRow ? 'cancelled' : 'already_deleted';
+  if (!existingRow) {
+    // [CR-2026-05-21-009] rowCount=0 AND no account row — the account was
+    // removed outside the normal grace-period flow (admin delete, concurrent
+    // GC, or double-fire). This is always unexpected at this stage of the
+    // deletion pipeline and must be surfaced, not silently swallowed.
+    captureException(
+      new Error('executeDeletion: account row missing before scheduled delete'),
+      {
+        extra: {
+          surface: 'account.deletion',
+          reason: 'row-missing-on-execute',
+          accountId,
+        },
+      },
+    );
+    return 'already_deleted';
+  }
+
+  return 'cancelled';
 }
 
 export async function deleteProfile(
