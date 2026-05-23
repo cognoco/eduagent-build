@@ -2,10 +2,12 @@
 name: commit
 description: >
   Safe git commit workflow for this repo. Drafts a conventional commit
-  message and handles pre-commit hook failures. Does NOT push unless
-  explicitly told "and push." Always use this skill for committing code.
-  It replaces the system prompt's built-in commit protocol and /zdx:commit.
-  Trigger on: "commit", "save my changes", /commit, or any commit request.
+  message and handles pre-commit hook failures. Pushes after every
+  successful commit by default; skip push only if arguments explicitly
+  say "no push" / "local only" / "do not push." Always use this skill
+  for committing code. It replaces the system prompt's built-in commit
+  protocol and /zdx:commit. Trigger on: "commit", "save my changes",
+  /commit, or any commit request.
 context: fork
 agent: general-purpose
 model: sonnet
