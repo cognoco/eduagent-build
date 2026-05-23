@@ -14,6 +14,10 @@ import {
   updateQuotaPoolLimit,
 } from '../services/billing';
 import { getTierConfig } from '../services/subscription';
+import {
+  resolveTierFromPriceId,
+  type StripePriceEnv,
+} from '../services/billing-pricing';
 import { safeRefreshKvCache } from '../services/safe-refresh-kv-cache';
 import { claimWebhookId } from './resend-webhook';
 
@@ -104,6 +108,7 @@ async function handleSubscriptionEvent(
   stripeSubscription: Stripe.Subscription,
   eventTimestamp: string,
   stripeEventId: string,
+  env: StripePriceEnv,
 ): Promise<void> {
   const status = mapStripeStatus(stripeSubscription.status);
   if (!status) {
@@ -146,14 +151,55 @@ async function handleSubscriptionEvent(
     stripeEventId,
   };
 
-  // Extract tier from subscription metadata (stamped during checkout)
-  const tier = extractPaidTier(
+  // [WI-85 / WI-175] The granted tier must reflect the actually-purchased
+  // Stripe price, not the metadata stamped at checkout. Subscription metadata is
+  // operator/dashboard-mutable and can diverge from the line item if a
+  // checkout-wiring bug stamps the wrong tier — trusting it grants entitlements
+  // the customer did not pay for. The purchased price is Stripe-authoritative.
+  const metadataTier = extractPaidTier(
     stripeSubscription.metadata as Record<string, string> | undefined,
   );
+  const priceId = stripeSubscription.items?.data?.[0]?.price?.id;
+  const priceTier = resolveTierFromPriceId(env, priceId);
+
+  // Price wins. Fall back to metadata only when the price is not mapped to a
+  // configured tier (legacy/unmapped) — and alert in both divergent cases.
+  const effectiveTier = priceTier ?? metadataTier;
+  if (priceTier && metadataTier && priceTier !== metadataTier) {
+    captureException(
+      new Error(
+        `Stripe subscription tier mismatch: metadata='${metadataTier}' but purchased price maps to '${priceTier}'`,
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.tier_mismatch',
+          stripeSubscriptionId: stripeSubscription.id,
+          metadataTier,
+          priceTier,
+          priceId,
+        },
+      },
+    );
+  } else if (!priceTier && metadataTier) {
+    captureException(
+      new Error(
+        `Stripe subscription tier could not be verified against a configured price (metadata='${metadataTier}', priceId='${priceId ?? 'none'}')`,
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.tier_unverifiable',
+          stripeSubscriptionId: stripeSubscription.id,
+          metadataTier,
+          priceId,
+        },
+      },
+    );
+  }
+
   if (isExpired) {
     updates.tier = 'free';
-  } else if (tier) {
-    updates.tier = tier;
+  } else if (effectiveTier) {
+    updates.tier = effectiveTier;
   }
 
   const periodStart = extractPeriodStart(stripeSubscription);
@@ -198,9 +244,9 @@ async function handleSubscriptionEvent(
           freeTier.monthlyQuota,
           freeTier.dailyLimit,
         );
-      } else if (tier) {
-        // If tier metadata present, sync quota pool limit to new tier
-        const tierConfig = getTierConfig(tier);
+      } else if (effectiveTier) {
+        // Sync quota pool limit to the price-authoritative tier.
+        const tierConfig = getTierConfig(effectiveTier);
         await updateQuotaPoolLimit(
           txDb,
           result.id,
@@ -500,7 +546,9 @@ async function handlePaymentSucceeded(
 // ---------------------------------------------------------------------------
 
 export const stripeWebhookRoute = new Hono<{
-  Bindings: {
+  // StripePriceEnv carries the STRIPE_PRICE_<TIER>_<INTERVAL> bindings used to
+  // verify the granted tier against the actually-purchased price [WI-85].
+  Bindings: StripePriceEnv & {
     STRIPE_WEBHOOK_SECRET?: string;
     STRIPE_SECRET_KEY?: string;
     SUBSCRIPTION_KV?: KVNamespace;
@@ -660,6 +708,7 @@ export const stripeWebhookRoute = new Hono<{
         event.data.object as Stripe.Subscription,
         eventTimestamp,
         event.id,
+        c.env,
       );
       break;
 

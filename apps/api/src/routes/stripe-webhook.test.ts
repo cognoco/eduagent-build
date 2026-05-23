@@ -1667,3 +1667,134 @@ describe('KV outage tolerance [CR-2026-05-19-H6]', () => {
     expect(captureException).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-85 / WI-175] Subscription tier granted from the authoritative purchased
+// price, not from client/operator-mutable metadata.
+// ---------------------------------------------------------------------------
+
+describe('subscription tier verified against purchased price [WI-85]', () => {
+  const PRICE_PLUS_MONTHLY = 'price_plus_monthly_test';
+
+  function subWithPriceAndTier(priceId: string | undefined, tier?: string) {
+    return makeSubscription({
+      status: 'active',
+      ...(tier ? { metadata: { tier } } : {}),
+      items: {
+        data: [
+          {
+            current_period_start: 1700000000,
+            current_period_end: 1702592000,
+            ...(priceId ? { price: { id: priceId } } : {}),
+          },
+        ],
+      },
+    });
+  }
+
+  it('grants the price-authoritative tier (not the metadata tier) and alerts on mismatch', async () => {
+    // metadata claims 'pro' but the purchased price maps to 'plus' → 'plus' wins.
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent(
+        'customer.subscription.updated',
+        subWithPriceAndTier(PRICE_PLUS_MONTHLY, 'pro'),
+      ),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      { ...TEST_ENV, STRIPE_PRICE_PLUS_MONTHLY: PRICE_PLUS_MONTHLY },
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub_stripe_123',
+      expect.objectContaining({ tier: 'plus' }),
+    );
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.tier_mismatch',
+        }),
+      }),
+    );
+  });
+
+  it('does not alert when metadata tier matches the purchased price', async () => {
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent(
+        'customer.subscription.updated',
+        subWithPriceAndTier(PRICE_PLUS_MONTHLY, 'plus'),
+      ),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      { ...TEST_ENV, STRIPE_PRICE_PLUS_MONTHLY: PRICE_PLUS_MONTHLY },
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub_stripe_123',
+      expect.objectContaining({ tier: 'plus' }),
+    );
+    expect(captureException).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.tier_mismatch',
+        }),
+      }),
+    );
+  });
+
+  it('falls back to metadata tier but alerts when the price cannot be mapped', async () => {
+    // Unknown price id (not configured in env) → cannot verify against a price.
+    // Keep the metadata tier so legacy/unmapped prices are not silently
+    // downgraded, but alert so the gap is queryable.
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent(
+        'customer.subscription.updated',
+        subWithPriceAndTier('price_unmapped_xyz', 'pro'),
+      ),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      { ...TEST_ENV, STRIPE_PRICE_PLUS_MONTHLY: PRICE_PLUS_MONTHLY },
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub_stripe_123',
+      expect.objectContaining({ tier: 'pro' }),
+    );
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.tier_unverifiable',
+        }),
+      }),
+    );
+  });
+});
