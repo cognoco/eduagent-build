@@ -1270,6 +1270,13 @@ function SaveWizardGate({
     child?: Profile;
   } | null>(null);
   const signupCompletionTrackedRef = React.useRef(false);
+  const colors = useThemeColors();
+
+  const handleCancel = React.useCallback(() => {
+    clearPreviewState();
+    onComplete();
+    router.replace('/(app)/home');
+  }, [onComplete, router]);
 
   React.useEffect(() => {
     onStart();
@@ -1329,6 +1336,31 @@ function SaveWizardGate({
       testID="save-wizard-gate"
     >
       <View testID={`save-wizard-step-${step}`} />
+      {/* Header row: back (Steps 2–3 only) on the left, cancel ✕ always on the right */}
+      <View className="flex-row justify-between items-center mb-4">
+        {step > 1 ? (
+          <Pressable
+            onPress={() => setStep((s) => (s - 1) as WizardStep)}
+            accessibilityRole="button"
+            accessibilityLabel="Back to previous step"
+            testID="save-wizard-back"
+            className="p-1"
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+          </Pressable>
+        ) : (
+          <View />
+        )}
+        <Pressable
+          onPress={handleCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel and exit"
+          testID="save-wizard-cancel"
+          className="p-1"
+        >
+          <Ionicons name="close" size={22} color={colors.textPrimary} />
+        </Pressable>
+      </View>
       <Text className="text-h1 font-bold text-text-primary mb-2">
         Great, let&apos;s save this and get you started.
       </Text>

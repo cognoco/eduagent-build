@@ -95,7 +95,7 @@ function isFirstCurriculumPreparingError(err: unknown): boolean {
   );
 }
 
-export default function CreateSubjectScreen() {
+function CreateSubjectScreenAuthenticated() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
@@ -104,7 +104,6 @@ export default function CreateSubjectScreen() {
     chatTopic?: string;
   }>();
   const colors = useThemeColors();
-  const { isLoaded, isSignedIn } = useAuth();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
   const apiClient = useApiClient();
@@ -584,22 +583,6 @@ export default function CreateSubjectScreen() {
       : resolveState.phase === 'preparing'
         ? t('subject.preparingCurriculum')
         : t('subject.creatingSubject');
-
-  // [BUG-375] Auth gate — deep-link entry must not show create-subject form to
-  // unauthenticated users. Guard before rendering any content.
-  if (!isLoaded) {
-    return (
-      <View
-        testID="create-subject-auth-loading"
-        className="flex-1 bg-background items-center justify-center"
-      >
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-  if (!isSignedIn) {
-    return <Redirect href="/sign-in" />;
-  }
 
   return (
     <KeyboardAvoidingView
@@ -1089,4 +1072,24 @@ export default function CreateSubjectScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+}
+
+// [S4-H2] Outer gate — only useAuth() is called here so that the inner
+// component's API-query hooks cannot fire for unauthenticated users.
+export default function CreateSubjectScreen() {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) {
+    return (
+      <View
+        testID="create-subject-auth-loading"
+        className="flex-1 bg-background items-center justify-center"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  if (!isSignedIn) {
+    return <Redirect href="/sign-in" />;
+  }
+  return <CreateSubjectScreenAuthenticated />;
 }
