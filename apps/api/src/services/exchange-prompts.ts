@@ -326,6 +326,25 @@ function looksLikeDeterministicHomeworkProblem(text: string): boolean {
   );
 }
 
+// S2-H1: Single source of truth for general-knowledge source eligibility.
+// Lives here (exchange-prompts.ts) to avoid circular import: exchanges.ts
+// already imports from exchange-prompts.ts. exchanges.ts re-exports this.
+export function allowsGeneralKnowledgeSource(
+  context: ExchangeContext,
+): boolean {
+  const mode = context.effectiveMode;
+  return (
+    context.sessionType === 'learning' &&
+    context.escalationRung <= 3 &&
+    context.pedagogyMode !== 'four_strands' &&
+    mode !== 'review' &&
+    mode !== 'practice' &&
+    mode !== 'recitation' &&
+    context.verificationType !== 'evaluate' &&
+    context.verificationType !== 'teach_back'
+  );
+}
+
 function buildPrivateSourceContractBlock(context: ExchangeContext): string {
   const fallbackEvidence: NonNullable<ExchangeContext['sourceEvidence']> = [];
   if (context.topicTitle || context.topicDescription) {
@@ -375,16 +394,8 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
       });
     }
   }
-  if (
-    context.sessionType === 'learning' &&
-    context.escalationRung <= 3 &&
-    context.pedagogyMode !== 'four_strands' &&
-    context.effectiveMode !== 'review' &&
-    context.effectiveMode !== 'practice' &&
-    context.effectiveMode !== 'recitation' &&
-    context.verificationType !== 'evaluate' &&
-    context.verificationType !== 'teach_back'
-  ) {
+  // S2-H1: Delegate to canonical predicate — prompt and audit share same gate.
+  if (allowsGeneralKnowledgeSource(context)) {
     fallbackEvidence.push({
       id: 'general_knowledge',
       kind: 'general_knowledge',

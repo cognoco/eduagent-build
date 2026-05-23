@@ -2309,6 +2309,75 @@ describe('source provenance audit', () => {
     expect(audit.status).toBe('ok');
     expect(audit.reliableReliedOnSourceIds).toEqual(['recitation_text']);
   });
+
+  // S2-C2: Break tests — general_knowledge must be rejected for non-learning sessions.
+  // These tests FAIL if the sessionType === 'learning' gate in
+  // allowsGeneralKnowledgeSource is removed or widened.
+
+  it('[BREAK-S2-C2] rejects general_knowledge claim for homework sessions', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        sessionType: 'homework',
+        topicTitle: undefined,
+        topicDescription: undefined,
+        escalationRung: 1,
+        effectiveMode: 'freeform',
+      },
+      'What is the capital of France?',
+    );
+
+    // general_knowledge must NOT appear in the source pack for homework sessions.
+    expect(sourceEvidence.some((s) => s.id === 'general_knowledge')).toBe(
+      false,
+    );
+
+    // If the model cites it anyway, the audit must reject it as unsupported.
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.95,
+      },
+      sourceEvidence,
+    );
+
+    expect(audit.status).toBe('unsupported_sources');
+    expect(audit.unsupportedSourceIds).toContain('general_knowledge');
+  });
+
+  it('[BREAK-S2-C2] rejects general_knowledge claim for interleaved sessions', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        sessionType: 'interleaved',
+        topicTitle: undefined,
+        topicDescription: undefined,
+        escalationRung: 1,
+        effectiveMode: 'freeform',
+        interleavedTopics: [{ topicId: 't1', title: 'Photosynthesis' }],
+      },
+      'What is the capital of France?',
+    );
+
+    // general_knowledge must NOT appear in the source pack for interleaved sessions.
+    expect(sourceEvidence.some((s) => s.id === 'general_knowledge')).toBe(
+      false,
+    );
+
+    // If the model cites it anyway, the audit must reject it as unsupported.
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.95,
+      },
+      sourceEvidence,
+    );
+
+    expect(audit.status).toBe('unsupported_sources');
+    expect(audit.unsupportedSourceIds).toContain('general_knowledge');
+  });
 });
 
 // ---------------------------------------------------------------------------
