@@ -80,7 +80,9 @@ export type BridgeTriggerSurface =
 
 export function triggerSurface(triggerPath: string): BridgeTriggerSurface {
   if (triggerPath.startsWith('/recaps/')) return 'recaps_detail';
-  if (triggerPath.includes('/session/')) return 'child_session_detail';
+  if (triggerPath.includes('/child/') && triggerPath.includes('/session/')) {
+    return 'child_session_detail';
+  }
   if (
     triggerPath.includes('/curriculum/') ||
     triggerPath.endsWith('/curriculum')
@@ -212,7 +214,7 @@ export function useCloneFromChild(): {
         setToast({
           kind: 'error',
           message: "Couldn't undo - you've already opened this topic.",
-          detail: 'You can remove it from Library later.',
+          detail: 'You can remove it from Library.',
           primaryAction: target
             ? {
                 label: 'Open',
@@ -220,6 +222,11 @@ export function useCloneFromChild(): {
                 testID: 'clone-toast-open-after-undo-failed',
               }
             : undefined,
+          secondaryAction: {
+            label: 'Go to Library',
+            onPress: () => router.push('/(app)/library' as Href),
+            testID: 'clone-toast-library-after-undo-failed',
+          },
         });
         return;
       }
@@ -383,6 +390,11 @@ export function useCloneFromChild(): {
         setToast({
           kind: 'error',
           message: 'This topic is no longer available.',
+          primaryAction: {
+            label: 'Back',
+            onPress: () => router.back(),
+            testID: 'clone-toast-back-not-found',
+          },
         });
         return;
       }
@@ -412,9 +424,17 @@ export function useCloneFromChild(): {
         });
         return;
       }
+      const retryArgs = lastCloneArgsRef.current;
       setToast({
         kind: 'error',
         message: formatApiError(error),
+        primaryAction: retryArgs
+          ? {
+              label: 'Try again',
+              onPress: () => cloneFromChildRef.current?.(retryArgs),
+              testID: 'clone-toast-retry',
+            }
+          : undefined,
       });
     },
   });

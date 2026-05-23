@@ -21,7 +21,13 @@ type Props = {
 
 const TIP_KEY_PREFIX = 'add_to_my_learning.tip_seen';
 
-function BridgeToast({ toast }: { toast: CloneToast }): React.ReactElement {
+function BridgeToast({
+  toast,
+  isCloning,
+}: {
+  toast: CloneToast;
+  isCloning: boolean;
+}): React.ReactElement {
   return (
     <View
       className={
@@ -58,9 +64,13 @@ function BridgeToast({ toast }: { toast: CloneToast }): React.ReactElement {
           {toast.secondaryAction ? (
             <Pressable
               onPress={toast.secondaryAction.onPress}
-              className="min-h-[44px] justify-center rounded-button bg-surface px-4 py-2"
+              disabled={isCloning}
+              className={`min-h-[44px] justify-center rounded-button bg-surface px-4 py-2${
+                isCloning ? ' opacity-60' : ''
+              }`}
               accessibilityRole="button"
               accessibilityLabel={toast.secondaryAction.label}
+              accessibilityState={{ disabled: isCloning }}
               testID={toast.secondaryAction.testID}
             >
               <Text className="text-body-sm font-semibold text-primary">
@@ -203,7 +213,7 @@ export function AddToMyLearningButton({
         {t('addToMyLearning.privacyNote')}
       </Text>
 
-      {toast ? <BridgeToast toast={toast} /> : null}
+      {toast ? <BridgeToast toast={toast} isCloning={isCloning} /> : null}
     </View>
   );
 }
