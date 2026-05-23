@@ -15,6 +15,17 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
 }));
 
+const mockCaptureMessage = jest.fn();
+jest.mock('@sentry/react-native', () => ({
+  captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
+  init: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+  setUser: jest.fn(),
+  getCurrentScope: () => ({ clear: jest.fn() }),
+  getClient: () => null,
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -303,6 +314,41 @@ describe('SignUpScreen', () => {
     await waitFor(() => {
       expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_openai' });
     });
+  });
+
+  // [BUG-510] Break test: when ssoSignIn.status is set, the flow must emit a
+  // structured Sentry event before redirecting. Per CLAUDE.md: "Silent recovery
+  // without escalation is banned." console.warn alone is insufficient; the event
+  // must be observable in Sentry so we can query how many times this path fired.
+  it('[BUG-510] emits Sentry captureMessage when SSO redirects due to incomplete signIn status', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: null,
+      signIn: { status: 'needs_first_factor' },
+      signUp: null,
+    });
+
+    render(<SignUpScreen />);
+    fireEvent.press(screen.getByTestId('sign-up-google-sso'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/(auth)/sign-in' }),
+      );
+    });
+
+    // Sentry must have been called — not just console.warn
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('incomplete signIn'),
+      expect.objectContaining({
+        level: 'info',
+        tags: expect.objectContaining({ flow: 'sign-up-sso' }),
+      }),
+    );
   });
 
   // CR-2026-05-21-105 — break test: ssoSignIn.status set means an existing

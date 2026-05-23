@@ -348,6 +348,44 @@ describe('CameraScreen', () => {
     getByTestId('grant-permission-button');
   });
 
+  // Break test: on first entry (OS has never been asked → status 'undetermined')
+  // the screen must auto-invoke requestPermission so the OS dialog appears
+  // without forcing the user through an in-app pre-prompt. After any user
+  // denial the status flips out of 'undetermined' and auto-request must stop.
+  it('auto-requests permission when status is undetermined', () => {
+    const requestPermission = jest.fn();
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: true, status: 'undetermined' },
+      requestPermission,
+      jest.fn().mockResolvedValue({
+        granted: false,
+        canAskAgain: true,
+        status: 'undetermined',
+      }),
+    ]);
+
+    render(<CameraScreen />, { wrapper: createWrapper() });
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not auto-request when permission has already been denied', () => {
+    const requestPermission = jest.fn();
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: false, status: 'denied' },
+      requestPermission,
+      jest.fn().mockResolvedValue({
+        granted: false,
+        canAskAgain: false,
+        status: 'denied',
+      }),
+    ]);
+
+    render(<CameraScreen />, { wrapper: createWrapper() });
+
+    expect(requestPermission).not.toHaveBeenCalled();
+  });
+
   it('permission body copy is jargon-free (U2, copy sweep 2026-04-19)', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: true },
@@ -441,7 +479,10 @@ describe('CameraScreen', () => {
       wrapper: createWrapper(),
     });
     getByTestId('open-settings-button');
-    getByText(/device settings/i);
+    // Match unique phrase from the denied copy (not the button label, which
+    // duplicates "Open Settings"); verifies users are told WHY they're being
+    // routed to Settings rather than seeing a re-prompt.
+    getByText(/won't let us ask again/i);
   });
 
   it('allows type-or-record entry when camera permission is permanently denied', () => {

@@ -338,27 +338,90 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(result!.lastStripeEventTimestamp).toBe(newerTs.toISOString());
   });
 
-  it('logs error and returns existing row on invalid transition (no throw)', async () => {
+  // [BREAK CR-2026-05-19-M11] Two concurrent deliveries of the same Stripe event
+  // ID must result in exactly ONE write. Pre-fix: both calls saw "not yet processed"
+  // (timestamp ordering check outside tx) and both wrote — divergent billing state.
+  // Post-fix: the event-ID check + UPDATE are inside a single db.transaction(), and
+  // the partial unique index on (accountId, lastStripeEventId) provides the
+  // storage-layer guarantee. The second writer's UPDATE is a no-op (idempotent return).
+  it('[BREAK CR-2026-05-19-M11] concurrent same-event-ID deliveries write only once', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('webhook-concurrent-dedup');
+    await createSubscription(
+      db,
+      acct.id,
+      'plus',
+      getTierConfig('plus').monthlyQuota,
+      { status: 'trial', stripeSubscriptionId: 'sub_concurrent_dedup_001' },
+    );
+
+    const stripeEventId = 'evt_concurrent_dedup_001';
+    const ts = new Date('2026-07-01T10:00:00.000Z').toISOString();
+
+    // Fire two identical event deliveries concurrently
+    const [r1, r2] = await Promise.all([
+      updateSubscriptionFromWebhook(
+        createIntegrationDb(),
+        'sub_concurrent_dedup_001',
+        {
+          status: 'active',
+          lastStripeEventTimestamp: ts,
+          stripeEventId,
+        },
+      ),
+      updateSubscriptionFromWebhook(
+        createIntegrationDb(),
+        'sub_concurrent_dedup_001',
+        {
+          status: 'active',
+          lastStripeEventTimestamp: ts,
+          stripeEventId,
+        },
+      ),
+    ]);
+
+    // Both return non-null (idempotent — second is a safe no-op return)
+    expect(r1).not.toBeNull();
+    expect(r2).not.toBeNull();
+
+    // Exactly one write happened — event ID stamped on the row
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.lastStripeEventId).toBe(stripeEventId);
+    expect(row!.status).toBe('active');
+
+    // Only one subscription row for this account
+    const rows = await db.query.subscriptions.findMany({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it('throws on invalid transition so callers do not continue quota updates', async () => {
     const db = createIntegrationDb();
     const acct = await seedAccount('webhook-invalid-transition');
     await db.insert(subscriptions).values({
       accountId: acct.id,
       tier: 'plus',
-      status: 'cancelled',
+      status: 'expired',
       stripeSubscriptionId: 'sub_invalid_001',
       lastStripeEventTimestamp: new Date('2026-01-01T00:00:00.000Z'),
     });
 
-    // cancelled -> active is not a valid transition in the state machine
+    // expired -> active is not a valid transition in the state machine
     const ts = new Date('2026-06-20T00:00:00.000Z').toISOString();
-    const result = await updateSubscriptionFromWebhook(db, 'sub_invalid_001', {
-      status: 'active',
-      lastStripeEventTimestamp: ts,
-    });
+    await expect(
+      updateSubscriptionFromWebhook(db, 'sub_invalid_001', {
+        status: 'active',
+        lastStripeEventTimestamp: ts,
+      }),
+    ).rejects.toThrow(/Invalid Stripe subscription transition/);
 
-    // Should not throw — logs + Sentry + returns existing row
-    expect(result).not.toBeNull();
-    expect(result!.status).toBe('cancelled');
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('expired');
   });
 });
 

@@ -174,6 +174,11 @@ export function reconnectPromptForError(error: unknown): string {
 }
 
 export function isTimeoutError(error: unknown): boolean {
+  // [BUG-389] Classify by the stable `isTimeout` property set by sse.ts —
+  // never string-match on the formatted message. The property is always set by
+  // the idle-timer path in sse.ts (see IDLE_TIMEOUT_MS handler). Message-text
+  // matching is the classify-after-format anti-pattern: the text can change
+  // with i18n or copy updates, breaking classification silently.
   if (
     typeof error === 'object' &&
     error !== null &&
@@ -181,9 +186,6 @@ export function isTimeoutError(error: unknown): boolean {
     (error as { isTimeout?: unknown }).isTimeout === true
   ) {
     return true;
-  }
-  if (error instanceof Error) {
-    return error.message.toLowerCase().includes('timed out while waiting');
   }
   return false;
 }

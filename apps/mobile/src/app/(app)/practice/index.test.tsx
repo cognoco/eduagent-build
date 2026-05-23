@@ -11,7 +11,8 @@ const mockUseReviewSummary = jest.fn();
 const mockUseQuizStats = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseAssessmentEligibleTopics = jest.fn();
-const mockUseParentProxy = jest.fn();
+const mockCanEnterPractice = jest.fn();
+let mockCanEnterPracticeValue = true;
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => {
@@ -26,9 +27,16 @@ jest.mock('expo-router', () => {
 });
 
 jest.mock(
-  '../../../hooks/use-parent-proxy' /* gc1-allow: grandfathered pattern, used in mentor-memory/relearn/session-summary */,
+  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins route-entry contract without the full app provider tree */,
   () => ({
-    useParentProxy: () => mockUseParentProxy(),
+    useNavigationContract: () => ({
+      // V0 fallback in the screen layouts reads `isParentProxy` when
+      // MODE_NAV_V1_ENABLED is off — keep it congruent with mockCanEnterPracticeValue
+      // so tests pass under either flag value.
+      isParentProxy: !mockCanEnterPracticeValue,
+      canEnter: mockCanEnterPractice,
+      gates: {},
+    }),
   }),
 );
 
@@ -98,7 +106,8 @@ describe('PracticeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
-    mockUseParentProxy.mockReturnValue({ isParentProxy: false });
+    mockCanEnterPracticeValue = true;
+    mockCanEnterPractice.mockReturnValue(true);
     jest
       .spyOn(Date, 'now')
       .mockReturnValue(new Date('2026-04-18T12:00:00.000Z').getTime());
@@ -432,7 +441,8 @@ describe('PracticeScreen', () => {
   });
 
   it('redirects to home when in parent proxy session', () => {
-    mockUseParentProxy.mockReturnValue({ isParentProxy: true });
+    mockCanEnterPracticeValue = false;
+    mockCanEnterPractice.mockReturnValue(false);
 
     render(<PracticeScreen />);
 

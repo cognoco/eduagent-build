@@ -12,7 +12,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { requireProfileId } from '../middleware/profile-scope';
+import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { apiError } from '../errors';
 import {
   buildKnowledgeInventory,
@@ -54,7 +54,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
 
       const history = await buildProgressHistory(db, profileId, query);
       return c.json(progressHistorySchema.parse(history));
-    }
+    },
   )
   .get(
     '/progress/milestones',
@@ -67,28 +67,29 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       const milestones = await listRecentMilestones(
         db,
         profileId,
-        query.limit ?? 5
+        query.limit ?? 5,
       );
       return c.json(milestonesResponseSchema.parse({ milestones }));
-    }
+    },
   )
   .post('/progress/refresh', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const rateLimited = await checkAndLogRateLimit(
       db,
       profileId,
-      c.get('account').id,
+      requireAccount(c.get('account')).id,
       'progress_refresh',
-      { hours: 1, maxCount: 10 }
+      { hours: 1, maxCount: 10 },
     );
     if (rateLimited) {
       return apiError(
         c,
         429,
         ERROR_CODES.RATE_LIMITED,
-        'Progress refresh is limited to 10 times per hour.'
+        'Progress refresh is limited to 10 times per hour.',
       );
     }
 

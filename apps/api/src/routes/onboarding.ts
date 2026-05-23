@@ -21,9 +21,9 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
-import { requireProfileId } from '../middleware/profile-scope';
+import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { assertOwnerAndParentAccess } from '../services/family-access';
-import { notFound } from '../errors';
+import { notFound, forbidden } from '../errors';
 import {
   updateConversationLanguage,
   updatePronouns,
@@ -51,8 +51,18 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingLanguagePatchSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
+      // [CR-2026-05-21-011] conversationLanguage is owner-gated: a child on a
+      // parent's account must not unilaterally change the AI tutor language.
+      const activeProfileMetaLanguage = c.get('profileMeta');
+      if (activeProfileMetaLanguage?.isOwner !== true) {
+        return forbidden(
+          c,
+          'Only the account owner can change the conversation language.',
+        );
+      }
       const { conversationLanguage } = c.req.valid('json');
       try {
         await updateConversationLanguage(
@@ -75,7 +85,8 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingLanguagePatchSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
@@ -103,8 +114,10 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingPronounsPatchSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
+      // self-edit allowed: pronouns are personal identity, parent should not gate
       const { pronouns } = c.req.valid('json');
       try {
         await updatePronouns(db, profileId, account.id, pronouns);
@@ -122,7 +135,8 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingPronounsPatchSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
@@ -145,8 +159,10 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingInterestsContextPatchSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
+      // self-edit allowed: interests are personal to the learner, gating would break solo learning
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, profileId, account.id, interests);
@@ -164,7 +180,8 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
     zValidator('json', onboardingInterestsContextPatchSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)

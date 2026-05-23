@@ -138,6 +138,30 @@ describe('consentMiddleware', () => {
     expect(res.status).toBe(200);
   });
 
+  // [CR-096] Prefix-collision guard: /v1/health sub-route must be exempt,
+  // but /v1/healthcheck-something must NOT be (no trailing-slash match).
+  it('[CR-096] passes through for /v1/health/sub (sub-route of exempt prefix)', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/health/sub',
+    });
+    const res = await app.request('/v1/health/sub');
+    expect(res.status).toBe(200);
+  });
+
+  it('[CR-096] blocks /v1/healthcheck-something — not a sub-path of /v1/health', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/healthcheck-something',
+    });
+    const res = await app.request('/v1/healthcheck-something');
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('CONSENT_REQUIRED');
+  });
+
   it('passes through for exempt path /v1/consent/', async () => {
     const app = createApp({
       profileId: 'p-1',

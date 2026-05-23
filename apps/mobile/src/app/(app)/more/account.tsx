@@ -10,6 +10,7 @@ import {
   SettingsRow,
 } from '../../../components/more/settings-rows';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   i18next,
   LANGUAGE_LABELS,
@@ -29,6 +30,7 @@ export default function AccountScreen(): React.ReactElement {
   const { user } = useUser();
   const { activeProfile } = useProfile();
   const role = useActiveProfileRole();
+  const navigationContract = useNavigationContract();
   const { data: subscription } = useSubscription();
   const { t } = useTranslation();
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
@@ -73,7 +75,13 @@ export default function AccountScreen(): React.ReactElement {
           onPress={() => router.push('/profiles')}
           testID="more-row-profile"
         />
-        <AccountSecurity visible={activeProfile?.isOwner ?? false} />
+        <AccountSecurity
+          visible={
+            FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+              ? navigationContract.gates.showAccountSecurity
+              : (activeProfile?.isOwner ?? false)
+          }
+        />
         {FEATURE_FLAGS.I18N_ENABLED ? (
           <SettingsRow
             label={t('settings.appLanguage')}
@@ -82,7 +90,11 @@ export default function AccountScreen(): React.ReactElement {
             testID="settings-app-language"
           />
         ) : null}
-        {role === 'owner' ? (
+        {(
+          FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+            ? navigationContract.gates.showBilling
+            : role === 'owner'
+        ) ? (
           <SettingsRow
             label={t('more.account.subscription')}
             value={

@@ -56,7 +56,9 @@ import {
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import type { NavigationContract } from '../../lib/navigation-contract';
 import {
   getPreviewState,
   setPreviewState,
@@ -207,9 +209,59 @@ const iconMap: Record<
   Home: { focused: 'home', default: 'home-outline' },
   School: { focused: 'school', default: 'school-outline' },
   Book: { focused: 'book', default: 'book-outline' },
+  Recaps: { focused: 'albums', default: 'albums-outline' },
   Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
+  Users: { focused: 'people', default: 'people-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
+
+type HomeTabPresentation = {
+  titleKey: 'tabs.children' | 'tabs.familyHub' | 'tabs.myLearning';
+  accessibilityLabelKey:
+    | 'tabs.childrenLabel'
+    | 'tabs.familyHubLabel'
+    | 'tabs.myLearningLabel';
+  iconName: 'Home' | 'School' | 'Users';
+};
+
+export function resolveContractHomeTabPresentation(
+  home: NavigationContract['home'],
+): HomeTabPresentation {
+  if (home.screen === 'FamilyHome') {
+    return {
+      titleKey: 'tabs.children',
+      accessibilityLabelKey: 'tabs.childrenLabel',
+      iconName: home.iconName,
+    };
+  }
+
+  return {
+    titleKey: 'tabs.myLearning',
+    accessibilityLabelKey: 'tabs.myLearningLabel',
+    iconName: home.iconName,
+  };
+}
+
+export function resolveShellVisibleTabs({
+  familyCapable,
+  isParentProxy,
+  mode,
+  navigationContract,
+  tabShape,
+  useContract,
+}: {
+  familyCapable: boolean;
+  isParentProxy: boolean;
+  mode: AppMode | null;
+  navigationContract: Pick<NavigationContract, 'visibleTabs'>;
+  tabShape: TabShape;
+  useContract: boolean;
+}): Set<string> {
+  if (useContract) return new Set(navigationContract.visibleTabs);
+  if (isParentProxy) return computeVisibleTabs(tabShape, true);
+  if (familyCapable && mode !== null) return computeModeVisibleTabs(mode);
+  return computeVisibleTabs(tabShape, false);
+}
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const colors = useThemeColors();
@@ -886,9 +938,10 @@ function ProfileBasicsStep({
           createdOwnerProfileId: parent.id,
         });
 
+        const cachedParent = parent;
         queryClient.setQueriesData<Profile[]>(
           { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
-          (old) => (old ? [...old, parent!] : [parent!]),
+          (old) => (old ? [...old, cachedParent] : [cachedParent]),
         );
       }
 
@@ -908,9 +961,10 @@ function ProfileBasicsStep({
           const data = (await res.json()) as { profile: Profile };
           child = data.profile;
 
+          const cachedChild = child;
           queryClient.setQueriesData<Profile[]>(
             { predicate: (q) => String(q.queryKey[0]) === 'profiles' },
-            (old) => (old ? [...old, child!] : [child!]),
+            (old) => (old ? [...old, cachedChild] : [cachedChild]),
           );
         } catch (childErr) {
           // [AC 9] Keep parent. Surface retryable child error inline.
@@ -1216,6 +1270,13 @@ function SaveWizardGate({
     child?: Profile;
   } | null>(null);
   const signupCompletionTrackedRef = React.useRef(false);
+  const colors = useThemeColors();
+
+  const handleCancel = React.useCallback(() => {
+    clearPreviewState();
+    onComplete();
+    router.replace('/(app)/home');
+  }, [onComplete, router]);
 
   React.useEffect(() => {
     onStart();
@@ -1275,6 +1336,31 @@ function SaveWizardGate({
       testID="save-wizard-gate"
     >
       <View testID={`save-wizard-step-${step}`} />
+      {/* Header row: back (Steps 2–3 only) on the left, cancel ✕ always on the right */}
+      <View className="flex-row justify-between items-center mb-4">
+        {step > 1 ? (
+          <Pressable
+            onPress={() => setStep((s) => (s - 1) as WizardStep)}
+            accessibilityRole="button"
+            accessibilityLabel="Back to previous step"
+            testID="save-wizard-back"
+            className="p-1"
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+          </Pressable>
+        ) : (
+          <View />
+        )}
+        <Pressable
+          onPress={handleCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel and exit"
+          testID="save-wizard-cancel"
+          className="p-1"
+        >
+          <Ionicons name="close" size={22} color={colors.textPrimary} />
+        </Pressable>
+      </View>
       <Text className="text-h1 font-bold text-text-primary mb-2">
         Great, let&apos;s save this and get you started.
       </Text>
@@ -1316,9 +1402,9 @@ function SaveWizardGate({
         </View>
       )}
 
-      {step === 2 && (
+      {step === 2 && target && (
         <ProfileBasicsStep
-          target={target!}
+          target={target}
           previewState={previewState}
           onComplete={(c) => {
             setCreated(c);
@@ -1327,9 +1413,9 @@ function SaveWizardGate({
         />
       )}
 
-      {step === 3 && created && (
+      {step === 3 && target && created && (
         <ConfirmStep
-          target={target!}
+          target={target}
           previewState={previewState}
           created={created}
           router={router}
@@ -2035,17 +2121,27 @@ export default function AppLayout() {
   const { mode, familyCapable } = useAppContext();
   const proxyColors = getProxyChromeColors(colors);
   const role = useActiveProfileRole();
+  const navigationContract = useNavigationContract();
   const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
-  const visibleTabs = React.useMemo(() => {
-    if (isParentProxy) return computeVisibleTabs(tabShape, true);
-    if (familyCapable && mode !== null) return computeModeVisibleTabs(mode);
-    return computeVisibleTabs(tabShape, false);
-  }, [familyCapable, isParentProxy, mode, tabShape]);
-  const homeTabPresentation = resolveHomeTabPresentation(
-    tabShape,
-    isParentProxy,
-    familyCapable ? mode : null,
+  const visibleTabs = React.useMemo(
+    () =>
+      resolveShellVisibleTabs({
+        familyCapable,
+        isParentProxy,
+        mode,
+        navigationContract,
+        tabShape,
+        useContract: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
+      }),
+    [familyCapable, isParentProxy, mode, navigationContract, tabShape],
   );
+  const homeTabPresentation = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? resolveContractHomeTabPresentation(navigationContract.home)
+    : resolveHomeTabPresentation(
+        tabShape,
+        isParentProxy,
+        familyCapable ? mode : null,
+      );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -2546,6 +2642,17 @@ export default function AppLayout() {
               tabBarAccessibilityLabel: t('tabs.libraryLabel'),
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="Book" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="recaps"
+            options={{
+              title: t('tabs.recaps'),
+              tabBarButtonTestID: 'tab-recaps',
+              tabBarAccessibilityLabel: t('tabs.recapsLabel'),
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Recaps" focused={focused} />
               ),
             }}
           />

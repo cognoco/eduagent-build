@@ -17,10 +17,25 @@
 // this stub is the missing handler the bug demands, not the full feature.
 // ---------------------------------------------------------------------------
 
+import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 
 const logger = createLogger();
+
+// Runtime schema for the event payload — guards against garbage data reaching
+// the observability log (CR-2026-05-21-025). Fields are intentionally loose
+// (z.string() not z.string().uuid()) to match what the emitter actually sends
+// without being overly brittle. rawResponsePreview is optional because older
+// emitter sites may not include it.
+const exchangeEmptyReplyFallbackDataSchema = z.object({
+  sessionId: z.string(),
+  profileId: z.string(),
+  flow: z.string(),
+  exchangeCount: z.number().int().nonnegative(),
+  reason: z.string(),
+  rawResponsePreview: z.string().optional(),
+});
 
 export const exchangeEmptyReplyFallback = inngest.createFunction(
   {
@@ -29,24 +44,26 @@ export const exchangeEmptyReplyFallback = inngest.createFunction(
   },
   { event: 'app/exchange.empty_reply_fallback' },
   async ({ event }) => {
-    const data = event.data as {
-      sessionId?: string;
-      profileId?: string;
-      flow?: string;
-      exchangeCount?: number;
-      reason?: string;
-      rawResponsePreview?: string;
-    };
+    const parsed = exchangeEmptyReplyFallbackDataSchema.safeParse(event.data);
+    if (!parsed.success) {
+      logger.warn('exchange.empty_reply_fallback.invalid_payload', {
+        parseError: parsed.error.message,
+        rawData: event.data,
+      });
+      return { status: 'invalid_payload' as const };
+    }
+
+    const data = parsed.data;
 
     // Warn-level so observability buckets these without paging on-call —
     // a single empty reply is recoverable; the escalation matters when
     // the rate spikes.
     logger.warn('exchange.empty_reply_fallback.received', {
-      sessionId: data.sessionId ?? 'unknown',
-      profileId: data.profileId ?? 'unknown',
-      flow: data.flow ?? 'unknown',
-      exchangeCount: data.exchangeCount ?? 0,
-      reason: data.reason ?? 'unknown',
+      sessionId: data.sessionId,
+      profileId: data.profileId,
+      flow: data.flow,
+      exchangeCount: data.exchangeCount,
+      reason: data.reason,
       // Preview is intentionally bounded at the emitter (200 chars) so this
       // is safe to surface in logs without leaking large LLM payloads.
       rawResponsePreview: data.rawResponsePreview ?? null,
@@ -55,11 +72,11 @@ export const exchangeEmptyReplyFallback = inngest.createFunction(
 
     return {
       status: 'logged' as const,
-      sessionId: data.sessionId ?? null,
-      reason: data.reason ?? 'unknown',
+      sessionId: data.sessionId,
+      reason: data.reason,
       // Greppable marker so a future feature ticket can find every spot
       // where escalation behavior is deferred.
       escalationDeferred: 'pending_llm_drift_alerting',
     };
-  }
+  },
 );

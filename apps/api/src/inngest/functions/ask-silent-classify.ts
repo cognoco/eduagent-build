@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (learningSessions.profileId enforced in WHERE)
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { learningSessions } from '@eduagent/database';
@@ -92,8 +93,8 @@ export const askSilentClassify = inngest.createFunction(
         .where(
           and(
             eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         )
         .limit(1);
 
@@ -117,14 +118,14 @@ export const askSilentClassify = inngest.createFunction(
     }
 
     const classification = await step.run('classify', async () =>
-      classifySubject(db, profileId, classifyInput)
+      classifySubject(db, profileId, classifyInput),
     );
 
     const topCandidate = [...classification.candidates]
       .sort((left, right) => right.confidence - left.confidence)
       .find(
         (candidate) =>
-          candidate.confidence >= SILENT_CLASSIFY_CONFIDENCE_THRESHOLD
+          candidate.confidence >= SILENT_CLASSIFY_CONFIDENCE_THRESHOLD,
       );
 
     if (!topCandidate) {
@@ -164,8 +165,8 @@ export const askSilentClassify = inngest.createFunction(
         .where(
           and(
             eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         );
     });
 
@@ -185,7 +186,7 @@ export const askSilentClassify = inngest.createFunction(
       subjectId: topCandidate.subjectId,
       confidence: topCandidate.confidence,
     };
-  }
+  },
 );
 
 export const askSilentClassifyOnFailure = inngest.createFunction(
@@ -215,5 +216,5 @@ export const askSilentClassifyOnFailure = inngest.createFunction(
     });
 
     return { ok: true };
-  }
+  },
 );

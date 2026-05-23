@@ -3,7 +3,8 @@ import { Redirect, Stack } from 'expo-router';
 import type { DictationSentence, DictationMode } from '@eduagent/schemas';
 import type { DictationReviewResult } from '../../../hooks/use-dictation-api';
 import { useThemeColors } from '../../../lib/theme';
-import { useParentProxy } from '../../../hooks/use-parent-proxy';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ---------------------------------------------------------------------------
 // DictationData context — RF-03: data flows through context, not route params
@@ -58,9 +59,17 @@ function DictationDataProvider({
 
 export default function DictationLayout(): React.ReactElement {
   const colors = useThemeColors();
-  const { isParentProxy } = useParentProxy();
+  const navigationContract = useNavigationContract();
 
-  if (isParentProxy) return <Redirect href="/(app)/home" />;
+  // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
+  // V0 behavior so cold deep-links don't redirect to /home. See H5.1 in branch CR.
+  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? !navigationContract.canEnter('dictation')
+    : navigationContract.isParentProxy;
+
+  if (blocked) {
+    return <Redirect href="/(app)/home" />;
+  }
 
   return (
     <DictationDataProvider>

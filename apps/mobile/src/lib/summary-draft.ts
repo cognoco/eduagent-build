@@ -26,10 +26,17 @@ function getDraftKey(profileId: string, sessionId: string): string {
 function reportDraftFailure(
   scope: 'read' | 'write' | 'clear',
   err: unknown,
+  profileId?: string,
+  sessionId?: string,
 ): void {
   console.warn(`[SummaryDraft] SecureStore ${scope} failed:`, err);
   Sentry.captureException(err, {
-    tags: { feature: 'summary_draft', secure_store_scope: scope },
+    tags: {
+      feature: 'summary_draft',
+      secure_store_scope: scope,
+      ...(profileId ? { profileId } : {}),
+      ...(sessionId ? { sessionId } : {}),
+    },
   });
 }
 
@@ -50,7 +57,7 @@ export async function writeSummaryDraft(
       JSON.stringify(payload),
     );
   } catch (err) {
-    reportDraftFailure('write', err);
+    reportDraftFailure('write', err, profileId, sessionId);
   }
 }
 
@@ -63,7 +70,7 @@ export async function readSummaryDraft(
   try {
     raw = await SecureStore.getItemAsync(getDraftKey(profileId, sessionId));
   } catch (err) {
-    reportDraftFailure('read', err);
+    reportDraftFailure('read', err, profileId, sessionId);
     return null;
   }
   if (!raw) return null;
@@ -72,7 +79,7 @@ export async function readSummaryDraft(
   try {
     parsed = JSON.parse(raw) as SummaryDraft;
   } catch (err) {
-    reportDraftFailure('read', err);
+    reportDraftFailure('read', err, profileId, sessionId);
     return null;
   }
 
@@ -102,6 +109,6 @@ export async function clearSummaryDraft(
   try {
     await SecureStore.deleteItemAsync(getDraftKey(profileId, sessionId));
   } catch (err) {
-    reportDraftFailure('clear', err);
+    reportDraftFailure('clear', err, profileId, sessionId);
   }
 }

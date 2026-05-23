@@ -1,14 +1,15 @@
 import { render, screen } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
 
-const mockReplace = jest.fn();
-
 jest.mock('expo-router', () => ({
   Stack: ({ children }: { children?: React.ReactNode }) => {
     const { View } = require('react-native');
     return <View testID="stack">{children}</View>;
   },
-  useRouter: () => ({ replace: mockReplace }),
+  Redirect: ({ href }: { href: string }) => {
+    const { View } = require('react-native');
+    return <View testID={`redirect-${href}`} />;
+  },
 }));
 
 jest.mock('@clerk/clerk-expo', () => ({
@@ -20,7 +21,6 @@ const PreviewLayout = require('./_layout').default;
 describe('PreviewLayout auth guard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockReplace.mockReset();
   });
 
   it('renders nothing while Clerk is still loading', () => {
@@ -32,7 +32,6 @@ describe('PreviewLayout auth guard', () => {
     const { toJSON } = render(<PreviewLayout />);
 
     expect(toJSON()).toBeNull();
-    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('renders the preview Stack when the user is signed out', () => {
@@ -44,10 +43,10 @@ describe('PreviewLayout auth guard', () => {
     render(<PreviewLayout />);
 
     screen.getByTestId('stack');
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('redirect-/(app)/home')).toBeNull();
   });
 
-  it('redirects signed-in users away from preview routes', () => {
+  it('renders Redirect for signed-in users instead of Stack', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -55,11 +54,11 @@ describe('PreviewLayout auth guard', () => {
 
     render(<PreviewLayout />);
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    screen.getByTestId('redirect-/(app)/home');
     expect(screen.queryByTestId('stack')).toBeNull();
   });
 
-  it('redirects when isSignedIn flips false to true mid-flow', () => {
+  it('switches to Redirect when isSignedIn flips false to true mid-flow', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: false,
@@ -67,7 +66,7 @@ describe('PreviewLayout auth guard', () => {
 
     const { rerender } = render(<PreviewLayout />);
     screen.getByTestId('stack');
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('redirect-/(app)/home')).toBeNull();
 
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
@@ -75,7 +74,7 @@ describe('PreviewLayout auth guard', () => {
     });
     rerender(<PreviewLayout />);
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    screen.getByTestId('redirect-/(app)/home');
     expect(screen.queryByTestId('stack')).toBeNull();
   });
 });

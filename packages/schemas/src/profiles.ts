@@ -27,6 +27,9 @@ export type ConversationLanguage = z.infer<typeof conversationLanguageSchema>;
 export const pronounsSchema = z.string().min(1).max(32);
 export type Pronouns = z.infer<typeof pronounsSchema>;
 
+export const appContextSchema = z.enum(['study', 'family']);
+export type AppContext = z.infer<typeof appContextSchema>;
+
 // BKT-C.1 — age cutoff for pronouns prompt during onboarding (COPPA-transition
 // age; below this, the field is never prompted and stays null).
 export const PRONOUNS_PROMPT_MIN_AGE = 13;
@@ -91,6 +94,13 @@ export type OnboardingPronounsPatch = z.infer<
   typeof onboardingPronounsPatchSchema
 >;
 
+export const profileAppContextUpdateSchema = z.object({
+  defaultAppContext: appContextSchema,
+});
+export type ProfileAppContextUpdateInput = z.infer<
+  typeof profileAppContextUpdateSchema
+>;
+
 export const profileSwitchSchema = z.object({
   profileId: z.string().uuid(),
 });
@@ -106,6 +116,8 @@ export const profileSchema = z.object({
   location: locationSchema.nullable(),
   isOwner: z.boolean(),
   hasPremiumLlm: z.boolean().default(false),
+  defaultAppContext: appContextSchema.nullable().default(null),
+  hasFamilyLinks: z.boolean().default(false),
   // BKT-C.1 — default 'en' so legacy profiles parse cleanly before the backfill
   // migration runs. After 0035 migrates, every row has a real value.
   conversationLanguage: conversationLanguageSchema.default('en'),

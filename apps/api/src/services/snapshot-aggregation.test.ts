@@ -45,6 +45,21 @@ jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const loggerWarnMock = jest.fn();
+
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./logger') as typeof import('./logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      warn: (...args: unknown[]) => loggerWarnMock(...args),
+      info: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
+
 import type { Database } from '@eduagent/database';
 import {
   subjects,
@@ -277,6 +292,7 @@ function makeTopicWithSubject(
     targetWordCount: null,
     targetChunkCount: null,
     sessionId: null,
+    sourceChildProfileId: null,
     createdAt: new Date('2026-04-01T00:00:00.000Z'),
     updatedAt: new Date('2026-04-01T00:00:00.000Z'),
   };
@@ -525,14 +541,14 @@ describe('getLatestSnapshot', () => {
 
 describe('getLatestSnapshotOnOrBefore', () => {
   it('returns null when no snapshots exist', async () => {
-    const db = createSnapshotDb({ findMany: [] });
+    const db = createSnapshotDb({ findFirst: undefined });
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
     expect(result).toBeNull();
   });
 
   it('returns the snapshot when its date equals the requested date', async () => {
     const db = createSnapshotDb({
-      findMany: [makeSnapshotRow({ snapshotDate: TODAY })],
+      findFirst: makeSnapshotRow({ snapshotDate: TODAY }),
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -543,11 +559,9 @@ describe('getLatestSnapshotOnOrBefore', () => {
 
   it('returns the closest earlier snapshot when the exact date is not present', async () => {
     const db = createSnapshotDb({
-      // findMany returns in desc order (as DB would)
-      findMany: [
-        makeSnapshotRow({ snapshotDate: '2026-04-18' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-17' }),
-      ],
+      // The SQL where clause filters out future rows and desc ordering picks
+      // the closest earlier snapshot.
+      findFirst: makeSnapshotRow({ snapshotDate: '2026-04-18' }),
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -558,10 +572,7 @@ describe('getLatestSnapshotOnOrBefore', () => {
 
   it('returns null when all snapshots are newer than the requested date', async () => {
     const db = createSnapshotDb({
-      findMany: [
-        makeSnapshotRow({ snapshotDate: '2026-04-20' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-21' }),
-      ],
+      findFirst: undefined,
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -571,11 +582,7 @@ describe('getLatestSnapshotOnOrBefore', () => {
 
   it('skips future snapshots and picks the most recent past one', async () => {
     const db = createSnapshotDb({
-      findMany: [
-        makeSnapshotRow({ snapshotDate: '2026-04-21' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-19' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-15' }),
-      ],
+      findFirst: makeSnapshotRow({ snapshotDate: '2026-04-19' }),
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -706,6 +713,13 @@ describe('buildKnowledgeInventory', () => {
       findFirst: latest,
       findMany: [latest, previous],
     });
+    (
+      db.query.progressSnapshots.findFirst as jest.MockedFunction<
+        typeof db.query.progressSnapshots.findFirst
+      >
+    )
+      .mockResolvedValueOnce(latest)
+      .mockResolvedValueOnce(previous);
     (
       db.query as unknown as Record<string, { findMany: jest.Mock }>
     ).subjects!.findMany.mockResolvedValue([makeSubjectRow(subjectId)]);
@@ -1214,6 +1228,43 @@ describe('refreshProgressSnapshot', () => {
     // refreshProgressSnapshot must not propagate the celebration error
     await expect(refreshProgressSnapshot(db, profileId)).resolves.toEqual(
       expect.objectContaining({}),
+    );
+  });
+
+  // [CR-2026-05-21-070] Red-green regression: one failing enqueue must NOT
+  // prevent subsequent milestones from being enqueued.
+  it('[CR-070] continues celebrating subsequent milestones after first queueCelebration throws', async () => {
+    const makeMilestone = (id: string) => ({
+      id,
+      profileId,
+      milestoneType: 'session_count' as const,
+      threshold: 1,
+      subjectId: null,
+      bookId: null,
+      metadata: null,
+      celebratedAt: null,
+      createdAt: new Date().toISOString(),
+    });
+    // Three milestones: first throws, second and third must still be attempted.
+    (storeMilestones as jest.Mock).mockResolvedValue([
+      makeMilestone('ms-a'),
+      makeMilestone('ms-b'),
+      makeMilestone('ms-c'),
+    ]);
+    (queueCelebration as jest.Mock)
+      .mockRejectedValueOnce(new Error('first fails'))
+      .mockResolvedValue(undefined);
+
+    const db = createSnapshotDb({ findFirst: undefined });
+
+    await refreshProgressSnapshot(db, profileId);
+
+    // All three milestones must have been attempted.
+    expect(queueCelebration).toHaveBeenCalledTimes(3);
+    // Partial-failure warn must have fired.
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'celebration.batch_partial_failure',
+      expect.objectContaining({ profileId, total: 3, succeeded: 2, failed: 1 }),
     );
   });
 

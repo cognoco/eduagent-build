@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (sessionEvents.profileId enforced in WHERE)
 import { and, asc, eq } from 'drizzle-orm';
 
 import {
@@ -39,7 +40,7 @@ function parseEventData(data: unknown): TopicProbeRequestedEvent | null {
 async function loadTopicProbeHistory(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<ExchangeEntry[]> {
   const rows = await db
     .select({
@@ -50,15 +51,15 @@ async function loadTopicProbeHistory(
     .where(
       and(
         eq(sessionEvents.profileId, profileId),
-        eq(sessionEvents.sessionId, sessionId)
-      )
+        eq(sessionEvents.sessionId, sessionId),
+      ),
     )
     .orderBy(asc(sessionEvents.createdAt), asc(sessionEvents.id));
 
   return rows
     .filter(
       (row) =>
-        row.eventType === 'user_message' || row.eventType === 'ai_response'
+        row.eventType === 'user_message' || row.eventType === 'ai_response',
     )
     .map((row) => ({
       role: row.eventType === 'user_message' ? 'user' : 'assistant',
@@ -68,7 +69,7 @@ async function loadTopicProbeHistory(
 
 function buildRetentionSeed(
   quality: number,
-  seededAt: Date
+  seededAt: Date,
 ): {
   easeFactor: number;
   intervalDays: number;
@@ -124,8 +125,8 @@ async function seedRetentionCard(params: {
       and(
         eq(retentionCards.id, card.id),
         eq(retentionCards.profileId, profileId),
-        eq(retentionCards.repetitions, 0)
-      )
+        eq(retentionCards.repetitions, 0),
+      ),
     );
 
   return quality;
@@ -158,8 +159,8 @@ export async function handleTopicProbeExtract({
       .where(
         and(
           eq(learningSessions.id, payload.sessionId),
-          eq(learningSessions.profileId, payload.profileId)
-        )
+          eq(learningSessions.profileId, payload.profileId),
+        ),
       )
       .limit(1);
     return row ?? null;
@@ -181,7 +182,7 @@ export async function handleTopicProbeExtract({
   }
 
   const extractedSignals = await step.run('extract-signals', () =>
-    extractSignalsFromExchangeHistory(history)
+    extractSignalsFromExchangeHistory(history),
   );
   const parsedSignalsResult =
     extractedInterviewSignalsSchema.safeParse(extractedSignals);
@@ -210,14 +211,14 @@ export async function handleTopicProbeExtract({
         .from(curriculumTopics)
         .innerJoin(
           curriculumBooks,
-          eq(curriculumBooks.id, curriculumTopics.bookId)
+          eq(curriculumBooks.id, curriculumTopics.bookId),
         )
         .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
         .where(
           and(
             eq(curriculumTopics.id, payload.topicId),
-            eq(subjects.profileId, payload.profileId)
-          )
+            eq(subjects.profileId, payload.profileId),
+          ),
         )
         .limit(1);
       if (!topic) return null;
@@ -229,7 +230,7 @@ export async function handleTopicProbeExtract({
         topicTitle: payload.topicTitle,
         timestamp: payload.timestamp,
       });
-    }
+    },
   );
 
   await step.run('persist-session-metadata', async () => {
@@ -240,8 +241,8 @@ export async function handleTopicProbeExtract({
       .where(
         and(
           eq(learningSessions.id, payload.sessionId),
-          eq(learningSessions.profileId, payload.profileId)
-        )
+          eq(learningSessions.profileId, payload.profileId),
+        ),
       )
       .limit(1);
     const metadata = {
@@ -259,8 +260,8 @@ export async function handleTopicProbeExtract({
       .where(
         and(
           eq(learningSessions.id, payload.sessionId),
-          eq(learningSessions.profileId, payload.profileId)
-        )
+          eq(learningSessions.profileId, payload.profileId),
+        ),
       );
   });
 
@@ -279,6 +280,7 @@ export const topicProbeExtract = inngest.createFunction(
   {
     id: 'topic-probe-extract',
     retries: 2,
+    idempotency: 'event.data.sessionId + "-" + event.data.topicId',
     onFailure: async ({
       event,
       error,
@@ -315,8 +317,8 @@ export const topicProbeExtract = inngest.createFunction(
           .where(
             and(
               eq(learningSessions.id, payload.sessionId),
-              eq(learningSessions.profileId, payload.profileId)
-            )
+              eq(learningSessions.profileId, payload.profileId),
+            ),
           )
           .limit(1);
         await db
@@ -331,8 +333,8 @@ export const topicProbeExtract = inngest.createFunction(
           .where(
             and(
               eq(learningSessions.id, payload.sessionId),
-              eq(learningSessions.profileId, payload.profileId)
-            )
+              eq(learningSessions.profileId, payload.profileId),
+            ),
           );
       } catch (cleanupError) {
         logger.error('[topic-probe-extract] failure cleanup failed', {
@@ -357,5 +359,5 @@ export const topicProbeExtract = inngest.createFunction(
     },
   },
   { event: 'app/topic-probe.requested' },
-  handleTopicProbeExtract
+  handleTopicProbeExtract,
 );

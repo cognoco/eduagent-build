@@ -92,19 +92,33 @@ jest.mock('../../lib/api-client', () =>
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-// use-parent-proxy uses setProxyMode from api-client (not the RPC useApiClient hook)
-// plus SecureStore reads — not an API hook. Keep as a direct mock.
-jest.mock('../../hooks/use-parent-proxy', () => ({
-  // gc1-allow: SecureStore native boundary
-  useParentProxy: () => ({ isParentProxy: false }),
-}));
-
 // use-active-profile-role is derived from useProfile + useParentProxy — no API calls.
 let mockActiveRole: 'owner' | 'child' | 'impersonated-child' | null = 'owner';
 jest.mock('../../hooks/use-active-profile-role', () => ({
   ...jest.requireActual('../../hooks/use-active-profile-role'),
   useActiveProfileRole: () => mockActiveRole,
 }));
+
+// mockCanEnterResult controls what canEnter() returns per-test.
+// Default true so most tests exercise normal screen rendering.
+// Set to false in proxy-redirect tests to verify the Redirect guard fires.
+let mockCanEnterResult = true;
+
+jest.mock(
+  '../../hooks/use-navigation-contract' /* gc1-allow: screen test pins navigation gates without the full app provider tree */,
+  () => ({
+    useNavigationContract: () => ({
+      gates: {
+        sessionIsOwner: mockActiveRole === 'owner',
+      },
+      // V0 fallback in the screen layouts reads `isParentProxy` when
+      // MODE_NAV_V1_ENABLED is off — keep it congruent with mockCanEnterResult
+      // so tests pass under either flag value.
+      isParentProxy: !mockCanEnterResult,
+      canEnter: (_route: string) => mockCanEnterResult,
+    }),
+  }),
+);
 
 jest.mock('../../lib/platform-alert', () => ({
   ...jest.requireActual('../../lib/platform-alert'),
@@ -425,5 +439,34 @@ describe('MentorMemoryScreen — explicit return target from More', () => {
 
     expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/more');
     expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+});
+
+// Break test: proxy/restricted users must be redirected to home, not shown
+// the mentor-memory screen. canEnter('mentor-memory') returns false for proxy
+// sessions and any other context where the screen is off-limits.
+describe('MentorMemoryScreen — canEnter=false redirects to home', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanEnterResult = false;
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'granted',
+    };
+  });
+
+  afterEach(() => {
+    mockCanEnterResult = true;
+    mockSearchParams = {};
+  });
+
+  it('renders Redirect to home when canEnter returns false (e.g. proxy session)', () => {
+    // Redirect renders as null in tests (mocked above); verify the screen
+    // body does NOT render — the memory-status-text testID is only present
+    // when the screen body renders past the canEnter guard.
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    expect(screen.queryByTestId('memory-status-text')).toBeNull();
   });
 });

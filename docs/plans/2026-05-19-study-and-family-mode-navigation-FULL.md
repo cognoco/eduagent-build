@@ -1,5 +1,9 @@
 # Study and Family Mode Navigation — Implementation Plan
 
+> **Status (2026-05-23):** Phase 1 foundation ✅ (migration `0089_ancient_naoko.sql`, `profiles.default_app_context`, `hasFamilyLinks` schema, navigation-contract scaffolding). Task 1 (V0 TabShape rename to study|family) ❌ NOT EXECUTED — `_layout.tsx` still exports `TabShape = 'guardian' | 'learner'` with `GUARDIAN_TABS`/`LEARNER_TABS`. V1 navigation runs via parallel `computeModeVisibleTabs()` behind `MODE_NAV_V1_ENABLED` flag. `FAMILY_TABS` in `navigation-contract.ts` correctly includes `{home, recaps, progress, more}`. Tasks 6, 12, 13, 16-20 require individual verification.
+
+> **Hard constraint (added 2026-05-22).** Today's 5-tab production mode (active when `MODE_NAV_V0_ENABLED=false` in Doppler) **must not regress** across any task in this plan. V0 helpers (`resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` in `apps/mobile/src/app/(app)/_layout.tsx:120-180`) and the V0-off short-circuits in `app-context.tsx:37, 44, 61` are **not deleted** as part of this migration. New `resolveNavigationContract` wiring is gated behind a separate `MODE_NAV_V1_ENABLED` flag. Every task must include or carry forward a regression test asserting that with both flags off, a guardian profile sees all 5 tabs. See the "Hard Constraint" section of `docs/specs/2026-05-21-navigation-contract.md` for the full matrix.
+
 > **Amendments from adversarial review (2026-05-19):**
 > - **CRITICAL-1**: Task 16 rewritten — `goBackOrReplace` and `homeHrefForReturnTo` already exist at `apps/mobile/src/lib/navigation.ts:16,26`. Extend, do not create parallel implementations.
 > - **CRITICAL-2**: Task 1 keeps `Set<string>` for tab-visibility (existing shape at `_layout.tsx:114-126`); plan-wide replace of `.includes(...)` with `.has(...)`.
@@ -63,7 +67,7 @@ Run:
 ls apps/api/drizzle | grep -E '^[0-9]{4}_' | sort | tail -3
 ```
 
-Highest at spec time was `0078_webhook_idempotency_keys.sql`. Use the next available number when creating the migration in Task 2 (likely `0079`, but verify at execution time).
+Highest at spec time was `0078_webhook_idempotency_keys.sql`. This plan's foundation migration landed as `0089_ancient_naoko.sql`. Use the next available number after `0089` when creating any additional migration in this plan (verify at execution time with `ls apps/api/drizzle | sort | tail -3`).
 
 Throughout this plan we refer to it as `00NN`. Substitute the real number consistently across the `.sql` file, the `.rollback.md` file, and any references.
 

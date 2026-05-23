@@ -13,7 +13,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { requireProfileId } from '../middleware/profile-scope';
+import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { getProfile } from '../services/profile';
 import {
@@ -76,11 +76,15 @@ export function isConsentRespondRateLimited(ipKey: string): boolean {
   const cutoff = now - CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS;
   const existing = consentRespondTimestamps.get(ipKey);
   const timestamps = (existing ?? []).filter((t) => t > cutoff);
-  if (timestamps.length === 0 && existing !== undefined) {
+
+  // [CR-2026-05-21-094] LRU touch: delete before re-set so the key moves to
+  // the insertion-order tail. This makes keys().next().value the true
+  // least-recently-touched IP rather than the first-ever inserted one.
+  if (existing !== undefined) {
     consentRespondTimestamps.delete(ipKey);
   }
-  const isNewKey =
-    !consentRespondTimestamps.has(ipKey) && timestamps.length === 0;
+
+  const isNewKey = timestamps.length === 0;
   if (
     isNewKey &&
     consentRespondTimestamps.size >= CONSENT_RESPOND_MAP_MAX_ENTRIES
@@ -131,7 +135,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     zValidator('json', consentRequestSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const input = c.req.valid('json');
 
       const childProfile = await getProfile(

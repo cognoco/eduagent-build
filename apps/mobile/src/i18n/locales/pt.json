@@ -964,7 +964,7 @@
     "empty": {
       "title": "Sua biblioteca está vazia",
       "message": "Inicie uma sessão de estudo e suas matérias aparecerão aqui.",
-      "goHome": "Ir para o Início"
+      "createFirstSubject": "Adicione sua primeira disciplina"
     },
     "curriculumComplete": {
       "title": "Você já cobriu tudo aqui!",
@@ -1326,7 +1326,7 @@
   "homework": {
     "permissionTitle": "É necessário acesso à câmera",
     "permissionPrompt": "Tire uma foto do seu dever de casa e eu te ajudarei a resolvê-lo passo a passo.",
-    "permissionDenied": "O acesso à câmera foi negado. Você pode habilitá-lo nas configurações do seu dispositivo para fotografar os problemas do dever de casa.",
+    "permissionDenied": "O acesso à câmera foi desativado. Seu telefone não nos deixa perguntar de novo — toque em «Abrir Configurações» e ative a câmera para este app.",
     "openSettings": "Abrir Configurações",
     "openSettingsLabel": "Abrir configurações do dispositivo",
     "allowCamera": "Permitir Câmera",
@@ -1988,7 +1988,11 @@
       "thisChild": "esta criança",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Confirmar — retirar consentimento",
-      "withdraw": "Retirar"
+      "withdraw": "Retirar",
+      "curriculumTitle": "Currículo",
+      "curriculumSubtitle": "Explore as disciplinas e os tópicos de {{name}}",
+      "curriculumNotAvailableTitle": "O currículo desta criança não está disponível",
+      "curriculumNotAvailableBody": "Você só pode visualizar o currículo de crianças vinculadas à sua conta familiar."
     },
     "mentorMemory": {
       "title": "Memória do mentor",
@@ -2332,7 +2336,11 @@
     "progress": "Progresso",
     "progressLabel": "Progresso",
     "more": "Mais",
-    "moreLabel": "Mais"
+    "moreLabel": "Mais",
+    "children": "Crianças",
+    "childrenLabel": "Crianças",
+    "recaps": "Resumos",
+    "recapsLabel": "Resumos"
   },
   "ocrTimeout": "A leitura demorou muito — tente novamente",
   "permissionTitle": "É necessário acesso à câmera",
@@ -2588,5 +2596,33 @@
       "noRoundsYet": "Nenhuma rodada ainda",
       "hintOpenHistory": "Abre o histórico de quizzes"
     }
+  },
+  "recaps": {
+    "title": "Resumos",
+    "subtitle": "Momentos de aprendizagem recentes da sua família.",
+    "emptyTitle": "Ainda não há resumos",
+    "emptyBody": "As sessões concluídas aparecerão aqui quando houver algo a resumir.",
+    "errorTitle": "Não foi possível carregar os resumos",
+    "errorMessage": "Tente novamente daqui a pouco.",
+    "summaryPending": "Um resumo desta sessão ainda está a ser preparado.",
+    "openRecapLabel": "Abrir o resumo de {{child}} para {{title}}",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   }
 }

@@ -21,7 +21,7 @@ import type {
   SessionMessageInput,
   LearningStyle,
   StrengthEntry,
-  StruggleEntry,
+  FocusAreaEntry,
   SubscriptionTier,
   VerificationType,
 } from '@eduagent/schemas';
@@ -1534,7 +1534,7 @@ export async function prepareExchangeContext(
             ? memorySnapshot.struggles
             : ((Array.isArray(learningProfile.struggles)
                 ? learningProfile.struggles
-                : []) as StruggleEntry[]),
+                : []) as FocusAreaEntry[]),
           communicationNotes: memorySnapshot
             ? memorySnapshot.communicationNotes
             : Array.isArray(learningProfile.communicationNotes)
@@ -2132,9 +2132,17 @@ export async function processMessage(
     throw err;
   }
 
-  // Compute time-to-answer: ms between last AI response and now
+  // Compute time-to-answer: ms between last AI response and now.
+  // [BUG-391] Defensive cast: neon-serverless returns Date objects for
+  // timestamp columns, but belt-and-braces — ensure we always call .getTime()
+  // on a real Date so a string value (e.g. under test mocks or schema drift)
+  // produces a finite result rather than NaN silently propagating into the
+  // persisted telemetry payload.
   const timeToAnswerMs = lastAiResponseAt
-    ? Date.now() - lastAiResponseAt.getTime()
+    ? Date.now() -
+      (lastAiResponseAt instanceof Date
+        ? lastAiResponseAt.getTime()
+        : new Date(lastAiResponseAt as string).getTime())
     : null;
 
   const persisted = await persistExchangeResult(
@@ -2296,9 +2304,14 @@ export async function streamMessage(
     context.topicTitle,
   );
 
-  // Compute time-to-answer before streaming begins
+  // Compute time-to-answer before streaming begins.
+  // [BUG-391] Same defensive cast as the non-streaming path above — ensure a
+  // string value from schema drift never produces a silent NaN.
   const timeToAnswerMs = lastAiResponseAt
-    ? Date.now() - lastAiResponseAt.getTime()
+    ? Date.now() -
+      (lastAiResponseAt instanceof Date
+        ? lastAiResponseAt.getTime()
+        : new Date(lastAiResponseAt as string).getTime())
     : null;
 
   const imageData: ImageData | undefined =

@@ -1,0 +1,434 @@
+import {
+  computeAgeBracket,
+  type Profile,
+  type SubscriptionTier,
+} from '@eduagent/schemas';
+
+import type { ActiveProfileRole } from '../hooks/use-active-profile-role';
+import type { AppMode } from './app-context';
+
+export type NavigationAppContext = AppMode;
+export type NavigationShape = 'study' | 'family';
+export type TabKey =
+  | 'home'
+  | 'own-learning'
+  | 'library'
+  | 'recaps'
+  | 'progress'
+  | 'more';
+
+export type RouteKey =
+  | 'home'
+  | 'own-learning'
+  | 'library'
+  | 'recaps'
+  | 'recaps/[recapId]'
+  | 'progress'
+  | 'progress/saved'
+  | 'progress/vocabulary'
+  | 'session'
+  | 'homework'
+  | 'dictation'
+  | 'quiz'
+  | 'practice'
+  | 'mentor-memory'
+  | 'topic/relearn'
+  | 'child/[profileId]'
+  | 'child/[profileId]/reports'
+  | 'child/[profileId]/reports/weekly'
+  | 'child/[profileId]/curriculum'
+  | 'child/[profileId]/session/[sessionId]'
+  | 'create-profile'
+  | 'subscription'
+  | 'more/account'
+  | 'more/privacy';
+
+export interface RouteParams {
+  for?: 'child' | 'self';
+  profileId?: string;
+  recapId?: string;
+  sessionId?: string;
+}
+
+export type NavigationProfile = Profile & {
+  defaultAppContext?: NavigationAppContext | null;
+  hasFamilyLinks?: boolean | null;
+};
+
+export interface NavigationFlags {
+  MODE_NAV_V0_ENABLED?: boolean;
+  MODE_NAV_V1_ENABLED: boolean;
+}
+
+export interface NavigationSubscriptionContext {
+  status: 'loading' | 'ready';
+  tier: SubscriptionTier | null;
+}
+
+export interface ProfileContext {
+  activeProfile: NavigationProfile | null;
+  profiles: ReadonlyArray<NavigationProfile>;
+  isParentProxy: boolean;
+  appContext: NavigationAppContext | null;
+  role: ActiveProfileRole | null;
+  subscription: NavigationSubscriptionContext;
+  flags: NavigationFlags;
+}
+
+export interface NavigationGates {
+  sessionIsOwner: boolean;
+  showBilling: boolean;
+  showAccountSecurity: boolean;
+  showExportDelete: boolean;
+  showAddChild: boolean;
+  showRemoveFamilyMember: boolean;
+  showFamilyChildActivity: boolean;
+  showProgressProfilePicker: boolean;
+  showAccommodationChildEditor: boolean;
+  showCelebrationsChildEditor: boolean;
+  showMentorMemoryChildConsent: boolean;
+  showInlineStudyInvite: boolean;
+  showLearnThisToo: boolean;
+  progressScope: 'self' | 'children';
+}
+
+export interface NavigationDiagnostic {
+  activeProfileId: string | null;
+  effectiveAppContext: NavigationAppContext;
+  isFamilyCapable: boolean;
+  isParentProxy: boolean;
+  linkedChildIds: string[];
+  reason:
+    | 'child-study-only'
+    | 'explicit-family'
+    | 'explicit-study'
+    | 'family-intent-without-family-links'
+    | 'legacy-v0-flags-off'
+    | 'parent-proxy'
+    | 'profile-default-family'
+    | 'profile-loading'
+    | 'v1-disabled';
+  role: ActiveProfileRole | null;
+  shape: NavigationShape;
+}
+
+export interface NavigationContract {
+  shape: NavigationShape;
+  effectiveAppContext: NavigationAppContext;
+  isFamilyCapable: boolean;
+  isParentProxy: boolean;
+  visibleTabs: ReadonlySet<TabKey>;
+  home: {
+    screen: 'LearnerHome' | 'FamilyHome';
+    titleKey: 'tabs.myLearning' | 'tabs.children';
+    iconName: 'School' | 'Users';
+  };
+  chrome: {
+    modeSwitcher: 'global-header' | 'hidden';
+    proxyBanner: 'required' | 'hidden';
+  };
+  gates: NavigationGates;
+  canEnter: (route: RouteKey, params?: RouteParams) => boolean;
+  isSurfaced: (route: RouteKey, params?: RouteParams) => boolean;
+  queryScope: {
+    appContext: NavigationAppContext;
+    profileId: string | null;
+  };
+  diagnostic: NavigationDiagnostic;
+}
+
+const STUDY_TABS: ReadonlySet<TabKey> = new Set([
+  'home',
+  'library',
+  'progress',
+  'more',
+]);
+const FAMILY_TABS: ReadonlySet<TabKey> = new Set([
+  'home',
+  'recaps',
+  'progress',
+  'more',
+]);
+const PROXY_TABS: ReadonlySet<TabKey> = new Set([
+  'home',
+  'library',
+  'progress',
+]);
+const LEGACY_GUARDIAN_TABS: ReadonlySet<TabKey> = new Set([
+  'home',
+  'own-learning',
+  'library',
+  'progress',
+  'more',
+]);
+
+const LEARNING_ROUTES = new Set<RouteKey>([
+  'session',
+  'homework',
+  'dictation',
+  'quiz',
+  'practice',
+  'mentor-memory',
+  'topic/relearn',
+]);
+
+const FAMILY_CHILD_ROUTES = new Set<RouteKey>([
+  'child/[profileId]',
+  'child/[profileId]/reports',
+  'child/[profileId]/reports/weekly',
+  'child/[profileId]/curriculum',
+  'child/[profileId]/session/[sessionId]',
+]);
+
+function getLinkedChildIds(
+  activeProfile: NavigationProfile | null,
+  profiles: ReadonlyArray<NavigationProfile>,
+): string[] {
+  if (!activeProfile) return [];
+  return profiles
+    .filter((profile) => profile.id !== activeProfile.id && !profile.isOwner)
+    .map((profile) => profile.id);
+}
+
+function isAdultOwner(profile: NavigationProfile | null): boolean {
+  return (
+    !!profile &&
+    profile.isOwner &&
+    computeAgeBracket(profile.birthYear) === 'adult'
+  );
+}
+
+function isFamilyCapable(activeProfile: NavigationProfile | null): boolean {
+  if (!activeProfile || !isAdultOwner(activeProfile)) return false;
+  return activeProfile.hasFamilyLinks === true;
+}
+
+function isLegacyGuardian(
+  activeProfile: NavigationProfile | null,
+  linkedChildIds: ReadonlyArray<string>,
+): boolean {
+  return !!activeProfile?.isOwner && linkedChildIds.length > 0;
+}
+
+function isLinkedChildRoute(
+  params: RouteParams | undefined,
+  linkedChildIds: ReadonlyArray<string>,
+): boolean {
+  return !!params?.profileId && linkedChildIds.includes(params.profileId);
+}
+
+function isOwnerRole(role: ActiveProfileRole | null): boolean {
+  return role === 'owner';
+}
+
+export function resolveNavigationContract(
+  context: ProfileContext,
+): NavigationContract {
+  const linkedChildIds = getLinkedChildIds(
+    context.activeProfile,
+    context.profiles,
+  );
+  const familyCapable = isFamilyCapable(context.activeProfile);
+  const ownerRole = isOwnerRole(context.role);
+  const subscriptionReady = context.subscription.status === 'ready';
+
+  let shape: NavigationShape = 'study';
+  let effectiveAppContext: NavigationAppContext = 'study';
+  let reason: NavigationDiagnostic['reason'] = 'explicit-study';
+  let visibleTabs: ReadonlySet<TabKey> = STUDY_TABS;
+
+  if (!context.activeProfile) {
+    reason = 'profile-loading';
+  } else if (
+    context.flags.MODE_NAV_V1_ENABLED === false &&
+    context.flags.MODE_NAV_V0_ENABLED === false &&
+    isLegacyGuardian(context.activeProfile, linkedChildIds) &&
+    !context.isParentProxy
+  ) {
+    // Legacy V0 fallback: shape stays 'study' and family-gates stay false here
+    // by design. When V1 is off, every screen short-circuits the contract behind
+    // `FEATURE_FLAGS.MODE_NAV_V1_ENABLED ? contract : legacy`, so .gates/.shape
+    // are not read in production — the legacy V0 code path (app-context.tsx,
+    // _layout.tsx helpers) is authoritative. visibleTabs is informational only.
+    reason = 'legacy-v0-flags-off';
+    visibleTabs = LEGACY_GUARDIAN_TABS;
+  } else if (context.flags.MODE_NAV_V1_ENABLED === false) {
+    reason = 'v1-disabled';
+  } else if (context.isParentProxy) {
+    reason = 'parent-proxy';
+    visibleTabs = PROXY_TABS;
+  } else if (!context.activeProfile.isOwner) {
+    reason = 'child-study-only';
+  } else if (context.appContext === 'family' && familyCapable) {
+    shape = 'family';
+    effectiveAppContext = 'family';
+    reason = 'explicit-family';
+    visibleTabs = FAMILY_TABS;
+  } else if (context.appContext === 'family' && !familyCapable) {
+    reason = 'family-intent-without-family-links';
+  } else if (
+    context.appContext === null &&
+    familyCapable &&
+    context.activeProfile.defaultAppContext === 'family'
+  ) {
+    shape = 'family';
+    effectiveAppContext = 'family';
+    reason = 'profile-default-family';
+    visibleTabs = FAMILY_TABS;
+  }
+
+  const familyShape = shape === 'family';
+  const addChildGate =
+    isAdultOwner(context.activeProfile) &&
+    ownerRole &&
+    !context.isParentProxy &&
+    subscriptionReady &&
+    context.activeProfile !== null;
+  const childEditorGate = ownerRole && familyShape && !context.isParentProxy;
+  const learnThisTooGate =
+    ownerRole &&
+    familyShape &&
+    !context.isParentProxy &&
+    context.activeProfile?.hasFamilyLinks === true;
+
+  const gates: NavigationGates = {
+    sessionIsOwner: ownerRole && !context.isParentProxy,
+    showBilling: ownerRole && !context.isParentProxy,
+    showAccountSecurity: ownerRole && !context.isParentProxy,
+    showExportDelete: ownerRole && !context.isParentProxy,
+    showAddChild: addChildGate,
+    showRemoveFamilyMember: childEditorGate && familyCapable,
+    showFamilyChildActivity: childEditorGate,
+    showProgressProfilePicker: childEditorGate,
+    showAccommodationChildEditor: childEditorGate,
+    showCelebrationsChildEditor: childEditorGate,
+    showMentorMemoryChildConsent: childEditorGate,
+    showInlineStudyInvite: ownerRole && familyCapable && !context.isParentProxy,
+    showLearnThisToo: learnThisTooGate,
+    progressScope: familyShape ? 'children' : 'self',
+  };
+
+  const home: NavigationContract['home'] = familyShape
+    ? {
+        screen: 'FamilyHome',
+        titleKey: 'tabs.children',
+        iconName: 'Users',
+      }
+    : {
+        screen: 'LearnerHome',
+        titleKey: 'tabs.myLearning',
+        iconName: 'School',
+      };
+
+  const canEnter = (route: RouteKey, params?: RouteParams): boolean => {
+    if (!context.activeProfile) return route === 'home';
+    if (context.isParentProxy) {
+      return route === 'home' || route === 'library' || route === 'progress';
+    }
+
+    if (FAMILY_CHILD_ROUTES.has(route)) {
+      return familyShape && isLinkedChildRoute(params, linkedChildIds);
+    }
+
+    if (LEARNING_ROUTES.has(route)) {
+      return familyShape ? ownerRole : true;
+    }
+
+    switch (route) {
+      case 'home':
+      case 'progress':
+        return true;
+      case 'progress/saved':
+      case 'progress/vocabulary':
+        return !familyShape;
+      case 'own-learning':
+        return visibleTabs.has('own-learning');
+      case 'library':
+        return !familyShape;
+      case 'recaps':
+      case 'recaps/[recapId]':
+        return familyShape;
+      case 'create-profile':
+        return params?.for === 'child' ? gates.showAddChild : ownerRole;
+      case 'more/account':
+      case 'more/privacy':
+        return true;
+      case 'subscription':
+        return gates.showBilling;
+    }
+
+    return false;
+  };
+
+  const isSurfaced = (route: RouteKey, params?: RouteParams): boolean => {
+    if (!canEnter(route, params)) return false;
+
+    if (LEARNING_ROUTES.has(route)) {
+      return !familyShape && !context.isParentProxy;
+    }
+
+    if (FAMILY_CHILD_ROUTES.has(route)) {
+      return familyShape && isLinkedChildRoute(params, linkedChildIds);
+    }
+
+    switch (route) {
+      case 'home':
+      case 'progress':
+        return true;
+      case 'progress/saved':
+      case 'progress/vocabulary':
+        return !familyShape;
+      case 'own-learning':
+      case 'library':
+      case 'recaps':
+        return visibleTabs.has(route);
+      case 'recaps/[recapId]':
+        return familyShape;
+      case 'create-profile':
+        return params?.for === 'child' ? gates.showAddChild : ownerRole;
+      case 'more/account':
+      case 'more/privacy':
+        return true;
+      case 'subscription':
+        return gates.showBilling;
+    }
+
+    return false;
+  };
+
+  return {
+    shape,
+    effectiveAppContext,
+    isFamilyCapable: familyCapable,
+    isParentProxy: context.isParentProxy,
+    visibleTabs,
+    home,
+    chrome: {
+      modeSwitcher:
+        familyCapable &&
+        !context.isParentProxy &&
+        context.flags.MODE_NAV_V1_ENABLED
+          ? 'global-header'
+          : 'hidden',
+      proxyBanner:
+        context.isParentProxy && context.activeProfile ? 'required' : 'hidden',
+    },
+    gates,
+    canEnter,
+    isSurfaced,
+    queryScope: {
+      appContext: effectiveAppContext,
+      profileId: context.activeProfile?.id ?? null,
+    },
+    diagnostic: {
+      activeProfileId: context.activeProfile?.id ?? null,
+      effectiveAppContext,
+      isFamilyCapable: familyCapable,
+      isParentProxy: context.isParentProxy,
+      linkedChildIds,
+      reason,
+      role: context.role,
+      shape,
+    },
+  };
+}

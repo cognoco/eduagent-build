@@ -191,13 +191,15 @@ The Primary Finding's root cause — the More-tab refactor — was addressed by 
 
 ### Broken Inventory References (3 rows above)
 
-| Old path | Action |
-|---|---|
-| `apps/mobile/e2e/flows/onboarding/onboarding-extras-flow.yaml` | `DEFERRED:INVENTORY-1` — update inventory to point at `onboarding-fast-path.yaml` |
-| `apps/mobile/e2e/flows/account/tutor-language-edit.yaml` | `DEFERRED:INVENTORY-2` — update inventory to point at `account/app-language-edit.yaml` |
-| `apps/mobile/e2e/flows/onboarding/settings-language-edit.yaml` | `DEFERRED:INVENTORY-3` — update inventory to point at `onboarding/onboarding-fast-path-language.yaml` |
+2026-05-23 update: these inventory references are no longer pending. `docs/flows/mobile-app-flow-inventory.md` points at the existing current files:
 
-The fixes are mechanical edits in `docs/flows/mobile-app-flow-inventory.md`. Not done here to avoid an unrelated inventory rewrite — to be carried by the test-machine agent or the inventory owner in a follow-up.
+| Old path | Current inventory reference |
+|---|---|
+| `apps/mobile/e2e/flows/onboarding/onboarding-extras-flow.yaml` | `e2e/flows/onboarding/onboarding-fast-path.yaml` |
+| `apps/mobile/e2e/flows/account/tutor-language-edit.yaml` | `e2e/flows/account/app-language-edit.yaml` |
+| `apps/mobile/e2e/flows/onboarding/settings-language-edit.yaml` | `e2e/flows/onboarding/onboarding-fast-path-language.yaml` |
+
+Verified by static search on 2026-05-23: the three old YAML paths do not appear in `docs/flows/mobile-app-flow-inventory.md`.
 
 ### Missing Or Incomplete Coverage (32 rows above)
 

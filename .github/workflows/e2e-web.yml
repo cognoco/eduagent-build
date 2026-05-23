@@ -21,16 +21,26 @@ permissions:
 jobs:
   # Lightweight gate: skip the expensive Playwright suite when the PR only
   # touches docs, configs, or workflow files unrelated to the app.
-  # Runs in ~5s on a shared runner (no checkout needed).
   changes:
     runs-on: ubuntu-latest
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
       - name: Check for relevant file changes
         id: check
         env:
-          GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "should-run=true" >> "$GITHUB_OUTPUT"
@@ -38,7 +48,7 @@ jobs:
             exit 0
           fi
 
-          FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+          FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
 
           SHOULD_RUN=false
           while IFS= read -r f; do
@@ -89,13 +99,13 @@ jobs:
       # workers). See playwright.config.ts → `usesRateLimitedApi`.
       E2E_ENV: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
         with:
           standalone: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: 22
           cache: pnpm
@@ -169,7 +179,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: playwright-web-smoke
           path: |

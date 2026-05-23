@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** Owner/account shared  
 > **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/more/index.tsx`, `apps/mobile/src/app/profiles.tsx`, `apps/mobile/src/app/create-profile.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/e2e/flows/parent/add-child-profile.yaml`, `apps/mobile/e2e/flows/regression/bug-239-parent-add-child.yaml`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/more/index.tsx`, `apps/mobile/src/app/profiles.tsx`, `apps/mobile/src/app/create-profile.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/e2e/flows/parent/add-child-profile.yaml`, `apps/mobile/e2e/flows/regression/bug-239-parent-add-child.yaml`
 
 ## Purpose
 

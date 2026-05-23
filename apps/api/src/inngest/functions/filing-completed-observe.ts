@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (learningSessions.profileId enforced in WHERE)
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';
 import { filingResolvedEventSchema } from '@eduagent/schemas';
@@ -30,7 +31,7 @@ export const filingCompletedObserve = inngest.createFunction(
       const row = await db.query.learningSessions.findFirst({
         where: and(
           eq(learningSessions.id, sessionId),
-          eq(learningSessions.profileId, profileId)
+          eq(learningSessions.profileId, profileId),
         ),
         columns: { filingStatus: true },
       });
@@ -57,8 +58,8 @@ export const filingCompletedObserve = inngest.createFunction(
             inArray(learningSessions.filingStatus, [
               'filing_pending',
               'filing_failed',
-            ])
-          )
+            ]),
+          ),
         )
         .returning({ id: learningSessions.id });
       return result.length > 0;
@@ -85,5 +86,5 @@ export const filingCompletedObserve = inngest.createFunction(
     }
 
     return { recovered: flipped, priorStatus };
-  }
+  },
 );

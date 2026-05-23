@@ -54,6 +54,7 @@ static/
 out
 
 test-output
+.test-logs/
 
 # TestSprite MCP generated tests (ephemeral, not committed)
 testsprite_tests/

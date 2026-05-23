@@ -58,6 +58,15 @@ export const dailySnapshotCron = inngest.createFunction(
       return { status: 'completed', queuedProfiles: 0 };
     }
 
+    // [CR-2026-05-21-035 follow-up] Include the cron-day bucket in the event
+    // payload so the per-event idempotency key (profileId + day) is unique per
+    // calendar day. Without `day` in the key, Inngest's default 24h dedup
+    // window sits exactly on the cron cadence (cron fires every 24h) and
+    // today's fan-out can be silently deduped against yesterday's events.
+    const day = await step.run('compute-cron-day', async () =>
+      new Date().toISOString().slice(0, 10),
+    );
+
     const BATCH_SIZE = 200;
     for (let i = 0; i < activeProfileIds.length; i += BATCH_SIZE) {
       const batch = activeProfileIds.slice(i, i + BATCH_SIZE);
@@ -65,7 +74,7 @@ export const dailySnapshotCron = inngest.createFunction(
         `fan-out-progress-refresh-${i}`,
         batch.map((profileId) => ({
           name: 'app/progress.snapshot.refresh' as const,
-          data: { profileId },
+          data: { profileId, day },
         })),
       );
     }
@@ -86,6 +95,13 @@ export const dailySnapshotRefresh = inngest.createFunction(
     // pattern and keeps DB pressure bounded while still draining the daily
     // batch within the cron's 21-hour gap.
     concurrency: { limit: 50 },
+    // [CR-2026-05-21-035] Deduplicate per (profileId, day): Inngest's default
+    // 24h idempotency window matches the cron cadence (24h between fires), so
+    // keying on profileId alone risks dropping today's events at the dedup
+    // boundary against yesterday's. Including the cron-day bucket in the key
+    // makes each day's fan-out unambiguously distinct while still deduping
+    // operator re-fires within the same day. Pattern mirrors archive-cleanup.ts:21.
+    idempotency: 'event.data.profileId + "-" + event.data.day',
   },
   { event: 'app/progress.snapshot.refresh' },
   async ({ event, step }) => {

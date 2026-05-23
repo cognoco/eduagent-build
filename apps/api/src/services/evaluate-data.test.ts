@@ -52,6 +52,26 @@ function createMockDb(overrides?: {
   const updateSet = jest.fn().mockReturnValue({ where: updateSetWhere });
   const updateMock = jest.fn().mockReturnValue({ set: updateSet });
 
+  // checkEvaluateEligibility now uses db.select().from().innerJoin()…limit(1)
+  // for the topic title lookup (parent-chain join for BUG-354 fix).
+  // Chain each builder method so the final .limit() resolves to the topic row.
+  const topicRows =
+    overrides?.queryResults?.topic != null
+      ? [overrides.queryResults.topic]
+      : [];
+  const selectLimitMock = jest.fn().mockResolvedValue(topicRows);
+  const selectWhereMock = jest.fn().mockReturnValue({ limit: selectLimitMock });
+  const selectInnerJoin2Mock = jest
+    .fn()
+    .mockReturnValue({ where: selectWhereMock });
+  const selectInnerJoin1Mock = jest
+    .fn()
+    .mockReturnValue({ innerJoin: selectInnerJoin2Mock });
+  const selectFromMock = jest
+    .fn()
+    .mockReturnValue({ innerJoin: selectInnerJoin1Mock });
+  const selectMock = jest.fn().mockReturnValue({ from: selectFromMock });
+
   return {
     query: {
       retentionCards: {
@@ -59,17 +79,13 @@ function createMockDb(overrides?: {
           .fn()
           .mockResolvedValue(overrides?.queryResults?.retentionCard ?? null),
       },
-      curriculumTopics: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue(overrides?.queryResults?.topic ?? null),
-      },
       sessionEvents: {
         findMany: jest
           .fn()
           .mockResolvedValue(overrides?.queryResults?.sessionEvents ?? []),
       },
     },
+    select: selectMock,
     update: updateMock,
   } as unknown as Database;
 }

@@ -6,7 +6,8 @@ import type {
   QuizRoundResponse,
 } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
-import { useParentProxy } from '../../../hooks/use-parent-proxy';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -113,9 +114,17 @@ export function QuizFlowProvider({
 
 export default function QuizLayout(): React.ReactElement {
   const colors = useThemeColors();
-  const { isParentProxy } = useParentProxy();
+  const navigationContract = useNavigationContract();
 
-  if (isParentProxy) return <Redirect href="/(app)/home" />;
+  // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
+  // V0 behavior so cold deep-links don't redirect to /home. See H5.1 in branch CR.
+  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? !navigationContract.canEnter('quiz')
+    : navigationContract.isParentProxy;
+
+  if (blocked) {
+    return <Redirect href="/(app)/home" />;
+  }
 
   return (
     <QuizFlowProvider>

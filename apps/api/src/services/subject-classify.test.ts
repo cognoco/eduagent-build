@@ -360,6 +360,92 @@ describe('classifySubject', () => {
     expect(result.needsConfirmation).toBe(true);
   });
 
+  // [CR-2026-05-21-076] Break tests — subjectClassifyLlmResponseSchema must
+  // reject malformed payloads and route to the heuristic fallback, not silently
+  // accept garbage that would produce wrong candidates or crash at runtime.
+  describe('[CR-2026-05-21-076] schema validation on malformed LLM payloads', () => {
+    it('falls back to heuristic when multi-subject LLM returns matches with non-string subjectName', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Mathematics'),
+        makeSubject('sub-002', 'Physics'),
+      ]);
+
+      // matches[].subjectName is a number — violates schema
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify({
+          matches: [{ subjectName: 42, confidence: 0.9 }],
+          suggestedSubjectName: null,
+        }),
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+        stopReason: 'stop',
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'solve 2x + 5 = 15',
+      );
+
+      // Schema parse fails → heuristic fallback path
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      expect(result.suggestedSubjectName).toBe('Mathematics');
+    });
+
+    it('falls back to heuristic when multi-subject LLM returns a non-object payload', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Physics'),
+        makeSubject('sub-002', 'Biology'),
+      ]);
+
+      // A JSON array at the top level — not the expected object shape
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify([{ subjectName: 'Physics', confidence: 0.9 }]),
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+        stopReason: 'stop',
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'Tell me about the war of currents',
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      // heuristic matches "war of currents" → Physics
+      expect(result.suggestedSubjectName).toBe('Physics');
+    });
+
+    it('falls back to heuristic when zero-subject LLM returns a missing suggestedSubjectName field', async () => {
+      mockListSubjects.mockResolvedValueOnce([]);
+
+      // suggestedSubjectName is absent — violates subjectSuggestLlmResponseSchema
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify({ something_else: 'ignored' }),
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+        stopReason: 'stop',
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'solve 2x + 5 = 15',
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      // heuristic kicks in for math text
+      expect(result.suggestedSubjectName).toBe('Mathematics');
+    });
+  });
+
   it('ignores LLM matches that do not correspond to enrolled subjects', async () => {
     mockListSubjects.mockResolvedValueOnce([
       makeSubject('sub-001', 'Mathematics'),

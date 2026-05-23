@@ -120,6 +120,20 @@ export default function CameraScreen(): React.ReactNode {
     }
   }, [permission?.granted, state.phase]);
 
+  // Auto-trigger the OS permission dialog on first entry instead of forcing
+  // the user through an in-app pre-prompt screen. Only fires when the OS
+  // hasn't been asked yet (status: 'undetermined'). After a denial the OS
+  // refuses re-prompts, so we fall through to the in-app screen which
+  // offers either the system-permitted re-ask (canAskAgain) or Open Settings.
+  const autoRequestedRef = useRef(false);
+  useEffect(() => {
+    if (autoRequestedRef.current) return;
+    if (permission?.status === 'undetermined') {
+      autoRequestedRef.current = true;
+      void requestPermission();
+    }
+  }, [permission?.status, requestPermission]);
+
   // Re-check permission when returning from system Settings.
   // useCameraPermissions does not auto-refresh on app resume, so the screen
   // gets stuck in the permission phase after the user grants access externally.

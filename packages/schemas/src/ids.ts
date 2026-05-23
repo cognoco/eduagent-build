@@ -19,7 +19,7 @@ import { z } from 'zod';
  * phantom symbol-keyed tag — at runtime the value is still a plain string,
  * but the compiler refuses to mix `ProfileId` with `SubjectId`.
  */
-function brandedUuid<Brand extends string>(brand: Brand) {
+function brandedUuid<Brand extends string>(_brand: Brand) {
   return z.string().uuid().brand<Brand>();
 }
 

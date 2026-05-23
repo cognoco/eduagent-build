@@ -939,7 +939,7 @@
     "empty": {
       "title": "Biblioteket ditt er tomt",
       "message": "Start en studieøkt, så vil emnene dine vises her.",
-      "goHome": "Gå til Hjem"
+      "createFirstSubject": "Legg til ditt første fag"
     },
     "curriculumComplete": {
       "title": "Du har dekket alt her!",
@@ -1301,7 +1301,7 @@
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",
     "permissionPrompt": "Ta et bilde av leksene dine, så hjelper jeg deg med å løse dem trinn for trinn.",
-    "permissionDenied": "Kameratilgang ble nektet. Du kan aktivere den i enhetens innstillinger for å fotografere lekseoppgaver.",
+    "permissionDenied": "Kameratilgangen ble slått av. Telefonen lar oss ikke spørre på nytt — trykk «Åpne innstillinger» og slå på kameraet for denne appen.",
     "openSettings": "Åpne innstillinger",
     "openSettingsLabel": "Åpne enhetsinnstillinger",
     "allowCamera": "Tillat kamera",
@@ -1963,7 +1963,11 @@
       "thisChild": "dette barnet",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Bekreft – trekk tilbake samtykke",
-      "withdraw": "Trekk tilbake"
+      "withdraw": "Trekk tilbake",
+      "curriculumTitle": "Læreplan",
+      "curriculumSubtitle": "Utforsk {{name}}s fag og emner",
+      "curriculumNotAvailableTitle": "Dette barnets læreplan er ikke tilgjengelig",
+      "curriculumNotAvailableBody": "Du kan bare se læreplanen for barn som er knyttet til familiekontoen din."
     },
     "mentorMemory": {
       "title": "Mentorens minne",
@@ -2307,7 +2311,11 @@
     "progress": "Fremgang",
     "progressLabel": "Fremgang",
     "more": "Mer",
-    "moreLabel": "Mer"
+    "moreLabel": "Mer",
+    "children": "Barn",
+    "childrenLabel": "Barn",
+    "recaps": "Sammendrag",
+    "recapsLabel": "Sammendrag"
   },
   "ocrTimeout": "Lesing tok for lang tid – prøv igjen",
   "permissionTitle": "Kameratilgang nødvendig",
@@ -2588,5 +2596,33 @@
       "noRoundsYet": "Ingen runder ennå",
       "hintOpenHistory": "Åpner quiz-historikk"
     }
+  },
+  "recaps": {
+    "title": "Sammendrag",
+    "subtitle": "Nylige læringsøyeblikk fra familien din.",
+    "emptyTitle": "Ingen sammendrag ennå",
+    "emptyBody": "Fullførte økter vil vises her når det er noe å oppsummere.",
+    "errorTitle": "Vi kunne ikke laste inn sammendrag",
+    "errorMessage": "Vennligst prøv igjen om et øyeblikk.",
+    "summaryPending": "Et sammendrag forberedes fortsatt for denne økten.",
+    "openRecapLabel": "Åpne {{child}}s sammendrag for {{title}}",
+    "detailHeading": "Øktsammendrag",
+    "backLabel": "Tilbake til sammendrag",
+    "detailLoadError": "Vi kunne ikke laste dette sammendraget",
+    "detailLoadErrorMessage": "Prøv igjen, eller gå tilbake til listen.",
+    "notFoundTitle": "Sammendrag ikke funnet",
+    "notFoundMessage": "Dette sammendraget er ikke lenger tilgjengelig.",
+    "exchangesCount": "{{count}} utvekslinger",
+    "whatHappened": "Hva skjedde",
+    "detailPending": "Dette sammendraget forberedes fortsatt.",
+    "tryAsking": "Prøv å spørre",
+    "openChildSession": "Åpne barnets økt"
+  },
+  "addToMyLearning": {
+    "tip": "Lagre en kopi av dette emnet i ditt eget bibliotek uten å påvirke barnets læring.",
+    "dismissTip": "Skjønner",
+    "dismiss": "Lukk",
+    "buttonLabel": "Legg til i min læring",
+    "privacyNote": "Privat for din læring"
   }
 }

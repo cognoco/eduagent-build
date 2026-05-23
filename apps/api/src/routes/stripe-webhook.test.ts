@@ -125,7 +125,15 @@ import { claimWebhookId } from './resend-webhook';
 // Test app with mock db middleware
 // ---------------------------------------------------------------------------
 
-const mockDb = {} as any;
+// handleSubscriptionEvent/handleSubscriptionDeleted now wrap billing
+// calls in db.transaction(). The billing functions are mocked at module
+// level so they don't use tx; we just need transaction to execute the
+// callback so the mocked functions are invoked normally.
+const mockDb = {
+  transaction: jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
+} as any;
 const mockKv = { put: jest.fn(), get: jest.fn() } as any;
 
 const app = new Hono<{ Variables: AppVariables }>()
@@ -637,6 +645,62 @@ describe('customer.subscription.updated', () => {
 
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
+
+  // [CR-052 break test] A second subscription.updated event fired AFTER
+  // cancellation (e.g. a period-end reminder) must NOT clobber cancelledAt
+  // back to null. Pre-fix, the else branch always set cancelledAt = null when
+  // canceled_at was absent, wiping the timestamp recorded by the first event.
+  it('[CR-052] second subscription.updated (no canceled_at) does not clobber cancelledAt set by first call', async () => {
+    // First event: subscription is cancelled — canceled_at is present.
+    const firstSub = makeSubscription({
+      status: 'canceled',
+      canceled_at: 1700100000,
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', firstSub),
+    );
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    const firstCall = (updateSubscriptionFromWebhook as jest.Mock).mock
+      .calls[0]?.[2] as Record<string, unknown> | undefined;
+    expect(firstCall?.cancelledAt).toBeDefined();
+    expect(firstCall?.cancelledAt).not.toBeNull();
+
+    jest.clearAllMocks();
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription(),
+    );
+
+    // Second event: a follow-up event (e.g. period-end reminder) with no
+    // canceled_at on the Stripe object. cancelledAt must NOT appear in updates.
+    const secondSub = makeSubscription({
+      status: 'canceled',
+      canceled_at: null,
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', secondSub),
+    );
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    const secondCall = (updateSubscriptionFromWebhook as jest.Mock).mock
+      .calls[0]?.[2] as Record<string, unknown> | undefined;
+    // cancelledAt must NOT be present (not null, not a new value) — omitted entirely.
+    expect(secondCall).not.toHaveProperty('cancelledAt');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -882,6 +946,44 @@ describe('invoice.payment_succeeded', () => {
     );
     // KV cache must also be refreshed
     expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
+  // [CR-052 break test] payment_succeeded must clear cancelledAt so that a user
+  // who cancelled then paid (or resumed from past_due) is NOT stuck showing
+  // "Cancelling" in the UI. The comment in handleSubscriptionEvent documents
+  // this intent; this test verifies the invoice path fulfils it.
+  // Red-green: remove `cancelledAt: null` from handlePaymentSucceeded's updates
+  // object and this test fails — updateSubscriptionFromWebhook will be called
+  // without the cancelledAt field, leaving the old timestamp in the DB.
+  it('[CR-052] payment_succeeded clears cancelledAt so UI does not show Cancelling after re-activation', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({ status: 'active' }),
+    );
+
+    const invoice = makeInvoice();
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('invoice.payment_succeeded', invoice),
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    // cancelledAt: null MUST be present in the update so the DB clears the timestamp.
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'sub_stripe_123',
+      expect.objectContaining({
+        status: 'active',
+        cancelledAt: null,
+      }),
+    );
   });
 
   // [ultrareview finding] If Stripe SDK v21 (or later) refactors the invoice

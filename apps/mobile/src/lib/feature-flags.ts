@@ -17,8 +17,8 @@ export const FEATURE_FLAGS = {
   // isFamilyCapableProfile() and the mentomate_preview_intent entry in sign-out-cleanup ship UNCONDITIONALLY.
   PREVIEW_ONBOARDING_ENABLED: true,
 
-  MODE_NAV_V0_ENABLED:
-    process.env.EXPO_PUBLIC_ENABLE_MODE_NAV === 'true',
+  MODE_NAV_V0_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV === 'true',
+  MODE_NAV_V1_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V1 === 'true',
 
   // [OPT-C] Independent adult-owner gate flag — toggles the 18+ requirement
   // for a parent creating a child profile. Defense-in-depth: paired with the

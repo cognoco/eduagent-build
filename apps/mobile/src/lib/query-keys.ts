@@ -60,7 +60,14 @@ export const queryKeys = {
       topicId: string | undefined,
       profileId: string | undefined,
     ) =>
-      ['progress', mode, 'topic', topicId, 'active-session', profileId] as const,
+      [
+        'progress',
+        mode,
+        'topic',
+        topicId,
+        'active-session',
+        profileId,
+      ] as const,
 
     resolveTopicSubject: (
       mode: ModeSegment,
@@ -115,7 +122,14 @@ export const queryKeys = {
       profileId: string | undefined,
       activeProfileId: string | undefined,
     ) =>
-      ['progress', mode, 'profile', profileId, 'reports', activeProfileId] as const,
+      [
+        'progress',
+        mode,
+        'profile',
+        profileId,
+        'reports',
+        activeProfileId,
+      ] as const,
 
     profileWeeklyReports: (
       mode: ModeSegment,
@@ -135,7 +149,15 @@ export const queryKeys = {
       mode: ModeSegment,
       activeProfileId: string | undefined,
       reportId: string | undefined,
-    ) => ['progress', mode, 'profile', activeProfileId, 'report', reportId] as const,
+    ) =>
+      [
+        'progress',
+        mode,
+        'profile',
+        activeProfileId,
+        'report',
+        reportId,
+      ] as const,
 
     profileWeeklyReportDetail: (
       mode: ModeSegment,
@@ -172,7 +194,14 @@ export const queryKeys = {
       childProfileId: string | undefined,
       subjectId: string | undefined,
     ) =>
-      ['dashboard', mode, 'child', childProfileId, 'subject', subjectId] as const,
+      [
+        'dashboard',
+        mode,
+        'child',
+        childProfileId,
+        'subject',
+        subjectId,
+      ] as const,
 
     childSessions: (mode: ModeSegment, childProfileId: string | undefined) =>
       ['dashboard', mode, 'child', childProfileId, 'sessions'] as const,
@@ -182,7 +211,14 @@ export const queryKeys = {
       childProfileId: string | undefined,
       sessionId: string | undefined,
     ) =>
-      ['dashboard', mode, 'child', childProfileId, 'session', sessionId] as const,
+      [
+        'dashboard',
+        mode,
+        'child',
+        childProfileId,
+        'session',
+        sessionId,
+      ] as const,
 
     childMemory: (mode: ModeSegment, childProfileId: string | undefined) =>
       ['dashboard', mode, 'child', childProfileId, 'memory'] as const,
@@ -194,12 +230,14 @@ export const queryKeys = {
       mode: ModeSegment,
       childProfileId: string | undefined,
       query: ProgressHistoryQuery | undefined,
-    ) => ['dashboard', mode, 'child', childProfileId, 'history', query] as const,
+    ) =>
+      ['dashboard', mode, 'child', childProfileId, 'history', query] as const,
 
     childProgressSummary: (
       mode: ModeSegment,
       childProfileId: string | undefined,
-    ) => ['dashboard', mode, 'child', childProfileId, 'progress-summary'] as const,
+    ) =>
+      ['dashboard', mode, 'child', childProfileId, 'progress-summary'] as const,
 
     childReports: (mode: ModeSegment, childProfileId: string | undefined) =>
       ['dashboard', mode, 'child', childProfileId, 'reports'] as const,
@@ -208,12 +246,14 @@ export const queryKeys = {
       mode: ModeSegment,
       childProfileId: string | undefined,
       reportId: string | undefined,
-    ) => ['dashboard', mode, 'child', childProfileId, 'report', reportId] as const,
+    ) =>
+      ['dashboard', mode, 'child', childProfileId, 'report', reportId] as const,
 
     childWeeklyReports: (
       mode: ModeSegment,
       childProfileId: string | undefined,
-    ) => ['dashboard', mode, 'child', childProfileId, 'weekly-reports'] as const,
+    ) =>
+      ['dashboard', mode, 'child', childProfileId, 'weekly-reports'] as const,
 
     childWeeklyReportDetail: (
       mode: ModeSegment,
@@ -234,8 +274,11 @@ export const queryKeys = {
   // sessions domain
   // ------------------------------------------------------------------
   sessions: {
-    detail: (mode: ModeSegment, sessionId: string, profileId: string | undefined) =>
-      ['session', mode, sessionId, profileId] as const,
+    detail: (
+      mode: ModeSegment,
+      sessionId: string,
+      profileId: string | undefined,
+    ) => ['session', mode, sessionId, profileId] as const,
 
     transcript: (
       mode: ModeSegment,
@@ -287,6 +330,23 @@ export const queryKeys = {
         queryKey[0] === 'session-summary' &&
         queryKey[2] === sessionId &&
         queryKey[3] === profileId,
+  },
+
+  // ------------------------------------------------------------------
+  // recaps domain
+  // ------------------------------------------------------------------
+  recaps: {
+    list: (
+      mode: ModeSegment,
+      profileId: string | undefined,
+      childProfileId: string | undefined,
+    ) => ['recaps', mode, profileId, childProfileId ?? null] as const,
+
+    detail: (
+      mode: ModeSegment,
+      profileId: string | undefined,
+      recapId: string | undefined,
+    ) => ['recaps', mode, profileId, 'detail', recapId] as const,
   },
 
   // ------------------------------------------------------------------

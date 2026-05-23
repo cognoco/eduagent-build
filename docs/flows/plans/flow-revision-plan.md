@@ -388,7 +388,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOMEWORK-01 | Start homework from home / More | ⚠️ | Pass w/ issues | | | 2026-05-14 hosted/WSL Playwright web: learner home smoke showed Homework action; J-01 UX crawl rendered `/homework/camera`. It did not complete an OCR homework session. |
+| HOMEWORK-01 | Start homework from learner home | ✅ | Pass | | ✅ 05-22 | Product clarification 2026-05-22: Homework was never intended to be surfaced from More. 2026-05-14 hosted/WSL Playwright web: learner home smoke showed Homework action; J-01 UX crawl rendered `/homework/camera`. It did not complete an OCR homework session. |
 | HOMEWORK-02 | Camera permission, capture, preview, OCR | ⚠️ | Pass w/ issues | | | 2026-05-14 WSL full Playwright web: J-01 UX crawl rendered `/homework/camera`; native camera permission/capture/OCR was not exercised on web. |
 | HOMEWORK-03 | Manual fallback when OCR is weak | ⚠️ | Pass w/ issues |  | Jest camera guard passed | 2026-05-14: targeted camera tests passed `shows manual fallback on first OCR failure` and `navigates to session with typed text on manual continue`. This is component-level coverage; live weak-OCR photo capture was not run on web. |
 | HOMEWORK-04 | Homework session multi-problem nav | ⚠️ | Pass w/ issues |  | Jest camera guard passed | 2026-05-14: targeted camera tests passed editable problem-card rendering and session navigation with serialized `homeworkProblems`. This covers multi-problem handoff at component level; a full session walkthrough with several queued homework problems still needs native/web E2E coverage. |

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { Sentry } from '../lib/sentry';
 
@@ -20,6 +21,7 @@ const SSO_TIMEOUT_MS = 10_000;
 export default function SSOCallbackScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { isSignedIn } = useAuth();
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
@@ -37,6 +39,9 @@ export default function SSOCallbackScreen() {
       });
       if (__DEV__)
         console.warn('[AUTH-DEBUG] maybeCompleteAuthSession threw:', err);
+      // [CR-2026-05-21-110] Show the escape UI immediately on error rather
+      // than making the user wait the full 10s timeout.
+      setShowFallback(true);
     };
     try {
       void Promise.resolve(WebBrowser.maybeCompleteAuthSession()).catch(
@@ -51,6 +56,13 @@ export default function SSOCallbackScreen() {
     const timer = setTimeout(() => setShowFallback(true), SSO_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  // [CR-2026-05-21-110] If Clerk auth state resolves to signed-in without
+  // the browser redirect completing (e.g. auth token already present),
+  // navigate home immediately rather than leaving the user on the spinner.
+  useEffect(() => {
+    if (isSignedIn) router.replace('/');
+  }, [isSignedIn, router]);
 
   return (
     <View className="flex-1 bg-background items-center justify-center">

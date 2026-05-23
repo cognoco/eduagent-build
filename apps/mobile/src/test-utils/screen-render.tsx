@@ -224,6 +224,7 @@ export function renderScreen(
   const profileContextValue: ProfileContextValue = {
     profiles,
     activeProfile,
+    isExplicitProxyMode: false,
     switchProfile: async () => ({ success: true }),
     isLoading: false,
     profileLoadError: null,
@@ -282,6 +283,7 @@ export function createScreenWrapper(
   const profileContextValue: ProfileContextValue = {
     profiles: opts.profiles,
     activeProfile: opts.activeProfile,
+    isExplicitProxyMode: false,
     switchProfile: async () => ({ success: true }),
     isLoading,
     profileLoadError: null,

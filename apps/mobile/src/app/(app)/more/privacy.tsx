@@ -9,19 +9,28 @@ import {
 } from '../../../components/more/settings-rows';
 import { useExportData } from '../../../hooks/use-account';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useLinkedChildren } from '../../../lib/profile';
 import {
   useUpdateWithdrawalArchivePreference,
   useWithdrawalArchivePreference,
 } from '../../../hooks/use-settings';
 import { formatApiError } from '../../../lib/format-api-error';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { platformAlert } from '../../../lib/platform-alert';
 
 export default function PrivacyScreen(): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
   const role = useActiveProfileRole();
+  const navigationContract = useNavigationContract();
   const linkedChildren = useLinkedChildren();
+  const showOwnerPrivacyGates = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showExportDelete
+    : role === 'owner';
+  const showWithdrawalArchive = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showRemoveFamilyMember
+    : role === 'owner';
   const exportData = useExportData();
   const { data: withdrawalArchivePreference, isLoading: archivePrefLoading } =
     useWithdrawalArchivePreference();
@@ -93,7 +102,7 @@ export default function PrivacyScreen(): React.ReactElement {
         testID="more-privacy-scroll"
       >
         <SectionHeader>{t('more.privacy.privacyAndData')}</SectionHeader>
-        {role === 'owner' && linkedChildren.length > 0 ? (
+        {showWithdrawalArchive && linkedChildren.length > 0 ? (
           <>
             <Text className="text-body font-semibold text-text-primary mb-2">
               {t('more.privacy.withdrawalArchiveTitle')}
@@ -132,7 +141,7 @@ export default function PrivacyScreen(): React.ReactElement {
           label={t('more.other.termsOfService')}
           onPress={() => router.push('/terms')}
         />
-        {role === 'owner' ? (
+        {showOwnerPrivacyGates ? (
           <SettingsRow
             label={t('more.other.exportMyData')}
             onPress={exportData.isPending ? undefined : handleExport}
@@ -144,7 +153,7 @@ export default function PrivacyScreen(): React.ReactElement {
             testID="more-row-export"
           />
         ) : null}
-        {role === 'owner' ? (
+        {showOwnerPrivacyGates ? (
           <SettingsRow
             label={t('more.other.deleteAccount')}
             onPress={() => router.push('/delete-account')}

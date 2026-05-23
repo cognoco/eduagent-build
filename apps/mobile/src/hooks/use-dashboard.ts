@@ -16,7 +16,9 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { useAppContext } from '../lib/app-context';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { queryKeys } from '../lib/query-keys';
+import { useNavigationDataScopeContract } from './use-navigation-contract';
 
 // Mirror of api/services/dashboard.ts:ChildSession used by the
 // `/dashboard/children/:profileId/sessions/:sessionId` route response. Hono's
@@ -50,6 +52,25 @@ interface ChildSessionDetail {
     | 'scattered'
     | null;
 }
+
+function useDashboardNavigationScope(): {
+  activeProfile: ReturnType<typeof useProfile>['activeProfile'];
+  mode: ReturnType<typeof useAppContext>['mode'];
+  canAccessFamilyChildData: boolean;
+} {
+  const { activeProfile } = useProfile();
+  const { mode: legacyMode } = useAppContext();
+  const navigationContract = useNavigationDataScopeContract();
+  const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.effectiveAppContext
+    : legacyMode;
+  const canAccessFamilyChildData = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showFamilyChildActivity
+    : legacyMode !== 'study' && activeProfile?.isOwner === true;
+
+  return { activeProfile, mode, canAccessFamilyChildData };
+}
+
 export function useDashboard(): UseQueryResult<DashboardData> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -126,8 +147,8 @@ export function useChildDetail(
   childProfileId: string | undefined,
 ): UseQueryResult<DashboardChild | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useDashboardNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childDetail(mode, childProfileId),
@@ -146,11 +167,7 @@ export function useChildDetail(
         cleanup();
       }
     },
-    enabled:
-      mode !== 'study' &&
-      !!activeProfile &&
-      activeProfile.isOwner === true &&
-      !!childProfileId,
+    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
   });
 }
 
@@ -159,8 +176,8 @@ export function useChildSubjectTopics(
   subjectId: string | undefined,
 ): UseQueryResult<TopicProgress[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useDashboardNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childSubject(mode, childProfileId, subjectId),
@@ -183,9 +200,8 @@ export function useChildSubjectTopics(
       }
     },
     enabled:
-      mode !== 'study' &&
       !!activeProfile &&
-      activeProfile.isOwner === true &&
+      canAccessFamilyChildData &&
       !!childProfileId &&
       !!subjectId,
   });
@@ -193,8 +209,8 @@ export function useChildSubjectTopics(
 
 export function useChildSessions(childProfileId: string | undefined) {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useDashboardNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childSessions(mode, childProfileId),
@@ -213,11 +229,7 @@ export function useChildSessions(childProfileId: string | undefined) {
         cleanup();
       }
     },
-    enabled:
-      mode !== 'study' &&
-      !!activeProfile &&
-      activeProfile.isOwner === true &&
-      !!childProfileId,
+    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
   });
 }
 
@@ -226,8 +238,8 @@ export function useChildSessionDetail(
   sessionId: string | undefined,
 ) {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useDashboardNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childSessionDetail(
@@ -260,9 +272,8 @@ export function useChildSessionDetail(
       }
     },
     enabled:
-      mode !== 'study' &&
       !!activeProfile &&
-      activeProfile.isOwner === true &&
+      canAccessFamilyChildData &&
       !!childProfileId &&
       !!sessionId,
   });
@@ -270,8 +281,8 @@ export function useChildSessionDetail(
 
 export function useChildMemory(childProfileId: string | undefined) {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, canAccessFamilyChildData } =
+    useDashboardNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.dashboard.childMemory(mode, childProfileId),
@@ -290,10 +301,6 @@ export function useChildMemory(childProfileId: string | undefined) {
         cleanup();
       }
     },
-    enabled:
-      mode !== 'study' &&
-      !!activeProfile &&
-      activeProfile.isOwner === true &&
-      !!childProfileId,
+    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
   });
 }

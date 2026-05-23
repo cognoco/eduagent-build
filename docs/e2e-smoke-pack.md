@@ -2,7 +2,7 @@
 
 **Phase 7 of the test-coverage-hardening plan.**
 
-The smoke pack is a small set of release-critical flows that must pass before any release or store submission. The full Maestro library (180 flows) covers regression, nightly, and weekly scenarios. The smoke pack focuses only on the paths most likely to break at release time.
+The smoke pack is a small set of release-critical flows that must pass before any release or store submission. The full Maestro library (187 flows) covers regression, nightly, and weekly scenarios. The smoke pack focuses only on the paths most likely to break at release time.
 
 ---
 
@@ -84,7 +84,7 @@ Flow 9 uses `NETWORK_DELAY_MS=12000` to inject a 12-second network delay via the
 
 ## How to Run the Broader Flow Library
 
-The full 180-flow library is organized in batches. To run the full regression suite:
+The full 187-flow library is organized in batches. To run the full regression suite:
 
 ```bash
 C:/Tools/doppler/doppler.exe run -c stg -- bash apps/mobile/e2e/scripts/run-all-regression.sh
@@ -96,13 +96,13 @@ CI runs flows tagged `smoke,pr-blocking` on every PR-triggered run, and `smoke,n
 
 ## Flow Inventory Summary
 
-Total flows: **180** (5 root-level + 30 setup helpers + 145 scenario flows)
+Total flows: **187** (5 root-level + 31 setup helpers + 151 scenario flows)
 
 | Area | Count |
 |---|---|
-| `_setup` (helpers, not standalone flows) | 30 |
+| `_setup` (helpers, not standalone flows) | 31 |
 | `auth` | 20 |
-| `parent` | 22 |
+| `parent` | 23 |
 | `learning` | 18 |
 | `account` | 14 |
 | `billing` | 10 |
@@ -110,13 +110,14 @@ Total flows: **180** (5 root-level + 30 setup helpers + 145 scenario flows)
 | `retention` | 8 |
 | `consent` | 8 |
 | `regression` | 7 |
-| `onboarding` | 7 |
+| `onboarding` | 12 |
 | `homework` | 4 |
 | `progress` | 4 |
 | `practice` | 3 |
 | `edge` | 3 |
 | `dictation` | 3 |
 | `subjects` | 2 |
+| `assessment` | 1 |
 | `home` | 1 |
 | `library` | 1 |
 | `session` | 1 (DRAFT — blocked on missing testID) |

@@ -160,8 +160,10 @@ export default function QuizHistoryScreen() {
         style={{ paddingTop: insets.top + 16 }}
       >
         <Pressable
+          // [QUIZ-09] Honor the same backHref that loading/empty/error states use.
+          // Hardcoding '/(app)/quiz' was ignoring returnTo=practice from Practice.
           testID="quiz-history-back"
-          onPress={() => goBackOrReplace(router, '/(app)/quiz')}
+          onPress={() => goBackOrReplace(router, backHref as Href)}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('quiz.history.goBack')}

@@ -31,7 +31,11 @@ export const topicRelevanceSchema = z.enum([
 ]);
 export type TopicRelevance = z.infer<typeof topicRelevanceSchema>;
 
-export const curriculumTopicSourceSchema = z.enum(['generated', 'user']);
+export const curriculumTopicSourceSchema = z.enum([
+  'generated',
+  'user',
+  'parent_bridge',
+]);
 export type CurriculumTopicSource = z.infer<typeof curriculumTopicSourceSchema>;
 
 // Subject schemas
@@ -130,6 +134,8 @@ export const curriculumTopicSchema = z.object({
   cefrSublevel: z.string().nullable().optional(),
   targetWordCount: z.number().int().nullable().optional(),
   targetChunkCount: z.number().int().nullable().optional(),
+  sourceChildProfileId: z.string().uuid().nullable().optional(),
+  createdAt: isoDateField.optional(),
 });
 export type CurriculumTopic = z.infer<typeof curriculumTopicSchema>;
 
@@ -461,6 +467,87 @@ export type CurriculumTopicAddResponse = z.infer<
   typeof curriculumTopicAddResponseSchema
 >;
 
+export const sourceAgeBracketSchema = z.enum([
+  'eleven_twelve',
+  'thirteen_fifteen',
+  'sixteen_plus',
+]);
+export type SourceAgeBracket = z.infer<typeof sourceAgeBracketSchema>;
+
+export const childTopicSnapshotSchema = z.object({
+  childProfileId: z.string().uuid(),
+  childDisplayName: z.string(),
+  subjectName: z.string(),
+  subjectLanguage: languageCodeSchema.nullable(),
+  bookTitle: z.string(),
+  bookAuthor: z.string().nullable(),
+  topicTitle: z.string(),
+  topicDescription: z.string(),
+  topicDescriptionHash: z.string(),
+  estimatedMinutes: z.number().int().min(5).max(240),
+  sourceAgeBracket: sourceAgeBracketSchema,
+});
+export type ChildTopicSnapshot = z.infer<typeof childTopicSnapshotSchema>;
+
+export const childTopicSnapshotResponseSchema = z.object({
+  snapshot: childTopicSnapshotSchema,
+});
+export type ChildTopicSnapshotResponse = z.infer<
+  typeof childTopicSnapshotResponseSchema
+>;
+
+export const cloneFromChildRequestSchema = z.object({
+  childProfileId: z.string().uuid(),
+  topicId: z.string().uuid(),
+  forceCopy: z.boolean().optional(),
+  requestId: z.string().uuid(),
+});
+export type CloneFromChildRequest = z.infer<typeof cloneFromChildRequestSchema>;
+
+export const cloneTopicStateSchema = z.enum([
+  'unstarted',
+  'in_progress',
+  'completed',
+]);
+export type CloneTopicState = z.infer<typeof cloneTopicStateSchema>;
+
+export const cloneCreatedIdsSchema = z.object({
+  topicId: z.string().uuid().optional(),
+  bookId: z.string().uuid().optional(),
+  subjectId: z.string().uuid().optional(),
+});
+export type CloneCreatedIds = z.infer<typeof cloneCreatedIdsSchema>;
+
+export const cloneFromChildResponseSchema = z.object({
+  topicId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  alreadyExisted: z.boolean(),
+  descriptionDivergent: z.boolean(),
+  descriptionRefreshed: z.boolean(),
+  topicState: cloneTopicStateSchema,
+  createdIds: cloneCreatedIdsSchema,
+});
+export type CloneFromChildResponse = z.infer<
+  typeof cloneFromChildResponseSchema
+>;
+
+export const undoCloneFromChildRequestSchema = z.object({
+  createdIds: cloneCreatedIdsSchema,
+});
+export type UndoCloneFromChildRequest = z.infer<
+  typeof undoCloneFromChildRequestSchema
+>;
+
+export const undoCloneFromChildResponseSchema = z.object({
+  deleted: z.object({
+    topic: z.boolean(),
+  }),
+  reason: z.literal('session_started').optional(),
+});
+export type UndoCloneFromChildResponse = z.infer<
+  typeof undoCloneFromChildResponseSchema
+>;
+
 // Curriculum interaction schemas
 
 export const topicSkipSchema = z.object({
@@ -536,6 +623,29 @@ export const subjectClassifyResultSchema = z.object({
   suggestedSubjectName: z.string().nullable().optional(),
 });
 export type SubjectClassifyResult = z.infer<typeof subjectClassifyResultSchema>;
+
+// LLM response shape for the multi-subject classification path.
+// Parsed via safeParse; failures fall back to inferSuggestedSubjectName().
+const subjectClassifyLlmMatchSchema = z.object({
+  subjectName: z.string(),
+  confidence: z.number().optional(),
+});
+
+export const subjectClassifyLlmResponseSchema = z.object({
+  matches: z.array(subjectClassifyLlmMatchSchema).optional().default([]),
+  suggestedSubjectName: z.string().nullable().optional(),
+});
+export type SubjectClassifyLlmResponse = z.infer<
+  typeof subjectClassifyLlmResponseSchema
+>;
+
+// LLM response shape for the zero-subject suggestion path.
+export const subjectSuggestLlmResponseSchema = z.object({
+  suggestedSubjectName: z.string(),
+});
+export type SubjectSuggestLlmResponse = z.infer<
+  typeof subjectSuggestLlmResponseSchema
+>;
 
 // --- Route response schemas ---
 

@@ -610,6 +610,41 @@
       "when": 1779494404000,
       "tag": "0086_bug393_fk_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1779494405000,
+      "tag": "0087_bug405_language_check_idempotent",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1779494406000,
+      "tag": "0088_bug363_dedup_pairkey_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1779494407000,
+      "tag": "0089_ancient_naoko",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1779537085283,
+      "tag": "0090_curved_sharon_ventura",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1779537085284,
+      "tag": "0091_parent_bridge_topic_source",
+      "breakpoints": true
     }
   ]
 }

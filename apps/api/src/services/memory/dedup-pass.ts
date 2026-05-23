@@ -45,9 +45,11 @@ export interface DedupPassArgs {
   cap: number;
 }
 
-export function dedupPairKey(a: string, b: string): string {
+// BUG-363: `category` is included in the key so that cross-category pairs with
+// identical textNormalized values cannot shadow each other's memoised decisions.
+export function dedupPairKey(category: string, a: string, b: string): string {
   const [low, high] = a < b ? [a, b] : [b, a];
-  return JSON.stringify([low, high]);
+  return JSON.stringify([category, low, high]);
 }
 
 function emptyReport(): DedupPassReport {
@@ -86,7 +88,7 @@ export interface DedupPassResult {
 }
 
 export async function runDedupForProfile(
-  args: DedupPassArgs
+  args: DedupPassArgs,
 ): Promise<DedupPassResult> {
   const report = emptyReport();
   const events: DedupEventTuple[] = [];
@@ -97,8 +99,8 @@ export async function runDedupForProfile(
     args.candidateIds && args.candidateIds.length > 0
       ? await Promise.all(
           args.candidateIds.map((id) =>
-            args.scoped.memoryFacts.findFirstActive(eq(memoryFacts.id, id))
-          )
+            args.scoped.memoryFacts.findFirstActive(eq(memoryFacts.id, id)),
+          ),
         )
       : await args.scoped.memoryFacts.findActiveCandidatesWithEmbedding();
 
@@ -132,8 +134,8 @@ export async function runDedupForProfile(
       2,
       and(
         eq(memoryFacts.category, candidate.category),
-        sql`${memoryFacts.id} <> ${candidate.id}`
-      )
+        sql`${memoryFacts.id} <> ${candidate.id}`,
+      ),
     );
     const best = neighbours.find((row) => row.distance <= args.threshold);
     if (!best) {
@@ -141,15 +143,20 @@ export async function runDedupForProfile(
       continue;
     }
 
-    const pairKey = dedupPairKey(candidate.textNormalized, best.textNormalized);
+    const pairKey = dedupPairKey(
+      candidate.category,
+      candidate.textNormalized,
+      best.textNormalized,
+    );
     const memo = await args.db
       .select()
       .from(memoryDedupDecisions)
       .where(
         and(
           eq(memoryDedupDecisions.profileId, args.profileId),
-          eq(memoryDedupDecisions.pairKey, pairKey)
-        )
+          eq(memoryDedupDecisions.pairKey, pairKey),
+          eq(memoryDedupDecisions.category, candidate.category),
+        ),
       )
       .limit(1);
 
@@ -176,7 +183,7 @@ export async function runDedupForProfile(
           candidate: { text: candidate.text, category: candidate.category },
           neighbour: { text: best.text, category: best.category },
         },
-        args.llmDeps
+        args.llmDeps,
       );
       if (!llmResult.ok) {
         report.failures += 1;
@@ -197,6 +204,7 @@ export async function runDedupForProfile(
         .values({
           profileId: args.profileId,
           pairKey,
+          category: candidate.category,
           decision: decision.action,
           mergedText: decision.action === 'merge' ? decision.merged_text : null,
           modelVersion,
@@ -211,8 +219,8 @@ export async function runDedupForProfile(
         .where(
           and(
             eq(memoryFacts.id, candidate.id),
-            eq(memoryFacts.profileId, args.profileId)
-          )
+            eq(memoryFacts.profileId, args.profileId),
+          ),
         )
         .limit(1);
       const [freshNeighbour] = await tx
@@ -221,8 +229,8 @@ export async function runDedupForProfile(
         .where(
           and(
             eq(memoryFacts.id, best.id),
-            eq(memoryFacts.profileId, args.profileId)
-          )
+            eq(memoryFacts.profileId, args.profileId),
+          ),
         )
         .limit(1);
       if (

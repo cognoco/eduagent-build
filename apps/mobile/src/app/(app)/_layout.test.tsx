@@ -172,9 +172,12 @@ const AppLayout = require('./_layout').default;
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
+  resolveContractHomeTabPresentation,
   resolveHomeTabPresentation,
+  resolveShellVisibleTabs,
   resolveTabShape,
 } = require('./_layout');
+const { resolveNavigationContract } = require('../../lib/navigation-contract');
 
 describe('mode tab helpers', () => {
   it('returns Study tabs for study mode', () => {
@@ -192,6 +195,63 @@ describe('mode tab helpers', () => {
       'more',
       'progress',
     ]);
+  });
+
+  it('returns V1 Family tabs from the navigation contract', () => {
+    const parent = {
+      id: '00000000-0000-7000-a000-000000000101',
+      accountId: '00000000-0000-7000-a000-000000000001',
+      avatarUrl: null,
+      birthYear: 1985,
+      consentStatus: null,
+      conversationLanguage: 'en',
+      createdAt: '2026-05-21T00:00:00.000Z',
+      defaultAppContext: 'family',
+      displayName: 'Parent',
+      hasFamilyLinks: true,
+      hasPremiumLlm: false,
+      isOwner: true,
+      linkCreatedAt: null,
+      location: null,
+      pronouns: null,
+      updatedAt: '2026-05-21T00:00:00.000Z',
+    };
+    const child = {
+      ...parent,
+      id: '00000000-0000-7000-a000-000000000201',
+      birthYear: 2014,
+      defaultAppContext: null,
+      displayName: 'Child',
+      hasFamilyLinks: false,
+      isOwner: false,
+    };
+    const contract = resolveNavigationContract({
+      activeProfile: parent,
+      profiles: [parent, child],
+      isParentProxy: false,
+      appContext: 'family',
+      role: 'owner',
+      subscription: { status: 'ready', tier: 'family' },
+      flags: { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
+    });
+
+    expect(
+      [
+        ...resolveShellVisibleTabs({
+          familyCapable: true,
+          isParentProxy: false,
+          mode: 'family',
+          navigationContract: contract,
+          tabShape: 'guardian',
+          useContract: true,
+        }),
+      ].sort(),
+    ).toEqual(['home', 'more', 'progress', 'recaps']);
+    expect(resolveContractHomeTabPresentation(contract.home)).toEqual({
+      titleKey: 'tabs.children',
+      accessibilityLabelKey: 'tabs.childrenLabel',
+      iconName: 'Users',
+    });
   });
 
   it('keeps proxy home presentation independent of mode', () => {
@@ -259,6 +319,7 @@ describe('AppLayout', () => {
       profileWasRemoved: false,
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile: jest.fn(),
+      isExplicitProxyMode: false,
     });
 
     // Default fetch routes for API hooks
@@ -313,6 +374,24 @@ describe('AppLayout', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
+    );
+    mockFetch.setRoute(
+      '/subscription/status',
+      () =>
+        new Response(
+          JSON.stringify({
+            status: {
+              tier: 'family',
+              status: 'active',
+              monthlyLimit: 700,
+              usedThisMonth: 0,
+            },
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
     );
   });
 
@@ -720,6 +799,7 @@ describe('AppLayout', () => {
       profileWasRemoved: false,
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile,
+      isExplicitProxyMode: true,
     });
 
     renderLayout();
@@ -1080,6 +1160,28 @@ describe('AppLayout no-profile gate — preview branch', () => {
 describe('computeVisibleTabs', () => {
   it('returns all 5 tabs for guardian shape', () => {
     const tabs = computeVisibleTabs('guardian');
+    expect(tabs).toEqual(
+      new Set(['home', 'own-learning', 'library', 'progress', 'more']),
+    );
+  });
+
+  // When both MODE_NAV_V0_ENABLED and MODE_NAV_V1_ENABLED are off, the shell
+  // must still show 5 tabs for a guardian profile (resolveShellVisibleTabs
+  // falls through to the V0 helper path with useContract=false). This is the
+  // critical production invariant — neither flag mutation should collapse
+  // guardian's own-learning tab.
+  it('resolveShellVisibleTabs preserves 5-tab guardian shell when both mode-navigation flags are off', () => {
+    // useContract=false (V1 off) + familyCapable=false (V0 off) → falls through
+    // to computeVisibleTabs(tabShape, isParentProxy)
+    const tabs = resolveShellVisibleTabs({
+      familyCapable: false,
+      isParentProxy: false,
+      mode: null,
+      // navigationContract is unused when useContract=false; stub the required field
+      navigationContract: { visibleTabs: new Set() as ReadonlySet<never> },
+      tabShape: 'guardian',
+      useContract: false,
+    });
     expect(tabs).toEqual(
       new Set(['home', 'own-learning', 'library', 'progress', 'more']),
     );
@@ -2027,6 +2129,208 @@ describe('SaveWizard — Step 3 (Confirm + Landing)', () => {
       expect.objectContaining({ pathname: '/(app)/session' }),
     );
     expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SaveWizard — Back / Cancel navigation
+// Spec: back arrow on Steps 2+; cancel ✕ on all steps; cancel calls
+// clearPreviewState → onComplete → router.replace('/(app)/home').
+// ---------------------------------------------------------------------------
+
+describe('SaveWizard — Back and Cancel navigation', () => {
+  let testQueryClient: QueryClient;
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/profiles',
+      () =>
+        new Response(
+          JSON.stringify({
+            profile: {
+              id: 'p1',
+              displayName: 'Solo',
+              birthYear: 2000,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+  }
+
+  function renderWizardLayout() {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    mockReplace.mockReset();
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  // 1. Back arrow absent on Step 1; present on Step 2 and Step 3.
+  it('back arrow is absent on Step 1 and present on Steps 2 and 3', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'maths',
+      createdAt: new Date().toISOString(),
+    });
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+
+    // Step 1: no back button
+    expect(screen.queryByTestId('save-wizard-back')).toBeNull();
+    // Cancel is present on Step 1
+    expect(screen.getByTestId('save-wizard-cancel')).toBeTruthy();
+
+    // Advance to Step 2
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    await screen.findByTestId('save-wizard-step-2');
+
+    // Step 2: back button present
+    expect(screen.getByTestId('save-wizard-back')).toBeTruthy();
+    expect(screen.getByTestId('save-wizard-cancel')).toBeTruthy();
+
+    // Advance to Step 3 by filling and submitting Step 2
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-display-name'),
+      'Solo',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2000');
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+    await screen.findByTestId('save-wizard-step-3');
+
+    // Step 3: back button present
+    expect(screen.getByTestId('save-wizard-back')).toBeTruthy();
+    expect(screen.getByTestId('save-wizard-cancel')).toBeTruthy();
+  });
+
+  // 2. Tapping back on Step 2 returns to Step 1 with target preserved.
+  it('tapping back on Step 2 returns to Step 1 with previously-selected target preserved', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+
+    // The "child" intent pre-selects save-target-child
+    expect(
+      screen.getByTestId('save-target-child').props.accessibilityState
+        ?.selected,
+    ).toBe(true);
+
+    // Advance to Step 2
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+    await screen.findByTestId('save-wizard-step-2');
+
+    // Go back
+    fireEvent.press(screen.getByTestId('save-wizard-back'));
+    await screen.findByTestId('save-wizard-step-1');
+
+    // Target selection is preserved
+    expect(
+      screen.getByTestId('save-target-child').props.accessibilityState
+        ?.selected,
+    ).toBe(true);
+  });
+
+  // 3. Tapping cancel on any step: clearPreviewState, onComplete, router.replace.
+  it('tapping cancel calls clearPreviewState, exits the wizard, and navigates home', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'biology',
+      createdAt: new Date().toISOString(),
+    });
+
+    const previewModule = require('../../lib/preview-onboarding-state');
+    const clearSpy = jest.spyOn(previewModule, 'clearPreviewState');
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+
+    fireEvent.press(screen.getByTestId('save-wizard-cancel'));
+
+    // clearPreviewState called before router.replace
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
   });
 });
 

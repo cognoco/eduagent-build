@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** Family-only  
 > **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, `apps/mobile/src/components/guards/RequireFamilyContext.tsx`, `apps/mobile/src/hooks/use-dashboard.ts`, `apps/mobile/src/hooks/use-progress.ts`, `apps/mobile/e2e/flows/parent/child-drill-down.yaml`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, `apps/mobile/src/components/guards/RequireFamilyContext.tsx`, `apps/mobile/src/hooks/use-dashboard.ts`, `apps/mobile/src/hooks/use-progress.ts`, `apps/mobile/e2e/flows/parent/child-drill-down.yaml`
 
 ## Purpose
 

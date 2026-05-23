@@ -8,6 +8,7 @@ import {
   childInventoryResponseSchema,
   childProgressHistoryResponseSchema,
   childSubjectTopicsResponseSchema,
+  childTopicSnapshotResponseSchema,
   childSessionsResponseSchema,
   childSessionDetailResponseSchema,
   childMemoryResponseSchema,
@@ -43,13 +44,14 @@ import {
   markWeeklyReportViewed,
 } from '../services/weekly-report';
 import { assertOwnerAndParentAccess } from '../services/family-access';
-import { notFound } from '../errors';
+import { ForbiddenError, notFound } from '../errors';
 import { isMemoryFactsReadEnabled } from '../config';
 import {
   getMemoryProjection,
   toCuratedView,
 } from '../services/memory/projection';
 import { getProgressSummary } from '../services/progress-summary';
+import { getChildTopicSnapshotForParent } from '../services/family-bridge';
 
 type DashboardRouteEnv = {
   Bindings: {
@@ -182,6 +184,34 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       subjectId,
     );
     return c.json(childSubjectTopicsResponseSchema.parse({ topics }));
+  })
+
+  .get('/dashboard/children/:profileId/topics/:topicId/snapshot', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+    const topicId = c.req.param('topicId');
+
+    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
+    // Convergence with sibling dashboard children routes — the service layer
+    // also calls assertParentAccess as defense-in-depth.
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+
+    try {
+      const snapshot = await getChildTopicSnapshotForParent(
+        db,
+        parentProfileId,
+        childProfileId,
+        topicId,
+      );
+      if (!snapshot) return notFound(c, 'Topic not found');
+      return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
+    } catch (error) {
+      if (error instanceof ForbiddenError) {
+        return notFound(c, 'Topic not found');
+      }
+      throw error;
+    }
   })
 
   // List child's sessions

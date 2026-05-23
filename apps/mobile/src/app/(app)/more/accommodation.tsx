@@ -7,11 +7,13 @@ import { useTranslation } from 'react-i18next';
 import type { AccommodationMode } from '@eduagent/schemas';
 
 import { useProfile } from '../../../lib/profile';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useChildLearnerProfile,
   useLearnerProfile,
   useUpdateAccommodationMode,
 } from '../../../hooks/use-learner-profile';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   ACCOMMODATION_GUIDE,
   ACCOMMODATION_OPTIONS,
@@ -30,6 +32,7 @@ export default function AccommodationScreen(): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { activeProfile, profiles } = useProfile();
+  const navigationContract = useNavigationContract();
   const [showGuide, setShowGuide] = useState(false);
 
   const { childProfileId } = useLocalSearchParams<{
@@ -42,7 +45,9 @@ export default function AccommodationScreen(): React.ReactElement {
     : undefined;
   const canEditChildPreferences =
     isChildMode &&
-    activeProfile?.isOwner === true &&
+    (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+      ? navigationContract.gates.showAccommodationChildEditor
+      : activeProfile?.isOwner === true) &&
     childProfile?.isOwner === false;
   const childName = childProfile?.displayName;
 
@@ -156,6 +161,16 @@ export default function AccommodationScreen(): React.ReactElement {
               >
                 <Text className="text-caption font-semibold text-primary">
                   {t('common.retry')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleBack}
+                className="self-start mt-2"
+                accessibilityRole="button"
+                testID="accommodation-mode-error-back"
+              >
+                <Text className="text-caption text-text-secondary">
+                  {t('common.goBack')}
                 </Text>
               </Pressable>
             </View>

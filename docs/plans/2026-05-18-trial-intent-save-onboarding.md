@@ -1,5 +1,7 @@
 # Trial Intent Save Onboarding Implementation Plan
 
+> **Status (2026-05-23):** Slice A (front door + save wizard) substantially implemented but with architecture divergence: save wizard lives as inline `SaveWizardGate` in `apps/mobile/src/app/(app)/_layout.tsx` (not as separate `(app)/preview/save.tsx` routes). State module is `apps/mobile/src/lib/preview-onboarding-state.ts` with API `getPreviewState`/`setPreviewState`/`clearPreviewState` (not `savePreviewOnboardingState`/`peek...`). Preview routes shipped at `apps/mobile/src/app/preview/`: `index.tsx`, `intent.tsx`, `topic.tsx`, `value-prop.tsx` (lesson/parent/both/not-sure variants NOT created). Slice C (server-backed preview lesson API) NOT started — `packages/schemas/src/preview-onboarding.ts` and `apps/api/src/routes/preview-onboarding*.ts` do not exist.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **Commit policy reminder (CLAUDE.md):** Subagents NEVER commit, with one explicit exception — the `/commit` skill is the authorized commit path. Every `Commit via /commit` step below is OK to invoke inside a subagent because `/commit` runs as an authorized `context: fork` subagent. Do not use bare `git add/commit/push`.

@@ -9,6 +9,7 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { profiles } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -33,6 +34,7 @@ export const topicRelevanceEnum = pgEnum('topic_relevance', [
 export const curriculumTopicSourceEnum = pgEnum('curriculum_topic_source', [
   'generated',
   'user',
+  'parent_bridge',
 ]);
 
 export const filedFromEnum = pgEnum('filed_from', [
@@ -177,6 +179,10 @@ export const curriculumTopics = pgTable(
     cefrSublevel: text('cefr_sublevel'),
     targetWordCount: integer('target_word_count'),
     targetChunkCount: integer('target_chunk_count'),
+    sourceChildProfileId: uuid('source_child_profile_id').references(
+      () => profiles.id,
+      { onDelete: 'set null' },
+    ),
     filedFrom: filedFromEnum('filed_from').notNull().default('pre_generated'),
     sessionId: uuid('session_id'),
     // FK to learning_sessions(id) is defined in migration SQL only.
@@ -196,6 +202,9 @@ export const curriculumTopics = pgTable(
       table.sortOrder,
     ),
     index('curriculum_topics_book_id_idx').on(table.bookId),
+    index('idx_curriculum_topics_source_child')
+      .on(table.sourceChildProfileId)
+      .where(sql`${table.sourceChildProfileId} IS NOT NULL`),
     // [CR-FIL-DEDUP-INDEX-12] Concurrent-write dedup. Defined in migration
     // 0043_topic_dedup_unique_index.sql as
     //   CREATE UNIQUE INDEX curriculum_topics_book_title_lower_uq
@@ -274,7 +283,7 @@ export const topicConnections = pgTable(
 //                                      CHECK (...) — requires fn or trigger.
 //   4. ALTER TABLE topic_connections ENABLE ROW LEVEL SECURITY;
 //   5. CREATE POLICY topic_connections_profile_isolation ON topic_connections
-//        USING (profile_id = NULLIF(current_setting('app.profile_id', true), '')::uuid);
+//        USING (profile_id = NULLIF(current_setting('app.current_profile_id', true), '')::uuid);
 
 export const curriculumAdaptations = pgTable(
   'curriculum_adaptations',

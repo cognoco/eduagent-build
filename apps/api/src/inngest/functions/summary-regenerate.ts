@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (sessionSummaries and learningSessions scoped by profileId)
 import { and, eq } from 'drizzle-orm';
 import {
   learningSessions,

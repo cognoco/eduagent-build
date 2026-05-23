@@ -45,16 +45,27 @@ jest.mock('@expo/vector-icons', () => {
 });
 
 const mockUseChildSessionDetail = jest.fn();
+const mockUseChildDetail = jest
+  .fn()
+  .mockReturnValue({ data: undefined, isLoading: false, isError: false });
 
 jest.mock('../../../../../hooks/use-dashboard', () => ({
   ...jest.requireActual('../../../../../hooks/use-dashboard'),
   useChildSessionDetail: (...args: unknown[]) =>
     mockUseChildSessionDetail(...args),
+  useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
 }));
 
 jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn().mockResolvedValue(undefined),
 }));
+
+jest.mock(
+  '../../../../../components/family/AddToMyLearningButton' /* gc1-allow: screen-level test — component has external boundaries (AsyncStorage, API client) tested separately in AddToMyLearningButton.test.tsx */,
+  () => ({
+    AddToMyLearningButton: () => null,
+  }),
+);
 
 const SessionDetailScreen = require('./[sessionId]').default;
 

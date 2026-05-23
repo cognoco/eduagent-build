@@ -62,10 +62,33 @@ export interface SwitchProfileResult {
   persistenceFailed?: boolean;
 }
 
+export interface SwitchProfileOptions {
+  /**
+   * [ACCOUNT-04] Set to true ONLY from retained internal/test proxy paths.
+   * Normal parent review enters parent-native child routes instead.
+   *
+   * A plain profile switch (e.g. child switching to their own slot) MUST NOT
+   * pass proxyMode:true — that conflates "parent viewing as child" with
+   * "child IS the user", breaking learner UI for non-owner profiles.
+   *
+   * Defaults to false — proxy is always OFF unless the caller sets it.
+   */
+  proxyMode?: boolean;
+}
+
 export interface ProfileContextValue {
   profiles: Profile[];
   activeProfile: Profile | null;
-  switchProfile: (profileId: string) => Promise<SwitchProfileResult>;
+  /**
+   * Whether a parent is explicitly in proxy mode (viewing a child's account).
+   * Driven by an explicit opt-in via switchProfile({ proxyMode: true }) —
+   * NOT derived from profile shape. False for plain profile switches.
+   */
+  isExplicitProxyMode: boolean;
+  switchProfile: (
+    profileId: string,
+    options?: SwitchProfileOptions,
+  ) => Promise<SwitchProfileResult>;
   isLoading: boolean;
   /** Set when the account's profile list could not be loaded. */
   profileLoadError: unknown | null;
@@ -145,6 +168,7 @@ export const PROFILE_SCOPED_KEYS = [
 export const ProfileContext = createContext<ProfileContextValue>({
   profiles: [],
   activeProfile: null,
+  isExplicitProxyMode: false,
   switchProfile: async () => ({ success: true }),
   isLoading: true,
   profileLoadError: null,
@@ -182,18 +206,23 @@ export function ProfileProvider({
 }: {
   children: ReactNode;
 }): ReactNode {
-  const {
-    data: profiles = [],
-    isLoading: isProfilesLoading,
-    isFetching: isProfilesFetching,
-    error: profileLoadError,
-  } = useProfiles();
+  const profilesQuery = useProfiles();
+  const profiles = profilesQuery.data ?? [];
+  const isProfilesLoading = profilesQuery.isLoading;
+  const isProfilesFetching = profilesQuery.isFetching;
+  // A stale-while-refetch failure should not eject a signed-in user from the
+  // app when we still have a usable profile list in cache.
+  const profileLoadError = profiles.length === 0 ? profilesQuery.error : null;
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [isRestoringId, setIsRestoringId] = useState(true);
   const [profileWasRemoved, setProfileWasRemoved] = useState(false);
+  // [ACCOUNT-04] Explicit proxy flag — true only when retained internal/test
+  // paths request it. Plain profile switches never set this. Initialised to
+  // false; restored from SecureStore on cold start.
+  const [isExplicitProxyMode, setIsExplicitProxyMode] = useState(false);
 
   // On mount: restore saved profile ID from SecureStore
   useEffect(() => {
@@ -211,12 +240,15 @@ export function ProfileProvider({
     void restore();
   }, []);
 
-  // Seed the API client's proxy flag from the last app session. The
-  // useParentProxy hook corrects the flag once the active profile is known.
+  // [ACCOUNT-04] Seed the API client's proxy flag and the explicit React state
+  // from the last app session. The useParentProxy hook reads isExplicitProxyMode
+  // from context — no more shape-derived override on cold start.
   useEffect(() => {
     void SecureStore.getItemAsync(PARENT_PROXY_KEY)
       .then((value) => {
-        setProxyMode(value === 'true');
+        const restoredProxy = value === 'true';
+        setProxyMode(restoredProxy);
+        setIsExplicitProxyMode(restoredProxy);
       })
       .catch(() => {
         /* SecureStore unavailable */
@@ -267,7 +299,10 @@ export function ProfileProvider({
   }, [activeProfile?.id]);
 
   const switchProfile = useCallback(
-    async (profileId: string): Promise<SwitchProfileResult> => {
+    async (
+      profileId: string,
+      options?: SwitchProfileOptions,
+    ): Promise<SwitchProfileResult> => {
       try {
         const res = await client.profiles.switch.$post({
           json: { profileId },
@@ -298,13 +333,25 @@ export function ProfileProvider({
           },
         });
       }
-      const nextActiveProfile =
-        profiles.find((profile) => profile.id === profileId) ?? null;
-      const nextIsParentProxy = Boolean(
-        nextActiveProfile &&
-        !nextActiveProfile.isOwner &&
-        profiles.some((profile) => profile.isOwner),
-      );
+
+      // [ACCOUNT-04] Proxy mode is driven by explicit caller intent, NOT derived
+      // from profile shape. User-facing parent review now uses parent-native
+      // child routes; retained internal/test callers can still pass
+      // proxyMode:true. All plain profile switches (child switching to their
+      // own slot, switchBack from ProxyBanner, etc.) default to false.
+      const nextIsParentProxy = options?.proxyMode === true;
+
+      // Persist the explicit proxy flag alongside the active profile ID so the
+      // correct state survives a cold start.
+      if (nextIsParentProxy) {
+        SecureStore.setItemAsync(PARENT_PROXY_KEY, 'true').catch(
+          Sentry.captureException,
+        );
+      } else {
+        SecureStore.deleteItemAsync(PARENT_PROXY_KEY).catch(
+          Sentry.captureException,
+        );
+      }
 
       // Keep imperative request headers in step with the requested switch
       // before resetting/refetching profile-scoped queries. Waiting for the
@@ -317,6 +364,7 @@ export function ProfileProvider({
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.
       setActiveProfileId(profileId);
+      setIsExplicitProxyMode(nextIsParentProxy);
       // Reset profile-scoped queries to prevent stale data leaking between
       // child profiles. Uses an allow-list so new query keys must be explicitly
       // added here to be reset on switch. 'profiles' is excluded because it
@@ -333,7 +381,7 @@ export function ProfileProvider({
         ? { success: true, persistenceFailed: true }
         : { success: true };
     },
-    [client, profiles, queryClient],
+    [client, queryClient],
   );
 
   const acknowledgeProfileRemoval = useCallback(() => {
@@ -363,6 +411,7 @@ export function ProfileProvider({
     () => ({
       profiles,
       activeProfile,
+      isExplicitProxyMode,
       switchProfile,
       isLoading,
       profileLoadError,
@@ -372,6 +421,7 @@ export function ProfileProvider({
     [
       profiles,
       activeProfile,
+      isExplicitProxyMode,
       switchProfile,
       isLoading,
       profileLoadError,

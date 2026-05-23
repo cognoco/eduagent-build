@@ -7,12 +7,14 @@ import { useTranslation } from 'react-i18next';
 import type { CelebrationLevel } from '@eduagent/schemas';
 
 import { useProfile } from '../../../lib/profile';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useCelebrationLevel,
   useChildCelebrationLevel,
   useUpdateCelebrationLevel,
   useUpdateChildCelebrationLevel,
 } from '../../../hooks/use-settings';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
@@ -24,6 +26,7 @@ export default function CelebrationsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { activeProfile, profiles } = useProfile();
+  const navigationContract = useNavigationContract();
   const { childProfileId } = useLocalSearchParams<{
     childProfileId?: string;
   }>();
@@ -33,7 +36,9 @@ export default function CelebrationsScreen(): React.ReactElement {
     : undefined;
   const canEditChildPreferences =
     isChildMode &&
-    activeProfile?.isOwner === true &&
+    (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+      ? navigationContract.gates.showCelebrationsChildEditor
+      : activeProfile?.isOwner === true) &&
     childProfile?.isOwner === false;
 
   const selfCelebration = useCelebrationLevel();
@@ -43,6 +48,8 @@ export default function CelebrationsScreen(): React.ReactElement {
   const celebrationQuery = canEditChildPreferences
     ? childCelebration
     : selfCelebration;
+  const celebrationQueryError =
+    celebrationQuery.isError && !celebrationQuery.data;
   const celebrationLevel =
     celebrationQuery.data ?? (canEditChildPreferences ? 'big_only' : 'all');
   const updateSelfCelebration = useUpdateCelebrationLevel();
@@ -126,33 +133,63 @@ export default function CelebrationsScreen(): React.ReactElement {
         keyboardShouldPersistTaps="handled"
         testID="celebrations-scroll"
       >
-        <Text className="text-body-sm text-text-secondary mb-4">
-          {t('more.celebrations.screenDescription')}
-        </Text>
-        <LearningModeOption
-          title={t('more.celebrations.allTitle')}
-          description={t('more.celebrations.allDescription')}
-          selected={celebrationLevel === 'all'}
-          disabled={celebrationQuery.isLoading || celebrationPending}
-          onPress={() => handleSelectCelebrationLevel('all')}
-          testID="celebration-level-all"
-        />
-        <LearningModeOption
-          title={t('more.celebrations.bigOnlyTitle')}
-          description={t('more.celebrations.bigOnlyDescription')}
-          selected={celebrationLevel === 'big_only'}
-          disabled={celebrationQuery.isLoading || celebrationPending}
-          onPress={() => handleSelectCelebrationLevel('big_only')}
-          testID="celebration-level-big-only"
-        />
-        <LearningModeOption
-          title={t('more.celebrations.offTitle')}
-          description={t('more.celebrations.offDescription')}
-          selected={celebrationLevel === 'off'}
-          disabled={celebrationQuery.isLoading || celebrationPending}
-          onPress={() => handleSelectCelebrationLevel('off')}
-          testID="celebration-level-off"
-        />
+        {celebrationQueryError ? (
+          <View className="bg-surface rounded-card px-4 py-4 mb-2">
+            <Text className="text-body-sm text-text-secondary">
+              {t('session.mentorMemory.loadError')}
+            </Text>
+            <Pressable
+              onPress={() => void celebrationQuery.refetch()}
+              className="self-start mt-3"
+              accessibilityRole="button"
+              testID="celebrations-retry"
+            >
+              <Text className="text-caption font-semibold text-primary">
+                {t('common.retry')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleBack}
+              className="self-start mt-2"
+              accessibilityRole="button"
+              testID="celebrations-error-back"
+            >
+              <Text className="text-caption text-text-secondary">
+                {t('common.goBack')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <Text className="text-body-sm text-text-secondary mb-4">
+              {t('more.celebrations.screenDescription')}
+            </Text>
+            <LearningModeOption
+              title={t('more.celebrations.allTitle')}
+              description={t('more.celebrations.allDescription')}
+              selected={celebrationLevel === 'all'}
+              disabled={celebrationQuery.isLoading || celebrationPending}
+              onPress={() => handleSelectCelebrationLevel('all')}
+              testID="celebration-level-all"
+            />
+            <LearningModeOption
+              title={t('more.celebrations.bigOnlyTitle')}
+              description={t('more.celebrations.bigOnlyDescription')}
+              selected={celebrationLevel === 'big_only'}
+              disabled={celebrationQuery.isLoading || celebrationPending}
+              onPress={() => handleSelectCelebrationLevel('big_only')}
+              testID="celebration-level-big-only"
+            />
+            <LearningModeOption
+              title={t('more.celebrations.offTitle')}
+              description={t('more.celebrations.offDescription')}
+              selected={celebrationLevel === 'off'}
+              disabled={celebrationQuery.isLoading || celebrationPending}
+              onPress={() => handleSelectCelebrationLevel('off')}
+              testID="celebration-level-off"
+            />
+          </>
+        )}
       </ScrollView>
     </View>
   );

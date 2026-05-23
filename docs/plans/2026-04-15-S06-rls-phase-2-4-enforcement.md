@@ -1,5 +1,7 @@
 # S-06 RLS — Phase 2-4: Enforcement (Post-Launch Sprint 2+)
 
+> **Status (2026-05-23):** Phase 2 ✅ — RLS policies shipped via migration `0085_bug216_rls_policies_sweep.sql` (37 tables, expanded from original 26-table scope). Phase 3 ❌ NOT STARTED — `withProfileScope` is implemented in `packages/database/src/rls.ts` but with signature `(db, profileId, fn)` (no `accountId`); no `DATABASE_URL_APP` dual-connection. Phase 4 ❌ NOT STARTED — no audit/refactor of `db.query.*` calls in billing/Inngest performed.
+
 > **Parent finding:** `docs/_archive/plans/bug-fix-plan HR.md` → S-06
 > **Prerequisite:** `docs/_archive/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` must be complete and deployed
 > **Created:** 2026-04-15

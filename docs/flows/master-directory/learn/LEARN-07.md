@@ -2,7 +2,7 @@
 
 > **Status:** Draft  
 > **Access label:** Shared different scope  
-> **Last mapped:** 2026-05-22  
+> **Last mapped:** 2026-05-23  
 > **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/session-summary/[sessionId].tsx`, `apps/mobile/src/app/session-transcript/[sessionId].tsx`, `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx`, `apps/mobile/src/hooks/use-sessions.ts`, `apps/mobile/src/hooks/use-dashboard.ts`
 
 ## Purpose
@@ -37,7 +37,7 @@ The learning session belongs to exactly one learner profile. Study users see the
 | View full transcript | `/session-transcript/[sessionId]` | Yes | Compatibility only | LEARN-23 filters system-prompt rows and strips LLM envelope JSON; parent-proxy link is gated per inventory. |
 | Continue learning | `/(app)/session` with `nextTopicId` when available | Yes | Bridge only | `session-next-topic-card` should start the learner's next session, with reason fed to prompt context. Mentor "learn this too" should write to the adult's Study context, not the child. |
 | Mentor child recap | `/(app)/child/[profileId]/session/[sessionId]` | No | Yes | Uses `useChildSessionDetail`; parent sees narrative/highlight/prompt/engagement and optional homework summary. |
-| Future Family Recaps | `/(app)/recaps` / `/(app)/recaps/[recapId]` target | No | Planned | Navigation contract says Family should surface Recaps once implemented; current V0 Family shell lacks `recaps`. |
+| Family Recaps | `/(app)/recaps` with detail handoff to `/(app)/child/[profileId]/session/[sessionId]` | No | Yes in V1 | Minimal navigation-contract branch surface lists child session recap fields and opens parent-native child session detail for full context. |
 
 ## Data Ownership And Privacy
 
@@ -74,7 +74,7 @@ The learning session belongs to exactly one learner profile. Study users see the
 | Fixed bug reference | BUG-134 | Root-level summary/transcript routes need their own auth gate because `(app)` layout auth guard does not apply. |
 | Fixed bug reference | BUG-449 | Historical summary re-entry must render persisted summary rather than empty "Your Words". |
 | Fixed bug reference | BUG-801 | Numeric URL params preserve explicit zero values instead of falling back silently. |
-| Product drift | Navigation contract | Family target is parent-native Recaps, but current V0 Family shell has `home, progress, more` and no `recaps` route yet. |
+| Product drift | Navigation contract | V1 Family target is parent-native Recaps; V0 Family shell still has `home, progress, more` and no tab-level Recaps. |
 | Product drift | LEARN-07 inventory note | `topicOrder` ordered-list rendering and second-session-open home teaser are listed as missing from audit Section E/Slice 2. |
 | Access drift | Parent proxy compatibility | Current code still recognizes parent proxy, while target contract says normal parent review should not enter proxy. |
 | Tooling gap | Notion MCP unavailable | Prior Notion bug URLs for LEARN-07 could not be retrieved; only code/inventory bug IDs are recorded here. |

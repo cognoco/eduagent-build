@@ -15,6 +15,7 @@ import {
   type Column,
 } from 'drizzle-orm';
 import type { Database } from './client';
+import type { QuizActivityType } from '@eduagent/schemas';
 import { applyStreakDecay } from './streaks-rules';
 import { VECTOR_DIM } from './schema/_pgvector';
 import {
@@ -49,6 +50,7 @@ import {
   pendingNotices,
   vocabulary,
   vocabularyRetentionCards,
+  dictationModeEnum,
   dictationResults,
   quizRounds,
   quizMissedItems,
@@ -59,14 +61,10 @@ import {
 } from './schema/index';
 
 // [BUG-704 / P-8] Single source of truth for the runtime DB enum
-// (quizActivityTypeEnum at schema/quiz.ts:15-19 = ['capitals', 'vocabulary',
-// 'guess_who']). Each repository method below previously redeclared a narrower
-// `'capitals' | 'guess_who'` literal, silently excluding 'vocabulary' from
-// the type system even though the DB column accepts it. Vocabulary mastery
-// rows could be inserted via raw SQL but couldn't be queried/updated through
-// the repository — a TypeScript-level data lockout. Widened here so all six
-// signatures stay aligned with the DB enum.
-type QuizActivityType = 'capitals' | 'vocabulary' | 'guess_who';
+// (quizActivityTypeEnum at quiz.ts:4-8 = ['capitals', 'vocabulary', 'guess_who']).
+// [BUG-390] Imported from @eduagent/schemas — was previously a local redefinition.
+// QuizActivityType is defined once in packages/schemas/src/quiz.ts and re-exported
+// via the schemas barrel. The local redefinition has been removed.
 
 export function createScopedRepository(db: Database, profileId: string) {
   if (!profileId || profileId.trim() === '') {
@@ -789,7 +787,8 @@ export function createScopedRepository(db: Database, profileId: string) {
         date: string;
         sentenceCount: number;
         mistakeCount: number | null;
-        mode: 'homework' | 'surprise';
+        // [CR-162] Derive from schema enum so this type stays in sync automatically.
+        mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
       }) {
         // [BUG-4] Idempotent on (profile_id, date, mode): a retry of the

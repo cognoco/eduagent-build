@@ -34,7 +34,6 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     expect(calledWith).toEqual(
       expect.arrayContaining([
         'hasSignedInBefore',
-        'mentomate_pending_auth_redirect',
         'parent-proxy-active',
         'session-recovery-marker',
         'mentomate_active_profile_id',

@@ -33,6 +33,7 @@ export default function ChildDetailLayout() {
           name="subjects/[subjectId]"
           getId={({ params }) => params?.subjectId}
         />
+        <Stack.Screen name="curriculum" />
         <Stack.Screen
           name="topic/[topicId]"
           getId={({ params }) => params?.topicId}

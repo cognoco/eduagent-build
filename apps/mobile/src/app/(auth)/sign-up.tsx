@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
+import { Sentry } from '../../lib/sentry';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
@@ -186,12 +187,22 @@ export default function SignUpScreen() {
         // Existing account: SSO matched an account that needs further sign-in
         // steps (e.g. TOTP, phone verification). Redirect to sign-in where
         // handleIncompleteSignIn can guide the user through the right factor.
+        // [BUG-510] Emit a structured Sentry event so incomplete-signIn cases
+        // are visible in observability — silent redirect alone is banned per
+        // CLAUDE.md "Silent recovery without escalation is banned."
         if (ssoSignIn?.status) {
           if (__DEV__)
             console.warn(
               `[AUTH-DEBUG] sign-up SSO: matched existing account, redirecting to sign-in.` +
                 ` signIn.status=${ssoSignIn.status}`,
             );
+          Sentry.captureMessage(
+            'sign-up SSO: incomplete signIn — redirecting to sign-in',
+            {
+              level: 'info',
+              tags: { flow: 'sign-up-sso', signInStatus: ssoSignIn.status },
+            },
+          );
           router.replace({
             pathname: '/(auth)/sign-in',
             params: { ssoNeedsSignIn: '1' },

@@ -224,6 +224,7 @@ export function renderScreen(
     profiles,
     activeProfile,
     switchProfile: opts.switchProfile ?? (async () => ({ success: true })),
+    isExplicitProxyMode: false,
     isLoading: false,
     profileLoadError: null,
     profileWasRemoved: false,

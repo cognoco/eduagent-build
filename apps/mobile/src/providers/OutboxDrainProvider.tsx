@@ -181,7 +181,19 @@ export function OutboxDrainProvider({
   );
 
   const runDrain = React.useCallback(async () => {
-    if (!activeProfile?.id || runningRef.current) {
+    if (!activeProfile?.id) {
+      // Expected race: drain called while activeProfile is undefined (e.g.
+      // mid sign-out). Not an error — add a breadcrumb so the pattern is
+      // observable in production without PII.
+      Sentry.addBreadcrumb({
+        category: 'outbox',
+        level: 'info',
+        message: 'drain skipped — no activeProfile',
+        data: { isRunning: runningRef.current },
+      });
+      return;
+    }
+    if (runningRef.current) {
       return;
     }
 

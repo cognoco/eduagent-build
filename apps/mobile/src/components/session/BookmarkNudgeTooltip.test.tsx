@@ -69,8 +69,7 @@ describe('BookmarkNudgeTooltip', () => {
   });
 
   it('stays hidden when SecureStore already records a dismissal for the profile', async () => {
-    // sanitizeSecureStoreKey replaces ':' with '_', so the stored key uses underscore
-    expoSecureStoreMock.__store.set('bookmark-nudge-shown_p1', 'true');
+    expoSecureStoreMock.__store.set('bookmark-nudge-shown.p1', 'true');
 
     render(
       <BookmarkNudgeTooltip
@@ -101,8 +100,7 @@ describe('BookmarkNudgeTooltip', () => {
 
     expect(screen.queryByTestId('bookmark-nudge-tooltip')).toBeNull();
     await waitFor(() => {
-      // sanitizeSecureStoreKey replaces ':' with '_'
-      expect(expoSecureStoreMock.__store.get('bookmark-nudge-shown_p1')).toBe(
+      expect(expoSecureStoreMock.__store.get('bookmark-nudge-shown.p1')).toBe(
         'true',
       );
     });

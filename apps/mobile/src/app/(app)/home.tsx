@@ -12,15 +12,25 @@ import {
 import { useCelebrationLevel } from '../../hooks/use-settings';
 import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useAckNotice, useDashboard } from '../../hooks/use-dashboard';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useProfile } from '../../lib/profile';
 import { useAppContext } from '../../lib/app-context';
 import { useModeSwitch } from '../../lib/use-mode-switch';
 
 function ModeChip(): React.ReactElement | null {
-  const { familyCapable, mode } = useAppContext();
+  const navigationContract = useNavigationContract();
+  const { familyCapable, mode: legacyMode } = useAppContext();
   const { switchMode } = useModeSwitch();
+  const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.effectiveAppContext
+    : legacyMode;
 
-  if (!familyCapable || mode === null) return null;
+  const showModeSwitcher = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.chrome.modeSwitcher !== 'hidden'
+    : familyCapable && mode !== null;
+
+  if (!showModeSwitcher || mode === null) return null;
   const nextMode = mode === 'family' ? 'study' : 'family';
   const label = mode === 'family' ? 'Family' : 'My Learning';
   const action = mode === 'family' ? 'My Learning' : 'Family';
@@ -41,7 +51,11 @@ function ModeChip(): React.ReactElement | null {
         <Text className="text-body-sm font-semibold text-primary">
           {action}
         </Text>
-        <Ionicons name="swap-horizontal" size={16} className="text-primary ms-2" />
+        <Ionicons
+          name="swap-horizontal"
+          size={16}
+          className="text-primary ms-2"
+        />
       </Pressable>
     </View>
   );
@@ -51,14 +65,17 @@ export default function HomeScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { profiles, activeProfile, isLoading } = useProfile();
-  const { mode } = useAppContext();
+  const { mode: legacyMode } = useAppContext();
+  const navigationContract = useNavigationContract();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
   const { data: pendingCelebrations } = usePendingCelebrations();
   const markCelebrationsSeen = useMarkCelebrationsSeen();
   const { data: dashboard } = useDashboard();
   const ackNotice = useAckNotice();
-  const isOwner = activeProfile?.isOwner === true;
+  const isOwner = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.sessionIsOwner
+    : activeProfile?.isOwner === true;
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations ?? [],
     celebrationLevel,
@@ -169,7 +186,16 @@ export default function HomeScreen(): React.ReactElement {
       <LearnerScreen
         profiles={profiles}
         activeProfile={activeProfile}
-        mode={mode}
+        mode={
+          FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+            ? navigationContract.effectiveAppContext
+            : legacyMode
+        }
+        showParentHome={
+          FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+            ? navigationContract.home.screen === 'FamilyHome'
+            : true
+        }
       />
       {CelebrationOverlay}
       {firstNotice && visibleNoticeId === firstNotice.id ? (

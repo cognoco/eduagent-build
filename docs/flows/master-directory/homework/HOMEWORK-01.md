@@ -15,7 +15,7 @@ For mentors, homework appears later as a reviewable child session artifact. A pa
 
 | Audience | Expected behavior |
 | --- | --- |
-| Student / Study | Homework is surfaced from Learner Home and, historically, More. Student can use camera, gallery, or manual/voice entry, then enter `/(app)/session?mode=homework`. |
+| Student / Study | Homework is surfaced from Learner Home. Student can use camera, gallery, or manual/voice entry, then enter `/(app)/session?mode=homework`. Homework is not surfaced from More. |
 | Mentor / Family | Not surfaced as a Family action. Parent review belongs under child session detail, child reports, or future Recaps. If an adult wants help with their own homework, they switch/bridge to adult Study. |
 | Owner/account | Adult owner in Study can start their own homework flow. Owner in Family can manage setup/billing but should not write homework data to a child unless product explicitly adds a parent-managed child assignment flow. |
 | Wrong-audience deep link | Parent proxy is redirected from `/(app)/homework` to `/(app)/home`. Family shell should not surface homework except via explicit bridge/deep link; unauthenticated access is handled by `(app)` auth/consent gates. |
@@ -31,7 +31,6 @@ The start flow is Study-only behavior for the active learner, but the resulting 
 | Entry point | Route/screen | Surfaced from Study? | Surfaced from Family? | Notes |
 | --- | --- | --- | --- | --- |
 | Learner home quick action | `home-action-homework` -> `/(app)/homework/camera` | Yes | No | `LearnerScreen` quick-action row opens the homework camera with `returnTo` params. |
-| More hub historical entry | `/(app)/more` -> `/(app)/homework/camera` | Legacy/possibly drift | No | Inventory still lists More entry, but current More hub no longer has an obvious homework row. Treat as drift to confirm. |
 | Subject-scoped homework | `/(app)/homework/camera?subjectId=&subjectName=` | Yes | No normal Family surface | Skips subject picker when subject is already known. |
 | Camera permission | `/(app)/homework/camera` permission phase | Yes | No | First-request uses `grant-permission-button`; permanently denied uses `open-settings-button`; manual entry remains available. |
 | Camera capture | `camera-view` / `capture-button` | Yes | No | Captures image, starts OCR, can cancel/retake. |
@@ -77,12 +76,11 @@ The start flow is Study-only behavior for the active learner, but the resulting 
 | Fixed bug reference | BUG-807 | Malformed classifier candidates are validated before navigation. |
 | Fixed bug reference | BUG-824 | Fresh image source resets classification trigger. |
 | Product memory | feedback_homework_not_socratic | Homework should explain and verify, not default to Socratic questioning. |
-| Inventory drift | HOMEWORK-01 More entry | Inventory says More can start homework, but current More hub appears not to expose a homework row. Confirm whether this entry is intentionally removed or should be restored. |
+| Obsolete bug | HOMEWORK-01 More entry | Product clarification 2026-05-22: Homework was never intended to be surfaced from More. The old inventory expectation was stale. |
 | Access drift | Navigation contract | Family routes may be reachable only via explicit bridge/deep link, not surfaced; current V0 contract still has legacy guardian/proxy behavior to migrate. |
 | Tooling gap | Notion MCP unavailable | Prior Notion bug URLs for HOMEWORK-01 could not be retrieved; only code/inventory bug IDs are recorded here. |
 
 ## Open Questions
 
-- Is the More-entry path for homework intentionally removed after the More hub split, or should a current Account/More sub-screen still surface it?
 - Should parents ever be able to start a child-scoped homework session from Family, or is the final product strictly "child starts, parent reviews"?
 - What is the retention/deletion policy for homework images after the text and summary have been extracted?

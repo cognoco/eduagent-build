@@ -51,6 +51,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
 - [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
 - [feedback_no_pr_unless_asked.md](feedback_no_pr_unless_asked.md) — NEVER create a PR unless explicitly asked.
+- [feedback_use_gh_cli_for_prs.md](feedback_use_gh_cli_for_prs.md) — Use `gh` CLI for PR status, checks, logs, and review workflows by default.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
 - [feedback_partial_staging_stash.md](feedback_partial_staging_stash.md) — Pre-commit tests full working tree; stash in-progress files before partial commits.
@@ -77,6 +78,8 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Deployment & Secrets
 
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars synced via `pnpm env:sync`.
+- [doppler-secrets.md](doppler-secrets.md) — Test secret resolution: project `mentomate`, configs `dev/stg/prd`. `DATABASE_URL` and friends needed by `*.test.ts` files that include integration paths. Archon's validate/push wrap via `doppler run`.
+- [load-database-env-windows-hardcode.md](load-database-env-windows-hardcode.md) — `packages/test-utils/.../load-database-env.ts` hardcodes Windows Doppler path; macOS/Linux must use external `doppler run` wrap.
 - [feedback_ota_env_vars.md](feedback_ota_env_vars.md) — Manual OTA must set target env vars explicitly.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
 - [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.

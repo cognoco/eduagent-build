@@ -1,5 +1,15 @@
 # Mobile Flow Improvements
 
+> **Note (2026-05-23):** This doc captures UX critique as of 2026-04-10. Several flows have since changed significantly:
+> - HOME-01: IntentCard pattern replaced by subject carousel + Ask Anything bar + quick-action row (home redesign).
+> - HOME-06: `/(app)/learn-new` was deleted; "Learn New" is no longer a route.
+> - LEARN-08: Library v3 replaced the three-tab structure with a single-pane subject-first shelf list.
+> - SUBJECT-09 (interview), SUBJECT-10 (analogy-preference), SUBJECT-11 (curriculum-review): removed from first-run onboarding.
+> - SUBJECT-13: not registered in canonical `mobile-app-flow-inventory.md`.
+> - PARENT-01: `/(app)/dashboard` is a permanent redirect to `/(app)/home`; parent surface is `ParentHomeScreen` branch inside `LearnerScreen`.
+>
+> See `mobile-app-flow-inventory.md` for the canonical current state.
+
 Date: 2026-04-10
 
 This review was written from an end-user point of view after reading the current mobile flow inventory and sampling the current route/component code behind those flows.
@@ -120,7 +130,7 @@ Interpretation notes:
 
 | ID | Flow | What feels missing | What will annoy or frustrate the end user |
 | --- | --- | --- | --- |
-| HOMEWORK-01 | Start homework from learner home or More screen | A more unified relationship between homework and normal learning. | Homework can feel like a separate tool rather than part of one continuous mentor experience. |
+| HOMEWORK-01 | Start homework from learner home | A more unified relationship between homework and normal learning. | Homework can feel like a separate tool rather than part of one continuous mentor experience. |
 | HOMEWORK-02 | Camera permission, capture, preview, and OCR | Gallery/image import, plus clearer OCR confidence feedback. | Camera-only is painful for screenshots, PDFs, or already-taken photos. |
 | HOMEWORK-03 | Manual fallback when OCR is weak or fails | Faster cleanup help after OCR. | Manually editing OCR into usable problem cards is still a lot of work when the user wanted quick help. |
 | HOMEWORK-04 | Homework tutoring session with multi-problem navigation | Stronger affordances around moving between problems and switching help modes. | Users may not realize how to progress through multiple problems once the session starts. |

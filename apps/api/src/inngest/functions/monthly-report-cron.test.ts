@@ -655,6 +655,15 @@ describe('monthlyReportGenerate', () => {
     );
   });
 
+  it('[CR-2026-05-21-034] has idempotency keyed on event.data.parentId + "-" + event.data.childId', () => {
+    const config = (
+      monthlyReportGenerate as unknown as { opts: { idempotency?: string } }
+    ).opts;
+    expect(config.idempotency).toBe(
+      'event.data.parentId + "-" + event.data.childId',
+    );
+  });
+
   describe('child_missing — child profile not found', () => {
     it('returns skipped with reason child_missing when child profile does not exist', async () => {
       (

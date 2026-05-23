@@ -52,6 +52,7 @@ import { BRAND_COLOR_PRIMARY } from '../services/brand';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { requireAccount } from '../middleware/profile-scope';
 
 const logger = createLogger();
 
@@ -147,7 +148,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Get current subscription status
   .get('/subscription', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     const freeTier = getTierConfig('free');
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
@@ -214,7 +216,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     async (c) => {
       const { tier, interval } = c.req.valid('json');
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
 
       // BUG-77: Return 404 (not 500) when Stripe is unconfigured -- these
       // endpoints are dormant for mobile. 404 communicates "feature not
@@ -301,7 +304,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // handled by platform subscription management (App Store / Google Play).
   .post('/subscription/cancel', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can cancel a subscription.
     const activeProfileMetaCancel = c.get('profileMeta');
@@ -375,7 +379,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     async (c) => {
       const { amount } = c.req.valid('json');
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
 
       // [CR-2026-05-19-H1] Only the account owner can purchase top-up credits.
       const activeProfileMetaTopup = c.get('profileMeta');
@@ -450,7 +455,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Get current usage/quota status
   .get('/usage', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     const freeTier = getTierConfig('free');
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
@@ -580,7 +586,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // through platform subscription management (App Store / Google Play).
   .post('/subscription/portal', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can access the billing portal.
     const activeProfileMetaPortal = c.get('profileMeta');
@@ -618,7 +625,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Fast KV-backed subscription status (for header display)
   .get('/subscription/status', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     const kv = c.env.SUBSCRIPTION_KV;
     const freeTier = getTierConfig('free');
 
@@ -698,7 +706,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Get family members and pool status
   .get('/subscription/family', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription) {
@@ -729,7 +738,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     async (c) => {
       const { profileId } = c.req.valid('json');
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const activeProfileMeta = c.get('profileMeta');
 
       // [BUG-94 / A1-HIGH] isOwner gate parity with /family/remove. Without
@@ -782,7 +792,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     async (c) => {
       const { profileId } = c.req.valid('json');
       const db = c.get('db');
-      const account = c.get('account');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       const activeProfileMeta = c.get('profileMeta');
 
       if (activeProfileMeta?.isOwner !== true) {
@@ -839,7 +850,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Join BYOK waitlist
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     // Use the authenticated account's email -- never trust caller-supplied email
     const email = account.email;
 

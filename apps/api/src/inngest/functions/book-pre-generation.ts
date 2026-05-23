@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 // ---------------------------------------------------------------------------
 // Book Pre-Generation — Epic 7
 // When a book's topics are generated, pre-generate the next 1-2 books in the

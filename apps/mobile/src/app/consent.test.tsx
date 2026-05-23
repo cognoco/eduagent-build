@@ -27,14 +27,25 @@ jest.mock('expo-router', () => ({
 
 let mockChildEmail: string | undefined = undefined;
 
-jest.mock('@clerk/clerk-expo', () => ({
-  useUser: () => ({
+const mockUseUser = jest.fn(
+  (): {
+    isLoaded: boolean;
+    user:
+      | { primaryEmailAddress: { emailAddress: string } | undefined }
+      | null
+      | undefined;
+  } => ({
+    isLoaded: true,
     user: {
       primaryEmailAddress: mockChildEmail
         ? { emailAddress: mockChildEmail }
         : undefined,
     },
   }),
+);
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useUser: () => mockUseUser(),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -132,6 +143,15 @@ describe('ConsentScreen', () => {
     mockChildEmail = undefined;
     mockCanGoBack.mockReturnValue(true);
     mockUseNetworkStatus.mockReturnValue({ isOffline: false, isReady: true });
+    // Restore default: Clerk hydrated, user present.
+    mockUseUser.mockImplementation(() => ({
+      isLoaded: true,
+      user: {
+        primaryEmailAddress: mockChildEmail
+          ? { emailAddress: mockChildEmail }
+          : undefined,
+      },
+    }));
   });
 
   afterEach(() => {
@@ -302,6 +322,40 @@ describe('ConsentScreen', () => {
 
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  // ── CR-108: Clerk hydration guard ───────────────────────────────
+
+  describe('CR-108: Clerk not yet hydrated', () => {
+    beforeEach(() => {
+      mockUseUser.mockReturnValue({ isLoaded: false, user: null });
+    });
+
+    it('disables the submit button when Clerk has not hydrated', () => {
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('consent-email'),
+        'parent@example.com',
+      );
+
+      const button = screen.getByTestId('consent-submit');
+      expect(
+        button.props.accessibilityState?.disabled ?? button.props.disabled,
+      ).toBeTruthy();
+    });
+
+    it('does not fire the API when submit is pressed during Clerk hydration window', () => {
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('consent-email'),
+        'parent@example.com',
+      );
+      fireEvent.press(screen.getByTestId('consent-submit'));
+
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+    });
   });
 
   // ── Phase 2: Parent view ─────────────────────────────────────────

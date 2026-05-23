@@ -119,6 +119,11 @@ export function createScreenWrapper(options: ScreenWrapperOptions = {}) {
         gcTime: 0,
         ...userOpts.defaultOptions?.queries,
       },
+      mutations: {
+        retry: false,
+        gcTime: 0,
+        ...userOpts.defaultOptions?.mutations,
+      },
     },
   });
 
@@ -133,6 +138,7 @@ export function createScreenWrapper(options: ScreenWrapperOptions = {}) {
     profiles,
     activeProfile,
     switchProfile: jest.fn().mockResolvedValue({ success: true }),
+    isExplicitProxyMode: false,
     isLoading: options.isLoading ?? false,
     profileLoadError: options.profileLoadError ?? null,
     profileWasRemoved: options.profileWasRemoved ?? false,

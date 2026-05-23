@@ -152,7 +152,7 @@ export const challengeRoundEvaluationItemSchema = z.object({
   concept: z.string().min(1).max(200),
   result: z.enum(['solid', 'partial', 'missing', 'misconception']),
   evidence: z.string().min(1).max(500),
-  answerEventId: z.string().min(1).max(120),
+  answerEventId: z.string().uuid(),
   learnerQuote: z.string().min(1).max(500),
   correction: z.string().min(1).max(500).optional(),
 });

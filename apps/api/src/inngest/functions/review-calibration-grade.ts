@@ -29,7 +29,7 @@ async function syncXpBestEffort(
   db: Database,
   profileId: string,
   topicId: string,
-  xpChange: 'none' | 'verified' | 'decayed'
+  xpChange: 'none' | 'verified' | 'decayed',
 ): Promise<void> {
   if (xpChange !== 'verified' && xpChange !== 'decayed') return;
 
@@ -93,7 +93,7 @@ export async function handleReviewCalibrationGrade({
   }
 
   const quality = await step.run('grade-recall-quality', () =>
-    evaluateRecallQuality(learnerMessage, topicTitle)
+    evaluateRecallQuality(learnerMessage, topicTitle),
   );
   const result = processRecallResult(state, quality, eventAt.toISOString());
   const cooldownThreshold = new Date(eventAt.getTime() - RETEST_COOLDOWN_MS);
@@ -121,9 +121,9 @@ export async function handleReviewCalibrationGrade({
           eq(retentionCards.profileId, profileId),
           or(
             isNull(retentionCards.lastReviewedAt),
-            lt(retentionCards.lastReviewedAt, cooldownThreshold)
-          )
-        )
+            lt(retentionCards.lastReviewedAt, cooldownThreshold),
+          ),
+        ),
       )
       .returning({ id: retentionCards.id });
   });
@@ -146,7 +146,11 @@ export async function handleReviewCalibrationGrade({
   };
 }
 export const reviewCalibrationGrade = inngest.createFunction(
-  { id: 'review-calibration-grade', retries: 2 },
+  {
+    id: 'review-calibration-grade',
+    retries: 2,
+    idempotency: 'event.data.sessionId + "-" + event.data.topicId',
+  },
   { event: 'app/review.calibration.requested' },
-  handleReviewCalibrationGrade
+  handleReviewCalibrationGrade,
 );

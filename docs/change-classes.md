@@ -17,6 +17,7 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 | **db-schema** | `packages/database/src/schema/**` | `db:push:dev`, `db:generate:dev` | `test:api:integration` | Never push to staging/prod |
 | **db-migrations** | `packages/database/drizzle/**` | `db:migrate:dev` | `test:api:integration` | Migrate before deploy; rollback section if dropping |
 | **llm-prompts** | `services/**/*-prompts.ts`, `services/llm/*.ts` | `eval:llm` | `eval:llm --live`, `test:llm:enduser` | Pre-commit enforces snapshot staging |
+| **llm-routing** | `services/llm/router.ts`, `services/session/session-exchange.ts`, `services/subscription.ts`, `scripts/premium-routing-pass.ts` | — | `test:llm:premium-routing` | Live Plus/Family advanced-model routing gate |
 | **llm-book-generation** | `packages/schemas/src/subjects.ts`, `services/book-generation.ts`, `services/book-suggestion-generation.ts`, `services/curriculum.ts`, `services/session/session-context-builders.ts`, `scripts/book-generation-pass.ts` | — | `test:llm:book-generation` | Live book/topic-map generation quality gate |
 | **inngest** | `apps/api/src/inngest/**` | — | `test:api:integration` | Verify dashboard sync after deploy |
 | **api-routes** | `apps/api/src/routes/**` | `test:api:unit` | `test:api:integration` | |

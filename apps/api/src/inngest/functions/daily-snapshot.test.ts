@@ -174,15 +174,15 @@ describe('dailySnapshotCron', () => {
       expect.arrayContaining([
         {
           name: 'app/progress.snapshot.refresh',
-          data: { profileId: 'profile-001' },
+          data: { profileId: 'profile-001', day: expect.any(String) },
         },
         {
           name: 'app/progress.snapshot.refresh',
-          data: { profileId: 'profile-002' },
+          data: { profileId: 'profile-002', day: expect.any(String) },
         },
         {
           name: 'app/progress.snapshot.refresh',
-          data: { profileId: 'profile-003' },
+          data: { profileId: 'profile-003', day: expect.any(String) },
         },
       ]),
     );
@@ -276,6 +276,17 @@ describe('dailySnapshotRefresh', () => {
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/progress.snapshot.refresh' }),
       ]),
+    );
+  });
+
+  // [CR-2026-05-21-035] Idempotency dedupes per (profileId, day) within
+  // Inngest's 24h window. Keying on profileId alone risks dropping today's
+  // events at the dedup boundary against yesterday's — the cron-day bucket
+  // disambiguates while still deduping operator re-fires within the same day.
+  it('[CR-2026-05-21-035] has idempotency keyed on event.data.profileId + day', () => {
+    const config = (dailySnapshotRefresh as any).opts;
+    expect(config.idempotency).toBe(
+      'event.data.profileId + "-" + event.data.day',
     );
   });
 

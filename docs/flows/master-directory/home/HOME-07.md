@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** Family-only  
 > **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/home.tsx`, `apps/mobile/src/components/home/LearnerScreen.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/lib/app-context.tsx`, `apps/mobile/src/lib/profile.ts`, `apps/mobile/src/app/(app)/own-learning.tsx`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/home.tsx`, `apps/mobile/src/components/home/LearnerScreen.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/lib/app-context.tsx`, `apps/mobile/src/lib/profile.ts`, `apps/mobile/src/app/(app)/own-learning.tsx`
 
 ## Purpose
 

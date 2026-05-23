@@ -15,6 +15,7 @@ let mockSearchParams: Record<string, string> = {};
 let mockOverdueTopicsReturn: Record<string, unknown> = {};
 let mockTeachingPreferenceReturn: Record<string, unknown> = {};
 let mockIsParentProxy = false;
+let mockLinkedChildren: Array<{ id: string; displayName: string }> = [];
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -31,38 +32,61 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../hooks/use-progress', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  useOverdueTopics: () => mockOverdueTopicsReturn,
-}));
-
-jest.mock('../../../hooks/use-retention', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  useStartRelearn: () => ({
-    mutate: mockMutate,
-    isPending: false,
+jest.mock(
+  '../../../hooks/use-progress' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useOverdueTopics: () => mockOverdueTopicsReturn,
   }),
-  useTeachingPreference: () => mockTeachingPreferenceReturn,
-}));
+);
 
-jest.mock('../../../hooks/use-parent-proxy', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  useParentProxy: () => ({ isParentProxy: mockIsParentProxy }),
-}));
+jest.mock(
+  '../../../hooks/use-retention' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useStartRelearn: () => ({
+      mutate: mockMutate,
+      isPending: false,
+    }),
+    useTeachingPreference: () => mockTeachingPreferenceReturn,
+  }),
+);
+
+jest.mock(
+  '../../../hooks/use-parent-proxy' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useParentProxy: () => ({ isParentProxy: mockIsParentProxy }),
+  }),
+);
+
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins route-entry contract without the full app provider tree */,
+  () => ({
+    useNavigationContract: () => ({
+      // V0 fallback in the screen layouts reads `isParentProxy` when
+      // MODE_NAV_V1_ENABLED is off — keep it congruent so tests pass under
+      // either flag value.
+      isParentProxy: mockIsParentProxy,
+      canEnter: () => !mockIsParentProxy,
+      gates: {},
+    }),
+  }),
+);
 
 jest.mock('../../../lib/profile', () => ({
   ...jest.requireActual('../../../lib/profile'),
   useProfile: () => ({
     activeProfile: { id: 'owner-id', isOwner: true, birthYear: null },
   }),
+  useLinkedChildren: () => mockLinkedChildren,
 }));
 
-jest.mock('../../../lib/navigation', () => ({
-  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
-  goBackOrReplace: (...args: unknown[]) => mockBack(...args),
-  homeHrefForReturnTo: (returnTo: string | undefined) =>
-    returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
-}));
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockBack(...args),
+    homeHrefForReturnTo: (returnTo: string | undefined) =>
+      returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
+  }),
+);
 
 const RelearnScreen = require('./relearn').default;
 
@@ -117,6 +141,7 @@ describe('RelearnScreen', () => {
     jest.clearAllMocks();
     mockSearchParams = {};
     mockIsParentProxy = false;
+    mockLinkedChildren = [{ id: 'child-1', displayName: 'Ada' }];
     mockOverdueTopicsReturn = {
       data: makeOverdueData(),
       isLoading: false,
@@ -178,6 +203,45 @@ describe('RelearnScreen', () => {
 
     screen.getByTestId('relearn-method-visual_diagrams');
     screen.getByText('Usual method');
+  });
+
+  it('shows the source child name for parent-bridge direct entry', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
+      source: 'parent_bridge',
+      childProfileId: 'child-1',
+    };
+
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    screen.getByTestId('relearn-parent-bridge-header');
+    screen.getByText("Added from Ada's learning.");
+  });
+
+  it('uses generic source copy when the bridge child is missing locally', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
+      source: 'parent_bridge',
+      childProfileId: 'deleted-child',
+    };
+
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    screen.getByText("Added from a child's learning.");
   });
 
   it('moves from the topic phase to the method phase when a topic is selected', async () => {

@@ -106,8 +106,19 @@ if [ -n "$MOBILE_FILES" ]; then
     abs_mobile_files="$abs_mobile_files $WORKSPACE_ROOT/$f"
   done
   echo "pre-commit-tests: [apps/mobile] jest --findRelatedTests ($MOBILE_FILES)"
+
+  MOBILE_JEST_SERIAL_ARGS=""
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      # Windows workers can finish all assertions and still return 1 when a
+      # child process is force-exited during teardown. Keep the same related
+      # test set, but run it in one process so the hook exits deterministically.
+      MOBILE_JEST_SERIAL_ARGS="--runInBand"
+      ;;
+  esac
+
   # shellcheck disable=SC2086
-  if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $abs_mobile_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+  if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $abs_mobile_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.' $MOBILE_JEST_SERIAL_ARGS); then
     FAILED=1
   fi
 fi

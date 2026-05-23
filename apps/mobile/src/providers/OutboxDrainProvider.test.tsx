@@ -15,6 +15,7 @@ import { enqueue } from '../lib/message-outbox';
 import { OutboxDrainProvider } from './OutboxDrainProvider';
 import { useProfile } from '../lib/profile';
 import { useApiClient } from '../lib/api-client';
+import { Sentry } from '../lib/sentry';
 
 // gc1-allow: useProfile drives the entire provider behaviour; the real
 // implementation pulls in Clerk, SecureStore, QueryClient, and full profile
@@ -48,13 +49,13 @@ jest.mock('../lib/api', () => ({ // gc1-allow: env URL
   getApiUrl: jest.fn().mockReturnValue('http://localhost:8787'),
 }));
 
-// gc1-allow: Sentry.captureException is a side-effect sink; its real
-// implementation imports native sentry modules that fail in Jest.
+// gc1-allow: Sentry.captureException / addBreadcrumb are side-effect sinks;
+// the real implementation imports native sentry modules that fail in Jest.
 // The @sentry/react-native global mock in test-setup.ts does not cover
 // the local re-export at lib/sentry.ts.
 // prettier-ignore
 jest.mock('../lib/sentry', () => ({ // gc1-allow: native Sentry
-  Sentry: { captureException: jest.fn() },
+  Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
 }));
 
 // ---------------------------------------------------------------------------
@@ -88,9 +89,6 @@ let _xhrInstances: FakeXhrInstance[] = [];
 
 function installFakeXhr(): () => FakeXhrInstance[] {
   _xhrInstances = [];
-
-  const OriginalXHR = (global as unknown as { XMLHttpRequest?: unknown })
-    .XMLHttpRequest;
 
   (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = jest.fn(
     () => {
@@ -158,8 +156,6 @@ function installFakeXhr(): () => FakeXhrInstance[] {
   ) as unknown;
 
   return () => _xhrInstances;
-
-  void OriginalXHR; // restored in afterEach
 }
 
 // ---------------------------------------------------------------------------
@@ -190,11 +186,7 @@ function setupMocks(profileId: string) {
 // scenario. Suppress unused-symbol noise with a no-op reference.
 function _renderProvider(profileId: string) {
   setupMocks(profileId);
-  return render(
-    <OutboxDrainProvider>
-      <></>
-    </OutboxDrainProvider>,
-  );
+  return render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
 }
 void _renderProvider;
 
@@ -236,11 +228,7 @@ describe('OutboxDrainProvider', () => {
 
       setupMocks('profile-A');
 
-      render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
-      );
+      render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
 
       // Wait for the XHR to be created.
       await waitFor(() => expect(getXhrInstances().length).toBeGreaterThan(0));
@@ -275,11 +263,7 @@ describe('OutboxDrainProvider', () => {
 
       setupMocks('profile-B');
 
-      render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
-      );
+      render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
 
       await waitFor(() => expect(getXhrInstances().length).toBeGreaterThan(0));
 
@@ -314,9 +298,7 @@ describe('OutboxDrainProvider', () => {
       setupMocks('profile-C');
 
       const { unmount } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // Wait for XHR to be created and the drain to be in-flight.
@@ -339,9 +321,7 @@ describe('OutboxDrainProvider', () => {
       setupMocks('profile-D');
 
       const { unmount } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // No XHR should have been created since the outbox is empty.
@@ -375,9 +355,7 @@ describe('OutboxDrainProvider', () => {
       setupMocks('profile-E');
 
       const { rerender } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // Wait for profile-E's XHR to be created.
@@ -393,11 +371,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       await act(async () => {
-        rerender(
-          <OutboxDrainProvider>
-            <></>
-          </OutboxDrainProvider>,
-        );
+        rerender(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
       });
 
       // The old XHR for profile-E must have been aborted.
@@ -436,9 +410,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       const { rerender } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       // Wait for profile-G's XHR to be active.
@@ -453,11 +425,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       await act(async () => {
-        rerender(
-          <OutboxDrainProvider>
-            <></>
-          </OutboxDrainProvider>,
-        );
+        rerender(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
       });
 
       // profile-G XHR aborted.
@@ -477,6 +445,34 @@ describe('OutboxDrainProvider', () => {
         xhrF._emitDoneEvent();
         xhrF._emitLoadend(200);
       });
+    });
+
+    it('adds a Sentry breadcrumb when drain is skipped due to missing activeProfile (CR-2026-05-21-152)', async () => {
+      // Arrange: no active profile (simulates mid-sign-out race).
+      (useProfile as jest.Mock).mockReturnValue({ activeProfile: undefined });
+      (useApiClient as jest.Mock).mockReturnValue({
+        support: {
+          'outbox-spillover': {
+            $post: jest.fn().mockResolvedValue({ ok: true }),
+          },
+        },
+      });
+
+      render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
+
+      // No XHR should be opened — the guard must return early.
+      expect(getXhrInstances()).toHaveLength(0);
+
+      // The breadcrumb must be emitted so the skip is observable in Sentry.
+      await waitFor(() =>
+        expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+          expect.objectContaining({
+            category: 'outbox',
+            level: 'info',
+            message: 'drain skipped — no activeProfile',
+          }),
+        ),
+      );
     });
 
     it('in-flight requests carry the snapshotted profileId, not the new profile after switch', async () => {
@@ -502,9 +498,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       const { rerender } = render(
-        <OutboxDrainProvider>
-          <></>
-        </OutboxDrainProvider>,
+        <OutboxDrainProvider>{null}</OutboxDrainProvider>,
       );
 
       await waitFor(() => expect(getXhrInstances().length).toBeGreaterThan(0));
@@ -520,11 +514,7 @@ describe('OutboxDrainProvider', () => {
       });
 
       await act(async () => {
-        rerender(
-          <OutboxDrainProvider>
-            <></>
-          </OutboxDrainProvider>,
-        );
+        rerender(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
       });
 
       // The X-Profile-Id on the already-opened XHR must still be profile-H.

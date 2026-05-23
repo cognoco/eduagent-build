@@ -1,12 +1,20 @@
 # Navigation Contract - Reconciled V1
 
-**Status:** Reconciled spec - pending implementation
+**Status:** PR 1 ✅ PR 2 ✅ PR 4 ✅ — PRs 3, 5, 6 pending.
 **Date:** 2026-05-21
 **Reconciled:** 2026-05-22
 **Product source:** `docs/specs/2026-05-19-study-and-family-mode-navigation-FULL.md`
 **Implementation baseline:** existing Mode Nav V0 in mobile code
 
 This document reconciles the narrower navigation-contract draft with the FULL Study/Family navigation spec and with the code inspection performed on 2026-05-22.
+
+## Related documents
+
+- [`docs/audience-matrix.md`](../audience-matrix.md) — **paired current-state inventory.** ~119 scattered gating reads with F1–F14 findings; this spec closes F5, F6, F7, F8, F11.
+- [`docs/flows/flow-master-directory.md`](../flows/flow-master-directory.md) — flow register that cites this spec from per-flow detail pages.
+- `CLAUDE.md` — "Profile Shapes" section is authoritative for **current (V0)** tab shapes (`guardian` / `learner`). This spec describes the **target (FULL)** shapes (`study` / `family`); the V0 → FULL mapping is in the "Decision" section below. Until `resolveNavigationContract` ships, CLAUDE.md's two-shape rule (`guardian` / `learner` — no third shape) governs production code.
+
+> **V0 vs target — important signpost.** This document targets `study` / `family` tab shapes. CLAUDE.md describes today's `guardian` / `learner` shapes. Both are "two shapes" but in **different universes**: V0 is what production renders today; FULL is what the contract migrates to. The MEMORY.md rule "NEVER add a third shape" applies to V0 — it does not forbid the V0 → FULL transition described here.
 
 The original contract idea is still correct: one contract should own per-profile UI/navigation behavior. The previous target shape was not correct for the FULL product direction because it preserved the current V0 no-Recaps tab set and treated mode persistence as a non-decision. This reconciled version makes the contract the implementation bridge from V0 to FULL.
 
@@ -21,11 +29,35 @@ The next implementation should introduce `resolveNavigationContract(ctx)` as the
 - **Study mode:** `home`, `library`, `progress`, `more`.
 - **Family mode:** `home`, `recaps`, `progress`, `more`.
 - The old guardian/hybrid tab set (`home`, `own-learning`, `library`, `progress`, `more`) is a V0/legacy starting point, not the final contract.
-- Recaps is not implemented yet. V1 must either add a minimal `recaps` screen/API in the same sequence or gate the tab behind an explicit tracked stub until the route exists.
+- Recaps is implemented (PR 4). V1 can wire the tab directly to `/(app)/recaps`.
 - Mode persistence is not optional for FULL. V1 uses server-backed per-profile `profiles.default_app_context`.
 - Parent review should be parent-native. Normal end-user paths should not require parent proxy mode.
 
 **Do not implement the old 2026-05-21 contract unchanged.** It would hard-code V0 behavior and conflict with the FULL spec.
+
+---
+
+## Hard Constraint — Preserve 5-Tab Mode Across All Increments
+
+**Non-negotiable.** Every PR in this migration must preserve today's 5-tab production mode (active when `EXPO_PUBLIC_ENABLE_MODE_NAV=false` in Doppler → `FEATURE_FLAGS.MODE_NAV_V0_ENABLED=false`). The 5-tab view is supported product behavior, not a temporary fallback — breaking it is a release blocker.
+
+**Flag matrix that must always hold:**
+
+| `MODE_NAV_V0_ENABLED` | `MODE_NAV_V1_ENABLED` | Behavior |
+|---|---|---|
+| off | off | **5-tab mode (today's prod) — never regress** |
+| on | off | 4-tab mode-switched view (V0 opt-in) |
+| any | on | New `resolveNavigationContract` with `study`/`family` shape |
+
+**Rules:**
+
+1. The V0-off short-circuits at `apps/mobile/src/lib/app-context.tsx` — `familyCapable=false` at line 60 and `derivedMode=null` at line 70 (force-off when both `MODE_NAV_V1_ENABLED` and `MODE_NAV_V0_ENABLED` are false) — **must stay alive**.
+2. The V0 fall-through at `apps/mobile/src/app/(app)/_layout.tsx:263` (`return computeVisibleTabs(tabShape, false)`) **must keep returning 5 tabs** for guardian profiles.
+3. V0 helpers `resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` (`_layout.tsx:122-185`) **must not be deleted** when V1 lands. They remain the source of truth for `MODE_NAV_V0_ENABLED=off`.
+4. `resolveNavigationContract` wiring is gated entirely behind `MODE_NAV_V1_ENABLED` (new flag) and **does not replace** the V0-off fallback path.
+5. Every PR must include a test asserting that with `MODE_NAV_V0_ENABLED=false` and `MODE_NAV_V1_ENABLED=false`, a guardian profile sees all 5 tabs.
+
+This constraint supersedes any spec line that implies V0 deletion. If a future amendment proposes removing V0 helpers, the precondition is: both Doppler flags retired in production and that retirement explicitly approved.
 
 ---
 
@@ -57,7 +89,7 @@ The codebase already has a V0 implementation:
 - Family capability is inferred client-side from the loaded profile list.
 - Family mode currently renders `home`, `progress`, `more`.
 - Study mode currently renders `home`, `library`, `progress`, `more`.
-- Recaps does not exist as a first-class route/API/schema.
+- Recaps now exists as a first-class route/API/schema (PR 4 complete: `recaps.tsx`, `routes/recaps.ts`, `services/recaps.ts`, `packages/schemas/src/recaps.ts`).
 - Parent-facing child session detail exists under child routes, backed by dashboard child session APIs.
 - Parent proxy is still active and can be entered through normal profile switching paths.
 - Mode switcher UI is mounted on Home, not app chrome.
@@ -159,6 +191,10 @@ type NavigationContract = {
     proxyBanner: 'required' | 'hidden';
   };
 
+  // NOTE: these are content-gates consumed *inside* More sub-screens
+  // (`more/account.tsx` for showBilling / showAccountSecurity,
+  //  `more/privacy.tsx` for showExportDelete). They are NOT top-level
+  //  More rows — CLAUDE.md "Profile Shapes" documents the placement.
   gates: {
     showBilling: boolean;
     showAccountSecurity: boolean;

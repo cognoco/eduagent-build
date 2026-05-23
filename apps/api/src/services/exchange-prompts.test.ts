@@ -1,4 +1,7 @@
-import { buildSystemPrompt } from './exchange-prompts';
+import {
+  buildSystemPrompt,
+  allowsGeneralKnowledgeSource,
+} from './exchange-prompts';
 import type { ExchangeContext } from './exchanges';
 
 function makeContext(
@@ -659,5 +662,62 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
     expect(prompt).not.toContain('<injected_system_instruction>');
     expect(prompt).toContain('&quot;/&gt;');
     expect(prompt).toContain('&lt;injected_system_instruction&gt;');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S2-H1: allowsGeneralKnowledgeSource + practice-mode prompt guard
+// ---------------------------------------------------------------------------
+
+describe('allowsGeneralKnowledgeSource', () => {
+  it('returns true for a standard learning session at rung 1', () => {
+    expect(
+      allowsGeneralKnowledgeSource(
+        makeContext({ sessionType: 'learning', escalationRung: 1 }),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false for practice effectiveMode', () => {
+    expect(
+      allowsGeneralKnowledgeSource(
+        makeContext({
+          sessionType: 'learning',
+          escalationRung: 1,
+          effectiveMode: 'practice',
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false for homework sessionType', () => {
+    expect(
+      allowsGeneralKnowledgeSource(
+        makeContext({ sessionType: 'homework', escalationRung: 1 }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false for interleaved sessionType', () => {
+    expect(
+      allowsGeneralKnowledgeSource(
+        makeContext({ sessionType: 'interleaved', escalationRung: 1 }),
+      ),
+    ).toBe(false);
+  });
+
+  // S2-H1 break test: removing effectiveMode !== 'practice' guard fails this.
+  it('[BREAK-S2-H1] prompt does NOT include general_knowledge source for practice-mode exchange', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        escalationRung: 1,
+        effectiveMode: 'practice',
+        topicTitle: 'Photosynthesis',
+        topicDescription: 'How plants convert sunlight into energy.',
+      }),
+    );
+
+    expect(prompt).not.toContain('id="general_knowledge"');
   });
 });

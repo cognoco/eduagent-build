@@ -6,8 +6,10 @@
  * objects but no `__drizzle_migrations` journal. This script detects that
  * state and seeds the journal so `migrate` skips already-applied migrations.
  *
- * Safe to run repeatedly — inserts only missing entries by hash comparison,
- * so new migrations added after the initial baseline are picked up.
+ * Safe to run repeatedly for the initial bootstrap only. Once any migration
+ * journal rows exist, missing hashes are left for `drizzle-kit migrate`.
+ * Otherwise a staging DB with schema drift can record a new migration as
+ * applied without running its SQL.
  */
 
 import { neon } from '@neondatabase/serverless';
@@ -50,7 +52,15 @@ const existingRows = await sql`
 `;
 const existingHashes = new Set(existingRows.map((r) => r.hash));
 
-// 4. Read journal and insert any missing entries
+if (existingHashes.size > 0) {
+  console.log(
+    `✓ Migration journal already initialized (${existingHashes.size} entries); ` +
+      'leaving missing migrations for drizzle-kit migrate',
+  );
+  process.exit(0);
+}
+
+// 4. Empty journal on a push-created DB: seed the current baseline once.
 const journal = JSON.parse(
   fs.readFileSync(path.join(MIGRATIONS_DIR, 'meta/_journal.json'), 'utf8'),
 );
@@ -72,7 +82,11 @@ for (const entry of journal.entries) {
 }
 
 if (added === 0) {
-  console.log(`✓ Migration journal up to date (${existingHashes.size} entries)`);
+  console.log(
+    `✓ Migration journal up to date (${existingHashes.size} entries)`,
+  );
 } else {
-  console.log(`✓ Added ${added} missing entries (${existingHashes.size + added} total)`);
+  console.log(
+    `✓ Added ${added} missing entries (${existingHashes.size + added} total)`,
+  );
 }

@@ -51,6 +51,11 @@ export const subscriptions = pgTable(
     lastStripeEventTimestamp: timestamp('last_stripe_event_timestamp', {
       withTimezone: true,
     }),
+    // [CR-2026-05-19-M11] Stripe event-ID dedup column — mirrors the
+    // lastRevenuecatEventId pattern. Set atomically inside
+    // updateSubscriptionFromWebhook so two concurrent deliveries of the same
+    // Stripe event ID cannot both write (unique index enforces at storage layer).
+    lastStripeEventId: text('last_stripe_event_id'),
     revenuecatOriginalAppUserId: text('revenuecat_original_app_user_id'),
     lastRevenuecatEventId: text('last_revenuecat_event_id'),
     lastRevenuecatEventTimestampMs: text('last_revenuecat_event_timestamp_ms'),
@@ -75,6 +80,14 @@ export const subscriptions = pgTable(
     uniqueIndex('subscriptions_account_revenuecat_event_id_idx')
       .on(table.accountId, table.lastRevenuecatEventId)
       .where(sql`${table.lastRevenuecatEventId} IS NOT NULL`),
+    // [CR-2026-05-19-M11] DB-level idempotency for Stripe subscription events.
+    // Mirrors the RevenueCat pattern above. Two concurrent deliveries of the
+    // same Stripe event ID cannot both write — the second UPDATE that tries to
+    // stamp the same (accountId, lastStripeEventId) pair is rejected by Postgres.
+    // The partial WHERE prevents NULL rows from colliding with each other.
+    uniqueIndex('subscriptions_account_stripe_event_id_idx')
+      .on(table.accountId, table.lastStripeEventId)
+      .where(sql`${table.lastStripeEventId} IS NOT NULL`),
   ],
 );
 

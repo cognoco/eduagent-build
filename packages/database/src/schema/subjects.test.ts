@@ -14,6 +14,10 @@ describe('curriculumTopics schema', () => {
   it('has sessionId column', () => {
     expect(curriculumTopics).toHaveProperty('sessionId');
   });
+
+  it('has nullable sourceChildProfileId provenance column', () => {
+    expect(curriculumTopics).toHaveProperty('sourceChildProfileId');
+  });
 });
 
 describe('bookSuggestions schema', () => {

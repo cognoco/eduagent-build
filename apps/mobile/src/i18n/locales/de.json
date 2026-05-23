@@ -939,7 +939,7 @@
     "empty": {
       "title": "Deine Bibliothek ist leer",
       "message": "Starte eine Lernsitzung und deine Fächer werden hier erscheinen.",
-      "goHome": "Zur Startseite"
+      "createFirstSubject": "Erstes Fach hinzufügen"
     },
     "curriculumComplete": {
       "title": "Du hast hier alles durchgenommen!",
@@ -1301,7 +1301,7 @@
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",
     "permissionPrompt": "Mach ein Foto von deinen Hausaufgaben und ich helfe dir, sie Schritt für Schritt zu lösen.",
-    "permissionDenied": "Der Kamerazugriff wurde verweigert. Du kannst ihn in den Geräteeinstellungen aktivieren, um Hausaufgaben zu fotografieren.",
+    "permissionDenied": "Der Kamerazugriff wurde deaktiviert. Dein Handy lässt uns nicht erneut fragen — tippe auf „Einstellungen öffnen“ und aktiviere die Kamera für diese App.",
     "openSettings": "Einstellungen öffnen",
     "openSettingsLabel": "Geräteeinstellungen öffnen",
     "allowCamera": "Kamera erlauben",
@@ -1963,7 +1963,11 @@
       "thisChild": "dieses Kind",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Bestätigen – Zustimmung widerrufen",
-      "withdraw": "Widerrufen"
+      "withdraw": "Widerrufen",
+      "curriculumTitle": "Lehrplan",
+      "curriculumSubtitle": "Entdecke die Fächer und Themen von {{name}}",
+      "curriculumNotAvailableTitle": "Der Lehrplan dieses Kindes ist nicht verfügbar",
+      "curriculumNotAvailableBody": "Sie können nur Lehrpläne für Kinder einsehen, die mit Ihrem Familienkonto verknüpft sind."
     },
     "mentorMemory": {
       "title": "Mentor-Gedächtnis",
@@ -2307,7 +2311,11 @@
     "progress": "Fortschritt",
     "progressLabel": "Fortschritt",
     "more": "Mehr",
-    "moreLabel": "Mehr"
+    "moreLabel": "Mehr",
+    "children": "Kinder",
+    "childrenLabel": "Kinder",
+    "recaps": "Zusammenfassungen",
+    "recapsLabel": "Zusammenfassungen"
   },
   "ocrTimeout": "Lesen hat zu lange gedauert – bitte versuche es erneut",
   "permissionTitle": "Kamerazugriff benötigt",
@@ -2588,5 +2596,33 @@
       "noRoundsYet": "Noch keine Runden",
       "hintOpenHistory": "Öffnet den Quiz-Verlauf"
     }
+  },
+  "recaps": {
+    "title": "Zusammenfassungen",
+    "subtitle": "Aktuelle Lernmomente aus deiner Familie.",
+    "emptyTitle": "Keine Zusammenfassungen",
+    "emptyBody": "Abgeschlossene Sitzungen erscheinen hier, sobald es etwas zusammenzufassen gibt.",
+    "errorTitle": "Fehler beim Laden der Zusammenfassungen",
+    "errorMessage": "Versuche es gleich noch einmal.",
+    "summaryPending": "Eine Zusammenfassung für diese Sitzung wird noch vorbereitet.",
+    "openRecapLabel": "Zusammenfassung von {{child}} für {{title}} öffnen",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   }
 }

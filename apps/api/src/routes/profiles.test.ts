@@ -21,12 +21,14 @@ jest.mock(
       countProfiles: jest.fn(),
       getProfile: jest.fn(),
       updateProfile: jest.fn(),
+      updateProfileAppContext: jest.fn(),
       switchProfile: jest.fn(),
     };
   },
 );
 
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
@@ -36,6 +38,7 @@ import {
   countProfiles,
   getProfile,
   updateProfile,
+  updateProfileAppContext,
   switchProfile,
   ProfileLimitError,
   ProfileValidationError,
@@ -72,6 +75,7 @@ function makeApp(overrides?: {
   accountId?: string;
   isOwner?: boolean;
   profileMeta?: ProfileMeta | null;
+  profileId?: string;
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
@@ -83,7 +87,7 @@ function makeApp(overrides?: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     } as Account);
-    c.set('profileId', undefined);
+    c.set('profileId', overrides?.profileId);
     // [CR-2026-05-19-H1] Inject profileMeta so isOwner gate can evaluate.
     // Default isOwner:true for happy-path tests; override for break tests.
     const profileMeta =
@@ -114,6 +118,7 @@ const createProfileWithLimitCheckMock = jest.mocked(
 const countProfilesMock = jest.mocked(countProfiles);
 const getProfileMock = jest.mocked(getProfile);
 const updateProfileMock = jest.mocked(updateProfile);
+const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
 const switchProfileMock = jest.mocked(switchProfile);
 
 beforeEach(() => {
@@ -549,6 +554,140 @@ describe('PATCH /v1/profiles/:id', () => {
 });
 
 // ---------------------------------------------------------------------------
+// PATCH /v1/profiles/:id/app-context
+// ---------------------------------------------------------------------------
+
+describe('PATCH /v1/profiles/:id/app-context', () => {
+  it('persists the default app context for a profile', async () => {
+    const updated = makeProfileRow({
+      id: PROFILE_ID_A,
+      displayName: 'Updated',
+    });
+    updateProfileAppContextMock.mockResolvedValue({
+      ...updated,
+      defaultAppContext: 'family',
+      hasFamilyLinks: true,
+    });
+
+    const res = await makeApp().request(
+      `/v1/profiles/${PROFILE_ID_A}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'family' }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      profile: {
+        id: PROFILE_ID_A,
+        defaultAppContext: 'family',
+        hasFamilyLinks: true,
+      },
+    });
+    expect(updateProfileAppContextMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID_A,
+      ACCOUNT_ID,
+      'family',
+    );
+  });
+
+  it('rejects an invalid app context value', async () => {
+    const res = await makeApp().request(
+      `/v1/profiles/${PROFILE_ID_A}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'recaps' }),
+      },
+    );
+
+    expect(res.status).toBe(400);
+    expect(updateProfileAppContextMock).not.toHaveBeenCalled();
+  });
+
+  // [CR-2026-05-19-H1] Break test — non-owner active on PROFILE_ID_A must not
+  // edit sibling PROFILE_ID_B's app-context. Active profileId is set so the
+  // gate's `id !== activeProfileId` clause is exercised against a real sibling
+  // identifier, not against `undefined` (which would mask a regression where
+  // the gate accidentally allowed self-edits to slip through to siblings).
+  it('[BREAK][CR-2026-05-19-H1] returns 403 when a non-owner edits a sibling app context', async () => {
+    const appWithNonOwner = makeApp({
+      profileId: PROFILE_ID_A,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2008,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+      } as ProfileMeta,
+    });
+
+    const res = await appWithNonOwner.request(
+      `/v1/profiles/${PROFILE_ID_B}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'study' }),
+      },
+    );
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    expect(updateProfileAppContextMock).not.toHaveBeenCalled();
+  });
+
+  // [CR-2026-05-19-H1] Positive case — a non-owner editing their OWN
+  // app-context is permitted (self-update is always allowed; only sibling
+  // edits are blocked). Paired with the break test above so the gate's two
+  // clauses (isOwner + self-id) are both covered.
+  it('[CR-2026-05-19-H1] allows a non-owner to update their own app context', async () => {
+    const updated = makeProfileRow({
+      id: PROFILE_ID_A,
+      displayName: 'Alex',
+      isOwner: false,
+    });
+    updateProfileAppContextMock.mockResolvedValue({
+      ...updated,
+      defaultAppContext: 'study',
+      hasFamilyLinks: false,
+    });
+
+    const appSelfUpdate = makeApp({
+      profileId: PROFILE_ID_A,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2008,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+      } as ProfileMeta,
+    });
+
+    const res = await appSelfUpdate.request(
+      `/v1/profiles/${PROFILE_ID_A}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'study' }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateProfileAppContextMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID_A,
+      ACCOUNT_ID,
+      'study',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // POST /v1/profiles/switch
 // ---------------------------------------------------------------------------
 
@@ -606,6 +745,75 @@ describe('POST /v1/profiles/switch', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [CR-353 / BUG-353] Break test: requireAccount() defensive unwrap
+//
+// Simulates a middleware-ordering regression where accountMiddleware is not
+// mounted (or is conditionally skipped) so c.get('account') returns undefined
+// at runtime. Without requireAccount(), the first `account.id` access in any
+// handler throws TypeError → 500, which is unstructured and hard to diagnose.
+//
+// With requireAccount() applied to every handler, the response is a structured
+// 401 — even when the middleware chain regresses.
+//
+// Red-green: revert any `requireAccount(c.get('account'))` call in profiles.ts
+// back to `c.get('account')` and both tests below flip from 401 → 500.
+// ---------------------------------------------------------------------------
+
+describe('[CR-353 / BUG-353] requireAccount defensive unwrap — 401 not 500 on account=undefined', () => {
+  /**
+   * Mini-app with NO account injected into context — simulates a
+   * middleware-ordering regression where accountMiddleware ran but failed
+   * to set `account` (e.g. early return, conditional skip, mounting outside
+   * the middleware chain).
+   */
+  function makeAppWithoutAccount() {
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      // Deliberately omit c.set('account', ...) to simulate the regression.
+      c.set('profileId', undefined);
+      c.set('profileMeta', undefined);
+      await next();
+    });
+    app.onError((err, c) => {
+      // Re-surface HTTPException with its own status so Hono returns the
+      // correct 4xx code rather than a generic 500.
+      if (err instanceof HTTPException) {
+        return c.json({ code: 'HTTP_ERROR', message: err.message }, err.status);
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500);
+    });
+    app.route('/v1', profileRoutes);
+    return app;
+  }
+
+  it('[BREAK] GET /v1/profiles returns 401 (not 500 TypeError) when account is undefined', async () => {
+    const res = await makeAppWithoutAccount().request('/v1/profiles');
+    // Before the fix: c.get('account').id throws TypeError → onError → 500.
+    // After the fix: requireAccount(c.get('account')) throws HTTPException(401) → 401.
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    // Must not be an unstructured 500 crash
+    expect(body.code).not.toBe('INTERNAL_ERROR');
+  });
+
+  it('[BREAK] POST /v1/profiles returns 401 (not 500 TypeError) when account is undefined', async () => {
+    const res = await makeAppWithoutAccount().request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'Test',
+        birthYear: 2000,
+        location: 'EU',
+      }),
+    });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).not.toBe('INTERNAL_ERROR');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -626,6 +834,8 @@ function makeProfileRow(
     location: 'EU' as const,
     isOwner: overrides.isOwner ?? true,
     hasPremiumLlm: false,
+    defaultAppContext: null,
+    hasFamilyLinks: false,
     conversationLanguage: 'en' as const,
     pronouns: null,
     consentStatus: null,

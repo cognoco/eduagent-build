@@ -66,6 +66,17 @@ jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins contract gates without the full app provider tree */,
+  () => ({
+    useNavigationContract: () => ({
+      gates: {
+        showAccommodationChildEditor: mockActiveProfile?.isOwner === true,
+      },
+    }),
+  }),
+);
+
+jest.mock(
   '../../../hooks/use-learner-profile' /* gc1-allow: unit test boundary */,
   () => ({
     useLearnerProfile: () => ({
@@ -180,6 +191,22 @@ describe('AccommodationScreen', () => {
     fireEvent.press(screen.getByTestId('accommodation-mode-retry'));
 
     expect(mockLearnerProfileRefetch).toHaveBeenCalled();
+  });
+
+  it('renders a go-back button in the error state and calls goBackOrReplace on press', () => {
+    mockLearnerProfile = null;
+    mockLearnerProfileError = true;
+    mockCanGoBack.mockReturnValue(false);
+
+    render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('accommodation-mode-error-back');
+    fireEvent.press(screen.getByTestId('accommodation-mode-error-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith(
+      '/(app)/more/learning-preferences',
+    );
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('toggles the "Not sure which to pick?" guide', () => {

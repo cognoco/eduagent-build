@@ -211,6 +211,13 @@ export const monthlyReportGenerate = inngest.createFunction(
   {
     id: 'progress-monthly-report-generate',
     name: 'Generate one monthly learning report',
+    // [CR-2026-05-21-034] Dedup duplicate fan-out events from monthlyReportCron
+    // before the expensive getSnapshotsInRange + generateReportHighlights (LLM)
+    // path runs. The onConflictDoNothing DB rescue only fires AFTER the LLM
+    // call; idempotency here short-circuits the entire run for any duplicate
+    // event within Inngest's 24-hour dedup window. The cron fires once per
+    // month so parentId + childId uniquely identifies one report per cycle.
+    idempotency: 'event.data.parentId + "-" + event.data.childId',
   },
   { event: 'app/monthly-report.generate' },
   async ({ event, step }) => {
@@ -346,9 +353,10 @@ export const monthlyReportGenerate = inngest.createFunction(
 
         let reportData = generateMonthlyReportData(
           childDisplayName,
-          lastMonthStart.toLocaleDateString(undefined, {
+          lastMonthStart.toLocaleDateString('en-US', {
             month: 'long',
             year: 'numeric',
+            timeZone: 'UTC',
           }),
           thisMonthMetrics,
           previousMetrics,

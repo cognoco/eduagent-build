@@ -1,5 +1,9 @@
-import { toAnthropicContent } from './anthropic';
-import type { MessagePart } from '../types';
+import {
+  toAnthropicContent,
+  toAnthropicFormat,
+  createAnthropicProvider,
+} from './anthropic';
+import type { MessagePart, ChatMessage, ModelConfig } from '../types';
 
 // ---------------------------------------------------------------------------
 // toAnthropicContent — pure formatting, no HTTP mocks needed
@@ -56,5 +60,108 @@ describe('toAnthropicContent', () => {
       type: 'image',
       source: { type: 'base64', media_type: 'image/webp', data: 'img2==' },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toAnthropicFormat — CR-2026-05-21-080: JSON directive injection
+// ---------------------------------------------------------------------------
+
+const JSON_DIRECTIVE =
+  'Respond with a single JSON object only. No prose, no markdown, no code fences.';
+
+describe('toAnthropicFormat — responseFormat json directive', () => {
+  const messages: ChatMessage[] = [
+    { role: 'system', content: 'You are a helpful tutor.' },
+    { role: 'user', content: 'Give me a quiz.' },
+  ];
+
+  it('does NOT append JSON directive when responseFormat is undefined', () => {
+    const { system } = toAnthropicFormat(messages, undefined);
+    expect(system).toBe('You are a helpful tutor.');
+    expect(system).not.toContain(JSON_DIRECTIVE);
+  });
+
+  it('appends JSON directive to existing system message when responseFormat="json"', () => {
+    const { system } = toAnthropicFormat(messages, 'json');
+    expect(system).toBe(`You are a helpful tutor.\n\n${JSON_DIRECTIVE}`);
+  });
+
+  it('sets system to JSON directive when there is no system message and responseFormat="json"', () => {
+    const noSystemMessages: ChatMessage[] = [
+      { role: 'user', content: 'Hello' },
+    ];
+    const { system } = toAnthropicFormat(noSystemMessages, 'json');
+    expect(system).toBe(JSON_DIRECTIVE);
+  });
+
+  it('preserves all non-system messages unchanged', () => {
+    const { messages: converted } = toAnthropicFormat(messages, 'json');
+    expect(converted).toHaveLength(1);
+    expect(converted[0]).toEqual({ role: 'user', content: 'Give me a quiz.' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createAnthropicProvider — CR-2026-05-21-080: fetch payload includes directive
+// Mocks only the Anthropic HTTP API (external boundary), not the router.
+// ---------------------------------------------------------------------------
+
+const baseConfig: ModelConfig = {
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-5',
+  maxTokens: 1024,
+};
+
+const mockSuccessResponse = {
+  content: [{ type: 'text', text: '{"answer": 42}' }],
+  stop_reason: 'end_turn',
+};
+
+describe('createAnthropicProvider — responseFormat json in fetch payload', () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockSuccessResponse),
+      text: () => Promise.resolve(JSON.stringify(mockSuccessResponse)),
+    } as unknown as Response);
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('includes the JSON-only directive in the system field when responseFormat="json"', async () => {
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'You are a quiz generator.' },
+      { role: 'user', content: 'Generate a quiz.' },
+    ];
+
+    await provider.chat(messages, { ...baseConfig, responseFormat: 'json' });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { system?: string };
+    expect(body.system).toContain(JSON_DIRECTIVE);
+    expect(body.system).toContain('You are a quiz generator.');
+  });
+
+  it('does NOT include the JSON-only directive when responseFormat is not set', async () => {
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'You are a quiz generator.' },
+      { role: 'user', content: 'Generate a quiz.' },
+    ];
+
+    await provider.chat(messages, baseConfig);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { system?: string };
+    expect(body.system).toBe('You are a quiz generator.');
+    expect(body.system).not.toContain(JSON_DIRECTIVE);
   });
 });

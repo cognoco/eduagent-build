@@ -23,11 +23,12 @@ import {
   type OverdueSubject,
   type OverdueTopic,
 } from '../../../hooks/use-progress';
-import { useProfile } from '../../../lib/profile';
+import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
-import { useParentProxy } from '../../../hooks/use-parent-proxy';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { firstParam } from '../../../lib/route-params';
 
 const TEACHING_METHODS = [
@@ -126,18 +127,26 @@ export default function RelearnScreen() {
     topicName?: string | string[];
     subjectName?: string | string[];
     returnTo?: string | string[];
+    returnId?: string | string[];
+    source?: string | string[];
+    childProfileId?: string | string[];
   }>();
   const routeTopicId = firstParam(params.topicId);
   const routeSubjectId = firstParam(params.subjectId);
   const routeTopicName = firstParam(params.topicName);
   const routeSubjectName = firstParam(params.subjectName);
   const returnTo = firstParam(params.returnTo);
+  const returnId = firstParam(params.returnId);
+  const source = firstParam(params.source);
+  const sourceChildProfileId = firstParam(params.childProfileId);
+  const isParentBridgeSource = source === 'parent_bridge';
 
   const directEntry = Boolean(routeTopicId && routeSubjectId);
   const startRelearn = useStartRelearn();
   const overdueTopics = useOverdueTopics();
   const { activeProfile } = useProfile();
-  const { isParentProxy } = useParentProxy();
+  const linkedChildren = useLinkedChildren();
+  const navigationContract = useNavigationContract();
   const ageBracket =
     activeProfile?.birthYear != null
       ? computeAgeBracket(activeProfile.birthYear)
@@ -175,6 +184,17 @@ export default function RelearnScreen() {
   const effectiveSubjectId = selectedSubject?.subjectId ?? routeSubjectId;
   const teachingPreference = useTeachingPreference(effectiveSubjectId);
   const preferredMethod = teachingPreference.data?.method ?? null;
+  const sourceChild = useMemo(
+    () =>
+      sourceChildProfileId
+        ? (linkedChildren.find((child) => child.id === sourceChildProfileId) ??
+          null)
+        : null,
+    [linkedChildren, sourceChildProfileId],
+  );
+  const parentBridgeHeaderText = sourceChild?.displayName
+    ? `Added from ${sourceChild.displayName}'s learning.`
+    : "Added from a child's learning.";
 
   useEffect(() => {
     if (
@@ -207,12 +227,12 @@ export default function RelearnScreen() {
 
   const handleLeave = useCallback(() => {
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo) as Href);
+      router.replace(homeHrefForReturnTo(returnTo, returnId) as Href);
       return;
     }
 
     goBackOrReplace(router, '/(app)/library' as const);
-  }, [returnTo, router]);
+  }, [returnId, returnTo, router]);
 
   const handleBack = useCallback(() => {
     setError(null);
@@ -295,6 +315,7 @@ export default function RelearnScreen() {
               mode: 'relearn',
               ...(result.recap ? { recap: result.recap } : {}),
               ...(returnTo ? { returnTo } : {}),
+              ...(returnId ? { returnId } : {}),
             },
           } as Href);
         },
@@ -313,6 +334,7 @@ export default function RelearnScreen() {
       routeTopicId,
       routeTopicName,
       returnTo,
+      returnId,
       router,
       selectedTopic,
       startRelearn,
@@ -326,7 +348,13 @@ export default function RelearnScreen() {
     return allSubjects;
   }, [allSubjects, selectedSubject]);
 
-  if (isParentProxy) {
+  // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
+  // V0 behavior so cold deep-links don't redirect to /home. See H5.1 in branch CR.
+  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? !navigationContract.canEnter('topic/relearn')
+    : navigationContract.isParentProxy;
+
+  if (blocked) {
     return <Redirect href="/(app)/home" />;
   }
 
@@ -553,6 +581,16 @@ export default function RelearnScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
           testID="relearn-method-phase"
         >
+          {isParentBridgeSource ? (
+            <View
+              className="mb-4 rounded-card border border-primary/20 bg-primary/10 px-4 py-3"
+              testID="relearn-parent-bridge-header"
+            >
+              <Text className="text-body-sm font-semibold text-text-primary">
+                {parentBridgeHeaderText}
+              </Text>
+            </View>
+          ) : null}
           <Text className="mb-4 text-body text-text-secondary">
             {copy.methodIntro}
           </Text>

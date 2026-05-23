@@ -3,10 +3,12 @@
 // Brief recall warmup after homework success. Pure business logic, no Hono.
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   learningSessions,
   curriculumTopics,
+  curriculumBooks,
+  subjects,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -32,20 +34,38 @@ import { sanitizeXmlValue } from './llm/sanitize';
 export async function generateRecallBridge(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<RecallBridgeResult> {
   const repo = createScopedRepository(db, profileId);
   const session = await repo.sessions.findFirst(
-    eq(learningSessions.id, sessionId)
+    eq(learningSessions.id, sessionId),
   );
 
   if (!session || !session.topicId) {
     return { questions: [], topicId: '', topicTitle: '' };
   }
 
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, session.topicId),
-  });
+  // Scope through parent chain: curriculumTopics → curriculumBooks → subjects.
+  // Defense-in-depth: session.topicId is already profile-owned (session was
+  // fetched via scoped repo), but the DB query itself enforces profileId so
+  // a bug in session creation can never silently leak a foreign topic into the
+  // LLM prompt.
+  const [topic] = await db
+    .select({
+      id: curriculumTopics.id,
+      title: curriculumTopics.title,
+      description: curriculumTopics.description,
+    })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+    .where(
+      and(
+        eq(curriculumTopics.id, session.topicId),
+        eq(subjects.profileId, profileId),
+      ),
+    )
+    .limit(1);
 
   if (!topic) {
     return { questions: [], topicId: session.topicId, topicTitle: '' };
@@ -85,7 +105,7 @@ export async function generateRecallBridge(
 
 function buildRecallBridgePrompt(
   topicTitle: string,
-  topicDescription: string
+  topicDescription: string,
 ): string {
   return (
     'You are MentoMate, a calm, clear tutor.\n\n' +
@@ -98,11 +118,11 @@ function buildRecallBridgePrompt(
     '- Questions should be answerable in 1-2 sentences\n' +
     `- Topic: <topic_title>${sanitizeXmlValue(
       topicTitle,
-      200
+      200,
     )}</topic_title>\n` +
     `- Description: <topic_description>${sanitizeXmlValue(
       topicDescription,
-      500
+      500,
     )}</topic_description>\n\n` +
     'Return exactly 2 questions, one per line.'
   );

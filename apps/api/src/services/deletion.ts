@@ -27,7 +27,24 @@ export async function scheduleDeletion(
       };
     }
 
-    const existing = await getDeletionStatus(db, accountId);
+    // [CR-2026-05-21-100] If the account row disappears between the failed
+    // tryScheduleDeletion update (0 rows) and this status read — e.g. a
+    // concurrent GC or admin delete — getDeletionStatus throws NotFoundError.
+    // From the requesting user's perspective the account is gone, which is
+    // exactly what they asked for. Treat it as a successful scheduling so
+    // the caller receives a sensible response instead of a raw 404.
+    let existing: Awaited<ReturnType<typeof getDeletionStatus>>;
+    try {
+      existing = await getDeletionStatus(db, accountId);
+    } catch (e) {
+      if (e instanceof NotFoundError) {
+        const gracePeriodEnds = new Date(
+          Date.now() + GRACE_PERIOD_MS,
+        ).toISOString();
+        return { gracePeriodEnds, scheduledNow: false };
+      }
+      throw e;
+    }
     if (existing.scheduled && existing.gracePeriodEnds) {
       return { gracePeriodEnds: existing.gracePeriodEnds, scheduledNow: false };
     }
@@ -238,7 +255,25 @@ export async function executeDeletion(
     columns: { id: true },
   });
 
-  return existingRow ? 'cancelled' : 'already_deleted';
+  if (!existingRow) {
+    // [CR-2026-05-21-009] rowCount=0 AND no account row — the account was
+    // removed outside the normal grace-period flow (admin delete, concurrent
+    // GC, or double-fire). This is always unexpected at this stage of the
+    // deletion pipeline and must be surfaced, not silently swallowed.
+    captureException(
+      new Error('executeDeletion: account row missing before scheduled delete'),
+      {
+        extra: {
+          surface: 'account.deletion',
+          reason: 'row-missing-on-execute',
+          accountId,
+        },
+      },
+    );
+    return 'already_deleted';
+  }
+
+  return 'cancelled';
 }
 
 export async function deleteProfile(

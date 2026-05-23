@@ -40,6 +40,15 @@ const RLS_EXCEPTIONS: Record<string, string> = {
   topic_connections:
     'BUG-226 (P3): transitive ownership via topics→books→subjects; ' +
     'dedicated migration required for direct profile_id + RLS',
+
+  // curriculum_topics has no owner profile_id column; ownership remains
+  // transitive through curriculum_topics.book_id → curriculum_books →
+  // subjects.profile_id. The source_child_profile_id column is nullable
+  // parent-bridge provenance and often points to a different child than the
+  // owner of the cloned topic, so it cannot drive row-level security.
+  curriculum_topics:
+    'Parent-bridge source_child_profile_id is provenance, not ownership; ' +
+    'topic ownership remains topics→books→subjects.profile_id',
 };
 
 function getProfileScopedTables(): string[] {

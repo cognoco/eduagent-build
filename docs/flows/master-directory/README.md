@@ -14,6 +14,12 @@ The flow pages are not execution logs. They should stay useful after a revision 
 
 Use [`_template.md`](_template.md) for new pages.
 
+## Related documents
+
+- [`../flow-master-directory.md`](../flow-master-directory.md) — parent register. Index of all flows + audience labels + vocabulary translation table.
+- [`../../specs/2026-05-21-navigation-contract.md`](../../specs/2026-05-21-navigation-contract.md) — target navigation contract. Cite from a flow page when audience access is contract-driven.
+- [`../../audience-matrix.md`](../../audience-matrix.md) — current-state gating inventory (F1–F14). Cite from a flow page that touches a gated surface (home, more, account, privacy, progress).
+
 ## Grouping
 
 | Folder | Flow IDs |

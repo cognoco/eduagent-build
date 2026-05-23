@@ -1686,10 +1686,59 @@ describe('SessionSummaryScreen', () => {
       const card = await screen.findByTestId('topic-suggestion-card');
       fireEvent.press(card);
 
+      // [S5-H1] Suggestion push must include bookId and subjectId so the topic
+      // screen receives the correct book/subject context.
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/topic/[topicId]',
-        params: { topicId: '11111111-1111-1111-1111-111111111111' },
+        params: {
+          topicId: '11111111-1111-1111-1111-111111111111',
+          bookId: '22222222-2222-2222-2222-222222222222',
+          subjectId: 'subject-uuid-1',
+        },
       });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [LEARN-07] "See your Library" CTA must always navigate to Library
+  // ---------------------------------------------------------------------------
+  describe('"See your Library" CTA [LEARN-07]', () => {
+    it('navigates to /(app)/library when topicId and subjectId are present in params', () => {
+      // Previously the handler routed to topic detail when both params were set.
+      // The CTA copy says "Library" — it must always go to Library.
+      mockParams.topicId = 'topic-uuid-123';
+      mockParams.subjectId = 'subject-uuid-456';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('go-to-library'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('navigates to /(app)/library when no topicId/subjectId in params', () => {
+      mockParams.topicId = undefined;
+      mockParams.subjectId = undefined;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('go-to-library'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('does not navigate to topic detail regardless of params', () => {
+      mockParams.topicId = 'topic-uuid-789';
+      mockParams.subjectId = 'subject-uuid-012';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('go-to-library'));
+
+      // Must never route to topic detail — that is the bug this test guards against.
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/(app)/topic/[topicId]' }),
+      );
     });
   });
 

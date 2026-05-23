@@ -13,6 +13,8 @@ import {
 import {
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
+  OWN_LEARNING_HREF,
+  OWN_LEARNING_RETURN_TO,
 } from '../../lib/navigation';
 
 let mockLinkedChildren: Array<{
@@ -22,6 +24,9 @@ let mockLinkedChildren: Array<{
 }> = [];
 let mockSubscriptionTier = 'plus';
 const mockSwitchProfile = jest.fn(async () => ({ success: true }));
+// [ACCOUNT-04] Explicit proxy flag — controls isExplicitProxyMode in the mock
+// profile context. Must be set to true only for proxy-mode test cases.
+let mockIsExplicitProxyMode = false;
 
 const mockFetch = createRoutedMockFetch({
   '/coaching-card': { coldStart: false, card: null, fallback: null },
@@ -68,7 +73,9 @@ const mockFetch = createRoutedMockFetch({
 jest.mock(
   '../../lib/api-client' /* gc1-allow: API client hook wraps auth/network boundary; test drives screen fetch states */,
   () =>
-    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(((
+      ...args: Parameters<typeof fetch>
+    ) => mockFetch(...args)) as jest.Mock),
 );
 
 jest.mock(
@@ -90,6 +97,9 @@ jest.mock(
         pronouns: null,
         consentStatus: null,
       },
+      // [ACCOUNT-04] Expose the explicit proxy flag — individual tests override
+      // mockIsExplicitProxyMode before rendering to simulate proxy state.
+      isExplicitProxyMode: mockIsExplicitProxyMode,
       switchProfile: mockSwitchProfile,
     }),
     useLinkedChildren: () => mockLinkedChildren,
@@ -101,12 +111,13 @@ jest.mock(
 );
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 jest.mock('expo-router', () => ({
-  router: { push: mockPush, replace: jest.fn() },
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  router: { push: mockPush, replace: mockReplace },
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -264,6 +275,7 @@ describe('LearnerScreen', () => {
     mockLinkedChildren = [];
     mockSubscriptionTier = 'plus';
     mockSwitchProfile.mockResolvedValue({ success: true });
+    mockIsExplicitProxyMode = false;
     Wrapper = createWrapper();
   });
 
@@ -499,6 +511,9 @@ describe('LearnerScreen', () => {
   });
 
   it('hides learner-only elements in parent proxy mode', async () => {
+    // [ACCOUNT-04] Proxy mode must be explicitly set — plain profile switches
+    // to a non-owner profile do NOT trigger proxy chrome.
+    mockIsExplicitProxyMode = true;
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
@@ -532,7 +547,44 @@ describe('LearnerScreen', () => {
     });
   });
 
+  it('[ACCOUNT-04] shows learner UI (not proxy chrome) when non-owner profile switches via plain switchProfile', async () => {
+    // Plain profile switch: isExplicitProxyMode stays false (the default).
+    // The child IS the user — must see normal learner surfaces.
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+    });
+
+    render(
+      <LearnerScreen
+        {...defaultProps}
+        profiles={[
+          { id: 'owner-id', displayName: 'Parent', isOwner: true },
+          { id: 'child-id', displayName: 'Alex', isOwner: false },
+        ]}
+        activeProfile={{
+          id: 'child-id',
+          displayName: 'Alex',
+          isOwner: false,
+        }}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('home-subject-carousel');
+      // Learner affordances must be visible — NOT hidden behind proxy chrome.
+      screen.getByTestId('home-ask-anything');
+      screen.getByTestId('home-action-study-new');
+      screen.getByTestId('home-add-subject-tile');
+      screen.getByTestId('home-my-notes');
+      // Proxy-specific elements must be absent.
+      expect(screen.queryByTestId('intent-proxy-placeholder')).toBeNull();
+    });
+  });
+
   it('switches back to parent view before opening child session summaries', async () => {
+    // [ACCOUNT-04] This is the legitimate proxy path — explicit proxy mode set.
+    mockIsExplicitProxyMode = true;
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
@@ -614,6 +666,32 @@ describe('LearnerScreen', () => {
     });
     // Guard against regression: home href must NOT be pushed before camera.
     expect(mockPush).not.toHaveBeenCalledWith(LEARNER_HOME_HREF);
+  });
+
+  // Break test: when LearnerScreen is mounted at the own-learning tab (via
+  // OwnLearningScreen, returnToTab='own-learning'), the Homework action must
+  // pre-seed the back-stack with the own-learning href so router.back() from
+  // camera returns to own-learning instead of falling through to the tabs'
+  // first-route (Home → FamilyHome for guardians). Reverting this guard
+  // re-introduces the guardian back-nav regression from H29.
+  it('seeds own-learning before camera when mounted at own-learning tab', async () => {
+    render(
+      <LearnerScreen
+        {...defaultProps}
+        showParentHome={false}
+        returnToTab={OWN_LEARNING_RETURN_TO}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await waitFor(() => screen.getByTestId('home-action-homework'));
+    fireEvent.press(screen.getByTestId('home-action-homework'));
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenNthCalledWith(1, OWN_LEARNING_HREF);
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/homework/camera',
+      params: { returnTo: OWN_LEARNING_RETURN_TO },
+    });
   });
 
   it('shows coach band from resume target', async () => {
@@ -937,6 +1015,107 @@ describe('LearnerScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-subject',
       params: { returnTo: 'learner-home' },
+    });
+  });
+
+  // [HOME-08] Subject-loading timeout escape actions.
+  //
+  // When the /subjects query is still loading after 15 seconds, the loading
+  // screen must surface two escape routes (Retry and Go to Library) so the
+  // learner is never stuck with a spinner and no way out.
+  //
+  // Strategy: set /subjects to hang (never resolve), use fake timers to advance
+  // past the 15-second threshold, then assert the timeout container and both
+  // CTAs appear. The react-query retry budget is set to 0 in createWrapper()
+  // so the query stays in isLoading without firing real retries.
+  describe('[HOME-08] loading timeout escape actions', () => {
+    let hangingFetchResolve: (() => void) | null = null;
+
+    beforeEach(() => {
+      // Hang the subjects fetch so isLoading stays true.
+      // The outer beforeEach runs first and sets /subjects to {subjects:[]};
+      // this inner beforeEach overrides it to a handler FUNCTION that returns a
+      // never-resolving Promise, keeping the component in isLoading state.
+      //
+      // IMPORTANT: setRoute must receive a function, not a Promise value.
+      // createRoutedMockFetch checks `typeof handler === 'function'` — if the
+      // handler is a Promise object (not a function), it JSON.stringify-es the
+      // Promise to '{}' and returns an immediate 200 response, which resolves
+      // isLoading immediately. Wrapping in an arrow function prevents that.
+      mockFetch.setRoute('/subjects', () => {
+        return new Promise<Response>((resolve) => {
+          hangingFetchResolve = () =>
+            resolve(
+              new Response(JSON.stringify({ subjects: [] }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              }),
+            );
+        });
+      });
+
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      // Resolve the hanging promise to prevent open-handle warnings.
+      hangingFetchResolve?.();
+      jest.useRealTimers();
+    });
+
+    it('shows the timeout container with "Taking longer than usual..." after 15 s', async () => {
+      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+      // Loading state appears immediately — no timeout text yet.
+      screen.getByTestId('learner-loading-state');
+      expect(screen.queryByTestId('learner-loading-timeout')).toBeNull();
+
+      // Advance past the 15-second threshold and flush React state updates.
+      jest.advanceTimersByTime(16_000);
+
+      await waitFor(() => {
+        screen.getByTestId('learner-loading-timeout');
+        screen.getByText('Taking longer than usual...');
+      });
+    });
+
+    it('shows the Retry CTA after timeout', async () => {
+      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+      jest.advanceTimersByTime(16_000);
+
+      await waitFor(() => screen.getByTestId('learner-loading-retry'));
+      // Retry button is present and pressable — pressing must not throw.
+      expect(() =>
+        fireEvent.press(screen.getByTestId('learner-loading-retry')),
+      ).not.toThrow();
+    });
+
+    it('[HOME-08] "Go to Library" CTA navigates to Library (not back to Home)', async () => {
+      // This is the core regression test for HOME-08: the prior "Go home" button
+      // looped back to the same screen (LearnerScreen IS the Home tab).
+      // The fix replaces it with Library + More routes that change state.
+      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+      jest.advanceTimersByTime(16_000);
+
+      await waitFor(() => screen.getByTestId('learner-loading-go-library'));
+      fireEvent.press(screen.getByTestId('learner-loading-go-library'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+      // Must NOT navigate to home — that would be a self-referential loop.
+      expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
+    });
+
+    it('"More options" CTA navigates to More tab', async () => {
+      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+      jest.advanceTimersByTime(16_000);
+
+      await waitFor(() => screen.getByTestId('learner-loading-go-more'));
+      fireEvent.press(screen.getByTestId('learner-loading-go-more'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
     });
   });
 });

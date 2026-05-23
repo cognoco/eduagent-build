@@ -127,7 +127,7 @@ export function LearnerScreen({
   const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { data: subscription } = useSubscription();
-  const { switchProfile } = useProfile();
+  const { switchProfile, isExplicitProxyMode } = useProfile();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
@@ -135,9 +135,10 @@ export function LearnerScreen({
   const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
     string | null
   >(null);
-  const isParentProxy = Boolean(
-    activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
-  );
+  // [ACCOUNT-04] Use the explicit proxy flag from context instead of deriving
+  // from profile shape. A non-owner profile switched to via plain switchProfile()
+  // is a normal learner session — proxy chrome must not appear.
+  const isParentProxy = isExplicitProxyMode;
   const parentProfile = isParentProxy
     ? profiles.find((profile) => profile.isOwner)
     : null;
@@ -164,10 +165,6 @@ export function LearnerScreen({
   }, [dashboard]);
   const returnParams = useMemo(
     () => ({ returnTo: returnToTab }),
-    [returnToTab],
-  );
-  const homeHref = useMemo(
-    () => homeHrefForReturnTo(returnToTab),
     [returnToTab],
   );
 
@@ -396,14 +393,20 @@ export function LearnerScreen({
 
   const openIntentAction = useCallback(
     (route: HomeIntentAction['route']): void => {
-      // [CR-2026-05-19-H29] Previously this seeded the back stack by pushing
-      // `homeHref` before the camera route. That logic was load-bearing when
-      // openIntentAction could be called from somewhere other than Home, but
-      // LearnerScreen IS the Home tab — the user is already on Home when this
-      // fires, so the extra push created a duplicate stack entry (back from
-      // camera → home → home again). Just push the leaf; Expo Router's tab
-      // navigator already falls back to the first tab route on `router.back()`
-      // for cross-stack pushes (see CLAUDE.md "cross-tab router.push" rules).
+      // Cross-tab push to a non-tab route (camera) synthesizes a 1-deep stack;
+      // router.back() then falls through to the tabs navigator's first-route
+      // (Home), which for guardians renders FamilyHome. Seed the back-stack
+      // with the calling tab's href ONLY when LearnerScreen is NOT mounted at
+      // Home (i.e., the own-learning tab via OwnLearningScreen). At Home, the
+      // seed would duplicate the stack entry (back: camera → home → home) —
+      // that's the H29 case [CR-2026-05-19-H29] this conditional preserves.
+      if (
+        route === '/(app)/homework/camera' &&
+        returnToTab !== LEARNER_HOME_RETURN_TO
+      ) {
+        router.push(homeHrefForReturnTo(returnToTab));
+      }
+
       router.push({
         pathname: route,
         params:
@@ -412,7 +415,7 @@ export function LearnerScreen({
             : returnParams,
       } as Href);
     },
-    [returnParams],
+    [returnParams, returnToTab],
   );
 
   if (isLoading) {
@@ -444,12 +447,26 @@ export function LearnerScreen({
                 Retry
               </Text>
             </Pressable>
+            {/* [HOME-08] Replace the self-referential "Go home" (which is this
+                screen) with escape routes that actually change state — matching
+                the recovery pattern already used in home.tsx:119. */}
             <Pressable
-              onPress={() => router.replace(homeHref as Href)}
+              onPress={() => router.replace('/(app)/library' as Href)}
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
-              testID="learner-loading-go-home"
+              testID="learner-loading-go-library"
             >
-              <Text className="text-body text-text-secondary">Go home</Text>
+              <Text className="text-body text-primary font-medium">
+                Go to Library
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.replace('/(app)/more' as Href)}
+              className="min-h-[44px] items-center justify-center px-6 py-2"
+              testID="learner-loading-go-more"
+            >
+              <Text className="text-body text-primary font-medium">
+                More options
+              </Text>
             </Pressable>
           </View>
         )}

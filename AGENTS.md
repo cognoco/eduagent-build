@@ -2,9 +2,9 @@
 
 ## Snapshot
 
-- Mobile: ~80 screens, 251 test suites, ~2594 tests
-- API: 42 route groups, 187 test suites, ~3780 tests, 48 Inngest functions
-- Cross-package integration tests: 43 suites in `tests/integration/`, ~290 cases
+- Mobile: ~88 screens, 311 test suites, ~3446 tests
+- API: 43 route groups, 329 test suites, ~5118 tests, 53 Inngest functions
+- Cross-package integration tests: 44 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
@@ -34,7 +34,6 @@ Key skills:
 | e2e | Mobile Maestro smoke runs | `.agents/skills/e2e/SKILL.md` |
 | maestro-testing | Writing or debugging Maestro flows | `.agents/skills/maestro-testing/SKILL.md` |
 | deep-bugfixing | Adversarial runtime-assumption reviews | `.agents/skills/deep-bugfixing/SKILL.md` |
-| audit-status | Inspect `docs/audit/cleanup-plan.md` state | `.agents/skills/audit-status/SKILL.md` |
 | learning-evolution-next | Learning-product evolution audit | `.agents/skills/learning-evolution-next/SKILL.md` |
 | notion | EduAgent/MentoMate Notion work items | `.agents/skills/notion/SKILL.md` |
 
@@ -166,14 +165,16 @@ cd apps/mobile && pnpm exec tsc --noEmit
 pnpm run db:push:dev
 pnpm run db:generate:dev
 pnpm run db:migrate:dev
+pnpm run db:studio:dev
 
 # LLM Eval Harness
 pnpm eval:llm
 pnpm eval:llm --live
 
 # Playwright E2E (web)
-doppler run -c stg -- pnpm run test:e2e:web:smoke
-doppler run -c stg -- pnpm run test:e2e:web
+# IMPORTANT: Must use Doppler with -c stg to match .dev.vars (which is generated from stg config).
+C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke
+C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web
 ```
 
-Last updated: 2026-05-12
+Last updated: 2026-05-23

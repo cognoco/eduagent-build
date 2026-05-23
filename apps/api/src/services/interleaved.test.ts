@@ -8,6 +8,7 @@ import { createDatabaseModuleMock } from '../test-utils/database-module';
 // Mock database
 const mockFindMany = jest.fn();
 const mockFindFirst = jest.fn();
+const mockSubjectsFindFirst = jest.fn();
 const mockInsert = jest.fn();
 const mockReturning = jest.fn();
 
@@ -15,10 +16,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
   exports: {
     createScopedRepository: jest.fn(() => ({
       retentionCards: { findMany: mockFindMany },
+      subjects: { findFirst: mockSubjectsFindFirst },
     })),
     retentionCards: { topicId: 'topicId', profileId: 'profileId' },
     curriculumTopics: { id: 'id', curriculumId: 'curriculumId' },
     curricula: { id: 'id', subjectId: 'subjectId' },
+    subjects: { id: 'id', profileId: 'profileId' },
     learningSessions: {},
   },
 });
@@ -207,6 +210,10 @@ describe('selectInterleavedTopics', () => {
       }),
     ];
     mockFindMany.mockResolvedValue(allCards);
+    mockSubjectsFindFirst.mockResolvedValue({
+      id: 'subject-001',
+      profileId: PROFILE_ID,
+    });
 
     const db = createMockDb();
     db.query.curricula.findFirst = jest.fn().mockResolvedValue({
@@ -234,6 +241,11 @@ describe('selectInterleavedTopics', () => {
 
   it('returns empty when subject has no curriculum', async () => {
     mockFindMany.mockResolvedValue([createMockCard({ topicId: 'topic-001' })]);
+    // Subject is owned by the caller — ownership passes. But no curriculum exists yet.
+    mockSubjectsFindFirst.mockResolvedValue({
+      id: 'subject-owned',
+      profileId: PROFILE_ID,
+    });
 
     const db = createMockDb();
     db.query.curricula.findFirst = jest.fn().mockResolvedValue(null);
@@ -244,6 +256,39 @@ describe('selectInterleavedTopics', () => {
     });
 
     expect(topics).toEqual([]);
+  });
+
+  it('[CR-018] returns empty when subjectId belongs to a different profile (ownership check)', async () => {
+    // Profile A's card data — would be returned if the ownership check were absent.
+    const profileACard = createMockCard({
+      id: 'c1',
+      topicId: 'topic-001',
+      nextReviewAt: new Date('2026-02-10'),
+    });
+    mockFindMany.mockResolvedValue([profileACard]);
+
+    // Profile B calls with Profile A's subjectId.
+    // The scoped subjects repo returns null — profile B does not own this subject.
+    mockSubjectsFindFirst.mockResolvedValue(null);
+
+    const db = createMockDb();
+    // If the ownership guard were absent, curricula.findFirst would be called and
+    // could return data. We leave it returning a valid curriculum to prove the guard
+    // fires before reaching the DB read.
+    db.query.curricula.findFirst = jest.fn().mockResolvedValue({
+      id: 'curriculum-001',
+      subjectId: 'subject-profile-a',
+    });
+
+    const topics = await selectInterleavedTopics(db, 'profile-b', {
+      subjectId: 'subject-profile-a',
+      topicCount: 5,
+    });
+
+    // Must return the same shape as "not found" — empty array, no profile A data.
+    expect(topics).toEqual([]);
+    // curricula must NOT have been queried — guard fires before DB reads.
+    expect(db.query.curricula.findFirst).not.toHaveBeenCalled();
   });
 
   it('includes stability information on returned topics', async () => {

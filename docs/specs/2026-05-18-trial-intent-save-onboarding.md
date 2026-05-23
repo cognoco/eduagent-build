@@ -54,6 +54,8 @@ test_patterns:
 
 **Date:** 2026-05-18
 
+> **Status (2026-05-23):** Implementation diverged from this spec. Save wizard implemented as inline `SaveWizardGate` in `apps/mobile/src/app/(app)/_layout.tsx` (not as separate `(app)/preview/save.tsx` routes). State module `apps/mobile/src/lib/preview-onboarding-state.ts` uses SecureStore with key `mentomate_preview_intent`, TTL 1 hour, type `PreviewOnboardingStateV0` with path union `'learner_lesson' | 'learner_value_prop' | 'parent_value_prop'`. Server-backed preview lesson API (Phase 2) not implemented.
+
 ## Overview
 
 ### Problem

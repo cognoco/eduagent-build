@@ -91,6 +91,14 @@ jest.mock(
   '../../../hooks/use-subscription' /* gc1-allow: unit test boundary */,
   () => ({
     useSubscription: () => ({ data: { tier: 'family' } }),
+    useSubscriptionStatus: () => ({
+      data: {
+        tier: 'family',
+        status: 'active',
+        monthlyLimit: 700,
+        usedThisMonth: 0,
+      },
+    }),
     useFamilySubscription: () => ({
       data: { profileCount: 2, maxProfiles: 4 },
     }),

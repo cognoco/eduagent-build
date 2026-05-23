@@ -256,9 +256,11 @@ export default function SavedBookmarksScreen() {
                 {t('progress.saved.emptySubtitle')}
               </Text>
               <Pressable
-                onPress={() =>
-                  goBackOrReplace(router, '/(app)/library' as const)
-                }
+                // [LEARN-24] CTA copy says "Go to Library" — use a direct replace
+                // so the user always lands on Library regardless of navigation history.
+                // goBackOrReplace would pick router.back() when canGoBack() is true,
+                // returning the user to Progress instead of Library.
+                onPress={() => router.replace('/(app)/library')}
                 className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={t('progress.saved.goToLibrary')}

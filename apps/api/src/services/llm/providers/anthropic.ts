@@ -60,7 +60,7 @@ interface AnthropicResponse {
 }
 
 export function toAnthropicContent(
-  content: string | MessagePart[]
+  content: string | MessagePart[],
 ): string | AnthropicContentBlock[] {
   if (typeof content === 'string') return content;
   const hasImages = content.some((p) => p.type === 'inline_data');
@@ -78,12 +78,22 @@ export function toAnthropicContent(
   });
 }
 
+// CR-2026-05-21-080: Anthropic has no native JSON response-format flag.
+// When responseFormat='json' is requested, we append a JSON-only directive to
+// the system prompt so callers that depend on structured JSON output don't get
+// free-text and a downstream parse failure.
+const JSON_ONLY_DIRECTIVE =
+  'Respond with a single JSON object only. No prose, no markdown, no code fences.';
+
 /**
  * Convert internal ChatMessage[] to Anthropic format.
  * Anthropic uses a separate `system` parameter instead of a system message
  * in the messages array.
  */
-function toAnthropicFormat(messages: ChatMessage[]): {
+export function toAnthropicFormat(
+  messages: ChatMessage[],
+  responseFormat?: 'json',
+): {
   system: string | undefined;
   messages: AnthropicMessage[];
 } {
@@ -104,6 +114,15 @@ function toAnthropicFormat(messages: ChatMessage[]): {
     }
   }
 
+  // Append JSON directive when caller requests structured JSON output.
+  // Anthropic has no native response_format flag; this is the only reliable
+  // mechanism to steer the model toward a parseable response.
+  if (responseFormat === 'json') {
+    system = system
+      ? `${system}\n\n${JSON_ONLY_DIRECTIVE}`
+      : JSON_ONLY_DIRECTIVE;
+  }
+
   return { system, messages: converted };
 }
 
@@ -117,10 +136,12 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
 
     async chat(
       messages: ChatMessage[],
-      config: ModelConfig
+      config: ModelConfig,
     ): Promise<ChatResult> {
-      const { system, messages: anthropicMessages } =
-        toAnthropicFormat(messages);
+      const { system, messages: anthropicMessages } = toAnthropicFormat(
+        messages,
+        config.responseFormat,
+      );
 
       const body: AnthropicRequest = {
         model: config.model,
@@ -143,7 +164,7 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       if (!res.ok) {
         const errorBody = await res.text();
         throw new Error(
-          `Anthropic API request failed (${res.status}): ${errorBody}`
+          `Anthropic API request failed (${res.status}): ${errorBody}`,
         );
       }
 
@@ -171,8 +192,10 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
 
       async function* generate(): AsyncIterable<string> {
         let rawStopReason: string | undefined;
-        const { system, messages: anthropicMessages } =
-          toAnthropicFormat(messages);
+        const { system, messages: anthropicMessages } = toAnthropicFormat(
+          messages,
+          config.responseFormat,
+        );
 
         const body: AnthropicRequest = {
           model: config.model,
@@ -197,13 +220,13 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
           if (!res.ok) {
             const errorBody = await res.text();
             throw new Error(
-              `Anthropic API stream failed (${res.status}): ${errorBody}`
+              `Anthropic API stream failed (${res.status}): ${errorBody}`,
             );
           }
 
           if (!res.body) {
             throw new Error(
-              'Anthropic API returned no response body for stream'
+              'Anthropic API returned no response body for stream',
             );
           }
 

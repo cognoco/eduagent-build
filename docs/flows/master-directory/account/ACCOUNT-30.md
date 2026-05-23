@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Access label:** Owner/account shared  
 > **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/more/index.tsx`, `apps/mobile/src/app/(app)/more/account.tsx`, `apps/mobile/src/app/(app)/more/privacy.tsx`, `apps/mobile/src/app/(app)/_layout.tsx`, `apps/mobile/src/hooks/use-active-profile-role.ts`, `apps/mobile/src/hooks/use-parent-proxy.ts`, `apps/mobile/src/app/profiles.tsx`, `apps/mobile/e2e/flows/account/more-impersonated-child.yaml`
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/more/index.tsx`, `apps/mobile/src/app/(app)/more/account.tsx`, `apps/mobile/src/app/(app)/more/privacy.tsx`, `apps/mobile/src/app/(app)/_layout.tsx`, `apps/mobile/src/hooks/use-active-profile-role.ts`, `apps/mobile/src/hooks/use-parent-proxy.ts`, `apps/mobile/src/app/profiles.tsx`, `apps/mobile/e2e/flows/account/more-impersonated-child.yaml`
 
 ## Purpose
 

@@ -16,7 +16,8 @@ import { useParentProxy } from './use-parent-proxy';
 // impossible flag combination (isOwner=true AND isParentProxy=true) that the
 // real hook cannot produce — that case overrides useParentProxy via the spy
 // below. All other exports from the module remain real.
-jest.mock('./use-parent-proxy', () => ({ // gc1-allow: defensive impossible-state test; useParentProxy cannot produce isOwner=true && isParentProxy=true from real profiles
+jest.mock('./use-parent-proxy', () => ({
+  // gc1-allow: defensive impossible-state test; useParentProxy cannot produce isOwner=true && isParentProxy=true from real profiles
   ...jest.requireActual('./use-parent-proxy'),
   useParentProxy: jest.fn(),
 }));
@@ -39,13 +40,19 @@ function childDirectWrapper() {
   return createHookWrapper({ activeProfile: child, profiles: [child] }).wrapper;
 }
 
-// Helper: build a wrapper where activeProfile is a non-owner AND an owner exists in list
-// → isParentProxy = true (from real useParentProxy), role = 'impersonated-child'.
+// Helper: build a wrapper where activeProfile is a non-owner AND explicit proxy is set
+// → isParentProxy = true (via isExplicitProxyMode), role = 'impersonated-child'.
+// [ACCOUNT-04] Must set isExplicitProxyMode:true — real useParentProxy no longer
+// derives proxy from profile shape. Only explicit switchProfile(id, {proxyMode:true})
+// triggers proxy; plain profile switches never set it.
 function proxyWrapper() {
   const owner = createTestProfile({ id: 'owner-1', isOwner: true });
   const child = createTestProfile({ id: 'child-1', isOwner: false });
-  return createHookWrapper({ activeProfile: child, profiles: [owner, child] })
-    .wrapper;
+  return createHookWrapper({
+    activeProfile: child,
+    profiles: [owner, child],
+    isExplicitProxyMode: true,
+  }).wrapper;
 }
 
 // Helper: null-profile wrapper (no active profile).
@@ -136,6 +143,7 @@ describe('useActiveProfileRoleState [BUG-130]', () => {
     const ctxValue = {
       profiles: [] as Profile[],
       activeProfile: null,
+      isExplicitProxyMode: false,
       switchProfile: async () => ({ success: true }),
       isLoading: true,
       profileLoadError: null,

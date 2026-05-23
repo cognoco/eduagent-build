@@ -28,6 +28,8 @@ import {
   curriculumAdaptRequestSchema,
   curriculumAdaptResponseSchema,
   subjectClassifyResultSchema,
+  subjectClassifyLlmResponseSchema,
+  subjectSuggestLlmResponseSchema,
   subjectResponseSchema,
   subjectListResponseSchema,
   createSubjectWithStructureResponseSchema,
@@ -93,9 +95,12 @@ describe('topicRelevanceSchema', () => {
 });
 
 describe('curriculumTopicSourceSchema', () => {
-  it.each(['generated', 'user'])('accepts source "%s"', (source) => {
-    expect(curriculumTopicSourceSchema.parse(source)).toBe(source);
-  });
+  it.each(['generated', 'user', 'parent_bridge'])(
+    'accepts source "%s"',
+    (source) => {
+      expect(curriculumTopicSourceSchema.parse(source)).toBe(source);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1050,6 +1055,8 @@ describe('schema export presence', () => {
     expect(curriculumTopicAddResponseSchema).toBeDefined();
     expect(curriculumAdaptSignalSchema).toBeDefined();
     expect(subjectClassifyResultSchema).toBeDefined();
+    expect(subjectClassifyLlmResponseSchema).toBeDefined();
+    expect(subjectSuggestLlmResponseSchema).toBeDefined();
     expect(bookSuggestionsResponseSchema).toBeDefined();
     expect(topicSuggestionSchema).toBeDefined();
     expect(MAX_GENERATED_SUBJECT_BOOKS).toBeGreaterThan(0);

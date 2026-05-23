@@ -47,16 +47,18 @@ Priority: P2
 Platform: Mobile Web, iOS, Android
 Notion: https://www.notion.so/HOMEWORK-01-More-screen-has-no-homework-entry-point-3688bce91f7c81a2ae30c90587fbd3bd
 
+Correction 2026-05-22: Product clarified that Homework was never intended to be surfaced from More. This finding is obsolete and should be treated as stale inventory/doc drift, not an app bug.
+
 Repro:
 1. Open Study.
 2. Go to More.
 3. Look for a homework/help-with-assignment entry point.
 
 Expected:
-- Per the access inventory, homework can be started from learner home or More.
+- Per corrected product direction, homework starts from learner home. It is not surfaced from More.
 
 Actual:
-- Learner home has a homework quick action, but More has no homework row/button.
+- Learner home has a homework quick action. More has no homework row/button, which is expected.
 
 Evidence:
 - `apps/mobile/src/components/home/LearnerScreen.tsx` exposes `home-action-homework`.
@@ -122,4 +124,4 @@ Evidence:
 - Practice hub routes to relearn, quiz, dictation, and recitation were inspected. No source-level dead-end found in PRACTICE-01..04.
 - Quiz generation/play/results/error paths were inspected. Main found navigation break is QUIZ-09.
 - Dictation generation, text preview, playback, completion, review, save/retry paths were inspected. Main found safety break is DICT-06.
-- Homework home entry, More entry, camera/manual/gallery/OCR/session handoff, image pass-through, and permission branches were inspected. Main found breaks are HOMEWORK-01 and HOMEWORK-06.
+- Homework home entry, camera/manual/gallery/OCR/session handoff, image pass-through, and permission branches were inspected. HOMEWORK-01 was later invalidated by product clarification; HOMEWORK-06 remains the active bug.

@@ -48,7 +48,7 @@ export default function ConsentScreen() {
   }>();
   const consentType = 'GDPR' as const;
 
-  const { user } = useUser();
+  const { user, isLoaded: isClerkLoaded } = useUser();
   const { activeProfile } = useProfile();
   const { mutateAsync, isPending } = useRequestConsent();
   const ageBracket =
@@ -138,6 +138,7 @@ export default function ConsentScreen() {
     stripSubAddressing(parentEmail.trim().toLowerCase()) ===
       stripSubAddressing(childEmail.toLowerCase());
   const canSubmit =
+    isClerkLoaded &&
     isValidEmail &&
     !isSameAsChild &&
     !isPending &&
@@ -146,6 +147,9 @@ export default function ConsentScreen() {
     !isOffline;
 
   const onSubmit = useCallback(async () => {
+    // CR-108: backstop — Clerk hydration window; canSubmit already blocks the
+    // button, but guard here too so the same-email check is never skipped.
+    if (!user) return;
     if (!canSubmit || !profileId) return;
 
     setError('');
@@ -161,6 +165,7 @@ export default function ConsentScreen() {
       setError(formatApiError(err));
     }
   }, [
+    user,
     canSubmit,
     profileId,
     consentType,

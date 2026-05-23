@@ -741,23 +741,11 @@ export default function SessionSummaryScreen() {
     finishSummaryNavigation();
   };
 
+  // [LEARN-07] "See your Library" CTA must always navigate to Library.
+  // The previous topic-detail branches were a mismatch with the CTA copy —
+  // topicId/subjectId is context about the session, not a redirect target.
   const handleGoToLibrary = (): void => {
-    if (topicId && subjectId) {
-      router.replace({
-        pathname: '/(app)/topic/[topicId]',
-        params: { topicId, subjectId },
-      } as Href);
-    } else if (fallbackSession?.topicId && fallbackSession.subjectId) {
-      router.replace({
-        pathname: '/(app)/topic/[topicId]',
-        params: {
-          topicId: fallbackSession.topicId,
-          subjectId: fallbackSession.subjectId,
-        },
-      } as Href);
-    } else {
-      router.replace('/(app)/library');
-    }
+    router.replace('/(app)/library');
   };
 
   const handleOpenMentorMemory = (): void => {
@@ -1182,7 +1170,16 @@ export default function SessionSummaryScreen() {
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/topic/[topicId]',
-                    params: { topicId: suggestion.id },
+                    params: {
+                      topicId: suggestion.id,
+                      // [S5-H1] Pass bookId + subjectId so the topic screen
+                      // can pre-select the correct book and subject context,
+                      // matching the direct-navigation path from the shelf.
+                      bookId: suggestion.bookId,
+                      ...((filedSubjectId ?? subjectId)
+                        ? { subjectId: filedSubjectId ?? subjectId }
+                        : {}),
+                    },
                   } as Href)
                 }
                 className="flex-row items-center py-3 border-b border-surface-elevated"

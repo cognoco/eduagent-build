@@ -338,13 +338,15 @@ export default function BookScreen() {
 
   const handleSubjectBookmarksPress = useCallback(() => {
     if (!subjectId) return;
-    router.push('/(app)/progress' as Href);
-    requestAnimationFrame(() => {
-      router.push({
-        pathname: '/(app)/progress/saved',
-        params: { subjectId },
-      } as Href);
-    });
+    // progress/_layout.tsx exports `unstable_settings = { initialRouteName: 'index' }`,
+    // which seeds progress/index in the stack when entering via a cross-tab push.
+    // A single push to the leaf is therefore sufficient — no need to push the
+    // parent first. The extra progress/index push was causing a double-back-press
+    // requirement to return to the originating shelf. (CR-2026-05-21-120)
+    router.push({
+      pathname: '/(app)/progress/saved',
+      params: { subjectId },
+    } as Href);
   }, [router, subjectId]);
 
   // --- Generation auto-trigger ---
@@ -1749,6 +1751,8 @@ export default function BookScreen() {
                     }
                     title={topic.title}
                     relevance={topic.relevance}
+                    sourceChildProfileId={topic.sourceChildProfileId}
+                    createdAt={topic.createdAt}
                     sessionCount={
                       state === 'continue-now' || state === 'started'
                         ? count

@@ -33,28 +33,34 @@ import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
+export const LATE_REVENUECAT_EVENT_OBSERVATION_MS = 48 * 60 * 60 * 1000;
+
 // ---------------------------------------------------------------------------
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
 // ---------------------------------------------------------------------------
 
 /**
  * BS-01: HMAC-based constant-time comparison.
- * Both inputs are hashed with SHA-256 HMAC (using a static key) before
+ * Both inputs are hashed with SHA-256 HMAC (using a private static key) before
  * comparison, producing fixed-length 32-byte digests regardless of input
  * length. This eliminates the length-leak timing side-channel that exists
  * when comparing raw strings of different lengths.
  *
+ * The HMAC key is a private constant — callers cannot vary it, so all
+ * comparisons use a single stable domain label and there is no risk of a
+ * future caller accidentally passing a different label that would silently
+ * change comparison semantics across deployments.
+ *
  * Uses SubtleCrypto (available in Cloudflare Workers) for proper HMAC.
  */
-async function constantTimeCompare(
-  a: string,
-  b: string,
-  secret: string,
-): Promise<boolean> {
+// Private domain-separation label — not a secret, not caller-visible.
+const HMAC_COMPARISON_LABEL = 'eduagent-revenuecat-hmac-comparison-v1';
+
+async function constantTimeCompare(a: string, b: string): Promise<boolean> {
   const encoder = new TextEncoder();
   const hmacKey = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(secret),
+    encoder.encode(HMAC_COMPARISON_LABEL),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],
@@ -747,13 +753,7 @@ export const revenuecatWebhookRoute = new Hono<{
     );
   }
 
-  if (
-    !(await constantTimeCompare(
-      token,
-      webhookSecret,
-      'eduagent-revenuecat-hmac-comparison-v1',
-    ))
-  ) {
+  if (!(await constantTimeCompare(token, webhookSecret))) {
     return apiError(
       c,
       401,
@@ -838,6 +838,28 @@ export const revenuecatWebhookRoute = new Hono<{
         eventType: event.type,
         eventId: event.id,
         accountId,
+      },
+    );
+  }
+
+  // [CR-049] Events older than RevenueCat's normal retry window are suspicious,
+  // but not automatically invalid: delayed purchase/renewal/expiration events
+  // can repair entitlement state. Ordering-based idempotency above is the guard
+  // against stale retries overwriting newer subscription state.
+  const eventAgeMs =
+    event.event_timestamp_ms === undefined
+      ? undefined
+      : Date.now() - event.event_timestamp_ms;
+  if (
+    eventAgeMs !== undefined &&
+    eventAgeMs > LATE_REVENUECAT_EVENT_OBSERVATION_MS
+  ) {
+    logger.warn(
+      '[revenuecat] Late event observed; processing after idempotency',
+      {
+        eventType: event.type,
+        eventId: event.id,
+        eventAgeMs,
       },
     );
   }

@@ -6,12 +6,25 @@ import type {
   VocabularyQuestion,
 } from '@eduagent/schemas';
 import { BadRequestError } from '@eduagent/schemas';
+
+// [CR-2026-05-19-M1] Sentry external-boundary mock — proves captureException
+// fires on mastery upsert failure. Sentry is an external boundary (Sentry SDK).
+const mockCaptureException = jest.fn();
+jest.mock('../sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../sentry') as typeof import('../sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
+
 import {
   assertAnswerInOptions,
   buildMasterySm2Input,
   buildMissedItemText,
   calculateScore,
   calculateXp,
+  completeQuizRound,
   getCapitalsSm2Quality,
   getCelebrationTier,
   getGuessWhoSm2Quality,
@@ -19,6 +32,8 @@ import {
   isAnswerCorrect,
   validateResults,
 } from './complete-round';
+import type { Database } from '@eduagent/database';
+import * as database from '@eduagent/database';
 
 describe('calculateScore', () => {
   it('counts correct answers', () => {
@@ -695,5 +710,149 @@ describe('buildMasterySm2Input [CR-2026-05-19-H9 break test]', () => {
     expect(input.interval).toBe(14);
     expect(input.repetitions).toBe(4);
     expect(input.nextReviewAt).toEqual(new Date('2026-04-15T10:00:00Z'));
+  });
+});
+
+// [CR-2026-05-19-M1] Break test — mastery upsert failure must escalate to Sentry.
+// Uses jest.spyOn on createScopedRepository (avoiding jest.mock of @eduagent/database)
+// so the real module loads but the repo is controlled per-test.
+describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]', () => {
+  const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
+  const ROUND_ID = '00000000-0000-4000-8000-000000000002';
+
+  const capitalsQuestion: CapitalsQuestion = {
+    type: 'capitals',
+    isLibraryItem: false,
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Nice', 'Bordeaux'],
+    funFact: 'Paris is on the Seine river.',
+  };
+
+  const mockRound = {
+    id: ROUND_ID,
+    profileId: PROFILE_ID,
+    status: 'active' as const,
+    activityType: 'capitals' as const,
+    total: 1,
+    questions: [capitalsQuestion],
+    libraryQuestionIndices: [],
+    subjectId: null,
+    score: null,
+    xpEarned: null,
+    completedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    results: null,
+    metadata: null,
+  };
+
+  // Build a minimal repo spy that drives just the mastery upsert path.
+  function makeRepoSpy(upsertImpl: () => Promise<unknown>) {
+    return {
+      quizRounds: {
+        findById: jest.fn().mockResolvedValue(mockRound),
+        completeActive: jest.fn().mockResolvedValue(true),
+        findRecentByActivity: jest.fn().mockResolvedValue([]),
+        findRecentCompletedByActivity: jest.fn().mockResolvedValue([]),
+      },
+      quizMasteryItems: {
+        findByKey: jest.fn().mockResolvedValue(null),
+        upsertFromCorrectAnswer: jest.fn().mockImplementation(upsertImpl),
+        updateSm2: jest.fn().mockResolvedValue(undefined),
+        findDueForProfile: jest.fn().mockResolvedValue([]),
+        incrementMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+        resetMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+      },
+      missedQuizItems: {
+        upsertMissedItems: jest.fn().mockResolvedValue(undefined),
+        softDeleteResolvedItems: jest.fn().mockResolvedValue(undefined),
+      },
+      profiles: { findById: jest.fn().mockResolvedValue(null) },
+      subjects: { findById: jest.fn().mockResolvedValue(null) },
+      xpLedger: { insert: jest.fn().mockResolvedValue(undefined) },
+      vocabulary: {
+        findById: jest.fn().mockResolvedValue(null),
+        findByKey: jest.fn().mockResolvedValue(null),
+      },
+      vocabularyReviews: { upsert: jest.fn().mockResolvedValue(undefined) },
+    };
+  }
+
+  // Make a fake Database where transaction() calls fn with itself (the repo spy
+  // is injected via the createScopedRepository spy below).
+  function makeMockDb(): Database {
+    const self: Database = {
+      transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(self),
+      ),
+    } as unknown as Database;
+    return self;
+  }
+
+  let createScopedRepoSpy: jest.SpyInstance;
+
+  afterEach(() => {
+    mockCaptureException.mockClear();
+    createScopedRepoSpy?.mockRestore();
+  });
+
+  it('[BREAK] captureException fires with surface=quiz.mastery_upsert when upsertFromCorrectAnswer throws', async () => {
+    const upsertError = new Error('DB connection lost during upsert');
+    const repoSpy = makeRepoSpy(() => Promise.reject(upsertError));
+    createScopedRepoSpy = jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repoSpy as unknown as ReturnType<
+          typeof database.createScopedRepository
+        >,
+      );
+
+    const results: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+    ];
+
+    // Must not throw — catch block swallows the error, logs + captures it
+    await expect(
+      completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, results),
+    ).resolves.toBeDefined();
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      upsertError,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'quiz.mastery_upsert',
+          roundId: ROUND_ID,
+          profileId: PROFILE_ID,
+        }),
+      }),
+    );
+  });
+
+  it('[NEGATIVE] captureException does NOT fire on successful upsert', async () => {
+    const repoSpy = makeRepoSpy(() => Promise.resolve({ id: 'mastery-1' }));
+    createScopedRepoSpy = jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repoSpy as unknown as ReturnType<
+          typeof database.createScopedRepository
+        >,
+      );
+
+    const results: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+    ];
+
+    await expect(
+      completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, results),
+    ).resolves.toBeDefined();
+
+    expect(mockCaptureException).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        extra: expect.objectContaining({ surface: 'quiz.mastery_upsert' }),
+      }),
+    );
   });
 });

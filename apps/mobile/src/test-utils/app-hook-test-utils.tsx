@@ -50,6 +50,8 @@ export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
     location: null,
     isOwner: true,
     hasPremiumLlm: false,
+    defaultAppContext: null,
+    hasFamilyLinks: false,
     // BKT-C.1 — required fields on Profile. Default to English tutor, null
     // pronouns (matches the onboarding default path).
     conversationLanguage: 'en',
@@ -65,6 +67,8 @@ export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
 interface CreateHookWrapperOptions {
   activeProfile?: Profile | null;
   profiles?: Profile[];
+  /** [ACCOUNT-04] Set to true to simulate explicit proxy mode (parent viewing child). */
+  isExplicitProxyMode?: boolean;
 }
 
 export function createHookWrapper(options: CreateHookWrapperOptions = {}) {
@@ -81,6 +85,7 @@ export function createHookWrapper(options: CreateHookWrapperOptions = {}) {
   const profileContextValue: ProfileContextValue = {
     profiles,
     activeProfile,
+    isExplicitProxyMode: options.isExplicitProxyMode ?? false,
     switchProfile: async () => ({ success: true }),
     isLoading: false,
     profileLoadError: null,

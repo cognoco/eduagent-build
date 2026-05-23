@@ -14,7 +14,12 @@ import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
-import { useProfile, isGuardianProfile } from '../lib/profile';
+import {
+  useProfile,
+  isGuardianProfile,
+  type SwitchProfileOptions,
+} from '../lib/profile';
+import { useAppContext } from '../lib/app-context';
 import { goBackOrReplace } from '../lib/navigation';
 import { useThemeColors } from '../lib/theme';
 import {
@@ -43,10 +48,9 @@ export default function ProfilesScreen() {
     currentName: string;
   } | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [pendingChildId, setPendingChildId] = useState<string | null>(null);
-  const [pendingChildName, setPendingChildName] = useState('');
   const renameInputRef = useRef<TextInput>(null);
   const switchInFlightRef = useRef(false);
+  const { setMode } = useAppContext();
 
   const canEditProfile = (profileId: string) => {
     if (!activeProfile) return false;
@@ -156,7 +160,10 @@ export default function ProfilesScreen() {
   // NOT add a redundant client-side ownership guard — doing so would be
   // false reassurance about security and would mask a real server-side
   // regression behind a green client check.
-  const handleSwitch = async (profileId: string) => {
+  const handleSwitch = async (
+    profileId: string,
+    options?: SwitchProfileOptions,
+  ) => {
     if (isSwitching || switchInFlightRef.current) return;
     switchInFlightRef.current = true;
     setIsSwitching(true);
@@ -166,7 +173,10 @@ export default function ProfilesScreen() {
       platformAlert('Taking longer than expected', 'Please try again.');
     }, 20_000);
     try {
-      const result = await switchProfile(profileId);
+      const result =
+        options !== undefined
+          ? await switchProfile(profileId, options)
+          : await switchProfile(profileId);
       clearTimeout(timeoutId);
       if (result?.success === false) {
         platformAlert(
@@ -201,25 +211,15 @@ export default function ProfilesScreen() {
 
   const handleProfileTap = (profile: (typeof profiles)[number]) => {
     if (activeProfile?.isOwner && !profile.isOwner) {
-      setPendingChildName(profile.displayName);
-      setPendingChildId(profile.id);
+      setMode('family');
+      router.replace({
+        pathname: '/(app)/child/[profileId]',
+        params: { profileId: profile.id, mode: 'settings' },
+      });
       return;
     }
 
     void handleSwitch(profile.id);
-  };
-
-  const handleConfirmProxySwitch = () => {
-    if (!pendingChildId) return;
-    const id = pendingChildId;
-    setPendingChildId(null);
-    setPendingChildName('');
-    void handleSwitch(id);
-  };
-
-  const handleCancelProxySwitch = () => {
-    setPendingChildId(null);
-    setPendingChildName('');
   };
 
   // [BUG-375] Auth gate — deep-link entry must not show profile data to
@@ -362,48 +362,6 @@ export default function ProfilesScreen() {
           )}
         </ScrollView>
       )}
-      <Modal
-        visible={pendingChildId !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={handleCancelProxySwitch}
-        testID="proxy-confirm-modal"
-      >
-        <View className="flex-1 justify-end bg-black/50">
-          <View
-            className="bg-surface rounded-t-2xl px-6 pt-6"
-            style={{ paddingBottom: Math.max(insets.bottom + 16, 32) }}
-          >
-            <Text className="text-h2 font-bold text-text-primary mb-3">
-              Viewing {pendingChildName}&apos;s account
-            </Text>
-            <Text className="text-body text-text-secondary mb-6">
-              You&apos;ll see their library, progress, recaps and saved
-              bookmarks. Chats are private to {pendingChildName}.
-            </Text>
-            <Pressable
-              onPress={handleConfirmProxySwitch}
-              className="bg-primary rounded-button py-3.5 items-center mb-3"
-              accessibilityRole="button"
-              accessibilityLabel={`View ${pendingChildName}'s account`}
-              testID="proxy-confirm-view"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                View account
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={handleCancelProxySwitch}
-              className="py-3.5 items-center"
-              accessibilityRole="button"
-              accessibilityLabel="Cancel"
-              testID="proxy-confirm-cancel"
-            >
-              <Text className="text-body text-text-secondary">Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
       <Modal
         visible={renaming !== null}
         transparent

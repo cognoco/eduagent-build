@@ -47,6 +47,7 @@ import { useResolveSubject } from '../../../hooks/use-resolve-subject';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStreaks } from '../../../hooks/use-streaks';
 import { useActiveSessionForTopic } from '../../../hooks/use-progress';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   useTotalTopicsCompleted,
   useIsFirstSession,
@@ -127,7 +128,8 @@ function SessionScreenInner() {
     recap,
     resumeFromSessionId,
     gaps: rawGaps,
-    returnTo,
+    returnTo: rawReturnTo,
+    returnId: rawReturnId,
     verificationType: routeVerificationType,
     imageUri: rawImageUri,
     imageMimeType: rawImageMimeType,
@@ -146,7 +148,8 @@ function SessionScreenInner() {
     recap?: string;
     resumeFromSessionId?: string;
     gaps?: string;
-    returnTo?: string;
+    returnTo?: string | string[];
+    returnId?: string | string[];
     verificationType?: string;
     imageUri?: string;
     imageMimeType?: string;
@@ -154,6 +157,8 @@ function SessionScreenInner() {
   // [BUG-635] Coerce Expo Router's `string | string[]` to a single string.
   const imageUri = firstParam(rawImageUri);
   const imageMimeType = firstParam(rawImageMimeType);
+  const returnTo = firstParam(rawReturnTo);
+  const returnId = firstParam(rawReturnId);
   const gaps = useMemo(() => {
     const raw = firstParam(rawGaps);
     if (!raw) return undefined;
@@ -171,13 +176,16 @@ function SessionScreenInner() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
+  const navigationContract = useNavigationContract();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
   const effectiveMode = mode ?? 'freeform';
-  const homeBackHref = homeHrefForReturnTo(returnTo);
+  const homeBackHref = homeHrefForReturnTo(returnTo, returnId);
   const chatBackFallback = returnTo
-    ? (homeBackHref as string)
+    ? typeof homeBackHref === 'string'
+      ? homeBackHref
+      : undefined
     : subjectId
       ? `/(app)/shelf/${subjectId}`
       : undefined;
@@ -217,9 +225,19 @@ function SessionScreenInner() {
         ...(topicId ? { topicId } : {}),
         ...(topicName ? { topicName } : {}),
         ...(returnTo ? { returnTo } : {}),
+        ...(returnId ? { returnId } : {}),
       },
     } as Href);
-  }, [mode, returnTo, router, subjectId, subjectName, topicId, topicName]);
+  }, [
+    mode,
+    returnId,
+    returnTo,
+    router,
+    subjectId,
+    subjectName,
+    topicId,
+    topicName,
+  ]);
   const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
   const normalizedCaptureSource = Array.isArray(captureSource)
     ? captureSource[0]
@@ -1104,7 +1122,7 @@ function SessionScreenInner() {
         messageFeedback,
         bookmarkState,
         quotaError,
-        isOwner: activeProfile?.isOwner === true,
+        isOwner: navigationContract.gates.sessionIsOwner,
         stage: conversationStage,
         handleQuickChip,
         handleMessageFeedback,
@@ -1114,7 +1132,7 @@ function SessionScreenInner() {
     });
 
   return (
-    <View className="flex-1">
+    <View className="flex-1" testID="session-screen">
       <ChatShell
         title={modeConfig.title}
         subtitle={subtitle}

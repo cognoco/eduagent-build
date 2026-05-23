@@ -32,6 +32,16 @@ describe('shelf/_layout.tsx', () => {
     capturedScreens.length = 0;
   });
 
+  // [BUG-404] Cross-stack pushes from another tab to shelf/[subjectId]/book/[bookId]
+  // synthesize a 1-deep stack that has no shelf index in the back chain, so
+  // router.back() from the book screen falls through to Home. unstable_settings
+  // with initialRouteName seeds a shelf index underneath, giving a 2-deep stack.
+  it('[BUG-404] exports unstable_settings with initialRouteName to seed back stack for cross-tab deep pushes', () => {
+    const layout = require('./_layout');
+    expect(layout.unstable_settings).toBeDefined();
+    expect(layout.unstable_settings.initialRouteName).toBe('[subjectId]');
+  });
+
   it('declares a Stack.Screen for [subjectId] with getId', () => {
     render(<ShelfLayout />);
 

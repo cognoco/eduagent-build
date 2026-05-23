@@ -939,7 +939,7 @@
     "empty": {
       "title": "Tu biblioteca está vacía",
       "message": "Inicia una sesión de estudio y tus materias aparecerán aquí.",
-      "goHome": "Ir a Inicio"
+      "createFirstSubject": "Añade tu primera materia"
     },
     "curriculumComplete": {
       "title": "¡Has cubierto todo aquí!",
@@ -1301,7 +1301,7 @@
   "homework": {
     "permissionTitle": "Se necesita acceso a la cámara",
     "permissionPrompt": "Toma una foto de tu tarea y te ayudaré a resolverla paso a paso.",
-    "permissionDenied": "Se denegó el acceso a la cámara. Puedes habilitarlo en los ajustes de tu dispositivo para fotografiar los problemas de la tarea.",
+    "permissionDenied": "Se desactivó el acceso a la cámara. Tu teléfono no nos deja preguntar de nuevo — toca «Abrir Ajustes» y activa la cámara para esta app.",
     "openSettings": "Abrir Ajustes",
     "openSettingsLabel": "Abrir ajustes del dispositivo",
     "allowCamera": "Permitir cámara",
@@ -1963,7 +1963,11 @@
       "thisChild": "este niño",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Confirmar — retirar consentimiento",
-      "withdraw": "Retirar"
+      "withdraw": "Retirar",
+      "curriculumTitle": "Currículo",
+      "curriculumSubtitle": "Explora las asignaturas y temas de {{name}}",
+      "curriculumNotAvailableTitle": "El plan de estudios de este niño no está disponible",
+      "curriculumNotAvailableBody": "Solo puedes revisar el plan de estudios de los niños vinculados a la cuenta familiar."
     },
     "mentorMemory": {
       "title": "Memoria del mentor",
@@ -2307,7 +2311,11 @@
     "progress": "Progreso",
     "progressLabel": "Progreso",
     "more": "Más",
-    "moreLabel": "Más"
+    "moreLabel": "Más",
+    "children": "Hijos",
+    "childrenLabel": "Hijos",
+    "recaps": "Resúmenes",
+    "recapsLabel": "Resúmenes"
   },
   "ocrTimeout": "La lectura tardó demasiado — inténtalo de nuevo",
   "permissionTitle": "Se necesita acceso a la cámara",
@@ -2588,5 +2596,33 @@
       "noRoundsYet": "Sin rondas aún",
       "hintOpenHistory": "Abre el historial de quiz"
     }
+  },
+  "recaps": {
+    "title": "Resúmenes",
+    "subtitle": "Momentos de aprendizaje recientes de tu familia.",
+    "emptyTitle": "Aún no hay resúmenes",
+    "emptyBody": "Las sesiones completadas aparecerán aquí cuando haya algo que resumir.",
+    "errorTitle": "No se pudieron cargar los resúmenes",
+    "errorMessage": "Inténtalo de nuevo en un momento.",
+    "summaryPending": "Se está preparando un resumen para esta sesión.",
+    "openRecapLabel": "Abrir el resumen de {{child}} para {{title}}",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   }
 }

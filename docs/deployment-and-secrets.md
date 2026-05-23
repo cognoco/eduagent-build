@@ -130,7 +130,7 @@ Secrets come from **three sources**:
 
 2. **Sensitive secrets** — synced from Doppler `stg` config to Cloudflare Workers via `pnpm secrets:sync stg`. Stored as Workers Secrets on the `mentomate-api-stg` worker.
 
-3. **GitHub Actions secrets** — `CLOUDFLARE_API_TOKEN` authenticates `wrangler deploy`, and `DATABASE_URL_STAGING` is used for staging migrations in `deploy.yml`.
+3. **GitHub Actions secrets** — `CLOUDFLARE_API_TOKEN` authenticates `wrangler deploy`, `DATABASE_URL_STAGING` is used for staging migrations, and `DOPPLER_TOKEN_STG` syncs Doppler secrets to the staging Worker before the deploy. `deploy.yml` hard-fails if `DOPPLER_TOKEN_STG` is unset (unless `SKIP_DOPPLER_SYNC` is set after a local sync). Same pattern for production with `DOPPLER_TOKEN_PRD`.
 
 ### Approval gate
 
@@ -210,11 +210,18 @@ Same pattern as staging:
 
 ### Runtime safety net
 
-`apps/api/src/config.ts` enforces **production-required keys** — if any are missing at startup, the worker throws and refuses to start:
+`apps/api/src/config.ts` enforces a two-tier required-keys check at startup:
+
+**Staging and production required keys** (missing → worker throws in both staging and production):
 
 - `CLERK_SECRET_KEY`
 - `CLERK_JWKS_URL`
 - `CLERK_AUDIENCE`
+- `INNGEST_SIGNING_KEY`
+- `INNGEST_EVENT_KEY`
+
+**Production-only required keys** (missing → worker throws in production only):
+
 - `GEMINI_API_KEY`
 - `VOYAGE_API_KEY`
 - `RESEND_API_KEY`
@@ -579,6 +586,8 @@ All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `
 | | `CLERK_JWKS_URL` | Yes |
 | | `CLERK_AUDIENCE` | Yes |
 | **LLM** | `GEMINI_API_KEY` | Yes |
+| | `OPENAI_API_KEY` | No (optional — OpenAI provider only active when key present) |
+| | `ANTHROPIC_API_KEY` | No (optional — Anthropic provider only active when key present) |
 | | `VOYAGE_API_KEY` | Yes |
 | **Email** | `RESEND_API_KEY` | Yes |
 | | `RESEND_WEBHOOK_SECRET` | Yes |
@@ -588,8 +597,8 @@ All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `
 | | `STRIPE_WEBHOOK_SECRET` | No (dormant) |
 | | `STRIPE_PRICE_*` (6 keys) | No (dormant) |
 | | `STRIPE_CUSTOMER_PORTAL_URL` | No (dormant) |
-| **Background Jobs** | `INNGEST_SIGNING_KEY` | No |
-| | `INNGEST_EVENT_KEY` | No |
+| **Background Jobs** | `INNGEST_SIGNING_KEY` | Yes (also staging) |
+| | `INNGEST_EVENT_KEY` | Yes (also staging) |
 | **Observability** | `SENTRY_DSN` | No |
 | **Testing** | `TEST_SEED_SECRET` | No (dev/staging only) |
 | **Prelaunch override** | `ALLOW_MISSING_IDEMPOTENCY_KV` | Only if temporarily launching without the production KV binding |
@@ -603,11 +612,16 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `DATABASE_URL_PRODUCTION` | `deploy.yml` — production Neon migrations before production deploys |
 | `DATABASE_URL_STAGING_HOST` | `deploy.yml` — expected host guard for staging DB target verification |
 | `DATABASE_URL_PRODUCTION_HOST` | `deploy.yml` — expected host guard for production DB target verification |
+| `DOPPLER_TOKEN_STG` | `deploy.yml`, `e2e-web.yml` — staging Doppler service token for Worker secret sync |
+| `DOPPLER_TOKEN_PRD` | `deploy.yml` — production Doppler service token for Worker secret sync |
+| `SKIP_DOPPLER_SYNC` | `deploy.yml` — opt-out flag when Doppler→Worker sync was run locally before dispatch |
 | `STAGING_API_URL` | Optional deploy smoke override; defaults to `https://api-stg.mentomate.com` |
 | `PRODUCTION_API_URL` | Optional deploy smoke override; defaults to `https://api.mentomate.com` |
-| `EXPO_TOKEN` | `deploy.yml`, `mobile-ci.yml` — authenticates EAS CLI |
-| `CLAUDE_CODE_OAUTH_TOKEN` | `claude.yml`, `claude-code-review.yml` — AI review |
-| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | `e2e-ci.yml` — Clerk auth in E2E tests |
+| `EXPO_TOKEN` | `deploy.yml`, `mobile-ci.yml`, `ci.yml` — authenticates EAS CLI |
+| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW` | `ci.yml` (OTA update step), `e2e-ci.yml`, `e2e-web.yml` — Clerk publishable key for preview/staging |
+| `EXPO_PUBLIC_SENTRY_DSN` | `ci.yml` — Sentry DSN injected into preview OTA updates |
+| `TEST_SEED_SECRET` | `e2e-ci.yml`, `e2e-web.yml`, `e2e-web-cleanup.yml` — auth for test seed endpoint |
+| `CLAUDE_CODE_OAUTH_TOKEN` (+ `_2`, `_3`) | `claude.yml`, `claude-code-review.yml` — AI review |
 
 ---
 
@@ -662,6 +676,11 @@ If wrangler is not authenticated, the sync skips gracefully (does not break `pnp
 | **Deploy** | `deploy.yml` | Push to main, manual dispatch | API deploy (staging/prod) + mobile builds |
 | **Mobile CI** | `mobile-ci.yml` | PRs/push touching mobile paths, manual | Mobile lint + test + preview builds |
 | **E2E** | `e2e-ci.yml` | Push/PR (relevant paths), nightly cron, manual | Integration tests + Maestro E2E flows |
+| **E2E Web** | `e2e-web.yml` | PRs | Playwright web E2E suite against staging |
+| **E2E Web Cleanup** | `e2e-web-cleanup.yml` | Nightly cron | Cleans up orphaned Playwright staging seed accounts |
+| **API Quality Gate** | `api-quality-gate.yml` | PRs | Dedicated API lint + typecheck + test gate |
+| **Docs Checks** | `docs-checks.yml` | Push (doc-only paths) | Lightweight checks for plan/spec doc changes |
+| **Claude Code** | `claude.yml` | Issue/PR comments, issue assignment | Claude Code agentic tasks triggered from GitHub |
 | **Code Review** | `claude-code-review.yml` | PRs | AI-assisted code review |
 
 ---

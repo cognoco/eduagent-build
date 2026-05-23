@@ -368,6 +368,17 @@ export function recoveryActions(
  * string-matches on formatted output.
  */
 function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
+  // [CR-145] Precondition: null/undefined cannot be coerced to an Error, and
+  // any attempt to read .message on them throws. Return early so no branch
+  // below can accidentally dereference a null/undefined error.
+  if (error == null) {
+    return {
+      message: DEFAULT_MESSAGE(),
+      category: 'unknown',
+      recovery: 'retry',
+    };
+  }
+
   // 1. Typed NetworkError — thrown by customFetch on fetch rejection
   if (isNetworkError(error)) {
     return {
@@ -457,7 +468,10 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
         ? (friendlyMessage(msg) ?? msg)
         : i18next.t('errors.badRequest'),
       category: 'unknown',
-      recovery: 'retry',
+      // [CR-157] 400 Bad Request cannot be resolved by retrying with the same
+      // payload — the server will reject it again. Go-back so the user can
+      // correct their input or navigate away.
+      recovery: 'go-back',
     };
   }
 
@@ -636,8 +650,16 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
       }
     }
 
-    // 3b. SSE timeout
-    if (msgLower.includes('timed out while waiting for a reply')) {
+    // 3b. SSE timeout — classify by the stable `isTimeout` property set by
+    // sse.ts, then fall back to message heuristic only for legacy paths that
+    // don't set the property. [BUG-389] The property check is the primary
+    // gate: it survives message text changes and i18n refactors. The message
+    // heuristic is retained solely as a belt-and-braces fallback for
+    // third-party or test paths that construct the error without `isTimeout`.
+    if (
+      (error as Error & { isTimeout?: unknown }).isTimeout === true ||
+      msgLower.includes('timed out while waiting for a reply')
+    ) {
       return {
         message: i18next.t('errors.timedOut'),
         category: 'network',
@@ -661,6 +683,9 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
     }
 
     // 6. Short, user-facing messages — pass through via the shared gate.
+    // Recovery is 'retry': this path is a generic fallback that also fires for
+    // spoofed errors (see anti-spoofing test). Only the explicit BadRequestError
+    // path above (branch 5) uses 'go-back' for CR-157. [CR-157]
     if (shouldPassThroughUserMessage(msg)) {
       return {
         message: friendlyMessage(msg) ?? msg,
@@ -670,7 +695,7 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
     }
   }
 
-  // 7. Fallback for null / undefined / non-Error values
+  // 7. Fallback for non-Error values (plain objects, strings, numbers, etc.)
   return { message: DEFAULT_MESSAGE(), category: 'unknown', recovery: 'retry' };
 }
 

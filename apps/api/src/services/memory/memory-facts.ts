@@ -10,7 +10,7 @@ import {
   interestsArraySchema,
   type InterestEntry,
   type StrengthEntry,
-  type StruggleEntry,
+  type FocusAreaEntry,
 } from '@eduagent/schemas';
 import {
   buildMemoryFactRowsFromProjection,
@@ -20,7 +20,7 @@ import {
 
 export type MemorySnapshot = {
   strengths: StrengthEntry[];
-  struggles: StruggleEntry[];
+  struggles: FocusAreaEntry[];
   interests: InterestEntry[];
   communicationNotes: string[];
   suppressedInferences: string[];
@@ -109,7 +109,7 @@ function reconstructStruggle(
   metadata: Record<string, unknown>,
   confidence: unknown,
   observedAt: Date,
-): StruggleEntry | null {
+): FocusAreaEntry | null {
   const topic =
     typeof metadata['topic'] === 'string' ? metadata['topic'] : text;
   if (!topic) return null;
@@ -230,7 +230,7 @@ export function buildProjectionFromMergedState(profile: {
       ? (profile.strengths as StrengthEntry[])
       : [],
     struggles: Array.isArray(profile.struggles)
-      ? (profile.struggles as StruggleEntry[])
+      ? (profile.struggles as FocusAreaEntry[])
       : [],
     interests: interestsParsed.success ? interestsParsed.data : [],
     communicationNotes: asStringArray(profile.communicationNotes),

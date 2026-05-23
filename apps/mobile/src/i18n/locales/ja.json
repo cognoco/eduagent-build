@@ -939,7 +939,7 @@
     "empty": {
       "title": "ライブラリは空です",
       "message": "学習セッションを開始すると、科目がここに表示されます。",
-      "goHome": "ホームへ"
+      "createFirstSubject": "最初の教科を追加"
     },
     "curriculumComplete": {
       "title": "ここではすべてを学習しました！",
@@ -1301,7 +1301,7 @@
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",
     "permissionPrompt": "宿題の写真を撮れば、一歩ずつ解くのを手伝います。",
-    "permissionDenied": "カメラへのアクセスが拒否されました。宿題の問題を撮影するには、デバイスの設定で有効にしてください。",
+    "permissionDenied": "カメラへのアクセスがオフになっています。端末側で再リクエストできないため、「設定を開く」をタップして、このアプリのカメラを有効にしてください。",
     "openSettings": "設定を開く",
     "openSettingsLabel": "デバイスの設定を開く",
     "allowCamera": "カメラを許可",
@@ -1963,7 +1963,11 @@
       "thisChild": "このお子様",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "確認 — 同意を撤回",
-      "withdraw": "撤回"
+      "withdraw": "撤回",
+      "curriculumTitle": "カリキュラム",
+      "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧",
+      "curriculumNotAvailableTitle": "このお子さまのカリキュラムは利用できません",
+      "curriculumNotAvailableBody": "ご家族アカウントに紐づいているお子さまのカリキュラムのみ確認できます。"
     },
     "mentorMemory": {
       "title": "メンターの記憶",
@@ -2307,7 +2311,11 @@
     "progress": "進捗",
     "progressLabel": "進捗",
     "more": "その他",
-    "moreLabel": "その他"
+    "moreLabel": "その他",
+    "children": "お子様",
+    "childrenLabel": "お子様",
+    "recaps": "ふりかえり",
+    "recapsLabel": "ふりかえり"
   },
   "ocrTimeout": "読み取りに時間がかかりすぎました — もう一度お試しください",
   "permissionTitle": "カメラへのアクセスが必要です",
@@ -2588,5 +2596,33 @@
       "noRoundsYet": "まだラウンドなし",
       "hintOpenHistory": "クイズの履歴を開く"
     }
+  },
+  "recaps": {
+    "title": "ふりかえり",
+    "subtitle": "ご家族の最近の学習の記録です。",
+    "emptyTitle": "ふりかえりはまだありません",
+    "emptyBody": "完了したセッションは、要約が作成されるとここに表示されます。",
+    "errorTitle": "ふりかえりを読み込めませんでした",
+    "errorMessage": "しばらくしてからもう一度お試しください。",
+    "summaryPending": "このセッションのふりかえりは現在準備中です。",
+    "openRecapLabel": "{{child}}さんの{{title}}のふりかえりを開く",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   }
 }

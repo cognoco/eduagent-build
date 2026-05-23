@@ -106,15 +106,32 @@ describe('scheduleDeletion', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it('throws and does not claim scheduled when the account is missing', async () => {
+  // [CR-2026-05-21-100] Break test — NotFoundError from getDeletionStatus must NOT
+  // bubble up as a raw 404 to a user who just requested account deletion.
+  //
+  // Scenario: tryScheduleDeletion UPDATE returns 0 rows (concurrent write won the
+  // race), then getDeletionStatus finds the account already gone. Before the fix
+  // the NotFoundError propagated to the caller → user sees "404 Not Found".
+  // After the fix the error is caught and a success-shaped response is returned.
+  //
+  // Red→green: Remove the try/catch in scheduleDeletion and the test fails with
+  // NotFoundError; restore the catch and it passes.
+  it('[CR-2026-05-21-100] returns success-shaped response when account disappears between update and status read', async () => {
     const db = createMockDb({
-      findFirstResult: undefined,
-      updateReturning: [],
+      findFirstResult: undefined, // getDeletionStatus → NotFoundError
+      updateReturning: [], // tryScheduleDeletion → 0 rows (missed the update)
     });
 
-    await expect(
-      scheduleDeletion(db, 'missing-account'),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    const before = Date.now();
+    const result = await scheduleDeletion(db, 'missing-account');
+    const after = Date.now();
+
+    // Must resolve (not reject) with a valid grace-period ISO string.
+    expect(result.scheduledNow).toBe(false);
+    const end = new Date(result.gracePeriodEnds).getTime();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    expect(end).toBeGreaterThanOrEqual(before + sevenDaysMs - 1000);
+    expect(end).toBeLessThanOrEqual(after + sevenDaysMs + 1000);
     expect(db.update).toHaveBeenCalled();
   });
 
@@ -454,6 +471,87 @@ describe('executeDeletion', () => {
     await expect(executeDeletion(db, 'account-1')).resolves.toBe(
       'already_deleted',
     );
+  });
+
+  // [CR-2026-05-21-009] Break test: when the account row is missing at execute
+  // time (0 rows deleted AND no existing row), Sentry must be notified.
+  // This is an unexpected state — account removed outside the normal grace-period
+  // flow (admin delete, concurrent GC, double-fire).
+  //
+  // Red→green: Remove the captureException call in executeDeletion and this
+  // test fails; restore it and it passes.
+  it('[CR-2026-05-21-009] captures Sentry exception when account is missing at execute time', async () => {
+    (captureException as jest.Mock).mockClear();
+
+    const db = {
+      query: {
+        accounts: {
+          findFirst: jest.fn().mockResolvedValue(undefined), // row missing
+        },
+        profiles: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest
+              .fn()
+              .mockResolvedValue([{ deletionScheduledAt: new Date() }]),
+          }),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 0 rows deleted
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await executeDeletion(db, 'account-1');
+
+    expect(result).toBe('already_deleted');
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'account.deletion',
+          reason: 'row-missing-on-execute',
+          accountId: 'account-1',
+        }),
+      }),
+    );
+  });
+
+  it('[CR-2026-05-21-009] does NOT capture Sentry when deletion is cancelled (row exists)', async () => {
+    (captureException as jest.Mock).mockClear();
+
+    const db = {
+      query: {
+        accounts: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'account-1' }), // row present → cancelled
+        },
+        profiles: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest
+              .fn()
+              .mockResolvedValue([{ deletionScheduledAt: new Date() }]),
+          }),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 0 rows deleted
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await executeDeletion(db, 'account-1');
+
+    expect(result).toBe('cancelled');
+    // Sentry must NOT fire for the expected cancel path.
+    expect(captureException).not.toHaveBeenCalled();
   });
 });
 
