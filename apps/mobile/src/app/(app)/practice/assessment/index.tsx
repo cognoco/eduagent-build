@@ -271,8 +271,12 @@ export default function AssessmentScreen() {
           }
         });
       } catch (err: unknown) {
+        // [UX-DE-H4] Do NOT inject server error text into the chat thread —
+        // the AI did not "say" this. Surface the error only in the footer
+        // ErrorFallback (rendered below via lastError), which carries a
+        // retry + go-home pair. Reset streaming so input/retry re-enable.
         const errorMessage = formatApiError(err);
-        animateResponse(errorMessage, setMessages, setIsStreaming);
+        setIsStreaming(false);
         setLastError(errorMessage);
       }
     },

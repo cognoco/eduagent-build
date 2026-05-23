@@ -19,6 +19,7 @@ import {
   useApiClient,
 } from '../lib/api-client';
 import { formatApiError } from '../lib/format-api-error';
+import { useAppContext } from '../lib/app-context';
 import {
   FAMILY_CHILDREN_RETURN_TO,
   FAMILY_PROGRESS_RETURN_TO,
@@ -166,6 +167,18 @@ export function useCloneFromChild(): {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { activeProfile } = useProfile();
+  const { setMode } = useAppContext();
+
+  // Library is a study-only tab (not in FAMILY_TABS / not in V1 guardian
+  // visible tabs). A bare router.push('/(app)/library') from family chrome
+  // navigates to a tab the contract considers hidden. Pair the push with
+  // setMode('study') so the chrome and route stay consistent.
+  const goToLibrary = useCallback((): void => {
+    setMode('study', {
+      onSuccess: () => router.push('/(app)/library' as Href),
+      onError: () => router.push('/(app)/library' as Href),
+    });
+  }, [router, setMode]);
   const [toast, setToast] = useState<CloneToast | null>(null);
   const lastOpenTargetRef = useRef<OpenTarget | null>(null);
   const lastCloneArgsRef = useRef<CloneFromChildArgs | null>(null);
@@ -226,7 +239,7 @@ export function useCloneFromChild(): {
             : undefined,
           secondaryAction: {
             label: 'Go to Library',
-            onPress: () => router.push('/(app)/library' as Href),
+            onPress: goToLibrary,
             testID: 'clone-toast-library-after-undo-failed',
           },
         });
@@ -235,8 +248,25 @@ export function useCloneFromChild(): {
 
       setToast(null);
     },
-    onError: () => {
-      setToast(null);
+    onError: (_error, createdIds) => {
+      // Undo failed (network blip, race with another mutation). Don't silently
+      // clear the toast — that makes the user believe the undo succeeded when
+      // the clone is still in their library. Offer a retry and a path to
+      // Library so they can remove it manually.
+      setToast({
+        kind: 'error',
+        message: "Couldn't undo. Try again, or remove it from Library.",
+        primaryAction: {
+          label: 'Try again',
+          onPress: () => undoMutation.mutate(createdIds),
+          testID: 'clone-toast-undo-retry',
+        },
+        secondaryAction: {
+          label: 'Go to Library',
+          onPress: goToLibrary,
+          testID: 'clone-toast-library-after-undo-error',
+        },
+      });
     },
   });
 

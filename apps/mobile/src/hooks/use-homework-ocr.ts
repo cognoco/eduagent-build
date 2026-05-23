@@ -35,7 +35,12 @@ export type OcrErrorCode =
   | 'LOW_QUALITY'
   | 'NO_TEXT'
   | 'ML_KIT_UNAVAILABLE'
-  | 'CACHE_FAILED';
+  | 'CACHE_FAILED'
+  | 'NETWORK_ERROR'
+  | 'AUTH_EXPIRED'
+  | 'IMAGE_TOO_LARGE'
+  | 'RATE_LIMITED'
+  | 'SERVER_ERROR';
 
 export interface UseHomeworkOcrResult {
   text: string | null;

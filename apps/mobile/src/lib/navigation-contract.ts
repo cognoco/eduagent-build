@@ -414,11 +414,7 @@ export function resolveNavigationContract(
     home,
     chrome: {
       modeSwitcher:
-        familyCapable &&
-        !context.isParentProxy &&
-        context.flags.MODE_NAV_V1_ENABLED
-          ? 'global-header'
-          : 'hidden',
+        familyCapable && !context.isParentProxy ? 'global-header' : 'hidden',
       proxyBanner:
         context.isParentProxy && context.activeProfile ? 'required' : 'hidden',
     },

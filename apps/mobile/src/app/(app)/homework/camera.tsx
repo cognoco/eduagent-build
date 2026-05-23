@@ -741,8 +741,15 @@ export default function CameraScreen(): React.ReactNode {
   // Intercept Android hardware back so it routes through handleClose too;
   // without this, the OS goBack() returns to whichever tab was active when
   // camera was pushed, which for cross-tab pushes is the tabs first-route.
+  // While OCR is in flight (phase === 'processing') we consume the back press
+  // without navigating away — otherwise an accidental back tap silently
+  // discards 3-5s of work with no warning. The result phase has its own
+  // explicit affordances so back behaves normally there.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (phaseRef.current === 'processing') {
+        return true;
+      }
       handleClose();
       return true;
     });
