@@ -27,6 +27,17 @@ describe('deploy migration baseline guard', () => {
     );
   });
 
+  it('[WI-84 DS-008] normal deploy workflow does not run baseline-migrations before migrate', () => {
+    const workflow = readFileSync(
+      resolve(__dirname, '../../../.github/workflows/deploy.yml'),
+      'utf8',
+    );
+
+    expect(workflow).not.toMatch(/Baseline migration journal/);
+    expect(workflow).not.toMatch(/baseline-migrations\.mjs/);
+    expect(workflow).toMatch(/pnpm exec drizzle-kit migrate/);
+  });
+
   it('repairs the subscription Stripe event column drift before parent-bridge schema changes', () => {
     const migration = readFileSync(PARENT_BRIDGE_MIGRATION, 'utf8');
 

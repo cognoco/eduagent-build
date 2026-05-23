@@ -154,6 +154,16 @@ interface ClerkUser {
   external_id: string | null;
 }
 
+function isSeedManagedClerkUserId(
+  clerkUserId: string,
+  seedClerkUserIds: string[] = [],
+): boolean {
+  return (
+    clerkUserId.startsWith(SEED_CLERK_PREFIX) ||
+    seedClerkUserIds.includes(clerkUserId)
+  );
+}
+
 /**
  * Finds or creates a real Clerk user via the Backend API.
  * If a user with the given email already exists, reuses it.
@@ -3597,21 +3607,25 @@ export async function seedScenario(
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  // Idempotent: delete existing accounts with the same email before seeding.
-  // Defence-in-depth: look up by email first, then delete by PK only if the
-  // account has a recognizable seed marker (clerk_seed_* prefix) or real Clerk
-  // user ID (user_* prefix from seed runs with CLERK_SECRET_KEY).
-  // This avoids a blind `DELETE WHERE email = ?` which would be dangerous if
-  // the environment guard ever failed (COPPA-regulated platform).
+  const seedMarkedClerkUser =
+    env.CLERK_SECRET_KEY != null
+      ? await findClerkUserByEmail(email, env)
+      : null;
+  const seedClerkUserIds =
+    seedMarkedClerkUser?.external_id?.startsWith(SEED_CLERK_PREFIX) === true
+      ? [seedMarkedClerkUser.id]
+      : [];
+
+  // Idempotent: delete existing seed accounts with the same email before
+  // seeding. Defence-in-depth: look up by email first, then delete by PK only
+  // if the account has a recognizable local seed marker (clerk_seed_* prefix)
+  // or a real Clerk user ID that Clerk itself marks with our seed external_id.
   // Child tables cascade via ON DELETE CASCADE.
   const existingAccounts = await db.query.accounts.findMany({
     where: eq(accounts.email, email),
   });
   for (const existing of existingAccounts) {
-    if (
-      existing.clerkUserId.startsWith(SEED_CLERK_PREFIX) ||
-      existing.clerkUserId.startsWith('user_')
-    ) {
+    if (isSeedManagedClerkUserId(existing.clerkUserId, seedClerkUserIds)) {
       await db.delete(accounts).where(eq(accounts.id, existing.id));
     }
   }
@@ -3634,9 +3648,22 @@ export async function resetDatabase(
     : await deleteClerkTestUsers(env, { prefix });
 
   if (prefix) {
+    const existingAccounts = await db.query.accounts.findMany({
+      where: like(accounts.email, `${prefix}%`),
+    });
+    const seedAccountIds = existingAccounts
+      .filter((account) =>
+        isSeedManagedClerkUserId(account.clerkUserId, clerkUserIds),
+      )
+      .map((account) => account.id);
+
+    if (seedAccountIds.length === 0) {
+      return { deletedCount: 0, clerkUsersDeleted };
+    }
+
     const deleted = await db
       .delete(accounts)
-      .where(like(accounts.email, `${prefix}%`))
+      .where(inArray(accounts.id, seedAccountIds))
       .returning({ id: accounts.id });
 
     return { deletedCount: deleted.length, clerkUsersDeleted };

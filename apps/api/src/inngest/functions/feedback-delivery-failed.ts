@@ -26,8 +26,15 @@ const logger = createLogger();
 // silently safeParse-fail every event the route fires — exactly the
 // "wired-but-untriggered" anti-pattern A-24 was filed to prevent.
 const eventDataSchema = z.object({
-  profileId: z.string(),
+  profileId: z.string().min(1),
+  userId: z.string().min(1),
   category: z.enum(['bug', 'suggestion', 'other']),
+  message: z.string().min(1).max(2000),
+  supportTo: z.string().email().optional(),
+  metaLines: z.string().min(1).max(2000),
+  appVersion: z.string().max(20).optional(),
+  platform: z.enum(['ios', 'android', 'web']).optional(),
+  osVersion: z.string().max(30).optional(),
 });
 
 export const feedbackDeliveryFailed = inngest.createFunction(
@@ -68,7 +75,8 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       );
       return { status: 'skipped' as const, reason: 'invalid_payload', issues };
     }
-    const { profileId, category } = validated.data;
+    const { profileId, userId, category, message, supportTo, metaLines } =
+      validated.data;
 
     const categoryLabel =
       category === 'bug'
@@ -110,7 +118,14 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           'retry-delivery',
         );
       } else {
-        const hashInput = JSON.stringify({ profileId, category });
+        const hashInput = JSON.stringify({
+          profileId,
+          userId,
+          category,
+          message,
+          supportTo,
+          metaLines,
+        });
         const hash = createHash('sha256')
           .update(hashInput)
           .digest('hex')
@@ -127,6 +142,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             surface: 'feedback-delivery-failed',
             reason: 'missing_event_id',
             profileId,
+            userId,
             category,
           },
         );
@@ -139,6 +155,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
               surface: 'feedback-delivery-failed',
               reason: 'missing_event_id',
               profileId,
+              userId,
               category,
             },
           },
@@ -147,12 +164,12 @@ export const feedbackDeliveryFailed = inngest.createFunction(
 
       const result = await sendEmail(
         {
-          to: getStepSupportEmail(),
+          to: supportTo ?? getStepSupportEmail(),
           subject: `[MentoMate ${categoryLabel}] delivery-retry for ${profileId.slice(
             0,
             8,
           )}`,
-          body: `[Delayed delivery] Category: ${category}\nProfile: ${profileId}\nOriginal delivery failed — this is a retry from the Inngest queue.`,
+          body: `${message}\n\n---\n${metaLines}`,
           type: 'feedback',
         },
         { resendApiKey, emailFrom, idempotencyKey },

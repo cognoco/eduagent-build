@@ -20,6 +20,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const WRANGLER_TOML_PATH = join(__dirname, '..', 'wrangler.toml');
+const DEPLOY_WORKFLOW_PATH = join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  '.github',
+  'workflows',
+  'deploy.yml',
+);
 
 function getTableSection(toml: string, tableName: string): string {
   const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -38,9 +47,11 @@ function getTableSection(toml: string, tableName: string): string {
 
 describe('wrangler.toml config guards', () => {
   let content: string;
+  let deployWorkflow: string;
 
   beforeAll(() => {
     content = readFileSync(WRANGLER_TOML_PATH, 'utf-8');
+    deployWorkflow = readFileSync(DEPLOY_WORKFLOW_PATH, 'utf-8');
   });
 
   describe('[CFG-3] production workers_dev', () => {
@@ -125,6 +136,43 @@ describe('wrangler.toml config guards', () => {
         /^API_ORIGIN\s*=\s*"https:\/\/api\.mentomate\.com"/m,
       );
       expect(productionVars).not.toMatch(/workers\.dev/);
+    });
+  });
+
+  describe('[WI-84 DS-042] IDEMPOTENCY_KV deploy safety', () => {
+    function hasEnvBinding(envName: 'staging' | 'production'): boolean {
+      const blocks = content.matchAll(
+        new RegExp(
+          `^\\[\\[env\\.${envName}\\.kv_namespaces\\]\\]([\\s\\S]*?)(?=^\\[\\[|^\\[env\\.|$)`,
+          'gm',
+        ),
+      );
+      return Array.from(blocks).some((block) => {
+        const body = block[1] ?? '';
+        const binding = body.match(/^binding\s*=\s*"([^"]+)"/m)?.[1];
+        const id = body.match(/^id\s*=\s*"([^"<][^"]+)"/m)?.[1];
+        return binding === 'IDEMPOTENCY_KV' && Boolean(id);
+      });
+    }
+
+    function deployWorkflowBlocksMissingBinding(): boolean {
+      const guardIndex = deployWorkflow.indexOf(
+        'verify-wrangler-kv-binding.mjs',
+      );
+      const deployIndex = deployWorkflow.indexOf('wrangler deploy');
+      return guardIndex >= 0 && deployIndex >= 0 && guardIndex < deployIndex;
+    }
+
+    it('staging either declares IDEMPOTENCY_KV or the deploy workflow blocks missing binding', () => {
+      expect(
+        hasEnvBinding('staging') || deployWorkflowBlocksMissingBinding(),
+      ).toBe(true);
+    });
+
+    it('production either declares IDEMPOTENCY_KV or the deploy workflow blocks missing binding', () => {
+      expect(
+        hasEnvBinding('production') || deployWorkflowBlocksMissingBinding(),
+      ).toBe(true);
     });
   });
 });

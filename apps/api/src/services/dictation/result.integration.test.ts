@@ -50,6 +50,10 @@ function getPreviousDate(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+function completionKey(n: number): string {
+  return `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+}
+
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
   const rows = await db.query.accounts.findMany({
@@ -142,6 +146,7 @@ describe('recordDictationResult (integration)', () => {
     const today = getServerDate();
 
     await recordDictationResult(db, profileId, {
+      completionKey: completionKey(1),
       localDate: today,
       sentenceCount: 5,
       mistakeCount: 2,
@@ -164,6 +169,7 @@ describe('recordDictationResult (integration)', () => {
     const before = new Date();
 
     const row = await recordDictationResult(db, profileId, {
+      completionKey: completionKey(2),
       localDate: '2026-05-13',
       sentenceCount: 5,
       mistakeCount: 2,
@@ -188,6 +194,7 @@ describe('recordDictationResult (integration)', () => {
     const today = getServerDate();
 
     await recordDictationResult(db, profileId, {
+      completionKey: completionKey(3),
       localDate: today,
       sentenceCount: 5,
       mistakeCount: 2,
@@ -196,6 +203,7 @@ describe('recordDictationResult (integration)', () => {
     });
 
     const second = await recordDictationResult(db, profileId, {
+      completionKey: completionKey(4),
       localDate: today,
       sentenceCount: 8,
       mistakeCount: 1,
@@ -211,15 +219,14 @@ describe('recordDictationResult (integration)', () => {
     expect(second.mode).toBe('surprise');
   });
 
-  // [BUG-4] Same (profile_id, date, mode) must be idempotent at the DB layer.
-  // Before the fix, a client retry of the same completion event accumulated
-  // duplicate rows because the table had only a plain index on (profile_id, date)
-  // and the repository performed a bare INSERT with no onConflict handler.
-  it('[BUG-4] same (profileId, date, mode) is idempotent — retry upserts, no duplicate row', async () => {
+  it('[WI-84 DS-115] same-day same-mode completions are distinct by completionKey while retries upsert', async () => {
     const db = createIntegrationDb();
     const today = getServerDate();
+    const keyA = completionKey(5);
+    const keyB = completionKey(6);
 
     const first = await recordDictationResult(db, profileId, {
+      completionKey: keyA,
       localDate: today,
       sentenceCount: 5,
       mistakeCount: 2,
@@ -227,10 +234,8 @@ describe('recordDictationResult (integration)', () => {
       reviewed: false,
     });
 
-    // Same (date, mode) — simulates a network retry. The second call must
-    // not create a second row; instead it updates the existing row with the
-    // latest counts/reviewed flag (last write wins).
     const second = await recordDictationResult(db, profileId, {
+      completionKey: keyB,
       localDate: today,
       sentenceCount: 6,
       mistakeCount: 1,
@@ -238,15 +243,23 @@ describe('recordDictationResult (integration)', () => {
       reviewed: true,
     });
 
+    const retry = await recordDictationResult(db, profileId, {
+      completionKey: keyA,
+      localDate: today,
+      sentenceCount: 7,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: true,
+    });
+
     const rows = await db.query.dictationResults.findMany({
       where: eq(dictationResults.profileId, profileId),
     });
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
     expect(rows[0]!.id).toBe(first.id);
-    expect(second.id).toBe(first.id);
-    expect(rows[0]!.sentenceCount).toBe(6);
-    expect(rows[0]!.mistakeCount).toBe(1);
-    expect(rows[0]!.reviewed).toBe(true);
+    expect(second.id).not.toBe(first.id);
+    expect(retry.id).toBe(first.id);
+    expect(rows.find((row) => row.id === first.id)?.sentenceCount).toBe(7);
   });
 
   // [SECURITY-IDOR] CCR PR #241 break test. Without ownership validation, an
@@ -261,6 +274,7 @@ describe('recordDictationResult (integration)', () => {
 
     await expect(
       recordDictationResult(db, profileId, {
+        completionKey: completionKey(7),
         localDate: today,
         sentenceCount: 5,
         mistakeCount: 2,
@@ -308,6 +322,7 @@ describe('recordDictationResult (integration)', () => {
       .returning();
 
     const row = await recordDictationResult(db, profileId, {
+      completionKey: completionKey(8),
       localDate: today,
       sentenceCount: 4,
       mistakeCount: 0,
@@ -346,8 +361,9 @@ describe('getDictationStreak (integration)', () => {
     const yesterday = getPreviousDate(today);
     const dayBefore = getPreviousDate(yesterday);
 
-    for (const date of [today, yesterday, dayBefore]) {
+    for (const [index, date] of [today, yesterday, dayBefore].entries()) {
       await recordDictationResult(db, profileId, {
+        completionKey: completionKey(9 + index),
         localDate: date,
         sentenceCount: 5,
         mistakeCount: 0,
@@ -366,6 +382,7 @@ describe('getDictationStreak (integration)', () => {
     const today = getServerDate();
 
     await recordDictationResult(db, profileId, {
+      completionKey: completionKey(12),
       localDate: today,
       sentenceCount: 5,
       mistakeCount: 0,
@@ -373,6 +390,7 @@ describe('getDictationStreak (integration)', () => {
       reviewed: false,
     });
     await recordDictationResult(db, profileId, {
+      completionKey: completionKey(13),
       localDate: today,
       sentenceCount: 8,
       mistakeCount: 1,

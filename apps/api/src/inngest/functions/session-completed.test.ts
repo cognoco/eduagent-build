@@ -527,6 +527,7 @@ function createEventData(
 describe('sessionCompleted', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (createDatabase as jest.Mock).mockReturnValue(mockSessionCompletedDb);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
     process.env['VOYAGE_API_KEY'] = 'pa-test-key-123';
     // Default: pending consent — analyze-learner-profile step short-circuits.
@@ -1002,47 +1003,42 @@ describe('sessionCompleted', () => {
   });
 
   describe('update-vocabulary-retention step', () => {
-    // getStepDatabase() caches the db instance per URL. We need to reset
-    // the cache before each test so the fresh createDatabase() mock is used.
-    // Import the reset helper from the inngest helpers module.
+    // Import the reset helper from the inngest helpers module so this describe
+    // controls the injected URL independently from the other session tests.
     const { resetDatabaseUrl } = require('../helpers');
 
     function setupSubjectMock(subjectData: Record<string, unknown> | null) {
-      // Reset the db cache so getStepDatabase() calls createDatabase() again
       resetDatabaseUrl();
-      // Override the createDatabase mock to return a db with the desired subject
-      (createDatabase as jest.Mock).mockImplementationOnce(() => {
-        const chainable = () => ({
-          from: () => ({
-            where: () => ({
-              orderBy: () => ({ limit: () => Promise.resolve([]) }),
-              limit: () => Promise.resolve([]),
-            }),
+      const chainable = () => ({
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({ limit: () => Promise.resolve([]) }),
+            limit: () => Promise.resolve([]),
           }),
-        });
-        const db: Record<string, unknown> = {
-          query: {
-            sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
-            curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
-            subjects: {
-              findFirst: jest.fn().mockResolvedValue(subjectData),
-            },
-            learningProfiles: {
-              findFirst: jest.fn().mockResolvedValue({
-                memoryConsentStatus: 'pending',
-                memoryCollectionEnabled: false,
-                memoryEnabled: false,
-              }),
-            },
-            streaks: { findFirst: jest.fn().mockResolvedValue(null) },
-          },
-          select: chainable,
-        };
-        db.transaction = jest
-          .fn()
-          .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
-        return db;
+        }),
       });
+      const db: Record<string, unknown> = {
+        query: {
+          sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+          curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
+          subjects: {
+            findFirst: jest.fn().mockResolvedValue(subjectData),
+          },
+          learningProfiles: {
+            findFirst: jest.fn().mockResolvedValue({
+              memoryConsentStatus: 'pending',
+              memoryCollectionEnabled: false,
+              memoryEnabled: false,
+            }),
+          },
+          streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+        },
+        select: chainable,
+      };
+      db.transaction = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+      (createDatabase as jest.Mock).mockImplementation(() => db);
     }
 
     const fourStrandsSubject = {

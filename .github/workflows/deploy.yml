@@ -73,15 +73,15 @@ jobs:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
       CI: true
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           filter: tree:0
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           standalone: true
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: 'pnpm'
@@ -134,13 +134,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           standalone: true
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: 'pnpm'
@@ -165,10 +165,10 @@ jobs:
       # `secrets.DATABASE_URL_STAGING` would silently fall through to
       # `DATABASE_URL_PRODUCTION` — i.e. a staging deploy could run
       # migrations on the production database. The downstream ternaries at
-      # the env: blocks of the verify / baseline / migrate steps below all
-      # share the same evaluation pattern, so this Assert step is the single
-      # chokepoint that protects all of them. Verify the intended secret was
-      # actually set before any URL assignment is used.
+      # the env: blocks of the verify / migrate steps below share the same
+      # evaluation pattern, so this Assert step is the single chokepoint that
+      # protects all of them. Verify the intended secret was actually set
+      # before any URL assignment is used.
       - name: Assert correct DATABASE_URL secret is set for deploy target
         env:
           IS_STAGING: ${{ github.event_name == 'push' || inputs.api_environment == 'staging' }}
@@ -214,12 +214,6 @@ jobs:
           DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
         run: node packages/database/scripts/verify-db-target.mjs
 
-      - name: Baseline migration journal (push→migrate transition)
-        working-directory: packages/database
-        env:
-          DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
-        run: node scripts/baseline-migrations.mjs
-
       - name: Run database migrations
         working-directory: packages/database
         env:
@@ -237,6 +231,7 @@ jobs:
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Deploying API to ${DEPLOY_ENV}"
+          node scripts/verify-wrangler-kv-binding.mjs wrangler.toml "${DEPLOY_ENV}" IDEMPOTENCY_KV
           pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
 
       # [BUG-238] When the Doppler token is missing the sync step previously
@@ -289,7 +284,7 @@ jobs:
         if: failure()
         env:
           DEPLOY_ENV: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const deployEnv = process.env.DEPLOY_ENV || 'unknown';
@@ -411,7 +406,7 @@ jobs:
       # [BUG-953] Re-use the same failure notification pattern for smoke failures.
       - name: Notify on smoke test failure
         if: failure()
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -494,7 +489,7 @@ jobs:
 
       - name: Notify on production smoke test failure
         if: failure()
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -549,13 +544,13 @@ jobs:
       (needs.mobile-confirm-production.result == 'success' || needs.mobile-confirm-production.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           standalone: true
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: 'pnpm'
@@ -563,7 +558,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Setup Expo
-        uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e  # v8
+        uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e # v8
         with:
           eas-version: 18.x
           packager: pnpm

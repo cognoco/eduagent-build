@@ -11,6 +11,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useState, useEffect, useRef } from 'react';
+import * as Crypto from 'expo-crypto';
 
 export default function DictationChoiceScreen(): React.ReactElement {
   const { t } = useTranslation();
@@ -59,6 +60,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
       if (generateCancelledRef.current) return;
 
       setData({
+        completionKey: Crypto.randomUUID(),
         sentences: result.sentences,
         language: result.language,
         title: result.title,

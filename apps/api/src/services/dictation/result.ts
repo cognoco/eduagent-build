@@ -14,6 +14,7 @@ import type { GenerateContext } from './generate';
 // ---------------------------------------------------------------------------
 
 export interface RecordResultInput {
+  completionKey: string;
   localDate: string;
   sentenceCount: number;
   mistakeCount: number | null;
@@ -48,6 +49,7 @@ export async function recordDictationResult(
     const txDb = tx as unknown as Database;
     const repo = createScopedRepository(txDb, profileId);
     const inserted = await repo.dictationResults.insert({
+      completionKey: input.completionKey,
       date: input.localDate,
       sentenceCount: input.sentenceCount,
       mistakeCount: input.mistakeCount,
@@ -77,6 +79,7 @@ export async function recordDictationResult(
         metadata: {
           reviewed: input.reviewed,
           mistakeCount: input.mistakeCount,
+          completionKey: input.completionKey,
         },
       }),
     'dictation.practice-activity-event',

@@ -9,6 +9,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { usePrepareHomework } from '../../../hooks/use-dictation-api';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
+import * as Crypto from 'expo-crypto';
 
 export default function TextPreviewScreen(): React.ReactElement {
   const { t } = useTranslation();
@@ -63,6 +64,7 @@ export default function TextPreviewScreen(): React.ReactElement {
       if (prepareCancelledRef.current) return;
 
       setData({
+        completionKey: Crypto.randomUUID(),
         sentences: result.sentences,
         language: result.language,
         mode: 'homework',

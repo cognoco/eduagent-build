@@ -784,6 +784,7 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
       async insert(values: {
+        completionKey: string;
         date: string;
         sentenceCount: number;
         mistakeCount: number | null;
@@ -791,18 +792,16 @@ export function createScopedRepository(db: Database, profileId: string) {
         mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
       }) {
-        // [BUG-4] Idempotent on (profile_id, date, mode): a retry of the
-        // same completion event upserts the latest counts/reviewed flag
-        // rather than creating a duplicate row. Backed by
-        // uniq_dictation_results_profile_date_mode in the schema.
+        // [WI-84 DS-115] Idempotent on (profile_id, completion_key): retries
+        // of one completion upsert, while legitimate same-day same-mode
+        // completions use different keys and land in separate rows.
         const [row] = await db
           .insert(dictationResults)
           .values({ profileId, ...values })
           .onConflictDoUpdate({
             target: [
               dictationResults.profileId,
-              dictationResults.date,
-              dictationResults.mode,
+              dictationResults.completionKey,
             ],
             set: {
               sentenceCount: values.sentenceCount,

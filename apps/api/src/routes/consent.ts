@@ -195,6 +195,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             data: {
               profileId: result.consentState.profileId,
               consentType: result.consentState.consentType,
+              requestedAt: result.consentState.requestedAt,
               timestamp: new Date().toISOString(),
             },
           }),

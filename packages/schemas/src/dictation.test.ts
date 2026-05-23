@@ -278,6 +278,7 @@ describe('dictationReviewResultSchema', () => {
 
 describe('recordDictationResultInputSchema', () => {
   const validInput = {
+    completionKey: UUID,
     localDate: '2025-01-15',
     sentenceCount: 5,
     mistakeCount: 1,
@@ -288,8 +289,19 @@ describe('recordDictationResultInputSchema', () => {
 
   it('accepts valid input', () => {
     const parsed = recordDictationResultInputSchema.parse(validInput);
+    expect(parsed.completionKey).toBe(UUID);
     expect(parsed.mode).toBe('homework');
     expect(parsed.reviewed).toBe(true);
+  });
+
+  it('[WI-84 DS-115] rejects missing completionKey', () => {
+    const { completionKey: _, ...rest } = validInput;
+    const result = recordDictationResultInputSchema.safeParse(rest);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path[0]);
+      expect(paths).toContain('completionKey');
+    }
   });
 
   it('defaults reviewed to false', () => {
@@ -412,6 +424,7 @@ describe('dictationResultSchema', () => {
   const validResult = {
     id: UUID,
     profileId: UUID,
+    completionKey: UUID,
     date: '2025-01-15',
     sentenceCount: 5,
     mistakeCount: 1,
@@ -477,6 +490,7 @@ describe('recordDictationResultResponseSchema', () => {
     const validResult = {
       id: UUID,
       profileId: UUID,
+      completionKey: UUID,
       date: '2025-01-15',
       sentenceCount: 5,
       mistakeCount: 0,

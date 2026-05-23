@@ -90,10 +90,12 @@ jest.mock(
 const mockSetData = jest.fn();
 
 let mockDictationData: {
+  completionKey: string;
   sentences: { text: string }[];
   language: string;
   mode: 'homework' | 'surprise';
 } | null = {
+  completionKey: '00000000-0000-4000-8000-000000000001',
   sentences: [
     { text: 'The quick brown fox.' },
     { text: 'Jumps over the lazy dog.' },
@@ -130,6 +132,7 @@ describe('PlaybackScreen', () => {
     jest.clearAllMocks();
     mockPlaybackState = 'idle';
     mockDictationData = {
+      completionKey: '00000000-0000-4000-8000-000000000001',
       sentences: [
         { text: 'The quick brown fox.' },
         { text: 'Jumps over the lazy dog.' },
@@ -236,7 +239,12 @@ describe('PlaybackScreen', () => {
   });
 
   it('does not auto-start when sentence list is empty', () => {
-    mockDictationData = { sentences: [], language: 'en', mode: 'surprise' };
+    mockDictationData = {
+      completionKey: '00000000-0000-4000-8000-000000000001',
+      sentences: [],
+      language: 'en',
+      mode: 'surprise',
+    };
     render(<PlaybackScreen />);
     expect(mockStart).not.toHaveBeenCalled();
   });

@@ -206,6 +206,31 @@ describe('weeklySelfReportCron', () => {
       ],
     );
   });
+
+  it('[WI-84 DS-038] throws when a fan-out batch fails so Inngest retries the cron', async () => {
+    mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([
+      PROFILE_A,
+    ]);
+
+    const step = {
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      sendEvent: jest.fn().mockRejectedValue(new Error('Inngest unavailable')),
+    };
+
+    await expect((weeklySelfReportCron as any).fn({ step })).rejects.toThrow(
+      'weekly-self-report-cron-fan-out failed to queue 1 batch',
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'weekly-self-report-cron-fan-out',
+          failedBatches: 1,
+          totalEvents: 1,
+        }),
+      }),
+    );
+  });
 });
 
 describe('weeklySelfReportGenerate', () => {
@@ -354,6 +379,42 @@ describe('selfProgressReportsBackfill', () => {
           data: { profileId: PROFILE_B, reportWeekStart: '2026-04-20' },
         },
       ]),
+    );
+  });
+
+  it('[WI-84 DS-038] throws when backfill fan-out fails instead of returning partial', async () => {
+    mockListEligibleSelfReportProfileIds
+      .mockResolvedValueOnce([PROFILE_A])
+      .mockResolvedValueOnce([]);
+
+    const step = {
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      sendEvent: jest.fn().mockRejectedValue(new Error('Inngest unavailable')),
+    };
+
+    await expect(
+      (selfProgressReportsBackfill as any).fn({
+        event: {
+          name: 'admin/progress-self-reports-backfill.requested',
+          data: {
+            requestedAt: '2026-05-12T12:00:00.000Z',
+            environment: 'staging',
+          },
+        },
+        step,
+      }),
+    ).rejects.toThrow(
+      'self-progress-reports-backfill-monthly-fan-out failed to queue 1 batch',
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'self-progress-reports-backfill-monthly-fan-out',
+          failedBatches: 1,
+          totalEvents: 1,
+        }),
+      }),
     );
   });
 });

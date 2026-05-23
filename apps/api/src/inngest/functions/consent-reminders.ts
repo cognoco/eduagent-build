@@ -25,6 +25,19 @@ export const consentReminder = inngest.createFunction(
   { event: 'app/consent.requested' },
   async ({ event, step }) => {
     const { profileId } = event.data;
+    const requestedAt =
+      typeof event.data.requestedAt === 'string'
+        ? event.data.requestedAt
+        : null;
+
+    function isMatchingRequest(liveRequestedAt: string | Date | null): boolean {
+      if (!requestedAt || !liveRequestedAt) return false;
+      const liveIso =
+        liveRequestedAt instanceof Date
+          ? liveRequestedAt.toISOString()
+          : new Date(liveRequestedAt).toISOString();
+      return liveIso === requestedAt;
+    }
 
     // [BUG-699] Build email options. Each reminder step passes a deterministic
     // idempotency key so Inngest step retries cannot deliver the same reminder
@@ -51,6 +64,9 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const state = await getProfileConsentState(db, profileId);
       if (!state?.parentEmail) return { parentEmail: null, consentToken: null };
+      if (!isMatchingRequest(state.requestedAt)) {
+        return { parentEmail: null, consentToken: null };
+      }
 
       // Fetch the live token separately — getProfileConsentState intentionally
       // omits it to keep the return surface minimal. We need it here so every
@@ -64,6 +80,12 @@ export const consentReminder = inngest.createFunction(
         parentEmail: state.parentEmail,
         consentToken: row?.consentToken ?? null,
       };
+    }
+
+    async function isCurrentConsentRequest(): Promise<boolean> {
+      const db = getStepDatabase();
+      const state = await getProfileConsentState(db, profileId);
+      return isMatchingRequest(state?.requestedAt ?? null);
     }
 
     /** Builds the direct consent page URL from a token. */
@@ -115,6 +137,7 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      if (!(await isCurrentConsentRequest())) return;
       const { parentEmail } = await lookupConsentDetails();
       if (!parentEmail) return;
       await sendEmail(
@@ -141,6 +164,7 @@ export const consentReminder = inngest.createFunction(
       // Fast guard: bail out if consent was already granted/withdrawn.
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      if (!(await isCurrentConsentRequest())) return;
       // CI-11: Use service function instead of raw SQL.
       // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.
       // This eliminates the TOCTOU race where a parent approves consent between

@@ -197,6 +197,21 @@ describe('seedScenario', () => {
     expect(typeof result.accountId).toBe('string');
     expect(result.accountId.length).toBeGreaterThan(0);
   });
+
+  it('[WI-84 DS-091] does not delete an existing non-seed Clerk account with the same email', async () => {
+    const db = createMockDb();
+    (db.query.accounts.findMany as jest.Mock).mockResolvedValueOnce([
+      {
+        id: 'real-account-id',
+        email: 'real@example.com',
+        clerkUserId: 'user_real_production_account',
+      },
+    ]);
+
+    await seedScenario(db, 'onboarding-complete', 'real@example.com');
+
+    expect(db.delete).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -238,6 +253,34 @@ describe('resetDatabase', () => {
     const result = await resetDatabase(db);
 
     expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+  });
+
+  it('[WI-84 DS-091] prefix reset does not delete non-seed Clerk accounts', async () => {
+    const deleteReturning = jest.fn().mockResolvedValue([]);
+    const deleteWhere = jest.fn().mockReturnValue({
+      returning: deleteReturning,
+    });
+    const db = {
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+      query: {
+        accounts: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'real-account-id',
+              email: 'e2e-real@example.com',
+              clerkUserId: 'user_real_production_account',
+            },
+          ]),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await resetDatabase(db, {}, { prefix: 'e2e-' });
+
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(db.delete).not.toHaveBeenCalled();
   });
 });
 

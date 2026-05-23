@@ -91,6 +91,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const TODAY = new Date().toISOString().slice(0, 10);
+const COMPLETION_KEY = '550e8400-e29b-41d4-a716-446655440000';
 
 beforeAll(() => {
   installTestJwksInterceptor();
@@ -340,6 +341,7 @@ describe('POST /v1/dictation/result', () => {
     (recordDictationResult as jest.Mock).mockResolvedValueOnce({
       id: 'a0000000-0000-4000-a000-000000000001',
       profileId: 'a0000000-0000-4000-a000-000000000002',
+      completionKey: COMPLETION_KEY,
       date: TODAY,
       sentenceCount: 5,
       mistakeCount: 2,
@@ -354,6 +356,7 @@ describe('POST /v1/dictation/result', () => {
         method: 'POST',
         headers: AUTH_HEADERS,
         body: JSON.stringify({
+          completionKey: COMPLETION_KEY,
           localDate: TODAY,
           sentenceCount: 5,
           mistakeCount: 2,
@@ -371,6 +374,7 @@ describe('POST /v1/dictation/result', () => {
       expect.anything(), // db
       'test-profile-id',
       expect.objectContaining({
+        completionKey: COMPLETION_KEY,
         localDate: TODAY,
         sentenceCount: 5,
         mode: 'homework',
@@ -397,6 +401,25 @@ describe('POST /v1/dictation/result', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
+  it('[WI-84 DS-115] returns 400 when completionKey is missing', async () => {
+    const res = await app.request(
+      '/v1/dictation/result',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          localDate: TODAY,
+          sentenceCount: 5,
+          mode: 'homework',
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+    expect(recordDictationResult).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when localDate is more than 1 day from server date [RF-04]', async () => {
     const farFutureDate = '2099-01-01';
 
@@ -406,6 +429,7 @@ describe('POST /v1/dictation/result', () => {
         method: 'POST',
         headers: AUTH_HEADERS,
         body: JSON.stringify({
+          completionKey: COMPLETION_KEY,
           localDate: farFutureDate,
           sentenceCount: 5,
           mode: 'homework',
@@ -426,6 +450,7 @@ describe('POST /v1/dictation/result', () => {
         method: 'POST',
         headers: AUTH_HEADERS,
         body: JSON.stringify({
+          completionKey: COMPLETION_KEY,
           localDate: TODAY,
           sentenceCount: 5,
           mode: 'invalid-mode',
@@ -450,6 +475,7 @@ describe('POST /v1/dictation/result', () => {
         method: 'POST',
         headers: makeAuthHeaders(),
         body: JSON.stringify({
+          completionKey: COMPLETION_KEY,
           localDate: TODAY,
           sentenceCount: 5,
           mode: 'homework',

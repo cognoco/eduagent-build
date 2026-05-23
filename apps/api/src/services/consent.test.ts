@@ -74,6 +74,7 @@ function createMockDb({
     .mockResolvedValue(findFirstResult ? [findFirstResult] : []);
   const updateWhere = jest.fn().mockReturnValue({ returning: updateReturning });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+  const updateFn = jest.fn().mockReturnValue({ set: updateSet });
   const deleteWhere = jest.fn().mockResolvedValue(undefined);
   const deleteFn = jest.fn().mockReturnValue({ where: deleteWhere });
 
@@ -97,7 +98,7 @@ function createMockDb({
         .fn()
         .mockImplementation(
           async (callback: (tx: unknown) => Promise<unknown>) => {
-            const tx = { insert: txInsert };
+            const tx = { insert: txInsert, update: updateFn, delete: deleteFn };
             return callback(tx);
           },
         );
@@ -119,7 +120,7 @@ function createMockDb({
       }),
     }),
     transaction: transactionFn,
-    update: jest.fn().mockReturnValue({ set: updateSet }),
+    update: updateFn,
     delete: deleteFn,
   } as unknown as Database;
 }
@@ -407,6 +408,14 @@ describe('processConsentResponse', () => {
     await processConsentResponse(db, 'valid-token', false);
 
     expect(db.delete).toHaveBeenCalled();
+  });
+
+  it('[WI-84 DS-056] wraps denied status update and profile deletion in one transaction', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    await processConsentResponse(db, 'valid-token', false);
+
+    expect(db.transaction).toHaveBeenCalled();
   });
 
   it('does not delete profile when consent is approved', async () => {

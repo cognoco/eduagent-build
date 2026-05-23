@@ -157,6 +157,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       }
 
       const row = await recordDictationResult(db, profileId, {
+        completionKey: input.completionKey,
         localDate: input.localDate,
         sentenceCount: input.sentenceCount,
         mistakeCount: input.mistakeCount ?? null,

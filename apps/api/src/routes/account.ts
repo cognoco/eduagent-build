@@ -20,7 +20,7 @@ import {
 } from '../services/deletion';
 import { generateExport } from '../services/export';
 import { inngest } from '../inngest/client';
-import { safeSend } from '../services/safe-non-core';
+import { captureException } from '../services/sentry';
 import { NotFoundError, apiError } from '../errors';
 
 type AccountRouteEnv = {
@@ -73,22 +73,32 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     if (scheduledNow) {
       const profileIds = await getProfileIdsForAccount(db, account.id);
 
-      // [CR-SILENT-RECOVERY-2] Account deletion is GDPR-relevant -- safeSend
-      // escalates dispatch failures to Sentry so on-call gets paged on aggregate
-      // dispatch-failure spikes. Mirrors the consent.ts [A-23] pattern.
-      await safeSend(
-        () =>
-          inngest.send({
-            name: 'app/account.deletion-scheduled',
-            data: {
-              accountId: account.id,
-              profileIds,
-              timestamp: new Date().toISOString(),
-            },
-          }),
-        'account.deletion',
-        { accountId: account.id },
-      );
+      try {
+        // core-send: account deletion must not claim scheduling if Inngest rejects the durable handoff.
+        await inngest.send({
+          name: 'app/account.deletion-scheduled',
+          data: {
+            accountId: account.id,
+            profileIds,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (error) {
+        await cancelDeletion(db, account.id);
+        captureException(error, {
+          extra: {
+            surface: 'account.deletion',
+            kind: 'core-send',
+            accountId: account.id,
+          },
+        });
+        return apiError(
+          c,
+          503,
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          'Account deletion could not be scheduled. Please try again.',
+        );
+      }
     }
 
     return c.json(

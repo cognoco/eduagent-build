@@ -86,12 +86,14 @@ let mockSentences: { text: string }[] = [
   { text: 'The quick brown fox.' },
   { text: 'Hello world.' },
 ];
+const COMPLETION_KEY = '00000000-0000-4000-8000-000000000001';
 
 jest.mock(
   './_layout' /* gc1-allow: layout depends on expo-router Stack and native theme */,
   () => ({
     useDictationData: () => ({
       data: {
+        completionKey: COMPLETION_KEY,
         sentences: mockSentences,
         language: 'en',
         mode: 'homework',
@@ -160,6 +162,12 @@ describe('DictationReviewScreen', () => {
         fireEvent.press(getByTestId('review-done'));
         await Promise.resolve();
       });
+      expect(mockRecordMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          completionKey: COMPLETION_KEY,
+          reviewed: true,
+        }),
+      );
       expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
     });
   });

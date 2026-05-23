@@ -446,31 +446,45 @@ export async function processConsentResponse(
   //    but only the first UPDATE will match the non-terminal status.
   const newStatus = approved ? 'CONSENTED' : 'WITHDRAWN';
   const now = new Date();
+  const consentStateId = row.id;
+  const consentProfileId = row.profileId;
 
-  const [updated] = await db
-    .update(consentStates)
-    .set({
-      status: newStatus,
-      respondedAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(consentStates.id, row.id),
-        eq(consentStates.profileId, row.profileId),
-        sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`,
-      ),
-    )
-    .returning();
+  async function updateStatus(
+    executor: Pick<Database, 'update'>,
+  ): Promise<void> {
+    const [updated] = await executor
+      .update(consentStates)
+      .set({
+        status: newStatus,
+        respondedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(consentStates.id, consentStateId),
+          eq(consentStates.profileId, consentProfileId),
+          sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`,
+        ),
+      )
+      .returning();
 
-  if (!updated) {
-    throw new ConsentAlreadyProcessedError();
+    if (!updated) {
+      throw new ConsentAlreadyProcessedError();
+    }
   }
 
-  // 3. If denied (FR10): cascade-delete the child's profile.
-  //    CASCADE FKs handle all child data (subjects, sessions, etc.)
-  if (!approved) {
-    await db.delete(profiles).where(eq(profiles.id, row.profileId));
+  if (approved) {
+    await updateStatus(db);
+  } else {
+    // 3. If denied (FR10): cascade-delete the child's profile.
+    //    CASCADE FKs handle all child data (subjects, sessions, etc.).
+    //    The denial status and destructive delete must commit or roll back
+    //    together; otherwise a delete failure can leave a withdrawn-but-live
+    //    child profile without a recovery path.
+    await db.transaction(async (tx) => {
+      await updateStatus(tx);
+      await tx.delete(profiles).where(eq(profiles.id, consentProfileId));
+    });
   }
 
   return mapConsentRow({
@@ -582,6 +596,7 @@ export async function getProfileConsentState(
   status: ConsentStatus;
   parentEmail: string | null;
   consentType: ConsentType;
+  requestedAt: string;
 } | null> {
   const row = await db.query.consentStates.findFirst({
     where: eq(consentStates.profileId, profileId),
@@ -592,6 +607,7 @@ export async function getProfileConsentState(
     status: row.status,
     parentEmail: row.parentEmail ?? null,
     consentType: row.consentType,
+    requestedAt: row.requestedAt.toISOString(),
   };
 }
 

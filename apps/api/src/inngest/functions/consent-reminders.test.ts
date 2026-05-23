@@ -87,6 +87,7 @@ interface ProfileConsentState {
   status: string;
   parentEmail: string | null;
   consentType: string;
+  requestedAt?: string | Date;
 }
 
 async function executeHandler(
@@ -95,6 +96,12 @@ async function executeHandler(
     status: 'PARENTAL_CONSENT_REQUESTED',
     parentEmail: 'parent@example.com',
     consentType: 'GDPR',
+    requestedAt: '2026-05-01T00:00:00.000Z',
+  },
+  eventData: Record<string, unknown> = {
+    profileId: 'profile-1',
+    consentType: 'GDPR',
+    requestedAt: '2026-05-01T00:00:00.000Z',
   },
 ): Promise<void> {
   let callIndex = 0;
@@ -114,10 +121,7 @@ async function executeHandler(
     event: {
       id: 'evt-test-1',
       name: 'app/consent.requested',
-      data: {
-        profileId: 'profile-1',
-        consentType: 'GDPR',
-      },
+      data: eventData,
     },
     step,
   });
@@ -221,13 +225,56 @@ describe('consentReminder', () => {
   });
 
   it('does not send email when parentEmail is not found in DB', async () => {
-    // Pass null profile state so parentEmail lookup returns null
-    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING'], null);
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING'], {
+      status: 'PARENTAL_CONSENT_REQUESTED',
+      parentEmail: null,
+      consentType: 'GDPR',
+      requestedAt: '2026-05-01T00:00:00.000Z',
+    });
 
     // No emails sent because parentEmail lookup returns null
     expect(mockSendEmail).not.toHaveBeenCalled();
     // Atomic delete still happens because consent status is PENDING
     expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
+  });
+
+  it('[WI-84 DS-021] skips stale reminder runs when latest consent request has a newer requestedAt', async () => {
+    await executeHandler(
+      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+      {
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+        requestedAt: '2026-05-20T00:00:00.000Z',
+      },
+      {
+        profileId: 'profile-1',
+        consentType: 'GDPR',
+        requestedAt: '2026-05-01T00:00:00.000Z',
+      },
+    );
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 DS-021] skips legacy reminder events without requestedAt because they cannot prove freshness', async () => {
+    await executeHandler(
+      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+      {
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+        requestedAt: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        profileId: 'profile-1',
+        consentType: 'GDPR',
+      },
+    );
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
   });
 
   // [BUG-699] Inngest step retries can replay sendEmail. Each reminder step

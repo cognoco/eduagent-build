@@ -67,26 +67,30 @@ describe('database/client.ts — neonPoolCache key hashing', () => {
     __internal_neonPoolCache.clear();
   });
 
-  it('returns the same drizzle handle for two requests with the same Neon DSN (cache hit)', () => {
+  it('[WI-84 DS-228] does not cache Neon pools by default', () => {
     const db1 = createDatabase(NEON_DSN_A);
     const db2 = createDatabase(NEON_DSN_A);
-    // Same DSN → same cached pool → drizzleNeon is called per request but the
-    // underlying NeonPool is reused. Assert the cache stayed at size 1.
-    expect(__internal_neonPoolCache.size).toBe(1);
+    expect(__internal_neonPoolCache.size).toBe(0);
     // Sanity: both handles exist.
     expect(db1).toBeDefined();
     expect(db2).toBeDefined();
   });
 
-  it('creates separate pools for different Neon DSNs (cache miss)', () => {
-    createDatabase(NEON_DSN_A);
-    createDatabase(NEON_DSN_B);
+  it('[WI-84 DS-228] reuses Neon pools only when cacheNeonPool is explicitly true', () => {
+    createDatabase(NEON_DSN_A, { cacheNeonPool: true });
+    createDatabase(NEON_DSN_A, { cacheNeonPool: true });
+    expect(__internal_neonPoolCache.size).toBe(1);
+  });
+
+  it('creates separate cached pools for different Neon DSNs when explicitly enabled', () => {
+    createDatabase(NEON_DSN_A, { cacheNeonPool: true });
+    createDatabase(NEON_DSN_B, { cacheNeonPool: true });
     expect(__internal_neonPoolCache.size).toBe(2);
   });
 
   it('never stores the raw DSN as a cache key — keys are sha256 hex digests', () => {
-    createDatabase(NEON_DSN_A);
-    createDatabase(NEON_DSN_B);
+    createDatabase(NEON_DSN_A, { cacheNeonPool: true });
+    createDatabase(NEON_DSN_B, { cacheNeonPool: true });
 
     const keys = Array.from(__internal_neonPoolCache.keys());
     expect(keys).toHaveLength(2);
@@ -112,7 +116,7 @@ describe('database/client.ts — neonPoolCache key hashing', () => {
     expect(key1).toBe(key2);
     expect(key1).toMatch(/^[0-9a-f]{64}$/);
 
-    createDatabase(NEON_DSN_A);
+    createDatabase(NEON_DSN_A, { cacheNeonPool: true });
     expect(__internal_neonPoolCache.has(key1)).toBe(true);
   });
 });
