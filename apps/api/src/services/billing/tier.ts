@@ -172,11 +172,10 @@ export function getUpgradePrompt(params: {
     };
   }
 
-  // Family -> Pro: at profile limit or trying to add beyond 4
-  if (
-    tier === 'family' &&
-    (profileCount >= 4 || (isAddingProfile && profileCount >= 4))
-  ) {
+  // Family -> Pro: at or over the 4-profile limit. The `isAddingProfile`
+  // discriminator was redundant here — `profileCount >= 4` already covers
+  // both "at limit" and "trying to add when already at limit".
+  if (tier === 'family' && profileCount >= 4) {
     return {
       reason: 'max_profiles_reached',
       suggestedTier: 'pro',
