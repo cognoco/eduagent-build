@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import { SubjectNotFoundError, type DictationMode } from '@eduagent/schemas';
 import { createScopedRepository, subjects } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
@@ -21,6 +22,20 @@ export interface RecordResultInput {
   mode: DictationMode;
   reviewed: boolean;
   subjectId?: string | null;
+}
+
+export function deriveLegacyDictationCompletionKey(
+  profileId: string,
+  localDate: string,
+  mode: DictationMode,
+): string {
+  const hex = createHash('md5')
+    .update(`dictation-result:${profileId}:${localDate}:${mode}`)
+    .digest('hex')
+    .split('');
+  hex[12] = '5';
+  hex[16] = ((parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20, 32).join('')}`;
 }
 
 export async function recordDictationResult(

@@ -7,7 +7,6 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
-import { createHash } from 'node:crypto';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 import { createRouteMeteringFixture } from '../test-utils/route-metering-fixture';
@@ -80,6 +79,7 @@ import {
   recordDictationResult,
   getDictationStreak,
   fetchGenerateContext,
+  deriveLegacyDictationCompletionKey,
 } from '../services/dictation';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
@@ -93,20 +93,6 @@ const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const COMPLETION_KEY = '550e8400-e29b-41d4-a716-446655440000';
-
-function expectedLegacyCompletionKey(
-  profileId: string,
-  localDate: string,
-  mode: string,
-): string {
-  const hex = createHash('md5')
-    .update(`dictation-result:${profileId}:${localDate}:${mode}`)
-    .digest('hex')
-    .split('');
-  hex[12] = '5';
-  hex[16] = ((parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
-  return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20, 32).join('')}`;
-}
 
 beforeAll(() => {
   installTestJwksInterceptor();
@@ -448,7 +434,7 @@ describe('POST /v1/dictation/result', () => {
       expect.anything(),
       'test-profile-id',
       expect.objectContaining({
-        completionKey: expectedLegacyCompletionKey(
+        completionKey: deriveLegacyDictationCompletionKey(
           'test-profile-id',
           TODAY,
           'homework',
