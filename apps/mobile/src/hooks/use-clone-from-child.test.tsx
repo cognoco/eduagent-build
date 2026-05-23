@@ -320,10 +320,13 @@ describe('useCloneFromChild', () => {
         kind: 'error',
         message: 'This topic is no longer available.',
       });
+      // Assertion inside waitFor: React Query commits state in multiple
+      // renders and the primaryAction is appended in the same commit as the
+      // message — but reading it outside waitFor races the commit.
+      expect(result.current.toast?.primaryAction?.testID).toBe(
+        'clone-toast-back-not-found',
+      );
     });
-    expect(result.current.toast?.primaryAction?.testID).toBe(
-      'clone-toast-back-not-found',
-    );
   });
 
   it('surfaces an upgrade CTA when the adult hits their monthly quota', async () => {
@@ -376,7 +379,7 @@ describe('useCloneFromChild', () => {
     );
 
     act(() => result.current.toast?.primaryAction?.onPress());
-    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/progress');
   });
 
   it('passes returnTo=family-recaps when the bridge tap originates from a recap detail', async () => {

@@ -76,7 +76,9 @@ tags:
 
 # Dismiss the first-render onboarding tip if AsyncStorage has no record of
 # it being seen (fresh install / fresh seed). Optional so re-runs against a
-# device that already dismissed the tip don't fail.
+# device that already dismissed the tip don't fail. Capture a screenshot
+# first so a future testID typo (silent skip) produces a visible artifact.
+- takeScreenshot: family-bridge-recaps-01b-before-tip-dismiss
 - tapOn:
     id: 'add-to-my-learning-tip-dismiss'
     optional: true
@@ -127,5 +129,14 @@ tags:
     visible:
       id: 'recap-detail-screen'
     timeout: 10000
+
+# Negative assertions: confirm we did NOT land on Home or the Recaps list.
+# The spec says "device back returns to Recaps detail (not Home, not Recaps
+# list)" — without these, a regression that lands on home-screen but where
+# recap-detail-screen is still mounted under it would pass silently.
+- assertNotVisible:
+    id: 'home-screen'
+- assertNotVisible:
+    id: 'recaps-screen'
 
 - takeScreenshot: family-bridge-recaps-05-back-to-detail

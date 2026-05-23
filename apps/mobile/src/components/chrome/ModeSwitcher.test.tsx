@@ -3,26 +3,31 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ModeSwitcher } from './ModeSwitcher';
 
 // react-i18next: use real en.json lookup so assertions hit rendered text
-jest.mock('react-i18next', () => require('../../test-utils/mock-i18n').i18nMock);
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock,
+);
 
-// useNavigationContract wraps context + query state — boundary mock
-// gc1-allow: hook wraps profile context, subscription query, and feature flags; not exercisable in isolation
 const mockUseNavigationContract = jest.fn();
-jest.mock('../../hooks/use-navigation-contract', () => ({
-  useNavigationContract: (...args: unknown[]) =>
-    mockUseNavigationContract(...args),
-}));
-
-// useModeSwitch wraps router, queryClient, and app context — boundary mock
-// gc1-allow: hook wraps expo-router, TanStack QueryClient, and native SecureStore; not exercisable in isolation
-const mockSwitchMode = jest.fn();
-jest.mock('../../lib/use-mode-switch', () => ({
-  useModeSwitch: () => ({
-    switchMode: mockSwitchMode,
-    isSwitching: false,
-    isSwitchingRef: { current: false },
+jest.mock(
+  '../../hooks/use-navigation-contract' /* gc1-allow: hook wraps profile context, subscription query, and feature flags; not exercisable in isolation */,
+  () => ({
+    useNavigationContract: (...args: unknown[]) =>
+      mockUseNavigationContract(...args),
   }),
-}));
+);
+
+const mockSwitchMode = jest.fn();
+jest.mock(
+  '../../lib/use-mode-switch' /* gc1-allow: hook wraps expo-router, TanStack QueryClient, and native SecureStore; not exercisable in isolation */,
+  () => ({
+    useModeSwitch: () => ({
+      switchMode: mockSwitchMode,
+      isSwitching: false,
+      isSwitchingRef: { current: false },
+    }),
+  }),
+);
 
 function buildContract(
   modeSwitcher: 'global-header' | 'hidden',

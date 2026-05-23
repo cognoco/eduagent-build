@@ -86,6 +86,11 @@ export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
   // orphan behind forever. Defense-in-depth on top of the primary
   // identity-scoped key fix in query-persister.ts.
   'eduagent-query-cache',
+  // AddToMyLearningButton.tsx falls back to the bare TIP_KEY_PREFIX
+  // (no profile suffix, no trailing dot) when activeProfile is absent at
+  // render time. The PER_PROFILE prefix wipe matches `add_to_my_learning.tip_seen.<id>`
+  // but not the bare form — clear it explicitly so the tip resets on sign-out.
+  'add_to_my_learning.tip_seen',
 ];
 
 // Global keys that should reset when no one is signed in. Excludes onboarding

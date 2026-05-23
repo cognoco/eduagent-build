@@ -12,8 +12,10 @@ import {
 import { assertOk } from '../lib/assert-ok';
 import {
   ForbiddenError,
+  NetworkError,
   NotFoundError,
   QuotaExceededError,
+  UpstreamError,
   useApiClient,
 } from '../lib/api-client';
 import { formatApiError } from '../lib/format-api-error';
@@ -417,24 +419,48 @@ export function useCloneFromChild(): {
           message: "We can't add this topic right now.",
           detail: 'Check that this child is still linked to your account.',
           primaryAction: {
-            label: 'Open Family',
-            onPress: () => router.push('/(app)/home' as Href),
+            // Route to Progress (which surfaces linked children) instead of
+            // the generic home hub — gives the user a place to verify the
+            // family link state.
+            label: 'See linked children',
+            onPress: () => router.push('/(app)/progress' as Href),
             testID: 'clone-toast-open-family',
           },
         });
         return;
       }
+      // Classify NetworkError and UpstreamError before falling through to the
+      // generic formatter — distinct error classes deserve distinct copy and
+      // distinct retry semantics. formatApiError is a presentation helper, not
+      // a classifier; never string-match its output.
       const retryArgs = lastCloneArgsRef.current;
+      const retryAction = retryArgs
+        ? {
+            label: 'Try again',
+            onPress: () => cloneFromChildRef.current?.(retryArgs),
+            testID: 'clone-toast-retry',
+          }
+        : undefined;
+      if (error instanceof NetworkError) {
+        setToast({
+          kind: 'error',
+          message: 'No connection. Check your network and try again.',
+          primaryAction: retryAction,
+        });
+        return;
+      }
+      if (error instanceof UpstreamError) {
+        setToast({
+          kind: 'error',
+          message: 'Something went wrong on our side. Try again in a moment.',
+          primaryAction: retryAction,
+        });
+        return;
+      }
       setToast({
         kind: 'error',
         message: formatApiError(error),
-        primaryAction: retryArgs
-          ? {
-              label: 'Try again',
-              onPress: () => cloneFromChildRef.current?.(retryArgs),
-              testID: 'clone-toast-retry',
-            }
-          : undefined,
+        primaryAction: retryAction,
       });
     },
   });

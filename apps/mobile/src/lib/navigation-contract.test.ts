@@ -858,6 +858,19 @@ describe('navigation-contract totality (fuzzed inputs never throw)', () => {
                   expect(() => contract.canEnter(route)).not.toThrow();
                   expect(() => contract.isSurfaced(route)).not.toThrow();
                 }
+                // Correctness invariants on the fuzz — turn the "no crash"
+                // sweep into a "no nonsense output" sweep:
+                //   1. The bridge gate (showLearnThisToo) is a family-shape
+                //      capability; if the contract returns a study shape it
+                //      must NEVER claim the bridge is showable.
+                //   2. A parent-proxy session is by definition NOT operating
+                //      as the owner; sessionIsOwner must be false.
+                if (contract.shape === 'study') {
+                  expect(contract.gates.showLearnThisToo).toBe(false);
+                }
+                if (isParentProxy) {
+                  expect(contract.gates.sessionIsOwner).toBe(false);
+                }
               }
             }
           }

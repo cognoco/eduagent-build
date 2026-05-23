@@ -1665,17 +1665,22 @@ export default function CameraScreen(): React.ReactNode {
                     {t('homework.retake')}
                   </Text>
                 </Pressable>
-                <Pressable
-                  testID="retry-button"
-                  onPress={handleRetryOcr}
-                  className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-                  accessibilityLabel={t('homework.tryReadingAgainLabel')}
-                  accessibilityRole="button"
-                >
-                  <Text className="text-body font-semibold text-text-inverse">
-                    {t('common.tryAgain')}
-                  </Text>
-                </Pressable>
+                {/* CACHE_FAILED never sets currentUriRef, so retry() is a
+                  silent no-op. Suppress the button to avoid the dead tap —
+                  the retake button above gives the user the working escape. */}
+                {ocr.errorCode === 'CACHE_FAILED' ? null : (
+                  <Pressable
+                    testID="retry-button"
+                    onPress={handleRetryOcr}
+                    className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+                    accessibilityLabel={t('homework.tryReadingAgainLabel')}
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-body font-semibold text-text-inverse">
+                      {t('common.tryAgain')}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
               {/* L2: Provide Go Home escape on first OCR failure */}
               <Pressable
