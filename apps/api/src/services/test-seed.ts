@@ -344,11 +344,57 @@ async function deleteClerkTestUsers(
   env: SeedEnv,
   options: ResetOptions = {},
 ): Promise<{ count: number; clerkUserIds: string[] }> {
-  if (!env.CLERK_SECRET_KEY) return { count: 0, clerkUserIds: [] };
-  const prefix = options.prefix?.trim().toLowerCase();
+  const seedUsers = await listSeedClerkUsers(env, options);
 
-  // Paginate through Clerk users and filter client-side by external_id prefix.
-  // Clerk's list users API supports `limit` and `offset` for pagination.
+  let deleted = 0;
+  const deletedIds: string[] = [];
+
+  for (const user of seedUsers) {
+    // Revert bypass_client_trust before deleting — belt-and-suspenders in case
+    // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
+    await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bypass_client_trust: false }),
+    }).catch((_e: unknown) => {
+      // Best-effort — don't block cleanup if PATCH fails
+    });
+
+    const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    });
+    if (delRes.ok) {
+      deleted++;
+      deletedIds.push(user.id);
+    }
+  }
+
+  return { count: deleted, clerkUserIds: deletedIds };
+}
+
+async function verifySeedClerkUserIds(
+  env: SeedEnv,
+  clerkUserIds: string[],
+  options: ResetOptions = {},
+): Promise<string[]> {
+  if (clerkUserIds.length === 0) return [];
+  const requestedIds = new Set(clerkUserIds);
+  const seedUsers = await listSeedClerkUsers(env, options);
+  return seedUsers
+    .filter((user) => requestedIds.has(user.id))
+    .map((user) => user.id);
+}
+
+async function listSeedClerkUsers(
+  env: SeedEnv,
+  options: ResetOptions = {},
+): Promise<ClerkUser[]> {
+  if (!env.CLERK_SECRET_KEY) return [];
+  const prefix = options.prefix?.trim().toLowerCase();
   const seedUsers: ClerkUser[] = [];
   let offset = 0;
   const pageSize = 100;
@@ -385,34 +431,7 @@ async function deleteClerkTestUsers(
     offset += pageSize;
   }
 
-  let deleted = 0;
-  const deletedIds: string[] = [];
-
-  for (const user of seedUsers) {
-    // Revert bypass_client_trust before deleting — belt-and-suspenders in case
-    // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
-    await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ bypass_client_trust: false }),
-    }).catch((_e: unknown) => {
-      // Best-effort — don't block cleanup if PATCH fails
-    });
-
-    const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-    });
-    if (delRes.ok) {
-      deleted++;
-      deletedIds.push(user.id);
-    }
-  }
-
-  return { count: deleted, clerkUserIds: deletedIds };
+  return seedUsers;
 }
 
 // ---------------------------------------------------------------------------
@@ -3651,15 +3670,27 @@ export async function resetDatabase(
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
 
-  // If caller supplied clerkUserIds, skip Clerk deletion (caller already did it
-  // — typically the clean-clerk-test-users.mjs script, which runs locally to
-  // avoid Cloudflare's 50-subrequest-per-Worker limit on bulk cleanup).
+  const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
+    ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
+        prefix,
+      })
+    : undefined;
+
+  if (
+    options.verifiedSeedClerkUserIds &&
+    verifiedSeedClerkUserIds?.length === 0
+  ) {
+    return { deletedCount: 0, clerkUsersDeleted: 0 };
+  }
+
+  // If caller supplied server-verifiable Clerk IDs, skip Clerk deletion
+  // because the cleanup script handles Clerk locally after DB rows are removed.
   const { count: clerkUsersDeleted, clerkUserIds } =
-    options.clerkUserIds || options.verifiedSeedClerkUserIds
+    options.clerkUserIds || verifiedSeedClerkUserIds
       ? {
           count: 0,
           clerkUserIds:
-            options.verifiedSeedClerkUserIds ??
+            verifiedSeedClerkUserIds ??
             (options.clerkUserIds ?? []).filter((id) =>
               id.startsWith(SEED_CLERK_PREFIX),
             ),

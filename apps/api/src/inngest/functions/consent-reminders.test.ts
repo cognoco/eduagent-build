@@ -170,7 +170,11 @@ describe('consentReminder', () => {
 
     // 3 reminder emails + 1 atomic delete via db.execute
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
-    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
+    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-1',
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
   });
 
   // [IMP-2] Token URL must reach the email body, not just the format call

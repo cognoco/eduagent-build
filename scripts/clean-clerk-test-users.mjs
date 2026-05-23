@@ -1,9 +1,10 @@
 // Deletes all Clerk seed users (external_id prefix `clerk_seed_`) and their DB rows.
 //
-// Architecture: this script deletes users from Clerk DIRECTLY (local Node has no
-// Cloudflare Worker 50-subrequest limit), then calls POST /v1/__test/reset
-// with the list of deleted IDs to let the server clean up DB rows in a single
-// transaction. For ~49 users this would otherwise exceed CF's subrequest cap.
+// Architecture: this script asks the server to clean up DB rows for Clerk users
+// that the server can still verify as seed-managed, then deletes those users
+// from Clerk DIRECTLY (local Node has no Cloudflare Worker 50-subrequest limit).
+// For ~49 users, doing the Clerk deletes inside the Worker would otherwise
+// exceed CF's subrequest cap.
 //
 // Safety: only users whose external_id starts with `clerk_seed_` are touched.
 // Real users (jjoerg@gmail.com, key_to@yahoo.com, zuzana.kopecna@zwizzly.com,
@@ -187,8 +188,11 @@ if (!EXECUTE) {
 
 // --execute path
 console.log(
-  `[clean-clerk] EXECUTE — deleting ${seedUsers.length} Clerk seed users (local HTTP, no CF Worker limit)...\n`,
+  `[clean-clerk] EXECUTE — cleaning DB rows and deleting ${seedUsers.length} Clerk seed users (local HTTP, no CF Worker limit)...\n`,
 );
+
+const seedIds = seedUsers.map((user) => user.id);
+const result = await cleanupDbRows(seedIds);
 
 const deletedIds = [];
 let failed = 0;
@@ -216,14 +220,6 @@ console.log(
   `\n[clean-clerk] Clerk deletion: ${deletedIds.length} deleted, ${failed} failed.`,
 );
 
-if (deletedIds.length === 0) {
-  console.log(
-    '[clean-clerk] No Clerk users were deleted; skipping DB cleanup.',
-  );
-  process.exit(failed > 0 ? 1 : 0);
-}
-
-const result = await cleanupDbRows(deletedIds);
 console.log(`[clean-clerk] Done.`);
 console.log(`[clean-clerk]   Clerk users deleted:    ${deletedIds.length}`);
 console.log(

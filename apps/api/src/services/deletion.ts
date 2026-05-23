@@ -300,7 +300,19 @@ export async function deleteProfile(
 export async function deleteProfileIfNoConsent(
   db: Database,
   profileId: string,
+  requestedAt?: Date,
 ): Promise<boolean> {
+  const requestGenerationPredicate = requestedAt
+    ? sql`
+      AND EXISTS (
+        SELECT 1 FROM consent_states
+        WHERE consent_states.profile_id = ${profileId}
+        AND consent_states.requested_at = ${requestedAt}
+        AND consent_states.status NOT IN ('CONSENTED', 'WITHDRAWN')
+      )
+    `
+    : sql``;
+
   const result = await db.execute(sql`
     DELETE FROM profiles WHERE id = ${profileId}
     AND NOT EXISTS (
@@ -308,6 +320,7 @@ export async function deleteProfileIfNoConsent(
       WHERE consent_states.profile_id = ${profileId}
       AND consent_states.status IN ('CONSENTED', 'WITHDRAWN')
     )
+    ${requestGenerationPredicate}
   `);
   // Drizzle returns rowCount for DELETE operations
   return (result.rowCount ?? 0) > 0;

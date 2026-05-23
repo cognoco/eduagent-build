@@ -165,12 +165,13 @@ export const consentReminder = inngest.createFunction(
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
       if (!(await isCurrentConsentRequest())) return;
+      if (!requestedAt) return;
       // CI-11: Use service function instead of raw SQL.
       // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.
       // This eliminates the TOCTOU race where a parent approves consent between
       // the status check above and the delete below.
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
-      await deleteProfileIfNoConsent(db, profileId);
+      await deleteProfileIfNoConsent(db, profileId, new Date(requestedAt));
     });
   },
 );

@@ -13,6 +13,47 @@ import {
 
 jest.mock('./sentry', () => ({ captureException: jest.fn() })); // gc1-allow: Sentry is an external telemetry boundary.
 
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['name'] === 'string') {
+    values.push(obj['name'].toLowerCase());
+  }
+  if (
+    'value' in obj &&
+    (typeof obj['value'] === 'string' ||
+      typeof obj['value'] === 'number' ||
+      obj['value'] instanceof Date)
+  ) {
+    values.push(String(obj['value']).toLowerCase());
+  }
+  if (Array.isArray(obj['value'])) {
+    for (const item of obj['value']) {
+      values.push(...extractSqlTextAndValues(item, visited));
+    }
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
+}
+
 function createMockDb(
   options: {
     findFirstResult?: Record<string, unknown>;
@@ -595,5 +636,23 @@ describe('deleteProfileIfNoConsent (CI-11)', () => {
 
     const result = await deleteProfileIfNoConsent(db, 'profile-1');
     expect(result).toBe(false);
+  });
+
+  it('[WI-84 review] binds the original requestedAt generation into the atomic delete', async () => {
+    const db = {
+      ...createMockDb(),
+      execute: jest.fn().mockResolvedValue({ rowCount: 0 }),
+    } as unknown as Database;
+
+    await deleteProfileIfNoConsent(
+      db,
+      'profile-1',
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
+
+    const sqlArg = (db.execute as jest.Mock).mock.calls[0]?.[0];
+    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
+    expect(sqlText).toContain('requested_at');
+    expect(sqlText).toContain('2026-05-01');
   });
 });

@@ -254,6 +254,12 @@ describe('seedScenario', () => {
 // ---------------------------------------------------------------------------
 
 describe('resetDatabase', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
@@ -333,6 +339,38 @@ describe('resetDatabase', () => {
       db,
       {},
       { clerkUserIds: ['user_real_production_account'] },
+    );
+
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 review] verifies supplied real Clerk IDs are seed-managed before DB deletion', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'user_real_production_account',
+          external_id: null,
+          email_addresses: [{ email_address: 'real-person@example.com' }],
+        },
+      ],
+    });
+    global.fetch = fetchMock;
+    const deleteReturning = jest.fn().mockResolvedValue([]);
+    const deleteWhere = jest.fn().mockReturnValue({
+      returning: deleteReturning,
+    });
+    const db = {
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+    } as unknown as Database;
+
+    const result = await resetDatabase(
+      db,
+      { CLERK_SECRET_KEY: 'sk_test' },
+      { verifiedSeedClerkUserIds: ['user_real_production_account'] },
     );
 
     expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
