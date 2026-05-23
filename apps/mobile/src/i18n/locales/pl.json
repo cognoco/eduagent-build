@@ -1990,7 +1990,9 @@
       "confirmWithdrawConsent": "Potwierdź — wycofaj zgodę",
       "withdraw": "Wycofaj",
       "curriculumTitle": "Program nauczania",
-      "curriculumSubtitle": "Przeglądaj przedmioty i tematy użytkownika {{name}}"
+      "curriculumSubtitle": "Przeglądaj przedmioty i tematy użytkownika {{name}}",
+      "curriculumNotAvailableTitle": "This child's curriculum is not available",
+      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
     },
     "mentorMemory": {
       "title": "Pamięć mentora",

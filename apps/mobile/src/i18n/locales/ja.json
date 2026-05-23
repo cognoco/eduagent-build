@@ -1965,7 +1965,9 @@
       "confirmWithdrawConsent": "確認 — 同意を撤回",
       "withdraw": "撤回",
       "curriculumTitle": "カリキュラム",
-      "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧"
+      "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧",
+      "curriculumNotAvailableTitle": "This child's curriculum is not available",
+      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
     },
     "mentorMemory": {
       "title": "メンターの記憶",

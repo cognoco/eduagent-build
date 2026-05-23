@@ -1990,7 +1990,9 @@
       "confirmWithdrawConsent": "Confirmar — retirar consentimento",
       "withdraw": "Retirar",
       "curriculumTitle": "Currículo",
-      "curriculumSubtitle": "Explore as disciplinas e os tópicos de {{name}}"
+      "curriculumSubtitle": "Explore as disciplinas e os tópicos de {{name}}",
+      "curriculumNotAvailableTitle": "This child's curriculum is not available",
+      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
     },
     "mentorMemory": {
       "title": "Memória do mentor",

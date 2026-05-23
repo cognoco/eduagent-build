@@ -1965,7 +1965,9 @@
       "confirmWithdrawConsent": "Confirmar — retirar consentimiento",
       "withdraw": "Retirar",
       "curriculumTitle": "Currículo",
-      "curriculumSubtitle": "Explora las asignaturas y temas de {{name}}"
+      "curriculumSubtitle": "Explora las asignaturas y temas de {{name}}",
+      "curriculumNotAvailableTitle": "This child's curriculum is not available",
+      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
     },
     "mentorMemory": {
       "title": "Memoria del mentor",

@@ -1965,7 +1965,9 @@
       "confirmWithdrawConsent": "Bekreft – trekk tilbake samtykke",
       "withdraw": "Trekk tilbake",
       "curriculumTitle": "Læreplan",
-      "curriculumSubtitle": "Utforsk {{name}}s fag og emner"
+      "curriculumSubtitle": "Utforsk {{name}}s fag og emner",
+      "curriculumNotAvailableTitle": "This child's curriculum is not available",
+      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
     },
     "mentorMemory": {
       "title": "Mentorens minne",

@@ -1965,7 +1965,9 @@
       "confirmWithdrawConsent": "Bestätigen – Zustimmung widerrufen",
       "withdraw": "Widerrufen",
       "curriculumTitle": "Lehrplan",
-      "curriculumSubtitle": "Entdecke die Fächer und Themen von {{name}}"
+      "curriculumSubtitle": "Entdecke die Fächer und Themen von {{name}}",
+      "curriculumNotAvailableTitle": "This child's curriculum is not available",
+      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account."
     },
     "mentorMemory": {
       "title": "Mentor-Gedächtnis",

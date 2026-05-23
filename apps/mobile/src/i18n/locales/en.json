@@ -1929,6 +1929,8 @@
       "reportsSubtitle": "Weekly and monthly updates for {{name}}",
       "curriculumTitle": "Curriculum",
       "curriculumSubtitle": "Browse {{name}}'s subjects and topics",
+      "curriculumNotAvailableTitle": "This child's curriculum is not available",
+      "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account.",
       "refreshActivity": "Refresh activity",
       "loadingChild": "Loading child data...",
       "couldNotLoad": "Could not load child data",
