@@ -14,6 +14,7 @@ jest.mock('react-i18next', () => ({
 
 const mockUseLocalSearchParams = jest.fn();
 const mockUseProfileSessions = jest.fn();
+const mockAddToMyLearningButton = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
@@ -31,6 +32,24 @@ jest.mock(
   }),
 );
 
+jest.mock(
+  '../../../../../components/family/AddToMyLearningButton' /* gc1-allow: topic route test verifies bridge props without mounting mutation/query providers */,
+  () => {
+    const React = require('react');
+    const { Text } = require('react-native');
+    return {
+      AddToMyLearningButton: (props: Record<string, unknown>) => {
+        mockAddToMyLearningButton(props);
+        return React.createElement(
+          Text,
+          { testID: 'mock-add-to-my-learning' },
+          props.topicTitle,
+        );
+      },
+    };
+  },
+);
+
 const TopicDetailScreen = require('./[topicId]').default;
 
 describe('TopicDetailScreen', () => {
@@ -40,9 +59,10 @@ describe('TopicDetailScreen', () => {
       data: [],
       isLoading: false,
     });
+    mockAddToMyLearningButton.mockClear();
   });
 
-  it('renders the understanding card and parent-facing review status', () => {
+  it('renders the understanding card, parent-facing review status, and bridge CTA', () => {
     mockUseLocalSearchParams.mockReturnValue({
       topicId: 'topic-1',
       profileId: 'child-1',
@@ -53,6 +73,7 @@ describe('TopicDetailScreen', () => {
       totalSessions: '3',
       subjectId: 'subject-1',
       subjectName: 'Mathematics',
+      childName: 'Ava',
     });
 
     render(<TopicDetailScreen />);
@@ -62,6 +83,17 @@ describe('TopicDetailScreen', () => {
     screen.getByText('Getting comfortable');
     screen.getByText('parentView.topic.reviewStatus');
     screen.getByText('A few things to refresh');
+    screen.getByTestId('mock-add-to-my-learning');
+    expect(mockAddToMyLearningButton).toHaveBeenCalledWith(
+      expect.objectContaining({
+        childDisplayName: 'Ava',
+        childProfileId: 'child-1',
+        subjectName: 'Mathematics',
+        topicId: 'topic-1',
+        topicTitle: 'Fractions',
+        triggerPath: '/child/child-1/curriculum/topic/topic-1',
+      }),
+    );
   });
 
   it('hides the review card when review data is not meaningful yet', () => {

@@ -1963,7 +1963,11 @@
       "thisChild": "このお子様",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "確認 — 同意を撤回",
-      "withdraw": "撤回"
+      "withdraw": "撤回",
+      "curriculumTitle": "カリキュラム",
+      "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧",
+      "curriculumNotAvailableTitle": "このお子さまのカリキュラムは利用できません",
+      "curriculumNotAvailableBody": "ご家族アカウントに紐づいているお子さまのカリキュラムのみ確認できます。"
     },
     "mentorMemory": {
       "title": "メンターの記憶",
@@ -2601,6 +2605,24 @@
     "errorTitle": "ふりかえりを読み込めませんでした",
     "errorMessage": "しばらくしてからもう一度お試しください。",
     "summaryPending": "このセッションのふりかえりは現在準備中です。",
-    "openRecapLabel": "{{child}}さんの{{title}}のふりかえりを開く"
+    "openRecapLabel": "{{child}}さんの{{title}}のふりかえりを開く",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   }
 }

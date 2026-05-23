@@ -146,6 +146,7 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, TopicNotSkippedError } from '../errors';
+import { getProfile } from '../services/profile';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
@@ -237,6 +238,97 @@ describe('curriculum routes', () => {
       });
     });
 
+    it('passes forceCopy through to the bridge service', async () => {
+      mockCloneTopicFromChild.mockResolvedValueOnce({
+        topicId: TOPIC_ID,
+        subjectId: SUBJECT_ID,
+        alreadyExisted: false,
+        descriptionDivergent: false,
+        descriptionRefreshed: false,
+        topicState: 'unstarted',
+        createdIds: { topicId: TOPIC_ID, subjectId: SUBJECT_ID },
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+            forceCopy: true,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const [, , inputArg] = mockCloneTopicFromChild.mock.calls[0];
+      expect(inputArg).toMatchObject({
+        childProfileId: CHILD_PROFILE_ID,
+        topicId: TOPIC_ID,
+        requestId: REQUEST_ID,
+        forceCopy: true,
+      });
+    });
+
+    it.each([
+      [
+        'missing requestId',
+        { childProfileId: CHILD_PROFILE_ID, topicId: TOPIC_ID },
+      ],
+      [
+        'invalid requestId',
+        {
+          childProfileId: CHILD_PROFILE_ID,
+          topicId: TOPIC_ID,
+          requestId: 'not-a-uuid',
+        },
+      ],
+    ])('rejects %s before calling the bridge service', async (_name, body) => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockCloneTopicFromChild).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+      expect(mockCloneTopicFromChild).not.toHaveBeenCalled();
+    });
+
     it('returns 404 for missing or inaccessible source topics', async () => {
       mockCloneTopicFromChild.mockRejectedValueOnce(new NotFoundError('Topic'));
 
@@ -258,6 +350,42 @@ describe('curriculum routes', () => {
       );
 
       expect(res.status).toBe(404);
+    });
+
+    it('[BREAK] returns 403 when the caller is not the account owner', async () => {
+      // Override the default isOwner: true profile for this single request so
+      // profile-scope middleware sets profileMeta.isOwner = false. The route
+      // calls assertOwnerProfile(c) which must throw ForbiddenError. If the
+      // assertOwnerProfile guard is removed, this test fails because the
+      // service mock would be invoked and the response would be 200.
+      (getProfile as jest.Mock).mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2008,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockCloneTopicFromChild).not.toHaveBeenCalled();
     });
   });
 
@@ -290,6 +418,109 @@ describe('curriculum routes', () => {
       expect(profileIdArg).toBe('test-profile-id');
       expect(createdIdsArg).toEqual({ topicId: TOPIC_ID });
       expect(await res.json()).toEqual({ deleted: { topic: true } });
+    });
+
+    it('returns the session-started reason when undo is no longer allowed', async () => {
+      mockUndoCloneFromChild.mockResolvedValueOnce({
+        deleted: { topic: false },
+        reason: 'session_started',
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: TOPIC_ID },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const [, profileIdArg, createdIdsArg] =
+        mockUndoCloneFromChild.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(createdIdsArg).toEqual({ topicId: TOPIC_ID });
+      expect(await res.json()).toEqual({
+        deleted: { topic: false },
+        reason: 'session_started',
+      });
+    });
+
+    it('returns 401 without auth', async () => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: TOPIC_ID },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+      expect(mockUndoCloneFromChild).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid createdIds before calling the bridge service', async () => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: 'not-a-uuid' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockUndoCloneFromChild).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] returns 403 when the caller is not the account owner', async () => {
+      // See the matching POST break-test: assertOwnerProfile must reject
+      // non-owner callers on the undo endpoint too. Removing the guard would
+      // let the mocked service run and return 200.
+      (getProfile as jest.Mock).mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2008,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: TOPIC_ID },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUndoCloneFromChild).not.toHaveBeenCalled();
     });
   });
 

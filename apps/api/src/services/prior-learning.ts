@@ -126,7 +126,10 @@ function formatTopicsForContext(topics: PriorTopic[]): string {
   ];
 
   for (const topic of topics) {
-    const parts: string[] = [`- ${topic.title}`];
+    // [PROMPT-INJECT] topic.title is DB-stored learner-/LLM-authored text and
+    // can contain angle brackets or newlines; strip-and-cap so it cannot
+    // close a wrapping tag or smuggle a directive into the system prompt.
+    const parts: string[] = [`- ${sanitizeXmlValue(topic.title, 200)}`];
 
     if (topic.summary) {
       // Data-not-instruction framing: the summary is learner-authored text

@@ -1963,7 +1963,11 @@
       "thisChild": "dette barnet",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Bekreft – trekk tilbake samtykke",
-      "withdraw": "Trekk tilbake"
+      "withdraw": "Trekk tilbake",
+      "curriculumTitle": "Læreplan",
+      "curriculumSubtitle": "Utforsk {{name}}s fag og emner",
+      "curriculumNotAvailableTitle": "Dette barnets læreplan er ikke tilgjengelig",
+      "curriculumNotAvailableBody": "Du kan bare se læreplanen for barn som er knyttet til familiekontoen din."
     },
     "mentorMemory": {
       "title": "Mentorens minne",
@@ -2601,6 +2605,24 @@
     "errorTitle": "Vi kunne ikke laste inn sammendrag",
     "errorMessage": "Vennligst prøv igjen om et øyeblikk.",
     "summaryPending": "Et sammendrag forberedes fortsatt for denne økten.",
-    "openRecapLabel": "Åpne {{child}}s sammendrag for {{title}}"
+    "openRecapLabel": "Åpne {{child}}s sammendrag for {{title}}",
+    "detailHeading": "Øktsammendrag",
+    "backLabel": "Tilbake til sammendrag",
+    "detailLoadError": "Vi kunne ikke laste dette sammendraget",
+    "detailLoadErrorMessage": "Prøv igjen, eller gå tilbake til listen.",
+    "notFoundTitle": "Sammendrag ikke funnet",
+    "notFoundMessage": "Dette sammendraget er ikke lenger tilgjengelig.",
+    "exchangesCount": "{{count}} utvekslinger",
+    "whatHappened": "Hva skjedde",
+    "detailPending": "Dette sammendraget forberedes fortsatt.",
+    "tryAsking": "Prøv å spørre",
+    "openChildSession": "Åpne barnets økt"
+  },
+  "addToMyLearning": {
+    "tip": "Lagre en kopi av dette emnet i ditt eget bibliotek uten å påvirke barnets læring.",
+    "dismissTip": "Skjønner",
+    "dismiss": "Lukk",
+    "buttonLabel": "Legg til i min læring",
+    "privacyNote": "Privat for din læring"
   }
 }

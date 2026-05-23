@@ -10,7 +10,12 @@ import {
 } from '@eduagent/schemas';
 
 import { assertOk } from '../lib/assert-ok';
-import { useApiClient, NotFoundError } from '../lib/api-client';
+import {
+  ForbiddenError,
+  NotFoundError,
+  QuotaExceededError,
+  useApiClient,
+} from '../lib/api-client';
 import { formatApiError } from '../lib/format-api-error';
 import {
   FAMILY_CHILDREN_RETURN_TO,
@@ -37,6 +42,7 @@ export type CloneFromChildArgs = {
 };
 
 type OpenTarget = {
+  childProfileId: string;
   topicId: string;
   subjectId: string;
   topicTitle?: string | null;
@@ -61,7 +67,12 @@ export type CloneToast = {
 function triggerSurface(triggerPath: string): string {
   if (triggerPath.startsWith('/recaps/')) return 'recaps_detail';
   if (triggerPath.includes('/session/')) return 'child_session_detail';
-  if (triggerPath.includes('/curriculum/')) return 'child_curriculum_detail';
+  if (
+    triggerPath.includes('/curriculum/') ||
+    triggerPath.endsWith('/curriculum')
+  ) {
+    return 'child_curriculum_detail';
+  }
   if (triggerPath.startsWith('/progress')) return 'family_progress';
   return 'family_child';
 }
@@ -157,6 +168,7 @@ export function useCloneFromChild(): {
       router.push({
         pathname: '/(app)/topic/relearn',
         params: {
+          childProfileId: target.childProfileId,
           topicId: target.topicId,
           subjectId: target.subjectId,
           ...(target.topicTitle ? { topicName: target.topicTitle } : {}),
@@ -241,6 +253,7 @@ export function useCloneFromChild(): {
       }
 
       const target: OpenTarget = {
+        childProfileId: args.childProfileId,
         topicId: result.topicId,
         subjectId: result.subjectId,
         topicTitle: args.topicTitle,
@@ -349,12 +362,45 @@ export function useCloneFromChild(): {
       });
     },
     onError: (error) => {
+      // Classify typed errors before falling back to the generic formatter so
+      // quota / unlinked / not-found cases each surface an actionable recovery
+      // path instead of a dismissing toast.
+      if (error instanceof NotFoundError) {
+        setToast({
+          kind: 'error',
+          message: 'This topic is no longer available.',
+        });
+        return;
+      }
+      if (error instanceof QuotaExceededError) {
+        setToast({
+          kind: 'error',
+          message: "You've reached your monthly learning limit.",
+          detail: 'Upgrade to keep adding topics this month.',
+          primaryAction: {
+            label: 'Upgrade',
+            onPress: () => router.push('/(app)/subscription' as Href),
+            testID: 'clone-toast-upgrade',
+          },
+        });
+        return;
+      }
+      if (error instanceof ForbiddenError) {
+        setToast({
+          kind: 'error',
+          message: "We can't add this topic right now.",
+          detail: 'Check that this child is still linked to your account.',
+          primaryAction: {
+            label: 'Open Family',
+            onPress: () => router.push('/(app)/home' as Href),
+            testID: 'clone-toast-open-family',
+          },
+        });
+        return;
+      }
       setToast({
         kind: 'error',
-        message:
-          error instanceof NotFoundError
-            ? 'This topic is no longer available.'
-            : formatApiError(error),
+        message: formatApiError(error),
       });
     },
   });

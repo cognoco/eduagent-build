@@ -139,7 +139,11 @@ export const summaryReconciliationCron = inngest.createFunction(
       },
     );
 
-    const timestamp = new Date().toISOString();
+    // [INNGEST-REPLAY] capture the fan-out timestamp inside step.run so it
+    // survives function replay without drifting between attempts.
+    const timestamp = await step.run('snapshot-fanout-timestamp', () =>
+      new Date().toISOString(),
+    );
     const totalCount =
       missingSummaries.length +
       missingLlmSummaries.length +

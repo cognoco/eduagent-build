@@ -218,6 +218,7 @@ export default function SubjectTopicsScreen() {
                     totalSessions: String(topic.totalSessions ?? 0),
                     subjectId: subjectId ?? '',
                     subjectName: subjectName ?? '',
+                    ...(childName ? { childName } : {}),
                   },
                 } as Href)
               }

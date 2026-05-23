@@ -30,15 +30,20 @@ jest.mock('expo-router', () => {
   };
 });
 
-jest.mock('../../../../components/guards/RequireFamilyContext' /* gc1-allow: layout unit test isolates Stack wiring from family route guard context */, () => ({
-  RequireFamilyContext: ({ children }: { children: React.ReactNode }) =>
-    children,
-}));
+jest.mock(
+  '../../../../components/guards/RequireFamilyContext' /* gc1-allow: layout unit test isolates Stack wiring from family route guard context */,
+  () => ({
+    RequireFamilyContext: ({ children }: { children: React.ReactNode }) =>
+      children,
+  }),
+);
 
-jest.mock('../../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({ background: '#000' }),
-}));
+jest.mock(
+  '../../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({ background: '#000' }),
+  }),
+);
 
 describe('child/[profileId]/_layout.tsx', () => {
   beforeEach(() => {
@@ -64,5 +69,12 @@ describe('child/[profileId]/_layout.tsx', () => {
     expect(screen!.getId).toBeInstanceOf(Function);
     expect(screen!.getId!({ params: { [paramKey]: 'abc-1' } })).toBe('abc-1');
     expect(screen!.getId!({ params: { [paramKey]: 'xyz-2' } })).toBe('xyz-2');
+  });
+
+  it('declares the curriculum route', () => {
+    render(<ChildDetailLayout />);
+    expect(capturedScreens.some((screen) => screen.name === 'curriculum')).toBe(
+      true,
+    );
   });
 });

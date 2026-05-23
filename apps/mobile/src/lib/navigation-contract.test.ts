@@ -619,6 +619,12 @@ describe('resolveNavigationContract route predicates', () => {
         isSurfaced: false,
       },
       {
+        route: 'child/[profileId]/curriculum',
+        params: linkedChildParams,
+        canEnter: false,
+        isSurfaced: false,
+      },
+      {
         route: 'create-profile',
         params: { for: 'child' },
         canEnter: false,
@@ -628,6 +634,26 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'more/account', canEnter: false, isSurfaced: false },
       { route: 'more/privacy', canEnter: false, isSurfaced: false },
     ]);
+  });
+});
+
+describe('resolveNavigationContract curriculum route defaults', () => {
+  it('surfaces child curriculum when a family-capable adult defaults to Family', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: null,
+        profiles: [familyAdult, child],
+      }),
+    );
+
+    expect(contract.diagnostic.reason).toBe('profile-default-family');
+    expect(
+      contract.canEnter('child/[profileId]/curriculum', linkedChildParams),
+    ).toBe(true);
+    expect(
+      contract.isSurfaced('child/[profileId]/curriculum', linkedChildParams),
+    ).toBe(true);
   });
 });
 
@@ -686,6 +712,16 @@ describe('resolveNavigationContract snapshot surface', () => {
                   ),
                   isSurfaced: contract.isSurfaced(
                     'child/[profileId]',
+                    linkedChildParams,
+                  ),
+                },
+                childCurriculum: {
+                  canEnter: contract.canEnter(
+                    'child/[profileId]/curriculum',
+                    linkedChildParams,
+                  ),
+                  isSurfaced: contract.isSurfaced(
+                    'child/[profileId]/curriculum',
                     linkedChildParams,
                   ),
                 },

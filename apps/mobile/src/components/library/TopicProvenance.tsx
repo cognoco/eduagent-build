@@ -35,7 +35,7 @@ export function TopicProvenance({
   );
   const recent = wasRecentlyAdded(createdAt);
 
-  if (!sourceChildProfileId && !recent) return null;
+  if (!childName && !recent) return null;
 
   return (
     <View className="mt-2 flex-row flex-wrap gap-2" testID="topic-provenance">

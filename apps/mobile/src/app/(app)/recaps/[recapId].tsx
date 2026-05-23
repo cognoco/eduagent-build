@@ -13,6 +13,7 @@ import {
 } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { ErrorFallback } from '../../../components/common';
 import { AddToMyLearningButton } from '../../../components/family/AddToMyLearningButton';
@@ -33,6 +34,7 @@ export default function RecapDetailScreen(): React.ReactElement {
   const recapId = firstParam(params.recapId);
   const navigationContract = useNavigationContract();
   const recapQuery = useRecap(recapId);
+  const { t } = useTranslation();
 
   if (!navigationContract.canEnter('recaps/[recapId]')) {
     return <Redirect href="/(app)/home" />;
@@ -72,13 +74,13 @@ export default function RecapDetailScreen(): React.ReactElement {
             onPress={handleBack}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Back to recaps"
+            accessibilityLabel={t('recaps.backLabel')}
             testID="recap-detail-back"
           >
             <Ionicons name="arrow-back" size={24} />
           </Pressable>
           <Text className="flex-1 text-h2 font-bold text-text-primary">
-            Session recap
+            {t('recaps.detailHeading')}
           </Text>
         </View>
 
@@ -89,15 +91,15 @@ export default function RecapDetailScreen(): React.ReactElement {
         ) : recapQuery.isError ? (
           <View className="mt-4">
             <ErrorFallback
-              title="We could not load this recap"
-              message="Try again, or head back to the recaps list."
+              title={t('recaps.detailLoadError')}
+              message={t('recaps.detailLoadErrorMessage')}
               primaryAction={{
-                label: 'Try again',
+                label: t('common.tryAgain'),
                 onPress: () => void recapQuery.refetch(),
                 testID: 'recap-detail-retry',
               }}
               secondaryAction={{
-                label: 'Back to recaps',
+                label: t('recaps.backLabel'),
                 onPress: handleBack,
                 testID: 'recap-detail-error-back',
               }}
@@ -107,10 +109,10 @@ export default function RecapDetailScreen(): React.ReactElement {
         ) : !recapQuery.data ? (
           <View className="mt-4">
             <ErrorFallback
-              title="Recap not found"
-              message="This recap is no longer available."
+              title={t('recaps.notFoundTitle')}
+              message={t('recaps.notFoundMessage')}
               primaryAction={{
-                label: 'Back to recaps',
+                label: t('recaps.backLabel'),
                 onPress: handleBack,
                 testID: 'recap-detail-not-found-back',
               }}
@@ -130,26 +132,26 @@ export default function RecapDetailScreen(): React.ReactElement {
             <Text className="mt-2 text-caption text-text-secondary">
               {formatRelativeDate(recapQuery.data.startedAt)}
               {recapQuery.data.exchangeCount > 0
-                ? ` - ${recapQuery.data.exchangeCount} exchanges`
+                ? ` - ${t('recaps.exchangesCount', { count: recapQuery.data.exchangeCount })}`
                 : ''}
             </Text>
 
             <View className="mt-5 rounded-card border border-border bg-surface px-4 py-4">
               <Text className="text-caption font-semibold text-text-secondary">
-                What happened
+                {t('recaps.whatHappened')}
               </Text>
               <Text className="mt-2 text-body text-text-primary leading-relaxed">
                 {recapQuery.data.narrative ??
                   recapQuery.data.displaySummary ??
                   recapQuery.data.highlight ??
-                  'This recap is still being prepared.'}
+                  t('recaps.detailPending')}
               </Text>
             </View>
 
             {recapQuery.data.conversationPrompt ? (
               <View className="mt-3 rounded-card border border-border bg-surface px-4 py-4">
                 <Text className="text-caption font-semibold text-text-secondary">
-                  Try asking
+                  {t('recaps.tryAsking')}
                 </Text>
                 <Text className="mt-2 text-body text-text-primary leading-relaxed">
                   {recapQuery.data.conversationPrompt}
@@ -170,11 +172,11 @@ export default function RecapDetailScreen(): React.ReactElement {
               onPress={handleOpenChildSession}
               className="mt-4 min-h-[48px] items-center justify-center rounded-button bg-surface px-4 py-3"
               accessibilityRole="button"
-              accessibilityLabel="Open child session"
+              accessibilityLabel={t('recaps.openChildSession')}
               testID="recap-detail-open-session"
             >
               <Text className="text-body font-semibold text-primary">
-                Open child session
+                {t('recaps.openChildSession')}
               </Text>
             </Pressable>
           </View>
