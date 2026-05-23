@@ -2,26 +2,41 @@ import { View, Pressable, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
+import { useAppContext } from '../../lib/app-context';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useModeSwitch } from '../../lib/use-mode-switch';
 
 /**
- * ModeSwitcher — app-shell chrome component.
+ * ModeSwitcher - app-shell chrome component.
  *
- * Self-gating: renders nothing when the navigation contract says the mode
- * switcher should be hidden (V1 off, parent proxy, non-family-capable users).
- * When visible it shows two pressable buttons — Study and Family — with the
- * currently active one marked selected via accessibilityState.
+ * Self-gating: renders nothing when neither the V1 navigation contract nor the
+ * legacy V0 mode-nav fallback allows a mode switcher. When visible it shows two
+ * pressable buttons - Study and Family - with the currently active one marked
+ * selected via accessibilityState.
  */
 export function ModeSwitcher(): React.ReactElement | null {
   const { t } = useTranslation();
   const contract = useNavigationContract();
+  const { isParentProxy } = useParentProxy();
+  const { mode: legacyMode, familyCapable } = useAppContext();
   const { switchMode } = useModeSwitch();
 
-  if (contract.chrome.modeSwitcher === 'hidden') {
+  const showV1Switcher = contract.chrome.modeSwitcher !== 'hidden';
+  const showV0Switcher =
+    !FEATURE_FLAGS.MODE_NAV_V1_ENABLED &&
+    FEATURE_FLAGS.MODE_NAV_V0_ENABLED &&
+    familyCapable &&
+    !isParentProxy;
+
+  if (!showV1Switcher && !showV0Switcher) {
     return null;
   }
 
-  const currentMode = contract.effectiveAppContext;
+  const currentMode =
+    showV0Switcher && !showV1Switcher
+      ? (legacyMode ?? 'study')
+      : contract.effectiveAppContext;
 
   return (
     <View
