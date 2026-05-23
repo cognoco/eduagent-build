@@ -7,6 +7,7 @@ import type {
 } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -115,7 +116,13 @@ export default function QuizLayout(): React.ReactElement {
   const colors = useThemeColors();
   const navigationContract = useNavigationContract();
 
-  if (!navigationContract.canEnter('quiz')) {
+  // V0 fallback: canEnter() blocks during profile-load when V1 is off — preserve
+  // V0 behavior so cold deep-links don't redirect to /home. See H5.1 in branch CR.
+  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? !navigationContract.canEnter('quiz')
+    : navigationContract.isParentProxy;
+
+  if (blocked) {
     return <Redirect href="/(app)/home" />;
   }
 

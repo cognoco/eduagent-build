@@ -111,6 +111,10 @@ jest.mock(
       gates: {
         sessionIsOwner: mockActiveRole === 'owner',
       },
+      // V0 fallback in the screen layouts reads `isParentProxy` when
+      // MODE_NAV_V1_ENABLED is off — keep it congruent with mockCanEnterResult
+      // so tests pass under either flag value.
+      isParentProxy: !mockCanEnterResult,
       canEnter: (_route: string) => mockCanEnterResult,
     }),
   }),

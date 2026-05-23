@@ -12,6 +12,16 @@ function getBookmarkNudgeKey(profileId: string | undefined): string {
   );
 }
 
+// Pre-2026-05-23 the prefix was concatenated with `:` which `sanitizeSecureStoreKey`
+// rewrote to `_`. Read the legacy key as a fallback so users who already
+// dismissed the nudge under the old key don't see it again, and migrate
+// forward by writing the new key on next dismiss.
+function getLegacyBookmarkNudgeKey(profileId: string | undefined): string {
+  return sanitizeSecureStoreKey(
+    profileId ? `${KEY_PREFIX}:${profileId}` : KEY_PREFIX,
+  );
+}
+
 interface BookmarkNudgeTooltipProps {
   aiResponseCount: number;
   isFirstSession: boolean;
@@ -36,13 +46,23 @@ export function BookmarkNudgeTooltip({
     if (!profileId || !isFirstSession || aiResponseCount < 3) return;
 
     checkedRef.current = true;
-    void SecureStore.getItemAsync(getBookmarkNudgeKey(profileId))
-      .then((value) => {
-        if (!value) {
-          setVisible(true);
-        }
-      })
-      .catch(() => undefined);
+    void (async () => {
+      try {
+        const current = await SecureStore.getItemAsync(
+          getBookmarkNudgeKey(profileId),
+        );
+        if (current) return;
+        // Legacy fallback: respect prior dismissal under the `:` form so we
+        // don't re-nudge users who already saw and dismissed this tooltip.
+        const legacy = await SecureStore.getItemAsync(
+          getLegacyBookmarkNudgeKey(profileId),
+        );
+        if (legacy) return;
+        setVisible(true);
+      } catch {
+        // SecureStore unavailable — fail closed (don't show the nudge).
+      }
+    })();
   }, [aiResponseCount, isFirstSession, profileId]);
 
   const dismiss = useCallback(() => {

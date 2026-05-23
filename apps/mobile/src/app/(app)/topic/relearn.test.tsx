@@ -60,6 +60,10 @@ jest.mock(
   '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins route-entry contract without the full app provider tree */,
   () => ({
     useNavigationContract: () => ({
+      // V0 fallback in the screen layouts reads `isParentProxy` when
+      // MODE_NAV_V1_ENABLED is off — keep it congruent so tests pass under
+      // either flag value.
+      isParentProxy: mockIsParentProxy,
       canEnter: () => !mockIsParentProxy,
       gates: {},
     }),

@@ -1,12 +1,21 @@
 import { Redirect, Stack } from 'expo-router';
 import { useThemeColors } from '../../../lib/theme';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 export default function SessionLayout(): React.JSX.Element {
   const colors = useThemeColors();
   const navigationContract = useNavigationContract();
 
-  if (!navigationContract.canEnter('session')) {
+  // When V1 is off the contract's canEnter() returns false during the
+  // profile-load window (activeProfile===null) — which would redirect cold
+  // deep-link entries to /home. Preserve the V0 behavior by using the legacy
+  // isParentProxy check until V1 ships everywhere.
+  const blocked = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? !navigationContract.canEnter('session')
+    : navigationContract.isParentProxy;
+
+  if (blocked) {
     return <Redirect href="/(app)/home" />;
   }
 

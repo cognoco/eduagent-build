@@ -12,6 +12,7 @@ const mockUseQuizStats = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseAssessmentEligibleTopics = jest.fn();
 const mockCanEnterPractice = jest.fn();
+let mockCanEnterPracticeValue = true;
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => {
@@ -29,6 +30,10 @@ jest.mock(
   '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins route-entry contract without the full app provider tree */,
   () => ({
     useNavigationContract: () => ({
+      // V0 fallback in the screen layouts reads `isParentProxy` when
+      // MODE_NAV_V1_ENABLED is off — keep it congruent with mockCanEnterPracticeValue
+      // so tests pass under either flag value.
+      isParentProxy: !mockCanEnterPracticeValue,
       canEnter: mockCanEnterPractice,
       gates: {},
     }),
@@ -101,6 +106,7 @@ describe('PracticeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
+    mockCanEnterPracticeValue = true;
     mockCanEnterPractice.mockReturnValue(true);
     jest
       .spyOn(Date, 'now')
@@ -435,6 +441,7 @@ describe('PracticeScreen', () => {
   });
 
   it('redirects to home when in parent proxy session', () => {
+    mockCanEnterPracticeValue = false;
     mockCanEnterPractice.mockReturnValue(false);
 
     render(<PracticeScreen />);
