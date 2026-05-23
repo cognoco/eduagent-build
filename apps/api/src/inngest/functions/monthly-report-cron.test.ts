@@ -824,6 +824,7 @@ describe('monthlyReportGenerate', () => {
           title: expect.stringContaining('Emma'),
           body: expect.any(String),
         }),
+        expect.objectContaining({ respectPushPreference: true }),
       );
     });
 
@@ -1466,6 +1467,74 @@ describe('monthlyReportGenerate', () => {
         expect.objectContaining({
           totals: expect.objectContaining({ activitiesCompleted: 0 }),
         }),
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [WI-115] Monthly push must respect parent's push opt-out preference
+  // ---------------------------------------------------------------------------
+
+  describe('[WI-115] monthly push respects push preference opt-out', () => {
+    beforeEach(() => {
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValue({ displayName: 'Emma' });
+      mockGetSnapshotsInRange
+        .mockResolvedValueOnce([
+          { snapshotDate: '2026-03-29', metrics: SAMPLE_METRICS },
+        ])
+        .mockResolvedValueOnce([]);
+    });
+
+    it('passes respectPushPreference:true to sendPushNotification', async () => {
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockSendPushNotification).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: 'monthly_report' }),
+        expect.objectContaining({ respectPushPreference: true }),
+      );
+    });
+
+    it('pushEnabled=false ⇒ monthly push not sent (sendPushNotification returns push_disabled)', async () => {
+      // Simulate the real sendPushNotification returning push_disabled when
+      // push is disabled — the mock respects the option here.
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: false,
+        reason: 'push_disabled',
+      });
+
+      const { result } = await executeGenerateSteps(makeGenerateEvent());
+
+      // The generate step still completes successfully even if push is
+      // suppressed — push opt-out is not an error.
+      expect(result).toEqual(expect.objectContaining({ status: 'completed' }));
+      expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('pushEnabled=false does NOT affect the email path', async () => {
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: false,
+        reason: 'push_disabled',
+      });
+      // Email pref on, parent has email.
+      (
+        mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+      ).mockResolvedValueOnce(null); // null → monthlyProgressEmail defaults to true
+      (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ displayName: 'Emma' })
+        .mockResolvedValueOnce({ accountId: 'account-parent' });
+      (
+        mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ email: 'parent@example.test' });
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      // Email must still be sent regardless of push opt-out.
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'parent@example.test' }),
+        expect.anything(),
       );
     });
   });

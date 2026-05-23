@@ -17,10 +17,9 @@
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
 
-import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   accounts,
-  consentStates,
   learningProfiles,
   monthlyReports,
   notificationPreferences,
@@ -43,6 +42,7 @@ import {
   type ChildStruggleLine,
 } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
+import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
 import { progressMetricsSchema } from '@eduagent/schemas';
@@ -235,14 +235,7 @@ export const monthlyReportGenerate = inngest.createFunction(
         // Consent gate (parity with weekly-progress-push and sendStruggleNotification):
         // skip child if their most-recent GDPR consent state is anything other than
         // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
-        const consentState = await db.query.consentStates.findFirst({
-          where: and(
-            eq(consentStates.profileId, childId),
-            eq(consentStates.consentType, 'GDPR'),
-          ),
-          orderBy: desc(consentStates.requestedAt),
-        });
-        if (consentState != null && consentState.status !== 'CONSENTED') {
+        if (!(await isGdprProcessingAllowed(db, childId))) {
           return { status: 'skipped' as const, reason: 'consent_not_granted' };
         }
 
@@ -478,12 +471,16 @@ export const monthlyReportGenerate = inngest.createFunction(
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' as const };
       }
-      await sendPushNotification(db, {
-        profileId: parentId,
-        title: `${reportResult.childDisplayName}'s monthly report is ready`,
-        body: 'Open the app to see what they learned this month.',
-        type: 'monthly_report',
-      });
+      await sendPushNotification(
+        db,
+        {
+          profileId: parentId,
+          title: `${reportResult.childDisplayName}'s monthly report is ready`,
+          body: 'Open the app to see what they learned this month.',
+          type: 'monthly_report',
+        },
+        { respectPushPreference: true },
+      );
       return { sent: true, reason: undefined };
     });
 

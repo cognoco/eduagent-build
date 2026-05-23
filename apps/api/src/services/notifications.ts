@@ -4,7 +4,7 @@
 // Uses Expo Push API via fetch (CF Workers-compatible, no Node SDK needed).
 // ---------------------------------------------------------------------------
 
-import { and, desc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ConsentType, NotificationPayload } from '@eduagent/schemas';
 import {
   familyLinks,
@@ -17,7 +17,9 @@ import {
   getDailyNotificationCount,
   logNotification,
   checkAndLogRateLimitInternal,
+  isPushEnabled,
 } from './settings';
+import { isGdprProcessingAllowed } from './consent';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -70,7 +72,11 @@ export async function sendPushNotification(
   // [BUG-856] When the caller already reserved the rate-limit slot via
   // checkAndLogRateLimitInternal, set skipRateLimitLog to true so we do not
   // double-count this push toward the daily cap or per-type rate limit.
-  options?: { skipRateLimitLog?: boolean; skipDailyCap?: boolean },
+  options?: {
+    skipRateLimitLog?: boolean;
+    skipDailyCap?: boolean;
+    respectPushPreference?: boolean;
+  },
 ): Promise<NotificationResult> {
   // 1. Get push token
   const token = await getPushToken(db, payload.profileId);
@@ -81,6 +87,16 @@ export async function sendPushNotification(
   // 2. Validate token format
   if (!isExpoPushToken(token)) {
     return { sent: false, reason: 'invalid_token' };
+  }
+
+  // [WI-226] When the caller opts in, honor the recipient's master push
+  // preference. The central helper previously checked only token + cap, so
+  // direct callers could deliver to profiles that disabled push.
+  if (
+    options?.respectPushPreference &&
+    !(await isPushEnabled(db, payload.profileId))
+  ) {
+    return { sent: false, reason: 'push_disabled' };
   }
 
   // 3. Check daily cap
@@ -468,12 +484,16 @@ export async function notifyParentToSubscribe(
   const childName = childProfile?.displayName ?? 'Your child';
 
   // 4. Send push notification to parent
-  await sendPushNotification(db, {
-    profileId: link.parentProfileId,
-    title: `${childName} wants to keep learning!`,
-    body: `${childName} has been making great progress. Subscribe to continue their learning journey.`,
-    type: 'subscribe_request',
-  });
+  await sendPushNotification(
+    db,
+    {
+      profileId: link.parentProfileId,
+      title: `${childName} wants to keep learning!`,
+      body: `${childName} has been making great progress. Subscribe to continue their learning journey.`,
+      type: 'subscribe_request',
+    },
+    { respectPushPreference: true },
+  );
 
   // 5. Send email to parent (via consent state parentEmail)
   const consentState = await db.query.consentStates.findFirst({
@@ -555,27 +575,12 @@ export async function sendStruggleNotification(
     return { sent: false, reason: 'no_parent_link' };
   }
 
-  // Privacy gate: only send when the child's most recent GDPR consent state
-  // is CONSENTED. PENDING / PARENTAL_CONSENT_REQUESTED / WITHDRAWN must
-  // suppress — a parent receiving "Mia is struggling with fractions" pushes
-  // for a child who has not consented (or has withdrawn) is a privacy
-  // violation. Mirrors the dashboard's consent visibility rule
-  // (`hasRestrictedConsent` in ParentDashboardSummary).
-  // Missing row = no restriction (consent presumed), per existing dashboard
-  // behaviour for accounts created before the consent flow shipped.
-  const consentState = await db.query.consentStates.findFirst({
-    where: and(
-      eq(consentStates.profileId, childProfileId),
-      eq(consentStates.consentType, 'GDPR'),
-    ),
-    orderBy: desc(consentStates.requestedAt),
-  });
-  if (consentState != null && consentState.status !== 'CONSENTED') {
+  // Privacy gate: only send when the child's GDPR consent permits processing.
+  if (!(await isGdprProcessingAllowed(db, childProfileId))) {
     logger.info('Struggle notification suppressed by consent', {
       event: 'notification.struggle.consent_blocked',
       childProfileId,
       type: notification.type,
-      consentStatus: consentState.status,
     });
     return { sent: false, reason: 'consent_not_granted' };
   }
@@ -630,6 +635,6 @@ export async function sendStruggleNotification(
     // [BUG-856] Slot already reserved by checkAndLogRateLimitInternal above
     // for the same (parentProfileId, type) bucket — skip the push log so we
     // do not record two rows for the same notification.
-    { skipRateLimitLog: true },
+    { skipRateLimitLog: true, respectPushPreference: true },
   );
 }
