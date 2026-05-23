@@ -1,16 +1,16 @@
 import {
+  PROFILE_FACTORY_ISO as ISO,
+  PROFILE_FACTORY_CHILD_BIRTH_YEAR as CHILD_BIRTH_YEAR,
+  makeProfile,
+} from '../test-utils/profile-factories';
+import {
   resolveNavigationContract,
   type NavigationContract,
   type ProfileContext,
   type RouteKey,
 } from './navigation-contract';
 
-type ContractProfile = NonNullable<ProfileContext['activeProfile']>;
 type SubscriptionContext = ProfileContext['subscription'];
-
-const ISO = '2026-05-21T00:00:00.000Z';
-const ADULT_BIRTH_YEAR = 1985;
-const CHILD_BIRTH_YEAR = 2014;
 
 const studyTabs = ['home', 'library', 'progress', 'more'] as const;
 const familyTabs = ['home', 'recaps', 'progress', 'more'] as const;
@@ -22,29 +22,6 @@ const legacyGuardianTabs = [
   'progress',
   'more',
 ] as const;
-
-function makeProfile(
-  overrides: Partial<ContractProfile> & { id: string },
-): ContractProfile {
-  return {
-    accountId: '00000000-0000-7000-a000-000000000001',
-    avatarUrl: null,
-    birthYear: ADULT_BIRTH_YEAR,
-    consentStatus: null,
-    conversationLanguage: 'en',
-    createdAt: ISO,
-    defaultAppContext: null,
-    displayName: 'Profile',
-    hasFamilyLinks: false,
-    hasPremiumLlm: false,
-    isOwner: true,
-    linkCreatedAt: null,
-    location: null,
-    pronouns: null,
-    updatedAt: ISO,
-    ...overrides,
-  } as ContractProfile;
-}
 
 const adult = makeProfile({
   id: '00000000-0000-7000-a000-000000000101',
