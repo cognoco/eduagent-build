@@ -89,7 +89,7 @@ export const strengthEntrySchema = z.object({
 });
 export type StrengthEntry = z.infer<typeof strengthEntrySchema>;
 
-export const struggleEntrySchema = z.object({
+export const focusAreaEntrySchema = z.object({
   subject: z.string().nullable(),
   topic: z.string(),
   lastSeen: z.string().datetime(),
@@ -97,7 +97,7 @@ export const struggleEntrySchema = z.object({
   confidence: confidenceLevelSchema,
   source: memorySourceSchema.optional(),
 });
-export type StruggleEntry = z.infer<typeof struggleEntrySchema>;
+export type FocusAreaEntry = z.infer<typeof focusAreaEntrySchema>;
 
 export const learningProfileSchema = z.object({
   id: z.string().uuid(),
@@ -108,7 +108,7 @@ export const learningProfileSchema = z.object({
   // `InterestEntry` directly.
   interests: interestsArraySchema,
   strengths: z.array(strengthEntrySchema),
-  struggles: z.array(struggleEntrySchema),
+  struggles: z.array(focusAreaEntrySchema),
   communicationNotes: z.array(z.string()),
   suppressedInferences: z.array(z.string()),
   // [BUG-705 / P-9] DB column `interest_timestamps` is jsonb NOT NULL DEFAULT

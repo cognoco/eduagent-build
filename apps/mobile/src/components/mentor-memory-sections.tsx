@@ -6,7 +6,7 @@ import type {
   InterestEntry,
   LearningStyle,
   MemorySource,
-  StruggleEntry,
+  FocusAreaEntry,
 } from '@eduagent/schemas';
 import type { TranslateKey } from '../i18n';
 
@@ -57,7 +57,7 @@ export function getLearningStyleRows(style: LearningStyle): LearningStyleRow[] {
   return rows;
 }
 
-export function getStruggleProgress(entry: StruggleEntry): {
+export function getFocusAreaProgress(entry: FocusAreaEntry): {
   progressLabel: string;
   progressValue: number;
 } {

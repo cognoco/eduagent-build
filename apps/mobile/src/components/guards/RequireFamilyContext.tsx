@@ -21,7 +21,10 @@ export function RequireFamilyContext({
   const { setMode } = useAppContext();
   const { canRenderFamilyRoute, familyCapable } = useGuardFamilyRoute();
 
-  if (!FEATURE_FLAGS.MODE_NAV_V0_ENABLED) {
+  if (
+    !FEATURE_FLAGS.MODE_NAV_V0_ENABLED &&
+    !FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+  ) {
     return children;
   }
 

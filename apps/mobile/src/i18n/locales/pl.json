@@ -964,7 +964,7 @@
     "empty": {
       "title": "Twoja biblioteka jest pusta",
       "message": "Rozpocznij sesję nauki, a Twoje przedmioty pojawią się tutaj.",
-      "goHome": "Strona główna"
+      "createFirstSubject": "Dodaj pierwszy przedmiot"
     },
     "curriculumComplete": {
       "title": "Przerobiłeś(-aś) tu wszystko!",

@@ -69,7 +69,14 @@ function isProfilesExempt(path: string, method: string): boolean {
 
 function isExempt(path: string, method: string): boolean {
   if (isProfilesExempt(path, method)) return true;
-  return EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix));
+  // [CR-096] Guard against prefix-collision bugs (e.g. `/health` matching
+  // `/healthcheck-something`). Exact match OR path is a sub-route of the
+  // prefix (trailing-slash delimiter). Some configured prefixes already end
+  // with `/`, so normalize once before adding the delimiter.
+  return EXEMPT_PREFIXES.some((prefix) => {
+    const base = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+    return path === base || path === `${base}/` || path.startsWith(`${base}/`);
+  });
 }
 
 export const consentMiddleware = createMiddleware<ConsentEnv>(

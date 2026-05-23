@@ -124,7 +124,10 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 import { Hono } from 'hono';
-import { revenuecatWebhookRoute } from './revenuecat-webhook';
+import {
+  LATE_REVENUECAT_EVENT_OBSERVATION_MS,
+  revenuecatWebhookRoute,
+} from './revenuecat-webhook';
 import type { AppVariables } from '../types/hono';
 import { writeSubscriptionStatus } from '../services/kv';
 import {
@@ -546,6 +549,55 @@ describe('idempotency', () => {
 
     // KV cache should NOT be refreshed for duplicate transactions
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Late event observation [CR-049]
+// ---------------------------------------------------------------------------
+
+describe('late event observation [CR-049]', () => {
+  // [CR-049 regression test] A late-but-not-superseded event must still be
+  // processed. RevenueCat may deliver delayed subscription events; returning
+  // 200 while dropping them would permanently lose entitlement repairs.
+  it('[CR-049] processes late events after idempotency allows them', async () => {
+    const staleTimestampMs =
+      Date.now() - LATE_REVENUECAT_EVENT_OBSERVATION_MS - 60_000;
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: staleTimestampMs,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.received).toBe(true);
+    expect(body.stale).toBeUndefined();
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    expect(ensureFreeSubscription).toHaveBeenCalled();
+  });
+
+  it('[CR-049] processes recent events normally (within 48h window)', async () => {
+    const recentTimestampMs =
+      Date.now() - LATE_REVENUECAT_EVENT_OBSERVATION_MS + 60_000;
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: recentTimestampMs,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+  });
+
+  it('[CR-049] processes events with no event_timestamp_ms (missing field passes through)', async () => {
+    // If event_timestamp_ms is absent, the guard cannot evaluate age and must
+    // not block the event — RevenueCat may omit the field on older SDK versions.
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: undefined,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
   });
 });
 

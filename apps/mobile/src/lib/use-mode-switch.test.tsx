@@ -13,6 +13,7 @@ import { FEATURE_FLAGS } from './feature-flags';
 import { createTestProfile } from '../test-utils/app-hook-test-utils';
 
 const mockReplace = jest.fn();
+const mockUpdateAppContextMutate = jest.fn();
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('mock-token') }),
@@ -27,11 +28,30 @@ jest.mock(
   }),
 );
 
+jest.mock(
+  '../hooks/use-profiles' /* gc1-allow: useModeSwitch V1 tests need to control the app-context persistence boundary without mounting the API client */,
+  () => ({
+    useUpdateProfileAppContext: () => ({
+      mutate: mockUpdateAppContextMutate,
+    }),
+  }),
+);
+
 const adult = createTestProfile({
   id: 'adult',
   displayName: 'Adult',
   isOwner: true,
   birthYear: 1985,
+  createdAt: '2026-01-01T00:00:00.000Z',
+});
+
+const familyAdult = createTestProfile({
+  id: 'family-adult',
+  displayName: 'Family Adult',
+  isOwner: true,
+  birthYear: 1985,
+  defaultAppContext: 'family',
+  hasFamilyLinks: true,
   createdAt: '2026-01-01T00:00:00.000Z',
 });
 
@@ -86,6 +106,7 @@ describe('useModeSwitch', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    mockUpdateAppContextMutate.mockReset();
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
       true;
     (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
@@ -200,8 +221,10 @@ describe('useModeSwitch', () => {
     clearTimeoutSpy.mockRestore();
   });
 
-  it('is a no-op when MODE_NAV_V0_ENABLED is off', () => {
+  it('is a no-op when both mode navigation flags are off', () => {
     (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
       false;
 
     const { result } = renderHook(
@@ -226,6 +249,42 @@ describe('useModeSwitch', () => {
     expect(mockReplace).not.toHaveBeenCalled();
     expect(result.current.modeSwitch.isSwitchingRef.current).toBe(false);
     expect(result.current.modeSwitch.isSwitching).toBe(false);
+  });
+
+  it('switches mode when V1 is enabled and V0 is disabled', () => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      true;
+
+    const { result } = renderHook(
+      () => ({
+        appContext: useAppContext(),
+        modeSwitch: useModeSwitch(),
+      }),
+      { wrapper: makeWrapper({ activeProfile: familyAdult }) },
+    );
+
+    expect(result.current.appContext.mode).toBe('family');
+
+    act(() => {
+      result.current.modeSwitch.switchMode('study');
+    });
+
+    expect(result.current.appContext.mode).toBe('study');
+    expect(mockUpdateAppContextMutate).toHaveBeenCalledWith(
+      {
+        profileId: familyAdult.id,
+        defaultAppContext: 'study',
+      },
+      expect.any(Object),
+    );
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('exposes isSwitching as reactive state for UI feedback', () => {

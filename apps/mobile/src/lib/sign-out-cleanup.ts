@@ -84,7 +84,6 @@ export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
 // to switch accounts on the same device should not be prompted to re-onboard).
 export const GLOBAL_KEYS: ReadonlyArray<string> = [
   'hasSignedInBefore', // sign-in.tsx HAS_SIGNED_IN_KEY — "Welcome back" gate
-  'mentomate_pending_auth_redirect', // pending-auth-redirect.ts
   sanitizeSecureStoreKey('parent-proxy-active'), // use-parent-proxy.ts / profile.ts
   'session-recovery-marker', // session-recovery.ts (un-keyed legacy form)
   sanitizeSecureStoreKey('mentomate_active_profile_id'), // profile.ts ACTIVE_PROFILE_KEY
@@ -147,7 +146,7 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
   },
   {
     file: 'apps/mobile/src/lib/summary-draft.ts',
-    line: 48,
+    line: 55,
     reason:
       'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API).',
   },

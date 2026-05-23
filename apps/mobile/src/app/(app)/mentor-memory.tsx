@@ -22,7 +22,7 @@ import {
   MemoryRow,
   MemorySection,
   getLearningStyleRows,
-  getStruggleProgress,
+  getFocusAreaProgress,
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
 import { goBackOrReplace } from '../../lib/navigation';
@@ -623,7 +623,7 @@ export default function MentorMemoryScreen() {
         >
           {(profile?.struggles ?? []).length > 0 ? (
             profile?.struggles.map((entry) => {
-              const progress = getStruggleProgress(entry);
+              const progress = getFocusAreaProgress(entry);
               return (
                 <MemoryRow
                   key={`${entry.subject ?? 'freeform'}:${entry.topic}`}

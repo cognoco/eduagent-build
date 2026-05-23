@@ -964,7 +964,7 @@
     "empty": {
       "title": "Sua biblioteca está vazia",
       "message": "Inicie uma sessão de estudo e suas matérias aparecerão aqui.",
-      "goHome": "Ir para o Início"
+      "createFirstSubject": "Adicione sua primeira disciplina"
     },
     "curriculumComplete": {
       "title": "Você já cobriu tudo aqui!",

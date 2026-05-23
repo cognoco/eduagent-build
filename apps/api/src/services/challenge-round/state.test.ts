@@ -13,7 +13,7 @@ function evalItem(
     concept: 'photosynthesis',
     result: 'solid',
     evidence: 'learner described chloroplast role correctly',
-    answerEventId: 'event-1',
+    answerEventId: '00000000-0000-4000-8000-000000000001',
     learnerQuote: 'plants use chloroplasts to capture light',
     ...overrides,
   };
@@ -147,11 +147,21 @@ describe('transitionChallengeState — answer_complete', () => {
         state: 'active',
         questionIndex: 0,
         totalQuestions: 3,
-        evaluations: [evalItem({ concept: 'a', answerEventId: 'e1' })],
+        evaluations: [
+          evalItem({
+            concept: 'a',
+            answerEventId: '00000000-0000-4000-8000-000000000001',
+          }),
+        ],
       },
       {
         type: 'answer_complete',
-        evaluation: [evalItem({ concept: 'b', answerEventId: 'e2' })],
+        evaluation: [
+          evalItem({
+            concept: 'b',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
+          }),
+        ],
       },
     );
     expect(next?.state).toBe('active');
@@ -168,13 +178,24 @@ describe('transitionChallengeState — answer_complete', () => {
         questionIndex: 2,
         totalQuestions: 3,
         evaluations: [
-          evalItem({ concept: 'a', answerEventId: 'e1' }),
-          evalItem({ concept: 'b', answerEventId: 'e2' }),
+          evalItem({
+            concept: 'a',
+            answerEventId: '00000000-0000-4000-8000-000000000001',
+          }),
+          evalItem({
+            concept: 'b',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
+          }),
         ],
       },
       {
         type: 'answer_complete',
-        evaluation: [evalItem({ concept: 'c', answerEventId: 'e3' })],
+        evaluation: [
+          evalItem({
+            concept: 'c',
+            answerEventId: '00000000-0000-4000-8000-000000000003',
+          }),
+        ],
       },
     );
     expect(next?.state).toBe('drafting');
@@ -193,8 +214,14 @@ describe('transitionChallengeState — answer_complete', () => {
       {
         type: 'answer_complete',
         evaluation: [
-          evalItem({ concept: 'a', answerEventId: 'e1' }),
-          evalItem({ concept: 'b', answerEventId: 'e2' }),
+          evalItem({
+            concept: 'a',
+            answerEventId: '00000000-0000-4000-8000-000000000001',
+          }),
+          evalItem({
+            concept: 'b',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
+          }),
         ],
       },
     );

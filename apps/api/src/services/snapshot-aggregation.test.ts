@@ -525,14 +525,14 @@ describe('getLatestSnapshot', () => {
 
 describe('getLatestSnapshotOnOrBefore', () => {
   it('returns null when no snapshots exist', async () => {
-    const db = createSnapshotDb({ findMany: [] });
+    const db = createSnapshotDb({ findFirst: undefined });
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
     expect(result).toBeNull();
   });
 
   it('returns the snapshot when its date equals the requested date', async () => {
     const db = createSnapshotDb({
-      findMany: [makeSnapshotRow({ snapshotDate: TODAY })],
+      findFirst: makeSnapshotRow({ snapshotDate: TODAY }),
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -543,11 +543,9 @@ describe('getLatestSnapshotOnOrBefore', () => {
 
   it('returns the closest earlier snapshot when the exact date is not present', async () => {
     const db = createSnapshotDb({
-      // findMany returns in desc order (as DB would)
-      findMany: [
-        makeSnapshotRow({ snapshotDate: '2026-04-18' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-17' }),
-      ],
+      // The SQL where clause filters out future rows and desc ordering picks
+      // the closest earlier snapshot.
+      findFirst: makeSnapshotRow({ snapshotDate: '2026-04-18' }),
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -558,10 +556,7 @@ describe('getLatestSnapshotOnOrBefore', () => {
 
   it('returns null when all snapshots are newer than the requested date', async () => {
     const db = createSnapshotDb({
-      findMany: [
-        makeSnapshotRow({ snapshotDate: '2026-04-20' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-21' }),
-      ],
+      findFirst: undefined,
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -571,11 +566,7 @@ describe('getLatestSnapshotOnOrBefore', () => {
 
   it('skips future snapshots and picks the most recent past one', async () => {
     const db = createSnapshotDb({
-      findMany: [
-        makeSnapshotRow({ snapshotDate: '2026-04-21' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-19' }),
-        makeSnapshotRow({ snapshotDate: '2026-04-15' }),
-      ],
+      findFirst: makeSnapshotRow({ snapshotDate: '2026-04-19' }),
     });
 
     const result = await getLatestSnapshotOnOrBefore(db, profileId, TODAY);
@@ -706,6 +697,13 @@ describe('buildKnowledgeInventory', () => {
       findFirst: latest,
       findMany: [latest, previous],
     });
+    (
+      db.query.progressSnapshots.findFirst as jest.MockedFunction<
+        typeof db.query.progressSnapshots.findFirst
+      >
+    )
+      .mockResolvedValueOnce(latest)
+      .mockResolvedValueOnce(previous);
     (
       db.query as unknown as Record<string, { findMany: jest.Mock }>
     ).subjects!.findMany.mockResolvedValue([makeSubjectRow(subjectId)]);

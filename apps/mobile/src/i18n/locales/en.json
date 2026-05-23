@@ -1009,7 +1009,7 @@
     "empty": {
       "title": "Your library will grow as you learn",
       "message": "Start with homework help or learn something new. Books and topics will appear here afterward.",
-      "goHome": "Back to Home"
+      "createFirstSubject": "Add your first subject"
     },
     "nextAction": {
       "title": "Continue {{subject}}",

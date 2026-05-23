@@ -33,6 +33,8 @@ import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
+export const LATE_REVENUECAT_EVENT_OBSERVATION_MS = 48 * 60 * 60 * 1000;
+
 // ---------------------------------------------------------------------------
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
 // ---------------------------------------------------------------------------
@@ -838,6 +840,28 @@ export const revenuecatWebhookRoute = new Hono<{
         eventType: event.type,
         eventId: event.id,
         accountId,
+      },
+    );
+  }
+
+  // [CR-049] Events older than RevenueCat's normal retry window are suspicious,
+  // but not automatically invalid: delayed purchase/renewal/expiration events
+  // can repair entitlement state. Ordering-based idempotency above is the guard
+  // against stale retries overwriting newer subscription state.
+  const eventAgeMs =
+    event.event_timestamp_ms === undefined
+      ? undefined
+      : Date.now() - event.event_timestamp_ms;
+  if (
+    eventAgeMs !== undefined &&
+    eventAgeMs > LATE_REVENUECAT_EVENT_OBSERVATION_MS
+  ) {
+    logger.warn(
+      '[revenuecat] Late event observed; processing after idempotency',
+      {
+        eventType: event.type,
+        eventId: event.id,
+        eventAgeMs,
       },
     );
   }

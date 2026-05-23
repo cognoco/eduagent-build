@@ -1688,7 +1688,10 @@ describe('SessionSummaryScreen', () => {
 
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/topic/[topicId]',
-        params: { topicId: '11111111-1111-1111-1111-111111111111' },
+        params: {
+          topicId: '11111111-1111-1111-1111-111111111111',
+          subjectId: 'subject-uuid-1',
+        },
       });
     });
   });

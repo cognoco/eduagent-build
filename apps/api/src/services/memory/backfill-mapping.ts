@@ -3,11 +3,11 @@ import {
   interestEntrySchema,
   interestsArraySchema,
   strengthEntrySchema,
-  struggleEntrySchema,
+  focusAreaEntrySchema,
   type ConfidenceLevel,
   type InterestEntry,
   type StrengthEntry,
-  type StruggleEntry,
+  type FocusAreaEntry,
 } from '@eduagent/schemas';
 
 export type MemoryFactCategory =
@@ -21,7 +21,7 @@ export type MemoryFactInsert = typeof memoryFacts.$inferInsert;
 
 export type MemoryProjection = {
   strengths: StrengthEntry[];
-  struggles: StruggleEntry[];
+  struggles: FocusAreaEntry[];
   interests: InterestEntry[];
   communicationNotes: string[];
   suppressedInferences: string[];
@@ -53,7 +53,7 @@ function dateOrFallback(value: string | undefined, fallback: Date): Date {
 export function mapStrengthToFact(
   profileId: string,
   entry: StrengthEntry,
-  observedAt: Date
+  observedAt: Date,
 ): MemoryFactInsert {
   const text = `${entry.subject}: ${entry.topics.join(', ')} (${
     entry.confidence
@@ -75,8 +75,8 @@ export function mapStrengthToFact(
 
 export function mapStruggleToFact(
   profileId: string,
-  entry: StruggleEntry,
-  fallbackObservedAt: Date
+  entry: FocusAreaEntry,
+  fallbackObservedAt: Date,
 ): MemoryFactInsert {
   const text = `${entry.subject ? `${entry.subject}: ` : ''}${entry.topic} (${
     entry.confidence
@@ -101,7 +101,7 @@ export function mapInterestToFact(
   profileId: string,
   entry: InterestEntry,
   timestamps: Record<string, string>,
-  fallbackObservedAt: Date
+  fallbackObservedAt: Date,
 ): MemoryFactInsert {
   return {
     profileId,
@@ -115,7 +115,7 @@ export function mapInterestToFact(
     },
     observedAt: dateOrFallback(
       timestamps[normalizeMemoryText(entry.label)],
-      fallbackObservedAt
+      fallbackObservedAt,
     ),
     confidence: 'medium',
   };
@@ -124,7 +124,7 @@ export function mapInterestToFact(
 export function mapCommunicationNoteToFact(
   profileId: string,
   note: string,
-  observedAt: Date
+  observedAt: Date,
 ): MemoryFactInsert {
   return {
     profileId,
@@ -141,7 +141,7 @@ export function mapSuppressedInferenceToFact(
   profileId: string,
   value: string,
   observedAt: Date,
-  originCategory = 'unknown'
+  originCategory = 'unknown',
 ): MemoryFactInsert {
   return {
     profileId,
@@ -168,7 +168,7 @@ function pushStringRows(
   malformed: MalformedMemoryEntry[],
   category: string,
   source: unknown,
-  mapper: (value: string) => MemoryFactInsert
+  mapper: (value: string) => MemoryFactInsert,
 ): void {
   if (!Array.isArray(source)) return;
   for (const value of source) {
@@ -182,28 +182,28 @@ function pushStringRows(
 
 export function buildMemoryFactRowsFromProjection(
   profileId: string,
-  projection: MemoryProjection
+  projection: MemoryProjection,
 ): MemoryFactInsert[] {
   return dedupeMemoryFactRows([
     ...projection.strengths.map((entry) =>
-      mapStrengthToFact(profileId, entry, projection.createdAt)
+      mapStrengthToFact(profileId, entry, projection.createdAt),
     ),
     ...projection.struggles.map((entry) =>
-      mapStruggleToFact(profileId, entry, projection.createdAt)
+      mapStruggleToFact(profileId, entry, projection.createdAt),
     ),
     ...projection.interests.map((entry) =>
       mapInterestToFact(
         profileId,
         entry,
         projection.interestTimestamps,
-        projection.createdAt
-      )
+        projection.createdAt,
+      ),
     ),
     ...projection.communicationNotes.map((note) =>
-      mapCommunicationNoteToFact(profileId, note, projection.createdAt)
+      mapCommunicationNoteToFact(profileId, note, projection.createdAt),
     ),
     ...projection.suppressedInferences.map((value) =>
-      mapSuppressedInferenceToFact(profileId, value, projection.createdAt)
+      mapSuppressedInferenceToFact(profileId, value, projection.createdAt),
     ),
   ]);
 }
@@ -225,7 +225,7 @@ export function memoryFactIdentityKey(row: MemoryFactInsert): string {
 }
 
 export function dedupeMemoryFactRows(
-  rows: MemoryFactInsert[]
+  rows: MemoryFactInsert[],
 ): MemoryFactInsert[] {
   const byIdentity = new Map<string, MemoryFactInsert>();
   for (const row of rows) {
@@ -260,14 +260,14 @@ export function buildBackfillRowsForProfile(profile: {
         continue;
       }
       rows.push(
-        mapStrengthToFact(profile.profileId, parsed.data, profile.createdAt)
+        mapStrengthToFact(profile.profileId, parsed.data, profile.createdAt),
       );
     }
   }
 
   if (Array.isArray(profile.struggles)) {
     for (const value of profile.struggles) {
-      const parsed = struggleEntrySchema.safeParse(value);
+      const parsed = focusAreaEntrySchema.safeParse(value);
       if (!parsed.success) {
         malformed.push({
           category: 'struggle',
@@ -277,7 +277,7 @@ export function buildBackfillRowsForProfile(profile: {
         continue;
       }
       rows.push(
-        mapStruggleToFact(profile.profileId, parsed.data, profile.createdAt)
+        mapStruggleToFact(profile.profileId, parsed.data, profile.createdAt),
       );
     }
   }
@@ -299,8 +299,8 @@ export function buildBackfillRowsForProfile(profile: {
           profile.profileId,
           parsed.data,
           timestamps,
-          profile.createdAt
-        )
+          profile.createdAt,
+        ),
       );
     }
   } else if (Array.isArray(profile.interests)) {
@@ -319,7 +319,7 @@ export function buildBackfillRowsForProfile(profile: {
     'communication_note',
     profile.communicationNotes,
     (note) =>
-      mapCommunicationNoteToFact(profile.profileId, note, profile.createdAt)
+      mapCommunicationNoteToFact(profile.profileId, note, profile.createdAt),
   );
   pushStringRows(
     rows,
@@ -327,7 +327,7 @@ export function buildBackfillRowsForProfile(profile: {
     'suppressed',
     profile.suppressedInferences,
     (value) =>
-      mapSuppressedInferenceToFact(profile.profileId, value, profile.createdAt)
+      mapSuppressedInferenceToFact(profile.profileId, value, profile.createdAt),
   );
 
   return { rows: dedupeMemoryFactRows(rows), malformed };

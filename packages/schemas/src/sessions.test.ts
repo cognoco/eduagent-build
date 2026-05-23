@@ -408,7 +408,7 @@ describe('sessionMetadata.challengeRound', () => {
       concept: 'x',
       result: 'solid' as const,
       evidence: 'ok',
-      answerEventId: 'e-1',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
       learnerQuote: 'q',
     };
     expect(
@@ -432,7 +432,7 @@ describe('sessionMetadata.challengeRound', () => {
             concept: 'a',
             result: 'solid',
             evidence: 'ok',
-            answerEventId: 'e-a',
+            answerEventId: '00000000-0000-4000-8000-00000000000a',
             learnerQuote: 'q-a',
           },
         ],

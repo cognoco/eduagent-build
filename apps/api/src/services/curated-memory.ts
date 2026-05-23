@@ -9,7 +9,7 @@ import type {
   MemoryCategory,
   MemoryCategoryKey,
   StrengthEntry,
-  StruggleEntry,
+  FocusAreaEntry,
 } from '@eduagent/schemas';
 import {
   hasMemoryFactsMarker,
@@ -86,7 +86,7 @@ function buildStrengthItems(strengths: unknown[]): CuratedMemoryItem[] {
 }
 
 function buildStruggleItems(struggles: unknown[]): CuratedMemoryItem[] {
-  return (struggles as StruggleEntry[]).map((entry) => ({
+  return (struggles as FocusAreaEntry[]).map((entry) => ({
     category: 'struggles' as const,
     value: entry.topic,
     statement: entry.subject

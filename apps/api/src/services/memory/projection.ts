@@ -13,7 +13,7 @@ import type {
   InterestEntry,
   LearningStyle,
   StrengthEntry,
-  StruggleEntry,
+  FocusAreaEntry,
 } from '@eduagent/schemas';
 import { interestsArraySchema, learningStyleSchema } from '@eduagent/schemas';
 import type { CuratedMemoryView } from '../curated-memory';
@@ -57,7 +57,7 @@ export type MemoryProjection = {
   // ── Memory facts (flag-aware; may come from JSONB or memory_facts) ────────
   interests: InterestEntry[];
   strengths: StrengthEntry[];
-  struggles: StruggleEntry[];
+  struggles: FocusAreaEntry[];
   communicationNotes: string[];
 
   // ── Memory metadata (always from JSONB) ───────────────────────────────────
@@ -156,10 +156,10 @@ function asStrengthArray(value: unknown): StrengthEntry[] {
   );
 }
 
-function asStruggleArray(value: unknown): StruggleEntry[] {
+function asStruggleArray(value: unknown): FocusAreaEntry[] {
   if (!Array.isArray(value)) return [];
   return value.filter(
-    (item): item is StruggleEntry =>
+    (item): item is FocusAreaEntry =>
       Boolean(item) && typeof item === 'object' && 'topic' in item,
   );
 }
@@ -206,7 +206,7 @@ function buildProjectionFromRow(
   overrides?: {
     interests?: InterestEntry[];
     strengths?: StrengthEntry[];
-    struggles?: StruggleEntry[];
+    struggles?: FocusAreaEntry[];
     communicationNotes?: string[];
   },
 ): MemoryProjection {
@@ -335,7 +335,7 @@ export function toLearnerSelfView(projection: MemoryProjection): {
   updatedAt: Date;
   interests: InterestEntry[];
   strengths: StrengthEntry[];
-  struggles: StruggleEntry[];
+  struggles: FocusAreaEntry[];
   communicationNotes: string[];
   suppressedInferences: string[];
   interestTimestamps: Record<string, string>;

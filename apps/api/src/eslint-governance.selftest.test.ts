@@ -43,6 +43,15 @@ interface LintResult {
   errorCount: number;
 }
 
+function parseLintResults(stdout: string): LintResult[] {
+  const trimmed = stdout.trim();
+  const jsonStart = trimmed.startsWith('[') ? 0 : trimmed.indexOf('[{');
+  if (jsonStart === -1) {
+    throw new Error(`eslint stdout did not contain JSON: ${stdout}`);
+  }
+  return JSON.parse(trimmed.slice(jsonStart)) as LintResult[];
+}
+
 function lint(filePath: string, source: string): LintResult {
   // shell:true is required on Windows so .cmd shims (eslint.cmd) resolve.
   const proc = spawnSync(
@@ -65,7 +74,7 @@ function lint(filePath: string, source: string): LintResult {
       `eslint produced no stdout. status=${proc.status} stderr=${proc.stderr}`,
     );
   }
-  const results = JSON.parse(proc.stdout) as LintResult[];
+  const results = parseLintResults(proc.stdout);
   if (results.length !== 1) {
     throw new Error(`Expected one lint result, got ${results.length}`);
   }
