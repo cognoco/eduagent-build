@@ -8,6 +8,7 @@ import {
   childInventoryResponseSchema,
   childProgressHistoryResponseSchema,
   childSubjectTopicsResponseSchema,
+  childTopicSnapshotResponseSchema,
   childSessionsResponseSchema,
   childSessionDetailResponseSchema,
   childMemoryResponseSchema,
@@ -42,14 +43,18 @@ import {
   getWeeklyReportForParentChild,
   markWeeklyReportViewed,
 } from '../services/weekly-report';
-import { assertOwnerAndParentAccess } from '../services/family-access';
-import { notFound } from '../errors';
+import {
+  assertOwnerAndParentAccess,
+  assertOwnerProfile,
+} from '../services/family-access';
+import { ForbiddenError, notFound } from '../errors';
 import { isMemoryFactsReadEnabled } from '../config';
 import {
   getMemoryProjection,
   toCuratedView,
 } from '../services/memory/projection';
 import { getProgressSummary } from '../services/progress-summary';
+import { getChildTopicSnapshotForParent } from '../services/family-bridge';
 
 type DashboardRouteEnv = {
   Bindings: {
@@ -182,6 +187,31 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       subjectId,
     );
     return c.json(childSubjectTopicsResponseSchema.parse({ topics }));
+  })
+
+  .get('/dashboard/children/:profileId/topics/:topicId/snapshot', async (c) => {
+    assertOwnerProfile(c);
+
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+    const topicId = c.req.param('topicId');
+
+    try {
+      const snapshot = await getChildTopicSnapshotForParent(
+        db,
+        parentProfileId,
+        childProfileId,
+        topicId,
+      );
+      if (!snapshot) return notFound(c, 'Topic not found');
+      return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
+    } catch (error) {
+      if (error instanceof ForbiddenError) {
+        return notFound(c, 'Topic not found');
+      }
+      throw error;
+    }
   })
 
   // List child's sessions

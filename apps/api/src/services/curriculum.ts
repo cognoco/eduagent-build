@@ -228,6 +228,8 @@ function mapTopicRow(
     cefrSublevel: row.cefrSublevel ?? null,
     targetWordCount: row.targetWordCount ?? null,
     targetChunkCount: row.targetChunkCount ?? null,
+    sourceChildProfileId: row.sourceChildProfileId ?? null,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
