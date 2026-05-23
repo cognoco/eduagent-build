@@ -1087,10 +1087,15 @@ export async function getBookWithTopics(
     : [];
 
   const topicIds = topicRows.map((topic) => topic.id);
+  // [L7-F9] Project only the columns the mapper below reads.
   const connectionRows =
     topicIds.length > 0
       ? await db
-          .select()
+          .select({
+            id: topicConnections.id,
+            topicAId: topicConnections.topicAId,
+            topicBId: topicConnections.topicBId,
+          })
           .from(topicConnections)
           .where(
             and(
