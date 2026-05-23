@@ -356,7 +356,7 @@ describe('family bridge integration', () => {
     const adultTopic = await findAdultTopic(
       fixture.db,
       fixture.adult.id,
-      'Fractions (from Ada)',
+      'Fractions (copy)',
     );
     expect(adultTopic?.topic.id).toBe(result.topicId);
     expect(adultTopic?.topic.sourceChildProfileId).toBe(fixture.child.id);

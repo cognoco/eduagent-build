@@ -146,6 +146,7 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, TopicNotSkippedError } from '../errors';
+import { getProfile } from '../services/profile';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
@@ -350,6 +351,42 @@ describe('curriculum routes', () => {
 
       expect(res.status).toBe(404);
     });
+
+    it('[BREAK] returns 403 when the caller is not the account owner', async () => {
+      // Override the default isOwner: true profile for this single request so
+      // profile-scope middleware sets profileMeta.isOwner = false. The route
+      // calls assertOwnerProfile(c) which must throw ForbiddenError. If the
+      // assertOwnerProfile guard is removed, this test fails because the
+      // service mock would be invoked and the response would be 200.
+      (getProfile as jest.Mock).mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2008,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockCloneTopicFromChild).not.toHaveBeenCalled();
+    });
   });
 
   // ---- DELETE /v1/curriculum/clone-from-child/undo -------------------------
@@ -451,6 +488,38 @@ describe('curriculum routes', () => {
       );
 
       expect(res.status).toBe(400);
+      expect(mockUndoCloneFromChild).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] returns 403 when the caller is not the account owner', async () => {
+      // See the matching POST break-test: assertOwnerProfile must reject
+      // non-owner callers on the undo endpoint too. Removing the guard would
+      // let the mocked service run and return 200.
+      (getProfile as jest.Mock).mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2008,
+        location: null,
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: false,
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: TOPIC_ID },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
       expect(mockUndoCloneFromChild).not.toHaveBeenCalled();
     });
   });

@@ -2605,6 +2605,24 @@
     "errorTitle": "Não foi possível carregar os resumos",
     "errorMessage": "Tente novamente daqui a pouco.",
     "summaryPending": "Um resumo desta sessão ainda está a ser preparado.",
-    "openRecapLabel": "Abrir o resumo de {{child}} para {{title}}"
+    "openRecapLabel": "Abrir o resumo de {{child}} para {{title}}",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   }
 }

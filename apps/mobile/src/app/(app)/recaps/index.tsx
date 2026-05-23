@@ -9,10 +9,10 @@ import { Redirect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { ErrorFallback } from '../../components/common';
-import { useNavigationContract } from '../../hooks/use-navigation-contract';
-import { useRecaps } from '../../hooks/use-recaps';
-import { formatRelativeDate } from '../../lib/format-relative-date';
+import { ErrorFallback } from '../../../components/common';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { useRecaps } from '../../../hooks/use-recaps';
+import { formatRelativeDate } from '../../../lib/format-relative-date';
 
 export default function RecapsScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();

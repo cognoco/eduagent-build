@@ -2395,7 +2395,25 @@
     "errorTitle": "We could not load recaps",
     "errorMessage": "Please try again in a moment.",
     "summaryPending": "A recap is still being prepared for this session.",
-    "openRecapLabel": "Open {{child}}'s recap for {{title}}"
+    "openRecapLabel": "Open {{child}}'s recap for {{title}}",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   },
   "ocrTimeout": "Reading took too long — please try again",
   "permissionTitle": "Camera access needed",

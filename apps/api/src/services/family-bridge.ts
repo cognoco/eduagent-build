@@ -184,7 +184,12 @@ async function resolveSubject(
             languageCode: adult.conversationLanguage,
             updatedAt: new Date(),
           })
-          .where(eq(subjects.id, existing.id));
+          .where(
+            and(
+              eq(subjects.id, existing.id),
+              eq(subjects.profileId, adultProfileId),
+            ),
+          );
         return {
           subject: { ...existing, languageCode: adult.conversationLanguage },
           created: false,
@@ -340,7 +345,12 @@ async function getTopicState(
 }
 
 function forceCopyTitle(snapshot: ChildTopicSnapshot, attempt: number): string {
-  const base = `${snapshot.topicTitle} (from ${snapshot.childDisplayName})`;
+  // Avoid embedding the child's display name in the persisted title — the
+  // sourceChildProfileId column already drives the live "From {child}" chip
+  // via TopicProvenance, so name resolution happens at render time. Storing
+  // the name in the title would survive child-profile deletion (the FK is
+  // ON DELETE SET NULL) and leak PII into any future export/analytics path.
+  const base = `${snapshot.topicTitle} (copy)`;
   return attempt === 0 ? base : `${base} ${attempt + 1}`;
 }
 

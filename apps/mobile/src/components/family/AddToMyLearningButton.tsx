@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   useCloneFromChild,
@@ -83,12 +84,14 @@ export function AddToMyLearningButton({
 }: Props): React.ReactElement | null {
   const navigationContract = useNavigationContract();
   const { activeProfile } = useProfile();
+  const { t } = useTranslation();
   const { cloneFromChild, isCloningFor, toast, dismissToast } =
     useCloneFromChild();
   const [tipState, setTipState] = useState<'pending' | 'show' | 'hide'>(
     'pending',
   );
-  const canShow = navigationContract.gates.showLearnThisToo && !!topicId;
+  const canShow =
+    navigationContract.gates.showLearnThisToo && !!topicId && !!childProfileId;
 
   const tipKey = useMemo(
     () =>
@@ -161,18 +164,17 @@ export function AddToMyLearningButton({
           testID="add-to-my-learning-tip"
         >
           <Text className="text-body-sm text-text-secondary">
-            Save a copy of this topic into your own Library without changing
-            your child's learning.
+            {t('addToMyLearning.tip')}
           </Text>
           <Pressable
             onPress={markTipSeen}
             className="mt-2 self-start min-h-[44px] justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Dismiss"
+            accessibilityLabel={t('addToMyLearning.dismiss')}
             testID="add-to-my-learning-tip-dismiss"
           >
             <Text className="text-body-sm font-semibold text-primary">
-              Got it
+              {t('addToMyLearning.dismissTip')}
             </Text>
           </Pressable>
         </View>
@@ -185,7 +187,7 @@ export function AddToMyLearningButton({
           isCloning ? ' opacity-60' : ''
         }`}
         accessibilityRole="button"
-        accessibilityLabel="Add to my learning"
+        accessibilityLabel={t('addToMyLearning.buttonLabel')}
         accessibilityState={{ disabled: isCloning }}
         testID="add-to-my-learning-button"
       >
@@ -193,12 +195,12 @@ export function AddToMyLearningButton({
           <ActivityIndicator color="white" />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
-            Add to my learning
+            {t('addToMyLearning.buttonLabel')}
           </Text>
         )}
       </Pressable>
       <Text className="mt-2 text-center text-caption text-text-secondary">
-        Private to your learning
+        {t('addToMyLearning.privacyNote')}
       </Text>
 
       {toast ? <BridgeToast toast={toast} /> : null}

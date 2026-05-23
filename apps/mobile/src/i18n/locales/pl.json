@@ -2605,6 +2605,24 @@
     "errorTitle": "Nie udało się wczytać podsumowań",
     "errorMessage": "Spróbuj ponownie za chwilę.",
     "summaryPending": "Podsumowanie tej sesji jest jeszcze przygotowywane.",
-    "openRecapLabel": "Otwórz podsumowanie {{child}} dla {{title}}"
+    "openRecapLabel": "Otwórz podsumowanie {{child}} dla {{title}}",
+    "detailHeading": "Session recap",
+    "backLabel": "Back to recaps",
+    "detailLoadError": "We could not load this recap",
+    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
+    "notFoundTitle": "Recap not found",
+    "notFoundMessage": "This recap is no longer available.",
+    "exchangesCount": "{{count}} exchanges",
+    "whatHappened": "What happened",
+    "detailPending": "This recap is still being prepared.",
+    "tryAsking": "Try asking",
+    "openChildSession": "Open child session"
+  },
+  "addToMyLearning": {
+    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
+    "dismissTip": "Got it",
+    "dismiss": "Dismiss",
+    "buttonLabel": "Add to my learning",
+    "privacyNote": "Private to your learning"
   }
 }
