@@ -63,7 +63,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
   if (c.env.ENVIRONMENT === 'production') {
     return c.json(
       { code: ERROR_CODES.FORBIDDEN, message: 'Not available in production' },
-      403
+      403,
     );
   }
 
@@ -79,7 +79,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
         message:
           'TEST_SEED_SECRET must be configured on non-development environments',
       },
-      403
+      403,
     );
   }
 
@@ -94,7 +94,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
       encoder.encode('test-seed-compare'),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ['sign']
+      ['sign'],
     );
     const [digestA, digestB] = await Promise.all([
       crypto.subtle.sign('HMAC', hmacKey, encoder.encode(headerSecret)),
@@ -112,7 +112,7 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
           code: ERROR_CODES.FORBIDDEN,
           message: 'Invalid or missing test secret',
         },
-        403
+        403,
       );
     }
   }
@@ -136,7 +136,7 @@ testSeedRoutes.post(
     };
     const result = await seedScenario(db, scenario, email, seedEnv);
     return c.json(result, 201);
-  }
+  },
 );
 
 testSeedRoutes.post('/__test/reset', async (c) => {
@@ -147,27 +147,28 @@ testSeedRoutes.post('/__test/reset', async (c) => {
   };
   const prefix = c.req.query('prefix')?.trim() || undefined;
 
-  // Optional body param: `clerkUserIds` lets callers (e.g.,
+  // Optional body param: `verifiedSeedClerkUserIds` lets callers (e.g.,
   // scripts/clean-clerk-test-users.mjs) pre-delete Clerk users locally and
   // have the server only handle DB cleanup. Avoids the CF Worker
   // 50-subrequest limit on bulk cleanup (~49 users × 2 calls > 50).
-  let clerkUserIds: string[] | undefined;
+  let verifiedSeedClerkUserIds: string[] | undefined;
   const contentType = c.req.header('content-type') ?? '';
   if (contentType.includes('application/json')) {
     const body = (await c.req.json().catch(() => ({}))) as {
+      verifiedSeedClerkUserIds?: unknown;
       clerkUserIds?: unknown;
     };
     if (
-      Array.isArray(body.clerkUserIds) &&
-      body.clerkUserIds.every((id) => typeof id === 'string')
+      Array.isArray(body.verifiedSeedClerkUserIds) &&
+      body.verifiedSeedClerkUserIds.every((id) => typeof id === 'string')
     ) {
-      clerkUserIds = body.clerkUserIds as string[];
+      verifiedSeedClerkUserIds = body.verifiedSeedClerkUserIds as string[];
     }
   }
 
   const { deletedCount, clerkUsersDeleted } = await resetDatabase(db, seedEnv, {
     prefix,
-    clerkUserIds,
+    verifiedSeedClerkUserIds,
   });
   return c.json({
     message: 'Database reset complete',
@@ -226,7 +227,7 @@ testSeedRoutes.get('/__test/llm-ping', async (c) => {
         message:
           'LLM ping is dev-only by default. Set LLM_PING_ENABLED=true to opt in on this environment.',
       },
-      403
+      403,
     );
   }
 
@@ -273,7 +274,7 @@ testSeedRoutes.get('/__test/llm-ping', async (c) => {
         error: err instanceof Error ? err.message : String(err),
         registeredProviders: providers,
       },
-      500
+      500,
     );
   }
 });

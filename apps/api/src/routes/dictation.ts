@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { createHash } from 'node:crypto';
 import {
   prepareHomeworkInputSchema,
   prepareHomeworkOutputSchema,
@@ -28,6 +29,21 @@ import {
 } from '../services/dictation';
 import { getLearningProfile } from '../services/learner-profile';
 import { checkAndLogRateLimit } from '../services/settings';
+
+function legacyCompletionKey(
+  profileId: string,
+  localDate: string,
+  mode: string,
+): string {
+  const hex = createHash('sha256')
+    .update(`dictation-result:${profileId}:${localDate}:${mode}`)
+    .digest('hex')
+    .slice(0, 32)
+    .split('');
+  hex[12] = '5';
+  hex[16] = ((parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20, 32).join('')}`;
+}
 
 // ---------------------------------------------------------------------------
 // Dictation Routes
@@ -157,7 +173,9 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       }
 
       const row = await recordDictationResult(db, profileId, {
-        completionKey: input.completionKey,
+        completionKey:
+          input.completionKey ??
+          legacyCompletionKey(profileId, input.localDate, input.mode),
         localDate: input.localDate,
         sentenceCount: input.sentenceCount,
         mistakeCount: input.mistakeCount ?? null,

@@ -283,6 +283,43 @@ describe('account routes', () => {
       });
     });
 
+    it('[WI-84 review] reports rollback failure when dispatch compensation fails', async () => {
+      const dispatchError = new Error('Inngest unavailable');
+      const rollbackError = new Error('rollback unavailable');
+      (inngest.send as jest.Mock).mockRejectedValueOnce(dispatchError);
+      (cancelDeletion as jest.Mock).mockRejectedValueOnce(rollbackError);
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+
+      expect(res.status).toBe(503);
+      expect(body).toMatchObject({
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+      expect(captureException).toHaveBeenCalledWith(dispatchError, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send',
+          accountId: 'test-account-id',
+        },
+      });
+      expect(captureException).toHaveBeenCalledWith(rollbackError, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send-rollback',
+          accountId: 'test-account-id',
+        },
+      });
+    });
+
     it('does not dispatch a second deletion event when already scheduled', async () => {
       (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',

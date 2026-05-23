@@ -401,7 +401,19 @@ describe('POST /v1/dictation/result', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
-  it('[WI-84 DS-115] returns 400 when completionKey is missing', async () => {
+  it('[WI-84 review] derives a stable completionKey when legacy clients omit it', async () => {
+    (recordDictationResult as jest.Mock).mockResolvedValueOnce({
+      id: 'a0000000-0000-4000-a000-000000000001',
+      profileId: 'a0000000-0000-4000-a000-000000000002',
+      completionKey: COMPLETION_KEY,
+      date: TODAY,
+      sentenceCount: 5,
+      mistakeCount: null,
+      mode: 'homework',
+      reviewed: false,
+      createdAt: new Date().toISOString(),
+    });
+
     const res = await app.request(
       '/v1/dictation/result',
       {
@@ -416,8 +428,18 @@ describe('POST /v1/dictation/result', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
-    expect(recordDictationResult).not.toHaveBeenCalled();
+    expect(res.status).toBe(201);
+    expect(recordDictationResult).toHaveBeenCalledWith(
+      expect.anything(),
+      'test-profile-id',
+      expect.objectContaining({
+        completionKey: expect.stringMatching(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+        ),
+        localDate: TODAY,
+        mode: 'homework',
+      }),
+    );
   });
 
   it('returns 400 when localDate is more than 1 day from server date [RF-04]', async () => {

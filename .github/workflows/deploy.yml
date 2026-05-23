@@ -214,6 +214,12 @@ jobs:
           DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
         run: node packages/database/scripts/verify-db-target.mjs
 
+      - name: Verify Cloudflare KV bindings before migrations
+        working-directory: apps/api
+        run: |
+          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
+          node scripts/verify-wrangler-kv-binding.mjs wrangler.toml "${DEPLOY_ENV}" IDEMPOTENCY_KV
+
       - name: Run database migrations
         working-directory: packages/database
         env:
@@ -231,7 +237,6 @@ jobs:
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Deploying API to ${DEPLOY_ENV}"
-          node scripts/verify-wrangler-kv-binding.mjs wrangler.toml "${DEPLOY_ENV}" IDEMPOTENCY_KV
           pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
 
       # [BUG-238] When the Doppler token is missing the sync step previously

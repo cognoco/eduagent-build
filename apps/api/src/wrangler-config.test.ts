@@ -163,6 +163,16 @@ describe('wrangler.toml config guards', () => {
       return guardIndex >= 0 && deployIndex >= 0 && guardIndex < deployIndex;
     }
 
+    function deployWorkflowBlocksBeforeMigrations(): boolean {
+      const guardIndex = deployWorkflow.indexOf(
+        'verify-wrangler-kv-binding.mjs',
+      );
+      const migrateIndex = deployWorkflow.indexOf(
+        '- name: Run database migrations',
+      );
+      return guardIndex >= 0 && migrateIndex >= 0 && guardIndex < migrateIndex;
+    }
+
     it('staging either declares IDEMPOTENCY_KV or the deploy workflow blocks missing binding', () => {
       expect(
         hasEnvBinding('staging') || deployWorkflowBlocksMissingBinding(),
@@ -172,6 +182,14 @@ describe('wrangler.toml config guards', () => {
     it('production either declares IDEMPOTENCY_KV or the deploy workflow blocks missing binding', () => {
       expect(
         hasEnvBinding('production') || deployWorkflowBlocksMissingBinding(),
+      ).toBe(true);
+    });
+
+    it('[WI-84 review] blocks missing IDEMPOTENCY_KV before migrations run', () => {
+      expect(
+        hasEnvBinding('staging') ||
+          hasEnvBinding('production') ||
+          deployWorkflowBlocksBeforeMigrations(),
       ).toBe(true);
     });
   });

@@ -141,6 +141,8 @@ export interface ResetOptions {
    * for DB cleanup. Used by scripts/clean-clerk-test-users.mjs to keep Clerk
    * HTTP calls out of the Worker invocation (Cloudflare 50-subrequest limit). */
   clerkUserIds?: string[];
+  /** Clerk IDs already verified by the local cleanup script as seed-managed. */
+  verifiedSeedClerkUserIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +164,10 @@ function isSeedManagedClerkUserId(
     clerkUserId.startsWith(SEED_CLERK_PREFIX) ||
     seedClerkUserIds.includes(clerkUserId)
   );
+}
+
+function isSeedManagedClerkUser(user: ClerkUser): boolean {
+  return user.external_id?.startsWith(SEED_CLERK_PREFIX) === true;
 }
 
 /**
@@ -192,6 +198,11 @@ async function createClerkTestUser(
   const seedExternalId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
 
   if (existingUser) {
+    if (!isSeedManagedClerkUser(existingUser)) {
+      throw new Error(
+        `Refusing to reuse non-seed Clerk user for seed email ${email}`,
+      );
+    }
     userId = existingUser.id;
   } else {
     // Step 2: Create user (password set here may silently fail for special chars)
@@ -3643,9 +3654,25 @@ export async function resetDatabase(
   // If caller supplied clerkUserIds, skip Clerk deletion (caller already did it
   // — typically the clean-clerk-test-users.mjs script, which runs locally to
   // avoid Cloudflare's 50-subrequest-per-Worker limit on bulk cleanup).
-  const { count: clerkUsersDeleted, clerkUserIds } = options.clerkUserIds
-    ? { count: 0, clerkUserIds: options.clerkUserIds }
-    : await deleteClerkTestUsers(env, { prefix });
+  const { count: clerkUsersDeleted, clerkUserIds } =
+    options.clerkUserIds || options.verifiedSeedClerkUserIds
+      ? {
+          count: 0,
+          clerkUserIds:
+            options.verifiedSeedClerkUserIds ??
+            (options.clerkUserIds ?? []).filter((id) =>
+              id.startsWith(SEED_CLERK_PREFIX),
+            ),
+        }
+      : await deleteClerkTestUsers(env, { prefix });
+
+  if (
+    options.clerkUserIds &&
+    !options.verifiedSeedClerkUserIds &&
+    clerkUserIds.length === 0
+  ) {
+    return { deletedCount: 0, clerkUsersDeleted };
+  }
 
   if (prefix) {
     const existingAccounts = await db.query.accounts.findMany({

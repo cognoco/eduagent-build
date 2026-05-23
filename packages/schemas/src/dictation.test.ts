@@ -294,14 +294,10 @@ describe('recordDictationResultInputSchema', () => {
     expect(parsed.reviewed).toBe(true);
   });
 
-  it('[WI-84 DS-115] rejects missing completionKey', () => {
+  it('[WI-84 review] accepts missing completionKey for legacy clients', () => {
     const { completionKey: _, ...rest } = validInput;
-    const result = recordDictationResultInputSchema.safeParse(rest);
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      const paths = result.error.issues.map((i) => i.path[0]);
-      expect(paths).toContain('completionKey');
-    }
+    const parsed = recordDictationResultInputSchema.parse(rest);
+    expect(parsed.completionKey).toBeUndefined();
   });
 
   it('defaults reviewed to false', () => {

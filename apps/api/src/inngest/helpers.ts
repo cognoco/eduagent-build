@@ -1,4 +1,9 @@
-import { createDatabase, type Database } from '@eduagent/database';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+  closeDatabase,
+  createDatabase,
+  type Database,
+} from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Module-level DATABASE_URL — set by Inngest middleware on CF Workers,
@@ -6,6 +11,26 @@ import { createDatabase, type Database } from '@eduagent/database';
 // ---------------------------------------------------------------------------
 
 let _databaseUrl: string | undefined;
+const stepDatabaseScope = new AsyncLocalStorage<Set<Database>>();
+
+export async function runWithStepDatabaseScope<T>(
+  callback: () => Promise<T>,
+): Promise<T> {
+  return stepDatabaseScope.run(new Set<Database>(), callback);
+}
+
+export function beginStepDatabaseScope(scope: Set<Database>): void {
+  stepDatabaseScope.enterWith(scope);
+}
+
+export async function closeStepDatabases(
+  scope = stepDatabaseScope.getStore(),
+): Promise<void> {
+  if (!scope) return;
+  const databases = [...scope];
+  scope.clear();
+  await Promise.all(databases.map((db) => closeDatabase(db)));
+}
 
 /** Called by Inngest middleware to inject the DATABASE_URL binding. */
 export function setDatabaseUrl(url: string): void {
@@ -37,7 +62,9 @@ export function getStepDatabase(): Database {
 
   // Phase 0.0 (RLS plan 2026-04-27): neon-serverless WS driver — real ACID
   // transactions; onTransactionFallback is no longer needed.
-  return createDatabase(url, { cacheNeonPool: false });
+  const db = createDatabase(url, { cacheNeonPool: false });
+  stepDatabaseScope.getStore()?.add(db);
+  return db;
 }
 
 // ---------------------------------------------------------------------------

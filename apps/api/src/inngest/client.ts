@@ -1,4 +1,5 @@
 import { Inngest, InngestMiddleware } from 'inngest';
+import type { Database } from '@eduagent/database';
 import {
   setDatabaseUrl,
   setVoyageApiKey,
@@ -8,6 +9,8 @@ import {
   setSupportEmail,
   setRetentionPurgeEnabled,
   setMemoryFactsDedupConfig,
+  beginStepDatabaseScope,
+  closeStepDatabases,
 } from './helpers';
 
 /**
@@ -24,6 +27,7 @@ const envBindingMiddleware = new InngestMiddleware({
   init() {
     return {
       onFunctionRun({ reqArgs }) {
+        const stepDatabaseScope = new Set<Database>();
         // reqArgs[0] is the Request, reqArgs[1] is the CF env bindings object
         const env = reqArgs[1] as Record<string, unknown> | undefined;
         if (env && typeof env['DATABASE_URL'] === 'string') {
@@ -67,7 +71,17 @@ const envBindingMiddleware = new InngestMiddleware({
                 : undefined,
           });
         }
-        return {};
+        return {
+          beforeMemoization() {
+            beginStepDatabaseScope(stepDatabaseScope);
+          },
+          beforeExecution() {
+            beginStepDatabaseScope(stepDatabaseScope);
+          },
+          beforeResponse() {
+            return closeStepDatabases(stepDatabaseScope);
+          },
+        };
       },
     };
   },

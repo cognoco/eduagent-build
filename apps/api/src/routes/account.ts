@@ -84,7 +84,6 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
           },
         });
       } catch (error) {
-        await cancelDeletion(db, account.id);
         captureException(error, {
           extra: {
             surface: 'account.deletion',
@@ -92,6 +91,17 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
             accountId: account.id,
           },
         });
+        try {
+          await cancelDeletion(db, account.id);
+        } catch (rollbackError) {
+          captureException(rollbackError, {
+            extra: {
+              surface: 'account.deletion',
+              kind: 'core-send-rollback',
+              accountId: account.id,
+            },
+          });
+        }
         return apiError(
           c,
           503,
