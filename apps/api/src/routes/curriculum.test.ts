@@ -237,6 +237,76 @@ describe('curriculum routes', () => {
       });
     });
 
+    it('passes forceCopy through to the bridge service', async () => {
+      mockCloneTopicFromChild.mockResolvedValueOnce({
+        topicId: TOPIC_ID,
+        subjectId: SUBJECT_ID,
+        alreadyExisted: false,
+        descriptionDivergent: false,
+        descriptionRefreshed: false,
+        topicState: 'unstarted',
+        createdIds: { topicId: TOPIC_ID, subjectId: SUBJECT_ID },
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+            forceCopy: true,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const [, , inputArg] = mockCloneTopicFromChild.mock.calls[0];
+      expect(inputArg).toMatchObject({
+        childProfileId: CHILD_PROFILE_ID,
+        topicId: TOPIC_ID,
+        requestId: REQUEST_ID,
+        forceCopy: true,
+      });
+    });
+
+    it.each([
+      [
+        'missing requestId',
+        { childProfileId: CHILD_PROFILE_ID, topicId: TOPIC_ID },
+      ],
+      [
+        'invalid requestId',
+        {
+          childProfileId: CHILD_PROFILE_ID,
+          topicId: TOPIC_ID,
+          requestId: 'not-a-uuid',
+        },
+      ],
+    ])('rejects %s before calling the bridge service', async (_name, body) => {
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockCloneTopicFromChild).not.toHaveBeenCalled();
+    });
+
     it('returns 404 for missing or inaccessible source topics', async () => {
       mockCloneTopicFromChild.mockRejectedValueOnce(new NotFoundError('Topic'));
 
@@ -290,6 +360,38 @@ describe('curriculum routes', () => {
       expect(profileIdArg).toBe('test-profile-id');
       expect(createdIdsArg).toEqual({ topicId: TOPIC_ID });
       expect(await res.json()).toEqual({ deleted: { topic: true } });
+    });
+
+    it('returns the session-started reason when undo is no longer allowed', async () => {
+      mockUndoCloneFromChild.mockResolvedValueOnce({
+        deleted: { topic: false },
+        reason: 'session_started',
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: TOPIC_ID },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const [, profileIdArg, createdIdsArg] =
+        mockUndoCloneFromChild.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(createdIdsArg).toEqual({ topicId: TOPIC_ID });
+      expect(await res.json()).toEqual({
+        deleted: { topic: false },
+        reason: 'session_started',
+      });
     });
   });
 

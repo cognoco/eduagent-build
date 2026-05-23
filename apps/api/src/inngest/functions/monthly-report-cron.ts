@@ -353,9 +353,10 @@ export const monthlyReportGenerate = inngest.createFunction(
 
         let reportData = generateMonthlyReportData(
           childDisplayName,
-          lastMonthStart.toLocaleDateString(undefined, {
+          lastMonthStart.toLocaleDateString('en-US', {
             month: 'long',
             year: 'numeric',
+            timeZone: 'UTC',
           }),
           thisMonthMetrics,
           previousMetrics,

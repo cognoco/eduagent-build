@@ -22,25 +22,6 @@ jest.mock(
   },
 );
 
-const mockLoggerWarn = jest.fn();
-jest.mock(
-  '../../services/logger' /* gc1-allow: observer test asserts logger.warn on invalid payload */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/logger',
-    ) as typeof import('../../services/logger');
-    return {
-      ...actual,
-      createLogger: () => ({
-        warn: (...args: unknown[]) => mockLoggerWarn(...args),
-        error: jest.fn(),
-        info: jest.fn(),
-        debug: jest.fn(),
-      }),
-    };
-  },
-);
-
 jest.mock(
   '../client' /* gc1-allow: observer test requires inngest client mock to expose trigger metadata */,
   () => {
@@ -66,6 +47,12 @@ jest.mock(
 import { orphanPersistFailed } from './orphan-persist-failed';
 import { functions } from '../index';
 
+// Console.warn spy — the structured logger serialises to JSON and calls
+// console.warn(jsonString). We parse the JSON to assert on message + context.
+const consoleWarnSpy = jest
+  .spyOn(console, 'warn')
+  .mockImplementation(() => undefined);
+
 async function invoke(eventData: unknown) {
   const handler = (
     orphanPersistFailed as unknown as {
@@ -73,6 +60,25 @@ async function invoke(eventData: unknown) {
     }
   ).fn;
   return handler({ event: { data: eventData } });
+}
+
+/** Parse the logger's JSON output and find a warn entry matching `message`. */
+function findWarnEntry(
+  message: string,
+): { message: string; context?: Record<string, unknown> } | undefined {
+  for (const call of consoleWarnSpy.mock.calls) {
+    try {
+      const entry = JSON.parse(call[0] as string) as {
+        level: string;
+        message: string;
+        context?: Record<string, unknown>;
+      };
+      if (entry.level === 'warn' && entry.message === message) return entry;
+    } catch {
+      // not a JSON log entry — skip
+    }
+  }
+  return undefined;
 }
 
 const VALID_PAYLOAD = {
@@ -86,6 +92,11 @@ const VALID_PAYLOAD = {
 describe('orphanPersistFailed', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleWarnSpy.mockClear();
+  });
+
+  afterAll(() => {
+    consoleWarnSpy.mockRestore();
   });
 
   it('is registered as the listener for app/orphan.persist.failed', () => {
@@ -114,7 +125,9 @@ describe('orphanPersistFailed', () => {
         },
       }),
     );
-    expect(mockLoggerWarn).not.toHaveBeenCalled();
+    expect(
+      findWarnEntry('orphan.persist.failed: invalid payload'),
+    ).toBeUndefined();
   });
 
   it('accepts a null reason field (nullable in schema)', async () => {
@@ -137,10 +150,9 @@ describe('orphanPersistFailed', () => {
     const result = await invoke(withoutDraftId);
 
     expect(result).toEqual({ recorded: false });
-    expect(mockLoggerWarn).toHaveBeenCalledWith(
-      'orphan.persist.failed: invalid payload',
-      expect.objectContaining({ issues: expect.any(Array) }),
-    );
+    const entry = findWarnEntry('orphan.persist.failed: invalid payload');
+    expect(entry).toBeDefined();
+    expect(entry!.context).toMatchObject({ issues: expect.any(Array) });
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
@@ -148,10 +160,9 @@ describe('orphanPersistFailed', () => {
     const result = await invoke({});
 
     expect(result).toEqual({ recorded: false });
-    expect(mockLoggerWarn).toHaveBeenCalledWith(
-      'orphan.persist.failed: invalid payload',
-      expect.objectContaining({ issues: expect.any(Array) }),
-    );
+    const entry = findWarnEntry('orphan.persist.failed: invalid payload');
+    expect(entry).toBeDefined();
+    expect(entry!.context).toMatchObject({ issues: expect.any(Array) });
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
@@ -159,10 +170,9 @@ describe('orphanPersistFailed', () => {
     const result = await invoke({ ...VALID_PAYLOAD, draftId: 12345 });
 
     expect(result).toEqual({ recorded: false });
-    expect(mockLoggerWarn).toHaveBeenCalledWith(
-      'orphan.persist.failed: invalid payload',
-      expect.objectContaining({ issues: expect.any(Array) }),
-    );
+    const entry = findWarnEntry('orphan.persist.failed: invalid payload');
+    expect(entry).toBeDefined();
+    expect(entry!.context).toMatchObject({ issues: expect.any(Array) });
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
@@ -170,10 +180,9 @@ describe('orphanPersistFailed', () => {
     const result = await invoke({ ...VALID_PAYLOAD, profileId: 'not-a-uuid' });
 
     expect(result).toEqual({ recorded: false });
-    expect(mockLoggerWarn).toHaveBeenCalledWith(
-      'orphan.persist.failed: invalid payload',
-      expect.objectContaining({ issues: expect.any(Array) }),
-    );
+    const entry = findWarnEntry('orphan.persist.failed: invalid payload');
+    expect(entry).toBeDefined();
+    expect(entry!.context).toMatchObject({ issues: expect.any(Array) });
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });
