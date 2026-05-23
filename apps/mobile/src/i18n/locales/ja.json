@@ -1963,7 +1963,9 @@
       "thisChild": "このお子様",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "確認 — 同意を撤回",
-      "withdraw": "撤回"
+      "withdraw": "撤回",
+      "curriculumTitle": "カリキュラム",
+      "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧"
     },
     "mentorMemory": {
       "title": "メンターの記憶",

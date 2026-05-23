@@ -1963,7 +1963,9 @@
       "thisChild": "dette barnet",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Bekreft – trekk tilbake samtykke",
-      "withdraw": "Trekk tilbake"
+      "withdraw": "Trekk tilbake",
+      "curriculumTitle": "Læreplan",
+      "curriculumSubtitle": "Utforsk {{name}}s fag og emner"
     },
     "mentorMemory": {
       "title": "Mentorens minne",

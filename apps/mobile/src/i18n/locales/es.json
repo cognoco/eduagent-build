@@ -1963,7 +1963,9 @@
       "thisChild": "este niño",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Confirmar — retirar consentimiento",
-      "withdraw": "Retirar"
+      "withdraw": "Retirar",
+      "curriculumTitle": "Currículo",
+      "curriculumSubtitle": "Explora las asignaturas y temas de {{name}}"
     },
     "mentorMemory": {
       "title": "Memoria del mentor",
