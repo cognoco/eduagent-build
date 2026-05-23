@@ -69,6 +69,7 @@ import { languageProgressRoutes } from './routes/language-progress';
 import { coachingCardRoutes } from './routes/coaching-card';
 import { celebrationRoutes } from './routes/celebrations';
 import { dashboardRoutes } from './routes/dashboard';
+import { recapsRoutes } from './routes/recaps';
 import { noticesRoutes } from './routes/notices';
 import { nudgeRoutes } from './routes/nudges';
 import { billingRoutes } from './routes/billing';
@@ -265,6 +266,7 @@ const routes = api
   .route('/', coachingCardRoutes)
   .route('/', celebrationRoutes)
   .route('/', dashboardRoutes)
+  .route('/', recapsRoutes)
   .route('/', noticesRoutes)
   .route('/', nudgeRoutes)
   .route('/', billingRoutes)
