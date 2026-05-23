@@ -61,7 +61,12 @@ export type CloneToast = {
 function triggerSurface(triggerPath: string): string {
   if (triggerPath.startsWith('/recaps/')) return 'recaps_detail';
   if (triggerPath.includes('/session/')) return 'child_session_detail';
-  if (triggerPath.includes('/curriculum/')) return 'child_curriculum_detail';
+  if (
+    triggerPath.includes('/curriculum/') ||
+    triggerPath.endsWith('/curriculum')
+  ) {
+    return 'child_curriculum_detail';
+  }
   if (triggerPath.startsWith('/progress')) return 'family_progress';
   return 'family_child';
 }

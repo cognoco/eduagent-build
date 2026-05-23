@@ -579,6 +579,7 @@ describe('ChildDetailScreen — profile overview', () => {
         totalSessions: '1',
         subjectId: '11111111-1111-7111-8111-111111111111',
         subjectName: 'Mathematics',
+        childName: 'Emma',
       },
     });
   });
@@ -664,6 +665,12 @@ describe('ChildDetailScreen — profile overview', () => {
 
   it('routes subject and report surfaces from child detail', () => {
     render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('child-curriculum-link'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/curriculum',
+      params: { profileId: 'child-001' },
+    });
 
     fireEvent.press(screen.getByTestId('child-reports-link'));
     expect(mockPush).toHaveBeenCalledWith({

@@ -18,6 +18,7 @@ import {
 } from '../../../../../lib/parent-vocab';
 import { useThemeColors } from '../../../../../lib/theme';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
+import { AddToMyLearningButton } from '../../../../../components/family/AddToMyLearningButton';
 
 const COMPLETION_STATUS_KEYS: Record<string, TranslateKey> = {
   not_started: 'parentView.topic.completionStatus.notStarted',
@@ -66,6 +67,7 @@ export default function TopicDetailScreen() {
     totalSessions: rawTotalSessions,
     subjectId: rawSubjectId,
     subjectName: rawSubjectName,
+    childName: rawChildName,
   } = useLocalSearchParams<{
     topicId: string;
     profileId: string;
@@ -76,6 +78,7 @@ export default function TopicDetailScreen() {
     totalSessions: string;
     subjectId: string;
     subjectName: string;
+    childName?: string;
   }>();
   const topicId = Array.isArray(rawTopicId) ? rawTopicId[0] : rawTopicId;
   const profileId = Array.isArray(rawProfileId)
@@ -87,6 +90,9 @@ export default function TopicDetailScreen() {
   const subjectName = Array.isArray(rawSubjectName)
     ? rawSubjectName[0]
     : rawSubjectName;
+  const childName = Array.isArray(rawChildName)
+    ? rawChildName[0]
+    : rawChildName;
   const backHref: Href =
     profileId && subjectId
       ? ({
@@ -252,6 +258,15 @@ export default function TopicDetailScreen() {
             );
           })()}
         </View>
+
+        <AddToMyLearningButton
+          childProfileId={profileId ?? ''}
+          childDisplayName={childName ?? 'your child'}
+          subjectName={subjectName}
+          topicId={topicId}
+          topicTitle={title}
+          triggerPath={`/child/${profileId ?? ''}/curriculum/topic/${topicId ?? ''}`}
+        />
 
         {/* Recent fluency-drill scores for this topic, when any have been
             recorded. Strip-style render keeps it scannable; tap-through and
