@@ -4,6 +4,7 @@ import {
   act,
   fireEvent,
   waitFor,
+  type RenderAPI,
 } from '@testing-library/react-native';
 import React from 'react';
 import {
@@ -19,11 +20,19 @@ const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
   '/learner-profile': { profile: { accommodationMode: 'none' } },
   '/settings/celebration-level': { celebrationLevel: 'all' },
+  '/subscription/status': {
+    status: {
+      tier: 'family',
+      status: 'active',
+      monthlyLimit: 700,
+      usedThisMonth: 0,
+    },
+  },
 });
 
 jest.mock(
-  '../../lib/api-client',
-  /* gc1-allow: test boundary - avoids real Hono fetch client and network calls */ () =>
+  '../../lib/api-client' /* gc1-allow: test boundary - avoids real Hono fetch client and network calls */,
+  () =>
     require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
@@ -61,6 +70,55 @@ jest.mock(
 );
 
 const HomeScreen = require('./home').default;
+
+const originalFetch = globalThis.fetch;
+const HOME_TEST_DEBUG = process.env.HOME_TEST_DEBUG === '1';
+
+function debugHomeTest(event: string, details?: unknown): void {
+  if (!HOME_TEST_DEBUG) return;
+  console.info(`[home.test] ${event}`, details === undefined ? '' : details);
+}
+
+function debugOpenHandles(event: string): void {
+  if (!HOME_TEST_DEBUG) return;
+  const processWithHandles = process as typeof process & {
+    _getActiveHandles?: () => unknown[];
+    _getActiveRequests?: () => unknown[];
+  };
+  const describeHandle = (handle: unknown) => {
+    const candidate = handle as {
+      constructor?: { name?: string };
+      hasRef?: () => boolean;
+      _idleTimeout?: number;
+      _destroyed?: boolean;
+    };
+    return {
+      type: candidate.constructor?.name ?? typeof handle,
+      hasRef:
+        typeof candidate.hasRef === 'function' ? candidate.hasRef() : undefined,
+      idleTimeout: candidate._idleTimeout,
+      destroyed: candidate._destroyed,
+    };
+  };
+
+  console.info(`[home.test] ${event}`, {
+    handles: processWithHandles._getActiveHandles?.().map(describeHandle),
+    requests: processWithHandles._getActiveRequests?.().map(describeHandle),
+  });
+}
+
+afterAll(() => {
+  debugOpenHandles('afterAll active handles');
+});
+
+beforeEach(() => {
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    mockFetch as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  (globalThis as unknown as { fetch: typeof fetch }).fetch = originalFetch;
+});
 
 function createModeScreenWrapper(
   options: Parameters<typeof createScreenWrapper>[0],
@@ -280,46 +338,77 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   });
 
   it('logs error when markCelebrationsSeen.mutateAsync rejects — no unhandled rejection [SF-1]', async () => {
+    let queryClient:
+      | ReturnType<typeof createScreenWrapper>['queryClient']
+      | null = null;
+    let renderResult: RenderAPI | null = null;
     const consoleSpy = jest
       .spyOn(console, 'warn')
-      .mockImplementation(jest.fn());
-    // Intercept globalThis.fetch so any request that escapes the Hono
-    // mock client returns a 500 without opening a real TCP socket.
-    const fetchSpy = jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response('{}', { status: 500 }));
+      .mockImplementation((...args: unknown[]) => {
+        debugHomeTest('console.warn', args);
+      });
     mockFetch.setRoute(
       '/celebrations/seen',
-      new Response('{}', { status: 500 }),
+      (url: string, init?: RequestInit) => {
+        debugHomeTest('mock route /celebrations/seen', {
+          url,
+          method: init?.method,
+          body: init?.body,
+        });
+        return new Response('{}', { status: 500 });
+      },
     );
     const owner = createTestProfile({
       id: 'p1',
       displayName: 'Alex',
       isOwner: true,
     });
-    const { wrapper, queryClient } = createScreenWrapper({
-      activeProfile: owner,
-      profiles: [owner],
-    });
 
-    render(<HomeScreen />, { wrapper });
+    try {
+      const screenHarness = createScreenWrapper({
+        activeProfile: owner,
+        profiles: [owner],
+      });
+      queryClient = screenHarness.queryClient;
 
-    expect(mockOnAllComplete).not.toBeNull();
-    await act(async () => {
-      mockOnAllComplete?.();
-    });
+      debugHomeTest('render start');
+      renderResult = render(<HomeScreen />, { wrapper: screenHarness.wrapper });
+      debugHomeTest('render complete', {
+        hasOnAllComplete: mockOnAllComplete !== null,
+        mockFetchCalls: mockFetch.mock.calls.length,
+      });
 
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[Celebrations] Failed to mark as seen, will retry on next visit:',
-        expect.objectContaining({ message: expect.any(String) }),
+      expect(mockOnAllComplete).not.toBeNull();
+      await act(async () => {
+        debugHomeTest('onAllComplete start');
+        mockOnAllComplete?.();
+        debugHomeTest('onAllComplete returned');
+      });
+
+      await waitFor(() => {
+        debugHomeTest('waitFor console.warn', {
+          warnCalls: consoleSpy.mock.calls.length,
+          mockFetchCalls: mockFetch.mock.calls.length,
+        });
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[Celebrations] Failed to mark as seen, will retry on next visit:',
+          expect.objectContaining({ message: expect.any(String) }),
+        );
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/celebrations/seen'),
+        expect.objectContaining({ method: 'POST' }),
       );
-    });
-
-    await act(async () => {
-      cleanupScreen(queryClient);
-    });
-    fetchSpy.mockRestore();
-    consoleSpy.mockRestore();
+    } finally {
+      renderResult?.unmount();
+      if (queryClient) {
+        const qc = queryClient;
+        await act(async () => {
+          cleanupScreen(qc);
+        });
+      }
+      consoleSpy.mockRestore();
+    }
   });
 });

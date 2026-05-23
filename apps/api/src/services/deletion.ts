@@ -27,7 +27,24 @@ export async function scheduleDeletion(
       };
     }
 
-    const existing = await getDeletionStatus(db, accountId);
+    // [CR-2026-05-21-100] If the account row disappears between the failed
+    // tryScheduleDeletion update (0 rows) and this status read — e.g. a
+    // concurrent GC or admin delete — getDeletionStatus throws NotFoundError.
+    // From the requesting user's perspective the account is gone, which is
+    // exactly what they asked for. Treat it as a successful scheduling so
+    // the caller receives a sensible response instead of a raw 404.
+    let existing: Awaited<ReturnType<typeof getDeletionStatus>>;
+    try {
+      existing = await getDeletionStatus(db, accountId);
+    } catch (e) {
+      if (e instanceof NotFoundError) {
+        const gracePeriodEnds = new Date(
+          Date.now() + GRACE_PERIOD_MS,
+        ).toISOString();
+        return { gracePeriodEnds, scheduledNow: false };
+      }
+      throw e;
+    }
     if (existing.scheduled && existing.gracePeriodEnds) {
       return { gracePeriodEnds: existing.gracePeriodEnds, scheduledNow: false };
     }

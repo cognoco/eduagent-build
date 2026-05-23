@@ -23,6 +23,7 @@ export * from './progress';
 export * from './retention-status';
 export * from './struggle-status';
 export * from './snapshots';
+export * from './recaps';
 
 // Observer event payload schemas — shared contract between Inngest senders and observer terminus functions
 export * from './observers';

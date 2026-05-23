@@ -20,12 +20,53 @@ import {
 jest.mock('react-native', () => ({ Platform: { OS: 'web' } }));
 
 describe('secure-storage sanitizer (platform-agnostic)', () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
   it('replaces unsupported characters with underscore', () => {
     expect(sanitizeSecureStoreKey('a:b/c=d')).toBe('a_b_c_d');
   });
 
   it('preserves the allowed character set', () => {
     expect(sanitizeSecureStoreKey('abc-123._XY')).toBe('abc-123._XY');
+  });
+
+  it('[CR-2026-05-21-149] emits a warn when forbidden chars are replaced', () => {
+    sanitizeSecureStoreKey('session:2026-05-21T12:00:00Z');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const message = String(warnSpy.mock.calls[0]?.[0] ?? '');
+    expect(message).toMatch(/secure-storage/i);
+    expect(message).toMatch(/forbidden chars replaced/i);
+    expect(message).toMatch(/rawLen=/);
+    expect(message).toMatch(/sanitizedLen=/);
+  });
+
+  it('[CR-2026-05-21-149] does NOT warn when the key is already safe', () => {
+    sanitizeSecureStoreKey('safe-key.123_xyz');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('[CR-2026-05-21-149] warns at most once per distinct sanitized key', () => {
+    // Two different raw keys that collapse to the same sanitized form
+    // should produce only one warning (the latch is keyed on sanitized output).
+    sanitizeSecureStoreKey('session:abc');
+    sanitizeSecureStoreKey('session_abc'); // already-sanitized form, no substitution needed
+    // Only the first call (with the forbidden char) should warn.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('[CR-2026-05-21-149] does not log the raw key value', () => {
+    const rawKey = 'prefix:super-secret-user-id';
+    sanitizeSecureStoreKey(rawKey);
+    const message = String(warnSpy.mock.calls[0]?.[0] ?? '');
+    expect(message).not.toContain('super-secret-user-id');
   });
 });
 

@@ -265,4 +265,50 @@ describe('generateRecallBridge (integration)', () => {
     expect(result.topicId).toBe('');
     expect(result.topicTitle).toBe('');
   });
+
+  // -------------------------------------------------------------------------
+  // [CR-2026-05-21-016] Break test: attacker-controlled topicId cross-profile
+  //
+  // Attack: profile A has a valid session, but session.topicId is set to a
+  // topic owned by profile B. The unscoped query (before the fix) would return
+  // profile B's topic and feed its title/description into the LLM prompt —
+  // cross-profile data disclosure.
+  //
+  // The DB allows the FK (topicId → curriculumTopics.id) without profile
+  // scoping, so a session from profile A CAN legally reference profile B's
+  // topic if inserted directly. The parent-chain join (topics → books →
+  // subjects.profileId = A) is the only layer that prevents the leak.
+  // -------------------------------------------------------------------------
+
+  it('[security] does not disclose topic owned by a different profile even when session.topicId points to it', async () => {
+    // Profile A — the "attacker" making the call
+    const { profileId: profileA } = await seedProfile();
+    const subjectIdA = await seedSubject(profileA);
+
+    // Profile B — the victim whose topic we want to protect
+    const { profileId: profileB } = await seedProfile();
+    const subjectIdB = await seedSubject(profileB);
+    const { topicId: topicIdB } = await seedCurriculumAndTopic(
+      subjectIdB,
+      'SECRET TOPIC — profile B only',
+      'This description must never reach profile A',
+    );
+
+    // Insert a session for profile A but wire it to profile B's topicId.
+    // The DB FK only checks curriculumTopics.id existence, not ownership —
+    // so this insert succeeds, creating the cross-profile wiring the attack
+    // relies on.
+    const sessionId = await seedSession(profileA, subjectIdA, topicIdB);
+
+    // The parent-chain join (topics → books → subjects WHERE subjects.profileId = profileA)
+    // must return nothing for topicIdB, so generateRecallBridge returns no questions
+    // and does NOT include profile B's topic title/description in any output.
+    const result = await generateRecallBridge(db, profileA, sessionId);
+
+    expect(result.questions).toEqual([]);
+    // topicId in the result comes from session.topicId (already revealed by the
+    // session lookup), but topicTitle must be empty — the topic data itself is
+    // withheld.
+    expect(result.topicTitle).toBe('');
+  });
 });

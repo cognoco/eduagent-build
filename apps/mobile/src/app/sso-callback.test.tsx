@@ -1,9 +1,14 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
+let mockIsSignedIn = false;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
+}));
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({ isSignedIn: mockIsSignedIn }),
 }));
 
 jest.mock('expo-web-browser', () => ({
@@ -57,6 +62,7 @@ const SSOCallbackScreen = require('./sso-callback').default;
 describe('SSOCallbackScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsSignedIn = false;
   });
 
   it('renders loading indicator and text', () => {
@@ -91,6 +97,34 @@ describe('SSOCallbackScreen', () => {
         tags: expect.objectContaining({ screen: 'SSOCallback' }),
       }),
     );
+  });
+
+  it('[CR-2026-05-21-110] shows fallback immediately when maybeCompleteAuthSession rejects — no 10s wait', async () => {
+    const err = new Error('auth session error');
+    WebBrowser.maybeCompleteAuthSession.mockReturnValueOnce(
+      Promise.reject(err),
+    );
+
+    render(<SSOCallbackScreen />);
+
+    // Before advancing any timers the fallback must already be visible.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('sso-fallback-back')).toBeTruthy();
+  });
+
+  it('[CR-2026-05-21-110] redirects to / when isSignedIn becomes true', async () => {
+    mockIsSignedIn = true;
+
+    render(<SSOCallbackScreen />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   describe('10s timeout fallback', () => {

@@ -2307,7 +2307,11 @@
     "progress": "Fortschritt",
     "progressLabel": "Fortschritt",
     "more": "Mehr",
-    "moreLabel": "Mehr"
+    "moreLabel": "Mehr",
+    "children": "Kinder",
+    "childrenLabel": "Kinder",
+    "recaps": "Zusammenfassungen",
+    "recapsLabel": "Zusammenfassungen"
   },
   "ocrTimeout": "Lesen hat zu lange gedauert – bitte versuche es erneut",
   "permissionTitle": "Kamerazugriff benötigt",
@@ -2588,5 +2592,15 @@
       "noRoundsYet": "Noch keine Runden",
       "hintOpenHistory": "Öffnet den Quiz-Verlauf"
     }
+  },
+  "recaps": {
+    "title": "Zusammenfassungen",
+    "subtitle": "Aktuelle Lernmomente aus deiner Familie.",
+    "emptyTitle": "Keine Zusammenfassungen",
+    "emptyBody": "Abgeschlossene Sitzungen erscheinen hier, sobald es etwas zusammenzufassen gibt.",
+    "errorTitle": "Fehler beim Laden der Zusammenfassungen",
+    "errorMessage": "Versuche es gleich noch einmal.",
+    "summaryPending": "Eine Zusammenfassung für diese Sitzung wird noch vorbereitet.",
+    "openRecapLabel": "Zusammenfassung von {{child}} für {{title}} öffnen"
   }
 }

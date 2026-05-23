@@ -2,7 +2,7 @@
 
 > **Status:** Draft  
 > **Access label:** Family-only  
-> **Last mapped:** 2026-05-22  
+> **Last mapped:** 2026-05-23  
 > **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/home.tsx`, `apps/mobile/src/components/home/LearnerScreen.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/lib/app-context.tsx`, `apps/mobile/src/lib/profile.ts`
 
 ## Purpose
@@ -54,14 +54,14 @@ The product flow is Family-only: it is the Family home for adults supporting lin
 | Loading | App shell should start Study-safe until profile/family capability is known. Current `HomeScreen` shows a neutral spinner before rendering either learner or parent content. |
 | Empty | Adult with no linked children should see setup choices and a continue-studying path. Current `ParentHomeScreen` shows `add-first-child-screen`; target says this is setup, not a blocking Family context. |
 | Success | Adult sees family summary, recent child activity, child command cards, conversation starters, reports/progress/nudge actions, family management, and a clear Study bridge. |
-| Error/recovery | Dashboard or child data errors should recover inside Family home or linked child routes. Fallbacks must not leak child data, force parent proxy, or send a Family user to a dead Recaps tab before Recaps exists. |
+| Error/recovery | Dashboard, Recaps, or child data errors should recover inside Family home, Recaps, or linked child routes. Fallbacks must not leak child data or force parent proxy. |
 | No access | Non-owners, child profiles, underage users, adults without family links, and profile-not-loaded sessions should not see parent gateway content. |
 
 ## Validation Notes
 
 | Lane | Coverage |
 | --- | --- |
-| Web preview | Verify current V0 mode chip, `parent-home-screen`, child cards, account avatar, add-child state, and no tab leakage. Future check should validate Family tabs only after Recaps exists. |
+| Web preview | Verify current V0 mode chip, `parent-home-screen`, child cards, account avatar, add-child state, no tab leakage, and V1 Family tabs including Recaps. |
 | Native/emulator | Inventory lists `e2e/flows/parent/parent-tabs.yaml` and `parent-dashboard.yaml`, but these reflect current/legacy parent behavior and need revalidation against the Study/Family contract. |
 | API/unit tests | `apps/mobile/src/app/(app)/home.test.tsx` covers owner/child home routing and V0 mode switch. `ParentHomeScreen.test.tsx` covers child routes, add-first-child, nudge, reports, and Study activation. |
 
@@ -73,7 +73,7 @@ The product flow is Family-only: it is the Family home for adults supporting lin
 | Naming drift | Inventory HOME-02 | Inventory says `ParentGateway`, but current code uses `ParentHomeScreen`; no current `ParentGateway` component was found in the active home path. |
 | Capability drift | `apps/mobile/src/lib/profile.ts` | Family capability is inferred client-side from profiles; target requires server-sourced `hasFamilyLinks`. |
 | Scope drift | `apps/mobile/src/components/home/LearnerScreen.tsx` | Parent home can render from inside `LearnerScreen`; Study-vs-Family ownership is therefore controlled by local mode/flags rather than a single navigation contract. |
-| Missing surface | Recaps | Family target depends on Recaps, but `/(app)/recaps` does not exist yet and must not be surfaced as a dead tab. |
+| Verification gap | Recaps | Minimal `/(app)/recaps` route/API/schema now exist in the navigation-contract branch; the Family home/Recaps handoff still needs a native flow re-run. |
 
 ## Open Questions
 

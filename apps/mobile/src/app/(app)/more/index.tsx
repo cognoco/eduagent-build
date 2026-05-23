@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useProfile } from '../../../lib/profile';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   useFamilySubscription,
   useSubscription,
@@ -25,6 +26,7 @@ import {
 } from '../../../hooks/use-settings';
 import { platformAlert } from '../../../lib/platform-alert';
 import { signOutWithCleanup } from '../../../lib/sign-out';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   SectionHeader,
   SettingsRow,
@@ -35,16 +37,11 @@ export default function MoreScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const { activeProfile, profiles } = useProfile();
-  // [BUG-915] When the parent is impersonating a child profile, the More tab
-  // must hide account-level destructive actions (Sign out, Delete account,
-  // Export my data, Subscription). Those operate on the parent's underlying
-  // account and are unsafe to expose while "Viewing TestKid's account" — the
-  // ProxyBanner at the top of (app)/_layout already provides the Switch-back
-  // pointer, so no additional escape affordance is needed in this screen.
-  // Uses the discriminated useActiveProfileRole() so the same role guard
-  // shape applies in mentor-memory and the post-approval landing.
   const role = useActiveProfileRole();
-  const isImpersonating = role === 'impersonated-child';
+  const navigationContract = useNavigationContract();
+  const isImpersonating = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.isParentProxy
+    : role === 'impersonated-child';
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: subscription } = useSubscription();
@@ -109,16 +106,18 @@ export default function MoreScreen() {
     } as never);
   }, [subscription, familyData, router, t]);
 
-  const linkedChildren = activeProfile?.isOwner
-    ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
-    : [];
-  // Add-child entry is the single global path to add a child profile.
-  // All adults reach it here — the Family tab has been removed entirely.
-  // Gated on isAdultOwner so under-18s and non-owner profiles never see it.
-  const showAddChild = isAdultOwner({
-    role,
-    birthYear: activeProfile?.birthYear,
-  });
+  const linkedChildren =
+    (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+      ? navigationContract.gates.showRemoveFamilyMember
+      : activeProfile?.isOwner === true) && activeProfile
+      ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
+      : [];
+  const showAddChild = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showAddChild
+    : isAdultOwner({
+        role,
+        birthYear: activeProfile?.birthYear,
+      });
 
   if (isImpersonating) {
     return (

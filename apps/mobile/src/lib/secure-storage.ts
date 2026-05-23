@@ -129,6 +129,14 @@ export async function deleteItemAsync(
   }
 }
 
+// One-shot latch: warn at most once per forbidden-char substitution to surface
+// unexpected key collisions (e.g. ISO timestamps with `:`) without flooding
+// the console. The latch is keyed on sanitized output so each distinct
+// collapsed key emits at most one warning per process.
+// Test-only reset is intentionally NOT exported — the warning is infrastructure
+// noise, not a contract callers depend on the way the web-fallback warning is.
+const _sanitizeWarnedKeys = new Set<string>();
+
 /**
  * [I-4 / I-5] Sanitize a raw string so it is safe to use as an iOS/Android
  * SecureStore key. iOS Keychain only allows [a-zA-Z0-9._-] — characters like
@@ -138,7 +146,22 @@ export async function deleteItemAsync(
  * (two different raw strings may produce the same key), but profileId and
  * sessionId values are UUID-like and only contain alphanumeric + hyphens, so
  * collisions are not a concern in practice.
+ *
+ * Emits a one-time console.warn per sanitized key when a substitution occurs,
+ * so unexpected collisions (e.g. sessionIds containing `:`) surface in dev
+ * logs. The raw key is never logged — only its lengths are recorded.
+ * [CR-2026-05-21-149]
  */
 export function sanitizeSecureStoreKey(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const sanitized = raw.replace(/[^a-zA-Z0-9._-]/g, '_');
+  if (sanitized !== raw && !_sanitizeWarnedKeys.has(sanitized)) {
+    _sanitizeWarnedKeys.add(sanitized);
+    console.warn(
+      `[secure-storage] sanitizeSecureStoreKey: forbidden chars replaced ` +
+        `(rawLen=${raw.length}, sanitizedLen=${sanitized.length}). ` +
+        `Two distinct raw keys may collapse to the same SecureStore key — ` +
+        `verify callers compose keys from UUID-safe characters only.`,
+    );
+  }
+  return sanitized;
 }

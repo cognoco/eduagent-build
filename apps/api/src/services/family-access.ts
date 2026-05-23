@@ -136,3 +136,14 @@ export async function assertOwnerAndParentAccess<
   }
   await assertParentAccess(db, parentProfileId, childProfileId);
 }
+
+export function assertOwnerProfile<
+  E extends ProfileMetaContextEnv,
+  P extends string,
+  I extends Input,
+>(c: Context<E, P, I>): void {
+  const profileMeta = c.get('profileMeta');
+  if (profileMeta?.isOwner !== true) {
+    throw new ForbiddenError('Only the account owner can view this surface.');
+  }
+}

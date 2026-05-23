@@ -119,6 +119,11 @@ export function createScreenWrapper(options: ScreenWrapperOptions = {}) {
         gcTime: 0,
         ...userOpts.defaultOptions?.queries,
       },
+      mutations: {
+        retry: false,
+        gcTime: 0,
+        ...userOpts.defaultOptions?.mutations,
+      },
     },
   });
 

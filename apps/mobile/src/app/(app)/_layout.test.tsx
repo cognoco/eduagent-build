@@ -172,9 +172,12 @@ const AppLayout = require('./_layout').default;
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
+  resolveContractHomeTabPresentation,
   resolveHomeTabPresentation,
+  resolveShellVisibleTabs,
   resolveTabShape,
 } = require('./_layout');
+const { resolveNavigationContract } = require('../../lib/navigation-contract');
 
 describe('mode tab helpers', () => {
   it('returns Study tabs for study mode', () => {
@@ -192,6 +195,63 @@ describe('mode tab helpers', () => {
       'more',
       'progress',
     ]);
+  });
+
+  it('returns V1 Family tabs from the navigation contract', () => {
+    const parent = {
+      id: '00000000-0000-7000-a000-000000000101',
+      accountId: '00000000-0000-7000-a000-000000000001',
+      avatarUrl: null,
+      birthYear: 1985,
+      consentStatus: null,
+      conversationLanguage: 'en',
+      createdAt: '2026-05-21T00:00:00.000Z',
+      defaultAppContext: 'family',
+      displayName: 'Parent',
+      hasFamilyLinks: true,
+      hasPremiumLlm: false,
+      isOwner: true,
+      linkCreatedAt: null,
+      location: null,
+      pronouns: null,
+      updatedAt: '2026-05-21T00:00:00.000Z',
+    };
+    const child = {
+      ...parent,
+      id: '00000000-0000-7000-a000-000000000201',
+      birthYear: 2014,
+      defaultAppContext: null,
+      displayName: 'Child',
+      hasFamilyLinks: false,
+      isOwner: false,
+    };
+    const contract = resolveNavigationContract({
+      activeProfile: parent,
+      profiles: [parent, child],
+      isParentProxy: false,
+      appContext: 'family',
+      role: 'owner',
+      subscription: { status: 'ready', tier: 'family' },
+      flags: { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
+    });
+
+    expect(
+      [
+        ...resolveShellVisibleTabs({
+          familyCapable: true,
+          isParentProxy: false,
+          mode: 'family',
+          navigationContract: contract,
+          tabShape: 'guardian',
+          useContract: true,
+        }),
+      ].sort(),
+    ).toEqual(['home', 'more', 'progress', 'recaps']);
+    expect(resolveContractHomeTabPresentation(contract.home)).toEqual({
+      titleKey: 'tabs.children',
+      accessibilityLabelKey: 'tabs.childrenLabel',
+      iconName: 'Users',
+    });
   });
 
   it('keeps proxy home presentation independent of mode', () => {
@@ -314,6 +374,24 @@ describe('AppLayout', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
+    );
+    mockFetch.setRoute(
+      '/subscription/status',
+      () =>
+        new Response(
+          JSON.stringify({
+            status: {
+              tier: 'family',
+              status: 'active',
+              monthlyLimit: 700,
+              usedThisMonth: 0,
+            },
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
     );
   });
 
@@ -1087,27 +1165,26 @@ describe('computeVisibleTabs', () => {
     );
   });
 
-  it('preserves the legacy guardian shell when both mode-navigation flags are off', () => {
-    const flags =
-      require('../../lib/feature-flags') as typeof import('../../lib/feature-flags');
-    const mutableFlags = flags.FEATURE_FLAGS as unknown as {
-      MODE_NAV_V0_ENABLED: boolean;
-      MODE_NAV_V1_ENABLED: boolean;
-    };
-    const originalV0 = mutableFlags.MODE_NAV_V0_ENABLED;
-    const originalV1 = mutableFlags.MODE_NAV_V1_ENABLED;
-
-    try {
-      mutableFlags.MODE_NAV_V0_ENABLED = false;
-      mutableFlags.MODE_NAV_V1_ENABLED = false;
-
-      expect(computeVisibleTabs('guardian')).toEqual(
-        new Set(['home', 'own-learning', 'library', 'progress', 'more']),
-      );
-    } finally {
-      mutableFlags.MODE_NAV_V0_ENABLED = originalV0;
-      mutableFlags.MODE_NAV_V1_ENABLED = originalV1;
-    }
+  // When both MODE_NAV_V0_ENABLED and MODE_NAV_V1_ENABLED are off, the shell
+  // must still show 5 tabs for a guardian profile (resolveShellVisibleTabs
+  // falls through to the V0 helper path with useContract=false). This is the
+  // critical production invariant — neither flag mutation should collapse
+  // guardian's own-learning tab.
+  it('resolveShellVisibleTabs preserves 5-tab guardian shell when both mode-navigation flags are off', () => {
+    // useContract=false (V1 off) + familyCapable=false (V0 off) → falls through
+    // to computeVisibleTabs(tabShape, isParentProxy)
+    const tabs = resolveShellVisibleTabs({
+      familyCapable: false,
+      isParentProxy: false,
+      mode: null,
+      // navigationContract is unused when useContract=false; stub the required field
+      navigationContract: { visibleTabs: new Set() as ReadonlySet<never> },
+      tabShape: 'guardian',
+      useContract: false,
+    });
+    expect(tabs).toEqual(
+      new Set(['home', 'own-learning', 'library', 'progress', 'more']),
+    );
   });
 
   it('defaults to guardian shape', () => {

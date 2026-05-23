@@ -39,6 +39,7 @@ import {
 } from '../../../components/progress';
 import { ProgressPillRow } from '../../../components/progress/ProgressPillRow';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   useChildInventory,
   useChildProgressSummary,
@@ -58,6 +59,7 @@ import { isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
 import { getSubjectTintMap } from '../../../lib/subject-tints';
 import { useAppContext } from '../../../lib/app-context';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useTheme } from '../../../lib/theme';
 
 function heroCopy(
@@ -505,7 +507,14 @@ export default function ProgressScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
-  const { mode } = useAppContext();
+  const navigationContract = useNavigationContract();
+  const { mode: legacyMode } = useAppContext();
+  const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.effectiveAppContext
+    : legacyMode;
+  const isFamilyProgress = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.progressScope === 'children'
+    : mode === 'family';
   const hasLinked = linkedChildren.length > 0;
   const { colorScheme } = useTheme();
   const requestedProfileId = Array.isArray(rawRequestedProfileId)
@@ -513,12 +522,9 @@ export default function ProgressScreen(): React.ReactElement {
     : rawRequestedProfileId;
 
   const [selectedProfileId, setSelectedProfileId] = useState<string>(() => {
-    if (mode === 'family') return linkedChildren[0]?.id ?? '';
+    if (isFamilyProgress) return linkedChildren[0]?.id ?? '';
     const knownRequestedProfileId =
-      requestedProfileId &&
-      (mode !== 'study' || requestedProfileId === activeProfile?.id) &&
-      (requestedProfileId === activeProfile?.id ||
-        linkedChildren.some((child) => child.id === requestedProfileId));
+      requestedProfileId && requestedProfileId === activeProfile?.id;
     if (knownRequestedProfileId) return requestedProfileId;
     return activeProfile?.id ?? '';
   });
@@ -529,28 +535,26 @@ export default function ProgressScreen(): React.ReactElement {
 
   useEffect(() => {
     if (!requestedProfileId) return;
-    const knownTarget =
-      ((mode !== 'study' || requestedProfileId === activeProfile?.id) &&
-        requestedProfileId === activeProfile?.id) ||
-      (mode === 'family' &&
-        linkedChildren.some((child) => child.id === requestedProfileId));
+    const knownTarget = isFamilyProgress
+      ? linkedChildren.some((child) => child.id === requestedProfileId)
+      : requestedProfileId === activeProfile?.id;
     if (knownTarget) {
       setSelectedProfileId(requestedProfileId);
     }
-  }, [requestedProfileId, activeProfile?.id, linkedChildren, mode]);
+  }, [requestedProfileId, activeProfile?.id, linkedChildren, isFamilyProgress]);
 
   useEffect(() => {
-    if (mode === 'study' && activeProfile?.id) {
+    if (!isFamilyProgress && activeProfile?.id) {
       setSelectedProfileId(activeProfile.id);
     }
     if (
-      mode === 'family' &&
+      isFamilyProgress &&
       selectedProfileId === activeProfile?.id &&
       linkedChildren[0]
     ) {
       setSelectedProfileId(linkedChildren[0].id);
     }
-  }, [activeProfile?.id, linkedChildren, mode, selectedProfileId]);
+  }, [activeProfile?.id, isFamilyProgress, linkedChildren, selectedProfileId]);
 
   // Re-seed when activeProfile loads after mount.
   useEffect(() => {
@@ -567,7 +571,7 @@ export default function ProgressScreen(): React.ReactElement {
   const ownInventoryQuery = useProgressInventory();
   const childInventoryQuery = useChildInventory(
     isViewingSelf ? undefined : selectedProfileId,
-    { enabled: mode !== 'study' && !isViewingSelf },
+    { enabled: isFamilyProgress && !isViewingSelf },
   );
   const inventoryQuery = isViewingSelf
     ? ownInventoryQuery
@@ -575,7 +579,7 @@ export default function ProgressScreen(): React.ReactElement {
 
   const childSummaryQuery = useChildProgressSummary(
     isViewingSelf ? undefined : selectedProfileId,
-    { enabled: mode !== 'study' && !isViewingSelf },
+    { enabled: isFamilyProgress && !isViewingSelf },
   );
   const overallProgressQuery = useOverallProgress();
 
@@ -722,7 +726,9 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     !profileSessionsQuery.isLoading &&
     isProfileStale({ sessionCount, lastSessionAt });
-  const isParentProxyView = role === 'impersonated-child';
+  const isParentProxyView = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.isParentProxy
+    : role === 'impersonated-child';
   // TODO: D-RP-18 Phase 2 — add 'ineligible' once API provides the discriminator.
   // Until then, no-reports-yet and truly-ineligible both collapse to 'awaiting'.
   // Report evidence must win over the empty/stale fallback. Otherwise a
@@ -882,7 +888,10 @@ export default function ProgressScreen(): React.ReactElement {
           {t('progress.pageSubtitle')}
         </Text>
 
-        {hasLinked && mode !== 'study' ? (
+        {hasLinked &&
+        (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+          ? navigationContract.gates.showProgressProfilePicker
+          : mode !== 'study') ? (
           <ProgressPillRow
             childrenProfiles={linkedChildren}
             selectedProfileId={selectedProfileId}

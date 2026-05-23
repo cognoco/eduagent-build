@@ -60,6 +60,46 @@ jest.mock(
 );
 
 jest.mock(
+  '../../../hooks/use-active-profile-role' /* gc1-allow: unit test boundary */,
+  () => ({
+    useActiveProfileRole: () =>
+      mockIsParentProxy
+        ? 'impersonated-child'
+        : mockActiveProfile?.isOwner
+          ? 'owner'
+          : 'child',
+  }),
+);
+
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: unit test boundary */,
+  () => ({
+    useNavigationContract: () => ({
+      effectiveAppContext: 'study',
+      isFamilyCapable: mockProfiles.some(
+        (profile) => profile.id !== mockActiveProfile?.id && !profile.isOwner,
+      ),
+      isParentProxy: mockIsParentProxy,
+      chrome: { modeSwitcher: 'hidden', proxyBanner: 'hidden' },
+      home: {
+        screen: 'LearnerHome',
+        titleKey: 'tabs.myLearning',
+        iconName: 'School',
+      },
+      visibleTabs: new Set(['home', 'library', 'progress', 'more']),
+      gates: {
+        showAddChild: mockActiveProfile?.isOwner === true,
+        showRemoveFamilyMember: mockActiveProfile?.isOwner === true,
+      },
+      canEnter: jest.fn(() => true),
+      isSurfaced: jest.fn(() => true),
+      queryScope: { appContext: 'study', profileId: mockActiveProfile?.id },
+      diagnostic: {},
+    }),
+  }),
+);
+
+jest.mock(
   '../../../hooks/use-subscription' /* gc1-allow: unit test boundary */,
   () => ({
     useSubscription: () => ({ data: mockSubscription }),
@@ -224,6 +264,26 @@ describe('MoreScreen landing', () => {
       pathname: '/create-profile',
       params: { for: 'child' },
     });
+  });
+
+  it('hides add-child for non-owner (child on parent account)', () => {
+    mockActiveProfile = {
+      id: 'profile-2',
+      displayName: 'Sam',
+      isOwner: false,
+      birthYear: 2010,
+    };
+    mockProfiles = [mockActiveProfile];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    // Break test: a non-owner (child account) must never see the add-child link.
+    // Showing it would let a child attempt to add siblings, hitting the family plan gate
+    // with a confusing error and leaking billing context.
+    expect(screen.queryByTestId('add-child-link')).toBeNull();
+    // Regular More rows are still visible for non-owner users
+    screen.getByTestId('more-row-learning-preferences');
+    screen.getByTestId('more-row-account');
   });
 
   it('locks More settings in parent preview', () => {

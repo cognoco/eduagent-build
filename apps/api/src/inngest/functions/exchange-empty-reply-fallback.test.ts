@@ -35,12 +35,12 @@ afterAll(() => {
 });
 
 interface FallbackEventData {
-  sessionId?: string;
-  profileId?: string;
-  flow?: string;
-  exchangeCount?: number;
-  reason?: string;
-  rawResponsePreview?: string;
+  sessionId?: unknown;
+  profileId?: unknown;
+  flow?: unknown;
+  exchangeCount?: unknown;
+  reason?: unknown;
+  rawResponsePreview?: unknown;
 }
 
 async function invokeHandler(data: FallbackEventData) {
@@ -107,5 +107,43 @@ describe('exchangeEmptyReplyFallback (BUG-851 / F-SVC-022)', () => {
       reason: 'malformed_envelope',
       rawResponsePreview: 'invalid json...',
     });
+  });
+
+  it('rejects a malformed payload with a structured warning and does NOT log the fallback event (CR-2026-05-21-025)', async () => {
+    // Payload with sessionId as a number — the bug that was silently coerced
+    // to 'unknown'. The handler must reject it, emit a parse-error warn, and
+    // return { status: 'invalid_payload' } without reaching the main log path.
+    const result = await invokeHandler({
+      sessionId: 42 as unknown as string,
+      profileId: undefined,
+      // flow, exchangeCount, reason intentionally missing
+    });
+
+    expect(result).toEqual({ status: 'invalid_payload' });
+
+    // The rejection warn must be present …
+    const calls = consoleWarnSpy.mock.calls;
+    const rejectionCall = calls.find((c) => {
+      try {
+        const entry = JSON.parse(c[0] as string) as { message: string };
+        return (
+          entry.message === 'exchange.empty_reply_fallback.invalid_payload'
+        );
+      } catch {
+        return false;
+      }
+    });
+    expect(rejectionCall).toBeDefined();
+
+    // … and the main observability log must NOT have been emitted.
+    const mainCall = calls.find((c) => {
+      try {
+        const entry = JSON.parse(c[0] as string) as { message: string };
+        return entry.message === 'exchange.empty_reply_fallback.received';
+      } catch {
+        return false;
+      }
+    });
+    expect(mainCall).toBeUndefined();
   });
 });

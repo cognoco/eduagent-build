@@ -313,6 +313,27 @@ jest.mock(
     }),
   }),
 );
+jest.mock(
+  '../../hooks/use-navigation-contract' /* gc1-allow: progress screen tests pin the contract shape without mounting app shell providers */,
+  () => ({
+    useNavigationContract: () => {
+      const familyMode =
+        mockSearchParams.profileId &&
+        mockLinkedChildren.some(
+          (child) => child.id === mockSearchParams.profileId,
+        );
+
+      return {
+        effectiveAppContext: familyMode ? 'family' : 'study',
+        isParentProxy: mockUseActiveProfileRole() === 'impersonated-child',
+        gates: {
+          progressScope: familyMode ? 'children' : 'self',
+          showProgressProfilePicker: familyMode,
+        },
+      };
+    },
+  }),
+);
 let mockSearchParams: { profileId?: string | string[] } = {};
 jest.mock('expo-router', () => {
   const ReactReq = jest.requireActual<typeof import('react')>('react');
@@ -1514,5 +1535,33 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     screen.getByTestId('progress-summary-fallback');
     expect(screen.queryByTestId('progress-summary-header')).toBeNull();
+  });
+
+  it('hides profile picker for non-owner (child on parent account)', () => {
+    // Break test: a child profile on a parent account must never see the progress
+    // profile picker — it lets them toggle into a parent's (or sibling's) progress
+    // view, which would expose another user's learning data.
+    mockUseActiveProfileRole.mockReturnValue('child');
+    mockActiveProfile = {
+      id: 'child-profile-id',
+      displayName: 'Sam',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    // Simulate child has NO linked children (non-owner cannot have family links)
+    mockLinkedChildren = [];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    // Profile picker must not appear — non-owner should only see their own progress
+    expect(screen.queryByTestId('progress-pill-row')).toBeNull();
+    // Regular progress content is still visible
+    screen.getByText('My progress');
   });
 });

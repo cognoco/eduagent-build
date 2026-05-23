@@ -2307,7 +2307,11 @@
     "progress": "Fremgang",
     "progressLabel": "Fremgang",
     "more": "Mer",
-    "moreLabel": "Mer"
+    "moreLabel": "Mer",
+    "children": "Barn",
+    "childrenLabel": "Barn",
+    "recaps": "Sammendrag",
+    "recapsLabel": "Sammendrag"
   },
   "ocrTimeout": "Lesing tok for lang tid – prøv igjen",
   "permissionTitle": "Kameratilgang nødvendig",
@@ -2588,5 +2592,15 @@
       "noRoundsYet": "Ingen runder ennå",
       "hintOpenHistory": "Åpner quiz-historikk"
     }
+  },
+  "recaps": {
+    "title": "Sammendrag",
+    "subtitle": "Nylige læringsøyeblikk fra familien din.",
+    "emptyTitle": "Ingen sammendrag ennå",
+    "emptyBody": "Fullførte økter vil vises her når det er noe å oppsummere.",
+    "errorTitle": "Vi kunne ikke laste inn sammendrag",
+    "errorMessage": "Vennligst prøv igjen om et øyeblikk.",
+    "summaryPending": "Et sammendrag forberedes fortsatt for denne økten.",
+    "openRecapLabel": "Åpne {{child}}s sammendrag for {{title}}"
   }
 }

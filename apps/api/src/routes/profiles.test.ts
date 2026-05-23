@@ -75,6 +75,7 @@ function makeApp(overrides?: {
   accountId?: string;
   isOwner?: boolean;
   profileMeta?: ProfileMeta | null;
+  profileId?: string;
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
@@ -86,7 +87,7 @@ function makeApp(overrides?: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     } as Account);
-    c.set('profileId', undefined);
+    c.set('profileId', overrides?.profileId);
     // [CR-2026-05-19-H1] Inject profileMeta so isOwner gate can evaluate.
     // Default isOwner:true for happy-path tests; override for break tests.
     const profileMeta =
@@ -608,8 +609,14 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
     expect(updateProfileAppContextMock).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when a non-owner edits a sibling app context', async () => {
+  // [CR-2026-05-19-H1] Break test — non-owner active on PROFILE_ID_A must not
+  // edit sibling PROFILE_ID_B's app-context. Active profileId is set so the
+  // gate's `id !== activeProfileId` clause is exercised against a real sibling
+  // identifier, not against `undefined` (which would mask a regression where
+  // the gate accidentally allowed self-edits to slip through to siblings).
+  it('[BREAK][CR-2026-05-19-H1] returns 403 when a non-owner edits a sibling app context', async () => {
     const appWithNonOwner = makeApp({
+      profileId: PROFILE_ID_A,
       profileMeta: {
         isOwner: false,
         birthYear: 2008,
@@ -629,7 +636,54 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
     );
 
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     expect(updateProfileAppContextMock).not.toHaveBeenCalled();
+  });
+
+  // [CR-2026-05-19-H1] Positive case — a non-owner editing their OWN
+  // app-context is permitted (self-update is always allowed; only sibling
+  // edits are blocked). Paired with the break test above so the gate's two
+  // clauses (isOwner + self-id) are both covered.
+  it('[CR-2026-05-19-H1] allows a non-owner to update their own app context', async () => {
+    const updated = makeProfileRow({
+      id: PROFILE_ID_A,
+      displayName: 'Alex',
+      isOwner: false,
+    });
+    updateProfileAppContextMock.mockResolvedValue({
+      ...updated,
+      defaultAppContext: 'study',
+      hasFamilyLinks: false,
+    });
+
+    const appSelfUpdate = makeApp({
+      profileId: PROFILE_ID_A,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2008,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+      } as ProfileMeta,
+    });
+
+    const res = await appSelfUpdate.request(
+      `/v1/profiles/${PROFILE_ID_A}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'study' }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateProfileAppContextMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID_A,
+      ACCOUNT_ID,
+      'study',
+    );
   });
 });
 

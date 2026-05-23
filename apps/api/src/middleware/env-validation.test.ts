@@ -79,6 +79,52 @@ describe('envValidationMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
+  // [CR-2026-05-21-099] Zod validation must run even when ENVIRONMENT=development
+  // so that misconfigured local bindings (wrong CLERK_JWKS_URL, missing
+  // DATABASE_URL, etc.) surface immediately rather than as cryptic errors on
+  // the first DB query.
+  it('[CR-099] runs validateEnv in Wrangler dev (ENVIRONMENT=development)', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const env = {
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://dev/db',
+    };
+    const c = createMockContext(env);
+    const next = jest.fn().mockResolvedValue(undefined);
+    mockValidateEnv.mockReturnValue(env as any);
+
+    await envValidationMiddleware(c, next);
+
+    expect(mockValidateEnv).toHaveBeenCalledWith(env);
+    expect(next).toHaveBeenCalled();
+  });
+
+  // [CR-2026-05-21-099] A misconfigured dev env must return 500, not silently
+  // proceed to the first DB query.
+  it('[CR-099] returns 500 when validateEnv throws in Wrangler dev (ENVIRONMENT=development)', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const c = createMockContext({ ENVIRONMENT: 'development' });
+    const next = jest.fn();
+    mockValidateEnv.mockImplementation(() => {
+      throw new Error('Invalid environment: {"DATABASE_URL":["Required"]}');
+    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    await envValidationMiddleware(c, next);
+
+    expect(mockValidateEnv).toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+    expect(c.json).toHaveBeenCalledWith(
+      {
+        code: 'ENV_VALIDATION_ERROR',
+        message: 'Invalid environment: {"DATABASE_URL":["Required"]}',
+      },
+      500,
+    );
+
+    errorSpy.mockRestore();
+  });
+
   it('returns 500 when validation fails', async () => {
     process.env['NODE_ENV'] = 'development';
     const c = createMockContext({});
