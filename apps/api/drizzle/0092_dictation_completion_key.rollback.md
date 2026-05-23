@@ -13,7 +13,10 @@ USING "dictation_results" b
 WHERE a.profile_id = b.profile_id
   AND a.date = b.date
   AND a.mode = b.mode
-  AND a.created_at < b.created_at;
+  AND (
+    a.created_at < b.created_at
+    OR (a.created_at = b.created_at AND a.id < b.id)
+  );
 
 ALTER TABLE "dictation_results" DROP COLUMN IF EXISTS "completion_key";
 CREATE UNIQUE INDEX "uniq_dictation_results_profile_date_mode"

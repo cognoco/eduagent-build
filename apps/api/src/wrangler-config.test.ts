@@ -193,4 +193,18 @@ describe('wrangler.toml config guards', () => {
       ).toBe(true);
     });
   });
+
+  describe('[WI-84 automated review] deploy workflow checkout safety', () => {
+    it('disables persisted GitHub credentials for every checkout step', () => {
+      const checkoutSteps = deployWorkflow.matchAll(
+        /^\s+- uses: actions\/checkout@[^\n]+(?:\n\s{8,}[^\n]+)*/gm,
+      );
+
+      const unsafeSteps = Array.from(checkoutSteps)
+        .map((match) => match[0])
+        .filter((step) => !/^\s+persist-credentials:\s+false\s*$/m.test(step));
+
+      expect(unsafeSteps).toEqual([]);
+    });
+  });
 });

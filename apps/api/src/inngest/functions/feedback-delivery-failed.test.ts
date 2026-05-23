@@ -72,6 +72,8 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
@@ -141,6 +143,17 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       const config = (feedbackDeliveryFailed as any).opts;
       expect(config.id).toBe('feedback-delivery-failed');
       expect(config.retries).toBe(2);
+    });
+
+    it('[WI-84 automated review] composes feedback payload validation from the shared schema contract', () => {
+      const source = readFileSync(
+        join(__dirname, 'feedback-delivery-failed.ts'),
+        'utf8',
+      );
+
+      expect(source).toContain("from '@eduagent/schemas'");
+      expect(source).toContain('feedbackSubmissionSchema');
+      expect(source).not.toContain("z.enum(['bug', 'suggestion', 'other'])");
     });
   });
 

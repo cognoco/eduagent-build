@@ -24,4 +24,15 @@ describe('dictation completion key migration', () => {
     expect(migration).toContain('mode');
     expect(migration).not.toContain('set "completion_key" = "id"');
   });
+
+  it('[WI-84 automated review] rollback dedupes tied timestamps deterministically', () => {
+    const rollback = readFileSync(
+      join(__dirname, '../drizzle/0092_dictation_completion_key.rollback.md'),
+      'utf8',
+    ).toLowerCase();
+
+    expect(rollback).toContain('a.created_at < b.created_at');
+    expect(rollback).toContain('a.created_at = b.created_at');
+    expect(rollback).toContain('a.id < b.id');
+  });
 });

@@ -34,7 +34,12 @@ function extractSqlTextAndValues(
       typeof obj['value'] === 'number' ||
       obj['value'] instanceof Date)
   ) {
-    values.push(String(obj['value']).toLowerCase());
+    const value = obj['value'];
+    values.push(
+      value instanceof Date
+        ? value.toISOString().toLowerCase()
+        : String(value).toLowerCase(),
+    );
   }
   if (Array.isArray(obj['value'])) {
     for (const item of obj['value']) {
@@ -653,6 +658,9 @@ describe('deleteProfileIfNoConsent (CI-11)', () => {
     const sqlArg = (db.execute as jest.Mock).mock.calls[0]?.[0];
     const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
     expect(sqlText).toContain('requested_at');
-    expect(sqlText).toContain('2026-05-01');
+    expect(sqlText).toContain('>=');
+    expect(sqlText).toContain('<');
+    expect(sqlText).toContain('2026-05-01t00:00:00.000z');
+    expect(sqlText).toContain('2026-05-01t00:00:00.001z');
   });
 });

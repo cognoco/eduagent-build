@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { createHash } from 'crypto';
+import { feedbackSubmissionSchema } from '@eduagent/schemas';
 import { z } from 'zod';
 import { inngest } from '../client';
 import {
@@ -20,21 +21,13 @@ import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
 const logger = createLogger();
 
-// [BUG-767 / A-24] Category enum must match the route's submission schema
-// (`feedbackCategorySchema` in `@eduagent/schemas`). The route persists
-// `body.category` directly into the event payload, so a mismatch here would
-// silently safeParse-fail every event the route fires — exactly the
-// "wired-but-untriggered" anti-pattern A-24 was filed to prevent.
-const eventDataSchema = z.object({
+// [BUG-767 / A-24] Compose from the shared route submission schema so the
+// retry consumer cannot drift from the API-facing feedback contract.
+const eventDataSchema = feedbackSubmissionSchema.extend({
   profileId: z.string().min(1),
   userId: z.string().min(1),
-  category: z.enum(['bug', 'suggestion', 'other']),
-  message: z.string().min(1).max(2000),
   supportTo: z.string().email().optional(),
   metaLines: z.string().min(1).max(2000),
-  appVersion: z.string().max(20).optional(),
-  platform: z.enum(['ios', 'android', 'web']).optional(),
-  osVersion: z.string().max(30).optional(),
 });
 
 export const feedbackDeliveryFailed = inngest.createFunction(
@@ -75,8 +68,17 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       );
       return { status: 'skipped' as const, reason: 'invalid_payload', issues };
     }
-    const { profileId, userId, category, message, supportTo, metaLines } =
-      validated.data;
+    const {
+      profileId,
+      userId,
+      category,
+      message,
+      supportTo,
+      metaLines,
+      appVersion,
+      platform,
+      osVersion,
+    } = validated.data;
 
     const categoryLabel =
       category === 'bug'
@@ -125,6 +127,9 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           message,
           supportTo,
           metaLines,
+          appVersion,
+          platform,
+          osVersion,
         });
         const hash = createHash('sha256')
           .update(hashInput)
