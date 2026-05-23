@@ -43,8 +43,13 @@ import {
   getWeeklyReportForParentChild,
   markWeeklyReportViewed,
 } from '../services/weekly-report';
-import { assertOwnerAndParentAccess } from '../services/family-access';
+import {
+  assertOwnerAndParentAccess,
+  assertOwnerProfile,
+  assertParentAccess,
+} from '../services/family-access';
 import { ForbiddenError, notFound } from '../errors';
+import { createLogger } from '../services/logger';
 import { isMemoryFactsReadEnabled } from '../config';
 import {
   getMemoryProjection,
@@ -66,6 +71,8 @@ type DashboardRouteEnv = {
     profileMeta: ProfileMeta | undefined;
   };
 };
+
+const logger = createLogger();
 
 export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get parent dashboard data
@@ -192,12 +199,24 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
     const topicId = c.req.param('topicId');
 
-    // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
-    // Convergence with sibling dashboard children routes — the service layer
-    // also calls assertParentAccess as defense-in-depth.
-    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // Split from the sibling routes' assertOwnerAndParentAccess: the spec's
+    // 404 IDOR contract requires us to hide *existence* of the topic from
+    // anyone who is not its parent (linked or not). Owner gating stays 403
+    // because non-owners shouldn't reach parent-admin endpoints at all; the
+    // parent-link gate and topic-existence both surface as 404.
+    // Source: docs/specs/2026-05-23-learn-this-too-bridge.md §Authorization
+    // ("404, never 403, never reveal whether the topic ID exists").
+    assertOwnerProfile(c);
 
     try {
+      // GUARD: Do NOT move assertOwnerProfile() inside this try — every
+      // ForbiddenError thrown here is converted to 404 below to preserve the
+      // IDOR contract. Non-owners must continue to surface as 403 via the
+      // global error handler, not as 404.
+      // Defense-in-depth: route-entry parent-link check before the service.
+      // getChildTopicSnapshotForParent also calls assertParentAccess.
+      await assertParentAccess(db, parentProfileId, childProfileId);
+
       const snapshot = await getChildTopicSnapshotForParent(
         db,
         parentProfileId,
@@ -208,6 +227,16 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
     } catch (error) {
       if (error instanceof ForbiddenError) {
+        // Audit-log unauthorized parent-link probes. The 404 hides topic
+        // existence from non-parents, but without this log an attacker
+        // who holds a valid owner token could enumerate child profile
+        // UUIDs at zero observable cost — every probe returns an
+        // indistinguishable 404. Pattern mirrors `profile_scope.ownership_mismatch`.
+        logger.warn('dashboard.snapshot.parent_access_denied', {
+          parentProfileId,
+          childProfileId,
+          topicId,
+        });
         return notFound(c, 'Topic not found');
       }
       throw error;

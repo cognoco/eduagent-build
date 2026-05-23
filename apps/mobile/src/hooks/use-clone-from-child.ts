@@ -12,8 +12,10 @@ import {
 import { assertOk } from '../lib/assert-ok';
 import {
   ForbiddenError,
+  NetworkError,
   NotFoundError,
   QuotaExceededError,
+  UpstreamError,
   useApiClient,
 } from '../lib/api-client';
 import { formatApiError } from '../lib/format-api-error';
@@ -64,9 +66,25 @@ export type CloneToast = {
   secondaryAction?: CloneToastAction;
 };
 
-function triggerSurface(triggerPath: string): string {
+// Local union — the analytics event consumer (Mixpanel / warehouse) groups
+// bridge taps by this dimension. Promoting to a typed union means a new entry
+// surface that forgets to extend this union becomes a TypeScript error at
+// the function return, not a silent drift to `string` that ships to prod
+// looking like a new value. Spec audit-trail line in
+// docs/specs/2026-05-23-learn-this-too-bridge.md §Authorization point 6 is
+// derived from this union (it is the source of truth, not the spec).
+export type BridgeTriggerSurface =
+  | 'recaps_detail'
+  | 'child_curriculum_detail'
+  | 'child_session_detail'
+  | 'family_progress'
+  | 'family_child';
+
+export function triggerSurface(triggerPath: string): BridgeTriggerSurface {
   if (triggerPath.startsWith('/recaps/')) return 'recaps_detail';
-  if (triggerPath.includes('/session/')) return 'child_session_detail';
+  if (triggerPath.includes('/child/') && triggerPath.includes('/session/')) {
+    return 'child_session_detail';
+  }
   if (
     triggerPath.includes('/curriculum/') ||
     triggerPath.endsWith('/curriculum')
@@ -198,7 +216,7 @@ export function useCloneFromChild(): {
         setToast({
           kind: 'error',
           message: "Couldn't undo - you've already opened this topic.",
-          detail: 'You can remove it from Library later.',
+          detail: 'You can remove it from Library.',
           primaryAction: target
             ? {
                 label: 'Open',
@@ -206,6 +224,11 @@ export function useCloneFromChild(): {
                 testID: 'clone-toast-open-after-undo-failed',
               }
             : undefined,
+          secondaryAction: {
+            label: 'Go to Library',
+            onPress: () => router.push('/(app)/library' as Href),
+            testID: 'clone-toast-library-after-undo-failed',
+          },
         });
         return;
       }
@@ -369,6 +392,11 @@ export function useCloneFromChild(): {
         setToast({
           kind: 'error',
           message: 'This topic is no longer available.',
+          primaryAction: {
+            label: 'Back',
+            onPress: () => router.back(),
+            testID: 'clone-toast-back-not-found',
+          },
         });
         return;
       }
@@ -391,16 +419,48 @@ export function useCloneFromChild(): {
           message: "We can't add this topic right now.",
           detail: 'Check that this child is still linked to your account.',
           primaryAction: {
-            label: 'Open Family',
-            onPress: () => router.push('/(app)/home' as Href),
+            // Route to Progress (which surfaces linked children) instead of
+            // the generic home hub — gives the user a place to verify the
+            // family link state.
+            label: 'See linked children',
+            onPress: () => router.push('/(app)/progress' as Href),
             testID: 'clone-toast-open-family',
           },
+        });
+        return;
+      }
+      // Classify NetworkError and UpstreamError before falling through to the
+      // generic formatter — distinct error classes deserve distinct copy and
+      // distinct retry semantics. formatApiError is a presentation helper, not
+      // a classifier; never string-match its output.
+      const retryArgs = lastCloneArgsRef.current;
+      const retryAction = retryArgs
+        ? {
+            label: 'Try again',
+            onPress: () => cloneFromChildRef.current?.(retryArgs),
+            testID: 'clone-toast-retry',
+          }
+        : undefined;
+      if (error instanceof NetworkError) {
+        setToast({
+          kind: 'error',
+          message: 'No connection. Check your network and try again.',
+          primaryAction: retryAction,
+        });
+        return;
+      }
+      if (error instanceof UpstreamError) {
+        setToast({
+          kind: 'error',
+          message: 'Something went wrong on our side. Try again in a moment.',
+          primaryAction: retryAction,
         });
         return;
       }
       setToast({
         kind: 'error',
         message: formatApiError(error),
+        primaryAction: retryAction,
       });
     },
   });

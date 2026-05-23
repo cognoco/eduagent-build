@@ -5,6 +5,7 @@ import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getApiUrl } from '../lib/api';
+import { fetchOrThrowNetworkError, UpstreamError } from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
 import {
   countMeaningfulTokens,
@@ -106,10 +107,52 @@ function stripListMarkers(text: string): string {
     .join('\n');
 }
 
+// Real homework math has digits/operators in STANDALONE tokens (e.g., "5",
+// "+", "x²", "12.5"). ML Kit garble like "Shob608rgg" has a digit run buried
+// inside a letter run — that should NOT count as a math cue, otherwise any
+// confidently-misread handwriting passes the gate as long as it contains a
+// stray digit. Require ≥2 math-like tokens AND at least one operator or
+// algebra-shaped token — two bare digit tokens like "5 5" or "12 15"
+// (page numbers, prices stripped of currency, dates) are NOT a math
+// expression and would otherwise let receipt/calendar photos skip server
+// escalation.
+function hasMathExpression(text: string): boolean {
+  const tokens = text.split(/\s+/).filter(Boolean);
+  let mathCount = 0;
+  let hasOperatorOrAlgebra = false;
+  for (const rawToken of tokens) {
+    const token = rawToken.replace(/[.,;]+$/, '');
+    if (!token) continue;
+    // Pure digit run (with optional decimal)
+    if (/^\d+(?:\.\d+)?$/.test(token)) {
+      mathCount++;
+      continue;
+    }
+    // Pure operator run
+    if (/^[+\-−×*·÷/=<>≤≥±²³]+$/.test(token)) {
+      mathCount++;
+      hasOperatorOrAlgebra = true;
+      continue;
+    }
+    // Algebra-shaped token: only letters, digits, and math symbols, with at
+    // least one digit AND no run of letters longer than 2 chars (rules out
+    // garble like "Shob608rgg" while admitting "5x", "2y²", "x=10", "3a+b").
+    if (
+      /^[\p{L}\d+\-−×*·÷/=<>≤≥±²³.()]+$/u.test(token) &&
+      /\d/.test(token) &&
+      !/\p{L}{3,}/u.test(token)
+    ) {
+      mathCount++;
+      hasOperatorOrAlgebra = true;
+    }
+  }
+  return mathCount >= 2 && hasOperatorOrAlgebra;
+}
+
 function hasStrongHomeworkCue(text: string): boolean {
   const contentText = stripListMarkers(text);
 
-  if (/\d/.test(contentText) || /[+\-−×*·÷/=<>≤≥±²³]/.test(contentText)) {
+  if (hasMathExpression(contentText)) {
     return true;
   }
 
@@ -150,17 +193,15 @@ function shouldEscalateLocalOcr(text: string, confidence?: number): boolean {
     return true;
   }
 
-  if (hasStrongHomeworkCue(text)) {
-    return false;
-  }
-
-  const words = getWordCount(text);
-  const nonEmptyLines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean).length;
-
-  return words > 0 && words <= 8 && nonEmptyLines <= 5;
+  // If the text has NO strong homework cue (no standalone math tokens, no
+  // question/colon punctuation, no homework verb), the ML Kit output isn't
+  // recognisably homework. Escalate to the server LLM regardless of length —
+  // previously this only escalated for short results (≤8 words / ≤5 lines),
+  // which let long confident-but-garbled outputs through (e.g., handwriting
+  // misread as "Rad / meol bs / Homo mino Shob608rgg / ..." passes only
+  // because of the embedded digit; with hasMathExpression that no longer
+  // counts as a cue, and now the length gate doesn't either).
+  return !hasStrongHomeworkCue(text);
 }
 
 function getLocalConfidence(result: unknown): number | undefined {
@@ -248,7 +289,11 @@ async function recognizeTextServerSide(
   }
   let response: Response;
   try {
-    response = await fetch(`${getApiUrl()}/v1/ocr`, {
+    // [CR-2026-05-21-156] Wrap so network-layer rejections become typed
+    // NetworkError instead of raw TypeError. format-api-error.ts classifies
+    // typed errors directly; the legacy TypeError string-match branch was
+    // removed as part of this fix.
+    response = await fetchOrThrowNetworkError(`${getApiUrl()}/v1/ocr`, {
       method: 'POST',
       headers,
       body: formData,
@@ -259,7 +304,16 @@ async function recognizeTextServerSide(
   }
 
   if (!response || !response.ok) {
-    throw new Error(`Server OCR failed (${response?.status ?? 'unknown'})`);
+    // Throw typed UpstreamError so the caller can branch on status. A bare
+    // Error caused every 4xx/5xx (401 auth lapse, 413 too large, 429 rate-limit)
+    // to surface the same generic "couldn't read clearly" message via the
+    // catch-all fallback, hiding real problems.
+    const status = response?.status ?? 0;
+    throw new UpstreamError(
+      `Server OCR failed (${status || 'unknown'})`,
+      'OCR_UPSTREAM',
+      status,
+    );
   }
 
   const payload = (await response.json()) as {

@@ -1,5 +1,5 @@
 # Flow P5: Parent Mode Switch — Family <-> My Learning
-# Validates: the parent Home mode chip and compact "My Learning" affordance
+# Validates: the parent Home mode switcher and compact "My Learning" affordance
 # both drive the Study/Family context switch instead of leaving the user
 # on the same Family surface.
 # Tags: nightly, parent, navigation
@@ -23,7 +23,7 @@ tags:
     timeout: 15000
 
 - assertVisible:
-    id: 'home-mode-chip'
+    id: 'mode-switcher-family'
 
 - takeScreenshot: parent-mode-switch-01-family
 
@@ -43,7 +43,7 @@ tags:
     timeout: 15000
 
 - assertVisible:
-    id: 'home-mode-chip'
+    id: 'mode-switcher-family'
 
 - assertVisible:
     id: 'tab-library'
@@ -53,9 +53,9 @@ tags:
 
 - takeScreenshot: parent-mode-switch-02-my-learning
 
-# 4. The header chip switches back to Family mode.
+# 4. The Family switcher button returns to Family mode.
 - tapOn:
-    id: 'home-mode-chip'
+    id: 'mode-switcher-family'
 
 - extendedWaitUntil:
     visible:
@@ -63,7 +63,7 @@ tags:
     timeout: 15000
 
 - assertVisible:
-    id: 'home-mode-chip'
+    id: 'mode-switcher-family'
 
 - assertVisible:
     id: 'parent-home-study-activation'

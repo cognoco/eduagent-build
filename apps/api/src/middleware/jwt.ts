@@ -224,7 +224,26 @@ export interface VerifyJWTOptions {
   issuer?: string;
   /** Expected audience (aud claim). If provided, the token's aud must include this value. */
   audience?: string;
+  /**
+   * [CR-2026-05-21-088] Symmetric leeway (seconds) applied to `exp` and `nbf`
+   * comparisons against the current clock. exp/nbf are second-precision but
+   * client and server clocks routinely disagree by sub-second amounts; without
+   * leeway, a freshly-issued token can be rejected as expired during a brief
+   * negative skew. Default 5s.
+   */
+  clockSkewSec?: number;
+  /**
+   * [CR-2026-05-21-088] Maximum age (seconds) since `iat`. Defense-in-depth
+   * against tokens whose `exp` was set to the far future at issue time —
+   * without this bound, such tokens would be accepted indefinitely as long as
+   * exp hasn't elapsed. Default 86400 (24h), which is conservative for an
+   * IdP that rotates session tokens every ~1 min (Clerk). Pass 0 to disable.
+   */
+  maxAgeSec?: number;
 }
+
+const DEFAULT_CLOCK_SKEW_SEC = 5;
+const DEFAULT_MAX_AGE_SEC = 24 * 60 * 60; // 24 hours
 
 export async function verifyJWT(
   token: string,
@@ -266,13 +285,32 @@ export async function verifyJWT(
 
   // Validate standard claims
   const now = Math.floor(Date.now() / 1000);
+  const skew = options?.clockSkewSec ?? DEFAULT_CLOCK_SKEW_SEC;
+  const maxAge = options?.maxAgeSec ?? DEFAULT_MAX_AGE_SEC;
 
-  if (payload.exp !== undefined && payload.exp < now) {
+  // [CR-2026-05-21-088] Apply symmetric leeway so sub-second skew between
+  // client and server clocks does not reject a just-issued token.
+  if (payload.exp !== undefined && payload.exp + skew < now) {
     throw new Error('Invalid JWT: token has expired');
   }
 
-  if (payload.nbf !== undefined && payload.nbf > now) {
+  if (payload.nbf !== undefined && payload.nbf > now + skew) {
     throw new Error('Invalid JWT: token not yet valid');
+  }
+
+  // [CR-2026-05-21-088] Defense-in-depth against far-future exp: reject tokens
+  // older than maxAge regardless of exp. Without this, an IdP misconfiguration
+  // (or compromised signing key + crafted exp=year-2099 token) would let a
+  // token live forever. Skipping when maxAge is 0 lets callers opt out.
+  // An `iat`-absent token can't be aged-out, so when maxAge is enforced we
+  // reject it rather than silently bypass the guard.
+  if (maxAge > 0) {
+    if (payload.iat === undefined) {
+      throw new Error('Invalid JWT: missing iat claim required for maxAge');
+    }
+    if (payload.iat + maxAge < now) {
+      throw new Error('Invalid JWT: token exceeds maximum age');
+    }
   }
 
   // Validate issuer claim

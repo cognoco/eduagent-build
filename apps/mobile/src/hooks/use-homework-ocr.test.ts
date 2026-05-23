@@ -211,11 +211,60 @@ describe('useHomeworkOcr', () => {
         confidence: 0.88,
       }),
     );
-    expect(mockTrackHomeworkOcrGateRejected).toHaveBeenCalledWith(
-      expect.objectContaining({
-        source: 'local',
-      }),
+    // The fixture is 130 "wordN" tokens with no strong homework cue, so the
+    // stricter gate now short-circuits the local result and escalates to the
+    // server directly — without first running isLikelyHomework. The shortcircuit
+    // analytics event fires instead of the "rejected as local" event.
+    expect(mockTrackHomeworkOcrGateShortcircuit).toHaveBeenCalled();
+  });
+
+  // Regression test for handwriting garble shipped from a real device:
+  // the photo was a numbered list ("1. What is chasing you / 2. What are
+  // you avoiding / ...") on Radisson BLU letterhead. ML Kit returned 8
+  // lines of confident garble containing an embedded digit "608" inside
+  // "Shob608rgg". Before the gate-tightening fix, the embedded digit
+  // satisfied the loose /\d/ check in hasStrongHomeworkCue, so the gate
+  // accepted the garble and never called the server LLM. The user saw
+  // the garbled text rendered as homework problems.
+  it('escalates ML Kit garble with embedded digit (long output, no real homework cue)', async () => {
+    const garble = [
+      'Rad',
+      'meol bs',
+      'Homo mino Shob608rgg',
+      'cnbejol liog',
+      '&iOs hodet',
+      'BLU',
+      'RADISSON',
+      'MEET INGS',
+    ].join('\n');
+    mockRecognize.mockResolvedValue({ text: garble });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: [
+            '1. What is chasing you',
+            '2. What are you avoiding',
+            '3. What do you want',
+          ].join('\n'),
+          confidence: 0.9,
+        }),
+        { status: 200 },
+      ),
     );
+
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toContain('What is chasing you');
+    expect(result.current.text).not.toContain('Shob608rgg');
+    expect(result.current.text).not.toContain('RADISSON');
   });
 
   it('escalates short cue-less OCR fragments instead of accepting them as problems', async () => {

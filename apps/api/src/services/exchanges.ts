@@ -590,7 +590,7 @@ export function buildExchangeSourceEvidence(
       reliability: 'model_general_knowledge',
       label: 'Confidence-gated general knowledge',
       excerpt:
-        'Allowed for ordinary low-stakes general knowledge in rung 1-3 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims.',
+        'Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims.',
       reliableForFacts: true,
     });
   }
@@ -797,6 +797,53 @@ function truncateForReply(value: string | undefined, maxChars = 160): string {
     : compact;
 }
 
+function normalizeAcknowledgementClause(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Strong acknowledgements semantically require a prior contribution to
+// acknowledge — safe to treat as ack regardless of conversation history.
+const STRONG_ACK_CLAUSE =
+  /^(thank you|thanks|thx|ty|got it|i got it|i see|i understand|makes sense|that makes sense|this makes sense)$/;
+// Weak / ambiguous tokens (yes / yeah / good / ok / cool …) are equally
+// natural as a learner's opening turn — without prior assistant context,
+// matching these as acknowledgements produces a bizarre "You're welcome"
+// reply. The caller passes hasPriorAssistantTurn to disambiguate.
+const WEAK_ACK_CLAUSE =
+  /^(ok|okay|yes|yep|yeah|sounds good|cool|perfect|great|nice|good|fine|alright|all right)$/;
+const POSITIVE_FEEDBACK_CLAUSE =
+  /^(that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/;
+const THANKS_WITH_FEEDBACK_CLAUSE =
+  /^(thank you|thanks|thx|ty) (that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/;
+
+function isAcknowledgementOnlyTurn(
+  value: string,
+  hasPriorAssistantTurn: boolean,
+): boolean {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (!compact) return false;
+  if (/[?]/.test(compact)) return false;
+
+  const clauses = compact
+    .split(/[.!;,]+|\s+-\s+/)
+    .map(normalizeAcknowledgementClause)
+    .filter(Boolean);
+  if (clauses.length === 0 || clauses.length > 3) return false;
+
+  return clauses.every(
+    (clause) =>
+      STRONG_ACK_CLAUSE.test(clause) ||
+      POSITIVE_FEEDBACK_CLAUSE.test(clause) ||
+      THANKS_WITH_FEEDBACK_CLAUSE.test(clause) ||
+      (hasPriorAssistantTurn && WEAK_ACK_CLAUSE.test(clause)),
+  );
+}
+
 function buildUnsupportedFactualReply(
   sourceAudit: ExchangeSourceAudit,
 ): string {
@@ -804,6 +851,18 @@ function buildUnsupportedFactualReply(
     getSourceEvidenceExcerpt(sourceAudit, 'learner_message'),
   );
   const lower = learnerQuestion.toLowerCase();
+
+  // Weak acknowledgement tokens (yes / yeah / good / ok) are equally
+  // natural as a learner's first turn. Without a prior assistant turn,
+  // matching these and replying "You're welcome" is nonsensical. Strong
+  // forms (thanks, "X was useful") presuppose a prior contribution and
+  // are accepted unconditionally — see isAcknowledgementOnlyTurn().
+  const hasPriorAssistantTurn = sourceAudit.evidence.some(
+    (e) => e.kind === 'conversation_history',
+  );
+  if (isAcknowledgementOnlyTurn(learnerQuestion, hasPriorAssistantTurn)) {
+    return "You're welcome. Want to keep going with this, or end here?";
+  }
 
   if (/\b(remember|takeaway|summary|recap)\b/.test(lower)) {
     return (
@@ -826,7 +885,11 @@ function buildUnsupportedFactualReply(
     );
   }
 
-  if (/\b(is|was|were|mostly|because|why|how)\b/.test(lower)) {
+  if (
+    /\b(source|sources|reference|references|textbook|worksheet|passage|photo|image|according to|based on|from this|from the text|quote|cite|citation|evidence)\b/.test(
+      lower,
+    )
+  ) {
     return (
       "That's a source-check question, so I should not answer it from memory. " +
       "Share the textbook passage, worksheet, photo, or trusted source, and we'll check what claim it supports and what evidence it gives."

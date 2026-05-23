@@ -31,8 +31,17 @@ import { sanitizeSecureStoreKey } from './secure-storage';
 export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // EarlyAdopterCard.tsx — DISMISSED_KEY: `earlyAdopterDismissed_${profileId}`
   (id) => `earlyAdopterDismissed_${id}`,
-  // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey: sanitized `bookmark-nudge-shown_${profileId}` (colon replaced by _)
+  // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey writes the dot-separator
+  // form post-2026-05-23 (commit 8803082f8). The colon-sanitized form is the
+  // legacy variant the writer's getLegacyBookmarkNudgeKey reads as a fallback;
+  // we wipe it here too so it doesn't persist forever on devices that
+  // dismissed under the old key. [CR-2026-05-21-143]
+  (id) => sanitizeSecureStoreKey(`bookmark-nudge-shown.${id}`),
   (id) => sanitizeSecureStoreKey(`bookmark-nudge-shown:${id}`),
+  // Raw un-sanitized colon variant: defensive against any pre-sanitization
+  // writer that landed before sanitizeSecureStoreKey was introduced. iOS
+  // would have rejected this key; Android may have accepted it.
+  (id) => `bookmark-nudge-shown:${id}`,
   // use-dictation-preferences.ts — getPaceKey + getPunctKey
   (id) => `dictation-pace-${id}`,
   (id) => `dictation-punctuation-${id}`,
@@ -77,6 +86,11 @@ export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
   // orphan behind forever. Defense-in-depth on top of the primary
   // identity-scoped key fix in query-persister.ts.
   'eduagent-query-cache',
+  // AddToMyLearningButton.tsx falls back to the bare TIP_KEY_PREFIX
+  // (no profile suffix, no trailing dot) when activeProfile is absent at
+  // render time. The PER_PROFILE prefix wipe matches `add_to_my_learning.tip_seen.<id>`
+  // but not the bare form — clear it explicitly so the tip resets on sign-out.
+  'add_to_my_learning.tip_seen',
 ];
 
 // Global keys that should reset when no one is signed in. Excludes onboarding
@@ -189,7 +203,16 @@ const OUTBOX_FLOWS = ['session'] as const;
 // summary-draft.ts which is outside this worker's file scope — recorded as a
 // follow-up. Until then this scan still serves as a forward-only guard so any
 // future migration to AsyncStorage is automatically wiped on sign-out.
-const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = ['summary-draft-'];
+// AddToMyLearningButton.tsx writes `add_to_my_learning.tip_seen.${profileId}`
+// to AsyncStorage. We can't enumerate every profileId we ever wrote against
+// (a shared device can sign in/out across many accounts), and the writer
+// uses AsyncStorage rather than SecureStore, so the registry meta-test
+// (sign-out-cleanup-registry.test.ts) wouldn't catch a missing wipe here.
+// Forward-only prefix wipe covers all per-profile tip-seen keys.
+const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = [
+  'summary-draft-',
+  'add_to_my_learning.tip_seen.',
+];
 
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>,

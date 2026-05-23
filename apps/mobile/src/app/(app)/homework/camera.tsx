@@ -9,6 +9,7 @@ import {
   ScrollView,
   AppState,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import {
   useRouter,
@@ -33,7 +34,7 @@ import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
 import { formatApiError } from '../../../lib/format-api-error';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import {
@@ -728,9 +729,25 @@ export default function CameraScreen(): React.ReactNode {
     [navigateToSession, manualText, homeworkCaptureSource],
   );
 
+  // Always replace, never back(). Camera is a leaf flow entered via cross-tab
+  // push, so the back stack is 1-deep and `router.back()` falls through to the
+  // tabs first-route (Home → ParentHomeScreen for guardians). Replacing with
+  // the explicit returnTo target makes close/back behavior deterministic
+  // regardless of the underlying back-stack state.
   const handleClose = useCallback(() => {
-    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+    router.replace(homeHrefForReturnTo(returnTo));
   }, [returnTo, router]);
+
+  // Intercept Android hardware back so it routes through handleClose too;
+  // without this, the OS goBack() returns to whichever tab was active when
+  // camera was pushed, which for cross-tab pushes is the tabs first-route.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [handleClose]);
 
   const toggleFlash = useCallback(() => {
     setFlash((prev) => (prev === 'off' ? 'on' : 'off'));
@@ -1648,17 +1665,22 @@ export default function CameraScreen(): React.ReactNode {
                     {t('homework.retake')}
                   </Text>
                 </Pressable>
-                <Pressable
-                  testID="retry-button"
-                  onPress={handleRetryOcr}
-                  className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-                  accessibilityLabel={t('homework.tryReadingAgainLabel')}
-                  accessibilityRole="button"
-                >
-                  <Text className="text-body font-semibold text-text-inverse">
-                    {t('common.tryAgain')}
-                  </Text>
-                </Pressable>
+                {/* CACHE_FAILED never sets currentUriRef, so retry() is a
+                  silent no-op. Suppress the button to avoid the dead tap —
+                  the retake button above gives the user the working escape. */}
+                {ocr.errorCode === 'CACHE_FAILED' ? null : (
+                  <Pressable
+                    testID="retry-button"
+                    onPress={handleRetryOcr}
+                    className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+                    accessibilityLabel={t('homework.tryReadingAgainLabel')}
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-body font-semibold text-text-inverse">
+                      {t('common.tryAgain')}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
               {/* L2: Provide Go Home escape on first OCR failure */}
               <Pressable

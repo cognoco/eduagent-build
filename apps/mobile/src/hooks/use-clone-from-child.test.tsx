@@ -8,7 +8,9 @@ import {
 import { setActiveProfileId } from '../lib/api-client';
 import { ProfileContext, type ProfileContextValue } from '../lib/profile';
 import {
+  triggerSurface,
   useCloneFromChild,
+  type BridgeTriggerSurface,
   type CloneFromChildArgs,
 } from './use-clone-from-child';
 
@@ -318,7 +320,105 @@ describe('useCloneFromChild', () => {
         kind: 'error',
         message: 'This topic is no longer available.',
       });
+      // Assertion inside waitFor: React Query commits state in multiple
+      // renders and the primaryAction is appended in the same commit as the
+      // message — but reading it outside waitFor races the commit.
+      expect(result.current.toast?.primaryAction?.testID).toBe(
+        'clone-toast-back-not-found',
+      );
     });
+  });
+
+  it('surfaces an upgrade CTA when the adult hits their monthly quota', async () => {
+    mockRandomUUID.mockReturnValueOnce(REQUEST_ID);
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 'QUOTA_EXCEEDED',
+          message: 'Quota exceeded',
+          details: { limit: 100, used: 100 },
+        },
+        402,
+      ),
+    );
+
+    const { result } = renderHook(() => useCloneFromChild(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => result.current.cloneFromChild(cloneArgs()));
+
+    await waitFor(() => {
+      expect(result.current.toast?.kind).toBe('error');
+    });
+    expect(result.current.toast?.primaryAction?.testID).toBe(
+      'clone-toast-upgrade',
+    );
+
+    act(() => result.current.toast?.primaryAction?.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+  });
+
+  it('surfaces a Family CTA when the link to the child is revoked (Forbidden)', async () => {
+    mockRandomUUID.mockReturnValueOnce(REQUEST_ID);
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ code: 'FORBIDDEN', message: 'No access' }, 403),
+    );
+
+    const { result } = renderHook(() => useCloneFromChild(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => result.current.cloneFromChild(cloneArgs()));
+
+    await waitFor(() => {
+      expect(result.current.toast?.kind).toBe('error');
+    });
+    expect(result.current.toast?.primaryAction?.testID).toBe(
+      'clone-toast-open-family',
+    );
+
+    act(() => result.current.toast?.primaryAction?.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/(app)/progress');
+  });
+
+  it('passes returnTo=family-recaps when the bridge tap originates from a recap detail', async () => {
+    const RECAP_ID = 'recap-abc-123';
+    mockRandomUUID.mockReturnValueOnce(REQUEST_ID);
+    mockFetch.mockResolvedValueOnce(jsonResponse(cloneResponse()));
+
+    const { result } = renderHook(() => useCloneFromChild(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() =>
+      result.current.cloneFromChild(
+        cloneArgs({ triggerPath: `/recaps/${RECAP_ID}` }),
+      ),
+    );
+
+    await waitFor(() => {
+      expect(result.current.toast?.primaryAction?.testID).toBe(
+        'clone-toast-open',
+      );
+    });
+
+    act(() => result.current.toast?.primaryAction?.onPress());
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/topic/relearn',
+        params: expect.objectContaining({
+          returnTo: 'family-recaps',
+          returnId: RECAP_ID,
+          source: 'parent_bridge',
+        }),
+      }),
+    );
+    expect(mockTrack).toHaveBeenCalledWith(
+      'add_to_my_learning.bridge',
+      expect.objectContaining({ triggerSurface: 'recaps_detail' }),
+    );
   });
 
   it('keeps the open action when undo fails because a session already started', async () => {
@@ -364,5 +464,76 @@ describe('useCloneFromChild', () => {
         }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Trigger-surface path-to-surface mapping
+//
+// The analytics consumer slices bridge taps by `triggerSurface`. The union
+// is exported so callers (entry-surface screens) can construct typed
+// triggerPaths, and so adding a new entry surface forces an exhaustive
+// update here — silent drift to a new string would break every dashboard
+// downstream.
+// ---------------------------------------------------------------------------
+
+describe('triggerSurface', () => {
+  const cases: Array<{
+    label: string;
+    triggerPath: string;
+    expected: BridgeTriggerSurface;
+  }> = [
+    {
+      label: 'recaps detail screen',
+      triggerPath: '/recaps/abc-123',
+      expected: 'recaps_detail',
+    },
+    {
+      label: 'child curriculum detail',
+      triggerPath: `/child/${CHILD_PROFILE_ID}/curriculum/subj-1`,
+      expected: 'child_curriculum_detail',
+    },
+    {
+      label: 'child curriculum landing (trailing /curriculum)',
+      triggerPath: `/child/${CHILD_PROFILE_ID}/curriculum`,
+      expected: 'child_curriculum_detail',
+    },
+    {
+      label: 'child session detail',
+      triggerPath: `/child/${CHILD_PROFILE_ID}/session/sess-9`,
+      expected: 'child_session_detail',
+    },
+    {
+      label: 'family progress (top level)',
+      triggerPath: '/progress',
+      expected: 'family_progress',
+    },
+    {
+      label: 'family progress (deep)',
+      triggerPath: '/progress/children',
+      expected: 'family_progress',
+    },
+    {
+      label: 'child detail fallback',
+      triggerPath: `/child/${CHILD_PROFILE_ID}`,
+      expected: 'family_child',
+    },
+    {
+      label: 'unknown surface defaults to family_child',
+      triggerPath: '/some/other/path',
+      expected: 'family_child',
+    },
+  ];
+
+  it.each(cases)('maps $label to $expected', ({ triggerPath, expected }) => {
+    expect(triggerSurface(triggerPath)).toBe(expected);
+  });
+
+  it('return type is the BridgeTriggerSurface union (compile-time check)', () => {
+    // Type-level guard: if the union widens to `string`, the assignment
+    // below becomes lossless and we lose the exhaustiveness signal. The
+    // runtime check is incidental — the real value is the typed assignment.
+    const surface: BridgeTriggerSurface = triggerSurface('/recaps/x');
+    expect(surface).toBe('recaps_detail');
   });
 });

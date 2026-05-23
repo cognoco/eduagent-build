@@ -264,8 +264,13 @@ export const trialExpiry = inngest.createFunction(
         const warningMessage = getTrialWarningMessage(daysRemaining);
         if (!warningMessage) continue;
 
+        // [CR-2026-05-21-030] Use UTC date math so the warning window aligns
+        // to UTC day boundaries regardless of process.env.TZ. setDate/getDate
+        // operate in the runtime's local TZ and would drift if the worker is
+        // ever deployed in a non-UTC environment. Matches the pattern in
+        // weekly-progress-push.ts:113-119.
         const targetDate = new Date(now);
-        targetDate.setDate(targetDate.getDate() + daysRemaining);
+        targetDate.setUTCDate(targetDate.getUTCDate() + daysRemaining);
         const targetDayStart = new Date(
           targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z',
         );
@@ -308,8 +313,9 @@ export const trialExpiry = inngest.createFunction(
           const message = getSoftLandingMessage(daysSinceEnd);
           if (!message) continue;
 
+          // [CR-2026-05-21-030] UTC date math — see note in send-trial-warnings step above.
           const targetDate = new Date(now);
-          targetDate.setDate(targetDate.getDate() - daysSinceEnd);
+          targetDate.setUTCDate(targetDate.getUTCDate() - daysSinceEnd);
           const targetDayStart = new Date(
             targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z',
           );

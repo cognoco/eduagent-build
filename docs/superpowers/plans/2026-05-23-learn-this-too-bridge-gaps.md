@@ -641,7 +641,7 @@ Use `/commit`.
 | Already existed, diverged + unstarted | Match + different description, no session, no queue → refresh description, `descriptionRefreshed=true`. |
 | Already existed, diverged + in_progress | Match + different description + session exists → keep existing, `descriptionDivergent=true`. |
 | Already existed, diverged + completed | Match + different description + session completed → keep existing, `descriptionDivergent=true`. |
-| Force copy | `forceCopy=true` skips name dedup, title becomes `"X (from ChildName)"`. |
+| Force copy | `forceCopy=true` skips name dedup, title becomes `"X (copy)"` (`"X (copy) 2"`, `"X (copy) 3"` on collision). Provenance is preserved via `source_child_profile_id`, never via the title string. |
 | Idempotency cache hit | Same `requestId` within 60s → returns cached response without re-running the transaction. |
 | ON CONFLICT race | INSERT returns empty (concurrent winner) → re-select returns same row, treated as `alreadyExisted=true`. |
 
@@ -1015,7 +1015,7 @@ it('creates a disambiguated separate copy when forceCopy=true', async () => {
   expect(second.topicId).not.toBe(first.topicId);
   const [adultTopic] = await db.select().from(curriculumTopics)
     .where(eq(curriculumTopics.id, second.topicId));
-  expect(adultTopic.title).toMatch(/\(from Ada\)/);
+  expect(adultTopic.title).toMatch(/\(copy\)/);
   expect(adultTopic.source).toBe('parent_bridge');
 });
 ```

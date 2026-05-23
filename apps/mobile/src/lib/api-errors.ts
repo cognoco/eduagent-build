@@ -57,6 +57,28 @@ export class NetworkError extends Error {
 }
 
 /**
+ * [CR-2026-05-21-156] Wraps `globalThis.fetch` so network-layer rejections
+ * (no response received — DNS failure, offline, timeout, abort, etc.) become
+ * typed `NetworkError` instead of leaking raw `TypeError` strings whose
+ * format depends on the React Native / Hermes version.
+ *
+ * Use this from any code path that calls `fetch` directly OUTSIDE of
+ * `api-client.ts`'s `customFetch` wrapper (e.g. health checks, OCR upload,
+ * non-RPC endpoints). `customFetch` handles its own NetworkError wrapping
+ * inside its closure.
+ */
+export async function fetchOrThrowNetworkError(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  try {
+    return await globalThis.fetch(input, init);
+  } catch (err) {
+    throw new NetworkError(undefined, err);
+  }
+}
+
+/**
  * [F-Q-01] Typed error for 5xx upstream responses.
  * Thrown by customFetch so callers can read `.code` and `.status` instead of
  * parsing raw JSON from Error.message.

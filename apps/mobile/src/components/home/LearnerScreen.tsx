@@ -24,7 +24,6 @@ import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren, useProfile } from '../../lib/profile';
 import {
   LEARNER_HOME_RETURN_TO,
-  homeHrefForReturnTo,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
 import {
@@ -34,6 +33,7 @@ import {
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { getSubjectTint, getSubjectTintMap } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
@@ -128,6 +128,7 @@ export function LearnerScreen({
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { data: subscription } = useSubscription();
   const { switchProfile, isExplicitProxyMode } = useProfile();
+  const navigationContract = useNavigationContract();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
@@ -393,20 +394,13 @@ export function LearnerScreen({
 
   const openIntentAction = useCallback(
     (route: HomeIntentAction['route']): void => {
-      // Cross-tab push to a non-tab route (camera) synthesizes a 1-deep stack;
-      // router.back() then falls through to the tabs navigator's first-route
-      // (Home), which for guardians renders FamilyHome. Seed the back-stack
-      // with the calling tab's href ONLY when LearnerScreen is NOT mounted at
-      // Home (i.e., the own-learning tab via OwnLearningScreen). At Home, the
-      // seed would duplicate the stack entry (back: camera → home → home) —
-      // that's the H29 case [CR-2026-05-19-H29] this conditional preserves.
-      if (
-        route === '/(app)/homework/camera' &&
-        returnToTab !== LEARNER_HOME_RETURN_TO
-      ) {
-        router.push(homeHrefForReturnTo(returnToTab));
-      }
-
+      // [CR-2026-05-19-H29] Single push, no home pre-seed. The camera screen
+      // itself uses router.replace(homeHrefForReturnTo(returnTo)) on close, so
+      // back/close behavior does not rely on the cross-tab back stack — it
+      // navigates to the explicit returnTo target. Previously this seeded
+      // homeHref before camera to work around the 1-deep cross-stack issue,
+      // but that doesn't actually seed the camera's back stack (pushing a tab
+      // route while on it behaves like a tab switch, not a stack push).
       router.push({
         pathname: route,
         params:
@@ -415,7 +409,7 @@ export function LearnerScreen({
             : returnParams,
       } as Href);
     },
-    [returnParams, returnToTab],
+    [returnParams],
   );
 
   if (isLoading) {
@@ -482,13 +476,15 @@ export function LearnerScreen({
     activeProfile?.isOwner === true &&
     (subscription?.tier === 'family' || subscription?.tier === 'pro');
 
-  if (
-    showParentHome &&
-    !isParentProxy &&
-    (FEATURE_FLAGS.MODE_NAV_V0_ENABLED
+  const familyHomeFromContract =
+    navigationContract.home.screen === 'FamilyHome';
+  const shouldShowFamilyHome = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? familyHomeFromContract
+    : FEATURE_FLAGS.MODE_NAV_V0_ENABLED
       ? mode === 'family'
-      : hasLinkedChildren || isFamilyPlanOwner)
-  ) {
+      : hasLinkedChildren || isFamilyPlanOwner;
+
+  if (showParentHome && !isParentProxy && shouldShowFamilyHome) {
     return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
   }
 

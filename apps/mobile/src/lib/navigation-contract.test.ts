@@ -1,16 +1,16 @@
 import {
+  PROFILE_FACTORY_ISO as ISO,
+  PROFILE_FACTORY_CHILD_BIRTH_YEAR as CHILD_BIRTH_YEAR,
+  makeProfile,
+} from '../test-utils/profile-factories';
+import {
   resolveNavigationContract,
   type NavigationContract,
   type ProfileContext,
   type RouteKey,
 } from './navigation-contract';
 
-type ContractProfile = NonNullable<ProfileContext['activeProfile']>;
 type SubscriptionContext = ProfileContext['subscription'];
-
-const ISO = '2026-05-21T00:00:00.000Z';
-const ADULT_BIRTH_YEAR = 1985;
-const CHILD_BIRTH_YEAR = 2014;
 
 const studyTabs = ['home', 'library', 'progress', 'more'] as const;
 const familyTabs = ['home', 'recaps', 'progress', 'more'] as const;
@@ -22,29 +22,6 @@ const legacyGuardianTabs = [
   'progress',
   'more',
 ] as const;
-
-function makeProfile(
-  overrides: Partial<ContractProfile> & { id: string },
-): ContractProfile {
-  return {
-    accountId: '00000000-0000-7000-a000-000000000001',
-    avatarUrl: null,
-    birthYear: ADULT_BIRTH_YEAR,
-    consentStatus: null,
-    conversationLanguage: 'en',
-    createdAt: ISO,
-    defaultAppContext: null,
-    displayName: 'Profile',
-    hasFamilyLinks: false,
-    hasPremiumLlm: false,
-    isOwner: true,
-    linkCreatedAt: null,
-    location: null,
-    pronouns: null,
-    updatedAt: ISO,
-    ...overrides,
-  } as ContractProfile;
-}
 
 const adult = makeProfile({
   id: '00000000-0000-7000-a000-000000000101',
@@ -752,8 +729,8 @@ describe('resolveNavigationContract snapshot surface', () => {
   });
 });
 
-describe('resolveNavigationContract V0 preservation', () => {
-  it('preserves the legacy 5-tab guardian shell when both navigation flags are off', () => {
+describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint)', () => {
+  it('returns LEGACY_GUARDIAN_TABS (5 tabs) when both flags are off and profile is family-capable', () => {
     const contract = resolveNavigationContract(
       makeContext({
         activeProfile: familyAdult,
@@ -763,11 +740,146 @@ describe('resolveNavigationContract V0 preservation', () => {
           MODE_NAV_V1_ENABLED: false,
         },
         profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
       }),
     );
 
     expectTabs(contract, legacyGuardianTabs);
     expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
     expect(contract.gates.showLearnThisToo).toBe(false);
+  });
+
+  it('reports v1-disabled and keeps the legacy V0 mode switcher in contract chrome', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        flags: {
+          MODE_NAV_V0_ENABLED: true,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.diagnostic.reason).toBe('v1-disabled');
+    expect(contract.chrome.modeSwitcher).toBe('global-header');
+    expect(contract.effectiveAppContext).toBe('family');
+    expect(contract.shape).toBe('study');
+    expect(contract.gates.showLearnThisToo).toBe(false);
+  });
+});
+
+describe('navigation-contract totality (fuzzed inputs never throw)', () => {
+  const flagsCases: ReadonlyArray<ProfileContext['flags']> = [
+    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: false },
+    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: false },
+    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
+    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: true },
+  ];
+  const appContexts: ReadonlyArray<ProfileContext['appContext']> = [
+    null,
+    'study',
+    'family',
+  ];
+  const proxies: ReadonlyArray<boolean> = [true, false];
+  const subs: ReadonlyArray<ProfileContext['subscription']> = [
+    { status: 'loading', tier: null },
+    { status: 'ready', tier: 'free' },
+    { status: 'ready', tier: 'family' },
+  ];
+  const profileShapes: ReadonlyArray<ProfileContext['activeProfile']> = [
+    null,
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa1',
+      isOwner: true,
+      birthYear: 1985,
+      hasFamilyLinks: false,
+    }),
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa2',
+      isOwner: true,
+      birthYear: 1985,
+      hasFamilyLinks: true,
+    }),
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa3',
+      isOwner: false,
+      birthYear: CHILD_BIRTH_YEAR,
+      hasFamilyLinks: false,
+      linkCreatedAt: ISO,
+    }),
+    makeProfile({
+      id: '00000000-0000-7000-a000-000000000fa4',
+      isOwner: true,
+      birthYear: CHILD_BIRTH_YEAR,
+      hasFamilyLinks: false,
+    }),
+  ];
+  const roles: ReadonlyArray<ProfileContext['role']> = [
+    'owner',
+    'impersonated-child',
+    'child',
+    null,
+  ];
+  const probeRoutes: ReadonlyArray<RouteKey> = [
+    'home',
+    'library',
+    'recaps',
+    'progress',
+    'session',
+    'topic/relearn',
+    'child/[profileId]',
+    'child/[profileId]/curriculum',
+    'subscription',
+    'more/account',
+  ];
+
+  it('every cross-product returns a complete contract without throwing', () => {
+    let count = 0;
+    for (const flags of flagsCases) {
+      for (const appContext of appContexts) {
+        for (const isParentProxy of proxies) {
+          for (const subscription of subs) {
+            for (const activeProfile of profileShapes) {
+              for (const role of roles) {
+                count += 1;
+                const contract = resolveNavigationContract({
+                  activeProfile,
+                  profiles: activeProfile ? [activeProfile] : [],
+                  isParentProxy,
+                  appContext,
+                  role,
+                  subscription,
+                  flags,
+                });
+                expect(contract.visibleTabs.size).toBeGreaterThan(0);
+                expect(['study', 'family']).toContain(contract.shape);
+                expect(contract.diagnostic.reason).toBeDefined();
+                for (const route of probeRoutes) {
+                  expect(() => contract.canEnter(route)).not.toThrow();
+                  expect(() => contract.isSurfaced(route)).not.toThrow();
+                }
+                // Correctness invariants on the fuzz — turn the "no crash"
+                // sweep into a "no nonsense output" sweep:
+                //   1. The bridge gate (showLearnThisToo) is a family-shape
+                //      capability; if the contract returns a study shape it
+                //      must NEVER claim the bridge is showable.
+                //   2. A parent-proxy session is by definition NOT operating
+                //      as the owner; sessionIsOwner must be false.
+                if (contract.shape === 'study') {
+                  expect(contract.gates.showLearnThisToo).toBe(false);
+                }
+                if (isParentProxy) {
+                  expect(contract.gates.sessionIsOwner).toBe(false);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(count).toBeGreaterThan(500);
   });
 });

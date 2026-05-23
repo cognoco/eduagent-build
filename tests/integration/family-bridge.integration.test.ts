@@ -17,6 +17,7 @@ import {
   cloneTopicFromChild,
   undoCloneFromChild,
 } from '../../apps/api/src/services/family-bridge';
+import { startRelearn } from '../../apps/api/src/services/retention-data';
 
 type IntegrationDb = ReturnType<typeof createIntegrationDb>;
 
@@ -330,7 +331,7 @@ describe('family bridge integration', () => {
     });
   });
 
-  it('force-copies a separate child-named topic when requested', async () => {
+  it('force-copies a separate provenance-tagged topic when requested', async () => {
     const fixture = await seedFamily();
     await seedLearningTree(fixture.db, {
       profileId: fixture.adult.id,
@@ -435,5 +436,93 @@ describe('family bridge integration', () => {
       where: eq(curriculumTopics.id, clone.topicId),
     });
     expect(topic?.id).toBe(clone.topicId);
+  });
+
+  // -------------------------------------------------------------------------
+  // Fresh-topic startRelearn path
+  //
+  // Source: docs/specs/2026-05-23-learn-this-too-bridge.md
+  //   §Relearn Screen Adjustments §1:
+  //   "Required: add an integration test that exercises the fresh-topic case
+  //    explicitly — clone via bridge → call startRelearn → verify session
+  //    created and `needs_deepening_topics` row written — to lock current
+  //    behavior against future regression."
+  //
+  // The bridge deliberately does NOT enqueue or start a session — the adult
+  // first sees the cloned topic in Library / on the relearn fresh-topic
+  // screen. startRelearn (called when the adult picks a method) is what
+  // actually writes the queue row and the learning_sessions row.
+  // -------------------------------------------------------------------------
+
+  it('clone via bridge → startRelearn creates session and needs_deepening row', async () => {
+    const fixture = await seedFamily();
+
+    const clone = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
+      childProfileId: fixture.child.id,
+      topicId: fixture.childLearning.topic.id,
+      requestId: randomUUID(),
+    });
+
+    expect(clone.topicState).toBe('unstarted');
+
+    // Bridge MUST NOT pre-create the queue row or a session — guards the
+    // spec contract that startRelearn is the only writer.
+    const preQueue = await fixture.db
+      .select()
+      .from(needsDeepeningTopics)
+      .where(
+        and(
+          eq(needsDeepeningTopics.profileId, fixture.adult.id),
+          eq(needsDeepeningTopics.topicId, clone.topicId),
+        ),
+      );
+    expect(preQueue).toHaveLength(0);
+
+    const preSessions = await fixture.db
+      .select()
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, fixture.adult.id),
+          eq(learningSessions.topicId, clone.topicId),
+        ),
+      );
+    expect(preSessions).toHaveLength(0);
+
+    const relearn = await startRelearn(fixture.db, fixture.adult.id, {
+      topicId: clone.topicId,
+      method: 'same',
+    });
+
+    expect(relearn.sessionId).toBeTruthy();
+    expect(relearn.method).toBe('same');
+
+    const postQueue = await fixture.db
+      .select()
+      .from(needsDeepeningTopics)
+      .where(
+        and(
+          eq(needsDeepeningTopics.profileId, fixture.adult.id),
+          eq(needsDeepeningTopics.topicId, clone.topicId),
+          eq(needsDeepeningTopics.status, 'active'),
+        ),
+      );
+    expect(postQueue).toHaveLength(1);
+    expect(postQueue[0]?.subjectId).toBe(clone.subjectId);
+
+    const postSessions = await fixture.db
+      .select()
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, fixture.adult.id),
+          eq(learningSessions.topicId, clone.topicId),
+        ),
+      );
+    expect(postSessions).toHaveLength(1);
+    expect(postSessions[0]?.id).toBe(relearn.sessionId);
+    expect(postSessions[0]?.status).toBe('active');
+    expect(postSessions[0]?.sessionType).toBe('learning');
+    expect(postSessions[0]?.subjectId).toBe(clone.subjectId);
   });
 });
