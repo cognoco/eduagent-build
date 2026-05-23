@@ -379,25 +379,18 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
     };
   }
 
-  // 1. Typed NetworkError — thrown by customFetch on fetch rejection
+  // [CR-2026-05-21-156] Typed NetworkError — thrown by customFetch AND by
+  // fetchOrThrowNetworkError (the standalone wrapper used by raw-fetch
+  // callsites outside customFetch: OCR upload, challenge round). The legacy
+  // TypeError string-match fallback was removed once those callsites were
+  // audited and migrated — Hermes/RN message-format drift could otherwise
+  // silently classify offline errors as 'unknown' instead of 'network'.
   if (isNetworkError(error)) {
     return {
       message: NETWORK_MESSAGE(),
       category: 'network',
       recovery: 'retry',
     };
-  }
-
-  // 1b. Legacy TypeError from native fetch (raw fetch calls outside customFetch)
-  if (error instanceof TypeError) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes('fetch') || msg.includes('network')) {
-      return {
-        message: NETWORK_MESSAGE(),
-        category: 'network',
-        recovery: 'retry',
-      };
-    }
   }
 
   // [I-13] UpstreamError — typed 5xx from api-client.ts. Classify before the

@@ -18,6 +18,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useCreateNote } from './use-notes';
 import { useProfile } from '../lib/profile';
 import { getApiUrl } from '../lib/api';
+import { fetchOrThrowNetworkError } from '../lib/api-errors';
 import { assertOk } from '../lib/assert-ok';
 
 async function postJson<T>(
@@ -32,7 +33,8 @@ async function postJson<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (profileId) headers['X-Profile-Id'] = profileId;
 
-  const res = await fetch(url, {
+  // [CR-2026-05-21-156] Wrap so fetch-layer rejections throw typed NetworkError.
+  const res = await fetchOrThrowNetworkError(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),

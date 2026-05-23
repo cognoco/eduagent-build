@@ -5,6 +5,7 @@ import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getApiUrl } from '../lib/api';
+import { fetchOrThrowNetworkError } from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
 import {
   countMeaningfulTokens,
@@ -248,7 +249,11 @@ async function recognizeTextServerSide(
   }
   let response: Response;
   try {
-    response = await fetch(`${getApiUrl()}/v1/ocr`, {
+    // [CR-2026-05-21-156] Wrap so network-layer rejections become typed
+    // NetworkError instead of raw TypeError. format-api-error.ts classifies
+    // typed errors directly; the legacy TypeError string-match branch was
+    // removed as part of this fix.
+    response = await fetchOrThrowNetworkError(`${getApiUrl()}/v1/ocr`, {
       method: 'POST',
       headers,
       body: formData,

@@ -58,22 +58,14 @@ const QUOTA_DETAILS = {
  */
 
 describe('classifyApiError', () => {
+  // [CR-2026-05-21-156] The legacy TypeError string-match branch was removed
+  // once raw fetch callsites were migrated to fetchOrThrowNetworkError. Two
+  // tests that asserted on TypeError classification were deleted in the same
+  // change — the behavior is intentionally gone. Network failures now arrive
+  // as typed NetworkError (see the 'classifies NetworkError as network /
+  // retry' test below). The bare 'timeout' Error branch is preserved.
+
   // --- Network errors ---
-
-  it('classifies TypeError fetch failure as network / retry', () => {
-    const err = new TypeError('Failed to fetch');
-    const result = classifyApiError(err);
-    expect(result.category).toBe('network');
-    expect(result.recovery).toBe('retry');
-    expect(result.message).toContain('offline');
-  });
-
-  it('classifies TypeError network failure as network / retry', () => {
-    const err = new TypeError('A network error occurred');
-    const result = classifyApiError(err);
-    expect(result.category).toBe('network');
-    expect(result.recovery).toBe('retry');
-  });
 
   it('classifies Error with "timeout" in message as network / retry', () => {
     const err = new Error('Request timeout after 30000ms');
@@ -582,21 +574,11 @@ describe('extractApiErrorCode', () => {
 });
 
 describe('formatApiError', () => {
+  // [CR-2026-05-21-156] The TypeError-as-network branch was removed (see note
+  // on classifyApiError above). Raw fetch callsites now wrap via
+  // fetchOrThrowNetworkError so network rejections arrive as typed NetworkError.
+
   // --- Network errors ---
-
-  it('returns network message for TypeError containing "fetch"', () => {
-    const err = new TypeError('Failed to fetch');
-    expect(formatApiError(err)).toBe(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
-    );
-  });
-
-  it('returns network message for TypeError containing "network"', () => {
-    const err = new TypeError('A network error occurred');
-    expect(formatApiError(err)).toBe(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
-    );
-  });
 
   it('returns network message for Error with "timeout" in message', () => {
     const err = new Error('Request timeout after 30000ms');
