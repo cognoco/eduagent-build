@@ -2,7 +2,7 @@
 // Session Summary — get, skip, and submit session summaries
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import {
   curriculumBooks,
   curriculumTopics,
@@ -161,55 +161,98 @@ export async function submitSummary(
   );
 
   const finalStatus = evaluation.isAccepted ? 'accepted' : 'submitted';
-  const existing = await findSessionSummaryRow(db, profileId, sessionId);
-  const now = new Date();
-  let finalRow: typeof sessionSummaries.$inferSelect;
 
-  if (existing) {
-    await db
-      .update(sessionSummaries)
-      .set({
-        topicId: existing.topicId ?? session.topicId ?? null,
+  // [CR-2026-05-19-M3] SITE 1: Wrap the existence-check + INSERT/UPDATE +
+  // applyReflectionMultiplier in a single transaction with a per-session
+  // advisory lock. Two concurrent submitSummary calls for the same session
+  // both pass the pre-tx findSessionSummaryRow check (both see "no summary"),
+  // both insert, and applyReflectionMultiplier runs twice → doubled XP.
+  // The advisory lock serialises concurrent calls; the second waits, then
+  // sees the already-submitted row and returns it idempotently.
+  // Known Drizzle pattern: PgTransaction → Database cast
+  // (see feedback_drizzle_transaction_cast.md).
+  const { finalRow, xpInfo } = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    // Per-session advisory lock — prevents concurrent submits from both
+    // passing the existence check and double-inserting / double-multiplying.
+    const lockKey = `session-summary:${profileId}:${sessionId}`;
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+    );
+
+    const now = new Date();
+    let row: typeof sessionSummaries.$inferSelect;
+
+    const existingInTx = await findSessionSummaryRow(
+      txDb,
+      profileId,
+      sessionId,
+    );
+
+    if (existingInTx) {
+      // Idempotent path: summary already exists (concurrent or prior submission).
+      // If it was already accepted/submitted, return as-is without re-running
+      // the multiplier or re-writing the row.
+      if (
+        existingInTx.status === 'accepted' ||
+        existingInTx.status === 'submitted'
+      ) {
+        const xpInfoIdempotent = await getSessionXpEntry(
+          txDb,
+          profileId,
+          sessionId,
+        );
+        return { finalRow: existingInTx, xpInfo: xpInfoIdempotent };
+      }
+
+      await tx
+        .update(sessionSummaries)
+        .set({
+          topicId: existingInTx.topicId ?? session.topicId ?? null,
+          content: input.content,
+          aiFeedback: evaluation.feedback,
+          status: finalStatus,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(sessionSummaries.id, existingInTx.id),
+            eq(sessionSummaries.profileId, profileId),
+          ),
+        );
+
+      row = {
+        ...existingInTx,
+        topicId: existingInTx.topicId ?? session.topicId ?? null,
         content: input.content,
         aiFeedback: evaluation.feedback,
         status: finalStatus,
         updatedAt: now,
-      })
-      .where(
-        and(
-          eq(sessionSummaries.id, existing.id),
-          eq(sessionSummaries.profileId, profileId),
-        ),
-      );
+      };
+    } else {
+      const [inserted] = await tx
+        .insert(sessionSummaries)
+        .values({
+          sessionId,
+          profileId,
+          topicId: session.topicId ?? null,
+          content: input.content,
+          aiFeedback: evaluation.feedback,
+          status: finalStatus,
+        })
+        .returning();
 
-    finalRow = {
-      ...existing,
-      topicId: existing.topicId ?? session.topicId ?? null,
-      content: input.content,
-      aiFeedback: evaluation.feedback,
-      status: finalStatus,
-      updatedAt: now,
-    };
-  } else {
-    const [inserted] = await db
-      .insert(sessionSummaries)
-      .values({
-        sessionId,
-        profileId,
-        topicId: session.topicId ?? null,
-        content: input.content,
-        aiFeedback: evaluation.feedback,
-        status: finalStatus,
-      })
-      .returning();
+      if (!inserted)
+        throw new Error('Insert session summary did not return a row');
+      row = inserted;
+    }
 
-    if (!inserted)
-      throw new Error('Insert session summary did not return a row');
-    finalRow = inserted;
-  }
+    await applyReflectionMultiplier(txDb, profileId, sessionId);
+    const xpInfoTx = await getSessionXpEntry(txDb, profileId, sessionId);
 
-  await applyReflectionMultiplier(db, profileId, sessionId);
-  const xpInfo = await getSessionXpEntry(db, profileId, sessionId);
+    return { finalRow: row, xpInfo: xpInfoTx };
+  });
 
   if (session.topicId) {
     try {
@@ -253,8 +296,10 @@ export async function submitSummary(
       id: finalRow.id,
       sessionId: finalRow.sessionId,
       content: finalRow.content ?? input.content,
-      aiFeedback: evaluation.feedback,
-      status: finalStatus,
+      aiFeedback: (finalRow.aiFeedback ?? evaluation.feedback) as string,
+      status: (finalRow.status === 'accepted' ? 'accepted' : 'submitted') as
+        | 'accepted'
+        | 'submitted',
       baseXp: xpInfo?.baseXp ?? null,
       reflectionBonusXp: xpInfo?.reflectionBonusXp ?? null,
     },

@@ -28,6 +28,7 @@ export {
 export {
   expireTrialSubscription,
   downgradeQuotaPool,
+  expireTrialAndDowngradeQuota,
   resetDailyQuotas,
   resetExpiredQuotaCycles,
   findExpiredTrials,

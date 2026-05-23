@@ -4,7 +4,7 @@
 // activateSubscriptionFromRevenuecat
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull, ne, or } from 'drizzle-orm';
 import {
   subscriptions,
   quotaPools,
@@ -179,13 +179,48 @@ export async function updateSubscriptionFromRevenuecatWebhook(
         : null;
     }
 
+    // [CR-2026-05-19-M3] SITE 4: SQL-level status guard in WHERE clause.
+    // If a status transition was validated above, include
+    // `AND status = existing.status` in the WHERE so the UPDATE is rejected
+    // (0 rows returned) if the row was concurrently mutated to a different
+    // status between our SELECT and this UPDATE — even within a transaction
+    // (e.g. a savepoint rollback + retry scenario). The JS throw above handles
+    // the semantics; this guard closes the storage-layer gap.
+    //
+    // Concurrent-delivery defense: under READ COMMITTED two transactions can
+    // both see lastRevenuecatEventId !== updates.eventId at SELECT time and
+    // both proceed to UPDATE the same row (last-writer-wins). Adding the
+    // event-ID predicate makes the second UPDATE re-evaluate against the
+    // post-commit row and return 0 rows, so we can detect the duplicate and
+    // return the existing snapshot instead of double-writing.
+    const whereParts = [eq(subscriptions.id, existing.id)];
+    if (updates.status !== undefined && updates.status !== existing.status) {
+      whereParts.push(eq(subscriptions.status, existing.status));
+    }
+    whereParts.push(
+      or(
+        isNull(subscriptions.lastRevenuecatEventId),
+        ne(subscriptions.lastRevenuecatEventId, updates.eventId),
+      )!,
+    );
+
     const [updated] = await tx
       .update(subscriptions)
       .set(setValues)
-      .where(eq(subscriptions.id, existing.id))
+      .where(and(...whereParts))
       .returning();
 
-    if (!updated) throw new Error('Subscription update did not return a row');
+    if (!updated) {
+      // 0 rows returned most likely means a concurrent delivery already
+      // stamped this eventId. Re-read and confirm before short-circuiting.
+      const recheck = await repo.subscriptions.findFirst();
+      if (recheck && recheck.lastRevenuecatEventId === updates.eventId) {
+        return mapSubscriptionRow(recheck);
+      }
+      throw new Error(
+        'Subscription update did not return a row — concurrent status mutation detected or row missing',
+      );
+    }
     return mapSubscriptionRow(updated);
   });
 }

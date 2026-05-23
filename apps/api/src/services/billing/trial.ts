@@ -9,6 +9,8 @@ import {
   type Database,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
+// NOTE: PgTransaction → Database cast pattern used below.
+// See feedback_drizzle_transaction_cast.md.
 import type { SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
 import { mapSubscriptionRow, type SubscriptionRow } from './types';
@@ -190,32 +192,90 @@ export async function findSubscriptionsByTrialDateRange(
  * Sets status to 'expired', tier to 'free', and quota pool to the extended
  * trial monthly equivalent (15 questions/day * 30 = 450/month).
  * Resets usedThisMonth so the user starts with a fresh allowance.
+ *
+ * [CR-2026-05-19-M3] SITE 2a: Both UPDATEs are in a single transaction.
+ * A process death between the two previously left the subscription with
+ * status='expired' + tier='free' but a quota pool still at plus limits
+ * (billing leak: user sees free tier but has plus-sized quota). Atomic
+ * commit-or-rollback closes that gap.
+ * Known Drizzle pattern: PgTransaction → Database cast
+ * (see feedback_drizzle_transaction_cast.md).
  */
 export async function transitionToExtendedTrial(
   db: Database,
   subscriptionId: string,
   extendedMonthlyQuota: number,
 ): Promise<void> {
-  await db
-    .update(subscriptions)
-    .set({
-      status: 'expired',
-      tier: 'free',
-      updatedAt: new Date(),
-    })
-    .where(eq(subscriptions.id, subscriptionId));
-
   const freeTierConfig = getTierConfig('free');
-  await db
-    .update(quotaPools)
-    .set({
-      monthlyLimit: extendedMonthlyQuota,
-      usedThisMonth: 0,
-      dailyLimit: freeTierConfig.dailyLimit,
-      usedToday: 0,
-      updatedAt: new Date(),
-    })
-    .where(eq(quotaPools.subscriptionId, subscriptionId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(subscriptions)
+      .set({
+        status: 'expired',
+        tier: 'free',
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, subscriptionId));
+
+    await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit: extendedMonthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: freeTierConfig.dailyLimit,
+        usedToday: 0,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.subscriptionId, subscriptionId));
+  });
+}
+
+/**
+ * Atomically expires a trial subscription AND downgrades its quota pool.
+ * Combines expireTrialSubscription + downgradeQuotaPool in a single
+ * transaction so no process death can leave subscription.status='expired'
+ * while the quota pool still carries plus-tier limits.
+ *
+ * [CR-2026-05-19-M3] SITE 2b: The pair expireTrialSubscription + downgradeQuotaPool
+ * was always meant to run together but had no tx wrap at the call site.
+ * This combined helper is the canonical atomic version; callers should prefer
+ * it over calling the two functions separately.
+ */
+export async function expireTrialAndDowngradeQuota(
+  db: Database,
+  subscriptionId: string,
+  monthlyLimit: number,
+  dailyLimit: number | null = null,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    // safe-caller: cron/system function — no user-facing output
+    await tx
+      .update(subscriptions)
+      .set({
+        status: 'expired',
+        tier: 'free',
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, subscriptionId));
+
+    // Idempotency: skip reset if already at target limit (mirrors downgradeQuotaPool).
+    const txDb = tx as unknown as Database;
+    const currentPool = await findQuotaPool__unscoped(txDb, subscriptionId);
+    if (currentPool && currentPool.monthlyLimit === monthlyLimit) {
+      return; // Already at target tier — preserve usage counters
+    }
+
+    await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit,
+        usedThisMonth: 0,
+        dailyLimit,
+        usedToday: 0,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.subscriptionId, subscriptionId));
+  });
 }
 
 /**

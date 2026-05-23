@@ -1178,6 +1178,12 @@ describe('transitionToExtendedTrial', () => {
           where: jest.fn().mockResolvedValue([]),
         }),
       }),
+      // transitionToExtendedTrial now wraps both UPDATEs in db.transaction();
+      // pass the same db through so the update mock is exercised and
+      // updateSetMock.mock.calls still captures both SET calls.
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db)),
     } as unknown as Database;
 
     await transitionToExtendedTrial(db, subscriptionId, 450);
