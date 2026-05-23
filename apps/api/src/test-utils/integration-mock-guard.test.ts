@@ -11,12 +11,15 @@ import { relative, resolve } from 'node:path';
 // (`inngest/client` + `test-utils/inngest-transport-capture`).
 //
 // Other external boundaries — Clerk JWKS, LLM providers, email providers,
-// push providers — are stubbed at the HTTP boundary (intercepting
+// push notification services — are stubbed at the HTTP boundary (intercepting
 // `globalThis.fetch`) or via bare-specifier package mocks, NOT by `jest.mock`
 // on an internal `services/*` module. This guard therefore correctly flags
 // internal service mocks such as `services/llm` as a violation even though the
 // underlying provider call is "external" — the right escape hatch is to
 // stub at the bare-specifier / fetch boundary, not in this allowlist.
+//
+// Observability sinks (Sentry, logger) are allowed because they are external
+// monitoring boundaries whose absence cannot break the real execution path.
 //
 // Internal mocks hide real prompt drift, envelope contract drift, ownership,
 // event-chain, and shape-of-response bugs.
@@ -38,6 +41,7 @@ const KNOWN_OFFENDERS = new Set<string>();
 // promise the docstring makes is actually honored.
 const ALLOWED_INTERNAL_BOUNDARY_MOCKS = [
   /(?:^|\/)services\/sentry$/,
+  /(?:^|\/)services\/logger$/,
   /(?:^|\/)services\/stripe$/,
   // Inngest transport capture — sanctioned sink for event dispatch in
   // integration tests that need to assert which downstream events fired.
@@ -180,6 +184,9 @@ describe('integration tests — internal mock guard', () => {
     ).toEqual([]);
     expect(
       sourceInternalMockSpecifiers(mockCallSnippet('../../services/sentry')),
+    ).toEqual([]);
+    expect(
+      sourceInternalMockSpecifiers(mockCallSnippet('../../services/logger')),
     ).toEqual([]);
     expect(
       sourceInternalMockSpecifiers(mockCallSnippet('@eduagent/database')),
