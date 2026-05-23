@@ -274,7 +274,7 @@ export const topicConnections = pgTable(
 //                                      CHECK (...) — requires fn or trigger.
 //   4. ALTER TABLE topic_connections ENABLE ROW LEVEL SECURITY;
 //   5. CREATE POLICY topic_connections_profile_isolation ON topic_connections
-//        USING (profile_id = NULLIF(current_setting('app.profile_id', true), '')::uuid);
+//        USING (profile_id = NULLIF(current_setting('app.current_profile_id', true), '')::uuid);
 
 export const curriculumAdaptations = pgTable(
   'curriculum_adaptations',
