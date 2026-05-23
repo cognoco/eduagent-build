@@ -26,6 +26,7 @@ export function useModeSwitch(): {
   const isSwitchingRef = useRef(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
   const modeRef = useRef(mode);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function useModeSwitch(): {
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (pendingTimerRef.current !== null) {
         clearTimeout(pendingTimerRef.current);
         pendingTimerRef.current = null;
@@ -54,30 +56,45 @@ export function useModeSwitch(): {
       isSwitchingRef.current = true;
       setIsSwitching(true);
       const previousMode = currentMode;
-      setMode(nextMode);
-      void queryClient.invalidateQueries({
-        predicate: (query) =>
-          MODE_SCOPED_KEYS.includes(
-            String(query.queryKey[0]) as (typeof MODE_SCOPED_KEYS)[number],
-          ),
-      });
-      if (activeProfile && previousMode) {
-        track('mode_switched', {
-          from: previousMode,
-          to: nextMode,
-          profileIdHash: hashProfileId(activeProfile.id),
-          accountAgeBucket: bucketAccountAge(activeProfile.createdAt),
-        });
-      }
-      pendingTimerRef.current = setTimeout(() => {
-        pendingTimerRef.current = null;
-        try {
-          router.replace('/(app)/home');
-        } finally {
-          isSwitchingRef.current = false;
+
+      const releaseSwitchLock = (): void => {
+        isSwitchingRef.current = false;
+        if (mountedRef.current) {
           setIsSwitching(false);
         }
-      }, 0);
+      };
+
+      setMode(nextMode, {
+        onError: releaseSwitchLock,
+        onSuccess: () => {
+          if (!mountedRef.current) {
+            releaseSwitchLock();
+            return;
+          }
+          void queryClient.invalidateQueries({
+            predicate: (query) =>
+              MODE_SCOPED_KEYS.includes(
+                String(query.queryKey[0]) as (typeof MODE_SCOPED_KEYS)[number],
+              ),
+          });
+          if (activeProfile && previousMode) {
+            track('mode_switched', {
+              from: previousMode,
+              to: nextMode,
+              profileIdHash: hashProfileId(activeProfile.id),
+              accountAgeBucket: bucketAccountAge(activeProfile.createdAt),
+            });
+          }
+          pendingTimerRef.current = setTimeout(() => {
+            pendingTimerRef.current = null;
+            try {
+              router.replace('/(app)/home');
+            } finally {
+              releaseSwitchLock();
+            }
+          }, 0);
+        },
+      });
     },
     [activeProfile, queryClient, router, setMode],
   );

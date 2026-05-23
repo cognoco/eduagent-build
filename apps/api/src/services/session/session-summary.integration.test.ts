@@ -7,15 +7,12 @@
  * doubled XP. Post-fix: advisory lock + transaction gate serialises concurrent
  * calls; the second sees the already-submitted row and returns it idempotently.
  *
- * No mocks of internal services or database — real DB only.
- * External boundaries: LLM (evaluateSummary) is NOT called in these tests
- * because submitSummary is called after the evaluation is done externally;
- * we exercise the DB-side race directly via the service function.
+ * No mocks of internal services or database — real DB only. The external LLM
+ * boundary uses the provider registry fixture so routeAndCall remains real.
  *
- * NOTE: evaluateSummary is an external LLM call. In integration tests we
- * cannot stub it without internal mocks. We instead test the idempotency
- * invariant by exercising the INSERT+lock path directly through a real DB
- * and relying on the unique-lock behaviour for the second concurrent call.
+ * The test verifies the idempotency invariant by exercising the INSERT+lock
+ * path directly through a real DB and relying on the unique-lock behaviour for
+ * the second concurrent call.
  * The test verifies that after two concurrent calls, XP is awarded at most
  * once (reflectionMultiplierApplied is true on exactly 1 xp_ledger row).
  */
@@ -24,6 +21,7 @@ import { eq, inArray, like } from 'drizzle-orm';
 import {
   accounts,
   createDatabase,
+  curricula,
   curriculumBooks,
   curriculumTopics,
   learningSessions,
@@ -36,6 +34,12 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { generateUUIDv7 } from '@eduagent/database';
+import {
+  llmStructuredJson,
+  registerLlmProviderFixture,
+} from '../../test-utils/llm-provider-fixtures';
+import { _resetCircuits } from '../llm';
+import { submitSummary } from './session-summary';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -94,14 +98,26 @@ async function seedFullSessionWithXpEntry(): Promise<{
     .values({ profileId: profile!.id, name: 'Mathematics' })
     .returning();
 
+  const [curriculum] = await db
+    .insert(curricula)
+    .values({ subjectId: subject!.id, version: 1 })
+    .returning();
+
   const [book] = await db
     .insert(curriculumBooks)
-    .values({ subjectId: subject!.id, title: 'Algebra I' })
+    .values({ subjectId: subject!.id, title: 'Algebra I', sortOrder: 0 })
     .returning();
 
   const [topic] = await db
     .insert(curriculumTopics)
-    .values({ bookId: book!.id, title: 'Linear Equations' })
+    .values({
+      curriculumId: curriculum!.id,
+      bookId: book!.id,
+      title: 'Linear Equations',
+      description: 'Solve equations with one variable.',
+      sortOrder: 0,
+      estimatedMinutes: 20,
+    })
     .returning();
 
   const [session] = await db
@@ -150,11 +166,38 @@ async function cleanupByPrefix() {
 describeIfDb(
   'submitSummary concurrent idempotency [CR-2026-05-19-M3 SITE 1]',
   () => {
+    let llmFixture: ReturnType<typeof registerLlmProviderFixture> | undefined;
+
+    beforeAll(() => {
+      _resetCircuits();
+      llmFixture = registerLlmProviderFixture({
+        chatResponse: llmStructuredJson({
+          feedback: 'Good work',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      });
+    });
+
     beforeEach(async () => {
+      _resetCircuits();
+      llmFixture?.clearCalls();
+      llmFixture?.clearChatError();
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'Good work',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
       await cleanupByPrefix();
     });
 
     afterAll(async () => {
+      llmFixture?.dispose();
+      _resetCircuits();
       await cleanupByPrefix();
     });
 
@@ -166,58 +209,22 @@ describeIfDb(
     it('[BREAK CR-2026-05-19-M3] two concurrent submitSummary calls produce exactly one summary row', async () => {
       const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
 
-      // Directly insert the summary row twice in parallel to simulate the race.
-      // We test the atomic INSERT path (not the full LLM path) because evaluateSummary
-      // is a real external LLM call. The transaction+advisory-lock fix applies to
-      // both paths identically.
-      const now = new Date();
-      const insertOne = db
-        .insert(sessionSummaries)
-        .values({
-          sessionId,
-          profileId,
+      const [first, second] = await Promise.all([
+        submitSummary(createIntegrationDb(), profileId, sessionId, {
           content: 'My summary',
-          aiFeedback: 'Good work',
-          status: 'submitted',
-        })
-        .onConflictDoNothing()
-        .returning();
-
-      // Second insert identical shape — without the advisory lock + tx, both
-      // would have succeeded when there was no unique constraint.
-      const insertTwo = db
-        .insert(sessionSummaries)
-        .values({
-          sessionId,
-          profileId,
+        }),
+        submitSummary(createIntegrationDb(), profileId, sessionId, {
           content: 'My summary',
-          aiFeedback: 'Good work',
-          status: 'submitted',
-        })
-        .onConflictDoNothing()
-        .returning();
+        }),
+      ]);
 
-      const [r1, r2] = await Promise.all([insertOne, insertTwo]);
-      void now;
-
-      // Exactly one write should have succeeded (the other hits onConflictDoNothing
-      // or the advisory lock). Combined they must give us ≤ 1 inserted row.
-      const totalInserted = (r1?.length ?? 0) + (r2?.length ?? 0);
-      // Both attempted inserts must not produce > 1 row for this session.
-      // This validates the constraint-level protection that the advisory lock enforces.
-      expect(totalInserted).toBeLessThanOrEqual(2); // both can succeed without unique constraint
-
-      // The real fix is at the advisory-lock level inside the transaction. Verify
-      // by checking that only ONE summary row exists for this session after both calls.
       const allSummaries = await db.query.sessionSummaries.findMany({
         where: eq(sessionSummaries.sessionId, sessionId),
       });
 
-      // NOTE: sessionSummaries has no unique constraint on (sessionId, profileId).
-      // The advisory lock in the transaction is the dedup mechanism. Since we're
-      // testing via direct inserts here (not via submitSummary), both can succeed.
-      // The integration test that matters is the applyReflectionMultiplier dedup:
-      expect(allSummaries.length).toBeGreaterThanOrEqual(1);
+      expect(allSummaries).toHaveLength(1);
+      expect(first.summary.id).toBe(allSummaries[0]!.id);
+      expect(second.summary.id).toBe(allSummaries[0]!.id);
     });
 
     it('[BREAK CR-2026-05-19-M3] applyReflectionMultiplier applied exactly once even with concurrent summary writes', async () => {

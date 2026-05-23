@@ -69,6 +69,12 @@ const CASCADE_EXCEPTIONS: Record<string, string> = {
   // language_profiles.milestoneId is a nullable advisory pointer.
   'language_profiles.milestoneId':
     'Nullable milestone pointer; set null on delete is intentional.',
+
+  // curriculum_topics.sourceChildProfileId is provenance for parent-bridge
+  // clones, not the owning profile. Deleting the source child profile should
+  // clear provenance without deleting the learner's cloned topic.
+  'curriculum_topics.sourceChildProfileId':
+    'Nullable parent-bridge provenance pointer; set null on delete is intentional.',
 };
 
 // ---------------------------------------------------------------------------

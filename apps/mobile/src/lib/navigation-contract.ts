@@ -22,7 +22,10 @@ export type RouteKey =
   | 'own-learning'
   | 'library'
   | 'recaps'
+  | 'recaps/[recapId]'
   | 'progress'
+  | 'progress/saved'
+  | 'progress/vocabulary'
   | 'session'
   | 'homework'
   | 'dictation'
@@ -36,7 +39,9 @@ export type RouteKey =
   | 'child/[profileId]/curriculum'
   | 'child/[profileId]/session/[sessionId]'
   | 'create-profile'
-  | 'subscription';
+  | 'subscription'
+  | 'more/account'
+  | 'more/privacy';
 
 export interface RouteParams {
   for?: 'child' | 'self';
@@ -193,12 +198,9 @@ function isAdultOwner(profile: NavigationProfile | null): boolean {
   );
 }
 
-function isFamilyCapable(
-  activeProfile: NavigationProfile | null,
-  linkedChildIds: ReadonlyArray<string>,
-): boolean {
+function isFamilyCapable(activeProfile: NavigationProfile | null): boolean {
   if (!activeProfile || !isAdultOwner(activeProfile)) return false;
-  return activeProfile.hasFamilyLinks === true || linkedChildIds.length > 0;
+  return activeProfile.hasFamilyLinks === true;
 }
 
 function isLegacyGuardian(
@@ -226,7 +228,7 @@ export function resolveNavigationContract(
     context.activeProfile,
     context.profiles,
   );
-  const familyCapable = isFamilyCapable(context.activeProfile, linkedChildIds);
+  const familyCapable = isFamilyCapable(context.activeProfile);
   const ownerRole = isOwnerRole(context.role);
   const subscriptionReady = context.subscription.status === 'ready';
 
@@ -336,14 +338,21 @@ export function resolveNavigationContract(
       case 'home':
       case 'progress':
         return true;
+      case 'progress/saved':
+      case 'progress/vocabulary':
+        return !familyShape;
       case 'own-learning':
         return visibleTabs.has('own-learning');
       case 'library':
         return !familyShape;
       case 'recaps':
+      case 'recaps/[recapId]':
         return familyShape;
       case 'create-profile':
         return params?.for === 'child' ? gates.showAddChild : ownerRole;
+      case 'more/account':
+      case 'more/privacy':
+        return true;
       case 'subscription':
         return gates.showBilling;
     }
@@ -366,12 +375,20 @@ export function resolveNavigationContract(
       case 'home':
       case 'progress':
         return true;
+      case 'progress/saved':
+      case 'progress/vocabulary':
+        return !familyShape;
       case 'own-learning':
       case 'library':
       case 'recaps':
         return visibleTabs.has(route);
+      case 'recaps/[recapId]':
+        return familyShape;
       case 'create-profile':
         return params?.for === 'child' ? gates.showAddChild : ownerRole;
+      case 'more/account':
+      case 'more/privacy':
+        return true;
       case 'subscription':
         return gates.showBilling;
     }

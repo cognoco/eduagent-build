@@ -1,5 +1,9 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { recapsResponseSchema, type RecapListItem } from '@eduagent/schemas';
+import {
+  recapDetailResponseSchema,
+  recapsResponseSchema,
+  type RecapListItem,
+} from '@eduagent/schemas';
 
 import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
@@ -40,6 +44,43 @@ export function useRecaps(
     },
     enabled:
       !!activeProfile &&
+      navigationContract.effectiveAppContext === 'family' &&
+      navigationContract.isFamilyCapable,
+    staleTime: 60_000,
+  });
+}
+
+export function useRecap(
+  recapId: string | undefined,
+): UseQueryResult<RecapListItem | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+  const navigationContract = useNavigationContract();
+
+  return useQuery({
+    queryKey: queryKeys.recaps.detail(
+      navigationContract.effectiveAppContext,
+      activeProfile?.id,
+      recapId,
+    ),
+    queryFn: async ({ signal: querySignal }) => {
+      if (!recapId) throw new Error('recapId is required');
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.recaps[':recapId'].$get(
+          { param: { recapId } },
+          { init: { signal } },
+        );
+        if (res.status === 404) return null;
+        await assertOk(res);
+        return recapDetailResponseSchema.parse(await res.json()).recap;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile &&
+      !!recapId &&
       navigationContract.effectiveAppContext === 'family' &&
       navigationContract.isFamilyCapable,
     staleTime: 60_000,

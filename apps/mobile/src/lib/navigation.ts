@@ -10,6 +10,14 @@ export const OWN_LEARNING_RETURN_TO = 'own-learning';
 export const OWN_LEARNING_HREF = '/(app)/own-learning';
 export const PRACTICE_RETURN_TO = 'practice';
 export const PRACTICE_HREF = '/(app)/practice';
+export const FAMILY_RECAPS_RETURN_TO = 'family-recaps';
+export const FAMILY_RECAPS_HREF = '/(app)/recaps';
+export const FAMILY_PROGRESS_RETURN_TO = 'family-progress';
+export const FAMILY_PROGRESS_HREF = '/(app)/progress';
+export const STUDY_PROGRESS_RETURN_TO = 'study-progress';
+export const STUDY_PROGRESS_HREF = '/(app)/progress';
+export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
+export const FAMILY_CHILDREN_HREF = '/(app)/home';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -17,11 +25,29 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 
 export function homeHrefForReturnTo(
   returnTo: string | string[] | undefined,
+  returnId?: string | string[] | undefined,
 ): Href {
   const token = firstParam(returnTo);
+  const id = firstParam(returnId);
   if (token === OWN_LEARNING_RETURN_TO) return OWN_LEARNING_HREF as Href;
   if (token === LEARNER_HOME_RETURN_TO) return LEARNER_HOME_HREF as Href;
   if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
+  if (token === FAMILY_RECAPS_RETURN_TO && id) {
+    return {
+      pathname: '/(app)/recaps/[recapId]',
+      params: { recapId: id },
+    } as Href;
+  }
+  if (token === FAMILY_RECAPS_RETURN_TO) return FAMILY_RECAPS_HREF as Href;
+  if (token === FAMILY_CHILDREN_RETURN_TO && id) {
+    return {
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: id },
+    } as Href;
+  }
+  if (token === FAMILY_PROGRESS_RETURN_TO) return FAMILY_PROGRESS_HREF as Href;
+  if (token === STUDY_PROGRESS_RETURN_TO) return STUDY_PROGRESS_HREF as Href;
+  if (token === FAMILY_CHILDREN_RETURN_TO) return FAMILY_CHILDREN_HREF as Href;
   return '/(app)/home' as Href;
 }
 

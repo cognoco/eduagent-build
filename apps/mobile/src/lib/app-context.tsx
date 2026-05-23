@@ -17,15 +17,22 @@ import { useUpdateProfileAppContext } from '../hooks/use-profiles';
 
 export type AppMode = 'study' | 'family';
 
+export interface AppModeSwitchCallbacks {
+  onError?: () => void;
+  onSuccess?: () => void;
+}
+
 export interface AppContextValue {
   mode: AppMode | null;
-  setMode: (mode: AppMode) => void;
+  setMode: (mode: AppMode, callbacks?: AppModeSwitchCallbacks) => void;
   familyCapable: boolean;
 }
 
 const AppContext = createContext<AppContextValue>({
   mode: 'study',
-  setMode: () => undefined,
+  setMode: (_mode, callbacks) => {
+    callbacks?.onError?.();
+  },
   familyCapable: false,
 });
 
@@ -90,10 +97,16 @@ export function AppContextProvider({
   }, [derivedMode, familyCapable, modeOverride]);
 
   const setMode = useCallback(
-    (nextMode: AppMode): void => {
+    (nextMode: AppMode, callbacks?: AppModeSwitchCallbacks): void => {
       if (FEATURE_FLAGS.MODE_NAV_V1_ENABLED) {
-        if (!activeProfile) return;
-        if (nextMode === 'family' && !familyCapable) return;
+        if (!activeProfile) {
+          callbacks?.onError?.();
+          return;
+        }
+        if (nextMode === 'family' && !familyCapable) {
+          callbacks?.onError?.();
+          return;
+        }
 
         const requestId = modeRequestSeq.current + 1;
         modeRequestSeq.current = requestId;
@@ -106,7 +119,11 @@ export function AppContextProvider({
           },
           {
             onSuccess: (profile) => {
-              if (modeRequestSeq.current !== requestId) return;
+              if (modeRequestSeq.current !== requestId) {
+                callbacks?.onError?.();
+                void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+                return;
+              }
               queryClient.setQueriesData<Profile[]>(
                 { queryKey: ['profiles'] },
                 (existing) =>
@@ -115,20 +132,33 @@ export function AppContextProvider({
                   ),
               );
               setModeOverride(null);
+              callbacks?.onSuccess?.();
             },
             onError: () => {
-              if (modeRequestSeq.current !== requestId) return;
+              if (modeRequestSeq.current !== requestId) {
+                callbacks?.onError?.();
+                void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+                return;
+              }
               setModeOverride(previousMode);
               void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+              callbacks?.onError?.();
             },
           },
         );
         return;
       }
 
-      if (!FEATURE_FLAGS.MODE_NAV_V0_ENABLED) return;
-      if (nextMode === 'family' && !familyCapable) return;
+      if (!FEATURE_FLAGS.MODE_NAV_V0_ENABLED) {
+        callbacks?.onError?.();
+        return;
+      }
+      if (nextMode === 'family' && !familyCapable) {
+        callbacks?.onError?.();
+        return;
+      }
       setModeOverride(nextMode);
+      callbacks?.onSuccess?.();
     },
     [
       activeProfile,

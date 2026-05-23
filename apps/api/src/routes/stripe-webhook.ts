@@ -470,6 +470,11 @@ async function handlePaymentSucceeded(
     stripeSubscriptionId,
     {
       status: 'active',
+      // [CR-052] Clear cancelledAt on payment success so a user who cancelled
+      // and then paid (or resumed after past_due) does NOT stay in the
+      // "Cancelling" UI state. The comment in handleSubscriptionEvent documents
+      // this intent; this is where it is fulfilled for the invoice path.
+      cancelledAt: null,
       lastStripeEventTimestamp: eventTimestamp,
       // [CR-2026-05-19-M11] Thread Stripe event ID for atomic dedup inside transaction.
       stripeEventId,

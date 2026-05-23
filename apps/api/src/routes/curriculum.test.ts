@@ -75,6 +75,8 @@ const mockChallengeCurriculum = jest.fn();
 const mockExplainTopicOrdering = jest.fn();
 const mockAddCurriculumTopic = jest.fn();
 const mockAdaptCurriculumFromPerformance = jest.fn();
+const mockCloneTopicFromChild = jest.fn();
+const mockUndoCloneFromChild = jest.fn();
 
 jest.mock(
   '../services/curriculum' /* gc1-allow: pattern-a conversion */,
@@ -95,6 +97,22 @@ jest.mock(
         mockAddCurriculumTopic(...args),
       adaptCurriculumFromPerformance: (...args: unknown[]) =>
         mockAdaptCurriculumFromPerformance(...args),
+    };
+  },
+);
+
+jest.mock(
+  '../services/family-bridge' /* gc1-allow: route unit test — bridge service has DB transaction logic covered separately */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/family-bridge',
+    ) as typeof import('../services/family-bridge');
+    return {
+      ...actual,
+      cloneTopicFromChild: (...args: unknown[]) =>
+        mockCloneTopicFromChild(...args),
+      undoCloneFromChild: (...args: unknown[]) =>
+        mockUndoCloneFromChild(...args),
     };
   },
 );
@@ -134,6 +152,8 @@ const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const TOPIC_ID = '550e8400-e29b-41d4-a716-446655440001';
+const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440002';
+const REQUEST_ID = '550e8400-e29b-41d4-a716-446655440003';
 
 // getCurriculum returns a Curriculum object (not an array of topics)
 const MOCK_CURRICULUM_OBJECT = {
@@ -173,6 +193,104 @@ describe('curriculum routes', () => {
   beforeEach(() => {
     clearJWKSCache();
     jest.clearAllMocks();
+  });
+
+  // ---- POST /v1/curriculum/clone-from-child --------------------------------
+
+  describe('POST /v1/curriculum/clone-from-child', () => {
+    it('clones a child topic into the active adult profile', async () => {
+      mockCloneTopicFromChild.mockResolvedValueOnce({
+        topicId: TOPIC_ID,
+        subjectId: SUBJECT_ID,
+        alreadyExisted: false,
+        descriptionDivergent: false,
+        descriptionRefreshed: false,
+        topicState: 'unstarted',
+        createdIds: { topicId: TOPIC_ID, subjectId: SUBJECT_ID },
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockCloneTopicFromChild).toHaveBeenCalledTimes(1);
+      const [, profileIdArg, inputArg] = mockCloneTopicFromChild.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(inputArg).toMatchObject({
+        childProfileId: CHILD_PROFILE_ID,
+        topicId: TOPIC_ID,
+        requestId: REQUEST_ID,
+      });
+    });
+
+    it('returns 404 for missing or inaccessible source topics', async () => {
+      mockCloneTopicFromChild.mockRejectedValueOnce(new NotFoundError('Topic'));
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            topicId: TOPIC_ID,
+            requestId: REQUEST_ID,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  // ---- DELETE /v1/curriculum/clone-from-child/undo -------------------------
+
+  describe('DELETE /v1/curriculum/clone-from-child/undo', () => {
+    it('undoes only the created bridge topic', async () => {
+      mockUndoCloneFromChild.mockResolvedValueOnce({
+        deleted: { topic: true },
+      });
+
+      const res = await app.request(
+        '/v1/curriculum/clone-from-child/undo',
+        {
+          method: 'DELETE',
+          headers: {
+            ...AUTH_HEADERS,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            createdIds: { topicId: TOPIC_ID },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const [, profileIdArg, createdIdsArg] =
+        mockUndoCloneFromChild.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(createdIdsArg).toEqual({ topicId: TOPIC_ID });
+      expect(await res.json()).toEqual({ deleted: { topic: true } });
+    });
   });
 
   // ---- GET /v1/subjects/:subjectId/curriculum ------------------------------

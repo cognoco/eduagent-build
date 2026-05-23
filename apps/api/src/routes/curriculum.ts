@@ -8,7 +8,11 @@ import {
   curriculumAdaptRequestSchema,
   curriculumTopicAddResponseSchema,
   curriculumAdaptResponseSchema,
+  cloneFromChildRequestSchema,
+  cloneFromChildResponseSchema,
   getCurriculumResponseSchema,
+  undoCloneFromChildRequestSchema,
+  undoCloneFromChildResponseSchema,
   topicSkipResponseSchema,
   topicUnskipResponseSchema,
   challengeCurriculumResponseSchema,
@@ -18,6 +22,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import type { ProfileMeta } from '../middleware/profile-scope';
 import {
   getCurriculum,
   skipTopic,
@@ -27,9 +32,15 @@ import {
   addCurriculumTopic,
   adaptCurriculumFromPerformance,
 } from '../services/curriculum';
+import { assertOwnerProfile } from '../services/family-access';
+import {
+  cloneTopicFromChild,
+  undoCloneFromChild,
+} from '../services/family-bridge';
 import {
   notFound,
   apiError,
+  ForbiddenError,
   NotFoundError,
   TopicNotSkippedError,
 } from '../errors';
@@ -40,10 +51,46 @@ type CurriculumRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
 export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
+  .post(
+    '/curriculum/clone-from-child',
+    zValidator('json', cloneFromChildRequestSchema),
+    async (c) => {
+      assertOwnerProfile(c);
+
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const input = c.req.valid('json');
+
+      try {
+        const result = await cloneTopicFromChild(db, profileId, input);
+        return c.json(cloneFromChildResponseSchema.parse(result));
+      } catch (error) {
+        if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+          return notFound(c, 'Topic not found');
+        }
+        throw error;
+      }
+    },
+  )
+  .delete(
+    '/curriculum/clone-from-child/undo',
+    zValidator('json', undoCloneFromChildRequestSchema),
+    async (c) => {
+      assertOwnerProfile(c);
+
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { createdIds } = c.req.valid('json');
+
+      const result = await undoCloneFromChild(db, profileId, createdIds);
+      return c.json(undoCloneFromChildResponseSchema.parse(result));
+    },
+  )
   // Get curriculum for a subject
   .get('/subjects/:subjectId/curriculum', async (c) => {
     const db = c.get('db');
@@ -64,7 +111,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       try {
         await skipTopic(db, profileId, subjectId, topicId);
         return c.json(
-          topicSkipResponseSchema.parse({ message: 'Topic skipped', topicId })
+          topicSkipResponseSchema.parse({ message: 'Topic skipped', topicId }),
         );
       } catch (error) {
         if (error instanceof NotFoundError) {
@@ -72,7 +119,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // Unskip (restore) a topic
   .post(
@@ -89,7 +136,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           topicUnskipResponseSchema.parse({
             message: 'Topic restored',
             topicId,
-          })
+          }),
         );
       } catch (error) {
         if (error instanceof NotFoundError) {
@@ -101,7 +148,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // Challenge/regenerate curriculum
   .post(
@@ -117,7 +164,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           db,
           profileId,
           subjectId,
-          input
+          input,
         );
         return c.json(curriculumTopicAddResponseSchema.parse(result));
       } catch (error) {
@@ -126,7 +173,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   .post(
     '/subjects/:subjectId/curriculum/challenge',
@@ -141,7 +188,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           db,
           profileId,
           subjectId,
-          feedback
+          feedback,
         );
         return c.json(challengeCurriculumResponseSchema.parse({ curriculum }));
       } catch (error) {
@@ -150,7 +197,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // Performance-driven curriculum adaptation (FR21)
   .post(
@@ -167,7 +214,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           db,
           profileId,
           subjectId,
-          input
+          input,
         );
         return c.json(curriculumAdaptResponseSchema.parse(result));
       } catch (error) {
@@ -176,7 +223,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // Explain topic ordering
   .get('/subjects/:subjectId/curriculum/topics/:topicId/explain', async (c) => {
@@ -189,7 +236,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         db,
         profileId,
         subjectId,
-        topicId
+        topicId,
       );
       return c.json(explainTopicResponseSchema.parse({ explanation }));
     } catch (error) {

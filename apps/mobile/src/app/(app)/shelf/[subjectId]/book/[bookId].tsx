@@ -1751,6 +1751,8 @@ export default function BookScreen() {
                     }
                     title={topic.title}
                     relevance={topic.relevance}
+                    sourceChildProfileId={topic.sourceChildProfileId}
+                    createdAt={topic.createdAt}
                     sessionCount={
                       state === 'continue-now' || state === 'started'
                         ? count

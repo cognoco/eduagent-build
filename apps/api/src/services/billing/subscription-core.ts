@@ -669,28 +669,39 @@ export async function activateSubscriptionFromCheckout(
         // Stripe is the source of truth and the incoming event is newer —
         // override existing row with the new subscription. Quota pool limit
         // is also updated so the user's tier reflects the latest activation.
+        // [CR-2026-05-19-M3 / atomicity] Wrap both writes in a transaction so
+        // a process death cannot leave subscriptions.tier updated while quota
+        // pool still carries the old limit.
         const tierConfig = getTierConfig(tier);
-        const [updatedDivergent] = await db
-          .update(subscriptions)
-          .set({
-            stripeSubscriptionId,
-            tier,
-            status: 'active',
-            lastStripeEventTimestamp: new Date(eventTimestamp),
-            updatedAt: new Date(),
-          })
-          .where(eq(subscriptions.id, existing.id))
-          .returning();
-        await updateQuotaPoolLimit(
-          db,
-          existing.id,
-          tierConfig.monthlyQuota,
-          tierConfig.dailyLimit,
-        );
-        if (!updatedDivergent)
-          throw new Error(
-            'Divergent-sub activation update did not return a row',
-          );
+        const updatedDivergent = await db.transaction(async (tx) => {
+          const [row] = await tx
+            .update(subscriptions)
+            .set({
+              stripeSubscriptionId,
+              tier,
+              status: 'active',
+              lastStripeEventTimestamp: new Date(eventTimestamp),
+              updatedAt: new Date(),
+            })
+            .where(eq(subscriptions.id, existing.id))
+            .returning();
+
+          if (!row)
+            throw new Error(
+              'Divergent-sub activation update did not return a row',
+            );
+
+          await tx
+            .update(quotaPools)
+            .set({
+              monthlyLimit: tierConfig.monthlyQuota,
+              dailyLimit: tierConfig.dailyLimit,
+              updatedAt: new Date(),
+            })
+            .where(eq(quotaPools.subscriptionId, existing.id));
+
+          return row;
+        });
         await safeSend(
           () =>
             inngest.send({
@@ -739,28 +750,39 @@ export async function activateSubscriptionFromCheckout(
   }
 
   // Bridge: set stripeSubscriptionId, tier, status, timestamp
+  // [CR-2026-05-19-M3 / atomicity] Both the subscription update and the quota
+  // pool update must be atomic — a process death between the two would leave
+  // subscriptions.tier at the new value while the quota pool still carries the
+  // old limit (billing leak). Wrap in a transaction so both commit or neither does.
   const tierConfig = getTierConfig(tier);
-  const [updated] = await db
-    .update(subscriptions)
-    .set({
-      stripeSubscriptionId,
-      tier,
-      status: 'active',
-      lastStripeEventTimestamp: new Date(eventTimestamp),
-      updatedAt: new Date(),
-    })
-    .where(eq(subscriptions.id, existing.id))
-    .returning();
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(subscriptions)
+      .set({
+        stripeSubscriptionId,
+        tier,
+        status: 'active',
+        lastStripeEventTimestamp: new Date(eventTimestamp),
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, existing.id))
+      .returning();
 
-  // Update quota pool limit to match the new tier
-  await updateQuotaPoolLimit(
-    db,
-    existing.id,
-    tierConfig.monthlyQuota,
-    tierConfig.dailyLimit,
-  );
+    if (!row)
+      throw new Error('Subscription activation update did not return a row');
 
-  if (!updated)
-    throw new Error('Subscription activation update did not return a row');
+    // Update quota pool limit to match the new tier (inside same tx)
+    await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit: tierConfig.monthlyQuota,
+        dailyLimit: tierConfig.dailyLimit,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.subscriptionId, existing.id));
+
+    return row;
+  });
+
   return mapSubscriptionRow(updated);
 }

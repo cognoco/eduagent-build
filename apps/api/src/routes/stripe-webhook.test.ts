@@ -948,6 +948,44 @@ describe('invoice.payment_succeeded', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
+  // [CR-052 break test] payment_succeeded must clear cancelledAt so that a user
+  // who cancelled then paid (or resumed from past_due) is NOT stuck showing
+  // "Cancelling" in the UI. The comment in handleSubscriptionEvent documents
+  // this intent; this test verifies the invoice path fulfils it.
+  // Red-green: remove `cancelledAt: null` from handlePaymentSucceeded's updates
+  // object and this test fails — updateSubscriptionFromWebhook will be called
+  // without the cancelledAt field, leaving the old timestamp in the DB.
+  it('[CR-052] payment_succeeded clears cancelledAt so UI does not show Cancelling after re-activation', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({ status: 'active' }),
+    );
+
+    const invoice = makeInvoice();
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('invoice.payment_succeeded', invoice),
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    // cancelledAt: null MUST be present in the update so the DB clears the timestamp.
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'sub_stripe_123',
+      expect.objectContaining({
+        status: 'active',
+        cancelledAt: null,
+      }),
+    );
+  });
+
   // [ultrareview finding] If Stripe SDK v21 (or later) refactors the invoice
   // payload again, extractSubscriptionIdFromInvoice() returns undefined and
   // we silently skip re-activating the subscription — stuck in past_due with
