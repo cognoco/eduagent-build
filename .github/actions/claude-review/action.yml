@@ -5,6 +5,9 @@ inputs:
   oauth_token:
     description: 'Claude Code OAuth token (secrets must be passed explicitly to composite actions)'
     required: true
+  review_rules_path:
+    description: 'Trusted checkout path containing CLAUDE.md and docs/project_context.md'
+    required: true
 
 runs:
   using: 'composite'
@@ -27,9 +30,10 @@ runs:
              gh pr diff ${{ github.event.pull_request.number }}
           2. Get PR description, commits, and any existing comments:
              gh pr view ${{ github.event.pull_request.number }}
-          3. Read the review rules (both files, in full):
-             - CLAUDE.md
-             - docs/project_context.md
+          3. Read the review rules from the trusted base checkout, not the PR workspace
+             (both files, in full):
+             - ${{ inputs.review_rules_path }}/CLAUDE.md
+             - ${{ inputs.review_rules_path }}/docs/project_context.md
 
           Use this context to understand what the author intended, what is explicitly
           deferred or out of scope, and any design decisions explained in commits.
@@ -145,7 +149,7 @@ runs:
 
           - Verdict: {VERDICT}
           - Files in diff: {count}
-          - Rules source: CLAUDE.md, docs/project_context.md
+          - Rules source: trusted base checkout CLAUDE.md, docs/project_context.md
 
           </details>
 
@@ -161,7 +165,7 @@ runs:
 
           - Verdict: APPROVED
           - Files in diff: {count}
-          - Rules source: CLAUDE.md, docs/project_context.md
+          - Rules source: trusted base checkout CLAUDE.md, docs/project_context.md
 
           </details>
 

@@ -50,6 +50,7 @@ jobs:
         uses: ./.trusted-actions/.github/actions/claude-review
         with:
           oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          review_rules_path: .trusted-actions
 
       # Fallback: token 1 hit its quota (429) or otherwise failed.
       # continue-on-error keeps the job green so we can check outcome directly.
@@ -60,6 +61,7 @@ jobs:
         uses: ./.trusted-actions/.github/actions/claude-review
         with:
           oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
+          review_rules_path: .trusted-actions
 
       - name: Run Claude Code Review (token 3 — fallback)
         id: review-3
@@ -68,6 +70,7 @@ jobs:
         uses: ./.trusted-actions/.github/actions/claude-review
         with:
           oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
+          review_rules_path: .trusted-actions
 
       - name: Verify review completed
         if: always()

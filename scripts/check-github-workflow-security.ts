@@ -140,8 +140,6 @@ function validatePipeToShell(file: string, step: Record<string, unknown>) {
   );
   if (!pipesToShell) return null;
 
-  if (run.includes('sha256sum -c')) return null;
-
   return {
     file,
     message: 'pipe-to-shell installer must be replaced or checksum-verified',
@@ -152,12 +150,14 @@ function validateLocalSecretAction(
   file: string,
   step: Record<string, unknown>,
   pullRequestWorkflow: boolean,
+  inheritedSecrets: boolean,
 ) {
   if (!pullRequestWorkflow) return null;
   const uses = step.uses;
   if (typeof uses !== 'string' || !isLocalAction(uses)) return null;
   if (isTrustedBaseAction(uses)) return null;
   if (
+    !inheritedSecrets &&
     !containsSecretReference(step.with) &&
     !containsSecretReference(step.env)
   ) {
@@ -220,6 +220,7 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
   const workflowRun = hasEvent(workflowOn, 'workflow_run');
   const jobs = getJobEntries(parsed);
   const pullRequestSkipOutputs = collectPullRequestSkipOutputs(jobs);
+  const workflowEnvHasSecrets = containsSecretReference(parsed.env);
 
   for (const step of getSteps((parsed.runs as Record<string, unknown>) ?? {})) {
     const actionViolation = validateActionRef(file, step);
@@ -229,6 +230,8 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
   }
 
   for (const [, job] of jobs) {
+    const inheritedSecrets =
+      workflowEnvHasSecrets || containsSecretReference(job.env);
     const workflowRunViolation = validateWorkflowRunJob(
       file,
       workflowRun,
@@ -245,6 +248,7 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
         file,
         step,
         pullRequestWorkflow,
+        inheritedSecrets,
       );
       if (localSecretViolation) violations.push(localSecretViolation);
 

