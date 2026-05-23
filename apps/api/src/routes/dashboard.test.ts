@@ -916,5 +916,70 @@ describe('dashboard routes', () => {
       const body = await res.json();
       expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     });
+
+    it('[BREAK] GET /dashboard/children/:id/topics/:topicId/snapshot returns 403 for non-owner profile', async () => {
+      // Snapshot route splits owner gating from parent-link gating: the owner
+      // gate is endpoint authorization (non-owners shouldn't reach parent-admin
+      // endpoints), so it still returns 403.
+      const TOPIC_ID = 'a0000000-0000-4000-a000-000000000001';
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/topics/${TOPIC_ID}/snapshot`,
+        { headers: NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Snapshot endpoint 404 IDOR contract
+  //
+  // Source: docs/specs/2026-05-23-learn-this-too-bridge.md §Authorization
+  // ("404, never 403, never reveal whether the topic ID exists").
+  //
+  // The snapshot route is the one place where parent-link rejection MUST
+  // return 404 rather than 403, so that an owner can't probe for the
+  // existence of a topic on a child profile that isn't linked to them.
+  // -------------------------------------------------------------------------
+
+  describe('snapshot 404 IDOR contract', () => {
+    const TOPIC_ID = 'a0000000-0000-4000-a000-000000000001';
+
+    beforeEach(() => {
+      // Restore owner default — the prior describe overrides mockGetProfile to
+      // isOwner:false at suite level, and clearAllMocks does not reset
+      // mockResolvedValue defaults.
+      mockGetProfile.mockResolvedValue({
+        id: 'test-profile-id',
+        birthYear: null,
+        location: null,
+        consentStatus: 'CONSENTED',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+      });
+    });
+
+    it('[BREAK] returns 404 (NOT 403) when owner has no family-link to the child', async () => {
+      // Owner profile (default mock has isOwner:true), but no family link.
+      // Pre-fix the route called assertOwnerAndParentAccess BEFORE the
+      // try/catch, so the ForbiddenError from assertParentAccess fell through
+      // the global handler as 403, leaking topic existence semantics.
+      // Persistent (not Once) so the service-layer assertParentAccess inside
+      // getChildTopicSnapshotForParent also sees the unlinked state.
+      mockFindFamilyLink.mockResolvedValue(undefined);
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/topics/${TOPIC_ID}/snapshot`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      expect(res.status).not.toBe(403);
+    });
   });
 });
