@@ -20,6 +20,16 @@
  * once (reflectionMultiplierApplied is true on exactly 1 xp_ledger row).
  */
 
+const mockRouteAndCall = jest.fn();
+
+jest.mock('../llm' /* gc1-allow: external LLM boundary */, () => {
+  const actual = jest.requireActual('../llm');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
+
 import { eq, inArray, like } from 'drizzle-orm';
 import {
   accounts,
@@ -36,6 +46,7 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { generateUUIDv7 } from '@eduagent/database';
+import { submitSummary } from './session-summary';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -151,6 +162,15 @@ describeIfDb(
   'submitSummary concurrent idempotency [CR-2026-05-19-M3 SITE 1]',
   () => {
     beforeEach(async () => {
+      mockRouteAndCall.mockReset();
+      mockRouteAndCall.mockResolvedValue({
+        response: JSON.stringify({
+          feedback: 'Good work',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      });
       await cleanupByPrefix();
     });
 
@@ -166,58 +186,22 @@ describeIfDb(
     it('[BREAK CR-2026-05-19-M3] two concurrent submitSummary calls produce exactly one summary row', async () => {
       const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
 
-      // Directly insert the summary row twice in parallel to simulate the race.
-      // We test the atomic INSERT path (not the full LLM path) because evaluateSummary
-      // is a real external LLM call. The transaction+advisory-lock fix applies to
-      // both paths identically.
-      const now = new Date();
-      const insertOne = db
-        .insert(sessionSummaries)
-        .values({
-          sessionId,
-          profileId,
+      const [first, second] = await Promise.all([
+        submitSummary(createIntegrationDb(), profileId, sessionId, {
           content: 'My summary',
-          aiFeedback: 'Good work',
-          status: 'submitted',
-        })
-        .onConflictDoNothing()
-        .returning();
-
-      // Second insert identical shape — without the advisory lock + tx, both
-      // would have succeeded when there was no unique constraint.
-      const insertTwo = db
-        .insert(sessionSummaries)
-        .values({
-          sessionId,
-          profileId,
+        }),
+        submitSummary(createIntegrationDb(), profileId, sessionId, {
           content: 'My summary',
-          aiFeedback: 'Good work',
-          status: 'submitted',
-        })
-        .onConflictDoNothing()
-        .returning();
+        }),
+      ]);
 
-      const [r1, r2] = await Promise.all([insertOne, insertTwo]);
-      void now;
-
-      // Exactly one write should have succeeded (the other hits onConflictDoNothing
-      // or the advisory lock). Combined they must give us ≤ 1 inserted row.
-      const totalInserted = (r1?.length ?? 0) + (r2?.length ?? 0);
-      // Both attempted inserts must not produce > 1 row for this session.
-      // This validates the constraint-level protection that the advisory lock enforces.
-      expect(totalInserted).toBeLessThanOrEqual(2); // both can succeed without unique constraint
-
-      // The real fix is at the advisory-lock level inside the transaction. Verify
-      // by checking that only ONE summary row exists for this session after both calls.
       const allSummaries = await db.query.sessionSummaries.findMany({
         where: eq(sessionSummaries.sessionId, sessionId),
       });
 
-      // NOTE: sessionSummaries has no unique constraint on (sessionId, profileId).
-      // The advisory lock in the transaction is the dedup mechanism. Since we're
-      // testing via direct inserts here (not via submitSummary), both can succeed.
-      // The integration test that matters is the applyReflectionMultiplier dedup:
-      expect(allSummaries.length).toBeGreaterThanOrEqual(1);
+      expect(allSummaries).toHaveLength(1);
+      expect(first.summary.id).toBe(allSummaries[0]!.id);
+      expect(second.summary.id).toBe(allSummaries[0]!.id);
     });
 
     it('[BREAK CR-2026-05-19-M3] applyReflectionMultiplier applied exactly once even with concurrent summary writes', async () => {

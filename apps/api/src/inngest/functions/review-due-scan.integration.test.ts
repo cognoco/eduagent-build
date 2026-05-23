@@ -383,9 +383,12 @@ describe('review-due-scan integration', () => {
     const { topicId } = await seedCurriculumTopic(profileF);
     await seedRetentionCard(profileF, topicId);
 
-    // Seed a review_reminder sent 1 hour ago — same UTC day
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    await seedNotificationLog(profileF, oneHourAgo);
+    // Seed at today's UTC start so this stays same-day even near midnight UTC.
+    const now = new Date();
+    const sameUtcDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    await seedNotificationLog(profileF, sameUtcDay);
 
     const { step } = await invokeHandler();
     const events = eventsForProfiles(step, new Set([profileF]));

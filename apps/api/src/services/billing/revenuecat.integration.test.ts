@@ -14,7 +14,7 @@
  * tests).
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
   quotaPools,

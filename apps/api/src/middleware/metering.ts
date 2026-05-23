@@ -66,9 +66,11 @@ function captureKvFailure(
   ctx: { op: 'read' | 'write' | 'delete'; accountId: string },
 ): void {
   captureException(err, {
-    extra: {
+    tags: {
       surface: 'billing.kv',
       op: ctx.op,
+    },
+    extra: {
       accountId: ctx.accountId,
     },
   });
