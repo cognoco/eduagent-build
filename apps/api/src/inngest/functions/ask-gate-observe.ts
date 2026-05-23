@@ -29,6 +29,13 @@ import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
 
+function summarizeReason(reason: string | undefined) {
+  return {
+    reasonPresent: typeof reason === 'string' && reason.length > 0,
+    reasonLength: typeof reason === 'string' ? reason.length : 0,
+  };
+}
+
 export const askGateDecisionObserve = inngest.createFunction(
   {
     id: 'ask-gate-decision-observe',
@@ -55,7 +62,7 @@ export const askGateDecisionObserve = inngest.createFunction(
     logger.info('ask.gate_decision.received', {
       sessionId: data.sessionId ?? null,
       meaningful: data.meaningful ?? null,
-      reason: data.reason ?? null,
+      ...summarizeReason(data.reason),
       method: data.method ?? null,
       exchangeCount: data.exchangeCount ?? null,
       learnerWordCount: data.learnerWordCount ?? null,

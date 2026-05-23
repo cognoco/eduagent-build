@@ -37,10 +37,17 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Checkout trusted base action definitions
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .trusted-actions
+          fetch-depth: 1
+
       - name: Run Claude Code Review (token 1)
         id: review-1
         continue-on-error: true
-        uses: ./.github/actions/claude-review
+        uses: ./.trusted-actions/.github/actions/claude-review
         with:
           oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -50,7 +57,7 @@ jobs:
         id: review-2
         if: steps.review-1.outcome == 'failure'
         continue-on-error: true
-        uses: ./.github/actions/claude-review
+        uses: ./.trusted-actions/.github/actions/claude-review
         with:
           oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
 
@@ -58,7 +65,7 @@ jobs:
         id: review-3
         if: steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'
         continue-on-error: true
-        uses: ./.github/actions/claude-review
+        uses: ./.trusted-actions/.github/actions/claude-review
         with:
           oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
 

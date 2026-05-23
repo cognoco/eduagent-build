@@ -130,9 +130,35 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     expect(entry?.context).toMatchObject({
       sessionId: 'sess-2',
       meaningful: false,
-      reason: 'too_short',
+      reasonPresent: true,
+      reasonLength: 'too_short'.length,
       method: 'heuristic',
     });
+  });
+
+  it('[BREAK / WI-83] does not log raw gate decision reason text', async () => {
+    const reason = 'The learner said email=parent@example.com token=secret';
+
+    await invoke(askGateDecisionObserve, {
+      sessionId: 'sess-sensitive',
+      meaningful: true,
+      reason,
+      method: 'llm',
+      exchangeCount: 2,
+      learnerWordCount: 9,
+      topicCount: 1,
+    });
+
+    const entry = lastJsonLine(consoleLogSpy);
+    const serializedEntry = JSON.stringify(entry);
+    expect(serializedEntry).not.toContain('parent@example.com');
+    expect(serializedEntry).not.toContain('token=secret');
+    expect(entry?.context).toMatchObject({
+      sessionId: 'sess-sensitive',
+      reasonPresent: true,
+      reasonLength: reason.length,
+    });
+    expect(entry?.context).not.toHaveProperty('reason');
   });
 
   it('handles empty payload gracefully (all fields optional)', async () => {
