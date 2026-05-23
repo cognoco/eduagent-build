@@ -428,7 +428,8 @@ describe('verifyJWT', () => {
   });
 
   it('rejects an expired token', async () => {
-    const pastExp = Math.floor(Date.now() / 1000) - 1; // already expired
+    // Beyond the 5s default skew so the leeway doesn't accept it.
+    const pastExp = Math.floor(Date.now() / 1000) - 10;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
       { sub: 'user-1', iss: 'https://clerk.dev', exp: pastExp },
@@ -437,6 +438,64 @@ describe('verifyJWT', () => {
     await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
       'token has expired',
     );
+  });
+
+  // [CR-2026-05-21-088] sub-second clock skew between issuer and verifier used
+  // to reject just-issued tokens. The ±5s default leeway must absorb this.
+  it('[CR-2026-05-21-088] accepts a token whose exp is 1s in the past (within default skew)', async () => {
+    const exp = Math.floor(Date.now() / 1000) - 1;
+    const token = await signJWT(
+      { alg: 'RS256', kid: 'test-key-1' },
+      { sub: 'user-1', iss: 'https://clerk.dev', exp },
+    );
+
+    const payload = await verifyJWT(token, keyMaterial.publicJwk);
+    expect(payload.sub).toBe('user-1');
+  });
+
+  // [CR-2026-05-21-088] Defense-in-depth against far-future exp values.
+  // A token issued 25h ago with exp=year-2099 must be rejected on iat age
+  // regardless of how far in the future exp is.
+  it('[CR-2026-05-21-088] rejects a token with stale iat even if exp is far in the future', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const staleIat = now - 25 * 60 * 60; // 25h ago
+    const farFutureExp = now + 365 * 24 * 60 * 60; // 1y from now
+    const token = await signJWT(
+      { alg: 'RS256', kid: 'test-key-1' },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: staleIat,
+        exp: farFutureExp,
+      },
+    );
+
+    await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
+      'token exceeds maximum age',
+    );
+  });
+
+  // [CR-2026-05-21-088] Callers can opt out of the iat max-age check by
+  // passing maxAgeSec: 0 — needed for non-Clerk integrations with long-lived
+  // tokens (none today, but the option must exist).
+  it('[CR-2026-05-21-088] accepts a stale-iat token when maxAgeSec is disabled', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const staleIat = now - 25 * 60 * 60;
+    const farFutureExp = now + 3600;
+    const token = await signJWT(
+      { alg: 'RS256', kid: 'test-key-1' },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: staleIat,
+        exp: farFutureExp,
+      },
+    );
+
+    const payload = await verifyJWT(token, keyMaterial.publicJwk, {
+      maxAgeSec: 0,
+    });
+    expect(payload.sub).toBe('user-1');
   });
 
   it('rejects tokens missing aud when audience validation is configured', async () => {

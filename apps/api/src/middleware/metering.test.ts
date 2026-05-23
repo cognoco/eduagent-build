@@ -1694,7 +1694,10 @@ describe('metering middleware', () => {
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({ usedThisMonth: 500, monthlyLimit: 500 }),
       );
-      mockGetTopUpCreditsRemaining.mockResolvedValue(500);
+      // Pre-check returns 500; post-decrement aggregate returns 499 (one consumed).
+      mockGetTopUpCreditsRemaining
+        .mockResolvedValueOnce(500)
+        .mockResolvedValueOnce(499);
       mockDecrementQuota.mockResolvedValue({
         success: true,
         source: 'top_up',
@@ -1721,6 +1724,44 @@ describe('metering middleware', () => {
       expect(stored).toMatchObject({
         usedThisMonth: 1,
       });
+    });
+
+    // [CR-2026-05-21-050] X-Quota-Remaining must aggregate across all top-up
+    // batches. Pre-fix: header reported `remainingMonthly + remainingTopUp`
+    // where remainingTopUp was the single FIFO-oldest batch we touched —
+    // UI showed "0 left" while the user had hundreds in other batches.
+    it('reports total top-up remainder across all batches (not single decremented batch)', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 }),
+      );
+      // User has 2 batches: oldest (FIFO target) has 1 left, newer has 100.
+      // Pre-check sees total 101. After consuming 1 from oldest, total = 100.
+      mockGetTopUpCreditsRemaining
+        .mockResolvedValueOnce(101)
+        .mockResolvedValueOnce(100);
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'top_up',
+        remainingMonthly: 0,
+        // Pre-fix bug: header would have been `0 + 0 = 0`, masking the 100
+        // credits still in the newer batch.
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Quota-Remaining')).toBe('100');
     });
   });
 

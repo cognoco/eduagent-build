@@ -651,8 +651,21 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       return;
     }
 
+    // [CR-2026-05-21-050] When the decrement consumed a top-up credit,
+    // `decrement.remainingTopUp` is only the remaining count of the single
+    // FIFO-oldest batch we just touched. If the user holds multiple unexpired
+    // top-up batches, summing remainingMonthly(=0) + that single-batch value
+    // under-reports — UI shows "0 questions left" while the user has
+    // hundreds across other unspent batches. Aggregate across all batches
+    // for the top-up case.
+    const headerRemaining =
+      decrement.source === 'top_up'
+        ? decrement.remainingMonthly +
+          (await getTopUpCreditsRemaining(db, subscriptionId))
+        : decrement.remainingMonthly + decrement.remainingTopUp;
+
     c.res = withQuotaHeaders(c.res, {
-      remaining: decrement.remainingMonthly + decrement.remainingTopUp,
+      remaining: headerRemaining,
       warningLevel: result.warningLevel,
       remainingDaily: decrement.remainingDaily,
     });
