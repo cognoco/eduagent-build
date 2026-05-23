@@ -35,7 +35,7 @@ async function createProfileForUser(
   userId: string,
   email: string,
   displayName: string,
-  birthYear: number
+  birthYear: number,
 ): Promise<string> {
   const res = await app.request(
     '/v1/profiles',
@@ -44,7 +44,7 @@ async function createProfileForUser(
       headers: buildAuthHeaders({ sub: userId, email }),
       body: JSON.stringify({ displayName, birthYear }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
   expect(res.status).toBe(201);
   const body = (await res.json()) as { profile: { id: string } };
@@ -56,7 +56,7 @@ async function createProfileForUser(
 async function createChildProfileDirect(
   parentProfileId: string,
   displayName: string,
-  birthYear: number
+  birthYear: number,
 ): Promise<string> {
   const db = createIntegrationDb();
   // Look up accountId from the parent profile
@@ -75,7 +75,7 @@ async function createChildProfileDirect(
 
 async function createFamilyLink(
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<void> {
   const db = createIntegrationDb();
   await db.insert(familyLinks).values({
@@ -107,7 +107,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Language Tester',
-      2010
+      2000,
     );
 
     const res = await app.request(
@@ -116,11 +116,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ conversationLanguage: 'cs' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -141,7 +141,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Pronouns Tester',
-      2010
+      2000,
     );
 
     const res = await app.request(
@@ -150,11 +150,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ pronouns: 'they/them' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -174,7 +174,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Interests Tester',
-      2010
+      2000,
     );
 
     const interests = [
@@ -188,11 +188,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ interests }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -223,7 +223,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Owner A',
-      2010
+      2010,
     );
 
     // User B needs their own profile first (profile-scope middleware requires it)
@@ -231,7 +231,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_B_CLERK_ID,
       USER_B_EMAIL,
       'Attacker B',
-      2000
+      2000,
     );
 
     // Now User B tries to update User A's language by sending User A's profileId
@@ -243,11 +243,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
-          profileA
+          profileA,
         ),
         body: JSON.stringify({ conversationLanguage: 'de' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Profile-scope middleware rejects foreign profileId with 403
@@ -268,14 +268,14 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Owner A',
-      2010
+      2010,
     );
 
     await createProfileForUser(
       USER_B_CLERK_ID,
       USER_B_EMAIL,
       'Attacker B',
-      2000
+      2000,
     );
 
     const res = await app.request(
@@ -284,11 +284,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
-          profileA
+          profileA,
         ),
         body: JSON.stringify({ pronouns: 'he/him' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -306,14 +306,14 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Owner A',
-      2010
+      2010,
     );
 
     await createProfileForUser(
       USER_B_CLERK_ID,
       USER_B_EMAIL,
       'Attacker B',
-      2000
+      2000,
     );
 
     const res = await app.request(
@@ -322,13 +322,13 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
-          profileA
+          profileA,
         ),
         body: JSON.stringify({
           interests: [{ label: 'Hacking', context: 'free_time' }],
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -342,14 +342,14 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Parent',
-      1985
+      1985,
     );
 
     // Insert child directly in DB (bypasses subscription tier limit).
     const childProfileId = await createChildProfileDirect(
       parentProfileId,
       'Child',
-      2014
+      2014,
     );
     await createFamilyLink(parentProfileId, childProfileId);
 
@@ -360,11 +360,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
         body: JSON.stringify({ conversationLanguage: 'es' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -383,13 +383,13 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Parent A',
-      1985
+      1985,
     );
     // Insert child directly (bypasses subscription tier limit).
     const childProfileId = await createChildProfileDirect(
       parentA,
       'Child A',
-      2014
+      2014,
     );
 
     // User B (no family link) tries to update the child
@@ -397,7 +397,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_B_CLERK_ID,
       USER_B_EMAIL,
       'Stranger B',
-      1990
+      1990,
     );
 
     const res = await app.request(
@@ -406,11 +406,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_B_CLERK_ID, email: USER_B_EMAIL },
-          parentB
+          parentB,
         ),
         body: JSON.stringify({ conversationLanguage: 'fr' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // assertParentAccess should reject — either 403 or 404
@@ -433,7 +433,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Validation Tester',
-      2010
+      2000,
     );
 
     const res = await app.request(
@@ -442,11 +442,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ conversationLanguage: 'xx-invalid' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Zod validation should reject
@@ -458,7 +458,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Long Pronouns',
-      2010
+      2000,
     );
 
     const res = await app.request(
@@ -467,11 +467,11 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ pronouns: 'a'.repeat(33) }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -487,7 +487,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Direct DB Bypass',
-      2010
+      2010,
     );
 
     const db = createIntegrationDb();
@@ -495,7 +495,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       db
         .update(profiles)
         .set({ pronouns: 'a'.repeat(33) })
-        .where(eq(profiles.id, profileId))
+        .where(eq(profiles.id, profileId)),
     ).rejects.toThrow(/profiles_pronouns_length_check/);
 
     // Sanity: 32 chars exactly is allowed.
@@ -515,7 +515,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Empty Interest',
-      2010
+      2000,
     );
 
     const res = await app.request(
@@ -524,13 +524,13 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A_CLERK_ID, email: USER_A_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           interests: [{ label: '', context: 'free_time' }],
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -543,7 +543,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       USER_A_CLERK_ID,
       USER_A_EMAIL,
       'Unauth Test',
-      2010
+      2010,
     );
 
     const res = await app.request(
@@ -556,7 +556,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
         },
         body: JSON.stringify({ conversationLanguage: 'en' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
