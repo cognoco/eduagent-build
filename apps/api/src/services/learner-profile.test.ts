@@ -6,6 +6,7 @@ import type {
 } from './learner-profile';
 import {
   analyzeSessionTranscript,
+  applyAnalysis,
   archiveStaleStruggles,
   buildAccommodationBlock,
   buildMemoryBlock,
@@ -20,6 +21,8 @@ import {
   selectCurrentlyWorkingOn,
   shouldUpdateLearningStyle,
 } from './learner-profile';
+import type { Database } from '@eduagent/database';
+import type { SessionAnalysisOutput } from '@eduagent/schemas';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
@@ -1945,5 +1948,82 @@ describe('analyzeSessionTranscript', () => {
     // Raw JSON structure must NOT appear — that would leak to the LLM.
     expect(userMessage).not.toContain('"signals"');
     expect(userMessage).not.toContain('"ui_hints"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyAnalysis — GDPR consent gate (WI-221)
+// ---------------------------------------------------------------------------
+
+describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
+  const profileId = 'profile-gdpr-test-001';
+
+  // Minimal analysis that produces at least one field update (interests).
+  const validAnalysis: SessionAnalysisOutput = {
+    confidence: 'high',
+    interests: ['astronomy'],
+    strengths: null,
+    struggles: null,
+    resolvedTopics: null,
+    communicationNotes: null,
+    engagementLevel: null,
+    explanationEffectiveness: null,
+  };
+
+  /**
+   * Builds a minimal db stub for applyAnalysis unit tests.
+   *
+   * consentFindFirstResult controls what db.query.consentStates.findFirst
+   * returns — used by isGdprProcessingAllowed.
+   *
+   * txReturnValue is returned by db.transaction so the test can assert
+   * whether the transaction was entered (current code path) or bypassed
+   * (after the GDPR fix).
+   */
+  function makeDb(
+    consentFindFirstResult: { status: string; consentType: string } | null,
+    txReturnValue: {
+      finalFieldsUpdated: string[];
+      finalNotifications: unknown[];
+    } = {
+      finalFieldsUpdated: ['interests'],
+      finalNotifications: [],
+    },
+  ) {
+    const txMock = jest.fn().mockResolvedValue(txReturnValue);
+    const consentFindFirst = jest
+      .fn()
+      .mockResolvedValue(consentFindFirstResult);
+    const db = {
+      transaction: txMock,
+      query: {
+        consentStates: { findFirst: consentFindFirst },
+      },
+    } as unknown as Database;
+    return { db, txMock, consentFindFirst };
+  }
+
+  it('enters the transaction when GDPR consent is CONSENTED (control)', async () => {
+    const { db, txMock } = makeDb({ status: 'CONSENTED', consentType: 'GDPR' });
+    await applyAnalysis(db, profileId, validAnalysis, null);
+    expect(txMock).toHaveBeenCalled();
+  });
+
+  it('enters the transaction when no GDPR consent row exists (pre-consent-flow, control)', async () => {
+    const { db, txMock } = makeDb(null);
+    await applyAnalysis(db, profileId, validAnalysis, null);
+    expect(txMock).toHaveBeenCalled();
+  });
+
+  it('[WI-221] skips analysis and returns empty when GDPR consent is WITHDRAWN', async () => {
+    // memoryConsentStatus='granted', memoryCollectionEnabled=true (passed via
+    // the txReturnValue — if the transaction fires, the test will see non-empty
+    // fieldsUpdated and fail, proving the bug). After the fix the transaction
+    // must NOT be entered.
+    const { db, txMock } = makeDb({ status: 'WITHDRAWN', consentType: 'GDPR' });
+    const result = await applyAnalysis(db, profileId, validAnalysis, null);
+    expect(result.fieldsUpdated).toEqual([]);
+    expect(result.notifications).toEqual([]);
+    expect(txMock).not.toHaveBeenCalled();
   });
 });
