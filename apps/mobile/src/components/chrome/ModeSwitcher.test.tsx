@@ -1,6 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { ModeSwitcher } from './ModeSwitcher';
 
 // react-i18next: use real en.json lookup so assertions hit rendered text
@@ -18,21 +17,6 @@ jest.mock(
   }),
 );
 
-const mockUseParentProxy = jest.fn();
-jest.mock(
-  '../../hooks/use-parent-proxy' /* gc1-allow: chrome fallback only needs proxy state; full profile/provider stack is covered elsewhere */,
-  () => ({
-    useParentProxy: (...args: unknown[]) => mockUseParentProxy(...args),
-  }),
-);
-
-const mockUseAppContext = jest.fn();
-jest.mock(
-  '../../lib/app-context' /* gc1-allow: chrome fallback only needs app mode/family capability; provider mutation flow is tested separately */,
-  () => ({
-    useAppContext: (...args: unknown[]) => mockUseAppContext(...args),
-  }),
-);
 
 const mockSwitchMode = jest.fn();
 jest.mock(
@@ -82,24 +66,10 @@ function buildContract(
   };
 }
 
-function setModeNavFlags(input: { v0: boolean; v1: boolean }): void {
-  const mutableFlags = FEATURE_FLAGS as unknown as {
-    MODE_NAV_V0_ENABLED: boolean;
-    MODE_NAV_V1_ENABLED: boolean;
-  };
-  mutableFlags.MODE_NAV_V0_ENABLED = input.v0;
-  mutableFlags.MODE_NAV_V1_ENABLED = input.v1;
-}
 
 beforeEach(() => {
   jest.clearAllMocks();
-  setModeNavFlags({ v0: false, v1: false });
-  mockUseParentProxy.mockReturnValue({ isParentProxy: false });
-  mockUseAppContext.mockReturnValue({
-    mode: 'study',
-    setMode: jest.fn(),
-    familyCapable: false,
-  });
+
 });
 
 describe('ModeSwitcher', () => {
@@ -130,37 +100,6 @@ describe('ModeSwitcher', () => {
     expect(familyBtn.props.accessibilityState).toEqual({ selected: false });
   });
 
-  it('renders for legacy V0 family-capable mode nav when V1 contract hides it', () => {
-    setModeNavFlags({ v0: true, v1: false });
-    mockUseNavigationContract.mockReturnValue(buildContract('hidden', 'study'));
-    mockUseAppContext.mockReturnValue({
-      mode: 'family',
-      setMode: jest.fn(),
-      familyCapable: true,
-    });
-
-    render(<ModeSwitcher />);
-
-    const studyBtn = screen.getByTestId('mode-switcher-study');
-    const familyBtn = screen.getByTestId('mode-switcher-family');
-
-    expect(studyBtn.props.accessibilityState).toEqual({ selected: false });
-    expect(familyBtn.props.accessibilityState).toEqual({ selected: true });
-  });
-
-  it('keeps the V1 contract authoritative when V1 hides the switcher', () => {
-    setModeNavFlags({ v0: true, v1: true });
-    mockUseNavigationContract.mockReturnValue(buildContract('hidden', 'study'));
-    mockUseAppContext.mockReturnValue({
-      mode: 'family',
-      setMode: jest.fn(),
-      familyCapable: true,
-    });
-
-    render(<ModeSwitcher />);
-
-    expect(screen.queryByTestId('mode-switcher')).toBeNull();
-  });
 
   it('calls switchMode with the other mode when non-active pressable is pressed', () => {
     mockUseNavigationContract.mockReturnValue(
