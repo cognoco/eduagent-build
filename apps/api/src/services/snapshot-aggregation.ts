@@ -42,8 +42,11 @@ import { getCurrentlyWorkingOn } from './learner-profile';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { computeWeeklyDeltas } from './progress-helpers';
 import { captureException } from './sentry';
+import { createLogger } from './logger';
 import { withTransientDatabaseRetry } from './transient-db-retry';
 import { generateWeeklyReportData } from './weekly-report';
+
+const logger = createLogger();
 
 type SubjectRow = typeof subjects.$inferSelect;
 type TopicRow = typeof curriculumTopics.$inferSelect;
@@ -1213,52 +1216,57 @@ export async function refreshProgressSnapshot(
 
   // [FR234.5] Bridge newly inserted milestones to the celebration queue.
   // [FR237.6] Look up birthYear once so detail text can be age-adapted.
+  // [CR-2026-05-21-070] try/catch is inside the loop so one failing enqueue
+  // does not abort celebrations for all subsequent milestones in the batch.
   if (insertedMilestones.length > 0) {
-    try {
-      const profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-        columns: { birthYear: true },
-      });
-      const age = new Date().getFullYear() - (profile?.birthYear ?? 2015);
+    const profile = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profileId),
+      columns: { birthYear: true },
+    });
+    const age = new Date().getFullYear() - (profile?.birthYear ?? 2015);
 
-      for (const milestone of insertedMilestones) {
-        const detail = getMilestoneCelebrationDetail(milestone, age);
-        const { milestoneType, threshold } = milestone;
+    let celebrationSucceeded = 0;
+    let celebrationFailed = 0;
 
-        let celebrationName: CelebrationName;
-        let celebrationReason: CelebrationReason;
+    for (const milestone of insertedMilestones) {
+      const detail = getMilestoneCelebrationDetail(milestone, age);
+      const { milestoneType, threshold } = milestone;
 
-        if (milestoneType === 'vocabulary_count') {
-          celebrationName = threshold >= 100 ? 'comet' : 'polar_star';
-          celebrationReason = 'deep_diver';
-        } else if (milestoneType === 'topic_mastered_count') {
-          celebrationName = threshold >= 25 ? 'comet' : 'polar_star';
-          celebrationReason = 'topic_mastered';
-        } else if (milestoneType === 'subject_mastered') {
-          celebrationName = 'orions_belt';
-          celebrationReason = 'curriculum_complete';
-        } else if (milestoneType === 'book_completed') {
-          celebrationName = 'comet';
-          celebrationReason = 'curriculum_complete';
-        } else if (milestoneType === 'streak_length') {
-          celebrationName = threshold >= 30 ? 'comet' : 'polar_star';
-          celebrationReason = threshold >= 30 ? 'streak_30' : 'streak_7';
-        } else if (milestoneType === 'session_count') {
-          celebrationName = 'polar_star';
-          celebrationReason = 'persistent';
-        } else if (milestoneType === 'learning_time') {
-          celebrationName = 'twin_stars';
-          celebrationReason = 'persistent';
-        } else if (milestoneType === 'topics_explored') {
-          celebrationName = 'polar_star';
-          celebrationReason = 'deep_diver';
-        } else if (milestoneType === 'cefr_level_up') {
-          celebrationName = 'orions_belt';
-          celebrationReason = 'deep_diver';
-        } else {
-          continue;
-        }
+      let celebrationName: CelebrationName;
+      let celebrationReason: CelebrationReason;
 
+      if (milestoneType === 'vocabulary_count') {
+        celebrationName = threshold >= 100 ? 'comet' : 'polar_star';
+        celebrationReason = 'deep_diver';
+      } else if (milestoneType === 'topic_mastered_count') {
+        celebrationName = threshold >= 25 ? 'comet' : 'polar_star';
+        celebrationReason = 'topic_mastered';
+      } else if (milestoneType === 'subject_mastered') {
+        celebrationName = 'orions_belt';
+        celebrationReason = 'curriculum_complete';
+      } else if (milestoneType === 'book_completed') {
+        celebrationName = 'comet';
+        celebrationReason = 'curriculum_complete';
+      } else if (milestoneType === 'streak_length') {
+        celebrationName = threshold >= 30 ? 'comet' : 'polar_star';
+        celebrationReason = threshold >= 30 ? 'streak_30' : 'streak_7';
+      } else if (milestoneType === 'session_count') {
+        celebrationName = 'polar_star';
+        celebrationReason = 'persistent';
+      } else if (milestoneType === 'learning_time') {
+        celebrationName = 'twin_stars';
+        celebrationReason = 'persistent';
+      } else if (milestoneType === 'topics_explored') {
+        celebrationName = 'polar_star';
+        celebrationReason = 'deep_diver';
+      } else if (milestoneType === 'cefr_level_up') {
+        celebrationName = 'orions_belt';
+        celebrationReason = 'deep_diver';
+      } else {
+        continue;
+      }
+
+      try {
         await queueCelebration(
           db,
           profileId,
@@ -1266,9 +1274,23 @@ export async function refreshProgressSnapshot(
           celebrationReason,
           detail,
         );
+        celebrationSucceeded++;
+      } catch (err) {
+        celebrationFailed++;
+        captureException(err, {
+          profileId,
+          extra: { milestoneType, threshold },
+        });
       }
-    } catch (err) {
-      captureException(err, { profileId });
+    }
+
+    if (celebrationFailed > 0) {
+      logger.warn('celebration.batch_partial_failure', {
+        profileId,
+        total: insertedMilestones.length,
+        succeeded: celebrationSucceeded,
+        failed: celebrationFailed,
+      });
     }
   }
 

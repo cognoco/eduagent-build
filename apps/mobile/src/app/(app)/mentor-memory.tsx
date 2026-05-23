@@ -38,8 +38,7 @@ import {
   useUnsuppressInference,
 } from '../../hooks/use-learner-profile';
 import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
-import { useParentProxy } from '../../hooks/use-parent-proxy';
-import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useUpdateInterestsContext } from '../../hooks/use-onboarding-dimensions';
 
 export default function MentorMemoryScreen() {
@@ -58,8 +57,8 @@ export default function MentorMemoryScreen() {
   const unsuppress = useUnsuppressInference();
   const grantConsent = useGrantMemoryConsent();
   const updateInterestsContext = useUpdateInterestsContext();
-  const { isParentProxy } = useParentProxy();
-  const role = useActiveProfileRole();
+  const navigationContract = useNavigationContract();
+  const isOwnerSelf = navigationContract.gates.sessionIsOwner;
   const [draft, setDraft] = useState('');
 
   // [H12] Timeout escape for loading spinner
@@ -231,7 +230,9 @@ export default function MentorMemoryScreen() {
     goBackOrReplace(router, '/(app)/more' as const);
   }, [resolvedReturnTo, router]);
 
-  if (isParentProxy) return <Redirect href="/(app)/home" />;
+  if (!navigationContract.canEnter('mentor-memory')) {
+    return <Redirect href="/(app)/home" />;
+  }
 
   if (isLoading) {
     if (loadTimedOut) {
@@ -367,7 +368,7 @@ export default function MentorMemoryScreen() {
                   // consent — don't tell them a guardian must act. Child
                   // profiles under a family link (isOwner === false) DO need
                   // a parent/guardian to enable memory collection.
-                  activeProfile?.isOwner
+                  isOwnerSelf
                   ? t('session.mentorMemory.status.pendingOwner')
                   : t('session.mentorMemory.status.pendingChild')}
           </Text>
@@ -406,7 +407,7 @@ export default function MentorMemoryScreen() {
           </Text>
         </View>
 
-        {consentStatus === 'pending' && activeProfile?.isOwner && (
+        {consentStatus === 'pending' && isOwnerSelf && (
           <View className="mt-3">
             <MemoryConsentPrompt
               title={t('session.mentorMemory.consent.title')}
@@ -465,7 +466,7 @@ export default function MentorMemoryScreen() {
                 accommodation in /more, so they have no "parent" to
                 attribute it to. The phrase only fits non-owner profiles
                 (child user, or parent in proxy mode). */}
-            {role !== 'owner' ? (
+            {!isOwnerSelf ? (
               <Text
                 testID="accommodation-set-by-parent"
                 className="text-caption text-text-secondary mt-1"

@@ -5,6 +5,10 @@
 // ---------------------------------------------------------------------------
 
 import type { SubjectClassifyResult } from '@eduagent/schemas';
+import {
+  subjectClassifyLlmResponseSchema,
+  subjectSuggestLlmResponseSchema,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { routeAndCall, extractFirstJsonObject } from './llm';
 import type { ChatMessage } from './llm';
@@ -124,14 +128,16 @@ export async function classifySubject(
         1, // Rung 1 = Gemini Flash (fast/cheap)
       );
       // [BUG-461] brace-depth walker replaces greedy regex
+      // [CR-2026-05-21-076] schema-validated parse replaces ad-hoc field checks
       const jsonStr = extractFirstJsonObject(suggestResult.response);
       if (jsonStr) {
-        const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-        const suggested =
-          typeof parsed.suggestedSubjectName === 'string' &&
-          parsed.suggestedSubjectName.trim()
-            ? parsed.suggestedSubjectName.trim()
-            : inferSuggestedSubjectName(text);
+        const parseResult = subjectSuggestLlmResponseSchema.safeParse(
+          JSON.parse(jsonStr),
+        );
+        const suggested = parseResult.success
+          ? parseResult.data.suggestedSubjectName.trim() ||
+            inferSuggestedSubjectName(text)
+          : inferSuggestedSubjectName(text);
         if (suggested) {
           return {
             candidates: [],
@@ -200,6 +206,7 @@ export async function classifySubject(
     const result = await routeAndCall(messages, 1); // Rung 1 = Gemini Flash (fast/cheap)
 
     // [BUG-461] brace-depth walker replaces greedy regex
+    // [CR-2026-05-21-076] schema-validated parse replaces ad-hoc field checks
     const jsonStr = extractFirstJsonObject(result.response);
     if (!jsonStr) {
       return {
@@ -209,16 +216,19 @@ export async function classifySubject(
       };
     }
 
-    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-    const rawMatches = Array.isArray(parsed.matches) ? parsed.matches : [];
-    const matches: Array<{ subjectName: string; confidence: number }> =
-      rawMatches.filter(
-        (m: unknown): m is { subjectName: string; confidence: number } =>
-          typeof m === 'object' &&
-          m !== null &&
-          'subjectName' in m &&
-          typeof (m as Record<string, unknown>).subjectName === 'string',
-      );
+    const parseResult = subjectClassifyLlmResponseSchema.safeParse(
+      JSON.parse(jsonStr),
+    );
+    if (!parseResult.success) {
+      return {
+        candidates: [],
+        needsConfirmation: true,
+        suggestedSubjectName: inferSuggestedSubjectName(text),
+      };
+    }
+
+    const parsed = parseResult.data;
+    const matches = parsed.matches;
 
     // Map LLM matches to candidates with subjectIds
     const candidates = matches

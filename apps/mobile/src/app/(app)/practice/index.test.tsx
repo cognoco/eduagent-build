@@ -11,7 +11,7 @@ const mockUseReviewSummary = jest.fn();
 const mockUseQuizStats = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseAssessmentEligibleTopics = jest.fn();
-const mockUseParentProxy = jest.fn();
+const mockCanEnterPractice = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => {
@@ -26,9 +26,12 @@ jest.mock('expo-router', () => {
 });
 
 jest.mock(
-  '../../../hooks/use-parent-proxy' /* gc1-allow: grandfathered pattern, used in mentor-memory/relearn/session-summary */,
+  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins route-entry contract without the full app provider tree */,
   () => ({
-    useParentProxy: () => mockUseParentProxy(),
+    useNavigationContract: () => ({
+      canEnter: mockCanEnterPractice,
+      gates: {},
+    }),
   }),
 );
 
@@ -98,7 +101,7 @@ describe('PracticeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
-    mockUseParentProxy.mockReturnValue({ isParentProxy: false });
+    mockCanEnterPractice.mockReturnValue(true);
     jest
       .spyOn(Date, 'now')
       .mockReturnValue(new Date('2026-04-18T12:00:00.000Z').getTime());
@@ -432,7 +435,7 @@ describe('PracticeScreen', () => {
   });
 
   it('redirects to home when in parent proxy session', () => {
-    mockUseParentProxy.mockReturnValue({ isParentProxy: true });
+    mockCanEnterPractice.mockReturnValue(false);
 
     render(<PracticeScreen />);
 

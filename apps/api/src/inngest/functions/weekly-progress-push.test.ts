@@ -315,6 +315,19 @@ describe('[BUG-260] weeklyProgressPushGenerate concurrency', () => {
   });
 });
 
+describe('[CR-2026-05-21-033] weeklyProgressPushGenerate idempotency', () => {
+  it('has idempotency keyed on event.data.parentId + "-" + event.data.reportWeekStart', () => {
+    const opts = (
+      weeklyProgressPushGenerate as unknown as {
+        opts: { idempotency?: string };
+      }
+    ).opts;
+    expect(opts.idempotency).toBe(
+      'event.data.parentId + "-" + event.data.reportWeekStart',
+    );
+  });
+});
+
 describe('weekly-progress-push isLocalHour9 (BUG-640 / J-4)', () => {
   // Helper: count how many of the 24 Monday-UTC hours match for a TZ.
   // Picks a Monday well clear of DST transitions: 2026-04-13 (Mon).

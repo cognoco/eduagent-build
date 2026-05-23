@@ -27,7 +27,7 @@ import { useProfile } from '../../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
-import { useParentProxy } from '../../../hooks/use-parent-proxy';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { firstParam } from '../../../lib/route-params';
 
 const TEACHING_METHODS = [
@@ -137,7 +137,7 @@ export default function RelearnScreen() {
   const startRelearn = useStartRelearn();
   const overdueTopics = useOverdueTopics();
   const { activeProfile } = useProfile();
-  const { isParentProxy } = useParentProxy();
+  const navigationContract = useNavigationContract();
   const ageBracket =
     activeProfile?.birthYear != null
       ? computeAgeBracket(activeProfile.birthYear)
@@ -326,7 +326,7 @@ export default function RelearnScreen() {
     return allSubjects;
   }, [allSubjects, selectedSubject]);
 
-  if (isParentProxy) {
+  if (!navigationContract.canEnter('topic/relearn')) {
     return <Redirect href="/(app)/home" />;
   }
 

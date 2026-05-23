@@ -17,10 +17,14 @@ export const sessionStaleCleanup = inngest.createFunction(
   },
   { cron: '*/10 * * * *' },
   async ({ step }) => {
-    const now = new Date();
-    const cutoff = new Date(now.getTime() - STALE_MINUTES * 60 * 1000);
-
+    // [CR-2026-05-21-029] now/cutoff computed INSIDE each step.run so the
+    // value is memoized as part of the step's cached result. Computing it
+    // outside causes the closure to recompute new Date() to a later value on
+    // replay while the cached step result reflects the original cutoff.
+    // Pattern mirrors transcript-purge-cron.ts:39-41 (BUG-189).
     const closedSessions = await step.run('close-stale-sessions', async () => {
+      const now = new Date();
+      const cutoff = new Date(now.getTime() - STALE_MINUTES * 60 * 1000);
       const db = getStepDatabase();
       return closeStaleSessions(db, cutoff);
     });
@@ -54,7 +58,7 @@ export const sessionStaleCleanup = inngest.createFunction(
             // a fallback quality=3 and advancing review intervals for
             // unattended time — silently corrupting forgetting-curve data.
             reason: 'silence_timeout',
-            timestamp: now.toISOString(),
+            timestamp: new Date().toISOString(),
           },
         })),
       );
@@ -63,12 +67,13 @@ export const sessionStaleCleanup = inngest.createFunction(
     // [CRIT-2] Abandon quiz rounds that have been active for too long.
     // Prefetched rounds the user never completed stay 'active' forever and
     // are quota-charged. Mark them 'abandoned' so they don't accumulate.
-    const quizRoundCutoff = new Date(
-      now.getTime() - QUIZ_ROUND_STALE_HOURS * 60 * 60 * 1000,
-    );
     const abandonedRounds = await step.run(
       'abandon-stale-quiz-rounds',
       async () => {
+        const now = new Date();
+        const quizRoundCutoff = new Date(
+          now.getTime() - QUIZ_ROUND_STALE_HOURS * 60 * 60 * 1000,
+        );
         const db = getStepDatabase();
         return abandonStaleQuizRounds(db, quizRoundCutoff);
       },
@@ -78,8 +83,8 @@ export const sessionStaleCleanup = inngest.createFunction(
       status: 'completed',
       closedCount: closedSessions.length,
       abandonedQuizRounds: abandonedRounds,
-      cutoff: cutoff.toISOString(),
-      timestamp: now.toISOString(),
+      cutoff: new Date(Date.now() - STALE_MINUTES * 60 * 1000).toISOString(),
+      timestamp: new Date().toISOString(),
     };
   },
 );

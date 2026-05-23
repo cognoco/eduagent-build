@@ -86,6 +86,11 @@ export const dailySnapshotRefresh = inngest.createFunction(
     // pattern and keeps DB pressure bounded while still draining the daily
     // batch within the cron's 21-hour gap.
     concurrency: { limit: 50 },
+    // [CR-2026-05-21-035] Deduplicate per (profileId, day): Inngest's default
+    // 24h idempotency window matches the cron cadence, so any cron replay or
+    // operator re-fire within the same day will not re-run the 6 parallel DB
+    // queries inside refreshProgressSnapshot. Pattern mirrors archive-cleanup.ts:21.
+    idempotency: 'event.data.profileId',
   },
   { event: 'app/progress.snapshot.refresh' },
   async ({ event, step }) => {

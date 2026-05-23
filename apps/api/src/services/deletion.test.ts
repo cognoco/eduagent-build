@@ -472,6 +472,87 @@ describe('executeDeletion', () => {
       'already_deleted',
     );
   });
+
+  // [CR-2026-05-21-009] Break test: when the account row is missing at execute
+  // time (0 rows deleted AND no existing row), Sentry must be notified.
+  // This is an unexpected state — account removed outside the normal grace-period
+  // flow (admin delete, concurrent GC, double-fire).
+  //
+  // Red→green: Remove the captureException call in executeDeletion and this
+  // test fails; restore it and it passes.
+  it('[CR-2026-05-21-009] captures Sentry exception when account is missing at execute time', async () => {
+    (captureException as jest.Mock).mockClear();
+
+    const db = {
+      query: {
+        accounts: {
+          findFirst: jest.fn().mockResolvedValue(undefined), // row missing
+        },
+        profiles: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest
+              .fn()
+              .mockResolvedValue([{ deletionScheduledAt: new Date() }]),
+          }),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 0 rows deleted
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await executeDeletion(db, 'account-1');
+
+    expect(result).toBe('already_deleted');
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'account.deletion',
+          reason: 'row-missing-on-execute',
+          accountId: 'account-1',
+        }),
+      }),
+    );
+  });
+
+  it('[CR-2026-05-21-009] does NOT capture Sentry when deletion is cancelled (row exists)', async () => {
+    (captureException as jest.Mock).mockClear();
+
+    const db = {
+      query: {
+        accounts: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'account-1' }), // row present → cancelled
+        },
+        profiles: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest
+              .fn()
+              .mockResolvedValue([{ deletionScheduledAt: new Date() }]),
+          }),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 0 rows deleted
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await executeDeletion(db, 'account-1');
+
+    expect(result).toBe('cancelled');
+    // Sentry must NOT fire for the expected cancel path.
+    expect(captureException).not.toHaveBeenCalled();
+  });
 });
 
 describe('deleteProfileIfNoConsent (CI-11)', () => {

@@ -298,8 +298,24 @@ export const weeklyProgressPushCron = inngest.createFunction(
       );
     });
 
-    const nowUtc = new Date();
-    const currentWeekStart = startOfCurrentWeek(nowUtc);
+    // [CR-2026-05-21-189] nowUtc/currentWeekStart computed INSIDE a dedicated
+    // step.run so the value is memoized as part of the step's cached result.
+    // Computing them at function entry caused the closure to recompute
+    // new Date() to a later value on Inngest replay while the upstream step
+    // result (find-weekly-self-report-profiles) reflected the original window.
+    // Pattern mirrors session-stale-cleanup.ts and summary-reconciliation-cron.ts
+    // (BUG-189 / CR-029 / CR-031). Date objects don't survive Inngest step
+    // result serialization cleanly — timestamps are returned as ms numbers and
+    // Dates are reconstructed from them after the step.
+    const weekWindow = await step.run('resolve-week-window', async () => {
+      const nowUtcMs = Date.now();
+      const currentWeekStartMs = startOfCurrentWeek(
+        new Date(nowUtcMs),
+      ).getTime();
+      return { nowUtcMs, currentWeekStartMs };
+    });
+    const nowUtc = new Date(weekWindow.nowUtcMs);
+    const currentWeekStart = new Date(weekWindow.currentWeekStartMs);
     const selfReportProfileIds = await step.run(
       'find-weekly-self-report-profiles',
       async () => {
@@ -404,6 +420,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
     // providers simultaneously. limit=25 mirrors the cadence already used for
     // weekly-self-report fan-out and keeps DB + provider pressure bounded.
     concurrency: { limit: 25 },
+    // [CR-2026-05-21-033] Dedup duplicate fan-out fires within the 24h Inngest
+    // window so the LLM/snapshot math (which runs BEFORE the notificationLog
+    // dedup inside prepare-weekly-progress-digest) is skipped on re-runs.
+    idempotency: 'event.data.parentId + "-" + event.data.reportWeekStart',
   },
   { event: 'app/weekly-progress-push.generate' },
   async ({ event, step }) => {

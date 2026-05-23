@@ -537,6 +537,29 @@ export const subjectClassifyResultSchema = z.object({
 });
 export type SubjectClassifyResult = z.infer<typeof subjectClassifyResultSchema>;
 
+// LLM response shape for the multi-subject classification path.
+// Parsed via safeParse; failures fall back to inferSuggestedSubjectName().
+const subjectClassifyLlmMatchSchema = z.object({
+  subjectName: z.string(),
+  confidence: z.number().optional(),
+});
+
+export const subjectClassifyLlmResponseSchema = z.object({
+  matches: z.array(subjectClassifyLlmMatchSchema).optional().default([]),
+  suggestedSubjectName: z.string().nullable().optional(),
+});
+export type SubjectClassifyLlmResponse = z.infer<
+  typeof subjectClassifyLlmResponseSchema
+>;
+
+// LLM response shape for the zero-subject suggestion path.
+export const subjectSuggestLlmResponseSchema = z.object({
+  suggestedSubjectName: z.string(),
+});
+export type SubjectSuggestLlmResponse = z.infer<
+  typeof subjectSuggestLlmResponseSchema
+>;
+
 // --- Route response schemas ---
 
 export const subjectResponseSchema = z.object({

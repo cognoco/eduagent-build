@@ -8,18 +8,19 @@ import { FEATURE_FLAGS } from '../lib/feature-flags';
 import {
   resolveNavigationContract,
   type NavigationContract,
+  type NavigationSubscriptionContext,
 } from '../lib/navigation-contract';
 import { useProfile } from '../lib/profile';
 
-export function useNavigationContract(): NavigationContract {
-  const { activeProfile, profiles } = useProfile();
+function useResolvedNavigationContract(
+  subscription: NavigationSubscriptionContext,
+): NavigationContract {
+  const { activeProfile, profiles = [] } = useProfile();
   const { mode } = useAppContext();
   const { isParentProxy } = useParentProxy();
   const role = useActiveProfileRole();
-  const subscription = useSubscriptionStatus({
-    enabled: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
-  });
-  const subscriptionData = subscription.data;
+  const subscriptionStatus = subscription.status;
+  const subscriptionTier = subscription.tier;
 
   return useMemo(
     () =>
@@ -30,14 +31,41 @@ export function useNavigationContract(): NavigationContract {
         appContext: mode,
         role,
         subscription: {
-          status: subscriptionData ? 'ready' : 'loading',
-          tier: subscriptionData?.tier ?? null,
+          status: subscriptionStatus,
+          tier: subscriptionTier,
         },
         flags: {
           MODE_NAV_V0_ENABLED: FEATURE_FLAGS.MODE_NAV_V0_ENABLED,
           MODE_NAV_V1_ENABLED: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
         },
       }),
-    [activeProfile, profiles, isParentProxy, mode, role, subscriptionData],
+    [
+      activeProfile,
+      profiles,
+      isParentProxy,
+      mode,
+      role,
+      subscriptionStatus,
+      subscriptionTier,
+    ],
   );
+}
+
+export function useNavigationContract(): NavigationContract {
+  const subscription = useSubscriptionStatus({
+    enabled: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
+  });
+  const subscriptionData = subscription.data;
+
+  return useResolvedNavigationContract({
+    status: subscriptionData ? 'ready' : 'loading',
+    tier: subscriptionData?.tier ?? null,
+  });
+}
+
+export function useNavigationDataScopeContract(): NavigationContract {
+  return useResolvedNavigationContract({
+    status: 'ready',
+    tier: null,
+  });
 }

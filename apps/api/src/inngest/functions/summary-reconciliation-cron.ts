@@ -17,14 +17,19 @@ export const summaryReconciliationCron = inngest.createFunction(
   },
   { cron: '0 4 * * *' },
   async ({ step }) => {
-    const now = new Date();
-    const since = new Date(now);
-    since.setUTCDate(since.getUTCDate() - 37);
-    const sixHoursAgo = new Date(now.getTime() - SIX_HOURS_MS);
-
+    // [CR-2026-05-21-031] Cutoffs computed INSIDE each step.run for replay
+    // stability. Inngest memoises step results on retry so the boundary value
+    // captured in the first run's cached output is what drives the query —
+    // computing now/since/sixHoursAgo at function entry caused the fan-out to
+    // target a moving window on partial-failure re-entry. Pattern mirrors
+    // transcript-purge-cron.ts:39-41.
     const missingSummaries = await step.run(
       'find-missing-summaries',
       async () => {
+        const now = new Date();
+        const since = new Date(now);
+        since.setUTCDate(since.getUTCDate() - 37);
+        const sixHoursAgo = new Date(now.getTime() - SIX_HOURS_MS);
         const db = getStepDatabase();
         return db
           .select({
@@ -57,6 +62,10 @@ export const summaryReconciliationCron = inngest.createFunction(
     const missingLlmSummaries = await step.run(
       'find-missing-llm-summaries',
       async () => {
+        const now = new Date();
+        const since = new Date(now);
+        since.setUTCDate(since.getUTCDate() - 37);
+        const sixHoursAgo = new Date(now.getTime() - SIX_HOURS_MS);
         const db = getStepDatabase();
         return db
           .select({
@@ -91,11 +100,13 @@ export const summaryReconciliationCron = inngest.createFunction(
       },
     );
 
-    const recapSince = new Date();
-    recapSince.setUTCDate(recapSince.getUTCDate() - 30);
     const missingRecaps = await step.run(
       'find-missing-learner-recaps',
       async () => {
+        const now = new Date();
+        const recapSince = new Date(now);
+        recapSince.setUTCDate(recapSince.getUTCDate() - 30);
+        const sixHoursAgo = new Date(now.getTime() - SIX_HOURS_MS);
         const db = getStepDatabase();
         return db
           .select({

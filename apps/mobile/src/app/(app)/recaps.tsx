@@ -86,15 +86,19 @@ export default function RecapsScreen(): React.ReactElement {
                   title:
                     recap.topicTitle ?? recap.subjectName ?? recap.displayTitle,
                 })}
-                onPress={() =>
+                onPress={() => {
+                  router.push({
+                    pathname: '/(app)/child/[profileId]',
+                    params: { profileId: recap.childProfileId },
+                  } as Href);
                   router.push({
                     pathname: '/(app)/child/[profileId]/session/[sessionId]',
                     params: {
                       profileId: recap.childProfileId,
                       sessionId: recap.sessionId,
                     },
-                  } as Href)
-                }
+                  } as Href);
+                }}
                 testID={`recap-row-${recap.recapId}`}
               >
                 <View className="flex-row items-start justify-between gap-3">
