@@ -1,6 +1,6 @@
 # Learn-this-too Bridge
 
-**Status:** Draft v2 — revised after adversarial review
+**Status:** Draft v3 — second adversarial review pass
 **Date:** 2026-05-23
 **Related:**
 - [`docs/specs/2026-05-21-navigation-contract.md`](./2026-05-21-navigation-contract.md) — defines PR 6c slot and the `topic/relearn` route.
@@ -11,7 +11,26 @@
 
 ## Revisions
 
-**v2 (2026-05-23) — adversarial review pass.** Findings addressed:
+**v3 (2026-05-23) — second adversarial review pass.** Findings addressed (citations to current code, not memory):
+
+- **C1-v3** — `returnTo` cannot pass arbitrary paths through `homeHrefForReturnTo` (`apps/mobile/src/lib/navigation.ts:18-26` is a closed token mapper). Spec now defines `FAMILY_RECAPS_RETURN_TO` / `FAMILY_CHILD_RETURN_TO` tokens (coordinate with the matching plan entry in `docs/plans/2026-05-19-study-and-family-mode-navigation-FULL.md:2863-2880`) and threads the source `recapId` / `childProfileId` as separate URL params so the helper can reconstruct the deep href.
+- **C2-v3** — Snapshot DTO and clone path updated to satisfy all NOT-NULL columns on `curriculum_topics` (`packages/database/src/schema/subjects.ts:156-209`): `curriculumId`, `bookId`, `sortOrder`, `description`, `estimatedMinutes` are all set. Bookless branch removed — all child topics already carry a `bookId`. Spec now describes resolve-or-create for `curricula` v1.
+- **C3-v3** — Subject dedup matches the actual unique index `subjects_profile_name_lower_active_uq` on `(profile_id, lower(name)) WHERE status='active'` (`subjects.ts:78-86`). `language_code` is set lazily when null on first clone and is **not** part of the dedup tuple.
+- **C4-v3** — Resolve-or-create uses `INSERT ... ON CONFLICT (...) DO NOTHING RETURNING id` against the existing unique indexes (`curriculum_books_subject_title_lower_uq`, `curriculum_topics_book_title_lower_uq`); a missed RETURNING re-selects. Burst sibling-tap races are now safe.
+- **C5-v3** — Topic INSERT explicitly sets `source = 'parent_bridge'`. A test asserts it.
+- **H1-v3** — Column name corrected: `profiles.conversationLanguage` (`packages/database/src/schema/profiles.ts:72`), not `primaryLanguage`.
+- **H2-v3** — Ownership gate uses `assertParentAccess(db, parentId, childId)` from `apps/api/src/services/family-access.ts:45-53` (not `getChildrenForParent`). Route wraps the thrown `ForbiddenError` into `notFound('Topic')` to preserve the spec's 404 IDOR contract.
+- **H3-v3** — Dropped the "non-archived family-link" predicate. `family_links` has no status/archived column today (`packages/database/src/schema/profiles.ts:193-220`); revocation is row deletion. If a soft-archive column is added later, extend `assertParentAccess` in that PR, not this one.
+- **H4-v3** — `startRelearn` already upserts the `needs_deepening_topics` row and creates the session (`apps/api/src/services/retention-data.ts:931-990`). §Relearn Screen Adjustments §1 rewritten as a regression-test task, not an open risk.
+- **H5-v3** — Dropped the collapsing-counter toast variant. V1 = single visible toast, latest wins. Counter pattern deferred to a follow-up since no existing toast component supports it.
+- **H6-v3** — Internal name standardised: analytics event `add_to_my_learning.bridge`, AsyncStorage key `add_to_my_learning.tip_seen`. Matches the H5 display copy.
+- **M2-v3** — Provenance chip when origin is null: **omit** (no "previous family member" copy).
+- **M3-v3** — Undo deletes the topic only. Empty book/subject containers stay — they're harmless and avoid the orphan-check race.
+- **M4-v3** — Subject-rename limitation links to the Library delete-topic flow so the cleanup path is actually discoverable.
+- **M5-v3** — Clone endpoint accepts a client-generated `requestId` for idempotency; server dedups by `(adultProfileId, childProfileId, sourceTopicId, requestId)` for 60s to absorb retries.
+- **L1-v3** — Route paths use Expo Router form `(app)/topic/relearn`.
+
+**v2 (2026-05-23) — first adversarial review pass.** Findings addressed:
 
 - **C1, C2** — Open URL now carries `subjectId` + `returnTo` and lands on a new "fresh-topic" mode of the relearn screen (no `needs_deepening_topics` row required). New section *Relearn Screen Adjustments* spells out the relearn-side change.
 - **H1** — Added `source_child_profile_id` column (nullable, `ON DELETE SET NULL`) on `curriculum_topics`. Origin is now recoverable from Library, not only at first navigation.
@@ -80,33 +99,47 @@ type ChildTopicSnapshot = {
   childProfileId: string;        // family-link verified server-side
   childDisplayName: string;      // for toast + Library provenance copy
   subjectName: string;           // e.g. "Mathematics"
-  subjectLanguage: string;       // ISO code of subject in CHILD's curriculum (informational only)
-  bookTitle: string | null;      // null if topic is not book-anchored
+  subjectLanguage: string | null;// ISO code of subject in CHILD's curriculum (informational only; child's subjects.languageCode is nullable)
+  bookTitle: string;             // REQUIRED — curriculum_topics.bookId is NOT NULL in schema
   bookAuthor: string | null;
   topicTitle: string;
-  topicDescription: string | null;
+  topicDescription: string;      // REQUIRED — curriculum_topics.description is NOT NULL in schema
   topicDescriptionHash: string;  // sha256 of (title + description); used to detect semantic divergence on already-existing match
+  estimatedMinutes: number;      // REQUIRED — curriculum_topics.estimatedMinutes is NOT NULL in schema; copied verbatim from child topic
   sourceAgeBracket: 'eleven_twelve' | 'thirteen_fifteen' | 'sixteen_plus';
 };
 ```
 
-This is **not** a new schema. It is a projection of existing child topic data, served via a new GET route that runs the same family-link scope check Recaps uses (`getChildrenForParent` ownership), then projects the columns above. No raw topic IDs from the child are exposed beyond what already appears in Recaps.
+This is **not** a new schema. It is a projection of existing child topic data, served via a new GET route that runs the family-link ownership check via `assertParentAccess(db, parentId, childId)` (`apps/api/src/services/family-access.ts:45-53`) and converts the thrown `ForbiddenError` to `notFound('Topic')` so the response shape never reveals whether the topic ID exists. No raw topic IDs from the child are exposed beyond what already appears in Recaps.
 
 ### Adult-side write — clone-only, no session, no queue
 
 The clone is performed server-side in one transaction. **Critically, the bridge does not call `startRelearn` and does not insert into `needs_deepening_topics` or `learning_sessions`.** Those writes happen later, when the adult opens the cloned topic from Library and goes through the relearn fresh-topic mode (see *Relearn Screen Adjustments* below).
 
-1. **Resolve subject language.** Use the **adult's primary language** (`profiles.primaryLanguage` or equivalent — verify in `apps/api/src/services/profile.ts`), not the child's. Rationale: adult is learning for themselves and should see subjects named/grouped in their own learning language. `snapshot.subjectLanguage` is informational only (carried for analytics and the "Subject Language" failure-mode disambiguation row).
-2. **Resolve subject.** Match by `(profileId = adultId, lower(name) = lower(snapshot.subjectName), language = adultPrimaryLanguage, status != 'archived')`. If none, create a new active subject for the adult with the snapshot's name and the adult's language. Record whether this was newly created.
-3. **Resolve book** (if `bookTitle` is non-null). Match by `(subjectId = resolvedSubjectId, lower(title) = lower(snapshot.bookTitle))`. If none, create a new book under the resolved subject. Record whether this was newly created.
-4. **Resolve topic.** Match by `(bookId = resolvedBookId OR subjectId = resolvedSubjectId for bookless topics, lower(title) = lower(snapshot.topicTitle))`.
-   - If no match → create a new topic with the snapshot's title and description. Set `source_child_profile_id = snapshot.childProfileId`. Record as newly created.
+All inserts use `INSERT ... ON CONFLICT (...) DO NOTHING RETURNING id` against the unique indexes that already exist in the schema (`subjects_profile_name_lower_active_uq`, `curriculum_books_subject_title_lower_uq`, `curriculum_topics_book_title_lower_uq` — all in `packages/database/src/schema/subjects.ts` with raw-SQL migration source 0043/0044). If `RETURNING id` is empty because another transaction won the race, re-`SELECT` by the unique key. This makes burst sibling-tap races safe end-to-end.
+
+1. **Resolve subject language.** Subject identity in the adult's curriculum is **language-agnostic by name** — the active unique index is `(profile_id, lower(name)) WHERE status='active'` with no `language_code` column (`subjects.ts:78-86`). The adult's `conversationLanguage` (`packages/database/src/schema/profiles.ts:72` — that is the real column name, not `primaryLanguage`) is used only to populate `subjects.languageCode` when a new subject is created OR when an existing matched subject has `languageCode = NULL`. We do not match on language; we never overwrite a non-null `languageCode`. `snapshot.subjectLanguage` is informational only (carried for analytics and the "Subject Language" failure-mode disambiguation row).
+2. **Resolve subject.** Match by `(profileId = adultId, lower(name) = lower(snapshot.subjectName), status = 'active')`. If none, `INSERT ... ON CONFLICT (profile_id, lower(name)) WHERE status='active' DO NOTHING RETURNING id`; on empty RETURNING re-select. New subjects are created with `languageCode = adult.conversationLanguage` and `pedagogyMode` from the adult's profile default. Record whether this was newly created.
+3. **Resolve curriculum.** Match by `(subjectId = resolvedSubjectId, version = 1)`. If none, `INSERT ... RETURNING id` (no unique-index conflict possible — subjects always start with curriculum v1 today). Record whether this was newly created.
+4. **Resolve book.** Match by `(subjectId = resolvedSubjectId, lower(title) = lower(snapshot.bookTitle))`. If none, `INSERT ... ON CONFLICT (subject_id, lower(title)) DO NOTHING RETURNING id`; on empty RETURNING re-select. `sortOrder = COALESCE(max(existing.sort_order), 0) + 1` over books in the resolved subject. Record whether this was newly created.
+5. **Resolve topic.** Match by `(bookId = resolvedBookId, lower(title) = lower(snapshot.topicTitle))`.
+   - If no match → `INSERT ... ON CONFLICT (book_id, lower(title)) DO NOTHING RETURNING id` with:
+     - `curriculumId = resolvedCurriculumId`
+     - `bookId = resolvedBookId`
+     - `title = snapshot.topicTitle`
+     - `description = snapshot.topicDescription`
+     - `estimatedMinutes = snapshot.estimatedMinutes`
+     - `sortOrder = COALESCE(max(existing.sort_order), 0) + 1` over topics in the resolved book
+     - `source = 'parent_bridge'` (requires the enum value added by migration — see §Schema Impact)
+     - `source_child_profile_id = snapshot.childProfileId`
+     - `filedFrom` and `relevance` use their column defaults (`pre_generated`, `core`).
+     On empty RETURNING re-select and fall through to the match branch below. Record as newly created.
    - If match found AND `existingTopic.descriptionHash === snapshot.topicDescriptionHash` → return existing topic. No write. (`alreadyExisted: true, descriptionDivergent: false`.)
    - If match found AND `existingTopic.descriptionHash !== snapshot.topicDescriptionHash`:
      - If the existing topic is **unstarted** (no `learning_sessions` row, no `needs_deepening_topics` row) → **refresh description** from the snapshot, keep the row. (`alreadyExisted: true, descriptionRefreshed: true`.) This addresses M2: adult's clone tracks the child's evolving framing while still unused.
      - If the existing topic has been started → do not refresh. Return existing. (`alreadyExisted: true, descriptionDivergent: true`.) The toast offers `[Add separate copy]` (see UI Flow).
-5. **Stop.** Do not create a session. Do not enqueue. Do not call `startRelearn`. Return.
-6. **Return.** Respond with:
+6. **Stop.** Do not create a session. Do not enqueue. Do not call `startRelearn`. Return.
+7. **Return.** Respond with:
 
 ```ts
 {
@@ -156,7 +189,7 @@ Behavior:
 - **Undo:** calls the undo endpoint with `createdIds`. Only newly created rows are deleted; pre-existing rows are never touched.
 - **Add separate copy:** calls the clone API with `forceCopy: true`; bridge creates a new topic with title `"{topicTitle} (from {childDisplayName})"` regardless of name match. Disambiguates false-positive merges (H3).
 
-**Toast stacking (M4):** at most one visible toast at a time. If a new bridge fires while a prior toast is showing, the prior toast collapses into a one-line counter ("Plus 2 more added — tap to see") which expands to a list on tap.
+**Toast stacking (M4, simplified for V1):** at most one visible toast at a time, latest wins. If a new bridge fires while a prior toast is showing, the prior toast is replaced. The collapsing counter pattern ("Plus N more added — tap to see") is deferred — no existing toast component supports it, and building it is out of scope for V1.
 
 The destination URL when the adult uses Open is described in detail under *Relearn Screen Adjustments*.
 
@@ -166,12 +199,12 @@ The destination URL when the adult uses Open is described in detail under *Relea
 
 This is the security-critical part.
 
-1. **Read side.** The child-topic snapshot endpoint must verify, on every call, that the requesting adult has a **non-archived** `family_links` row to the source child. If not → 404 (same shape as existing dashboard child endpoints). Never 403, never reveal whether the topic ID exists.
+1. **Read side.** The child-topic snapshot endpoint must verify, on every call, that the requesting adult has a `family_links` row to the source child. Use `assertParentAccess(db, adultProfileId, childProfileId)` from `apps/api/src/services/family-access.ts:45-53`. The helper throws `ForbiddenError`; the route catches it and re-throws `notFound('Topic')` so the response is **404** — never 403, never reveal whether the topic ID exists. *Note:* `family_links` has no status/archived column today (`packages/database/src/schema/profiles.ts:193-220`); revocation is row deletion. If a soft-archive column is added later, extend `assertParentAccess` in that PR.
 2. **Write side.** The clone writes only to the adult's profile. Use `createScopedRepository(adultProfileId)` for all writes. `subjects.profileId`, `curriculum_books.subjectId → subjects.profileId`, `curriculum_topics.bookId → curriculum_books.subjectId → subjects.profileId` all enforce ownership.
 3. **No child mutation.** The bridge has no write path to the child's data. Reject any request that tries to pass a child profile ID in a write context.
 4. **Link revocation.** If the family-link is revoked between the read and the write (race window measured in ms), the write succeeds but no further clones from that child are possible. The cloned topic on the adult side remains — it is the adult's own topic now. **Revocation does not retroactively delete cloned topics.** This is intentional: once an adult chose to learn fractions, the fact that they originally saw it on their child's recap does not give the child or anyone else a right to remove it.
-5. **GDPR delete of child.** `source_child_profile_id` is `ON DELETE SET NULL`. When a child profile is deleted, the adult's cloned topic row remains but its origin reference becomes null. Library provenance copy reads "Added from a previous family member's learning." (Or simply hides the chip if null.) No data loss for the adult; no child reference left behind.
-6. **Audit trail.** Log a structured analytics event `learn_this_too.bridge` with `{ adultProfileIdHash, childProfileIdHash, subjectName, topicTitle, isNewSubject, isNewBook, isNewTopic, alreadyExisted, descriptionDivergent, descriptionRefreshed, topicState, source: 'recap' | 'child_curriculum' | 'child_session' }`. No raw display names, no birth years, no IDs. **Every tap emits an event, even repeated taps on the same topic** — this preserves multi-child attribution (M6) when the same topic is later seen on a sibling's recap.
+5. **GDPR delete of child.** `source_child_profile_id` is `ON DELETE SET NULL`. When a child profile is deleted, the adult's cloned topic row remains but its origin reference becomes null. Library provenance chip is **omitted** when the column is null — no "previous family member" copy, which reads awkward and rare. No data loss for the adult; no child reference left behind.
+6. **Audit trail.** Log a structured analytics event `add_to_my_learning.bridge` with `{ adultProfileIdHash, childProfileIdHash, subjectName, topicTitle, isNewSubject, isNewBook, isNewTopic, alreadyExisted, descriptionDivergent, descriptionRefreshed, topicState, source: 'recap' | 'child_curriculum' | 'child_session', requestId }`. No raw display names, no birth years, no IDs. **Every tap emits an event, even repeated taps on the same topic** — this preserves multi-child attribution (M6) when the same topic is later seen on a sibling's recap. The server dedups by `(adultProfileId, childProfileId, sourceTopicId, requestId)` over a 60-second window so natural network retries do not double-count.
 
 ---
 
@@ -202,7 +235,7 @@ The cloned topic is treated as adult-authored from the moment it is written:
 - `pedagogyMode` is set from the adult's profile.
 - `ageBracket` (for prompt selection) is the adult's bracket.
 - The topic title and description are stored verbatim from the child snapshot (or refreshed on re-clone of an unstarted topic, per M2). The LLM re-frames at session time using existing adult prompts — there is no "originally child" flag flowing into prompts.
-- Subject language is the adult's primary language (HIGH-2). The topic title remains in whatever language it was authored in (typically the school's instruction language) — parents are expected to recognize "Photosynthesis" or "Pythagorean Theorem" even if it doesn't match their UI language. The LLM teaching language at session time is the subject's language, i.e. the adult's primary language.
+- The adult's `subjects.languageCode` is populated from `profiles.conversationLanguage` when creating a new subject (or filling in a null `languageCode` on a matched existing subject). The topic title remains in whatever language it was authored in (typically the school's instruction language) — parents are expected to recognize "Photosynthesis" or "Pythagorean Theorem" even if it doesn't match their UI language. The LLM teaching language at session time follows the resolved subject's `languageCode`.
 
 This means an adult who clones their 11-year-old's "Photosynthesis" topic will get adult-level conceptual depth in the first exchange, taught in the adult's primary language, even though the child's version of the same topic ran with younger framing in possibly a different language. This is the desired outcome — the adult is learning for themselves.
 
@@ -222,7 +255,7 @@ If the adult wants to preview what their child saw, that is a separate flow (Rec
 
 **Copy rationale (H5):** "Learn this too" was ambiguous — it read as joint/co-learning or preview, neither of which match the actual behavior (silent clone into private adult profile). "Add to my learning" is unambiguously a clone-to-self action. The "Private to your learning" caption (M8) addresses the parent's implicit question "does my child see this?"
 
-**First-run tip (M6/M7):** the first time an eligible parent lands on Recaps detail, a small inline tooltip appears next to the CTA: *"Tap to add this topic to your own learning, privately."* Dismisses on tap or after 6 seconds. State persisted in `AsyncStorage` key `learn_this_too.tip_seen`. Shows once per profile.
+**First-run tip (M6/M7):** the first time an eligible parent lands on Recaps detail, a small inline tooltip appears next to the CTA: *"Tap to add this topic to your own learning, privately."* Dismisses on tap or after 6 seconds. State persisted in `AsyncStorage` key `add_to_my_learning.tip_seen`. Shows once per profile.
 
 ### One-tap with undo toast
 
@@ -256,14 +289,17 @@ See *Adult-side landing* for the full toast variant table. Key behavioral guaran
 
 ### Open / Library navigation (H6 returnTo)
 
-The Open action navigates to `topic/relearn` in a new fresh-topic mode (see *Relearn Screen Adjustments*). The URL is:
+The Open action navigates to `(app)/topic/relearn` in a new fresh-topic mode (see *Relearn Screen Adjustments*). The URL is:
 
 ```
-/topic/relearn?topicId={topicId}&subjectId={subjectId}&topicName={encodedTitle}&subjectName={encodedSubjectName}&returnTo={triggerPath}&source=parent_bridge
+/(app)/topic/relearn?topicId={topicId}&subjectId={subjectId}&topicName={encodedTitle}&subjectName={encodedSubjectName}&returnTo={tokenName}&returnId={contextId}&source=parent_bridge
 ```
 
 - `topicId`, `subjectId`, `topicName`, `subjectName` — already supported by `relearn.tsx:123-133`.
-- `returnTo` — already supported by `relearn.tsx:208-215` via `handleLeave` → `homeHrefForReturnTo`. Pass the path the parent tapped from (`recaps/{recapId}`, `child/{profileId}/...`) so device back returns them to their review.
+- `returnTo` + `returnId` — **`homeHrefForReturnTo` today is a closed token mapper** (`apps/mobile/src/lib/navigation.ts:18-26`) that only knows `own-learning`, `learner-home`, `practice`; any other value falls through to `/(app)/home`. To return the parent to their actual review surface, this PR adds two new tokens — `family-recaps` and `family-child` — and extends the helper to reconstruct the deep href from `returnId`:
+  - `returnTo=family-recaps` + `returnId=<recapId>` → `(app)/recaps/[recapId]`
+  - `returnTo=family-child` + `returnId=<childProfileId>` → `(app)/child/[profileId]`
+  Coordinate with the matching token entries in `docs/plans/2026-05-19-study-and-family-mode-navigation-FULL.md:2863-2880` so the navigation-contract plan and this spec land non-conflicting token sets.
 - `source=parent_bridge` — drives the one-line provenance header on the relearn screen.
 
 ---
@@ -274,7 +310,7 @@ The existing `topic/relearn.tsx` is the "pick an overdue topic and pick a method
 
 **Required relearn changes (must be in same PR as bridge):**
 
-1. **Verify `startRelearn` accepts a topic that has no `needs_deepening_topics` row.** If it does not, change it to upsert the queue entry on first start (treating the cloned topic as a fresh entry). The relearn flow's `startRelearn` call site is `apps/mobile/src/hooks/use-retention.ts` → server route under `apps/api/src/routes/retention.ts`. Add an integration test: clone via bridge → call startRelearn → verify session created and `needs_deepening_topics` row written.
+1. **Regression test only — `startRelearn` already upserts the queue row.** `apps/api/src/services/retention-data.ts:931-972` checks for an active `needs_deepening_topics` row, inserts one if none exists, then unconditionally creates a `learning_sessions` row. The cloned-but-not-queued topic path therefore already works. **Required:** add an integration test that exercises the fresh-topic case explicitly — clone via bridge → call startRelearn → verify session created and `needs_deepening_topics` row written — to lock current behavior against future regression.
 2. **Empty-state copy guard.** In `directEntry` mode, the screen must never fall through to the picker if `useOverdueTopics` returns empty — it must go straight to the method phase. Audit `relearn.tsx:179-206` (the `useEffect` that sets `phase`) — it currently respects `directEntry`, but add a test that this is preserved if a future refactor changes the effect.
 3. **Provenance header (decorative).** When `source=parent_bridge` is in the URL params, render a one-line header above the method picker: "Added from {{childName}}'s learning." `childName` is looked up by reading `source_child_profile_id` on the topic and resolving the family-link display name. If the source has been deleted (column null), show "Added from a child's learning" or omit.
 4. **Back navigation respects `returnTo`.** Already implemented at `relearn.tsx:208-215` — confirm via test that the bridge's `returnTo` survives the round trip (parent reading recap → bridge → relearn → method picked → returns to recap, not to home).
@@ -293,9 +329,9 @@ The existing `topic/relearn.tsx` is the "pick an overdue topic and pick a method
 | Same topic already in adult's curriculum, description diverged, started | Adult mid-learning when child's version changes, OR false-positive name match | Toast: "'X' is already in your Mathematics — but their version reads differently. [Open my copy] [Add separate copy]" | Adult chooses: keep their progress, OR create disambiguated copy `"X (from ChildName)"` |
 | Topic in progress | Adult started days ago | Toast: "'X' is in your Mathematics — you're working on it. [Resume]" | Tap Resume to continue |
 | Topic completed | Adult finished previously | Toast: "You've already learned 'X'. [Review]" | Tap Review for results / re-take |
-| Same topic exists under a *renamed* adult subject | Adult renamed Math → Algebra | Case-insensitive match misses; duplicate clone created | Accepted limitation (V1). Manual cleanup via Library. |
+| Same topic exists under a *renamed* adult subject | Adult renamed Math → Algebra | Case-insensitive match misses; duplicate clone created | Accepted limitation (V1). Manual cleanup via Library's topic-delete flow (`apps/mobile/src/app/(app)/library/...` — verify the exact path at implementation time and link from the toast's empty state). |
 | Source child deleted (GDPR) before write | Async deletion mid-flow | 404 toast | Cloned topics already in adult's curriculum are unaffected; their `source_child_profile_id` becomes null via FK cascade |
-| Source child deleted after clone | GDPR delete after weeks | Library chip changes from "From {{childName}}" to "From a previous family member" or hides | None needed; adult's data intact |
+| Source child deleted after clone | GDPR delete after weeks | Library provenance chip hides (omitted when `source_child_profile_id` is null) | None needed; adult's data intact |
 | Adult's subject name conflicts in casing | Case-insensitive match resolves | Topic adds under existing subject | No duplicate subject created |
 | Network error on snapshot read | GET fails before tap completes | Trigger button shows inline error state + retry icon | Tap retry; otherwise next render |
 | Bridge fired in proxy mode (defensive) | Contract gate failure or test bug | Button never rendered | Contract `showLearnThisToo === false` in proxy; ratchet test enforces |
@@ -303,7 +339,7 @@ The existing `topic/relearn.tsx` is the "pick an overdue topic and pick a method
 | Undo tapped, network blip or row gone | Race / disconnect | Silent dismiss; topic persists if row genuinely persisted | Adult can delete manually from Library |
 | Cloned topic ignored forever | Adult never opens it from Library | Topic sits with provenance chip in Library; no special cleanup | Same as any adult-added-but-unstarted topic |
 | Subject language: child English, adult Norwegian | Cross-language family | Subject created under adult's Norwegian-language curriculum with the snapshot's English topic title verbatim; LLM teaches in Norwegian | Title may look foreign in Library; description is in adult's view |
-| Multiple toasts in flight | Parent clones rapidly | Latest toast visible; older collapse into "Plus N more added — tap to see" | Tap counter to expand list of recent clones |
+| Multiple toasts in flight | Parent clones rapidly | Latest toast replaces the prior one (single visible toast, latest wins) | Library shows all freshly-cloned topics with their "Recently added" 24h badge |
 | Toast missed (auto-dismissed before user noticed) | Slow tap, distracted user | Topic appears in Library with "Recently added" badge (24h) and provenance chip ("From {{childName}}") | No notification, but origin is visible in Library |
 
 ---
@@ -322,14 +358,15 @@ CREATE INDEX idx_curriculum_topics_source_child
   WHERE source_child_profile_id IS NOT NULL;
 ```
 
-- `subjects` — may insert one row per new (adult, name, adultLanguage) tuple.
-- `curriculum_books` — may insert one row per new (subject, title) tuple.
-- `curriculum_topics` — may insert one row per new (book/subject, title) tuple; `source_child_profile_id` set on bridge-created rows; null on all other rows (including manually added, AI-suggested, retention-derived).
+- `subjects` — may insert one row per new (adult, lower(name)) where status='active' (matches existing unique index `subjects_profile_name_lower_active_uq`). `languageCode` set from `profiles.conversationLanguage` on insert; left untouched on match.
+- `curricula` — may insert one row per new (subject, version=1) tuple. Required by `curriculum_topics.curriculumId` (NOT NULL FK).
+- `curriculum_books` — may insert one row per new (subject, lower(title)) tuple. `sortOrder = max + 1` over books in the subject.
+- `curriculum_topics` — may insert one row per new (book, lower(title)) tuple, setting `source = 'parent_bridge'`, `source_child_profile_id = childProfileId`, `description` and `estimatedMinutes` from snapshot, `sortOrder = max + 1`. `source_child_profile_id` is null on all non-bridge rows.
 - `needs_deepening_topics` — **not written by the bridge.** Only written later when the adult goes through the relearn fresh-topic mode and `startRelearn` fires.
 - `learning_sessions` — **not written by the bridge.** Same as above.
-- `curriculum_topic_source` enum — add `'parent_bridge'` value if absent (verify in `packages/database/src/schema/subjects.ts`; if the enum already covers it, skip).
+- `curriculum_topic_source` enum — **must add `'parent_bridge'`**. Current enum is `('generated', 'user')` (`packages/database/src/schema/subjects.ts:33-36`).
 
-If the enum needs the new value:
+Migration for the enum value:
 
 ```sql
 ALTER TYPE curriculum_topic_source ADD VALUE IF NOT EXISTS 'parent_bridge';
@@ -354,16 +391,17 @@ Three new routes, all under existing route groups:
 ### `GET /dashboard/children/:childProfileId/topics/:topicId/snapshot`
 
 - Requires authenticated adult profile.
-- Verifies family-link ownership via existing `getChildrenForParent` logic.
-- Returns `ChildTopicSnapshot` (including `topicDescriptionHash`, `childDisplayName`) or 404.
+- Verifies family-link ownership via `assertParentAccess(db, adultProfileId, childProfileId)` (`apps/api/src/services/family-access.ts:45-53`). Wraps the thrown `ForbiddenError` and re-throws `notFound('Topic')` so the response is 404, never 403.
+- Returns `ChildTopicSnapshot` (including `topicDescriptionHash`, `childDisplayName`, `estimatedMinutes`) or 404.
 - Read-only.
 
 ### `POST /curriculum/clone-from-child`
 
-- Body: `{ childProfileId: string; topicId: string; forceCopy?: boolean }`.
+- Body: `{ childProfileId: string; topicId: string; forceCopy?: boolean; requestId: string }`.
+  - `requestId` — client-generated UUID. Server dedups by `(adultProfileId, childProfileId, topicId, requestId)` for 60 seconds (in-memory or a small Redis TTL key) so network retries are idempotent.
   - `forceCopy: true` skips the name-match dedup and always creates a new topic with title `"{snapshot.topicTitle} (from {snapshot.childDisplayName})"`. Used by the `[Add separate copy]` toast action.
-- Verifies family-link.
-- Performs the resolve-or-create transaction described in *Adult-side write*.
+- Verifies family-link via `assertParentAccess` (same 403→404 wrapping as above).
+- Performs the resolve-or-create transaction described in *Adult-side write*, using `INSERT ... ON CONFLICT ... DO NOTHING RETURNING id` against the actual unique indexes.
 - **Does not** call `startRelearn`. **Does not** create a session or queue entry.
 - Returns `{ topicId, subjectId, alreadyExisted, descriptionDivergent, descriptionRefreshed, topicState, createdIds }`.
 
@@ -372,10 +410,10 @@ Route placement note: this is curriculum-mutation (write subject/book/topic), no
 ### `DELETE /curriculum/clone-from-child/undo`
 
 - Body: `{ createdIds: { topicId?: string; bookId?: string; subjectId?: string } }`.
-- Verifies each ID belongs to the requesting adult (via `createScopedRepository`).
-- Deletes in order: topic, then book (if newly created and now orphan), then subject (if newly created and now orphan).
-- On FK violation (session row references the topic) → returns `{ deleted: { topic: false, book: false, subject: false }, reason: 'session_started' }`. Mobile handles this with the explicit "Couldn't undo — you've already opened this" toast (H4).
-- On other failures → returns `{ deleted: {...partial...} }`. Mobile dismisses silently.
+- Verifies each ID belongs to the requesting adult via `createScopedRepository(adultProfileId)`.
+- **Deletes the topic only** (and only if `createdIds.topicId` is set). Empty `curriculum_books` and `subjects` containers are left in place — they are harmless and deleting them safely would require row-locks (concurrent clones could land between the orphan check and the delete and lose legitimate data).
+- On FK violation (session row references the topic) → returns `{ deleted: { topic: false }, reason: 'session_started' }`. Mobile handles this with the explicit "Couldn't undo — you've already opened this" toast (H4).
+- On other failures (network blip, row already gone) → returns `{ deleted: { topic: false } }`. Mobile dismisses silently.
 
 ---
 
@@ -403,7 +441,7 @@ Backed by `useMutation` from React Query. On success, shows the toast variant ma
 
 ### New component
 
-`apps/mobile/src/components/family/AddToMyLearningButton.tsx` (renamed from `LearnThisTooButton` per H5):
+`apps/mobile/src/components/family/AddToMyLearningButton.tsx` (renamed from `LearnThisTooButton` per H5; the `components/family/` folder already exists — see `FamilyOrientationCue.tsx`, `WithdrawalCountdownBanner.tsx`):
 
 ```ts
 type Props = {
@@ -510,7 +548,7 @@ Add a matrix row to `navigation-contract.test.ts` covering each precondition.
 
 ### Step 7 — Analytics event
 
-- Wire `learn_this_too.bridge` event in the mutation `onSuccess`. Fires on every tap, including `alreadyExisted: true` (multi-child attribution per M6).
+- Wire `add_to_my_learning.bridge` event in the mutation `onSuccess`. Fires on every tap, including `alreadyExisted: true` (multi-child attribution per M6). Server dedups on `requestId` over 60s.
 
 ### Step 8 — E2E
 
@@ -536,14 +574,18 @@ Add a matrix row to `navigation-contract.test.ts` covering each precondition.
 1. **Recaps detail dependency.** Block this spec on nav-contract PR 4 shipping `recaps/[recapId]`. No fallback to the Recaps list row.
 2. **Already-cloned detection.** Match by `(subjectId/bookId, lower(title))`. Description divergence is detected via `descriptionHash`. Handling depends on topic state (refresh unstarted, offer separate copy if started). Adult-side subject renames remain a V1 accepted limitation.
 3. **One-tap vs modal.** One-tap with undo toast — conditional on the bridge being a clone-only write (no `startRelearn`, no session, no queue). Toast variants reflect state. `[Add separate copy]` action mitigates false-positive name merges.
-4. **Origin storage (v2 reversal).** Store `source_child_profile_id` as nullable FK with `ON DELETE SET NULL`. Origin is visible in Library, not only at toast time. GDPR-safe via FK cascade.
-5. **Subject language.** Adult's primary language, not child's. Topic title and description stored verbatim from child snapshot.
-6. **Trigger copy.** "Add to my learning" + "Private to your learning" caption.
-7. **Open URL.** Carries `topicId`, `subjectId`, `topicName`, `subjectName`, `returnTo`, `source=parent_bridge`. Back-navigation returns parent to trigger surface.
-8. **Relearn fresh-topic mode.** New behavior (or verified existing behavior) on `relearn.tsx` that handles topics without a `needs_deepening_topics` row. `startRelearn` must accept these.
+4. **Origin storage.** See *Data Trace Decision* — nullable `source_child_profile_id` with `ON DELETE SET NULL`. Provenance chip omitted when null.
+5. **Subject language.** Subject dedup is language-agnostic by name (matches the existing unique index). `subjects.languageCode` is populated from the adult's `conversationLanguage` on insert; never overwritten on match. Topic title and description stored verbatim from child snapshot.
+6. **Trigger copy.** "Add to my learning" + "Private to your learning" caption. Internal event/storage names use `add_to_my_learning.*`.
+7. **Open URL.** Carries `topicId`, `subjectId`, `topicName`, `subjectName`, `returnTo` (token), `returnId` (context id), `source=parent_bridge`. Requires the new `family-recaps` / `family-child` tokens in `homeHrefForReturnTo` — coordinate with the nav-contract plan.
+8. **Relearn fresh-topic mode.** Verified: `startRelearn` already upserts the queue row and creates the session. Spec ships a regression test, no behavior change required.
+9. **Idempotency.** Clone endpoint accepts a client `requestId`; server dedups for 60s.
+10. **Undo.** Topic-only delete. Empty book/subject containers stay.
 
 ## Out Of Spec — Defer
 
-- Visual design of the toast (existing toast component + counter pattern).
-- Conversion telemetry beyond `learn_this_too.bridge` event (first session, retention impact). Add when data needs grow.
+- Collapsing-counter toast pattern ("Plus N more added — tap to see"). V1 ships single visible toast, latest wins. Counter requires building a new toast variant — defer until product demand confirms it.
+- Conversion telemetry beyond `add_to_my_learning.bridge` event (first session, retention impact). Add when data needs grow.
 - "Recently added" surface aggregating all sources (manual, AI, bridge). For now, the 24h badge per topic in Library is sufficient.
+- Adding a soft-archive column to `family_links`. Today revocation is row deletion; revisit if a UX need emerges.
+- Widening `subjects` unique index to include `language_code`. Not required by V1 since dedup is language-agnostic by design.
