@@ -30,10 +30,13 @@ jest.mock('expo-crypto', () => ({
   randomUUID: () => mockRandomUUID(),
 }));
 
-jest.mock('../lib/analytics', () => ({
-  hashProfileId: (...args: [string]) => mockHashProfileId(...args),
-  track: (...args: unknown[]) => mockTrack(...args),
-}));
+jest.mock(
+  '../lib/analytics' /* gc1-allow: hook test isolates analytics side effects while exercising API/navigation behavior */,
+  () => ({
+    hashProfileId: (...args: [string]) => mockHashProfileId(...args),
+    track: (...args: unknown[]) => mockTrack(...args),
+  }),
+);
 
 const originalFetch = globalThis.fetch;
 
