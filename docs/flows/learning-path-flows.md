@@ -1,6 +1,6 @@
 # Learning Path Flows — End-User Perspective
 
-Complete trace of every learning path in MentoMate, from the learner's first tap to post-session recording. Last updated 2026-05-04.
+Complete trace of every learning path in MentoMate, from the learner's first tap to post-session recording. Last updated 2026-05-23.
 
 > **What changed since 2026-04-14**
 > - The five tutoring-session paths below are unchanged in shape; only their **entry points** moved. The intermediate `/(app)/learn-new` screen was deleted in the home IA simplification (commit 55ddcbdb). Learners now tap a quick action or the Ask Anything bar directly on `/(app)/home` to start any path.
@@ -12,7 +12,7 @@ Complete trace of every learning path in MentoMate, from the learner's first tap
 > - **Library v3 (PR #144, commit 1dd00262).** The shelves/books/topics tab architecture is gone. Library is a single-pane topic-first view with expandable subject shelves, inline book cards, server-side debounced search (`LibrarySearchBar` + `useLibrarySearch`), and retention pills. Guided learning and relearn paths now start from this single-pane view.
 > - **Quiz history + round detail (PR #121).** Completed rounds remain discoverable after the results screen is dismissed via `/(app)/quiz/history` and `/(app)/quiz/[roundId]`.
 > - **Bookmarks within sessions (commit 6e0ffb58).** Learners can bookmark AI messages mid-session; saved messages live at `/(app)/progress/saved`. A first-time `BookmarkNudgeTooltip` appears after a few AI responses. Parent-proxy mode disables delete.
-> - **Session transcript for parents (commit 53524c6d, BUG-889).** New read-only `/(app)/session-transcript/[sessionId]` route reachable from the session-summary "View full transcript" link. Bubbles are rendered through `stripEnvelopeJson` (BUG-941).
+> - **Session transcript for parents (commit 53524c6d, BUG-889).** New read-only `session-transcript/[sessionId]` route (top-level, not under `(app)/`) reachable from the session-summary "View full transcript" link. Bubbles are rendered through `stripEnvelopeJson` (BUG-941).
 > - **Onboarding extras Bucket C — `conversationLanguage` (mandatory), `pronouns`, `interestsContext`.** These dimensions are now passed into every session prompt; see Cross-Cutting Dimensions.
 > - **i18n cross-cutting layer.** UI strings (errors, dictation alerts, camera permission copy, sso-callback) are rendered via `t()` in en/nb/de/es/pl/pt/ja. App-language is now editable from More.
 > - **Profile-as-lens phase 1.** Profile-scoped screens receive the active profile as a navigation lens; impersonated-child sessions hide destructive actions in More.
@@ -812,7 +812,7 @@ Parents don't use learning paths directly. They see the **outputs** of the recor
 |---|---|
 | Dashboard activity feed | `learning_sessions` + `session_events` |
 | Session recap block (Parent Narrative Phase 1, commit 68a2288c) | `learning_sessions.metadata` summary fields, surfaced as a recap card on parent dashboard |
-| Read-only session transcript (`/(app)/session-transcript/[sessionId]`, BUG-889) | `session_events` (user_message + ai_response), bubbles run through `stripEnvelopeJson` |
+| Read-only session transcript (`session-transcript/[sessionId]`, BUG-889, top-level route not under `(app)/`) | `session_events` (user_message + ai_response), bubbles run through `stripEnvelopeJson` |
 | Homework summary | `learning_sessions.metadata.homeworkSummary` |
 | Subject progress | `progress_snapshots` |
 | Understanding card (replaced "Mastery" in Parent Narrative Phase 1) | Aggregated from `progress_snapshots` + `learning_profiles`; retention badges gated until enough signal |

@@ -4,7 +4,7 @@ AI-powered tutoring platform that teaches through Socratic dialogue, spaced repe
 
 ## Architecture
 
-Nx monorepo with two apps and five shared packages:
+Nx monorepo with two apps and four shared packages:
 
 ```
 apps/
@@ -15,7 +15,6 @@ packages/
   schemas/       Zod schemas — single source of shared types
   database/      Drizzle ORM + Neon PostgreSQL
   retention/     SM-2 spaced repetition algorithm
-  factory/       Test data builders
   test-utils/    Shared test utilities and mocks
 ```
 
@@ -95,13 +94,13 @@ Required: `DATABASE_URL` (Neon connection string). See `.env.example` for all va
 
 ## Project Status
 
-**Epics 0-16 complete.** Pre-launch — store publishing blocked (Apple enrollment pending, Google Play appeal in progress).
+**Epics 0-16 complete.** Pre-launch — Apple Developer + Google Play accounts approved 2026-05-21; preparing for first store submission.
 
-- 38+ mobile screens, 1,228 mobile tests (117 suites)
-- 33 API route groups, 2,136 API tests, 19 integration suites
-- 16 Inngest background functions
+- 88+ mobile screens, ~3446 mobile tests (311 suites)
+- 43 API route groups, ~5118 API tests, 44 integration suites
+- 53 Inngest background functions
 - Auth (Clerk), SSE streaming, Neon DB, E2E tests (Playwright + Maestro) — all shipped
-- LLM structured response envelope migrated across all 9 prompt surfaces
+- LLM structured response envelope migrated across all prompt surfaces
 - OTA updates operational via EAS Update
 
 ## Documentation

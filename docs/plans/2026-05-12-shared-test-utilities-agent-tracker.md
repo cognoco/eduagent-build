@@ -4,6 +4,8 @@
 **Purpose:** Historical coordination plan for agents implementing the shared test utility framework.  
 **Full context:** `docs/plans/2026-05-12-shared-test-utility-framework-plan.md`
 
+_(File location: still at `docs/plans/` despite Archived status header — to be moved to `docs/_archive/plans/done/` on next cleanup pass.)_
+
 ## Agent Rules
 
 - Read this tracker before changing test utilities or mock cleanup tests.

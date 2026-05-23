@@ -23,7 +23,7 @@ Notes:
 | --- | --- |
 | Primary context | An adult owner supports child learners they are allowed to see. |
 | Capability | Adult owner profile with server-sourced family links. Adults without links may see setup, not the final Family shell. |
-| Target tabs | `home`, `recaps`, `progress`, `more`. The minimal Recaps path is implemented in the navigation-contract branch; if Recaps is disabled or rolled back, the tab must not be surfaced as a dead tab. |
+| Target tabs | `home`, `recaps`, `progress`, `more`. The minimal Recaps path is implemented in the navigation-contract branch; if Recaps is disabled or rolled back, the tab must not be surfaced as a dead tab. (V1 target; current V0 family-mode = `home, progress, more` only — recaps tab requires `MODE_NAV_V1_ENABLED=true`) |
 | Home surface | Family/Children home, replacing the old guardian hybrid home as the target experience. |
 | Child data access | Parent-native child routes and APIs scoped by family-link/consent rules. |
 | Learning routes | Not directly surfaced from Mentor mode. "Learn this too" and similar bridges switch the adult into Study as themselves. |
@@ -81,7 +81,7 @@ Notes:
 
 | Original ID | Mentor access | How it should work |
 | --- | --- | --- |
-| PARENT-01 | Adult owners with child access | Parent dashboard behavior becomes part of the Family/Children home target. Solo adults without child links should remain Study-safe plus setup CTA. |
+| PARENT-01 | Adult owners with child access | Parent dashboard behavior becomes part of the Family/Children home target. Solo adults without child links should remain Study-safe plus setup CTA. (Today `/(app)/dashboard` already redirects to `/(app)/home`; actual parent surface is `ParentHomeScreen` branch inside `LearnerScreen`.) |
 | PARENT-02 | Adult owners with multiple children | Multi-child dashboard supports selecting or comparing linked children. |
 | PARENT-03 | Adult owners with child access | Child detail is the main mentor drill-down surface. |
 | PARENT-04 | Adult owners with child access | Child subject/topic drill-down remains parent-native and must enforce family-link/consent access. |
@@ -110,6 +110,8 @@ Notes:
 | HOMEWORK-01 through HOMEWORK-07 | Not directly surfaced as child impersonation | Homework capture/tutoring is a student flow. A mentor can help through review/support surfaces or switch to Study as themselves; normal mentor mode should not start child homework by proxy unless a separately designed guardian-assist flow exists. |
 
 ## Recaps Target
+
+The Recaps tab route lives at `apps/mobile/src/app/(app)/recaps.tsx`. It is gated behind `MODE_NAV_V1_ENABLED=true` in the navigation contract; the V0 guardian bridge for the 5-tab `LEGACY_GUARDIAN_TABS` shape is `apps/mobile/src/app/(app)/own-learning.tsx`.
 
 The original inventory did not have a first-class Recaps flow. The target Mentor/Family map derives the minimal Recaps feed from these existing flows:
 

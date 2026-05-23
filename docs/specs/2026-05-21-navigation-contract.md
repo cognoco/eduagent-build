@@ -1,6 +1,6 @@
 # Navigation Contract - Reconciled V1
 
-**Status:** Reconciled spec - pending implementation
+**Status:** PR 1 ✅ PR 2 ✅ PR 4 ✅ — PRs 3, 5, 6 pending.
 **Date:** 2026-05-21
 **Reconciled:** 2026-05-22
 **Product source:** `docs/specs/2026-05-19-study-and-family-mode-navigation-FULL.md`
@@ -29,7 +29,7 @@ The next implementation should introduce `resolveNavigationContract(ctx)` as the
 - **Study mode:** `home`, `library`, `progress`, `more`.
 - **Family mode:** `home`, `recaps`, `progress`, `more`.
 - The old guardian/hybrid tab set (`home`, `own-learning`, `library`, `progress`, `more`) is a V0/legacy starting point, not the final contract.
-- Recaps is not implemented yet. V1 must either add a minimal `recaps` screen/API in the same sequence or gate the tab behind an explicit tracked stub until the route exists.
+- Recaps is implemented (PR 4). V1 can wire the tab directly to `/(app)/recaps`.
 - Mode persistence is not optional for FULL. V1 uses server-backed per-profile `profiles.default_app_context`.
 - Parent review should be parent-native. Normal end-user paths should not require parent proxy mode.
 
@@ -51,9 +51,9 @@ The next implementation should introduce `resolveNavigationContract(ctx)` as the
 
 **Rules:**
 
-1. The V0-off short-circuits at `apps/mobile/src/lib/app-context.tsx:37, 44, 61` (force `familyCapable=false`, `mode=null`) **must stay alive**.
-2. The V0 fall-through at `apps/mobile/src/app/(app)/_layout.tsx:2042` (`return computeVisibleTabs(tabShape, false)`) **must keep returning 5 tabs** for guardian profiles.
-3. V0 helpers `resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` (`_layout.tsx:120-180`) **must not be deleted** when V1 lands. They remain the source of truth for `MODE_NAV_V0_ENABLED=off`.
+1. The V0-off short-circuits at `apps/mobile/src/lib/app-context.tsx` — `familyCapable=false` at line 60 and `derivedMode=null` at line 70 (force-off when both `MODE_NAV_V1_ENABLED` and `MODE_NAV_V0_ENABLED` are false) — **must stay alive**.
+2. The V0 fall-through at `apps/mobile/src/app/(app)/_layout.tsx:263` (`return computeVisibleTabs(tabShape, false)`) **must keep returning 5 tabs** for guardian profiles.
+3. V0 helpers `resolveTabShape`, `computeVisibleTabs`, `computeModeVisibleTabs`, `resolveHomeTabPresentation` (`_layout.tsx:122-185`) **must not be deleted** when V1 lands. They remain the source of truth for `MODE_NAV_V0_ENABLED=off`.
 4. `resolveNavigationContract` wiring is gated entirely behind `MODE_NAV_V1_ENABLED` (new flag) and **does not replace** the V0-off fallback path.
 5. Every PR must include a test asserting that with `MODE_NAV_V0_ENABLED=false` and `MODE_NAV_V1_ENABLED=false`, a guardian profile sees all 5 tabs.
 
@@ -89,7 +89,7 @@ The codebase already has a V0 implementation:
 - Family capability is inferred client-side from the loaded profile list.
 - Family mode currently renders `home`, `progress`, `more`.
 - Study mode currently renders `home`, `library`, `progress`, `more`.
-- Recaps does not exist as a first-class route/API/schema.
+- Recaps now exists as a first-class route/API/schema (PR 4 complete: `recaps.tsx`, `routes/recaps.ts`, `services/recaps.ts`, `packages/schemas/src/recaps.ts`).
 - Parent-facing child session detail exists under child routes, backed by dashboard child session APIs.
 - Parent proxy is still active and can be entered through normal profile switching paths.
 - Mode switcher UI is mounted on Home, not app chrome.

@@ -23,7 +23,7 @@ Two large changes reshape the inventory:
 
 1. **Home & navigation IA simplification (commit 55ddcbdb, 2026-04-17/18).**
    - `/(app)/learn-new` and `/(app)/learn` were deleted. Their job is now done by the four IntentCards rendered directly on `/(app)/home` (`LearnerScreen`).
-   - Tab bar whitelist is now `home, library, progress, more` (Progress was promoted from a hidden non-tab route to a top-level tab).
+   - Tab bar whitelist for learner shape is `home, library, progress, more` (Progress was promoted from a hidden non-tab route to a top-level tab); guardian shape retains `home, own-learning, library, progress, more` in V0.
    - `FULL_SCREEN_ROUTES` (tab bar hidden) now also covers `dictation` and `quiz` in addition to `session`, `homework`, `onboarding`, `shelf`.
 2. **Quiz, dictation, vision, animation feature drop (commit f6631f4a, 2026-04-16).** New top-level practice activities and the photo-review path that depends on multimodal LLM input.
 
@@ -124,7 +124,7 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | HOME-02 | Parent gateway home | `/(app)/home` via `ParentHomeScreen` / Family home contract | `e2e/flows/parent/parent-tabs.yaml`, `e2e/flows/parent/parent-dashboard.yaml` |
 | HOME-03 | Parent tabs and parent-mode navigation | V1 Family shell: `/(app)/home`, `/(app)/recaps`, `/(app)/progress`, `/(app)/more`; V0 guardian fallback still includes `/(app)/own-learning` and `/(app)/library` | `e2e/flows/parent/parent-tabs.yaml` — needs re-run/repair for the V1 Recaps tab |
 | HOME-04 | Animated splash and initial shell | root `_layout.tsx` splash / launch experience | `e2e/flows/edge/animated-splash.yaml` |
-| HOME-05 | Empty first-user state (no subjects yet) — surfaced through the learner home action set; CTA `home-action-study-new` deep-links into `/create-subject` (updated 2026-05-14; old `home-add-subject-tile`/`home-add-first-subject` IDs no longer match) | `LearnerScreen` empty-subjects branch | `e2e/flows/edge/empty-first-user.yaml` |
+| HOME-05 | Empty first-user state (no subjects yet) — surfaced through the learner home action set; CTA `home-action-study-new` is the primary entry; `home-add-subject-tile` / `home-add-first-subject` IDs remain in the empty-subjects branch | `LearnerScreen` empty-subjects branch | `e2e/flows/edge/empty-first-user.yaml` |
 | HOME-06 | Resume interrupted session (driven by SecureStore session-recovery marker + `useContinueSuggestion`; surfaced as the active-subject card or a recovery affordance on the home carousel) | `LearnerScreen` continue affordance | Code-only |
 | HOME-07 | Add-first-child gate for parent owners on family/pro plans without a child profile yet — "Add a child to get started" branch on parent home; CTA navigates to `/create-profile` | `/(app)/home` parent branch | Code-only |
 | HOME-08 | Home loading-timeout fallback | `/(app)/home` after 10s of profile load | Code-only — testIDs `home-loading-timeout`, `home-loading-retry`, `timeout-library-button`, `timeout-more-button` |
@@ -137,8 +137,8 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 | SUBJECT-07 | Focused subject or focused-book flow | `/create-subject` -> first learning session | `e2e/flows/onboarding/create-subject.yaml` |
 | SUBJECT-08 | Per-subject native-language setup for language-learning subjects (four-strands pedagogy). Distinct from the profile-wide `conversationLanguage` set in SUBJECT-16 | `/(app)/onboarding/language-setup` | Covered by onboarding flows; language branch is route-backed |
 | SUBJECT-12 | View curriculum without committing to a learning session | curriculum screen and library/book entry routes | `e2e/flows/onboarding/view-curriculum.yaml` |
-| SUBJECT-14 | Placement / knowledge assessment | `/assessment` | `e2e/flows/assessment/assessment-cycle.yaml` |
-| SUBJECT-16 | Conversation-language picker (mandatory, profile-wide). Sets `conversationLanguage`. First entry: post-create-profile onboarding before pronouns | `/(app)/onboarding/language-picker` | `e2e/flows/onboarding/onboarding-fast-path-language.yaml` |
+| SUBJECT-14 | Placement / knowledge assessment | `/(app)/practice/assessment` | `e2e/flows/assessment/assessment-cycle.yaml` |
+| SUBJECT-16 | Conversation-language picker (mandatory, profile-wide). Sets `conversationLanguage`. First entry: post-create-profile onboarding before pronouns | `/(app)/onboarding/language-setup` | `e2e/flows/onboarding/onboarding-fast-path-language.yaml` |
 | SUBJECT-17 | After conversation-language setup, learners at or above `PRONOUNS_PROMPT_MIN_AGE` see a pronouns picker with preset options and a free-text Other path. Learners below the age gate skip this screen automatically and continue onboarding. | `/(app)/onboarding/pronouns` | Partial: covered when onboarding fast-path coverage reaches the pronouns stage; no dedicated current pronouns YAML exists |
 
 ## Learning, Chat, Library, Retention, and Progress
@@ -174,7 +174,7 @@ For the planned redesign, see `docs/plans/app evolution plan/2026-05-06-learning
 
 ## Practice Hub and Practice Activities
 
-The Practice hub is the top-level surface for activities that are not full tutoring sessions. It is reached from the home quick-action row (`home-action-practice`). The hub itself is **not** a tab — it is a non-tab route under `/(app)/practice` that hides the tab bar at the route level.
+The Practice hub is the top-level surface for activities that are not full tutoring sessions. It is reached from the home quick-action row (`home-action-practice`). The hub itself is **not** a tab — it is a non-tab route under `/(app)/practice` whose tab button is hidden (excluded from `visibleTabs`) but whose tab bar chrome remains visible (it is not in `FULL_SCREEN_ROUTES`).
 
 | ID | Flow | Primary routes / entry points | Coverage |
 | --- | --- | --- | --- |
@@ -231,7 +231,7 @@ Dictation is a five-screen flow under `/(app)/dictation` with its own React cont
 | HOMEWORK-05 | Gallery import (pick existing photo instead of camera capture) | `/(app)/homework/camera` gallery picker | Code-only — see `2026-04-10-homework-gallery-import-design.md` |
 | HOMEWORK-06 | Image pass-through to multimodal LLM (vision) for richer help | session route after homework capture; same image path used by dictation review | Code-only — see `2026-04-16-homework-image-vision-design.md` |
 | HOMEWORK-07 | Camera permission onboarding — first-request prompt and permanently-denied Settings-redirect state; auto-refreshes permission on return from OS Settings so camera unlocks without a manual restart | `/(app)/homework/camera` permission phase | `e2e/flows/homework/camera-permission-denied.yaml` (permanently-denied state); first-request covered by `homework/camera-ocr.yaml` |
-| PARENT-01 | Parent dashboard (parents only — solo accounts without linked children render `LearnerScreen`, not a dashboard). `MetricInfoDot` + `SamplePreview` parent components active across child detail / session / topic surfaces (commit 02e4c519) | `/(app)/dashboard` | `e2e/flows/parent/parent-dashboard.yaml` |
+| PARENT-01 | Parent dashboard (parents only — solo accounts without linked children render `LearnerScreen`, not a dashboard). `MetricInfoDot` + `SamplePreview` parent components active across child detail / session / topic surfaces (commit 02e4c519). Note: `/(app)/dashboard` is a permanent redirect to `/(app)/home`; the actual parent surface is rendered by the `ParentHomeScreen` branch inside `LearnerScreen`. | `/(app)/home` (via `ParentHomeScreen` branch in `LearnerScreen`; `/(app)/dashboard` is a redirect) | `e2e/flows/parent/parent-dashboard.yaml` |
 | PARENT-02 | Multi-child dashboard | dashboard with multiple linked children | `e2e/flows/parent/multi-child-dashboard.yaml` |
 | PARENT-03 | Child detail drill-down | `/(app)/child/[profileId]` | `e2e/flows/parent/child-drill-down.yaml` |
 | PARENT-04 | Child subject -> topic drill-down | `/(app)/child/[profileId]/subjects/[subjectId]`, `topic/[topicId]` | Covered inside `e2e/flows/parent/child-drill-down.yaml` |
@@ -305,6 +305,19 @@ These are not single-screen flows, but they shape user experience across multipl
 | CC-16 | HMR-safe error type guards in `format-api-error.ts` (BUG-947) | All `instanceof` checks for typed API errors (`ForbiddenError`, `QuotaExceededError`, `UpstreamError`, etc.) are replaced with `.name` string + property-shape guards so Metro HMR module reloads do not break class identity. |
 | CC-17 | Profile-as-lens navigation pattern (commit a72ebfac) | Profile-scoped screens receive the active profile via a navigation lens (`/(app)/child/[profileId]` and equivalent) rather than re-fetching at the screen level. `(app)/_layout.tsx` is the authority. `useActiveProfileRole()` gates destructive More actions for impersonated-child sessions (ACCOUNT-30). |
 | CC-18 | Stable FlatList refs (PERF-10, commit 088640c8) | Hoisted `keyExtractor` / `renderItem` references prevent virtualisation from being defeated by re-render churn. Applied to library, vocabulary, history, and bookmarks lists. |
+
+## Recently Shipped Routes — Pending Flow IDs
+
+The following routes exist in `apps/mobile/src/app/(app)/` but have not yet been assigned canonical flow IDs in this inventory. They should be added in the next inventory pass.
+
+| Route | Status | Notes |
+| --- | --- | --- |
+| `/(app)/progress/reports/` (`reports/index.tsx` + `reports/[reportId].tsx`) | Shipped | Child-reports list and report detail; referenced as an entry point in PARENT-06 but not registered as its own flow row |
+| `/(app)/progress/weekly-report/[weeklyReportId]` (`weekly-report/_layout.tsx` + `[weeklyReportId].tsx`) | Shipped | Push-driven weekly report detail; referenced in PARENT-13 but shares entry point with `/(app)/child/[profileId]/weekly-report/[weeklyReportId]` — confirm canonical route |
+| `/(app)/more/celebrations.tsx` | Shipped | Celebration / reward screen reachable from More; no flow row exists |
+| `/(app)/vocabulary/` (`vocabulary/index.tsx` + `vocabulary/[subjectId].tsx`) | Shipped | Cross-subject vocabulary browser index + per-subject vocabulary list; LEARN-21 covers `/(app)/progress/vocabulary` separately |
+| `/(app)/recaps.tsx` | Shipped (flag-gated) | Family Recaps tab surface; V1 Family shell only (`MODE_NAV_V1_ENABLED=true`); not yet a flow row in this inventory |
+| `/(app)/own-learning.tsx` | Shipped | Guardian bridge tab for the V0 5-tab shape; LEARN-08 in the V0 `own-learning` slot; no standalone flow row |
 
 ## Best Next Candidates for Dedicated Flow Docs or E2E Coverage
 

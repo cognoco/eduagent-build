@@ -1,5 +1,15 @@
 # Mobile Flow Improvements
 
+> **Note (2026-05-23):** This doc captures UX critique as of 2026-04-10. Several flows have since changed significantly:
+> - HOME-01: IntentCard pattern replaced by subject carousel + Ask Anything bar + quick-action row (home redesign).
+> - HOME-06: `/(app)/learn-new` was deleted; "Learn New" is no longer a route.
+> - LEARN-08: Library v3 replaced the three-tab structure with a single-pane subject-first shelf list.
+> - SUBJECT-09 (interview), SUBJECT-10 (analogy-preference), SUBJECT-11 (curriculum-review): removed from first-run onboarding.
+> - SUBJECT-13: not registered in canonical `mobile-app-flow-inventory.md`.
+> - PARENT-01: `/(app)/dashboard` is a permanent redirect to `/(app)/home`; parent surface is `ParentHomeScreen` branch inside `LearnerScreen`.
+>
+> See `mobile-app-flow-inventory.md` for the canonical current state.
+
 Date: 2026-04-10
 
 This review was written from an end-user point of view after reading the current mobile flow inventory and sampling the current route/component code behind those flows.

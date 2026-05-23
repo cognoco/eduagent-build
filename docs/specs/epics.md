@@ -385,7 +385,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 ### FR Coverage Map
 
-**All 149 FRs mapped. 121 MVP (Epics 0-5), 5 later-phase FRs now shipped (Epic 8), 23 deferred (Epics 6-7).**
+**All 176 FRs mapped. 121 MVP (Epics 0-5), 5 later-phase FRs now shipped (Epic 8), 23 deferred (Epics 6-7), 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency, 2 Epic 7 library browsing, 2 Epic 7 library UX refactor.**
 
 | FR Range | Category | Epic | Scope |
 |----------|----------|------|-------|
@@ -435,13 +435,13 @@ Completed specs are in `docs/_archive/specs/Done/`. Active/in-progress specs are
 | 9 | Native IAP (RevenueCat, Stripe dormant) | Stories in this file | DONE |
 | 10 | Pre-launch UX polish | Stories in this file | DONE |
 | 11 | Brand identity (teal/lavender, dark-first) | Stories in this file | DONE |
-| 12 | Persona removal (age + role + intent-as-cards) | `plans/epic-12-persona-to-roles.md` | DONE |
+| 12 | Persona removal (age + role + intent-as-cards) | Stories in this file (`plans/epic-12-persona-to-roles.md` not committed) | DONE |
 | 13 | Session lifecycle (wall-clock, recovery, celebrations, adaptive silence) | Stories in this file | DONE |
 | 14 | Human agency & feedback | Stories in this file | DONE |
 | 15 | Visible progress (snapshots, milestones, journey screen, reports) | `_archive/specs/Done/2026-04-07-epic-15-visible-progress-design.md` | DONE |
 | 16 | Adaptive memory (learner profiles, mentor memory, accommodations) | `_archive/specs/Done/2026-04-07-epic-16-adaptive-memory-design.md` | DONE |
 | 17 | Voice-first learning (server STT/TTS, pronunciation, hands-free) | `specs/2026-04-07-epic-17-voice-first-design.md` | NOT STARTED |
-| 18 | LLM Tuning — Structured Output, Personalization & Reliability | `specs/2026-04-18-llm-*.md` (3 files) | IN PROGRESS |
+| 18 | LLM Tuning — Structured Output, Personalization & Reliability | `_archive/specs/Done/2026-04-18-llm-*.md` (3 files) | DONE |
 | — | Conversation-first learning flow | `_archive/specs/Done/2026-04-08-conversation-first-learning-flow-design.md` | DONE |
 | — | Adaptive home screen | `_archive/specs/Done/2026-04-04-adaptive-home-screen-design.md` | DONE |
 | — | EAS Update / OTA deploys | `_archive/specs/Done/2026-04-02-eas-update-ota-design.md` | DONE |
@@ -460,7 +460,7 @@ Completed specs are in `docs/_archive/specs/Done/`. Active/in-progress specs are
 | — | Code review fixes plan | `_archive/specs/Done/plan-code-review-fixes.md` | DONE |
 | — | Animation improvements | `_archive/specs/2026-04-16-animation-improvements-design.md` | DONE |
 | — | Quiz UI redesign fixes | `_archive/specs/2026-04-18-quiz-ui-redesign-finding-fixes.md` | DONE |
-| — | Prompt tuning design | `specs/2026-04-19-prompt-tuning-design.md` | IN PROGRESS |
+| — | Prompt tuning design | `_archive/specs/Done/2026-04-19-prompt-tuning-design.md` | DONE |
 | WEB-A | Parent control center (web) — candidate | Stories in this file | NOT STARTED |
 | WEB-B | Text-mode learning flow (web) — candidate | Stories in this file | NOT STARTED |
 
@@ -6071,10 +6071,10 @@ Make voice the default learning modality rather than an optional input method. A
 
 Replace fragile free-text markers and JSON-in-text patterns with a typed response envelope (`llmResponseEnvelopeSchema`). Wire unused learner data (interests, age, struggles, strengths, urgency) into all LLM prompt surfaces. Fix tone, shorten interview, add escape buttons and confidence-aware UI.
 
-**Detailed specs:**
-- `specs/2026-04-18-llm-response-envelope.md` — envelope schema contract + migration playbook
-- `specs/2026-04-18-llm-reliability-ux-audit.md` — 7 findings (F1.1–F8) on marker fragility, tone, UX dead-ends
-- `specs/2026-04-18-llm-personalization-audit.md` — 9 prompt surfaces audited, personalization gaps mapped
+**Detailed specs (archived):**
+- `_archive/specs/Done/2026-04-18-llm-response-envelope.md` — envelope schema contract + migration playbook
+- `_archive/specs/Done/2026-04-18-llm-reliability-ux-audit.md` — 7 findings (F1.1–F8) on marker fragility, tone, UX dead-ends
+- `_archive/specs/Done/2026-04-18-llm-personalization-audit.md` — 9 prompt surfaces audited, personalization gaps mapped
 
 **Dependencies:** Epic 2 (exchange loop), Epic 3 (assessment/retention), Epic 16 (adaptive memory)
 

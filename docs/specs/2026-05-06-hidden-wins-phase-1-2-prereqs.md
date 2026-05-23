@@ -5,9 +5,11 @@
 **Source backlog:** `docs/plans/app evolution plan/2026-05-06-hidden-wins-backlog.md`
 **Scope:** Phase 1 type-plumbing prep plus Phase 2 P0 prerequisite decisions.
 
+> **Status: Implemented 2026-05-XX.** Phase 1 (shared DashboardChild contract), Phase 2A (consent redaction via `redactDashboardChild`), and Phase 2B (push registration failure classification) all live in code. This spec is preserved as the design record; archive candidate.
+
 ## Phase 1: Family Summary Type Plumbing
 
-`apps/mobile/src/app/(app)/family.tsx` must consume the shared `DashboardChild` contract from `@eduagent/schemas` so the streak and XP fields already present in `dashboardChildSchema` remain aligned with the API response:
+`apps/mobile/src/components/home/ParentHomeScreen.tsx` must consume the shared `DashboardChild` contract from `@eduagent/schemas` so the streak and XP fields already present in `dashboardChildSchema` remain aligned with the API response:
 
 | Field | Source contract | Purpose |
 |---|---|---|
@@ -95,6 +97,6 @@ Do not build a generic "tap to retry notifications" banner until the hook expose
 
 | Item | Verified By |
 |---|---|
-| Phase 1 family type plumbing compiles | `test: pnpm exec jest --findRelatedTests apps/mobile/src/app/(app)/family.tsx --no-coverage` |
+| Phase 1 family type plumbing compiles | `test: pnpm exec jest --findRelatedTests apps/mobile/src/components/home/ParentHomeScreen.tsx --no-coverage` |
 | Consent visibility rule is specified before badge UI | `manual: this spec, Phase 2A` |
 | Push registration failure modes are specified before indicator UI | `manual: this spec, Phase 2B` |

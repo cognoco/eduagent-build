@@ -4,7 +4,7 @@
 >
 > This scaffold rebuilds the doc from references in the earlier draft of `docs/specs/2026-05-21-navigation-contract.md` (dangling commit `e6287097`). All file:line citations below are extracted from that draft and re-verified against current HEAD — but the original severity labels (F1–F14) are *inferred* from the navigation-contract's "5 of 14 findings addressed" callout. Re-derive F-numbers from a fresh audit if precision matters.
 
-**Status:** Verified 2026-05-22 against HEAD. File:line citations corrected (~14 entries had off-by-N or wrong-symbol issues; see git diff vs. 2026-05-21 for the deltas). F-numbering still scaffolded — re-derive from a fresh audit if precision matters.
+**Status:** Verified 2026-05-23 against HEAD. File:line citations corrected (~14 entries had off-by-N or wrong-symbol issues; see git diff vs. 2026-05-21 for the deltas). F-numbering still scaffolded — re-derive from a fresh audit if precision matters.
 
 > **Migration constraint.** Closing F5/F6/F7/F8/F11 by migrating these sites to `resolveNavigationContract` **must not regress today's 5-tab mode** (active when `MODE_NAV_V0_ENABLED=false` in Doppler). The contract is wired behind a separate `MODE_NAV_V1_ENABLED` flag; the V0 helpers consumed by each site below stay alive. See the "Hard Constraint" section of `docs/specs/2026-05-21-navigation-contract.md` for the flag matrix.
 
@@ -31,29 +31,29 @@ The navigation-contract addresses **5 of 14 findings** here (F5, F6, F7, F8, F11
 
 ## Inventory — Scattered Gating Sites
 
-Each entry is a current-code site that branches on profile attributes (`isOwner`, `role`, `birthYear`, `mode`, `isParentProxy`, `tier`, `consentStatus`). Verified 2026-05-22 against HEAD.
+Each entry is a current-code site that branches on profile attributes (`isOwner`, `role`, `birthYear`, `mode`, `isParentProxy`, `tier`, `consentStatus`). Verified 2026-05-23 against HEAD.
 
 ### Shell and Routing
 
 | File:line | Reads | What it gates | Finding |
 |---|---|---|---|
-| `apps/mobile/src/app/(app)/_layout.tsx:2038-2048` | `tabShape`, `visibleTabs`, `homeTabPresentation` | Tab bar composition; replaced by `useNavigationContract()` | F11 |
-| `apps/mobile/src/app/(app)/_layout.tsx:1527` | `consentStatus === 'PARENTAL_CONSENT_REQUESTED'` | Full-screen consent overlay (shell-level interception) | F2 |
-| `apps/mobile/src/app/(app)/_layout.tsx:2427` | Withdrawal flow | Full-screen withdrawal overlay | F2 |
+| `apps/mobile/src/app/(app)/_layout.tsx:2093-2109` | `tabShape`, `visibleTabs`, `homeTabPresentation` | Tab bar composition; replaced by `useNavigationContract()` | F11 |
+| `apps/mobile/src/app/(app)/_layout.tsx:1581` | `consentStatus === 'PARENTAL_CONSENT_REQUESTED'` | Full-screen consent overlay (shell-level interception) | F2 |
+| `apps/mobile/src/app/(app)/_layout.tsx:2491` | Withdrawal flow | Full-screen withdrawal overlay | F2 |
 
 ### Home
 
 | File:line | Reads | What it gates | Finding |
 |---|---|---|---|
-| `apps/mobile/src/app/(app)/home.tsx:54, 61, 169-173` | `mode` (54), `isOwner` (61) — passes `profiles`, `activeProfile`, `mode` to `<LearnerScreen>` | **Always mounts `<LearnerScreen>`** (the route itself does not branch — see CLAUDE.md "Profile Shapes" rule). The other gating inputs (`hasLinkedChildren`, `isFamilyPlanOwner`, `isParentProxy`, `showParentHome`) are read inside `LearnerScreen`, not here. | F11 |
-| `apps/mobile/src/components/home/LearnerScreen.tsx:479-490` | `isOwner`, `subscription.tier`, `showParentHome`, `isParentProxy`, `mode`, `hasLinkedChildren`, `isFamilyPlanOwner` | **The actual `ParentHomeScreen` vs learner-home branch** (lines 483-490, with `isFamilyPlanOwner` derived at 479-481). Inline switch instead of contract read. | F11 |
+| `apps/mobile/src/app/(app)/home.tsx:68, 76-78, 186` | `mode` (68 as `legacyMode`), `isOwner` (76-78) — passes `profiles`, `activeProfile`, `mode` to `<LearnerScreen>` | **Always mounts `<LearnerScreen>`** (the route itself does not branch — see CLAUDE.md "Profile Shapes" rule). The other gating inputs (`hasLinkedChildren`, `isFamilyPlanOwner`, `isParentProxy`, `showParentHome`) are read inside `LearnerScreen`, not here. | F11 |
+| `apps/mobile/src/components/home/LearnerScreen.tsx:474-483` | `isOwner`, `subscription.tier`, `showParentHome`, `isParentProxy`, `mode`, `hasLinkedChildren`, `isFamilyPlanOwner` | **The actual `ParentHomeScreen` vs learner-home branch** (lines 479-483, with `isFamilyPlanOwner` derived at 474-475). Inline switch instead of contract read. | F11 |
 
 ### More / Account / Privacy
 
 | File:line | Reads | What it gates | Finding |
 |---|---|---|---|
-| `apps/mobile/src/app/(app)/more/index.tsx:46-47, 71, 112-114, 118-121` | `role` (46-47), `subscription.tier` (71, family/pro gate for add-child), `activeProfile.isOwner` (112), `isAdultOwner({role, birthYear})` (118-121) | `showAddChild`, linked-children list for `showRemoveFamilyMember` | F5, F8 |
-| `apps/mobile/src/app/(app)/more/account.tsx:76, 85` | `activeProfile.isOwner` (76), `role === 'owner'` (85) | `showAccountSecurity` (76), `showBilling` / subscription row (85) | F5 |
+| `apps/mobile/src/app/(app)/more/index.tsx:40, 66, 112-118` | `role` (40), `subscription.tier` (66, family/pro gate for add-child), `activeProfile.isOwner` (112), `isAdultOwner({role, birthYear})` (115-118) | `showAddChild`, linked-children list for `showRemoveFamilyMember` | F5, F8 |
+| `apps/mobile/src/app/(app)/more/account.tsx:81-82, 95-96` | `activeProfile.isOwner` (81-82), `role === 'owner'` (95-96) | `showAccountSecurity` (81-82), `showBilling` / subscription row (95-96) | F5 |
 | `apps/mobile/src/app/(app)/more/accommodation.tsx:43-46` | `isOwner` on `activeProfile` AND `childProfile` (proxy-edit canonical) | `canEditChildPreferences` → accommodation child editor | F5 |
 | `apps/mobile/src/app/(app)/more/celebrations.tsx:34-37` | `isOwner` on `activeProfile` AND `childProfile` (proxy-edit canonical) | `canEditChildPreferences` → celebrations child editor | F5 |
 | `apps/mobile/src/app/(app)/more/privacy.tsx:96, 135, 147` | `role === 'owner'` | Withdrawal-archive section (96), Export Data row (135), Delete Account row (147) — **NOT** mentor-memory consent (that lives in `mentor-memory.tsx`) | F5, F7 |
@@ -66,16 +66,16 @@ Each entry is a current-code site that branches on profile attributes (`isOwner`
 | File:line | Reads | What it gates | Finding |
 |---|---|---|---|
 | `apps/mobile/src/app/(app)/mentor-memory.tsx:217-218` | `profile.memoryConsentStatus` → `consentStatus`, `memoryEnabled` | Local derived state used by all downstream gates in this screen | F2 |
-| `apps/mobile/src/app/(app)/mentor-memory.tsx:234` | `isParentProxy` | Proxy redirect (`<Redirect href="/(app)/home" />`) | F3 |
-| `apps/mobile/src/app/(app)/mentor-memory.tsx:361-372, 409` | `consentStatus`, `activeProfile.isOwner` | Pending-copy role-aware branch (361-372) and adult-owner consent prompt visibility (409) | F5, F7 |
-| `apps/mobile/src/app/(app)/mentor-memory.tsx:468` | `role !== 'owner'` | **UX copy branching** ("Set by parent" badge) — not a visibility gate | F7 |
+| `apps/mobile/src/app/(app)/mentor-memory.tsx:233` | `navigationContract.canEnter('mentor-memory')` | Proxy redirect (`<Redirect href="/(app)/home" />`); now reads via contract, not raw `isParentProxy` | F3 |
+| `apps/mobile/src/app/(app)/mentor-memory.tsx:366-372, 410` | `consentStatus`, `isOwnerSelf` (via `navigationContract.gates.sessionIsOwner` at 61) | Pending-copy role-aware branch (366-372) and adult-owner consent prompt visibility (410) | F5, F7 |
+| `apps/mobile/src/app/(app)/mentor-memory.tsx:469` | `!isOwnerSelf` | **UX copy branching** ("Set by parent" badge) — not a visibility gate | F7 |
 
 ### Progress / Child Routes
 
 | File:line | Reads | What it gates | Finding |
 |---|---|---|---|
-| `apps/mobile/src/app/(app)/progress/index.tsx:725` | `role === 'impersonated-child'` → `isParentProxyView` | Discriminator for progress header / picker rendering. (The `progressHeaderTitleKey` / `showProgressProfilePicker` names from the navigation-contract spec do **not** exist in current code — re-check after the contract lands.) | F11 |
-| `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx:12, 41` | Wraps `<Stack>` in `<RequireFamilyContext>` | Family-link membership guard. The `setMode('family')` side effect lives in `components/guards/RequireFamilyContext.tsx:42` (read via `useGuardFamilyRoute()` declared at `lib/navigation.ts:106`). | F8 |
+| `apps/mobile/src/app/(app)/progress/index.tsx:729-731` | `role === 'impersonated-child'` → `isParentProxyView` (V0) or `navigationContract.isParentProxy` (V1) | Discriminator for progress header / picker rendering. | F11 |
+| `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx:12, 41` | Wraps `<Stack>` in `<RequireFamilyContext>` | Family-link membership guard. The `setMode('family')` side effect lives in `components/guards/RequireFamilyContext.tsx:45` (read via `useGuardFamilyRoute()` declared at `lib/navigation.ts:106`). | F8 |
 | `apps/mobile/src/app/(app)/child/[profileId]/index.tsx:432-441` | `consent.data?.consentStatus` (432), `'CONSENTED'`/`'WITHDRAWN'` checks (436-437, 441) | Child-profile data display gate (`hasConsentRecord`, `isWithdrawn`) | F2 |
 
 ### Deep Learning Routes
@@ -88,17 +88,17 @@ Each entry is a current-code site that branches on profile attributes (`isOwner`
 | `apps/mobile/src/app/(app)/session/_layout.tsx:9` | mode/proxy | `canEnter('session')` | F11 |
 | `apps/mobile/src/app/(app)/quiz/_layout.tsx:118` | mode/proxy | `canEnter('quiz')` | F11 |
 | `apps/mobile/src/app/(app)/practice/index.tsx:441` | mode/proxy | `canEnter('practice')` | F11 |
-| `apps/mobile/src/app/(app)/session/index.tsx:1107` | `isOwner` | `sessionIsOwner` | F5 |
+| `apps/mobile/src/app/(app)/session/index.tsx:1109` | `isOwner` | `sessionIsOwner` | F5 |
 
 ### Supporting
 
 | File:line | Reads | What it gates | Finding |
 |---|---|---|---|
 | `apps/mobile/src/lib/profile.ts:42-48` | `activeProfile.id / isOwner / birthYear`, `profiles[].isOwner` | `isFamilyCapableProfile()` predicate | — |
-| `apps/mobile/src/lib/app-context.tsx:34` | `useState<AppMode \| null>` | `modeOverride` React state — not persisted to AsyncStorage/SecureStore (final `mode` derived at line 53) | F9 |
-| `apps/mobile/src/lib/app-context.tsx:49-51` | `activeProfile.id / isOwner / birthYear` change | `useEffect` clears `modeOverride` on active-profile flip | F9 |
+| `apps/mobile/src/lib/app-context.tsx:52` | `useState<AppMode \| null>` | `modeOverride` React state — not persisted to AsyncStorage/SecureStore (final `mode` derived at line 88) | F9 |
+| `apps/mobile/src/lib/app-context.tsx:74-84` | `activeProfile.id / isOwner / birthYear` change | `useEffect` clears `modeOverride` on active-profile flip | F9 |
 | `packages/schemas/src/age.ts:53-65` | `role`, `isOwner`, `birthYear` | `isAdultOwner(profile, currentYear?)` canonical predicate | — |
-| `apps/mobile/src/lib/navigation.ts:106` + `apps/mobile/src/components/guards/RequireFamilyContext.tsx:42` | `useGuardFamilyRoute()` declared at `navigation.ts:106` (pure read); `setMode('family')` side effect lives in the consumer `RequireFamilyContext.tsx:42` | Family-route guard with consumer-side mode-flip side effect — not a pure guard at the guard-component level | F8 |
+| `apps/mobile/src/lib/navigation.ts:106` + `apps/mobile/src/components/guards/RequireFamilyContext.tsx:45` | `useGuardFamilyRoute()` declared at `navigation.ts:106` (pure read); `setMode('family')` side effect lives in the consumer `RequireFamilyContext.tsx:45` | Family-route guard with consumer-side mode-flip side effect — not a pure guard at the guard-component level | F8 |
 
 **Estimated touch count:** ~20 production files, ~119 line-level reads in scope (revised after adversarial AST grep, 2026-05-21).
 

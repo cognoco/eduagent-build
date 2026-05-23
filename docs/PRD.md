@@ -132,7 +132,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 | Feature Category | Included Features |
 |------------------|-------------------|
-| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (exploring — not yet implemented), multi-profile (family), GDPR parental consent (11-15, EU) |
+| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (implemented via Clerk custom OAuth), multi-profile (family), GDPR parental consent (11-15, EU) |
 | **Onboarding** | Subject selection (any topic), conversational interview, dynamic curriculum generation, homework help quick entry |
 | **Learning Experience** | Real-time AI chat, prior knowledge context, adaptive explanations, mandatory user summaries, homework integrity mode |
 | **Assessments** | In-lesson quizzes, topic completion tests, re-testing from summaries |

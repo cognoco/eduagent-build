@@ -71,7 +71,7 @@ Notes:
 | Original ID | Student access | How it should work |
 | --- | --- | --- |
 | HOME-01 | All students | Student home keeps the current learner home behavior: subject carousel, add/study-new action, Ask Anything, Homework, Practice, and optional CoachBand. |
-| HOME-02, HOME-03 | Not Study surfaces | Parent gateway home and parent-mode navigation move to Mentor/Family access. Adults in Study see `LearnerScreen`, not the family home. |
+| HOME-02, HOME-03 | Not Study surfaces | Parent gateway home and parent-mode navigation move to Mentor/Family access. All users mount `LearnerScreen` at `/(app)/home`; the `ParentHomeScreen` branch activates inside `LearnerScreen` only when mode=family. Study-mode adults see the learner-home branch of `LearnerScreen`. |
 | HOME-04 | All users | Animated splash and initial shell remain shared. |
 | HOME-05 | All students with no subjects | Empty first-user state deep-links to subject creation and must not require mentor setup. |
 | HOME-06 | All students | Resume interrupted session continues the active student's session. |
@@ -131,6 +131,14 @@ Notes:
 | BILLING-08 | Family owners | Family pool details are account/family billing information. They may be visible to eligible owners, but they do not change Study ownership of learning data. |
 | BILLING-09, BILLING-10 | Owner profiles | Top-up and BYOK waitlist remain account/billing surfaces where enabled. |
 | BILLING-11, BILLING-12 | Owner profiles | Trial and static comparison cards remain subscription details under Account/Profile. |
+
+## Additional Surfaces Without Canonical Student Flow IDs
+
+| Route | Notes |
+| --- | --- |
+| `/(app)/own-learning.tsx` | V0 guardian tab bridge. Adult owners in the 5-tab `GUARDIAN_TABS` shape see this tab. It is not a student-only surface but should be noted: Study-mode adults on the guardian shape access their own learning from `own-learning` rather than the `library` tab slot. |
+| `/(app)/progress/reports/` (`reports/index.tsx` + `reports/[reportId].tsx`) | Child-reports list and detail. These exist as routes under `/(app)/progress/` and are referenced in PARENT-06 as an entry point, but have no standalone student-facing flow row. |
+| `/(app)/my-notes` | Not found in the current codebase (`apps/mobile/src/app/(app)/`). Do not add a flow row until this route is confirmed shipped. |
 
 ## Mentor-Only Flows Excluded From Student Surface
 
