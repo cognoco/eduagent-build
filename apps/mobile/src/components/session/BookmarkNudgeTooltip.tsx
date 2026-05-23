@@ -8,7 +8,7 @@ const KEY_PREFIX = 'bookmark-nudge-shown';
 
 function getBookmarkNudgeKey(profileId: string | undefined): string {
   return sanitizeSecureStoreKey(
-    profileId ? `${KEY_PREFIX}:${profileId}` : KEY_PREFIX,
+    profileId ? `${KEY_PREFIX}.${profileId}` : KEY_PREFIX,
   );
 }
 

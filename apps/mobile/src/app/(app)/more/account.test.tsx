@@ -63,7 +63,7 @@ jest.mock(
   () => ({
     useNavigationContract: () => ({
       gates: {
-        showAccountSecurity: mockActiveProfile?.isOwner === true,
+        showAccountSecurity: mockRole === 'owner',
         showBilling: mockRole === 'owner',
       },
     }),

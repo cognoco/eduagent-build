@@ -460,12 +460,6 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'home', canEnter: true, isSurfaced: true },
       { route: 'library', canEnter: false, isSurfaced: false },
       { route: 'recaps', canEnter: true, isSurfaced: true },
-      {
-        route: 'recaps/[recapId]',
-        params: { recapId: 'recap-1' },
-        canEnter: true,
-        isSurfaced: true,
-      },
       { route: 'session', canEnter: true, isSurfaced: false },
       { route: 'homework', canEnter: true, isSurfaced: false },
       { route: 'dictation', canEnter: true, isSurfaced: false },

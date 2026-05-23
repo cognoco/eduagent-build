@@ -74,7 +74,7 @@ export default function HomeScreen(): React.ReactElement {
   const { data: dashboard } = useDashboard();
   const ackNotice = useAckNotice();
   const isOwner = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showBilling
+    ? navigationContract.gates.sessionIsOwner
     : activeProfile?.isOwner === true;
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations ?? [],

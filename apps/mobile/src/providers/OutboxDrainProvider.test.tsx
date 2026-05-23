@@ -15,6 +15,7 @@ import { enqueue } from '../lib/message-outbox';
 import { OutboxDrainProvider } from './OutboxDrainProvider';
 import { useProfile } from '../lib/profile';
 import { useApiClient } from '../lib/api-client';
+import { Sentry } from '../lib/sentry';
 
 // gc1-allow: useProfile drives the entire provider behaviour; the real
 // implementation pulls in Clerk, SecureStore, QueryClient, and full profile
@@ -48,13 +49,13 @@ jest.mock('../lib/api', () => ({ // gc1-allow: env URL
   getApiUrl: jest.fn().mockReturnValue('http://localhost:8787'),
 }));
 
-// gc1-allow: Sentry.captureException is a side-effect sink; its real
-// implementation imports native sentry modules that fail in Jest.
+// gc1-allow: Sentry.captureException / addBreadcrumb are side-effect sinks;
+// the real implementation imports native sentry modules that fail in Jest.
 // The @sentry/react-native global mock in test-setup.ts does not cover
 // the local re-export at lib/sentry.ts.
 // prettier-ignore
 jest.mock('../lib/sentry', () => ({ // gc1-allow: native Sentry
-  Sentry: { captureException: jest.fn() },
+  Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
 }));
 
 // ---------------------------------------------------------------------------
@@ -444,6 +445,34 @@ describe('OutboxDrainProvider', () => {
         xhrF._emitDoneEvent();
         xhrF._emitLoadend(200);
       });
+    });
+
+    it('adds a Sentry breadcrumb when drain is skipped due to missing activeProfile (CR-2026-05-21-152)', async () => {
+      // Arrange: no active profile (simulates mid-sign-out race).
+      (useProfile as jest.Mock).mockReturnValue({ activeProfile: undefined });
+      (useApiClient as jest.Mock).mockReturnValue({
+        support: {
+          'outbox-spillover': {
+            $post: jest.fn().mockResolvedValue({ ok: true }),
+          },
+        },
+      });
+
+      render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
+
+      // No XHR should be opened — the guard must return early.
+      expect(getXhrInstances()).toHaveLength(0);
+
+      // The breadcrumb must be emitted so the skip is observable in Sentry.
+      await waitFor(() =>
+        expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+          expect.objectContaining({
+            category: 'outbox',
+            level: 'info',
+            message: 'drain skipped — no activeProfile',
+          }),
+        ),
+      );
     });
 
     it('in-flight requests carry the snapshotted profileId, not the new profile after switch', async () => {
