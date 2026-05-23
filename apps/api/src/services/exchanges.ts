@@ -806,7 +806,25 @@ function normalizeAcknowledgementClause(value: string): string {
     .trim();
 }
 
-function isAcknowledgementOnlyTurn(value: string): boolean {
+// Strong acknowledgements semantically require a prior contribution to
+// acknowledge — safe to treat as ack regardless of conversation history.
+const STRONG_ACK_CLAUSE =
+  /^(thank you|thanks|thx|ty|got it|i got it|i see|i understand|makes sense|that makes sense|this makes sense)$/;
+// Weak / ambiguous tokens (yes / yeah / good / ok / cool …) are equally
+// natural as a learner's opening turn — without prior assistant context,
+// matching these as acknowledgements produces a bizarre "You're welcome"
+// reply. The caller passes hasPriorAssistantTurn to disambiguate.
+const WEAK_ACK_CLAUSE =
+  /^(ok|okay|yes|yep|yeah|sounds good|cool|perfect|great|nice|good|fine|alright|all right)$/;
+const POSITIVE_FEEDBACK_CLAUSE =
+  /^(that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/;
+const THANKS_WITH_FEEDBACK_CLAUSE =
+  /^(thank you|thanks|thx|ty) (that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/;
+
+function isAcknowledgementOnlyTurn(
+  value: string,
+  hasPriorAssistantTurn: boolean,
+): boolean {
   const compact = value.replace(/\s+/g, ' ').trim();
   if (!compact) return false;
   if (/[?]/.test(compact)) return false;
@@ -819,15 +837,10 @@ function isAcknowledgementOnlyTurn(value: string): boolean {
 
   return clauses.every(
     (clause) =>
-      /^(thank you|thanks|thx|ty|ok|okay|yes|yep|yeah|got it|i got it|i see|i understand|makes sense|that makes sense|this makes sense|sounds good|cool|perfect|great|nice|good|fine|alright|all right)$/.test(
-        clause,
-      ) ||
-      /^(that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/.test(
-        clause,
-      ) ||
-      /^(thank you|thanks|thx|ty) (that|this|it) (was|is) (useful|helpful|clear|good|great|perfect|nice)$/.test(
-        clause,
-      ),
+      STRONG_ACK_CLAUSE.test(clause) ||
+      POSITIVE_FEEDBACK_CLAUSE.test(clause) ||
+      THANKS_WITH_FEEDBACK_CLAUSE.test(clause) ||
+      (hasPriorAssistantTurn && WEAK_ACK_CLAUSE.test(clause)),
   );
 }
 
@@ -839,7 +852,15 @@ function buildUnsupportedFactualReply(
   );
   const lower = learnerQuestion.toLowerCase();
 
-  if (isAcknowledgementOnlyTurn(learnerQuestion)) {
+  // Weak acknowledgement tokens (yes / yeah / good / ok) are equally
+  // natural as a learner's first turn. Without a prior assistant turn,
+  // matching these and replying "You're welcome" is nonsensical. Strong
+  // forms (thanks, "X was useful") presuppose a prior contribution and
+  // are accepted unconditionally — see isAcknowledgementOnlyTurn().
+  const hasPriorAssistantTurn = sourceAudit.evidence.some(
+    (e) => e.kind === 'conversation_history',
+  );
+  if (isAcknowledgementOnlyTurn(learnerQuestion, hasPriorAssistantTurn)) {
     return "You're welcome. Want to keep going with this, or end here?";
   }
 

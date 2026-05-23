@@ -49,6 +49,7 @@ import {
   assertParentAccess,
 } from '../services/family-access';
 import { ForbiddenError, notFound } from '../errors';
+import { createLogger } from '../services/logger';
 import { isMemoryFactsReadEnabled } from '../config';
 import {
   getMemoryProjection,
@@ -70,6 +71,8 @@ type DashboardRouteEnv = {
     profileMeta: ProfileMeta | undefined;
   };
 };
+
+const logger = createLogger();
 
 export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get parent dashboard data
@@ -224,6 +227,16 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
     } catch (error) {
       if (error instanceof ForbiddenError) {
+        // Audit-log unauthorized parent-link probes. The 404 hides topic
+        // existence from non-parents, but without this log an attacker
+        // who holds a valid owner token could enumerate child profile
+        // UUIDs at zero observable cost — every probe returns an
+        // indistinguishable 404. Pattern mirrors `profile_scope.ownership_mismatch`.
+        logger.warn('dashboard.snapshot.parent_access_denied', {
+          parentProfileId,
+          childProfileId,
+          topicId,
+        });
         return notFound(c, 'Topic not found');
       }
       throw error;

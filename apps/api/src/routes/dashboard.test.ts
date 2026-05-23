@@ -979,13 +979,41 @@ describe('dashboard routes', () => {
       );
 
       expect(res.status).toBe(404);
-      expect(res.status).not.toBe(403);
       // Body shape contract: must be the typed apiError envelope so mobile
       // classifiers bucket this the same way they bucket every other 404. A
       // regression that emits a bare-text 404 or wrong code would still pass
       // a status-only check.
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toMatchObject({ code: ERROR_CODES.NOT_FOUND });
+    });
+
+    // [BREAK] The 404-IDOR conversion is intentional and gated by
+    // assertOwnerProfile being placed OUTSIDE the try/catch. A refactor that
+    // moves assertOwnerProfile inside the try would silently convert
+    // non-owner ForbiddenError → 404 too, masking owner-gate breaks. This
+    // test locks the structural invariant by asserting non-owner traffic
+    // still surfaces as 403 from this same route (mockGetProfile is reset
+    // to isOwner:true above in the beforeEach, so this test overrides it).
+    it('[BREAK] non-owner still gets 403 from snapshot route (assertOwnerProfile placement guard)', async () => {
+      mockGetProfile.mockResolvedValueOnce({
+        id: 'test-profile-id',
+        birthYear: 2012,
+        location: null,
+        consentStatus: 'CONSENTED',
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+      });
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/topics/${TOPIC_ID}/snapshot`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     });
   });
 });

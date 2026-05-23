@@ -1947,6 +1947,32 @@ describe('source provenance audit', () => {
     expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
   });
 
+  // [BREAK] A learner's first message of bare "yes" / "yeah" / "good" used to
+  // hit the acknowledgement branch and reply "You're welcome", which is
+  // nonsensical with no prior assistant turn to thank. Weak tokens now require
+  // conversation_history evidence. Revert the `hasPriorAssistantTurn` guard
+  // and the WEAK_ACK_CLAUSE/STRONG_ACK_CLAUSE split to confirm this test fails.
+  it("does not say 'You're welcome' to a bare 'yes' on the learner's first turn", () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'No trusted history source was provided.',
+      },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'yes',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Please share your source material.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/You're welcome/i);
+  });
+
   it('does not turn learner thanks into a source-check fallback', () => {
     const audit = auditExchangeSources(
       {

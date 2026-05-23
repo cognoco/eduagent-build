@@ -657,12 +657,15 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // top-up batches, summing remainingMonthly(=0) + that single-batch value
     // under-reports — UI shows "0 questions left" while the user has
     // hundreds across other unspent batches. Aggregate across all batches
-    // for the top-up case.
-    const headerRemaining =
+    // for the top-up case, and reuse the same aggregate for the KV cache
+    // below so the header and the cached snapshot can't disagree.
+    const topUpRemainingAggregate =
       decrement.source === 'top_up'
-        ? decrement.remainingMonthly +
-          (await getTopUpCreditsRemaining(db, subscriptionId))
-        : decrement.remainingMonthly + decrement.remainingTopUp;
+        ? await getTopUpCreditsRemaining(db, subscriptionId)
+        : decrement.remainingTopUp;
+
+    const headerRemaining =
+      decrement.remainingMonthly + topUpRemainingAggregate;
 
     c.res = withQuotaHeaders(c.res, {
       remaining: headerRemaining,
@@ -676,12 +679,14 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // cached count would each write original+1, understating actual usage.
     if (kv) {
       // Single formula for both branches: `remainingMonthly` is already 0 in
-      // the top-up path, so `monthlyLimit - 0 - remainingTopUp` is the same
-      // accounting as the monthly-source path. Branching to literal
-      // `monthlyLimit` made the cache report fully exhausted on the very
-      // first top-up consumption and blocked the user until KV TTL expired.
+      // the top-up path, so `monthlyLimit - 0 - topUpRemainingAggregate` is
+      // the same accounting as the monthly-source path. Use the SAME aggregate
+      // we wrote into the header — earlier this used the single-batch
+      // `decrement.remainingTopUp`, which over-counted usage when multiple
+      // unexpired batches existed and could push the cached `usedThisMonth`
+      // close to or past `monthlyLimit` for the duration of the KV TTL.
       const atomicUsedMonth =
-        monthlyLimit - decrement.remainingMonthly - decrement.remainingTopUp;
+        monthlyLimit - decrement.remainingMonthly - topUpRemainingAggregate;
       const atomicUsedToday =
         dailyLimit !== null && decrement.remainingDaily !== null
           ? dailyLimit - decrement.remainingDaily

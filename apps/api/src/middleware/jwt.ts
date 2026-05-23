@@ -302,8 +302,15 @@ export async function verifyJWT(
   // older than maxAge regardless of exp. Without this, an IdP misconfiguration
   // (or compromised signing key + crafted exp=year-2099 token) would let a
   // token live forever. Skipping when maxAge is 0 lets callers opt out.
-  if (maxAge > 0 && payload.iat !== undefined && payload.iat + maxAge < now) {
-    throw new Error('Invalid JWT: token exceeds maximum age');
+  // An `iat`-absent token can't be aged-out, so when maxAge is enforced we
+  // reject it rather than silently bypass the guard.
+  if (maxAge > 0) {
+    if (payload.iat === undefined) {
+      throw new Error('Invalid JWT: missing iat claim required for maxAge');
+    }
+    if (payload.iat + maxAge < now) {
+      throw new Error('Invalid JWT: token exceeds maximum age');
+    }
   }
 
   // Validate issuer claim

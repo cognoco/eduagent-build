@@ -381,7 +381,12 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: Math.floor(Date.now() / 1000),
+        exp,
+      },
     );
 
     const payload = await verifyJWT(token, keyMaterial.publicJwk);
@@ -394,7 +399,12 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const validToken = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: Math.floor(Date.now() / 1000),
+        exp,
+      },
     );
 
     // Replace the real signature with garbage
@@ -410,7 +420,12 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const originalToken = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: Math.floor(Date.now() / 1000),
+        exp,
+      },
     );
 
     // Swap in a different payload (different sub) — signature no longer matches
@@ -446,7 +461,12 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) - 1;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: Math.floor(Date.now() / 1000),
+        exp,
+      },
     );
 
     const payload = await verifyJWT(token, keyMaterial.publicJwk);
@@ -473,6 +493,51 @@ describe('verifyJWT', () => {
     await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
       'token exceeds maximum age',
     );
+  });
+
+  // [BREAK] iat-absent tokens used to silently bypass the max-age guard
+  // because the check was conditioned on `payload.iat !== undefined`. An
+  // attacker who could mint a token without iat would defeat the defense-
+  // in-depth backstop. Maintainers: this test guards the "fail closed when
+  // iat is missing AND maxAge is enforced" rule. Revert the iat-required
+  // branch in jwt.ts to confirm this test fails.
+  it('[BREAK] rejects an iat-absent token when maxAgeSec is enforced', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const farFutureExp = now + 365 * 24 * 60 * 60;
+    const token = await signJWT(
+      { alg: 'RS256', kid: 'test-key-1' },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        exp: farFutureExp,
+        // intentionally NO iat
+      },
+    );
+
+    await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
+      /missing iat claim required for maxAge/,
+    );
+  });
+
+  // Counter-test: the iat-required rule must NOT apply when the caller
+  // explicitly opts out of max-age. An iat-absent token with maxAgeSec=0
+  // is acceptable.
+  it('accepts an iat-absent token when maxAgeSec is disabled', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const farFutureExp = now + 3600;
+    const token = await signJWT(
+      { alg: 'RS256', kid: 'test-key-1' },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        exp: farFutureExp,
+      },
+    );
+
+    const payload = await verifyJWT(token, keyMaterial.publicJwk, {
+      maxAgeSec: 0,
+    });
+    expect(payload.sub).toBe('user-1');
   });
 
   // [CR-2026-05-21-088] Callers can opt out of the iat max-age check by
@@ -502,7 +567,12 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: Math.floor(Date.now() / 1000),
+        exp,
+      },
     );
 
     await expect(
@@ -511,13 +581,15 @@ describe('verifyJWT', () => {
   });
 
   it('accepts tokens whose aud matches the configured audience', async () => {
-    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
       {
         sub: 'user-1',
         iss: 'https://clerk.dev',
         aud: ['eduagent-web', 'eduagent-api'],
+        iat: now,
         exp,
       },
     );
@@ -533,13 +605,15 @@ describe('verifyJWT', () => {
   });
 
   it('rejects tokens with a wrong audience', async () => {
-    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
       {
         sub: 'user-1',
         iss: 'https://clerk.dev',
         aud: ['eduagent-web'],
+        iat: now,
         exp,
       },
     );
@@ -550,10 +624,11 @@ describe('verifyJWT', () => {
   });
 
   it('rejects tokens with a wrong issuer', async () => {
-    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://evil.com', exp },
+      { sub: 'user-1', iss: 'https://evil.com', iat: now, exp },
     );
 
     await expect(
@@ -580,7 +655,12 @@ describe('verifyJWT', () => {
     const signingInput =
       toBase64Url({ alg: 'RS256', kid: 'test-key-1' }) +
       '.' +
-      toBase64Url({ sub: 'user-1', iss: 'https://clerk.dev', exp });
+      toBase64Url({
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        iat: Math.floor(Date.now() / 1000),
+        exp,
+      });
 
     const data = new TextEncoder().encode(signingInput);
     const signatureBuffer = await crypto.subtle.sign(
