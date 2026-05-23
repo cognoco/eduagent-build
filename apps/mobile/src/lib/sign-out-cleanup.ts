@@ -198,7 +198,16 @@ const OUTBOX_FLOWS = ['session'] as const;
 // summary-draft.ts which is outside this worker's file scope — recorded as a
 // follow-up. Until then this scan still serves as a forward-only guard so any
 // future migration to AsyncStorage is automatically wiped on sign-out.
-const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = ['summary-draft-'];
+// AddToMyLearningButton.tsx writes `add_to_my_learning.tip_seen.${profileId}`
+// to AsyncStorage. We can't enumerate every profileId we ever wrote against
+// (a shared device can sign in/out across many accounts), and the writer
+// uses AsyncStorage rather than SecureStore, so the registry meta-test
+// (sign-out-cleanup-registry.test.ts) wouldn't catch a missing wipe here.
+// Forward-only prefix wipe covers all per-profile tip-seen keys.
+const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = [
+  'summary-draft-',
+  'add_to_my_learning.tip_seen.',
+];
 
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>,

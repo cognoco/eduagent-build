@@ -77,6 +77,8 @@ function listMobileProductionSources(): string[] {
     .filter((file) => !file.endsWith('.test.tsx'))
     .filter((file) => !file.endsWith('.d.ts'))
     .filter((file) => !file.startsWith('apps/mobile/src/i18n/'))
+    .filter((file) => !file.includes('/__fixtures__/'))
+    .filter((file) => !file.includes('/test-utils/'))
     .filter((file) => file !== SELF_FILE);
 }
 
