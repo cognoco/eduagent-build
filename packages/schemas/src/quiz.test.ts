@@ -6,6 +6,7 @@ import {
   generateRoundInputSchema,
   guessWhoLlmOutputSchema,
   guessWhoQuestionSchema,
+  questionCheckInputSchema,
   questionResultSchema,
   quizActivityTypeSchema,
   quizQuestionSchema,
@@ -201,6 +202,36 @@ describe('quiz schemas', () => {
   describe('completeRoundInputSchema', () => {
     it('requires at least one result', () => {
       expect(() => completeRoundInputSchema.parse({ results: [] })).toThrow();
+    });
+  });
+
+  describe('questionCheckInputSchema', () => {
+    it('[BREAK/WI-163] accepts finalAttempt and cluesUsed for server-recorded checks', () => {
+      expect(
+        questionCheckInputSchema.parse({
+          questionIndex: 0,
+          answerGiven: 'Newton',
+          answerMode: 'free_text',
+          finalAttempt: false,
+          cluesUsed: 2,
+        }),
+      ).toEqual({
+        questionIndex: 0,
+        answerGiven: 'Newton',
+        answerMode: 'free_text',
+        finalAttempt: false,
+        cluesUsed: 2,
+      });
+    });
+
+    it('[BREAK/WI-163] rejects out-of-range check cluesUsed', () => {
+      expect(() =>
+        questionCheckInputSchema.parse({
+          questionIndex: 0,
+          answerGiven: 'Newton',
+          cluesUsed: 6,
+        }),
+      ).toThrow();
     });
   });
 

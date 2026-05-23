@@ -846,7 +846,7 @@ exports[`navigation-contract matrix snapshot row-v0-flags-off: V0 hard constrain
     "topic/relearn:{"for":"child"}": false,
   },
   "chrome": {
-    "modeSwitcher": "global-header",
+    "modeSwitcher": "hidden",
     "proxyBanner": "hidden",
   },
   "diagnostic": {

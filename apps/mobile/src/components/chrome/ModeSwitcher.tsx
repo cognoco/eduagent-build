@@ -5,10 +5,12 @@ import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useModeSwitch } from '../../lib/use-mode-switch';
 
 /**
- * ModeSwitcher — app-shell chrome component.
+ * ModeSwitcher - app-shell chrome component.
  *
  * Self-gating: renders nothing when the navigation contract says the mode
- * switcher should be hidden (parent proxy, non-family-capable users).
+ * switcher should be hidden. The contract owns both V1 chrome and legacy V0
+ * fallback visibility, keeping this component free of raw owner/proxy/mode
+ * gates.
  * When visible it shows two pressable buttons — Study and Family — with the
  * currently active one marked selected via accessibilityState. While a switch
  * is in flight both buttons are disabled and the requested side shows a

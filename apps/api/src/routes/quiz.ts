@@ -301,7 +301,13 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { id: roundId } = c.req.valid('param');
-      const { questionIndex, answerGiven, answerMode } = c.req.valid('json');
+      const {
+        questionIndex,
+        answerGiven,
+        answerMode,
+        finalAttempt,
+        cluesUsed,
+      } = c.req.valid('json');
 
       const result = await checkQuizAnswerWithCorrect(
         db,
@@ -310,13 +316,17 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
         questionIndex,
         answerGiven,
         answerMode,
+        finalAttempt,
+        cluesUsed,
       );
       // [F-Q-02/F-Q-07] Reveal correctAnswer only on wrong submissions so the
       // client can highlight the right option and show the person's name.
       return c.json(
         questionCheckResponseSchema.parse({
           correct: result.correct,
-          ...(result.correct ? {} : { correctAnswer: result.correctAnswer }),
+          ...(result.correctAnswer
+            ? { correctAnswer: result.correctAnswer }
+            : {}),
         }),
         200,
       );

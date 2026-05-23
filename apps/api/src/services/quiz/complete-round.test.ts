@@ -332,6 +332,27 @@ describe('validateResults (anti-tampering)', () => {
     expect(validated[0]?.questionIndex).toBe(0);
   });
 
+  it('[BREAK/WI-230] keeps only the first result for each questionIndex', () => {
+    const duplicated: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 100 },
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 100 },
+      { questionIndex: 1, correct: true, answerGiven: 'Berlin', timeMs: 100 },
+    ];
+    const deduplicated: QuestionResult[] = [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 100 },
+      { questionIndex: 1, correct: true, answerGiven: 'Berlin', timeMs: 100 },
+    ];
+
+    const validated = validateResults(questions, duplicated);
+
+    expect(validated).toHaveLength(2);
+    expect(validated.map((result) => result.questionIndex)).toEqual([0, 1]);
+    expect(calculateScore(validated)).toBe(calculateScore(deduplicated));
+    expect(calculateXp(validated, questions.length)).toBe(
+      calculateXp(deduplicated, questions.length),
+    );
+  });
+
   // [BUG-STALE-OPTIONS] validateResults must drop MC results where
   // answerGiven is not in the server-known options — this is the final
   // defense layer against stale-options race results reaching the score.
@@ -723,7 +744,19 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
     completedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    results: null,
+    // [WI-89] completeQuizRound scores from the persisted /check attempts in
+    // `round.results`, not from the `results` param. Seed the recorded final
+    // attempt so validatedResults is non-empty and the mastery upsert path
+    // (the subject of this escalation test) is actually exercised.
+    results: [
+      {
+        questionIndex: 0,
+        correct: true,
+        answerGiven: 'Paris',
+        timeMs: 2000,
+        finalAttempt: true,
+      },
+    ],
     metadata: null,
   };
 

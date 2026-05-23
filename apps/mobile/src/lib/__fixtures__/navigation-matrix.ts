@@ -1,13 +1,36 @@
-import {
-  PROFILE_FACTORY_ISO as ISO,
-  PROFILE_FACTORY_CHILD_BIRTH_YEAR as CHILD_BIRTH_YEAR,
-  makeProfile,
-} from '../../test-utils/profile-factories';
 import type {
+  NavigationProfile,
   ProfileContext,
   RouteKey,
   RouteParams,
 } from '../navigation-contract';
+
+const ISO = '2026-05-21T00:00:00.000Z';
+const ADULT_BIRTH_YEAR = 1985;
+const CHILD_BIRTH_YEAR = 2014;
+
+function makeProfile(
+  overrides: Partial<NavigationProfile> & { id: string },
+): NavigationProfile {
+  return {
+    accountId: '00000000-0000-7000-a000-000000000001',
+    avatarUrl: null,
+    birthYear: ADULT_BIRTH_YEAR,
+    consentStatus: null,
+    conversationLanguage: 'en',
+    createdAt: ISO,
+    defaultAppContext: null,
+    displayName: 'Profile',
+    hasFamilyLinks: false,
+    hasPremiumLlm: false,
+    isOwner: true,
+    linkCreatedAt: null,
+    location: null,
+    pronouns: null,
+    updatedAt: ISO,
+    ...overrides,
+  } as NavigationProfile;
+}
 
 const ADULT_NO_LINKS = makeProfile({
   id: '00000000-0000-7000-a000-000000000101',

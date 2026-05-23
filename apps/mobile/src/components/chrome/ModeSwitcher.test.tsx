@@ -48,7 +48,7 @@ function buildContract(
   return {
     chrome: { modeSwitcher, proxyBanner: 'hidden' as const },
     effectiveAppContext,
-    shape: 'learner' as const,
+    shape: effectiveAppContext,
     isFamilyCapable: modeSwitcher === 'global-header',
     isParentProxy: false,
     visibleTabs: new Set(['home', 'library', 'progress', 'more']),

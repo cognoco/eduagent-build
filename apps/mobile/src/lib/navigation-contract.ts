@@ -210,6 +210,13 @@ function isLegacyGuardian(
   return !!activeProfile?.isOwner && linkedChildIds.length > 0;
 }
 
+function isLegacyV0FamilyCapable(
+  activeProfile: NavigationProfile | null,
+  linkedChildIds: ReadonlyArray<string>,
+): boolean {
+  return isAdultOwner(activeProfile) && linkedChildIds.length > 0;
+}
+
 function isLinkedChildRoute(
   params: RouteParams | undefined,
   linkedChildIds: ReadonlyArray<string>,
@@ -231,6 +238,13 @@ export function resolveNavigationContract(
   const familyCapable = isFamilyCapable(context.activeProfile);
   const ownerRole = isOwnerRole(context.role);
   const subscriptionReady = context.subscription.status === 'ready';
+  const legacyV0ModeNavActive =
+    context.flags.MODE_NAV_V1_ENABLED === false &&
+    context.flags.MODE_NAV_V0_ENABLED === true;
+  const legacyV0FamilyCapable = isLegacyV0FamilyCapable(
+    context.activeProfile,
+    linkedChildIds,
+  );
 
   let shape: NavigationShape = 'study';
   let effectiveAppContext: NavigationAppContext = 'study';
@@ -254,6 +268,14 @@ export function resolveNavigationContract(
     visibleTabs = LEGACY_GUARDIAN_TABS;
   } else if (context.flags.MODE_NAV_V1_ENABLED === false) {
     reason = 'v1-disabled';
+    if (
+      legacyV0ModeNavActive &&
+      legacyV0FamilyCapable &&
+      !context.isParentProxy &&
+      context.appContext !== null
+    ) {
+      effectiveAppContext = context.appContext;
+    }
   } else if (context.isParentProxy) {
     reason = 'parent-proxy';
     visibleTabs = PROXY_TABS;
@@ -405,6 +427,11 @@ export function resolveNavigationContract(
     return false;
   };
 
+  const showModeSwitcher =
+    !context.isParentProxy &&
+    ((context.flags.MODE_NAV_V1_ENABLED && familyCapable) ||
+      (legacyV0ModeNavActive && legacyV0FamilyCapable));
+
   return {
     shape,
     effectiveAppContext,
@@ -413,8 +440,7 @@ export function resolveNavigationContract(
     visibleTabs,
     home,
     chrome: {
-      modeSwitcher:
-        familyCapable && !context.isParentProxy ? 'global-header' : 'hidden',
+      modeSwitcher: showModeSwitcher ? 'global-header' : 'hidden',
       proxyBanner:
         context.isParentProxy && context.activeProfile ? 'required' : 'hidden',
     },

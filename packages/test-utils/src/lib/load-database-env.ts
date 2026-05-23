@@ -4,7 +4,7 @@
  * Resolution order:
  * 1. DATABASE_URL already in env (CI, Docker, `doppler run --`)  → use it
  * 2. .env.test.local / .env.development.local file exists        → load it
- * 3. Doppler CLI available (`C:/Tools/doppler/doppler.exe`)      → fetch from Doppler
+ * 3. Doppler CLI available (DOPPLER_CLI, fixed paths, or PATH)   → fetch from Doppler
  *
  * This guarantees integration tests get DATABASE_URL regardless of how
  * Jest is invoked (NX target, direct jest, pnpm script, etc.).
@@ -13,9 +13,14 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 
-const DOPPLER_CLI = 'C:/Tools/doppler/doppler.exe';
+const DOPPLER_CLI_CANDIDATES = [
+  'C:/Tools/doppler/doppler.exe',
+  '/opt/homebrew/bin/doppler',
+  '/usr/local/bin/doppler',
+  `${process.env.HOME ?? ''}/.local/bin/doppler`,
+].filter(Boolean);
 
 const DOPPLER_SECRETS = [
   'DATABASE_URL',
@@ -26,35 +31,68 @@ const DOPPLER_SECRETS = [
   'TEST_SEED_SECRET',
 ] as const;
 
-function loadFromDoppler(): boolean {
-  if (!existsSync(DOPPLER_CLI)) {
-    return false;
+function findDopplerCliCandidates(): string[] {
+  const candidates: string[] = [];
+
+  if (process.env.DOPPLER_CLI) {
+    candidates.push(process.env.DOPPLER_CLI);
+  }
+
+  for (const candidate of DOPPLER_CLI_CANDIDATES) {
+    if (existsSync(candidate)) {
+      candidates.push(candidate);
+    }
   }
 
   try {
-    const json = execSync(
-      `"${DOPPLER_CLI}" secrets download --no-file --format json`,
-      {
-        encoding: 'utf-8',
-        timeout: 15_000,
-        stdio: ['ignore', 'pipe', 'ignore'],
-      },
-    );
-
-    const secrets = JSON.parse(json) as Record<string, string>;
-
-    for (const key of DOPPLER_SECRETS) {
-      if (secrets[key] && !process.env[key]) {
-        process.env[key] = secrets[key];
-      }
-    }
-
-    if (process.env.DATABASE_URL) {
-      console.log('✅ Loaded test secrets from Doppler CLI');
-      return true;
-    }
+    const command =
+      process.platform === 'win32' ? 'where doppler' : 'command -v doppler';
+    const found = execSync(command, {
+      encoding: 'utf-8',
+      timeout: 2_000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    candidates.push(...found);
   } catch {
-    // Doppler CLI failed (not logged in, network issue) — fall through
+    // PATH lookup failed — fixed candidates may still work.
+  }
+
+  candidates.push('doppler');
+
+  return [...new Set(candidates)];
+}
+
+function loadFromDoppler(): boolean {
+  for (const dopplerCli of findDopplerCliCandidates()) {
+    try {
+      const json = execFileSync(
+        dopplerCli,
+        ['secrets', 'download', '--no-file', '--format', 'json'],
+        {
+          encoding: 'utf-8',
+          timeout: 15_000,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        },
+      );
+
+      const secrets = JSON.parse(json) as Record<string, string>;
+
+      for (const key of DOPPLER_SECRETS) {
+        if (secrets[key] && !process.env[key]) {
+          process.env[key] = secrets[key];
+        }
+      }
+
+      if (process.env.DATABASE_URL) {
+        console.log('✅ Loaded test secrets from Doppler CLI');
+        return true;
+      }
+    } catch {
+      // Try the next candidate (not logged in, stale PATH entry, network issue).
+    }
   }
 
   return false;

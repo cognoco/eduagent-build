@@ -17,6 +17,7 @@ const mockPrefetchMutate = jest.fn();
 const mockCompleteRoundMutate = jest.fn();
 const mockPlatformAlert = jest.fn();
 const mockSentryCapture = jest.fn();
+let mockGuessWhoResolveTwice = false;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, dismissTo: mockDismissTo }),
@@ -64,14 +65,22 @@ jest.mock(
       const { Pressable, Text } = require('react-native');
       return (
         <Pressable
-          onPress={() =>
+          onPress={() => {
             onResolved({
               correct: true,
               answerGiven: 'Nikola Tesla',
               cluesUsed: 3,
               answerMode: 'free_text',
-            })
-          }
+            });
+            if (mockGuessWhoResolveTwice) {
+              onResolved({
+                correct: true,
+                answerGiven: 'Nikola Tesla',
+                cluesUsed: 3,
+                answerMode: 'free_text',
+              });
+            }
+          }}
           testID="guess-who-resolve-correct"
         >
           <Text>Resolve Guess Who</Text>
@@ -169,6 +178,7 @@ beforeEach(() => {
 describe('QuizPlayScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGuessWhoResolveTwice = false;
     mockReturnTo = null;
     mockCheckAnswer.mockResolvedValue({ correct: true });
     // Reset to a valid round for each test
@@ -488,6 +498,7 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
 describe('QuizPlayScreen — Guess Who finish autosave', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGuessWhoResolveTwice = false;
     mockRound = {
       id: 'round-guess-who',
       activityType: 'guess_who' as const,
@@ -546,6 +557,61 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
     );
     expect(mockSetCompletionResult).toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz/results');
+  });
+
+  it('[BREAK/WI-282] does not submit duplicate results when Guess Who resolves twice', async () => {
+    mockGuessWhoResolveTwice = true;
+    mockRound = {
+      id: 'round-wi-282',
+      activityType: 'guess_who' as const,
+      theme: 'Inventors',
+      total: 2,
+      questions: [
+        {
+          type: 'guess_who' as const,
+          clues: ['1', '2', '3', '4', '5'],
+          mcFallbackOptions: [
+            'Nikola Tesla',
+            'Ada Lovelace',
+            'Grace Hopper',
+            'Alan Turing',
+          ],
+          funFact: 'Fact',
+          isLibraryItem: true,
+        },
+        {
+          type: 'guess_who' as const,
+          clues: ['1', '2', '3', '4', '5'],
+          mcFallbackOptions: [
+            'Nikola Tesla',
+            'Ada Lovelace',
+            'Grace Hopper',
+            'Alan Turing',
+          ],
+          funFact: 'Fact',
+          isLibraryItem: true,
+        },
+      ],
+    };
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
+    await waitFor(() => screen.getByText('Correct'));
+
+    await new Promise((resolve) => setTimeout(resolve, 280));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
+    fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
+
+    await waitFor(() => {
+      expect(mockCompleteRoundMutate).toHaveBeenCalled();
+    });
+    const payload = mockCompleteRoundMutate.mock.calls.at(-1)?.[0];
+    expect(
+      payload.results.map((result: { questionIndex: number }) => {
+        return result.questionIndex;
+      }),
+    ).toEqual([0, 1]);
   });
 
   it('can start one more round after the final autosave', async () => {

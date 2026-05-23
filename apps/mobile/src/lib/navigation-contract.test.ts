@@ -761,11 +761,11 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
 
-  it('reports v1-disabled (and does not enter the legacy-5-tab path) when V0 flag is on and V1 is off', () => {
+  it('reports v1-disabled and keeps the legacy V0 mode switcher in contract chrome', () => {
     const contract = resolveNavigationContract(
       makeContext({
         activeProfile: familyAdult,
-        appContext: null,
+        appContext: 'family',
         flags: {
           MODE_NAV_V0_ENABLED: true,
           MODE_NAV_V1_ENABLED: false,
@@ -776,6 +776,9 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
     );
 
     expect(contract.diagnostic.reason).toBe('v1-disabled');
+    expect(contract.chrome.modeSwitcher).toBe('global-header');
+    expect(contract.effectiveAppContext).toBe('family');
+    expect(contract.shape).toBe('study');
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
 });

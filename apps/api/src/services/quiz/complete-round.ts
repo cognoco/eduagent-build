@@ -1,4 +1,10 @@
-import { createScopedRepository, type Database } from '@eduagent/database';
+import { and, eq, sql } from 'drizzle-orm';
+
+import {
+  createScopedRepository,
+  quizRounds,
+  type Database,
+} from '@eduagent/database';
 import type {
   CompleteRoundResponse,
   QuestionResult,
@@ -46,6 +52,71 @@ export function buildMasterySm2Input(existing: {
 }
 
 const logger = createLogger();
+
+type RecordedQuestionResult = QuestionResult & {
+  checkedAt?: string;
+  finalAttempt?: boolean;
+};
+
+function isFinalRecordedAttempt(result: RecordedQuestionResult): boolean {
+  return result.finalAttempt !== false;
+}
+
+function getServerAttemptElapsedMs(
+  roundCreatedAt: Date | undefined,
+  existingResults: RecordedQuestionResult[],
+  now: Date,
+): number {
+  const latestCheckedAt = existingResults
+    .map((result) => result.checkedAt)
+    .filter((value): value is string => typeof value === 'string')
+    .sort()
+    .at(-1);
+  const startedAt = latestCheckedAt
+    ? new Date(latestCheckedAt)
+    : (roundCreatedAt ?? now);
+  const elapsed = now.getTime() - startedAt.getTime();
+  return Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0;
+}
+
+function toStoredQuestionResult(
+  result: RecordedQuestionResult,
+): QuestionResult {
+  return {
+    questionIndex: result.questionIndex,
+    correct: result.correct,
+    answerGiven: result.answerGiven,
+    timeMs: result.timeMs,
+    ...(result.cluesUsed != null ? { cluesUsed: result.cluesUsed } : {}),
+    ...(result.answerMode ? { answerMode: result.answerMode } : {}),
+    ...(result.disputed ? { disputed: true } : {}),
+  };
+}
+
+async function appendRecordedAttempt(
+  db: Database,
+  profileId: string,
+  roundId: string,
+  attempt: RecordedQuestionResult,
+): Promise<void> {
+  const rows = await db
+    .update(quizRounds)
+    .set({
+      results: sql`${quizRounds.results} || ${JSON.stringify([attempt])}::jsonb`,
+    })
+    .where(
+      and(
+        eq(quizRounds.id, roundId),
+        eq(quizRounds.profileId, profileId),
+        eq(quizRounds.status, 'active'),
+      ),
+    )
+    .returning({ id: quizRounds.id });
+
+  if (!rows[0]) {
+    throw new ConflictError('Round already completed');
+  }
+}
 
 /**
  * [ASSUMP-F5] Server-side truth for `correct`. The client's `result.correct`
@@ -154,8 +225,10 @@ export async function checkQuizAnswerWithCorrect(
   roundId: string,
   questionIndex: number,
   answerGiven: string,
-  answerMode?: 'free_text' | 'multiple_choice',
-): Promise<{ correct: boolean; correctAnswer: string }> {
+  answerMode?: NonNullable<QuestionResult['answerMode']>,
+  finalAttempt?: boolean,
+  cluesUsed?: number,
+): Promise<{ correct: boolean; correctAnswer?: string }> {
   const repo = createScopedRepository(db, profileId);
   const round = await repo.quizRounds.findById(roundId);
   if (!round) throw new NotFoundError('Round');
@@ -166,7 +239,31 @@ export async function checkQuizAnswerWithCorrect(
   if (!question) throw new NotFoundError('Question');
   assertAnswerInOptions(question, answerGiven, answerMode);
   const correct = isAnswerCorrect(question, answerGiven);
-  return { correct, correctAnswer: question.correctAnswer };
+  const existingResults = Array.isArray(round.results)
+    ? (round.results as RecordedQuestionResult[])
+    : [];
+  const now = new Date();
+  const isFinalAttempt =
+    question.type === 'guess_who' ? correct || finalAttempt !== false : true;
+  const attempt: RecordedQuestionResult = {
+    questionIndex,
+    correct,
+    answerGiven,
+    timeMs: getServerAttemptElapsedMs(round.createdAt, existingResults, now),
+    checkedAt: now.toISOString(),
+    finalAttempt: isFinalAttempt,
+    ...(answerMode ? { answerMode } : {}),
+    ...(cluesUsed != null ? { cluesUsed } : {}),
+  };
+
+  await appendRecordedAttempt(db, profileId, roundId, attempt);
+
+  return {
+    correct,
+    ...(isFinalAttempt && !correct
+      ? { correctAnswer: question.correctAnswer }
+      : {}),
+  };
 }
 
 /**
@@ -185,7 +282,9 @@ export function validateResults(
   clientResults: QuestionResult[],
 ): QuestionResult[] {
   const validated: QuestionResult[] = [];
+  const seenQuestionIndices = new Set<number>();
   for (const result of clientResults) {
+    if (seenQuestionIndices.has(result.questionIndex)) continue;
     const question = questions[result.questionIndex];
     if (!question) continue;
     // Drop MC answers for fixed-option question types when the submitted
@@ -208,6 +307,7 @@ export function validateResults(
       ...result,
       correct: isAnswerCorrect(question, result.answerGiven),
     });
+    seenQuestionIndices.add(result.questionIndex);
   }
   return validated;
 }
@@ -342,8 +442,22 @@ export async function completeQuizRound(
 
     const questions = round.questions as QuizQuestion[];
     const total = round.total;
-    const validatedResults = validateResults(questions, results);
-    const droppedResults = results.length - validatedResults.length;
+    const recordedResults = Array.isArray(round.results)
+      ? (round.results as RecordedQuestionResult[])
+      : [];
+    const finalRecordedResults = recordedResults.filter(isFinalRecordedAttempt);
+    const completionSourceResults = finalRecordedResults;
+    const validatedResults = validateResults(
+      questions,
+      completionSourceResults,
+    );
+    const storedResults = validatedResults.map((result) =>
+      toStoredQuestionResult(result as RecordedQuestionResult),
+    );
+    const droppedResults =
+      (recordedResults.length > 0
+        ? finalRecordedResults.length
+        : results.length) - validatedResults.length;
     const score = calculateScore(validatedResults);
     const xpEarned = calculateXp(validatedResults, total, round.activityType);
     const celebrationTier = getCelebrationTier(score, total);
@@ -380,7 +494,7 @@ export async function completeQuizRound(
     // If another concurrent call already completed the round, this UPDATE
     // affects 0 rows → ConflictError.
     const updated = await txRepo.quizRounds.completeActive(roundId, {
-      results: validatedResults,
+      results: storedResults,
       score,
       xpEarned,
       completedAt,

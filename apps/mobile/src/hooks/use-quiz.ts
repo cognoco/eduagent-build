@@ -8,6 +8,7 @@ import {
 import type {
   CompleteRoundResponse,
   QuestionCheckResponse,
+  QuestionCheckInput,
   QuestionResult,
   QuizActivityType,
   QuizRoundResponse,
@@ -108,20 +109,35 @@ export function useCheckAnswer(): UseMutationResult<
   Error,
   {
     roundId: string;
-    questionIndex: number;
-    answerGiven: string;
-    answerMode?: 'free_text' | 'multiple_choice';
+    questionIndex: QuestionCheckInput['questionIndex'];
+    answerGiven: QuestionCheckInput['answerGiven'];
+    answerMode?: QuestionCheckInput['answerMode'];
+    finalAttempt?: QuestionCheckInput['finalAttempt'];
+    cluesUsed?: QuestionCheckInput['cluesUsed'];
   }
 > {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async ({ roundId, questionIndex, answerGiven, answerMode }) => {
+    mutationFn: async ({
+      roundId,
+      questionIndex,
+      answerGiven,
+      answerMode,
+      finalAttempt,
+      cluesUsed,
+    }) => {
       const res = await client.quiz.rounds[':id'].check.$post({
         param: { id: roundId },
         // [BUG-STALE-OPTIONS] Pass answerMode so the API can verify MC answers
         // are in question.options — defense-in-depth against stale-options race.
-        json: { questionIndex, answerGiven, answerMode },
+        json: {
+          questionIndex,
+          answerGiven,
+          answerMode,
+          finalAttempt,
+          cluesUsed,
+        },
       });
       await assertOk(res);
       return (await res.json()) as QuestionCheckResponse;
