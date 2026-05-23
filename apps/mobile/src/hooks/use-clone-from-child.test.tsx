@@ -321,6 +321,101 @@ describe('useCloneFromChild', () => {
         message: 'This topic is no longer available.',
       });
     });
+    expect(result.current.toast?.primaryAction?.testID).toBe(
+      'clone-toast-back-not-found',
+    );
+  });
+
+  it('surfaces an upgrade CTA when the adult hits their monthly quota', async () => {
+    mockRandomUUID.mockReturnValueOnce(REQUEST_ID);
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 'QUOTA_EXCEEDED',
+          message: 'Quota exceeded',
+          details: { limit: 100, used: 100 },
+        },
+        402,
+      ),
+    );
+
+    const { result } = renderHook(() => useCloneFromChild(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => result.current.cloneFromChild(cloneArgs()));
+
+    await waitFor(() => {
+      expect(result.current.toast?.kind).toBe('error');
+    });
+    expect(result.current.toast?.primaryAction?.testID).toBe(
+      'clone-toast-upgrade',
+    );
+
+    act(() => result.current.toast?.primaryAction?.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+  });
+
+  it('surfaces a Family CTA when the link to the child is revoked (Forbidden)', async () => {
+    mockRandomUUID.mockReturnValueOnce(REQUEST_ID);
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ code: 'FORBIDDEN', message: 'No access' }, 403),
+    );
+
+    const { result } = renderHook(() => useCloneFromChild(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => result.current.cloneFromChild(cloneArgs()));
+
+    await waitFor(() => {
+      expect(result.current.toast?.kind).toBe('error');
+    });
+    expect(result.current.toast?.primaryAction?.testID).toBe(
+      'clone-toast-open-family',
+    );
+
+    act(() => result.current.toast?.primaryAction?.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('passes returnTo=family-recaps when the bridge tap originates from a recap detail', async () => {
+    const RECAP_ID = 'recap-abc-123';
+    mockRandomUUID.mockReturnValueOnce(REQUEST_ID);
+    mockFetch.mockResolvedValueOnce(jsonResponse(cloneResponse()));
+
+    const { result } = renderHook(() => useCloneFromChild(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() =>
+      result.current.cloneFromChild(
+        cloneArgs({ triggerPath: `/recaps/${RECAP_ID}` }),
+      ),
+    );
+
+    await waitFor(() => {
+      expect(result.current.toast?.primaryAction?.testID).toBe(
+        'clone-toast-open',
+      );
+    });
+
+    act(() => result.current.toast?.primaryAction?.onPress());
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/topic/relearn',
+        params: expect.objectContaining({
+          returnTo: 'family-recaps',
+          returnId: RECAP_ID,
+          source: 'parent_bridge',
+        }),
+      }),
+    );
+    expect(mockTrack).toHaveBeenCalledWith(
+      'add_to_my_learning.bridge',
+      expect.objectContaining({ triggerSurface: 'recaps_detail' }),
+    );
   });
 
   it('keeps the open action when undo fails because a session already started', async () => {

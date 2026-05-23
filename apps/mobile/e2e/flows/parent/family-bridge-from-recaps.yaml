@@ -74,6 +74,13 @@ tags:
     direction: DOWN
     timeout: 10000
 
+# Dismiss the first-render onboarding tip if AsyncStorage has no record of
+# it being seen (fresh install / fresh seed). Optional so re-runs against a
+# device that already dismissed the tip don't fail.
+- tapOn:
+    id: 'add-to-my-learning-tip-dismiss'
+    optional: true
+
 - tapOn:
     id: 'add-to-my-learning-button'
 
