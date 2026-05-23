@@ -23,7 +23,7 @@ SOURCE="auto"
 SPEED_FILTER="all"
 
 # ── State ────────────────────────────────────────────────────────────────
-declare -A SEEN=()
+SEEN_CMDS=$'\n'
 declare -a FAST_CMDS=()
 declare -a SLOW_CMDS=()
 declare -a NOTES=()
@@ -33,8 +33,10 @@ FILES=""
 # ── Helpers ──────────────────────────────────────────────────────────────
 add_cmd() {
   local speed="$1" cmd="$2" desc="$3"
-  [[ -n "${SEEN[$cmd]+_}" ]] && return
-  SEEN[$cmd]=1
+  case "$SEEN_CMDS" in
+    *$'\n'"$cmd"$'\n'*) return ;;
+  esac
+  SEEN_CMDS="${SEEN_CMDS}${cmd}"$'\n'
   if [[ "$speed" == "fast" ]]; then
     FAST_CMDS+=("$cmd|$desc")
   else
@@ -44,6 +46,20 @@ add_cmd() {
 
 note() {
   NOTES+=("$1")
+}
+
+join_unique_classes() {
+  local seen=$'\n'
+  local class
+  local out=()
+  for class in "${CLASSES[@]}"; do
+    case "$seen" in
+      *$'\n'"$class"$'\n'*) continue ;;
+    esac
+    seen="${seen}${class}"$'\n'
+    out+=("$class")
+  done
+  echo "${out[*]}"
 }
 
 hit() {
@@ -112,6 +128,14 @@ if [[ -z "$FILES" ]]; then
 fi
 
 FILE_COUNT=$(echo "$FILES" | wc -l | tr -d ' ')
+
+# ── TypeScript parity with Husky pre-commit ─────────────────────────────
+# Husky runs `tsc --build` for any staged .ts/.tsx file. Keep validate aligned
+# so type-broken agent output fails before the commit/push phase.
+if hit '\.tsx?$'; then
+  CLASSES+=("typescript")
+  add_cmd fast "pnpm exec tsc --build" "Full incremental typecheck"
+fi
 
 # ═════════════════════════════════════════════════════════════════════════
 # CHANGE CLASS DEFINITIONS
@@ -314,7 +338,7 @@ echo "  Change Classes Detected"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 echo "  Files:   $FILE_COUNT"
-echo "  Classes: ${CLASSES[*]}"
+echo "  Classes: $(join_unique_classes)"
 echo ""
 
 # ── Advisory ─────────────────────────────────────────────────────────────
