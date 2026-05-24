@@ -92,12 +92,24 @@ let unkeyedWarningEmitted = false;
 function bytesToHex(bytes: Uint8Array, take: number): string {
   let hex = '';
   for (let i = 0; i < take; i += 1) {
-    hex += bytes[i]!.toString(16).padStart(2, '0');
+    // `noUncheckedIndexedAccess` widens bytes[i] to `number | undefined`;
+    // the loop bound guarantees in-range, so coerce with `?? 0` rather
+    // than a non-null assertion to keep eslint happy.
+    hex += (bytes[i] ?? 0).toString(16).padStart(2, '0');
   }
   return hex;
 }
 
 export function hashProfileId(profileId: string): string {
+  // Guard against an empty/missing profile ID flowing in from a
+  // not-yet-loaded auth state (Clerk hydration race). Without this, the
+  // prod-no-key path below collides every empty call into the well-known
+  // `sha256('')` constant and funnel analysis silently misattributes
+  // every pre-auth event to one Sentry bucket. Surface the misuse with a
+  // sentinel that won't collide with any real hash output.
+  if (!profileId) {
+    return 'v3_invalid_empty';
+  }
   const envSecret = process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
   if (envSecret) {
     // Truncate to 16 bytes / 32 hex chars. 128-bit truncation gives a

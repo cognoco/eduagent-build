@@ -88,6 +88,7 @@ describe('isAllowedImageUri [WI-284]', () => {
       ['https://example.com/image.jpg'],
       ['mentomate://homework?imageUri=...'],
       ['data:image/png;base64,AAAA'],
+      // eslint-disable-next-line no-script-url -- intentional bad fixture for allowlist coverage
       ['javascript:alert(1)'],
       ['/etc/hosts'], // bare absolute path with no scheme
       [''],

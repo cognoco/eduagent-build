@@ -739,6 +739,68 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  // ---------------------------------------------------------------------
+  // [WI-284 / WI-87 review] When the deep-link imageUri falls outside the
+  // allowed cache/document sandbox, useImageBase64 refuses to read it
+  // (status='failed'). The session screen must NOT pass the rejected
+  // URI through to the stream-attachment options OR to anything that
+  // would render it inline (ChatShell's <Image source>). Pin both the
+  // read-side rejection and the auto-send opts gate so a future refactor
+  // can't silently flatten safeImageUri back to the raw imageUri.
+  // ---------------------------------------------------------------------
+
+  it('[WI-87] does not stream homework image when imageUri is outside the cache/document sandbox', async () => {
+    jest.useRealTimers();
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      // Outside the mocked cacheDirectory/documentDirectory roots — the
+      // allowlist rejects this exactly like a deep-link `file:///etc/hosts`.
+      imageUri: 'file:///etc/hosts',
+      imageMimeType: 'image/jpeg',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        {
+          id: 'problem-1',
+          text: 'Solve 2x + 5 = 17',
+          source: 'ocr',
+        },
+      ]),
+    });
+
+    const wrapper = createWrapper();
+    render(<SessionScreen />, { wrapper });
+
+    await waitFor(() => {
+      expect(mockStream).toHaveBeenCalled();
+    });
+
+    // The allowlist rejected the URI, so readAsStringAsync MUST NOT have
+    // been called for the attacker URI. (The whole point of WI-284.)
+    expect(mockReadAsStringAsync).not.toHaveBeenCalledWith(
+      'file:///etc/hosts',
+      expect.anything(),
+    );
+
+    // The stream call MUST NOT include the rejected imageUri in any form
+    // — neither as base64 in the LLM payload nor as a URI that would
+    // later render via ChatShell's <Image source>. mockStream's 5th arg
+    // is the opts object; assert imageBase64 is absent (no read) and
+    // assert the call's full payload contains nothing pointing at the
+    // attacker URI.
+    const streamCall = mockStream.mock.calls.find(
+      (call) => call?.[0] === 'Solve 2x + 5 = 17',
+    );
+    expect(streamCall).toBeDefined();
+    const opts = streamCall?.[4] as Record<string, unknown> | undefined;
+    expect(opts).toBeDefined();
+    expect(opts?.imageBase64).toBeUndefined();
+    // Whichever shape the attachment options take, none of them may
+    // carry the attacker-controlled URI through to the chat-render path.
+    expect(JSON.stringify(opts ?? {})).not.toContain('file:///etc/hosts');
+  });
+
   it('hides contextual chips on greeting but shows session tools above the composer', () => {
     const wrapper = createWrapper();
     const testScreen = render(<SessionScreen />, { wrapper });

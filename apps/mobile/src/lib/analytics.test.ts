@@ -152,6 +152,15 @@ describe('hashProfileId — HMAC-SHA256 hardening [WI-315]', () => {
     expect(configBreadcrumbs[0].level).toBe('warning');
   });
 
+  it('returns the invalid-empty sentinel when profileId is empty (no sha256-of-empty collision bucket)', () => {
+    process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 = 'any-key';
+    expect(hashProfileId('')).toBe('v3_invalid_empty');
+    // Also in the prod-no-key path — guard runs before the env-secret check.
+    delete process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
+    (global as { __DEV__?: boolean }).__DEV__ = false;
+    expect(hashProfileId('')).toBe('v3_invalid_empty');
+  });
+
   it('[BREAK] in dev, falls back to a clearly-marked dev key so local builds keep working', () => {
     // Dev builds intentionally tolerate a missing key — but the fallback
     // must be visibly a dev fallback (so a leaked dev hash can't be
