@@ -1204,6 +1204,7 @@ describe('BILLING_ISSUE', () => {
         source: 'revenuecat',
       }),
     });
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
   it('[WI-78 review] does not emit payment.failed for stale non-duplicate RevenueCat events', async () => {

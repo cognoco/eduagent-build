@@ -671,9 +671,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           },
         } as Href);
       } catch (err: unknown) {
-        topicSwitchInFlightRef.current = false;
         setIsClosing(false);
         platformAlert('Could not switch topic', classifyApiError(err).message);
+      } finally {
+        topicSwitchInFlightRef.current = false;
       }
     },
     [

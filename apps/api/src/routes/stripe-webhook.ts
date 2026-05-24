@@ -480,7 +480,11 @@ async function handlePaymentFailed(
     },
   );
 
-  if (updated && updated.webhookApplied !== false) {
+  const shouldDispatchPaymentFailed =
+    updated !== null &&
+    shouldDispatchPaymentFailedEvent(updated, stripeEventId);
+
+  if (updated && shouldDispatchPaymentFailed) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -495,7 +499,7 @@ async function handlePaymentFailed(
 
   if (!updated) return;
 
-  if (shouldDispatchPaymentFailedEvent(updated, stripeEventId)) {
+  if (shouldDispatchPaymentFailed) {
     // core-send: payment-failed alert — observed by payment-failed-observe.ts.
     // Kept direct so a dispatch failure throws to the Stripe webhook handler,
     // which then returns non-2xx → Stripe retries the webhook. A swallowed

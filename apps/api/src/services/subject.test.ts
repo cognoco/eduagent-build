@@ -507,6 +507,29 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
+  it('[WI-78 review] takes the subject-name lock before finding or creating a focused subject', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      subjects: {
+        findMany,
+        findFirst: jest.fn(),
+      },
+    });
+    const db = createFocusedBookDb();
+
+    await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      rawInput: 'tea',
+    });
+
+    const lockOrder = (db.execute as jest.Mock).mock.invocationCallOrder[0];
+    const lookupOrder = findMany.mock.invocationCallOrder[0];
+    if (lockOrder == null || lookupOrder == null) {
+      throw new Error('Expected lock and subject lookup call order');
+    }
+    expect(lockOrder).toBeLessThan(lookupOrder);
+  });
+
   it('does not fire curriculum prewarm for an existing book that already has topics', async () => {
     const subjectRow = mockSubjectRow({
       id: uuidSubjectId,

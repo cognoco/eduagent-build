@@ -320,17 +320,27 @@ export async function createSubjectWithStructure(
 
   // Focused book path: input combines a broad subject with a specific focus area
   if (effectiveFocus) {
-    const existingSubject = await findExistingSubjectByName(
-      db,
-      profileId,
-      input.name,
-    );
-    const targetSubject =
-      existingSubject ??
-      (await createSubject(db, profileId, {
-        name: input.name,
-        rawInput: input.rawInput,
-      }));
+    const subjectNameLockKey = `subject:${profileId}:${input.name
+      .trim()
+      .toLowerCase()}`;
+    const targetSubject = await db.transaction(async (tx) => {
+      const txDb = tx as unknown as Database;
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${subjectNameLockKey}))`,
+      );
+      const existingSubject = await findExistingSubjectByName(
+        txDb,
+        profileId,
+        input.name,
+      );
+      return (
+        existingSubject ??
+        (await createSubject(txDb, profileId, {
+          name: input.name,
+          rawInput: input.rawInput,
+        }))
+      );
+    });
 
     await ensureCurriculum(db, targetSubject.id);
 

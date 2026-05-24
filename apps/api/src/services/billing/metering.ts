@@ -332,6 +332,28 @@ export async function decrementQuota(
     return topUpResult;
   }
 
+  // A concurrent request can consume the last daily slot after the monthly
+  // failure snapshot but before/while we lose a contended top-up decrement.
+  // Re-read once so callers see the real hard-stop reason instead of a generic
+  // "none" exhaustion classification.
+  const latestPool = await findQuotaPool__unscoped(db, subscriptionId);
+  if (
+    latestPool &&
+    latestPool.dailyLimit !== null &&
+    latestPool.usedToday >= latestPool.dailyLimit
+  ) {
+    return {
+      success: false,
+      source: 'daily_exceeded',
+      remainingMonthly: Math.max(
+        0,
+        latestPool.monthlyLimit - latestPool.usedThisMonth,
+      ),
+      remainingTopUp: 0,
+      remainingDaily: 0,
+    };
+  }
+
   // 3. Both exhausted or no top-ups available
   return {
     success: false,

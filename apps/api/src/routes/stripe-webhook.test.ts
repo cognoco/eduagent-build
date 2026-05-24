@@ -833,6 +833,7 @@ describe('invoice.payment_failed', () => {
         attempt: 3,
       }),
     });
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
   it('[WI-78 review] does not emit payment.failed for stale non-duplicate events', async () => {

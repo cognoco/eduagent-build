@@ -458,7 +458,10 @@ async function handleBillingIssue(
     status: 'past_due',
   });
 
-  if (updated && updated.webhookApplied !== false) {
+  const shouldDispatchBillingIssue =
+    updated !== null && shouldDispatchBillingIssueEvent(updated, event.id);
+
+  if (updated && shouldDispatchBillingIssue) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -472,7 +475,7 @@ async function handleBillingIssue(
 
   if (!updated) return;
 
-  if (shouldDispatchBillingIssueEvent(updated, event.id)) {
+  if (shouldDispatchBillingIssue) {
     // core-send: payment-failed alert - billing observability cannot be silent.
     // A swallowed dispatch leaves the failed payment unobserved by alerting.
     await inngest.send({

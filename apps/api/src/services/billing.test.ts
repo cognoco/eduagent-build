@@ -685,6 +685,40 @@ describe('decrementQuota', () => {
     expect(findTopUp).toHaveBeenCalledTimes(4);
   });
 
+  it('[WI-78 review] reports daily_exceeded when the last top-up race also consumes the daily slot', async () => {
+    const stalePool = mockQuotaPoolRow({
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: 10,
+      usedToday: 9,
+    });
+    const refreshedPool = mockQuotaPoolRow({
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: 10,
+      usedToday: 10,
+    });
+    const topUp = mockTopUpRow({ remaining: 1 });
+    const db = createMockDb({
+      updateReturningSequence: [
+        [], // monthly atomic UPDATE: WHERE used < limit fails
+        [], // top-up decrement lost to the request that filled the daily cap
+      ],
+    });
+    const findPool = (db as any).query.quotaPools.findFirst as jest.Mock;
+    findPool
+      .mockResolvedValueOnce(stalePool)
+      .mockResolvedValueOnce(refreshedPool);
+    const findTopUp = (db as any).query.topUpCredits.findFirst as jest.Mock;
+    findTopUp.mockResolvedValueOnce(topUp).mockResolvedValueOnce(undefined);
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('daily_exceeded');
+    expect(result.remainingDaily).toBe(0);
+  });
+
   it('returns failure when both monthly and top-up are exhausted', async () => {
     const db = createMockDb({
       updateReturning: [], // monthly atomic fails

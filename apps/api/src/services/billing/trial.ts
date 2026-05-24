@@ -285,7 +285,7 @@ export async function transitionToExtendedTrialFromRevenuecatEvent(
         : null;
     }
 
-    await tx
+    const quotaRows = await tx
       .update(quotaPools)
       .set({
         monthlyLimit: extendedMonthlyQuota,
@@ -294,7 +294,14 @@ export async function transitionToExtendedTrialFromRevenuecatEvent(
         usedToday: 0,
         updatedAt: new Date(),
       })
-      .where(eq(quotaPools.subscriptionId, subscriptionId));
+      .where(eq(quotaPools.subscriptionId, subscriptionId))
+      .returning({ id: quotaPools.id });
+
+    if (quotaRows.length === 0) {
+      throw new Error(
+        `Missing quota pool for subscription ${subscriptionId}; rolling back trial extension`,
+      );
+    }
 
     return { ...mapSubscriptionRow(updated), webhookApplied: true };
   });

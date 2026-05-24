@@ -548,6 +548,41 @@ describe('updateSubscriptionAndQuotaFromRevenuecatWebhook (integration) [WI-78 r
     expect(pool!.monthlyLimit).toBe(familyConfig.monthlyQuota);
     expect(pool!.dailyLimit).toBe(familyConfig.dailyLimit);
   });
+
+  it('rolls back the subscription update when the quota row is missing', async () => {
+    const account = await seedAccount(1);
+    const { subscription } = await seedSubscriptionWithQuota(
+      account.id,
+      'plus',
+    );
+    const db = createIntegrationDb();
+    const familyConfig = getTierConfig('family');
+
+    await db
+      .delete(quotaPools)
+      .where(eq(quotaPools.subscriptionId, subscription.id));
+
+    await expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook(
+        db,
+        account.id,
+        {
+          eventId: 'evt-missing-quota',
+          eventTimestampMs: 1_800_000_000_000,
+          tier: 'family',
+          status: 'active',
+        },
+        {
+          monthlyQuota: familyConfig.monthlyQuota,
+          dailyLimit: familyConfig.dailyLimit,
+        },
+      ),
+    ).rejects.toThrow('quota pool');
+
+    const row = await loadSubscription(account.id);
+    expect(row!.tier).toBe('plus');
+    expect(row!.lastRevenuecatEventId).not.toBe('evt-missing-quota');
+  });
 });
 
 // ---------------------------------------------------------------------------

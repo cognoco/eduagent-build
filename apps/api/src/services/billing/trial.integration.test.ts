@@ -28,7 +28,6 @@ import {
   transitionToExtendedTrial,
   transitionToExtendedTrialFromRevenuecatEvent,
   expireTrialAndDowngradeQuota,
-  downgradeQuotaPool,
 } from '../billing';
 import { getTierConfig } from '../subscription';
 
@@ -431,6 +430,34 @@ describe('transitionToExtendedTrialFromRevenuecatEvent [WI-78 review]', () => {
     expect(pool!.monthlyLimit).toBe(quotaPool.monthlyLimit);
     expect(pool!.usedThisMonth).toBe(quotaPool.usedThisMonth);
     expect(pool!.usedToday).toBe(quotaPool.usedToday);
+  });
+
+  it('rolls back the trial transition when the quota row is missing', async () => {
+    const account = await seedAccount(5);
+    const { subscription } = await seedTrialSubscriptionWithPlusQuota(
+      account.id,
+      'trial',
+    );
+    const db = createIntegrationDb();
+
+    await db
+      .delete(quotaPools)
+      .where(eq(quotaPools.subscriptionId, subscription.id));
+
+    await expect(
+      transitionToExtendedTrialFromRevenuecatEvent(
+        db,
+        subscription.id,
+        450,
+        'evt-trial-missing-quota',
+        1_800_000_000_000,
+      ),
+    ).rejects.toThrow('quota pool');
+
+    const sub = await loadSubscriptionById(subscription.id);
+    expect(sub!.status).toBe('trial');
+    expect(sub!.tier).toBe('plus');
+    expect(sub!.lastRevenuecatEventId).not.toBe('evt-trial-missing-quota');
   });
 });
 

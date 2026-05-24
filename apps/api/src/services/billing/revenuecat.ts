@@ -127,14 +127,21 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
     );
 
     if (updated && updated.webhookApplied !== false) {
-      await tx
+      const quotaRows = await tx
         .update(quotaPools)
         .set({
           monthlyLimit: quota.monthlyQuota,
           dailyLimit: quota.dailyLimit,
           updatedAt: new Date(),
         })
-        .where(eq(quotaPools.subscriptionId, updated.id));
+        .where(eq(quotaPools.subscriptionId, updated.id))
+        .returning({ id: quotaPools.id });
+
+      if (quotaRows.length === 0) {
+        throw new Error(
+          `Missing quota pool for subscription ${updated.id}; rolling back RevenueCat subscription update`,
+        );
+      }
     }
 
     return updated;
