@@ -8,6 +8,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as ts from 'typescript';
 
 // Navigation patterns that count as "has an exit".
 //
@@ -16,10 +17,13 @@ import * as path from 'path';
 // router.push without ever offering the user a way *back*, so its presence
 // gives a false-positive pass. The audit must only credit primitives that
 // actually move the user off the current screen toward a known prior
-// location: back/replace, the goBackOrReplace helper, the ChatShell which
-// renders its own back chevron, or visible back/close affordances.
+// location: replace, the goBackOrReplace helper, the ChatShell which renders
+// its own back chevron, or visible back/close affordances.
+//
+// Bare router.back() is intentionally NOT credited here. It only proves there
+// is some prior history entry, not that the entry is the parent the user
+// expects. The negative ratchet below catches live router.back() calls.
 const EXIT_PATTERNS = [
-  /router\.back\(\)/, // router.back()
   /router\.replace\(/, // router.replace(...) — replaces current entry
   /goBackOrReplace\(/, // goBackOrReplace helper (wraps router.back/replace)
   /ChatShell/, // ChatShell component has built-in back button
@@ -55,6 +59,11 @@ const EXEMPT_SCREENS: string[] = [
   '(auth)/sign-in.tsx',
 ];
 
+// Forward-only ratchet: route screens must not add bare router.back().
+// If a future route has a truly native-stack-owned reason to call it directly,
+// add it here with a dated comment and prefer migrating it away quickly.
+const BARE_ROUTER_BACK_ALLOWLIST = new Set<string>();
+
 function getAllScreenFiles(dir: string): string[] {
   const results: string[] = [];
 
@@ -88,6 +97,43 @@ function getAllScreenFiles(dir: string): string[] {
 
 function getRelativeName(filePath: string, baseDir: string): string {
   return path.relative(baseDir, filePath).replace(/\\/g, '/');
+}
+
+function findBareRouterBackCalls(
+  source: string,
+  filePath = 'screen.tsx',
+): Array<{ line: number; text: string }> {
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const calls: Array<{ line: number; text: string }> = [];
+
+  function visit(node: ts.Node): void {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'back' &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === 'router'
+    ) {
+      const { line } = sourceFile.getLineAndCharacterOfPosition(
+        node.getStart(sourceFile),
+      );
+      calls.push({
+        line: line + 1,
+        text: node.getText(sourceFile),
+      });
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return calls;
 }
 
 describe('Screen navigation audit', () => {
@@ -137,12 +183,53 @@ describe('Screen navigation audit', () => {
     expect(hasExit).toBe(false);
   });
 
-  it('[BUG-748] router.back legitimately credited as an exit', () => {
+  it('[BUG-748] router.back alone is not credited as an exit', () => {
     const fakeScreen = `
       const router = useRouter();
       <Pressable onPress={() => router.back()} />
     `;
     const hasExit = EXIT_PATTERNS.some((pattern) => pattern.test(fakeScreen));
-    expect(hasExit).toBe(true);
+    expect(hasExit).toBe(false);
+  });
+
+  it('[BUG-BACK-RATCHET] route screens do not call bare router.back()', () => {
+    const violations: Array<{ file: string; line: number; text: string }> = [];
+
+    for (const filePath of screenFiles) {
+      const relativeName = getRelativeName(filePath, appDir);
+      if (BARE_ROUTER_BACK_ALLOWLIST.has(relativeName)) continue;
+
+      const source = fs.readFileSync(filePath, 'utf-8');
+      for (const call of findBareRouterBackCalls(source, relativeName)) {
+        violations.push({ file: relativeName, ...call });
+      }
+    }
+
+    if (violations.length > 0) {
+      const message = violations
+        .map((v) => `  ${v.file}:${v.line} — ${v.text}`)
+        .join('\n');
+      throw new Error(
+        `Found ${violations.length} bare router.back() call(s) in route screens:\n${message}\n\n` +
+          'Use goBackOrReplace(router, parentHref), router.replace(parentHref), or a documented dismiss strategy instead.',
+      );
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('[BUG-BACK-RATCHET] detects live router.back() calls but ignores comments', () => {
+    const sample = `
+      // router.back() in comments documents the historical trap.
+      const router = useRouter();
+      <Pressable onPress={() => router.back()} />
+    `;
+
+    expect(findBareRouterBackCalls(sample)).toEqual([
+      { line: 4, text: 'router.back()' },
+    ]);
+    expect(
+      findBareRouterBackCalls('// router.back() in a comment only'),
+    ).toEqual([]);
   });
 });

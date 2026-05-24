@@ -13,6 +13,7 @@ import { DeskLampAnimation } from '../../../components/common';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
 import { homeHrefForReturnTo } from '../../../lib/navigation';
+import { resolveLoadingMotionPreset } from '../../../lib/motion-presets';
 import { useThemeColors } from '../../../lib/theme';
 import {
   classifyApiError,
@@ -94,6 +95,10 @@ export default function QuizLaunchScreen(): React.ReactElement {
     setReturnTo,
     setRound,
   } = useQuizFlow();
+  const screenLoadingMotion = resolveLoadingMotionPreset({
+    surface: 'screen',
+    contentDensity: 'sparse',
+  });
   const routeActivityType = parseRouteActivityType(routeActivityTypeParam);
   const routeSubjectId = firstRouteParam(routeSubjectIdParam);
   const routeLanguageName = firstRouteParam(routeLanguageNameParam);
@@ -384,7 +389,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
       testID="quiz-launch-loading"
     >
       <DeskLampAnimation
-        size={150}
+        size={screenLoadingMotion.size}
         color={colors.textSecondary}
         testID="quiz-launch-thinking-lamp"
       />

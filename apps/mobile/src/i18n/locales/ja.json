@@ -159,22 +159,12 @@
       "familySummary": {
         "nameListWithMore_one": "{{names}} + {{count}}人",
         "nameListWithMore_other": "{{names}} + {{count}}人",
-        "withParent": "あなた + {{memberNames}}",
         "parentOnly": "あなた",
         "withMinutes_one": "{{memberNames}} · 今週{{count}}分",
         "withMinutes_other": "{{memberNames}} · 今週{{count}}分",
         "withSessions_one": "{{memberNames}} · 今週{{count}}回",
         "withSessions_other": "{{memberNames}} · 今週{{count}}回",
         "noActivity": "{{memberNames}} · 今週のセッションなし",
-        "childMinutes_one": "{{memberNames}}: 今週{{count}}分",
-        "childMinutes_other": "{{memberNames}}: 今週{{count}}分",
-        "childSessions_one": "{{memberNames}}: 今週{{count}}回",
-        "childSessions_other": "{{memberNames}}: 今週{{count}}回",
-        "childNoActivity": "{{memberNames}}: 今週のセッションなし",
-        "parentLearningWithTopic": "あなた: {{subjectName}}の{{topicTitle}}",
-        "parentLearningWithSubject": "あなた: {{subjectName}}",
-        "parentExampleLead": "あなたがよいお手本です。",
-        "parentExampleNudge": "短いセッションで進め方を見せましょう。",
         "attentionChild": "{{childName}}さんに少し注意が必要かもしれません",
         "profileLimit": "{{max}}プロフィール中{{count}}使用中",
         "addProfileAction": "プロフィールを追加",
@@ -183,24 +173,13 @@
       "encouragementNote": "ナッジは短い応援メッセージです。返信は必要ありません。",
       "transitionNoticeTitle": "{{childNames}}のメンターになりました",
       "transitionNoticeBody": "今夜、この会話のきっかけを1つ試してみましょう。",
-      "recentActivity": {
-        "title": "子どもの最近のアクティビティ"
-      },
-      "studyActivation": {
-        "title": "あなたも学習しますか？",
-        "body": "自分の学習時間になったら、マイラーニングに切り替えましょう。",
-        "action": "マイラーニングへ"
-      },
       "cards": {
         "checkChild": "{{childName}}さんの様子を見る",
         "checkChildFallback": "今週の進み具合を見る",
         "weeklyReport": "{{childName}}さんの週次レポートを読む",
         "weeklyReportSubtitle": "最新のまとめを確認する",
         "sendNudge": "{{childName}}さんにナッジを送る",
-        "sendNudgeSubtitle": "短い応援を選ぶ",
-        "continueOwn": "自分の学習を続ける",
-        "continueOwnSubtitle": "{{subjectName}}の{{topicTitle}}を続ける",
-        "continueOwnEmptySubtitle": "前回の続きから始める"
+        "sendNudgeSubtitle": "短い応援を選ぶ"
       },
       "snapshot": {
         "noActivity": "今週の活動はありません",
@@ -211,12 +190,13 @@
         "titleMorning": "会話のきっかけ",
         "titleAfternoon": "会話のきっかけ",
         "titleEvening": "会話のきっかけ",
-        "promptWithTopic": "今日{{topic}}がわかった瞬間はいつだった？",
-        "promptNoActivity": "今夜始めやすくするには何があったらいい？",
-        "promptFallback": "昨日より楽に感じたことは何だった？",
+        "promptWithTopic": "今週、{{topic}}で前よりわかりやすくなったことは何？",
+        "promptNoActivity": "今週始めやすくするには何があったらいい？",
+        "promptFallback": "前回より今週のほうが楽に感じたことは何？",
         "promptTrickiestWithTopic": "今{{topic}}で一番難しいところはどこ？",
-        "promptTomorrow": "明日は何に集中しようか？",
-        "promptCurious": "何か気になっていることはある？"
+        "promptNextGoalWithTopic": "今週の{{topic}}の小さな目標を1つ決める？",
+        "promptRestartWithTopic": "今週の{{topic}}の小さな目標を1つ決める？",
+        "promptRestartEasierWithTopic": "{{topic}}を再開しやすくしてみる？"
       },
       "empty": {
         "title": "Your family dashboard starts here",

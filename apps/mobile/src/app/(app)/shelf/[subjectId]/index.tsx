@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { BookProgressStatus, BookSuggestion } from '@eduagent/schemas';
 import { BookPageFlipAnimation } from '../../../../components/common';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
+import { LoadingMomentOverlay } from '../../../../components/common/LoadingMomentOverlay';
 import { BookCard } from '../../../../components/library/BookCard';
 import { SuggestionCard } from '../../../../components/library/SuggestionCard';
 import { useBookSuggestions } from '../../../../hooks/use-book-suggestions';
@@ -17,6 +18,7 @@ import {
   classifyApiError,
   recoveryActions,
 } from '../../../../lib/format-api-error';
+import { resolveLoadingMotionPreset } from '../../../../lib/motion-presets';
 import { useSubjectTint, useThemeColors } from '../../../../lib/theme';
 
 export default function ShelfScreen() {
@@ -36,6 +38,10 @@ export default function ShelfScreen() {
   const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
   const shelfTint = useSubjectTint(subjectId ?? 'shelf');
+  const screenLoadingMotion = resolveLoadingMotionPreset({
+    surface: 'screen',
+    contentDensity: 'sparse',
+  });
 
   const { data: suggestionsData } = useBookSuggestions(subjectId);
   const bookSuggestions = suggestionsData?.suggestions ?? [];
@@ -214,7 +220,11 @@ export default function ShelfScreen() {
         style={{ paddingTop: insets.top }}
         testID="shelf-loading"
       >
-        <BookPageFlipAnimation size={150} color={themeColors.accent} />
+        <BookPageFlipAnimation
+          size={screenLoadingMotion.size}
+          color={themeColors.accent}
+          testID="shelf-loading-animation"
+        />
         <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
           {t('library.shelf.loadingTitle')}
         </Text>
@@ -466,14 +476,19 @@ export default function ShelfScreen() {
 
       {/* Loading overlay during filing */}
       {filing.isPending ? (
-        <View
-          className="absolute inset-0 bg-background/80 items-center justify-center"
+        <LoadingMomentOverlay
+          animationTestID="shelf-filing-animation"
+          message={t('library.shelf.organizing')}
+          panelTestID="shelf-filing-overlay-panel"
+          renderAnimation={({ size, testID }) => (
+            <BookPageFlipAnimation
+              size={size}
+              color={themeColors.accent}
+              testID={testID}
+            />
+          )}
           testID="shelf-filing-overlay"
         >
-          <BookPageFlipAnimation size={150} color={themeColors.accent} />
-          <Text className="text-body-sm text-text-secondary mt-3">
-            {t('library.shelf.organizing')}
-          </Text>
           {showSkip && (
             <Pressable
               onPress={() => {
@@ -495,7 +510,7 @@ export default function ShelfScreen() {
               </Text>
             </Pressable>
           )}
-        </View>
+        </LoadingMomentOverlay>
       ) : null}
 
       {/* Error overlay when filing (adding a suggestion) fails */}

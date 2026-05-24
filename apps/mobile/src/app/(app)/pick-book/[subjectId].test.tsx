@@ -1,5 +1,5 @@
 import { fireEvent, waitFor, act } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
 import {
   renderScreen,
@@ -42,8 +42,34 @@ jest.mock(
 jest.mock(
   '../../../components/common', // gc1-allow: native-boundary — animation components use react-native-reanimated unavailable in Jest
   () => ({
-    BookPageFlipAnimation: () => null,
-    MagicPenAnimation: () => null,
+    BookPageFlipAnimation: ({
+      size,
+      testID,
+    }: {
+      size?: number;
+      testID?: string;
+    }) => {
+      const React = require('react');
+      const { View } = require('react-native');
+      return React.createElement(View, {
+        testID,
+        style: { width: size, height: size },
+      });
+    },
+    MagicPenAnimation: ({
+      size,
+      testID,
+    }: {
+      size?: number;
+      testID?: string;
+    }) => {
+      const React = require('react');
+      const { View } = require('react-native');
+      return React.createElement(View, {
+        testID,
+        style: { width: size, height: size },
+      });
+    },
   }),
 );
 
@@ -306,6 +332,11 @@ describe('PickBookScreen', () => {
 
     const { result } = renderPickBook();
     result.getByTestId('pick-book-loading');
+    expect(
+      StyleSheet.flatten(
+        result.getByTestId('pick-book-loading-animation').props.style,
+      ),
+    ).toEqual(expect.objectContaining({ width: 150, height: 150 }));
 
     resolveResponse(
       new Response(JSON.stringify(DEFAULT_SUGGESTIONS), {
@@ -593,9 +624,23 @@ describe('PickBookScreen', () => {
       // Trigger handlePickSuggestion — kicks off filing
       fireEvent.press(result.getByText('Europe'));
       result.rerender(<PickBookScreen />);
+      const overlay = result.getByTestId('pick-book-filing-overlay');
+      result.getByTestId('pick-book-filing-overlay-panel');
+      expect(
+        StyleSheet.flatten(
+          result.getByTestId('pick-book-filing-animation').props.style,
+        ),
+      ).toEqual(expect.objectContaining({ width: 96, height: 96 }));
+      expect(StyleSheet.flatten(overlay.props.style)).toEqual(
+        expect.objectContaining({
+          backgroundColor: '#faf5eef5',
+        }),
+      );
 
       // Force the showSkip timer to fire (8s) so the Skip button renders.
-      jest.advanceTimersByTime(8_000);
+      await act(async () => {
+        jest.advanceTimersByTime(8_000);
+      });
       result.rerender(<PickBookScreen />);
 
       const skipBtn = result.getByTestId('pick-book-filing-skip');

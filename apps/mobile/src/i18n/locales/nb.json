@@ -159,22 +159,12 @@
       "familySummary": {
         "nameListWithMore_one": "{{names}} + {{count}} til",
         "nameListWithMore_other": "{{names}} + {{count}} til",
-        "withParent": "Du + {{memberNames}}",
         "parentOnly": "Du",
         "withMinutes_one": "{{memberNames}} · {{count}} min denne uken",
         "withMinutes_other": "{{memberNames}} · {{count}} min denne uken",
         "withSessions_one": "{{memberNames}} · {{count}} økt denne uken",
         "withSessions_other": "{{memberNames}} · {{count}} økter denne uken",
         "noActivity": "{{memberNames}} · ingen økter denne uken",
-        "childMinutes_one": "{{memberNames}}: {{count}} min denne uken",
-        "childMinutes_other": "{{memberNames}}: {{count}} min denne uken",
-        "childSessions_one": "{{memberNames}}: {{count}} økt denne uken",
-        "childSessions_other": "{{memberNames}}: {{count}} økter denne uken",
-        "childNoActivity": "{{memberNames}}: ingen økter denne uken",
-        "parentLearningWithTopic": "Du: {{topicTitle}} i {{subjectName}}",
-        "parentLearningWithSubject": "Du: {{subjectName}}",
-        "parentExampleLead": "Du går foran som et godt eksempel.",
-        "parentExampleNudge": "Vis hvordan det gjøres: start en kort økt.",
         "attentionChild": "{{childName}} kan trenge oppmerksomhet",
         "profileLimit": "{{count}} av {{max}} profiler brukt",
         "addProfileAction": "Legg til profil",
@@ -183,24 +173,13 @@
       "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
       "transitionNoticeTitle": "Du veileder nå {{childNames}}",
       "transitionNoticeBody": "Prøv et av disse innsjekkingsspørsmålene i kveld.",
-      "recentActivity": {
-        "title": "Nylig barneaktivitet"
-      },
-      "studyActivation": {
-        "title": "Vil du studere også?",
-        "body": "Bytt til Min læring når det er din studietid.",
-        "action": "Gå til Min læring"
-      },
       "cards": {
         "checkChild": "Se hvordan det går med {{childName}}",
         "checkChildFallback": "Trykk for å se ukens fremgang",
         "weeklyReport": "Les ukerapporten til {{childName}}",
         "weeklyReportSubtitle": "Få med deg den siste oppsummeringen",
         "sendNudge": "Send {{childName}} en nudge",
-        "sendNudgeSubtitle": "Velg en kort oppmuntring",
-        "continueOwn": "Fortsett din egen læring",
-        "continueOwnSubtitle": "Fortsett med {{topicTitle}} i {{subjectName}}",
-        "continueOwnEmptySubtitle": "Fortsett der du slapp"
+        "sendNudgeSubtitle": "Velg en kort oppmuntring"
       },
       "snapshot": {
         "noActivity": "Ingen aktivitet denne uken",
@@ -211,12 +190,13 @@
         "titleMorning": "Samtalestartere",
         "titleAfternoon": "Samtalestartere",
         "titleEvening": "Samtalestartere",
-        "promptWithTopic": "Hva gjorde at {{topic}} ga mening i dag?",
-        "promptNoActivity": "Hva ville gjort det lett å starte i kveld?",
-        "promptFallback": "Hva føltes lettere i dag enn i går?",
+        "promptWithTopic": "Hva ble tydeligere i {{topic}} denne uken?",
+        "promptNoActivity": "Hva ville gjort det lett å starte denne uken?",
+        "promptFallback": "Hva føltes lettere denne uken enn sist?",
         "promptTrickiestWithTopic": "Hva er det vanskeligste med {{topic}} akkurat nå?",
-        "promptTomorrow": "Hva bør vi fokusere på i morgen?",
-        "promptCurious": "Er det noe du er nysgjerrig på?"
+        "promptNextGoalWithTopic": "Vil dere velge ett lite {{topic}}-mål for denne uken?",
+        "promptRestartWithTopic": "Vil dere velge ett lite {{topic}}-mål for denne uken?",
+        "promptRestartEasierWithTopic": "Skal vi gjøre det lettere å starte med {{topic}} igjen?"
       },
       "empty": {
         "title": "Your family dashboard starts here",

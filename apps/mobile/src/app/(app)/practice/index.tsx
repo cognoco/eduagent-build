@@ -871,7 +871,12 @@ export default function PracticeScreen(): React.ReactElement {
                   },
                   pointerStyle(),
                 ]}
-                onPress={() => router.push('/(app)/dictation' as Href)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/dictation',
+                    params: practiceReturnParams,
+                  } as Href)
+                }
                 accessibilityRole="button"
                 accessibilityLabel={t('practiceHub.dictation.title')}
                 testID="practice-dictation"
@@ -910,7 +915,7 @@ export default function PracticeScreen(): React.ReactElement {
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/session',
-                    params: { mode: 'recitation' },
+                    params: { mode: 'recitation', ...practiceReturnParams },
                   } as Href)
                 }
                 accessibilityRole="button"

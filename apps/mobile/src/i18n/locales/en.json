@@ -160,12 +160,13 @@
         "titleMorning": "Conversation starters",
         "titleAfternoon": "Conversation starters",
         "titleEvening": "Conversation starters",
-        "promptWithTopic": "What made {{topic}} click today?",
-        "promptNoActivity": "What would make starting feel easy tonight?",
-        "promptFallback": "What felt easier today than yesterday?",
+        "promptWithTopic": "What felt clearer in {{topic}} this week?",
+        "promptNoActivity": "What would make starting feel easy this week?",
+        "promptFallback": "What felt easier this week than last time?",
         "promptTrickiestWithTopic": "What's the trickiest part of {{topic}} right now?",
-        "promptTomorrow": "What should we focus on tomorrow?",
-        "promptCurious": "What's something you're curious about?"
+        "promptNextGoalWithTopic": "Want to pick one small {{topic}} goal for this week?",
+        "promptRestartWithTopic": "Want to pick one small {{topic}} goal for this week?",
+        "promptRestartEasierWithTopic": "Should we make {{topic}} easier to restart?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -178,22 +179,12 @@
       "familySummary": {
         "nameListWithMore_one": "{{names}} + {{count}} more",
         "nameListWithMore_other": "{{names}} + {{count}} more",
-        "withParent": "You + {{memberNames}}",
         "parentOnly": "You",
         "withMinutes_one": "{{memberNames}} · {{count}} min this week",
         "withMinutes_other": "{{memberNames}} · {{count}} min this week",
         "withSessions_one": "{{memberNames}} · {{count}} session this week",
         "withSessions_other": "{{memberNames}} · {{count}} sessions this week",
         "noActivity": "{{memberNames}} · no sessions this week",
-        "childMinutes_one": "{{memberNames}}: {{count}} min this week",
-        "childMinutes_other": "{{memberNames}}: {{count}} min this week",
-        "childSessions_one": "{{memberNames}}: {{count}} session this week",
-        "childSessions_other": "{{memberNames}}: {{count}} sessions this week",
-        "childNoActivity": "{{memberNames}}: no sessions this week",
-        "parentLearningWithTopic": "You: {{topicTitle}} in {{subjectName}}",
-        "parentLearningWithSubject": "You: {{subjectName}}",
-        "parentExampleLead": "You lead by example.",
-        "parentExampleNudge": "Show them how it's done: start a quick session.",
         "attentionChild": "{{childName}} may need attention",
         "profileLimit": "{{count}} of {{max}} profiles used",
         "addProfileAction": "Add profile",
@@ -202,24 +193,13 @@
       "encouragementNote": "Nudges are gentle one-way encouragements.",
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
       "transitionNoticeBody": "Try one of these check-in questions tonight.",
-      "recentActivity": {
-        "title": "Recent child activity"
-      },
-      "studyActivation": {
-        "title": "Want to study too?",
-        "body": "Switch to My Learning when this is your study time.",
-        "action": "Go to My Learning"
-      },
       "cards": {
         "checkChild": "See how {{childName}} is doing",
         "checkChildFallback": "Tap to see this week's progress",
         "weeklyReport": "Read {{childName}}'s weekly report",
         "weeklyReportSubtitle": "Catch up on the latest summary",
         "sendNudge": "Send {{childName}} a nudge",
-        "sendNudgeSubtitle": "Choose a short encouragement",
-        "continueOwn": "Continue your own learning",
-        "continueOwnSubtitle": "Pick up {{topicTitle}} in {{subjectName}}",
-        "continueOwnEmptySubtitle": "Pick up where you left off"
+        "sendNudgeSubtitle": "Choose a short encouragement"
       },
       "snapshot": {
         "noActivity": "No activity this week",
