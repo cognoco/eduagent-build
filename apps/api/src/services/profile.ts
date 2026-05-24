@@ -535,6 +535,31 @@ export async function updateProfileAppContext(
   accountId: string,
   defaultAppContext: AppContext,
 ): Promise<Profile | null> {
+  const existing = await db.query.profiles.findFirst({
+    where: and(
+      eq(profiles.id, profileId),
+      eq(profiles.accountId, accountId),
+      isNull(profiles.archivedAt),
+    ),
+  });
+  if (!existing) return null;
+
+  if (defaultAppContext === 'family') {
+    const familyLink = await db.query.familyLinks.findFirst({
+      where: eq(familyLinks.parentProfileId, profileId),
+    });
+    if (
+      existing.isOwner !== true ||
+      computeAgeBracket(existing.birthYear) !== 'adult' ||
+      !familyLink
+    ) {
+      throw new ForbiddenError(
+        'Family mode is only available to adult owner profiles with family links.',
+        'FAMILY_CONTEXT_NOT_ALLOWED',
+      );
+    }
+  }
+
   const rows = await db
     .update(profiles)
     .set({
