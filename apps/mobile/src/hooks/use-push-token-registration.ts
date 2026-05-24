@@ -74,7 +74,7 @@ export function usePushTokenRegistration(): PushRegistrationState {
 
     const activeProfileId = activeProfile?.id ?? null;
     if (!activeProfileId) return;
-    if (isParentProxy) return;
+    if (isParentProxyRef.current) return;
 
     try {
       const { status } = await Notifications.getPermissionsAsync();
