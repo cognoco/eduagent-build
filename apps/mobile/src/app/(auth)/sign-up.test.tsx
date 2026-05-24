@@ -445,4 +445,12 @@ describe('SignUpScreen', () => {
       );
     });
   });
+
+  it('[BUG-591] renders the clerk-captcha mount point so signUp.create can attach the widget', () => {
+    render(<SignUpScreen />);
+    // RN-Web translates nativeID into DOM id="clerk-captcha"; Clerk's Smart
+    // CAPTCHA widget queries for this element on web. Without it, sign-up
+    // silently hangs (button disables, no verification UI, no error).
+    expect(screen.getByTestId('clerk-captcha')).toBeTruthy();
+  });
 });
