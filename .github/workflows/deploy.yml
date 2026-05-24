@@ -281,8 +281,13 @@ jobs:
           fi
           export DOPPLER_TOKEN
           echo "Syncing Doppler secrets (${SYNC_TARGET}) → Worker (${DEPLOY_ENV})"
-          # Pinned to v3.69.1 — pipe-to-shell with a version flag prevents CDN-compromise injection.
-          curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sudo sh -s -- --version 3.69.1
+          DOPPLER_VERSION="3.76.0"
+          DOPPLER_ARCHIVE="doppler_${DOPPLER_VERSION}_linux_amd64.tar.gz"
+          DOPPLER_SHA256="04f1ff30ed162d7af1dba7f11ad6a37ef35099de86a7ec6e261b64b1b337a3f3"
+          curl -fsSLO "https://github.com/DopplerHQ/cli/releases/download/${DOPPLER_VERSION}/${DOPPLER_ARCHIVE}"
+          echo "${DOPPLER_SHA256}  ${DOPPLER_ARCHIVE}" | sha256sum -c -
+          sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
+          doppler --version
           pnpm secrets:sync "$SYNC_TARGET"
 
       # [BUG-953] Notify on deploy failure — creates a GitHub issue so silent

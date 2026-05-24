@@ -60,7 +60,12 @@ export const testSeedRoutes = new Hono<TestEnv>();
 // Environment + secret guard — protects ALL /__test/* routes
 // ---------------------------------------------------------------------------
 testSeedRoutes.use('/__test/*', async (c, next) => {
-  if (c.env.ENVIRONMENT === 'production') {
+  // Fail-closed: only allow recognised non-production environments.
+  // If ENVIRONMENT is undefined (e.g., a partial Doppler sync in production),
+  // treat the request as production (403). Previously the guard only blocked
+  // the literal string 'production', so an unset binding silently allowed
+  // /__test/* routes through.
+  if (c.env.ENVIRONMENT !== 'development' && c.env.ENVIRONMENT !== 'staging') {
     return c.json(
       { code: ERROR_CODES.FORBIDDEN, message: 'Not available in production' },
       403,

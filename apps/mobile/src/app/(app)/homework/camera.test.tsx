@@ -675,6 +675,101 @@ describe('CameraScreen', () => {
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
+  // [BREAK] Android hardware-back must NOT navigate away while OCR is in
+  // flight. Previously the back handler unconditionally called handleClose,
+  // which router.replace'd home and silently discarded 3-5s of in-flight
+  // OCR work. The phase guard makes back a no-op during 'processing'.
+  it('hardware back during non-processing phase routes through handleClose', () => {
+    const { BackHandler } = require('react-native');
+    const listenerSpy = jest.spyOn(BackHandler, 'addEventListener');
+    render(<CameraScreen />, { wrapper: createWrapper() });
+
+    // Find the most recent hardwareBackPress listener registered by the
+    // camera screen (other useEffects may have registered their own).
+    const calls = listenerSpy.mock.calls.filter(
+      ([event]) => event === 'hardwareBackPress',
+    );
+    const lastCall = calls[calls.length - 1];
+    expect(lastCall).toBeDefined();
+    const handler = lastCall![1] as () => boolean;
+
+    const consumed = handler();
+    expect(consumed).toBe(true);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/home');
+
+    listenerSpy.mockRestore();
+  });
+
+  it('hardware back during processing phase is consumed without navigating (preserves in-flight OCR)', async () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'processing',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockLaunchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///gallery/homework.png' }],
+    });
+
+    const { BackHandler } = require('react-native');
+    const listenerSpy = jest.spyOn(BackHandler, 'addEventListener');
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    fireEvent.press(getByTestId('gallery-button'));
+    await waitFor(() => {
+      getByTestId('photo-preview');
+    });
+
+    await act(async () => {
+      fireEvent.press(getByTestId('camera-use-this-button'));
+    });
+
+    mockRouter.replace.mockClear();
+
+    const calls = listenerSpy.mock.calls.filter(
+      ([event]) => event === 'hardwareBackPress',
+    );
+    const lastCall = calls[calls.length - 1];
+    expect(lastCall).toBeDefined();
+    const handler = lastCall![1] as () => boolean;
+
+    const consumed = handler();
+    expect(consumed).toBe(true);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    listenerSpy.mockRestore();
+  });
+
+  it('CACHE_FAILED suppresses the retry button (cache write failed → currentUriRef is null → retry is a no-op)', () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: 'Failed to cache image',
+      errorCode: 'CACHE_FAILED',
+      // failCount: 0 — first failure shows the primary action buttons (retake +
+      // suppressed retry). failCount >= 1 switches to the manual-input fallback
+      // branch which uses 'try-camera-again-button' instead.
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    const { queryByTestId, getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    // Retake and Go Home remain — they don't depend on currentUriRef.
+    expect(getByTestId('retake-button')).toBeTruthy();
+    // Retry would be a dead tap, so it must not be rendered.
+    expect(queryByTestId('retry-button')).toBeNull();
+  });
+
   // ---- Processing phase ----
 
   it('shows processing state with subject name', async () => {

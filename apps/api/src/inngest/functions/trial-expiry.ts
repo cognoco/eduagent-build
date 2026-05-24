@@ -133,12 +133,24 @@ export const trialExpiry = inngest.createFunction(
   { id: 'trial-expiry-check', name: 'Check and process trial expirations' },
   { cron: '0 0 * * *' }, // Daily at midnight
   async ({ step }) => {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
+    // [BUG-189] now + today computed INSIDE step.run so Inngest memoises them
+    // as ISO strings on the step's cached result. Computing them in the outer
+    // handler causes the closure to recompute new Date() to a later wall-clock
+    // value on replay while the cached step output still reflects the original
+    // boundary. Downstream step.run callbacks reconstruct `now` from `nowIso`.
+    // Pattern mirrors transcript-purge-cron.ts:39-41 (BUG-189).
+    const { nowIso, today } = await step.run('compute-today', async () => {
+      const computedNow = new Date();
+      return {
+        nowIso: computedNow.toISOString(),
+        today: computedNow.toISOString().slice(0, 10),
+      };
+    });
 
     // Step 1: Transition trials that just ended → extended trial (soft landing)
     // Instead of going directly to free, users get 15 questions/day for 14 more days.
     const expiredResult = await step.run('process-expired-trials', async () => {
+      const now = new Date(nowIso);
       const db = getStepDatabase();
       const expiredTrials = await findExpiredTrials(db, now);
 
@@ -188,6 +200,7 @@ export const trialExpiry = inngest.createFunction(
     const extendedResult = await step.run(
       'process-extended-trial-expiry',
       async () => {
+        const now = new Date(nowIso);
         const db = getStepDatabase();
         // Find subscriptions whose trial ended exactly TRIAL_EXTENDED_DAYS ago
         // (i.e. they've been in extended trial for the full 14-day window)
@@ -257,6 +270,7 @@ export const trialExpiry = inngest.createFunction(
     // changes (e.g. trial pause/unpause flows, retroactive status edits),
     // promote to distinct enum values rather than broaden the dedup window.
     const warningsSent = await step.run('send-trial-warnings', async () => {
+      const now = new Date(nowIso);
       const db = getStepDatabase();
       let sent = 0;
 
@@ -306,6 +320,7 @@ export const trialExpiry = inngest.createFunction(
     const softLandingSent = await step.run(
       'send-soft-landing-messages',
       async () => {
+        const now = new Date(nowIso);
         const db = getStepDatabase();
         let sent = 0;
 

@@ -45,6 +45,57 @@ describe('maintenanceRoutes', () => {
     mockCaptureException.mockClear();
   });
 
+  // ----- Break-test for length-leak timing oracle ------------------------
+  // The previous implementation of constantTimeEqual short-circuited on
+  // `left.length !== right.length`, letting an attacker distinguish "wrong
+  // length" from "right length, wrong bytes" by observing response timing.
+  // The fix hashes both inputs with SHA-256 HMAC before comparing, so the
+  // XOR loop always runs over fixed-length 32-byte digests.
+  //
+  // We can't measure wall-clock timing reliably in unit tests, so we
+  // instead assert that `crypto.subtle.sign` is called the same number of
+  // times in BOTH the equal-length and unequal-length cases. If a future
+  // refactor reintroduces an early-exit on length mismatch, the call count
+  // for the unequal-length case will drop and this test will fail.
+  describe('constantTimeEqual length-leak break-test', () => {
+    it('runs the HMAC digest in both equal- and unequal-length cases (no early-exit)', async () => {
+      const realSubtle = globalThis.crypto.subtle;
+      const signSpy = jest.spyOn(realSubtle, 'sign');
+
+      try {
+        // Unequal-length attempt: header is 1 char, secret is 2 chars.
+        const appUnequal = createTestApp({ MAINTENANCE_SECRET: 'ab' });
+        const resUnequal = await appUnequal.request(
+          '/maintenance/sentry-smoke',
+          {
+            method: 'POST',
+            headers: { 'X-Maintenance-Secret': 'a' },
+          },
+        );
+        expect(resUnequal.status).toBe(403);
+        const signCallsUnequal = signSpy.mock.calls.length;
+
+        signSpy.mockClear();
+
+        // Equal-length attempt: both 2 chars, wrong bytes.
+        const appEqual = createTestApp({ MAINTENANCE_SECRET: 'ab' });
+        const resEqual = await appEqual.request('/maintenance/sentry-smoke', {
+          method: 'POST',
+          headers: { 'X-Maintenance-Secret': 'xy' },
+        });
+        expect(resEqual.status).toBe(403);
+        const signCallsEqual = signSpy.mock.calls.length;
+
+        // Both code paths must call HMAC sign the same number of times.
+        // If the length-leak short-circuit returns, signCallsUnequal drops to 0.
+        expect(signCallsUnequal).toBeGreaterThanOrEqual(2);
+        expect(signCallsUnequal).toBe(signCallsEqual);
+      } finally {
+        signSpy.mockRestore();
+      }
+    });
+  });
+
   it('rejects sentry smoke without the maintenance secret', async () => {
     const app = createTestApp({ MAINTENANCE_SECRET: 'secret' });
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const pedagogyModeSchema = z.enum(['socratic', 'four_strands']);
 export type PedagogyMode = z.infer<typeof pedagogyModeSchema>;
@@ -52,8 +53,8 @@ export const vocabularySchema = z.object({
   cefrLevel: cefrLevelSchema.nullable().optional(),
   milestoneId: z.string().uuid().nullable().optional(),
   mastered: z.boolean(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 export type Vocabulary = z.infer<typeof vocabularySchema>;
 
@@ -85,8 +86,8 @@ export const vocabularyRetentionCardSchema = z.object({
   easeFactor: z.number(),
   intervalDays: z.number().int(),
   repetitions: z.number().int(),
-  lastReviewedAt: z.string().datetime().nullable(),
-  nextReviewAt: z.string().datetime().nullable(),
+  lastReviewedAt: isoDateField.nullable(),
+  nextReviewAt: isoDateField.nullable(),
   failureCount: z.number().int(),
   consecutiveSuccesses: z.number().int(),
 });

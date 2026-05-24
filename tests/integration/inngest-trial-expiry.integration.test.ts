@@ -271,6 +271,7 @@ describe('Integration: trial-expiry Inngest function', () => {
     const { result, executionOrder } = await executeTrialExpiry();
 
     expect(executionOrder).toEqual([
+      'compute-today',
       'process-expired-trials',
       'process-extended-trial-expiry',
       'send-trial-warnings',

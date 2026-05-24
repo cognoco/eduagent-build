@@ -1445,7 +1445,12 @@
       "LOW_QUALITY": "We couldn't read this photo clearly. Try again with better lighting or a steadier hand.",
       "NO_TEXT": "We couldn't find any text in this photo. Make sure the homework is visible and well-lit.",
       "ML_KIT_UNAVAILABLE": "Photo reading isn't available in this version. A quick app update will bring it back.",
-      "CACHE_FAILED": "We had trouble preparing the photo. Try again or type the problem in."
+      "CACHE_FAILED": "We had trouble preparing the photo. Try again or type the problem in.",
+      "NETWORK_ERROR": "We couldn't reach the server. Check your connection and try again.",
+      "AUTH_EXPIRED": "Your session expired. Sign in again to keep going.",
+      "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
+      "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
+      "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     }
   },
   "progress": {
@@ -2406,7 +2411,8 @@
     "whatHappened": "What happened",
     "detailPending": "This recap is still being prepared.",
     "tryAsking": "Try asking",
-    "openChildSession": "Open child session"
+    "openChildSession": "Open child session",
+    "emptyCtaStartSession": "Start a session"
   },
   "addToMyLearning": {
     "tip": "Save a copy of this topic into your own Library without changing your child's learning.",

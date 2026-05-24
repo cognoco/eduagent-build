@@ -5,6 +5,10 @@
 
 import { z } from 'zod';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 export interface CachedSubscriptionStatus {
   subscriptionId: string;
@@ -83,8 +87,16 @@ export async function readSubscriptionStatus(
       dailyLimit: parsed.dailyLimit ?? null,
       usedToday: parsed.usedToday ?? 0,
     } as CachedSubscriptionStatus;
-  } catch {
-    // Cache corruption — treat as miss
+  } catch (err) {
+    // Cache corruption — treat as miss, but escalate so we can query frequency.
+    logger.warn('[kv] subscription_status corruption — treating as miss', {
+      event: 'kv.subscription_status.corruption',
+      accountId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      tags: { surface: 'kv_subscription', reason: 'corruption' },
+    });
     return null;
   }
 }

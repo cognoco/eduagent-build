@@ -32,11 +32,13 @@ import {
 } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { useAppContext } from '../lib/app-context';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
 import { UpstreamError } from '../lib/api-errors';
 import { queryKeys } from '../lib/query-keys';
+import { useNavigationDataScopeContract } from './use-navigation-contract';
 import {
   streamSSEViaXHR,
   type FluencyDrillEvent,
@@ -58,6 +60,26 @@ function invalidateSessionDerivedQueries(
   void queryClient.invalidateQueries({ queryKey: ['retention'] });
   void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
   void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
+}
+
+function useSessionNavigationScope(): {
+  activeProfile: ReturnType<typeof useProfile>['activeProfile'];
+  mode: ReturnType<typeof useAppContext>['mode'];
+  profileId: string | undefined;
+} {
+  const { activeProfile } = useProfile();
+  const { mode: legacyMode } = useAppContext();
+  const navigationContract = useNavigationDataScopeContract();
+
+  if (!FEATURE_FLAGS.MODE_NAV_V1_ENABLED) {
+    return { activeProfile, mode: legacyMode, profileId: activeProfile?.id };
+  }
+
+  return {
+    activeProfile,
+    mode: navigationContract.queryScope.appContext,
+    profileId: navigationContract.queryScope.profileId ?? undefined,
+  };
 }
 
 type FilingStatus =
@@ -204,7 +226,7 @@ export function useSetSessionInputMode(
 ): UseMutationResult<SessionStartResult, Error, { inputMode: InputMode }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: { inputMode: InputMode }) => {
@@ -220,7 +242,7 @@ export function useSetSessionInputMode(
         predicate: (query) =>
           queryKeys.sessions.matchTranscriptAnyMode(
             sessionId,
-            activeProfile?.id,
+            profileId,
           )(query.queryKey),
       });
       // Input mode changes only mutate the session row/transcript metadata.
@@ -238,7 +260,7 @@ export function useClearContinuationDepth(
 ): UseMutationResult<SessionStartResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async () => {
@@ -253,10 +275,7 @@ export function useClearContinuationDepth(
     onSuccess: () => {
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchAnyMode(
-            sessionId,
-            activeProfile?.id,
-          )(query.queryKey),
+          queryKeys.sessions.matchAnyMode(sessionId, profileId)(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
     },
@@ -537,11 +556,10 @@ export function useSessionTranscript(
   sessionId: string,
 ): UseQueryResult<TranscriptResponse | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSessionNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.sessions.transcript(mode, sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.transcript(mode, sessionId, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -571,11 +589,10 @@ export function useSession(
   sessionId: string,
 ): UseQueryResult<LearningSession | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSessionNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.sessions.detail(mode, sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.detail(mode, sessionId, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -666,11 +683,10 @@ export function useParkingLot(
   sessionId: string,
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSessionNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.sessions.parkingLot(mode, sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.parkingLot(mode, sessionId, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -694,15 +710,14 @@ export function useTopicParkingLot(
   topicId: string,
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSessionNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.sessions.topicParkingLot(
       mode,
       subjectId,
       topicId,
-      activeProfile?.id,
+      profileId,
     ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -725,9 +740,8 @@ export function useAddParkingLotItem(
   sessionId: string,
 ): UseMutationResult<{ item: ParkingLotItem }, Error, { question: string }> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
-  const { mode } = useAppContext();
+  const { mode, profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: { question: string }) => {
@@ -743,11 +757,7 @@ export function useAddParkingLotItem(
       // this profile cannot touch another profile's parking-lot cache on a
       // shared device. Mirrors the queryKeys.sessions.parkingLot factory.
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.sessions.parkingLot(
-          mode,
-          sessionId,
-          activeProfile?.id,
-        ),
+        queryKey: queryKeys.sessions.parkingLot(mode, sessionId, profileId),
       });
     },
   });
@@ -762,11 +772,10 @@ export function useSessionSummary(
   },
 ): UseQueryResult<SessionSummary | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSessionNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.sessions.summary(mode, sessionId, activeProfile?.id),
+    queryKey: queryKeys.sessions.summary(mode, sessionId, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -793,7 +802,7 @@ export function useSubmitSummary(
 ): UseMutationResult<SubmitSummaryResult, Error, { content: string }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: { content: string }) => {
@@ -809,7 +818,7 @@ export function useSubmitSummary(
         predicate: (query) =>
           queryKeys.sessions.matchSummaryAnyMode(
             sessionId,
-            activeProfile?.id,
+            profileId,
           )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
@@ -822,7 +831,7 @@ export function useSkipSummary(
 ): UseMutationResult<SkipSummaryResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async () => {
@@ -837,7 +846,7 @@ export function useSkipSummary(
         predicate: (query) =>
           queryKeys.sessions.matchSummaryAnyMode(
             sessionId,
-            activeProfile?.id,
+            profileId,
           )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);

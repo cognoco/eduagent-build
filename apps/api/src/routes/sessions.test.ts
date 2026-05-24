@@ -165,6 +165,10 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
   return {
     ...actual,
     // overrides
+    // [L8-F11] Mock shape extended to match learningSessionSchema, which
+    // the route now parses (was previously passing through unvalidated).
+    // Added fields: inputMode, verificationType, wallClockSeconds, filedAt,
+    // filingStatus, filingRetryCount.
     startSession: jest
       .fn()
       .mockImplementation((_db, _profileId, subjectId, input) => ({
@@ -172,6 +176,8 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
         subjectId,
         topicId: input.topicId ?? null,
         sessionType: 'learning',
+        inputMode: 'text',
+        verificationType: null,
         status: 'active',
         escalationRung: 1,
         exchangeCount: 0,
@@ -179,6 +185,10 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
         lastActivityAt: new Date().toISOString(),
         endedAt: null,
         durationSeconds: null,
+        wallClockSeconds: null,
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
       })),
     startFirstCurriculumSession: jest
       .fn()
@@ -187,6 +197,8 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
         subjectId,
         topicId: '770e8400-e29b-41d4-a716-446655440001',
         sessionType: input.sessionType ?? 'learning',
+        inputMode: 'text',
+        verificationType: null,
         status: 'active',
         escalationRung: 1,
         exchangeCount: 0,
@@ -194,6 +206,10 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
         lastActivityAt: new Date().toISOString(),
         endedAt: null,
         durationSeconds: null,
+        wallClockSeconds: null,
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
       })),
     getSession: jest.fn().mockResolvedValue({
       id: SESSION_ID,

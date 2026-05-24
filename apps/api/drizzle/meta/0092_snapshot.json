@@ -1,5 +1,5 @@
 {
-  "id": "6925ebca-4883-4a13-987c-be8b50c90fa6",
+  "id": "e2839a0a-4f91-492d-96b5-70c232d782d2",
   "prevId": "04cd7683-baa6-44b3-b034-58db3b4f3d14",
   "version": "7",
   "dialect": "postgresql",
@@ -1375,12 +1375,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "completion_key": {
-          "name": "completion_key",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
         "date": {
           "name": "date",
           "type": "date",
@@ -1422,27 +1416,6 @@
         }
       },
       "indexes": {
-        "uniq_dictation_results_profile_completion_key": {
-          "name": "uniq_dictation_results_profile_completion_key",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "completion_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "uniq_dictation_results_profile_date_mode": {
           "name": "uniq_dictation_results_profile_date_mode",
           "columns": [
@@ -1768,7 +1741,45 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "consent_states_profile_requested_idx": {
+          "name": "consent_states_profile_requested_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "requested_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "consent_states_token_idx": {
+          "name": "consent_states_token_idx",
+          "columns": [
+            {
+              "expression": "consent_token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"consent_states\".\"consent_token\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "consent_states_profile_id_profiles_id_fk": {
           "name": "consent_states_profile_id_profiles_id_fk",

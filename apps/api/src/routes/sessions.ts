@@ -15,8 +15,10 @@ import {
   systemPromptBodySchema,
   ERROR_CODES,
   filingRetryEventSchema,
+  learningSessionSchema,
   LlmStreamError,
   RateLimitedError,
+  recallBridgeResultSchema,
   SafetyFilterError,
   streamErrorFrameSchema,
   streamFallbackFrameSchema,
@@ -197,7 +199,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             matcherEnabled: isTopicIntentMatcherEnabled(c.env.MATCHER_ENABLED),
           },
         );
-        return c.json({ session }, 201);
+        // [L8-F11] Validate response shape against the public contract.
+        return c.json({ session: learningSessionSchema.parse(session) }, 201);
       } catch (err) {
         if (err instanceof CurriculumSessionNotReadyError) {
           return apiError(c, 409, ERROR_CODES.CONFLICT, err.message);
@@ -221,7 +224,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       try {
         const session = await startSession(db, profileId, subjectId, input);
-        return c.json({ session }, 201);
+        // [L8-F11] Validate response shape against the public contract.
+        return c.json({ session: learningSessionSchema.parse(session) }, 201);
       } catch (err) {
         if (err instanceof SubjectInactiveError) {
           return apiError(c, 403, ERROR_CODES.SUBJECT_INACTIVE, err.message);
@@ -1293,7 +1297,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       }
 
       const result = await generateRecallBridge(db, profileId, sessionId);
-      return c.json(result);
+      // [L8-F9] Validate response shape against the public contract.
+      return c.json(recallBridgeResultSchema.parse(result));
     },
   );
 

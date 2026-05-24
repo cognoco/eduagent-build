@@ -3,8 +3,13 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, sql, isNull } from 'drizzle-orm';
-import { profiles, familyLinks, type Database } from '@eduagent/database';
+import { eq, and, asc, desc, inArray, sql, isNull } from 'drizzle-orm';
+import {
+  profiles,
+  familyLinks,
+  consentStates,
+  type Database,
+} from '@eduagent/database';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { safeSend } from './safe-non-core';
@@ -124,18 +129,39 @@ export async function listProfiles(
     links.map((link) => [link.childProfileId, link.createdAt]),
   );
   const linkedChildIds = new Set(links.map((link) => link.childProfileId));
-  const mapped = await Promise.all(
-    rows.map(async (row) => {
-      const status = await getConsentStatus(db, row.id);
-      return mapProfileRow(row, status, {
-        linkCreatedAt: linkCreatedAtByChildId.get(row.id) ?? null,
-        hasFamilyLinks: row.isOwner
-          ? links.length > 0
-          : linkedChildIds.has(row.id),
-      });
+
+  // [L7-F1] Batch consent lookup: one query for all profileIds, then build a
+  // map keyed by profileId with the latest status by requestedAt. Replaces
+  // the previous N+1 of one getConsentStatus call per profile.
+  const profileIds = rows.map((row) => row.id);
+  const consentRows = profileIds.length
+    ? await db
+        .select({
+          profileId: consentStates.profileId,
+          status: consentStates.status,
+          requestedAt: consentStates.requestedAt,
+        })
+        .from(consentStates)
+        .where(inArray(consentStates.profileId, profileIds))
+        .orderBy(desc(consentStates.requestedAt))
+    : [];
+  const statusByProfileId = new Map<string, Profile['consentStatus']>();
+  for (const row of consentRows) {
+    // Rows arrive in descending requestedAt order, so the first hit per
+    // profileId is the latest status.
+    if (!statusByProfileId.has(row.profileId)) {
+      statusByProfileId.set(row.profileId, row.status);
+    }
+  }
+
+  return rows.map((row) =>
+    mapProfileRow(row, statusByProfileId.get(row.id) ?? null, {
+      linkCreatedAt: linkCreatedAtByChildId.get(row.id) ?? null,
+      hasFamilyLinks: row.isOwner
+        ? links.length > 0
+        : linkedChildIds.has(row.id),
     }),
   );
-  return mapped;
 }
 
 /**

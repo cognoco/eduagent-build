@@ -8,27 +8,46 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
+// useNavigationContract internally composes useAppContext + useProfile +
+// useSubscription + feature flags. Wiring all four providers in a
+// chrome-component unit test would duplicate the navigation-contract.test.ts
+// scope without adding contract coverage (which lives in that file and the
+// snapshot test). Risk: this test cannot catch a regression in the contract
+// resolution itself — only that ModeSwitcher reads the contract correctly.
+// TODO(zk): promote ModeSwitcher coverage to an integration test under
+// _layout that mounts the real provider chain (tracked as parallel-review
+// follow-up).
 const mockUseNavigationContract = jest.fn();
-jest.mock(
-  '../../hooks/use-navigation-contract' /* gc1-allow: hook wraps profile context, subscription query, and feature flags; not exercisable in isolation */,
-  () => ({
+jest.mock('../../hooks/use-navigation-contract', () => {
+  const actual = jest.requireActual('../../hooks/use-navigation-contract');
+  return {
+    ...actual,
     useNavigationContract: (...args: unknown[]) =>
       mockUseNavigationContract(...args),
-  }),
-);
+  };
+});
 
-
+// useModeSwitch internally uses useRouter + useQueryClient + useAppContext.setMode
+// (a TanStack mutation with onError/onSuccess). The switch-error state we surface
+// here is a UI consequence of setMode's onError callback; the mode-switching
+// logic itself is covered in use-mode-switch.test.
 const mockSwitchMode = jest.fn();
-jest.mock(
-  '../../lib/use-mode-switch' /* gc1-allow: hook wraps expo-router, TanStack QueryClient, and native SecureStore; not exercisable in isolation */,
-  () => ({
+const mockDismissError = jest.fn();
+let mockIsSwitching = false;
+let mockSwitchError: 'study' | 'family' | null = null;
+jest.mock('../../lib/use-mode-switch', () => {
+  const actual = jest.requireActual('../../lib/use-mode-switch');
+  return {
+    ...actual,
     useModeSwitch: () => ({
       switchMode: mockSwitchMode,
-      isSwitching: false,
-      isSwitchingRef: { current: false },
+      isSwitching: mockIsSwitching,
+      isSwitchingRef: { current: mockIsSwitching },
+      switchError: mockSwitchError,
+      dismissError: mockDismissError,
     }),
-  }),
-);
+  };
+});
 
 function buildContract(
   modeSwitcher: 'global-header' | 'hidden',
@@ -66,10 +85,10 @@ function buildContract(
   };
 }
 
-
 beforeEach(() => {
   jest.clearAllMocks();
-
+  mockIsSwitching = false;
+  mockSwitchError = null;
 });
 
 describe('ModeSwitcher', () => {
@@ -96,10 +115,16 @@ describe('ModeSwitcher', () => {
     expect(studyBtn).toBeTruthy();
     expect(familyBtn).toBeTruthy();
 
-    expect(studyBtn.props.accessibilityState).toEqual({ selected: true });
-    expect(familyBtn.props.accessibilityState).toEqual({ selected: false });
+    // Study is current mode → selected true; family → selected false
+    expect(studyBtn.props.accessibilityState).toEqual({
+      selected: true,
+      disabled: false,
+    });
+    expect(familyBtn.props.accessibilityState).toEqual({
+      selected: false,
+      disabled: false,
+    });
   });
-
 
   it('calls switchMode with the other mode when non-active pressable is pressed', () => {
     mockUseNavigationContract.mockReturnValue(
@@ -124,8 +149,14 @@ describe('ModeSwitcher', () => {
     const studyBtn = screen.getByTestId('mode-switcher-study');
     const familyBtn = screen.getByTestId('mode-switcher-family');
 
-    expect(familyBtn.props.accessibilityState).toEqual({ selected: true });
-    expect(studyBtn.props.accessibilityState).toEqual({ selected: false });
+    expect(familyBtn.props.accessibilityState).toEqual({
+      selected: true,
+      disabled: false,
+    });
+    expect(studyBtn.props.accessibilityState).toEqual({
+      selected: false,
+      disabled: false,
+    });
   });
 
   it('calls switchMode with study when user in family mode presses study button', () => {
@@ -139,5 +170,58 @@ describe('ModeSwitcher', () => {
 
     expect(mockSwitchMode).toHaveBeenCalledTimes(1);
     expect(mockSwitchMode).toHaveBeenCalledWith('study');
+  });
+
+  it('disables both buttons and shows a spinner on the requested side while a switch is in flight', () => {
+    mockIsSwitching = true;
+    mockUseNavigationContract.mockReturnValue(
+      buildContract('global-header', 'study'),
+    );
+
+    render(<ModeSwitcher />);
+
+    const studyBtn = screen.getByTestId('mode-switcher-study');
+    const familyBtn = screen.getByTestId('mode-switcher-family');
+
+    expect(studyBtn.props.accessibilityState).toEqual({
+      selected: true,
+      disabled: true,
+    });
+    expect(familyBtn.props.accessibilityState).toEqual({
+      selected: false,
+      disabled: true,
+    });
+    // Spinner appears on the side that isn't currently active (the target of
+    // the in-flight switch).
+    expect(screen.queryByTestId('mode-switcher-family-spinner')).toBeTruthy();
+    expect(screen.queryByTestId('mode-switcher-study-spinner')).toBeNull();
+  });
+
+  it('renders an error row with retry + dismiss when switchError is set', () => {
+    // [BREAK] Earlier behavior silently no-op'd failed switches — the buttons
+    // stayed tappable, no toast appeared, and the user had no signal that the
+    // server rejected the switch. The error row is the recovery affordance.
+    mockSwitchError = 'family';
+    mockUseNavigationContract.mockReturnValue(
+      buildContract('global-header', 'study'),
+    );
+
+    render(<ModeSwitcher />);
+
+    expect(screen.getByTestId('mode-switcher-error')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('mode-switcher-error-retry'));
+    expect(mockSwitchMode).toHaveBeenCalledWith('family');
+  });
+
+  it('dismisses the error row when the dismiss action is pressed', () => {
+    mockSwitchError = 'family';
+    mockUseNavigationContract.mockReturnValue(
+      buildContract('global-header', 'study'),
+    );
+
+    render(<ModeSwitcher />);
+
+    fireEvent.press(screen.getByTestId('mode-switcher-error-dismiss'));
+    expect(mockDismissError).toHaveBeenCalledTimes(1);
   });
 });

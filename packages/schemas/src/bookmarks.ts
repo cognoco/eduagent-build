@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const bookmarkSchema = z.object({
   id: z.string().uuid(),
@@ -9,7 +10,7 @@ export const bookmarkSchema = z.object({
   subjectName: z.string(),
   topicTitle: z.string().nullable(),
   content: z.string(),
-  createdAt: z.string().datetime(),
+  createdAt: isoDateField,
 });
 export type Bookmark = z.infer<typeof bookmarkSchema>;
 

@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
+  bookmarkSchema,
   createBookmarkSchema,
   bookmarkListQuerySchema,
   bookmarkListResponseSchema,
@@ -38,6 +39,14 @@ const sessionBookmarksQuerySchema = z.object({
   sessionId: z.string().uuid(),
 });
 
+// [L8-F10] Local response wrapper for POST /bookmarks. Mirrors the
+// { bookmarks: [...] } shape used by the GET handlers (which parse via
+// sessionBookmarkListResponseSchema / bookmarkListResponseSchema). Kept
+// local since no shared schema package export exists for the singular case.
+const createBookmarkResponseSchema = z.object({
+  bookmark: bookmarkSchema,
+});
+
 export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
   .post('/bookmarks', zValidator('json', createBookmarkSchema), async (c) => {
     // [BUG-973 / CCR-PR126-C-2] Block writes from proxy sessions. DELETE
@@ -51,7 +60,7 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
       c.req.valid('json').eventId,
     );
 
-    return c.json({ bookmark }, 201);
+    return c.json(createBookmarkResponseSchema.parse({ bookmark }), 201);
   })
   .get(
     '/bookmarks/session',

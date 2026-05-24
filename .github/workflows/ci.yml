@@ -161,6 +161,9 @@ jobs:
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: pnpm exec tsx scripts/check-gc1-pattern-a.ts
 
+      - name: GitHub workflow supply-chain check
+        run: pnpm run check:github-workflow-security
+
       # Structural-regression guards under scripts/ (BUG-979 / BUG-974). Nx
       # does not pick these up — they live outside any project — so we run
       # them directly through ts-jest via scripts/jest.config.cjs.

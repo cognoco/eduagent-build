@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   uniqueIndex,
   integer,
   pgEnum,
@@ -37,10 +38,10 @@ export const dictationResults = pgTable(
   },
   // [WI-84 rollout] Keep the legacy date/mode uniqueness during the expand
   // deploy so old Workers still have a backing ON CONFLICT target. A follow-up
-  // contract migration can replace this with a non-unique read index once all
-  // deployed Workers write against completionKey.
+  // contract migration can make completionKey unique once all deployed Workers
+  // write against that conflict target.
   (table) => [
-    uniqueIndex('uniq_dictation_results_profile_completion_key').on(
+    index('idx_dictation_results_profile_completion_key').on(
       table.profileId,
       table.completionKey,
     ),

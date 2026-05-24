@@ -19,6 +19,7 @@ import {
   checkAndLogRateLimitInternal,
 } from './settings';
 import { createLogger } from './logger';
+import { captureException } from './sentry';
 
 const logger = createLogger();
 
@@ -125,7 +126,17 @@ export async function sendPushNotification(
     }
 
     return { sent: true, ticketId };
-  } catch {
+  } catch (err) {
+    logger.error('[push] send failed', {
+      event: 'notification.push.network_error',
+      profileId: payload.profileId,
+      type: payload.type,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      profileId: payload.profileId,
+      tags: { surface: 'push_notification', reason: 'network_error' },
+    });
     return { sent: false, reason: 'network_error' };
   }
 }
@@ -283,9 +294,18 @@ export async function sendEmail(
 
     const result = (await response.json()) as { id?: string };
     return { sent: true, messageId: result.id };
-  } catch {
-    // [logging sweep] structured logger so PII fields land as JSON context
-    logger.error('[email] Network error sending email');
+  } catch (err) {
+    // [logging sweep] structured logger so PII fields land as JSON context.
+    // Escalate via Sentry too — `logger.error` alone is not queryable for
+    // the "how often did this fire in 24h" question.
+    logger.error('[email] Network error sending email', {
+      event: 'notification.email.network_error',
+      type: payload.type,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      tags: { surface: 'email', reason: 'network_error' },
+    });
     return { sent: false, reason: 'network_error' };
   }
 }

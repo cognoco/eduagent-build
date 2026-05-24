@@ -9,13 +9,18 @@ import {
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 const col = (name: string) => ({ name });
-const chainable = () => ({
-  from: () => ({
-    where: () => ({
-      orderBy: () => ({ limit: () => Promise.resolve([]) }),
-      limit: () => Promise.resolve([]),
-    }),
+// Joinable terminal: supports both direct .where()/.limit() (no joins)
+// and chained .innerJoin().innerJoin()...where()/.limit() (loadTopicTitle's
+// topics ⋈ books ⋈ subjects parent-chain ownership check, H3.2).
+const joinable = (): any => ({
+  innerJoin: () => joinable(),
+  where: () => ({
+    orderBy: () => ({ limit: () => Promise.resolve([]) }),
+    limit: () => Promise.resolve([]),
   }),
+});
+const chainable = () => ({
+  from: () => joinable(),
 });
 const mockSessionCompletedDb = createTransactionalMockDb({
   query: {
@@ -75,7 +80,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
       topicId: col('topicId'),
       repetitions: col('repetitions'),
     },
-    curriculumTopics: { id: col('id'), title: col('title') },
+    curriculumTopics: {
+      id: col('id'),
+      title: col('title'),
+      bookId: col('bookId'),
+    },
+    curriculumBooks: { id: col('id'), subjectId: col('subjectId') },
     learningProfiles: { profileId: col('profileId') },
     learningSessions: { id: col('id'), profileId: col('profileId') },
     memoryFacts: {
@@ -1009,36 +1019,43 @@ describe('sessionCompleted', () => {
 
     function setupSubjectMock(subjectData: Record<string, unknown> | null) {
       resetDatabaseUrl();
-      const chainable = () => ({
-        from: () => ({
+      // Override the createDatabase mock to return a db with the desired subject.
+      // Multiple session-completed steps call getStepDatabase(); a one-shot mock
+      // can be consumed before update-vocabulary-retention runs.
+      (createDatabase as jest.Mock).mockImplementation(() => {
+        const joinable = (): any => ({
+          innerJoin: () => joinable(),
           where: () => ({
             orderBy: () => ({ limit: () => Promise.resolve([]) }),
             limit: () => Promise.resolve([]),
           }),
-        }),
+        });
+        const chainable = () => ({
+          from: () => joinable(),
+        });
+        const db: Record<string, unknown> = {
+          query: {
+            sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+            curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
+            subjects: {
+              findFirst: jest.fn().mockResolvedValue(subjectData),
+            },
+            learningProfiles: {
+              findFirst: jest.fn().mockResolvedValue({
+                memoryConsentStatus: 'pending',
+                memoryCollectionEnabled: false,
+                memoryEnabled: false,
+              }),
+            },
+            streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+          },
+          select: chainable,
+        };
+        db.transaction = jest
+          .fn()
+          .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+        return db;
       });
-      const db: Record<string, unknown> = {
-        query: {
-          sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
-          curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
-          subjects: {
-            findFirst: jest.fn().mockResolvedValue(subjectData),
-          },
-          learningProfiles: {
-            findFirst: jest.fn().mockResolvedValue({
-              memoryConsentStatus: 'pending',
-              memoryCollectionEnabled: false,
-              memoryEnabled: false,
-            }),
-          },
-          streaks: { findFirst: jest.fn().mockResolvedValue(null) },
-        },
-        select: chainable,
-      };
-      db.transaction = jest
-        .fn()
-        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
-      (createDatabase as jest.Mock).mockImplementation(() => db);
     }
 
     const fourStrandsSubject = {
@@ -2405,7 +2422,14 @@ describe('embedNewFactsForProfile embed failure observability [CR-2026-05-19-M1]
     mockSafeSend.mockClear();
   });
 
-  it('[BREAK] invalid_input failure emits safeSend counter, NOT captureException', async () => {
+  // [L9-F2] The orphan `app/embed.skipped` dispatch was removed
+  // 2026-05-23 — no handler exists for the event, and the inner safeSend was
+  // amplifying on every step retry. Expected/benign failure classes
+  // (`invalid_input`, `no_voyage_key`) are now SILENT at the dispatch layer:
+  // counted via logger.warn (the structured-log queryable channel), NOT via
+  // safeSend, NOT via captureException. Sentry escalation is reserved for
+  // unexpected failure classes (transient, rate_limited, dimension_mismatch).
+  it('[BREAK] invalid_input failure is silent — no safeSend, no captureException', async () => {
     const mockDb = makeDbWithRows([
       { id: 'fact-1', text: 'some text that triggers 4xx', category: 'pref' },
     ]);
@@ -2423,21 +2447,13 @@ describe('embedNewFactsForProfile embed failure observability [CR-2026-05-19-M1]
     );
 
     expect(result.failed).toBe(1);
-    // safeSend counter must fire for queryable skip rate
-    expect(mockSafeSend).toHaveBeenCalledTimes(1);
-    expect(mockSafeSend).toHaveBeenCalledWith(
-      expect.any(Function),
-      'memory_facts.embed_on_write.skipped',
-      expect.objectContaining({
-        profileId: PROFILE_ID_OBS,
-        reason: 'invalid_input',
-      }),
-    );
-    // captureException must NOT fire — invalid_input is an expected/documented class
+    // Orphan-event dispatch removed — safeSend must not fire for benign classes.
+    expect(mockSafeSend).not.toHaveBeenCalled();
+    // captureException must NOT fire — invalid_input is expected/documented.
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
-  it('[BREAK] no_voyage_key failure emits safeSend counter, NOT captureException', async () => {
+  it('[BREAK] no_voyage_key failure is silent — no safeSend, no captureException', async () => {
     const mockDb = makeDbWithRows([
       { id: 'fact-2', text: 'some text', category: 'fact' },
     ]);
@@ -2450,11 +2466,7 @@ describe('embedNewFactsForProfile embed failure observability [CR-2026-05-19-M1]
 
     await embedNewFactsForProfile(mockDb, PROFILE_ID_OBS, mockEmbedder);
 
-    expect(mockSafeSend).toHaveBeenCalledWith(
-      expect.any(Function),
-      'memory_facts.embed_on_write.skipped',
-      expect.objectContaining({ reason: 'no_voyage_key' }),
-    );
+    expect(mockSafeSend).not.toHaveBeenCalled();
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 

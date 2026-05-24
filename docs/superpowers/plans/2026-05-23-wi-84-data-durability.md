@@ -325,9 +325,9 @@ Run the test-seed Jest files. For API behavior changes, also run `pnpm exec jest
 - Modify: `apps/api/src/services/dictation/result.ts`
 - Modify: `apps/api/src/routes/dictation.ts` and `.test.ts`
 - Modify: `apps/api/src/services/dictation/result.integration.test.ts`
-- Add: new `apps/api/drizzle/0092_*` migration SQL and rollback doc
+- Add: new `apps/api/drizzle/0093_*` migration SQL and rollback doc
 
-**Rollout note:** This PR must be the expand step only. Production migrations run before the Worker deploy, so dropping `uniq_dictation_results_profile_date_mode` in the same deploy would break the old compiled Worker, whose insert still uses `ON CONFLICT (profile_id,date,mode)`. Keep that unique index and the repository conflict target in this PR. Follow-up #394, after this Worker is deployed everywhere, should drop the legacy unique index, add a non-unique read index if needed, and switch the repository conflict target to `(profileId, completionKey)`.
+**Rollout note:** This PR must be the expand step only. Production migrations run before the Worker deploy, so dropping `uniq_dictation_results_profile_date_mode` in the same deploy would break the old compiled Worker, whose insert still uses `ON CONFLICT (profile_id,date,mode)`. Keep that unique index and the repository conflict target in this PR. The new completion-key index is intentionally non-unique until the contract rollout because the repository still targets the legacy conflict key. Follow-up #394, after this Worker is deployed everywhere, must re-run the deterministic completion-key backfill for rows old Workers inserted with database-generated placeholders, then drop the legacy unique index, add the unique `(profile_id, completion_key)` index, add a non-unique date/mode read index if needed, and switch the repository conflict target to `(profileId, completionKey)`.
 
 - [ ] **Step 1: Write RED schema/route tests**
 
@@ -361,7 +361,7 @@ Expected: FAIL because no `completionKey` exists yet.
 
 - [ ] **Step 4: Implement GREEN**
 
-Add `completion_key` to `dictation_results`, backfill existing rows with the same deterministic legacy key used by omitted-key clients, set a database default for old Worker inserts during the migration-to-deploy window, and create the new unique `(profile_id, completion_key)` index. Preserve `uniq_dictation_results_profile_date_mode` and the repository's legacy conflict target until the contract follow-up. Update mobile/API schema callers so clients can generate and submit a stable per-completion UUID; the server stores the key now even though same-day same-mode distinction is gated on the later contract step.
+Add `completion_key` to `dictation_results`, backfill existing rows with the same deterministic legacy key used by omitted-key clients, set a database default for old Worker inserts during the migration-to-deploy window, and create a non-unique `(profile_id, completion_key)` index. Preserve `uniq_dictation_results_profile_date_mode` and the repository's legacy conflict target until the contract follow-up. Update mobile/API schema callers so clients can generate and submit a stable per-completion UUID; the server stores the key now even though same-day same-mode distinction is gated on the later contract step.
 
 - [ ] **Step 5: Verify GREEN**
 
@@ -485,5 +485,5 @@ Open a PR from branch `WI-84`. Monitor `gh pr checks`, automated review comments
 - Spec coverage: all 11 child items are mapped to Tasks 1-10, with bundle validation in Task 11.
 - Placeholder scan: no task is intentionally deferred; Task 5 has one external-state branch because real Cloudflare KV namespace ids may not be present in repo/Doppler.
 - Type consistency: `completionKey` is the API/domain property, `completion_key` is the DB column.
-- Rollout split: DS-115's schema/client expand step ships here. The same-day same-mode behavior remains blocked by the preserved legacy unique index until tracked follow-up #394 runs after the new Worker is deployed.
+- Rollout split: DS-115's schema/client expand step ships here. The same-day same-mode behavior remains blocked by the preserved legacy unique index until tracked follow-up #394 runs after the new Worker is deployed. That follow-up must first re-run deterministic backfill for old-Worker gap rows that received database-generated placeholder keys, then add the unique completion-key index and switch the repository conflict target.
 - Risk: this is a broad P1 bundle. If implementation becomes too large for one PR, split only after preserving traceability and getting explicit approval because WI-84 Definition of Done is work-package-level.

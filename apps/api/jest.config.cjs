@@ -30,7 +30,12 @@ module.exports = {
     '^@eduagent/test-utils$': '<rootDir>/packages/test-utils/src/index.ts',
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
   },
-  modulePathIgnorePatterns: ['\\.claude/worktrees', '<rootDir>/.worktrees/'],
+  modulePathIgnorePatterns: [
+    '\\.claude/worktrees',
+    '<rootDir>/.worktrees/',
+    '<rootDir>/.tmp/',
+    '[/\\\\]\\.tmp',
+  ],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: [
     '<rootDir>/apps/api/src/**/*.test.ts',
@@ -41,6 +46,8 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '<rootDir>/.worktrees/',
+    '<rootDir>/.tmp/',
+    '[/\\\\]\\.tmp',
     '\\.integration\\.test\\.ts$',
   ],
   coverageDirectory: '<rootDir>/coverage/apps/api',

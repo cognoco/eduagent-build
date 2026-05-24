@@ -8,13 +8,13 @@ describe('dictation completion key migration', () => {
     ) as { entries?: Array<{ tag?: string }> };
 
     expect(journal.entries?.map((entry) => entry.tag)).toContain(
-      '0092_dictation_completion_key',
+      '0093_dictation_completion_key',
     );
   });
 
   it('[WI-84 automated review] backfills the same legacy key used by old clients', () => {
     const migration = readFileSync(
-      join(__dirname, '../drizzle/0092_dictation_completion_key.sql'),
+      join(__dirname, '../drizzle/0093_dictation_completion_key.sql'),
       'utf8',
     ).toLowerCase();
 
@@ -31,7 +31,7 @@ describe('dictation completion key migration', () => {
 
   it('[WI-84 review] keeps the legacy unique index for migration-before-deploy safety', () => {
     const migration = readFileSync(
-      join(__dirname, '../drizzle/0092_dictation_completion_key.sql'),
+      join(__dirname, '../drizzle/0093_dictation_completion_key.sql'),
       'utf8',
     ).toLowerCase();
 
@@ -43,14 +43,28 @@ describe('dictation completion key migration', () => {
     );
   });
 
+  it('[WI-84 review] keeps the new completion-key index non-unique until the contract rollout', () => {
+    const migration = readFileSync(
+      join(__dirname, '../drizzle/0093_dictation_completion_key.sql'),
+      'utf8',
+    ).toLowerCase();
+
+    expect(migration).toContain(
+      'create index "idx_dictation_results_profile_completion_key"',
+    );
+    expect(migration).not.toContain(
+      'create unique index "uniq_dictation_results_profile_completion_key"',
+    );
+  });
+
   it('[WI-84 review] rollback leaves the preserved legacy unique index alone', () => {
     const rollback = readFileSync(
-      join(__dirname, '../drizzle/0092_dictation_completion_key.rollback.md'),
+      join(__dirname, '../drizzle/0093_dictation_completion_key.rollback.md'),
       'utf8',
     ).toLowerCase();
 
     expect(rollback).toContain(
-      'drop index if exists "uniq_dictation_results_profile_completion_key"',
+      'drop index if exists "idx_dictation_results_profile_completion_key"',
     );
     expect(rollback).toContain('drop column if exists "completion_key"');
     expect(rollback).not.toContain(

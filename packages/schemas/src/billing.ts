@@ -1,7 +1,15 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const subscriptionTierSchema = z.enum(['free', 'plus', 'family', 'pro']);
 export type SubscriptionTier = z.infer<typeof subscriptionTierSchema>;
+
+/** Paid tiers (the purchasable subset of SubscriptionTier — excludes 'free'). */
+export const paidTierSchema = z.enum(['plus', 'family', 'pro']);
+export type PaidTier = z.infer<typeof paidTierSchema>;
+
+export const billingIntervalSchema = z.enum(['monthly', 'yearly']);
+export type BillingInterval = z.infer<typeof billingIntervalSchema>;
 
 export const subscriptionStatusSchema = z.enum([
   'trial',
@@ -15,8 +23,8 @@ export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 export const subscriptionSchema = z.object({
   tier: subscriptionTierSchema,
   status: subscriptionStatusSchema,
-  trialEndsAt: z.string().datetime().nullable(),
-  currentPeriodEnd: z.string().datetime().nullable(),
+  trialEndsAt: isoDateField.nullable(),
+  currentPeriodEnd: isoDateField.nullable(),
   cancelAtPeriodEnd: z.boolean(),
   monthlyLimit: z.number().int(),
   usedThisMonth: z.number().int(),
@@ -28,8 +36,8 @@ export const subscriptionSchema = z.object({
 export type Subscription = z.infer<typeof subscriptionSchema>;
 
 export const checkoutRequestSchema = z.object({
-  tier: z.enum(['plus', 'family', 'pro']),
-  interval: z.enum(['monthly', 'yearly']),
+  tier: paidTierSchema,
+  interval: billingIntervalSchema,
 });
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 
@@ -65,17 +73,17 @@ export const usageSchema = z
     remainingQuestions: z.number().int(),
     topUpCreditsRemaining: z.number().int(),
     warningLevel: z.enum(['none', 'soft', 'hard', 'exceeded']),
-    cycleResetAt: z.string().datetime(),
+    cycleResetAt: isoDateField,
     dailyLimit: z.number().int().nullable(),
     usedToday: z.number().int(),
     dailyRemainingQuestions: z.number().int().nullable(),
     byProfile: z.array(usageProfileBreakdownRowSchema).optional(),
     familyAggregate: usageFamilyAggregateSchema.nullable().optional(),
-    resetsAt: z.string().datetime().optional(),
-    renewsAt: z.string().datetime().nullable().optional(),
+    resetsAt: isoDateField.optional(),
+    renewsAt: isoDateField.nullable().optional(),
     resetsAtLabel: z.string().optional(),
     renewsAtLabel: z.string().nullable().optional(),
-    perProfileAvailableSince: z.string().datetime().optional(),
+    perProfileAvailableSince: isoDateField.optional(),
   })
   .strip();
 export type Usage = z.infer<typeof usageSchema>;
@@ -93,7 +101,7 @@ export type PortalResponse = z.infer<typeof portalResponseSchema>;
 
 export const cancelResponseSchema = z.object({
   message: z.string(),
-  currentPeriodEnd: z.string().datetime(),
+  currentPeriodEnd: isoDateField,
 });
 export type CancelResponse = z.infer<typeof cancelResponseSchema>;
 

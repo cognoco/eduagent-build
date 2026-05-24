@@ -130,9 +130,35 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     expect(entry?.context).toMatchObject({
       sessionId: 'sess-2',
       meaningful: false,
-      reason: 'too_short',
+      reasonPresent: true,
+      reasonLength: 'too_short'.length,
       method: 'heuristic',
     });
+  });
+
+  it('[BREAK / WI-83] does not log raw gate decision reason text', async () => {
+    const reason = 'The learner said email=parent@example.com token=secret';
+
+    await invoke(askGateDecisionObserve, {
+      sessionId: 'sess-sensitive',
+      meaningful: true,
+      reason,
+      method: 'llm',
+      exchangeCount: 2,
+      learnerWordCount: 9,
+      topicCount: 1,
+    });
+
+    const entry = lastJsonLine(consoleLogSpy);
+    const serializedEntry = JSON.stringify(entry);
+    expect(serializedEntry).not.toContain('parent@example.com');
+    expect(serializedEntry).not.toContain('token=secret');
+    expect(entry?.context).toMatchObject({
+      sessionId: 'sess-sensitive',
+      reasonPresent: true,
+      reasonLength: reason.length,
+    });
+    expect(entry?.context).not.toHaveProperty('reason');
   });
 
   it('handles empty payload gracefully (all fields optional)', async () => {
@@ -152,6 +178,53 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     const entry = lastJsonLine(consoleErrorSpy);
     expect(entry?.message).toBe('ask.gate_decision.schema_drift');
     expect(entry?.level).toBe('error');
+  });
+
+  it('[BREAK / WI-83] does not log or capture raw reason text on schema drift', async () => {
+    await invoke(askGateDecisionObserve, {
+      sessionId: 123,
+      reason: 'contains email=parent@example.com token=secret',
+    } as unknown as Record<string, unknown>);
+
+    const entry = lastJsonLine(consoleErrorSpy);
+    const serializedLog = JSON.stringify(entry);
+    const serializedCapture = JSON.stringify(mockCaptureException.mock.calls);
+
+    expect(serializedLog).not.toContain('parent@example.com');
+    expect(serializedLog).not.toContain('token=secret');
+    expect(serializedCapture).not.toContain('parent@example.com');
+    expect(serializedCapture).not.toContain('token=secret');
+    expect(entry?.context).toMatchObject({
+      rawData: {
+        reasonPresent: true,
+        reasonLength: 'contains email=parent@example.com token=secret'.length,
+      },
+    });
+  });
+
+  it('[BREAK / WI-83] does not log or capture arbitrary schema-drift fields', async () => {
+    await invoke(askGateDecisionObserve, {
+      sessionId: 123,
+      reason: 'contains email=parent@example.com token=secret',
+      debug: 'learner=student@example.com bearer=secret-token',
+    } as unknown as Record<string, unknown>);
+
+    const entry = lastJsonLine(consoleErrorSpy);
+    const serializedLog = JSON.stringify(entry);
+    const serializedCapture = JSON.stringify(mockCaptureException.mock.calls);
+
+    expect(serializedLog).not.toContain('student@example.com');
+    expect(serializedLog).not.toContain('secret-token');
+    expect(serializedCapture).not.toContain('student@example.com');
+    expect(serializedCapture).not.toContain('secret-token');
+    expect(entry?.context).toMatchObject({
+      rawData: {
+        payloadType: 'object',
+        fieldCount: 3,
+        reasonPresent: true,
+        reasonLength: 'contains email=parent@example.com token=secret'.length,
+      },
+    });
   });
 
   // [BREAK / BUG-312] Schema drift must escalate to Sentry — silent
@@ -232,6 +305,29 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
     const entry = lastJsonLine(consoleErrorSpy);
     expect(entry?.message).toBe('ask.gate_timeout.schema_drift');
     expect(entry?.level).toBe('error');
+  });
+
+  it('[BREAK / WI-83] does not log or capture arbitrary timeout schema-drift fields', async () => {
+    await invoke(askGateTimeoutObserve, {
+      sessionId: 123,
+      exchangeCount: 'many',
+      debug: 'learner=student@example.com bearer=secret-token',
+    } as unknown as Record<string, unknown>);
+
+    const entry = lastJsonLine(consoleErrorSpy);
+    const serializedLog = JSON.stringify(entry);
+    const serializedCapture = JSON.stringify(mockCaptureException.mock.calls);
+
+    expect(serializedLog).not.toContain('student@example.com');
+    expect(serializedLog).not.toContain('secret-token');
+    expect(serializedCapture).not.toContain('student@example.com');
+    expect(serializedCapture).not.toContain('secret-token');
+    expect(entry?.context).toMatchObject({
+      rawData: {
+        payloadType: 'object',
+        fieldCount: 3,
+      },
+    });
   });
 
   // [BREAK / BUG-312] Same Sentry-escalation contract for the timeout
