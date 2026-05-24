@@ -1567,6 +1567,56 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('remove-family-member-p3');
   });
 
+  it('shows live family pool details for pro subscriptions', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'pro',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'pro',
+              monthlyLimit: 1500,
+              usedThisMonth: 300,
+              remainingQuestions: 1200,
+              profileCount: 3,
+              maxProfiles: 4,
+              members: [
+                { profileId: 'p1', displayName: 'Parent', isOwner: true },
+                { profileId: 'p2', displayName: 'Alex', isOwner: false },
+                { profileId: 'p3', displayName: 'Mia', isOwner: false },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('family-pool-section');
+    });
+    screen.getByText('3 of 4 profiles connected');
+    screen.getByText(/1200 shared questions left/i);
+    screen.getByText('Parent (owner)');
+    screen.getByText('Alex');
+    screen.getByText('Mia');
+  });
+
   it('removes a non-owner profile from the family pool after confirmation', async () => {
     mockFetch.setRoute(
       '/subscription',
@@ -1835,6 +1885,31 @@ describe('SubscriptionScreen', () => {
       expect(
         screen.getByText('You learned 1 topic and earned 50 XP — great work!'),
       ).toBeTruthy();
+    });
+
+    it('[B-607] paywall strings flow through i18n (childPaywall + restore + byokWaitlist namespaces)', () => {
+      // Locale-key presence regression guard for B-607. If any of these key
+      // paths get deleted or renamed, this test fails immediately rather than
+      // letting non-EN locales silently fall back to key strings or English.
+      // The rendered-string assertions above (e.g. "You've been exploring..."
+      // at line ~1776) already validate runtime i18n; this guard makes the
+      // locale dependency explicit so a future contributor sees the contract.
+      const enJson = jest.requireActual('../../i18n/locales/en.json');
+      expect(enJson.subscription.childPaywall.greatStart).toBe(
+        "You've been exploring and learning — great start!",
+      );
+      expect(enJson.subscription.childPaywall.notifyButton).toBe(
+        'Notify My Parent',
+      );
+      expect(enJson.subscription.restore.button).toBe('Restore Purchases');
+      expect(enJson.subscription.byokWaitlist).toBeDefined();
+      // All 7 locales must define the namespaces.
+      for (const loc of ['de', 'es', 'ja', 'nb', 'pl', 'pt']) {
+        const j = jest.requireActual(`../../i18n/locales/${loc}.json`);
+        expect(j.subscription.childPaywall).toBeDefined();
+        expect(j.subscription.restore).toBeDefined();
+        expect(j.subscription.byokWaitlist).toBeDefined();
+      }
     });
   });
 

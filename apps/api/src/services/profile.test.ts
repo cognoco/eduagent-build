@@ -54,6 +54,7 @@ jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 import type { Database } from '@eduagent/database';
+import { ForbiddenError } from '@eduagent/schemas';
 import {
   listProfiles,
   createProfile,
@@ -516,10 +517,12 @@ describe('updateProfileAppContext', () => {
   it('returns mapped profile after persisting the default app context', async () => {
     const row = mockProfileRow({
       id: 'owner-1',
+      birthYear: 1985,
       isOwner: true,
       defaultAppContext: 'family',
     });
     const db = createMockDb({
+      findFirstResult: row,
       updateReturning: [row],
       familyFindFirstResult: {
         childProfileId: 'child-1',
@@ -539,6 +542,77 @@ describe('updateProfileAppContext', () => {
     expect(result!.hasFamilyLinks).toBe(true);
   });
 
+  it('allows study context for profiles that are not family-capable', async () => {
+    const row = mockProfileRow({
+      id: 'child-1',
+      birthYear: 2014,
+      isOwner: false,
+      defaultAppContext: 'study',
+    });
+    const db = createMockDb({
+      findFirstResult: row,
+      updateReturning: [row],
+    });
+
+    const result = await updateProfileAppContext(
+      db,
+      'child-1',
+      'account-123',
+      'study',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.defaultAppContext).toBe('study');
+  });
+
+  it('[BREAK] rejects family context for non-owner profiles', async () => {
+    const row = mockProfileRow({
+      id: 'child-1',
+      birthYear: 2014,
+      isOwner: false,
+    });
+    const db = createMockDb({ findFirstResult: row });
+
+    await expect(
+      updateProfileAppContext(db, 'child-1', 'account-123', 'family'),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] rejects family context for adult owners without family links', async () => {
+    const row = mockProfileRow({
+      id: 'owner-1',
+      birthYear: 1985,
+      isOwner: true,
+    });
+    const db = createMockDb({ findFirstResult: row });
+
+    await expect(
+      updateProfileAppContext(db, 'owner-1', 'account-123', 'family'),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] rejects family context for under-18 owners with family links', async () => {
+    const row = mockProfileRow({
+      id: 'owner-1',
+      birthYear: 2012,
+      isOwner: true,
+    });
+    const db = createMockDb({
+      findFirstResult: row,
+      familyFindFirstResult: {
+        childProfileId: 'child-1',
+        createdAt: new Date('2026-02-03T04:05:06.000Z'),
+      },
+    });
+
+    await expect(
+      updateProfileAppContext(db, 'owner-1', 'account-123', 'family'),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
   it('returns null when the profile does not exist', async () => {
     const db = createMockDb({ updateReturning: [] });
 
@@ -555,6 +629,20 @@ describe('updateProfileAppContext', () => {
   it('[BREAK] WHERE clause includes archived_at IS NULL guard', async () => {
     let capturedWhere: unknown;
     const db = {
+      query: {
+        profiles: {
+          findFirst: jest.fn().mockResolvedValue(
+            mockProfileRow({
+              id: 'profile-1',
+              accountId: 'account-1',
+              birthYear: 1985,
+            }),
+          ),
+        },
+        familyLinks: {
+          findFirst: jest.fn(),
+        },
+      },
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
           where: jest.fn().mockImplementation((condition: unknown) => {

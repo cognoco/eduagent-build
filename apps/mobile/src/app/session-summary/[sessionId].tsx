@@ -23,6 +23,7 @@ import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
@@ -130,7 +131,14 @@ export default function SessionSummaryScreen() {
     transcript.data?.archived === false ? transcript.data : null;
   const { onSuccessfulRecall } = useRatingPrompt();
   const { activeProfile } = useProfile();
-  const { isParentProxy, childProfile } = useParentProxy();
+  // childProfile (consent status + id) is genuinely not exposed on the
+  // navigation contract — it describes the target child for mentor-memory
+  // navigation, not the active user's navigation state. The proxy-mode
+  // gating that used to read `isParentProxy` from this hook now flows
+  // through `contract.gates.showLearningActions` (= !isParentProxy).
+  const { childProfile } = useParentProxy();
+  const { gates: navigationGates } = useNavigationContract();
+  const isProxyMode = !navigationGates.showLearningActions;
   const activeProfileRole = useActiveProfileRole();
   const ageBracket =
     activeProfile?.birthYear != null
@@ -150,7 +158,7 @@ export default function SessionSummaryScreen() {
   usePostSessionNotificationAsk(
     activeProfile?.id,
     totalSessionCount >= 1,
-    isParentProxy,
+    isProxyMode,
   );
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
 
@@ -817,7 +825,7 @@ export default function SessionSummaryScreen() {
   // `completedSessionCount !== undefined && completedSessionCount >= 2` guard.
   const hasMentorMemorySignal = totalSessionCount >= 2;
   const hasParentProxyMemoryAccess =
-    !isParentProxy ||
+    !isProxyMode ||
     (childProfile?.consentStatus === 'CONSENTED' && !!childProfile.id);
   const shouldShowMentorMemoryCue =
     hasMentorMemorySignal && hasParentProxyMemoryAccess;
@@ -829,7 +837,7 @@ export default function SessionSummaryScreen() {
   // Feature 1: "You mastered these" row
   const resolvedTopics: string[] =
     learnerProfile.data?.recentlyResolvedTopics ?? [];
-  const shouldShowMasteredRow = resolvedTopics.length > 0 && !isParentProxy;
+  const shouldShowMasteredRow = resolvedTopics.length > 0 && !isProxyMode;
 
   // Feature 2: "Try this next" topic suggestions rail
   const suggestionItems = (topicSuggestions.data ?? []).slice(0, 3);
@@ -944,7 +952,7 @@ export default function SessionSummaryScreen() {
           server-side belt-and-suspenders, but we hide the affordance here too
           so it never appears on the parent UI).
         */}
-        {!isParentProxy && sessionId ? (
+        {!isProxyMode && sessionId ? (
           <Pressable
             onPress={() => {
               const resumeTopicId = topicId ?? fallbackSession?.topicId;
@@ -978,7 +986,7 @@ export default function SessionSummaryScreen() {
             read-only summary access only and must not see the full chat log.
             Feature 3: When the transcript has been purged (retention policy),
             show an archived notice instead of the "View full transcript" CTA. */}
-        {!isParentProxy && sessionId ? (
+        {!isProxyMode && sessionId ? (
           isTranscriptPurged ? (
             <View
               className="bg-surface rounded-card p-4 mb-4"

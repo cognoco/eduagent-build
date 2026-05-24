@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { LearnerScreen } from '../../components/home';
+import { LearnerScreen, ParentHomeScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
   useMarkCelebrationsSeen,
@@ -149,11 +149,15 @@ export default function HomeScreen(): React.ReactElement {
 
   return (
     <View className="flex-1" testID="home-screen">
-      <LearnerScreen
-        profiles={profiles}
-        activeProfile={activeProfile}
-        showParentHome={true}
-      />
+      {navigationContract.home.screen === 'FamilyHome' ? (
+        <ParentHomeScreen activeProfile={activeProfile} />
+      ) : (
+        <LearnerScreen
+          profiles={profiles}
+          activeProfile={activeProfile}
+          showParentHome={false}
+        />
+      )}
       {CelebrationOverlay}
       {firstNotice && visibleNoticeId === firstNotice.id ? (
         <View

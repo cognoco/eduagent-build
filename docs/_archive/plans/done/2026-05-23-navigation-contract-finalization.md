@@ -1,5 +1,7 @@
 # Navigation Contract — Finalization Plan
 
+> **STATUS — 2026-05-24:** All actionable tasks delivered or resolved. See "Final Closeout (2026-05-24)" at the bottom for per-task disposition. Phase 6.3 (manual smoke) is the only remaining item and requires a human at Metro.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Complete the FULL Study/Family navigation contract migration begun by PRs 1, 2, 4 — finish PRs 3, 5, 6 of `docs/specs/2026-05-21-navigation-contract.md` while preserving the 5-tab V0 production fallback at every step.
@@ -1064,3 +1066,32 @@ If any of these fail: do not merge. Fix the root cause; do not weaken the contra
 **Type consistency:** all referenced types (`NavigationContract`, `ProfileContext`, `RouteKey`, `TabKey`, `NavigationGates`, `NavigationDiagnostic`) match the live signatures in `apps/mobile/src/lib/navigation-contract.ts`. `useNavigationContract()` and `useNavigationDataScopeContract()` match the live `apps/mobile/src/hooks/use-navigation-contract.ts` exports. `gates.showLearnThisToo`, `progressScope`, `home.screen`, `chrome.modeSwitcher`, `diagnostic.reason` all match the contract source.
 
 No gaps found. Plan ready to execute.
+
+---
+
+## Final Closeout (2026-05-24)
+
+Per-task disposition recorded at archive time.
+
+| Task | Status | Disposition |
+|---|---|---|
+| Phase 1.1 V0 5-tab regression | ✅ Done | `navigation-contract.test.ts:783` `describe('V0 fallback - hard constraint...')` asserts `diagnostic.reason === 'legacy-v0-flags-off'`. |
+| Phase 1.2 Matrix snapshot | ✅ Done | `navigation-contract.snapshot.test.ts` + `__fixtures__/navigation-matrix.ts` + accepted snapshot. |
+| Phase 1.3 Totality fuzz | ✅ Done | `navigation-contract.test.ts:883` `describe('totality (fuzzed inputs never throw)')`. |
+| Phase 1.4 Usage-guard runs in CI | ✅ Done | `navigation-contract-usage-guard.test.ts` enforced; allowlist restructured into Boundary (9) / V0-fallback (9) / non-nav-domain (9) with pinned `expectedFindings` counts. |
+| Phase 2 `child/[profileId]/curriculum` | ✅ Done | Route + test exist; link wired from `child/[profileId]/index.tsx:853`. `_layout.tsx:7` declares `unstable_settings.initialRouteName = 'index'`. |
+| Phase 3.1 ModeSwitcher in chrome | ✅ Done | `components/chrome/ModeSwitcher.tsx` mounted at `_layout.tsx:2377`; `ModeChip` removed from `home.tsx`. |
+| Phase 3.2 LearnerScreen contract read | ✅ Done | `LearnerScreen.tsx:471` reads `navigationContract.gates.showFamilyHome` instead of re-deriving from raw mode/hasLinkedChildren/isFamilyPlanOwner. |
+| Phase 3.3 Shrink usage-guard allowlist | ✅ Done | Subsumed by Phase 6 terminal-allowlist restructure. |
+| Phase 4.1 topic/relearn guard | ✅ Done | `relearn.tsx:355` uses `canEnter('topic/relearn', ...)`; `showLearnThisToo` consumed by `AddToMyLearningButton.tsx:108`. |
+| Phase 4.2 quiz / practice guards | ✅ Done | `quiz/_layout.tsx:122` and `practice/index.tsx:445` use `canEnter(...)`. |
+| Phase 4.3 mentor-memory consent gate | ✅ Resolved (kept `sessionIsOwner`) | The plan invited the judgment "if gates differ in cases mentor-memory cares about, keep the broader one." `showMentorMemoryChildConsent` additionally requires `familyShape`, which would incorrectly hide the self-consent prompt for a solo owner in study shape. Kept `sessionIsOwner` and added a code comment at `mentor-memory.tsx:62` documenting the distinction: `showMentorMemoryChildConsent` is the content gate for the child-consent editor at `child/[profileId]/mentor-memory.tsx`, not the self-view screen. |
+| Phase 4.4 Data hooks `queryScope` | ✅ Done | `use-dashboard.ts`, `use-progress.ts`, `use-sessions.ts`, `use-retry-filing.ts` import `useNavigationDataScopeContract`; recorded as V0-fallback entries. |
+| Phase 5.1 Proxy entry audit | ✅ Resolved (already clean) | `setIsExplicitProxyMode` lives only in `profile.ts` (boundary). The only flip path is `switchProfile(id, { proxyMode: true })`. Grep across `apps/mobile/src` finds no normal-user callsite — only the test files and the boundary comments. Locked by ACCOUNT-04 commit, regression-tested in `profile.test.tsx:271,656`. |
+| Phase 5.2 Learn-this-too bridge | ✅ Done | Implementation wired: `useCloneFromChild` hook, `AddToMyLearningButton` component, `gates.showLearnThisToo` at contract `:368`, `canEnter('topic/relearn', { for: 'child' })` honored. Spec doc (`docs/specs/2026-05-23-learn-this-too-bridge.md`) lives on a sibling branch and is not required for this plan to archive. |
+| Phase 5.3 Notification cross-context | ✅ Done | `use-notification-response-handler.ts` uses `decideNotificationTapNavigation` with `prompt`/`replace`/`push` semantics and `setMode` for cross-context replacement. |
+| Phase 5.4 Back-stack push-chain | ✅ Resolved (covered by `unstable_settings`) | `child/[profileId]/_layout.tsx:7` exports `unstable_settings = { initialRouteName: 'index' }`. The two cross-stack `router.push` sites (`weekly-report/[weeklyReportId].tsx:279` → child root; `ParentHomeScreen.tsx:1162` → `child/<id>/reports`) are both safe under that setting per CLAUDE.md "Repo-Specific Guardrails". |
+| Phase 6.1 Empty allowlist | ✅ Done | Allowlist restructured into terminal Boundary (9) + V0-fallback (9) + Non-nav-domain (9) sets with pinned `expectedFindings`. `CANONICAL_BOUNDARY_FILES` locks the boundary set. |
+| Phase 6.2 AST ratchet | ✅ Done | `navigation-contract.guard.test.ts` enforces V0-resolver import allowlist and `contract.diagnostic.*` consumer allowlist. |
+| Phase 6.3 Final validation smoke | ⏸ Deferred (user-only) | Requires booting Metro with both `MODE_NAV_V0_ENABLED=false MODE_NAV_V1_ENABLED=false` and `…V1_ENABLED=true` and verifying the golden paths listed in Phase 6.3 Step 4. Cannot be completed by an agent. |
+

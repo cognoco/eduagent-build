@@ -19,7 +19,7 @@ import {
   useApiClient,
 } from '../lib/api-client';
 import { formatApiError } from '../lib/format-api-error';
-import { useAppContext } from '../lib/app-context';
+import { useEnsureStudyMode } from '../lib/use-mode-switch';
 import {
   FAMILY_CHILDREN_RETURN_TO,
   FAMILY_PROGRESS_RETURN_TO,
@@ -167,18 +167,16 @@ export function useCloneFromChild(): {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { activeProfile } = useProfile();
-  const { setMode } = useAppContext();
+  const ensureStudyMode = useEnsureStudyMode();
 
   // Library is a study-only tab (not in FAMILY_TABS / not in V1 guardian
   // visible tabs). A bare router.push('/(app)/library') from family chrome
-  // navigates to a tab the contract considers hidden. Pair the push with
-  // setMode('study') so the chrome and route stay consistent.
+  // navigates to a tab the contract considers hidden. ensureStudyMode pairs
+  // the navigation with the necessary mode switch so chrome and route stay
+  // consistent.
   const goToLibrary = useCallback((): void => {
-    setMode('study', {
-      onSuccess: () => router.push('/(app)/library' as Href),
-      onError: () => router.push('/(app)/library' as Href),
-    });
-  }, [router, setMode]);
+    ensureStudyMode(() => router.push('/(app)/library' as Href));
+  }, [ensureStudyMode, router]);
   const [toast, setToast] = useState<CloneToast | null>(null);
   const lastOpenTargetRef = useRef<OpenTarget | null>(null);
   const lastCloneArgsRef = useRef<CloneFromChildArgs | null>(null);

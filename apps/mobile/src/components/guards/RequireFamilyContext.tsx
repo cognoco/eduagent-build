@@ -1,12 +1,12 @@
 import { Pressable, Text, View } from 'react-native';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { LEARNER_HOME_HREF } from '../../lib/navigation';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { type RouteKey, type RouteParams } from '../../lib/navigation-contract';
-import { useAppContext } from '../../lib/app-context';
+import { useEnterFamilyMode } from '../../lib/use-mode-switch';
 
 // [PARENT-03] RequireFamilyContext is a READ-ONLY route guard.
 // It renders children only when the user is already in Family mode.
@@ -29,8 +29,9 @@ export function RequireFamilyContext({
   params?: RouteParams;
 }): ReactNode {
   const router = useRouter();
-  const { setMode } = useAppContext();
+  const enterFamilyMode = useEnterFamilyMode();
   const contract = useNavigationContract();
+  const [switchFailed, setSwitchFailed] = useState(false);
 
   if (
     !FEATURE_FLAGS.MODE_NAV_V0_ENABLED &&
@@ -58,8 +59,19 @@ export function RequireFamilyContext({
   }
 
   function handleSwitchToFamily(): void {
-    setMode('family');
-    router.replace('/(app)/home');
+    setSwitchFailed(false);
+    enterFamilyMode({
+      onSuccess: () => {
+        router.replace('/(app)/home');
+      },
+      onError: () => {
+        // Server rejected the family-context switch (e.g. owner lost
+        // family-link, or under-18 — the API guard in profile.ts.
+        // Stay on this screen and surface an actionable error so the
+        // user does not silently land on Home with mode unchanged.
+        setSwitchFailed(true);
+      },
+    });
   }
 
   return (
@@ -73,6 +85,16 @@ export function RequireFamilyContext({
       <Text className="text-body text-text-secondary text-center">
         Child learning profiles are only visible in Family mode.
       </Text>
+
+      {switchFailed && (
+        <Text
+          testID="family-route-switch-error"
+          className="text-body-sm text-danger text-center"
+        >
+          We couldn&apos;t switch to Family mode. Try again, or contact support
+          if this keeps happening.
+        </Text>
+      )}
 
       {contract.isFamilyCapable && (
         <Pressable

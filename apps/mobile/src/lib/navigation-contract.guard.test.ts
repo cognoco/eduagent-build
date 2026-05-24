@@ -26,6 +26,20 @@ const DIAGNOSTIC_ALLOWED_FILES = new Set([
   'apps/mobile/src/lib/navigation-contract.guard.test.ts',
 ]);
 
+// No route-name allowlist by design. The route check below scans only
+// `Tabs.Screen` declarations in the root `(app)/_layout.tsx` — the contract's
+// top-level navigation surface — and every name there must resolve to a
+// `TabKey` or `RouteKey` union member. Adding a route exemption would mean
+// admitting a tab that the contract cannot gate; instead, update `TabKey` /
+// `RouteKey` so `resolveNavigationContract` decides visibility.
+//
+// `Stack.Screen` declarations inside nested `_layout.tsx` files (e.g.
+// `recaps/_layout.tsx` → `[recapId]`, `more/_layout.tsx` → `account`) are
+// intentionally NOT scanned: they are sub-tree fragments owned by their
+// parent `RouteKey` (`recaps/[recapId]`, `more/account`), not standalone
+// gateable routes. A nested stack route is governed by whichever ancestor
+// `RouteKey` covers it.
+
 function repoRoot(): string {
   return resolve(__dirname, '../../../..');
 }

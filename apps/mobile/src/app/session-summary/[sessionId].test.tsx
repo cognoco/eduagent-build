@@ -137,6 +137,23 @@ jest.mock(
   }),
 );
 
+// useNavigationContract is sourced from useParentProxy in production for the
+// `gates.showLearningActions` flag, so route the mock through the existing
+// proxy fixture rather than maintaining parallel state across tests. Other
+// exports (useNavigationDataScopeContract etc.) pass through to the real
+// module so use-sessions queryScope fallbacks resolve correctly.
+jest.mock(
+  '../../hooks/use-navigation-contract' /* gc1-allow: hook depends on full app provider tree; stub pins gates for deterministic tests */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-navigation-contract'),
+    useNavigationContract: () => ({
+      gates: {
+        showLearningActions: !mockUseParentProxy().isParentProxy,
+      },
+    }),
+  }),
+);
+
 // use-rating-prompt reads/writes SecureStore and calls expo-store-review.
 // It has no useApiClient() calls, so keep it as a direct mock.
 const mockOnSuccessfulRecall = jest.fn();

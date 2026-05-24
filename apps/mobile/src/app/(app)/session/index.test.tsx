@@ -739,6 +739,55 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  // [HOMEWORK-06] Image conversion failure / timeout must NOT silently
+  // degrade to text-only. The learner sees a system message explaining the
+  // photo was dropped, and the auto-send proceeds with attachImage=false.
+  it('surfaces a system message and sends text-only when image conversion fails', async () => {
+    jest.useRealTimers();
+    mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      imageMimeType: 'image/jpeg',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        {
+          id: 'problem-1',
+          text: 'Solve 2x + 5 = 17',
+          source: 'ocr',
+        },
+      ]),
+    });
+
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
+
+    // System message tells the learner the photo was dropped.
+    await waitFor(() => {
+      expect(
+        testScreen.getByText(
+          /couldn't open your photo, so I'm starting with the text only/i,
+        ),
+      ).toBeTruthy();
+    });
+
+    // Auto-send still proceeds, but WITHOUT the image attachment.
+    await waitFor(() => {
+      expect(mockStream).toHaveBeenCalled();
+    });
+    const streamCall = mockStream.mock.calls.find(
+      (call: unknown[]) => call[0] === 'Solve 2x + 5 = 17',
+    );
+    expect(streamCall).toBeDefined();
+    const streamOpts = streamCall?.[4] as
+      | { imageBase64?: string; imageMimeType?: string }
+      | undefined;
+    expect(streamOpts?.imageBase64).toBeUndefined();
+    expect(streamOpts?.imageMimeType).toBeUndefined();
+  });
+
   // ---------------------------------------------------------------------
   // [WI-284 / WI-87 review] When the deep-link imageUri falls outside the
   // allowed cache/document sandbox, useImageBase64 refuses to read it
