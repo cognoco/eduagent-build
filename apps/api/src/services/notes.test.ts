@@ -26,6 +26,7 @@ import {
   listAllNotes,
   updateNote,
   deleteNoteById,
+  getNotesForTopic,
   getTopicIdsWithNotes,
 } from './notes';
 
@@ -44,10 +45,11 @@ import {
  */
 
 type StubRow = Record<string, unknown>;
+type SelectBatch = StubRow[] | Error;
 
 interface StubConfig {
   /** Rows returned by .select()...where() calls (in order) */
-  selectMany?: StubRow[][];
+  selectMany?: SelectBatch[];
   /** Rows returned by .selectDistinct()...where() calls (in order) */
   selectDistinct?: StubRow[][];
   /** Rows returned by .insert()...returning() calls (in order) */
@@ -103,17 +105,20 @@ function makeDbStub(config: StubConfig): Parameters<typeof listAllNotes>[0] {
   const txExecuteOk = config.txExecuteOk !== false;
 
   function makeSelectImpl(
-    rowsQueue: StubRow[][],
+    rowsQueue: SelectBatch[],
   ): (...args: unknown[]) => ChainCall {
     return () => {
-      const rows = rowsQueue.shift() ?? [];
+      const batch = rowsQueue.shift() ?? [];
       const chain: ChainCall = {
         from: () => chain,
         innerJoin: () => chain,
         leftJoin: () => chain,
         where: () => chain,
         orderBy: () => chain,
-        limit: async () => rows,
+        limit: async () => {
+          if (batch instanceof Error) throw batch;
+          return batch;
+        },
       };
       // Also support awaiting the chain directly (no .limit call)
 
@@ -121,9 +126,13 @@ function makeDbStub(config: StubConfig): Parameters<typeof listAllNotes>[0] {
       // Make it awaitable as array (for cases without .limit())
       Object.defineProperty(chain, 'then', {
         get() {
+          if (batch instanceof Error) {
+            return (_res: (v: StubRow[]) => void, rej?: (e: Error) => void) =>
+              Promise.reject(batch).catch(rej);
+          }
           // Resolve immediately with rows when awaited directly
           return (res: (v: StubRow[]) => void) =>
-            Promise.resolve(rows).then(res);
+            Promise.resolve(batch).then(res);
         },
       });
       return chain;
@@ -212,6 +221,13 @@ function makeDbStub(config: StubConfig): Parameters<typeof listAllNotes>[0] {
   };
 
   return dbStub as unknown as Parameters<typeof listAllNotes>[0];
+}
+
+function missingTopicNotesSessionIdError(): Error {
+  return Object.assign(
+    new Error('column topic_notes.session_id does not exist'),
+    { code: '42703' },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -355,6 +371,97 @@ describe('listAllNotes — ISO date formatting', () => {
     expect(typeof result.notes[0]!.createdAt).toBe('string');
     expect(typeof result.notes[0]!.updatedAt).toBe('string');
     expect(result.notes[0]!.createdAt).toBe(testDate.toISOString());
+  });
+});
+
+describe('listAllNotes — session_id schema drift fallback', () => {
+  it('returns notes with null sessionId when a deployed DB is missing topic_notes.session_id', async () => {
+    const testDate = new Date('2026-03-15T10:30:00.000Z');
+    const rows = [
+      {
+        id: '00000000-0000-7000-8000-000000000001',
+        topicId: '00000000-0000-7000-8000-000000000002',
+        topicTitle: 'Topic',
+        bookId: '00000000-0000-7000-8000-000000000003',
+        bookTitle: 'Book',
+        subjectId: '00000000-0000-7000-8000-000000000004',
+        subjectName: 'Subject',
+        sessionId: null,
+        content: 'Legacy note',
+        createdAt: testDate,
+        updatedAt: testDate,
+      },
+    ];
+    const db = makeDbStub({
+      selectMany: [missingTopicNotesSessionIdError(), rows],
+    });
+
+    const result = await listAllNotes(db, 'profile-1');
+
+    expect(result.notes).toEqual([
+      expect.objectContaining({
+        id: '00000000-0000-7000-8000-000000000001',
+        sessionId: null,
+        content: 'Legacy note',
+      }),
+    ]);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('rethrows an unrelated 42703 (different table.column) instead of silently falling back', async () => {
+    // Break-test for the schema-drift matcher: a future query that joins
+    // topic_notes with another table referencing a different `session_id`
+    // column must NOT trigger the legacy fallback. Only the literal
+    // "topic_notes.session_id" undefined-column error is the schema-drift
+    // case we hedge for.
+    const unrelatedError = Object.assign(
+      new Error('column other_table.session_id does not exist'),
+      { code: '42703' },
+    );
+    const db = makeDbStub({
+      selectMany: [unrelatedError],
+    });
+
+    await expect(listAllNotes(db, 'profile-1')).rejects.toThrow(
+      'column other_table.session_id does not exist',
+    );
+  });
+});
+
+describe('getNotesForTopic — session_id schema drift fallback', () => {
+  it('returns topic notes with null sessionId when the optional source column is missing', async () => {
+    const testDate = new Date('2026-03-15T10:30:00.000Z');
+    const db = makeDbStub({
+      selectMany: [
+        [{ id: 'topic-owned' }],
+        missingTopicNotesSessionIdError(),
+        [
+          {
+            id: '00000000-0000-7000-8000-000000000011',
+            topicId: '00000000-0000-7000-8000-000000000012',
+            sessionId: null,
+            content: 'Legacy topic note',
+            createdAt: testDate,
+            updatedAt: testDate,
+          },
+        ],
+      ],
+    });
+
+    const result = await getNotesForTopic(
+      db,
+      'profile-1',
+      '00000000-0000-7000-8000-000000000013',
+      '00000000-0000-7000-8000-000000000012',
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: '00000000-0000-7000-8000-000000000011',
+        sessionId: null,
+        content: 'Legacy topic note',
+      }),
+    ]);
   });
 });
 
