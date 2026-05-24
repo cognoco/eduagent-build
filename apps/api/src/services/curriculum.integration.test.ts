@@ -14,6 +14,9 @@ import { releaseBookGenerationClaimIfEmpty } from './curriculum';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
+const hasDatabaseUrl = !!process.env.DATABASE_URL;
+const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
+
 function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -102,18 +105,18 @@ async function seedClaimedEmptyBook(database: Database, profileId: string) {
   return { subjectId: subject!.id, bookId: book!.id };
 }
 
-let db: Database;
+describeIfDb('releaseBookGenerationClaimIfEmpty (integration)', () => {
+  let db: Database;
 
-beforeAll(async () => {
-  db = createIntegrationDb();
-  await cleanupByPrefix(db);
-});
+  beforeAll(async () => {
+    db = createIntegrationDb();
+    await cleanupByPrefix(db);
+  });
 
-afterAll(async () => {
-  await cleanupByPrefix(db);
-});
+  afterAll(async () => {
+    await cleanupByPrefix(db);
+  });
 
-describe('releaseBookGenerationClaimIfEmpty (integration)', () => {
   it('[WI-78 review] does not clear another profile generation claim', async () => {
     const { ownerProfileId, attackerProfileId } = await seedProfiles(db);
     const { subjectId, bookId } = await seedClaimedEmptyBook(

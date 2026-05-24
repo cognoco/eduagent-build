@@ -320,9 +320,8 @@ export async function createSubjectWithStructure(
 
   // Focused book path: input combines a broad subject with a specific focus area
   if (effectiveFocus) {
-    const subjectNameLockKey = `subject:${profileId}:${input.name
-      .trim()
-      .toLowerCase()}`;
+    const normalizedSubjectName = input.name.trim();
+    const subjectNameLockKey = `subject:${profileId}:${normalizedSubjectName.toLowerCase()}`;
     const targetSubject = await db.transaction(async (tx) => {
       const txDb = tx as unknown as Database;
       await tx.execute(
@@ -331,12 +330,12 @@ export async function createSubjectWithStructure(
       const existingSubject = await findExistingSubjectByName(
         txDb,
         profileId,
-        input.name,
+        normalizedSubjectName,
       );
       return (
         existingSubject ??
         (await createSubject(txDb, profileId, {
-          name: input.name,
+          name: normalizedSubjectName,
           rawInput: input.rawInput,
         }))
       );

@@ -1911,6 +1911,19 @@ export async function persistExchangeResult(
   const aiEventId = insertedEvents.find(
     (event) => event.eventType === 'ai_response',
   )?.id;
+
+  await safeWrite(
+    () =>
+      applyContinuationScore(
+        db,
+        profileId,
+        sessionId,
+        behavioral?.retrievalScore,
+      ),
+    'session-exchange.continuation-score',
+    { profileId, sessionId },
+  );
+
   const sessionMetadata = session.metadata as Record<string, unknown> | null;
   const effectiveMode = sessionMetadata?.['effectiveMode'];
 
@@ -2171,12 +2184,6 @@ export async function processMessage(
     options?.clientId,
   );
 
-  await safeWrite(
-    () =>
-      applyContinuationScore(db, profileId, sessionId, result.retrievalScore),
-    'session-exchange.continuation-score',
-    { profileId, sessionId },
-  );
   if (persisted.persistedUserMessage) {
     await maybeDispatchTopicProbeExtraction(
       db,
@@ -2480,17 +2487,6 @@ export async function streamMessage(
           teachBackAssessment: parsed.teachBackAssessment,
         },
         options?.clientId,
-      );
-      await safeWrite(
-        () =>
-          applyContinuationScore(
-            db,
-            profileId,
-            sessionId,
-            parsed.retrievalScore,
-          ),
-        'session-exchange.continuation-score',
-        { profileId, sessionId },
       );
       if (persisted.persistedUserMessage) {
         await maybeDispatchTopicProbeExtraction(
