@@ -448,6 +448,20 @@ export async function getPushToken(
   return row?.expoPushToken ?? null;
 }
 
+/**
+ * Whether the profile has the master push switch enabled. notification_preferences.pushEnabled
+ * defaults to false, so an absent/never-configured row counts as disabled.
+ */
+export async function isPushEnabled(
+  db: Database,
+  profileId: string,
+): Promise<boolean> {
+  const row = await db.query.notificationPreferences.findFirst({
+    where: eq(notificationPreferences.profileId, profileId),
+  });
+  return row?.pushEnabled === true;
+}
+
 // ---------------------------------------------------------------------------
 // Notification Logging (daily cap enforcement)
 // ---------------------------------------------------------------------------

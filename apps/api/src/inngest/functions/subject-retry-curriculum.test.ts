@@ -77,6 +77,9 @@ function makeMockDb(bookOverrides?: Record<string, unknown>) {
           .fn()
           .mockResolvedValue({ id: SUBJECT_ID, profileId: PROFILE_ID }),
       },
+      consentStates: {
+        findFirst: jest.fn().mockResolvedValue(undefined),
+      },
     },
     select: jest.fn(),
   };
@@ -316,5 +319,82 @@ describe('subjectRetryCurriculum', () => {
     await handler({ event: { data: validPayload() }, step });
 
     expect(sendEventCalls).toHaveLength(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-82] GDPR consent gate
+  // -------------------------------------------------------------------------
+
+  describe('GDPR consent gate', () => {
+    it.each([
+      ['WITHDRAWN', { status: 'WITHDRAWN' }],
+      ['PENDING', { status: 'PENDING' }],
+      ['PARENTAL_CONSENT_REQUESTED', { status: 'PARENTAL_CONSENT_REQUESTED' }],
+    ])(
+      'skips and returns consent_not_granted when consent status is %s',
+      async (_label, consentRow) => {
+        const mockDb = makeMockDb();
+        mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+        mockGetStepDatabase.mockReturnValue(mockDb);
+        const { step } = createInngestStepRunner();
+
+        const result = await handler({ event: { data: validPayload() }, step });
+
+        expect(result).toEqual({
+          status: 'skipped',
+          reason: 'consent_not_granted',
+        });
+        expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+        expect(mockPersistBookTopics).not.toHaveBeenCalled();
+      },
+    );
+
+    it('proceeds normally when consent status is CONSENTED', async () => {
+      const mockDb = makeMockDb();
+      const confirmDb = makeMockDb({ topicsGenerated: true });
+      mockDb.query.consentStates.findFirst.mockResolvedValue({
+        status: 'CONSENTED',
+      });
+      let callCount = 0;
+      mockGetStepDatabase.mockImplementation(() => {
+        callCount++;
+        return callCount <= 2 ? mockDb : confirmDb;
+      });
+      const { step } = createInngestStepRunner();
+
+      const result = await handler({ event: { data: validPayload() }, step });
+
+      expect(result).toMatchObject({
+        status: 'retried',
+        subjectId: SUBJECT_ID,
+        bookId: BOOK_ID,
+      });
+      expect(mockGenerateBookTopics).toHaveBeenCalled();
+      expect(mockPersistBookTopics).toHaveBeenCalled();
+    });
+
+    // [WI-82] Cross-step memoization regression: consent granted when
+    // load-retry-context ran, then withdrawn before retry-generate-and-persist.
+    // The re-check INSIDE the generate step must catch the withdrawal.
+    it('skips LLM and persist when consent is withdrawn between the load and generate steps', async () => {
+      // load-retry-context sees CONSENTED → context becomes 'pending'.
+      // retry-generate-and-persist sees WITHDRAWN → LLM must be skipped.
+      const loadDb = makeMockDb();
+      loadDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      const confirmDb = makeMockDb({ topicsGenerated: false });
+      let callCount = 0;
+      mockGetStepDatabase.mockImplementation(() => {
+        callCount++;
+        return callCount <= 2 ? loadDb : confirmDb;
+      });
+      const { step } = createInngestStepRunner();
+
+      await handler({ event: { data: validPayload() }, step });
+
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+      expect(mockPersistBookTopics).not.toHaveBeenCalled();
+    });
   });
 });

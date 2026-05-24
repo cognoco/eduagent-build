@@ -14,6 +14,7 @@ import {
   getPushToken,
   getDailyNotificationCount,
   logNotification,
+  isPushEnabled,
 } from './settings';
 
 const profileId = 'test-profile-id';
@@ -436,5 +437,31 @@ describe('logNotification', () => {
     await logNotification(db, profileId, 'daily_reminder');
 
     expect(db.insert).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-82] isPushEnabled
+// ---------------------------------------------------------------------------
+
+describe('isPushEnabled', () => {
+  it('returns true when row.pushEnabled is true', async () => {
+    const db = createMockDb({ findFirstResult: { pushEnabled: true } });
+    await expect(isPushEnabled(db, profileId)).resolves.toBe(true);
+  });
+
+  it('returns false when row.pushEnabled is false', async () => {
+    const db = createMockDb({ findFirstResult: { pushEnabled: false } });
+    await expect(isPushEnabled(db, profileId)).resolves.toBe(false);
+  });
+
+  it('returns false when no row exists (absent row counts as disabled)', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    await expect(isPushEnabled(db, profileId)).resolves.toBe(false);
+  });
+
+  it('returns false when row exists but pushEnabled is null/undefined', async () => {
+    const db = createMockDb({ findFirstResult: { pushEnabled: null } });
+    await expect(isPushEnabled(db, profileId)).resolves.toBe(false);
   });
 });

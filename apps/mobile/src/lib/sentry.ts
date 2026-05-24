@@ -140,13 +140,14 @@ export function isSentryEnabled(): boolean {
   return sentryActive;
 }
 
-/** Calculates age from a birth year using the current calendar year.
+/** Calculates age from a birth year using the current UTC calendar year.
+ *  Uses getUTCFullYear() to match the server contract (apps/api/src/services/consent.ts).
  *  Year-only approximation always rounds UP (overestimates age by up to 11
  *  months), so the result errs toward *less* protection — consent/Sentry gates
  *  must use `<=` thresholds to compensate (e.g., `age <= 16` not `age < 16`).
  */
 function calculateAge(birthYear: number): number {
-  return new Date().getFullYear() - birthYear;
+  return new Date().getUTCFullYear() - birthYear;
 }
 
 /**
@@ -179,8 +180,8 @@ export function evaluateSentryForProfile(
 
   const age = calculateAge(birthYear);
 
-  if (age < 13) {
-    // Under 13: only enable if consent is CONSENTED
+  if (age <= 13) {
+    // Under 13 (or borderline 13 — year-only overestimates): only enable if consent is CONSENTED
     if (consentStatus === 'CONSENTED') {
       enableSentry();
       // [BUG-555] Update user scope to reflect the active profile.

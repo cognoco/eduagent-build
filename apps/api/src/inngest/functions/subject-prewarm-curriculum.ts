@@ -8,6 +8,7 @@ import { getStepDatabase } from '../helpers';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 import { getProfileAge } from '../../services/profile';
+import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 
 type PrewarmContext =
@@ -26,7 +27,8 @@ type PrewarmContext =
       bookTitle: string;
       bookDescription: string;
       learnerAge: number;
-    };
+    }
+  | { status: 'consent-blocked' };
 
 async function loadBook(
   db: Database,
@@ -85,6 +87,14 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           };
         }
 
+        // [WI-82] Re-check current GDPR consent at execution time. This job runs
+        // outside the HTTP consent middleware; a queued event must not load learner
+        // age data, call the LLM, or persist derived topics for a profile whose
+        // consent is no longer granted.
+        if (!(await isGdprProcessingAllowed(db, profileId))) {
+          return { status: 'consent-blocked' as const };
+        }
+
         return {
           status: 'pending',
           profileId,
@@ -97,6 +107,10 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
       },
     );
 
+    if (context.status === 'consent-blocked') {
+      return { status: 'skipped', reason: 'consent_not_granted' };
+    }
+
     const generated = await step.run(
       'generate-and-persist-topics',
       async (): Promise<boolean> => {
@@ -107,6 +121,15 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
         const db = getStepDatabase();
         const book = await loadBook(db, profileId, subjectId, bookId);
         if (book.topicsGenerated) {
+          return false;
+        }
+
+        // [WI-82] Re-check consent INSIDE this step. The gate in
+        // load-prewarm-context is memoized by Inngest, so on a retry of this
+        // step a consent withdrawal that occurred after the first run would
+        // otherwise be missed and stale-allowed learner data would still reach
+        // the LLM. Re-evaluating here closes the cross-step memoization gap.
+        if (!(await isGdprProcessingAllowed(db, profileId))) {
           return false;
         }
 

@@ -8,7 +8,7 @@ import {
 } from '../helpers';
 import { and, eq, gte, lt } from 'drizzle-orm';
 import { consentStates } from '@eduagent/database';
-import { getConsentStatus } from '../../services/consent';
+import { getConsentStatus, refreshConsentToken } from '../../services/consent';
 import {
   sendEmail,
   formatConsentReminderEmail,
@@ -94,43 +94,64 @@ export const consentReminder = inngest.createFunction(
       return `${getStepAppUrl()}/v1/consent-page?token=${encodeURIComponent(token)}`;
     }
 
-    // Day 7 reminder
+    // Day 7 reminder.
+    // [DS-020] Mint the fresh token in its OWN step so Inngest memoizes it: the
+    // original requestConsent token expires after 7 days (race-prone link), and
+    // refreshConsentToken is non-idempotent (random token each call). If the mint
+    // shared a step with sendEmail, a retry after a delivered email would mint a
+    // new token, dead-linking the email the parent already received.
     await step.sleep('wait-7-days', '7d');
-    await step.run('send-day-7-reminder', async () => {
+    const day7 = await step.run('refresh-day-7-token', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      const { parentEmail, consentToken } = await lookupConsentDetails();
-      if (!parentEmail || !consentToken) return;
-      await sendEmail(
-        formatConsentReminderEmail(
-          parentEmail,
-          'your child',
-          23,
-          buildTokenUrl(consentToken),
-        ),
-        emailOpts('day-7'),
-      );
+      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
+        return null;
+      const { parentEmail } = await lookupConsentDetails();
+      if (!parentEmail) return null;
+      const freshToken = await refreshConsentToken(db, profileId);
+      return { parentEmail, freshToken };
     });
+    if (day7) {
+      await step.run('send-day-7-reminder', async () => {
+        await sendEmail(
+          formatConsentReminderEmail(
+            day7.parentEmail,
+            'your child',
+            23,
+            buildTokenUrl(day7.freshToken),
+          ),
+          emailOpts('day-7'),
+        );
+      });
+    }
 
-    // Day 14 reminder
+    // Day 14 reminder. Same memoized-mint pattern as day-7 (see note above):
+    // without the fresh token the day-14 link is always expired (day-0 token
+    // had a 7-day TTL), and the mint must be its own step to survive retries.
     await step.sleep('wait-7-more-days', '7d');
-    await step.run('send-day-14-reminder', async () => {
+    const day14 = await step.run('refresh-day-14-token', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      const { parentEmail, consentToken } = await lookupConsentDetails();
-      if (!parentEmail || !consentToken) return;
-      await sendEmail(
-        formatConsentReminderEmail(
-          parentEmail,
-          'your child',
-          16,
-          buildTokenUrl(consentToken),
-        ),
-        emailOpts('day-14'),
-      );
+      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
+        return null;
+      const { parentEmail } = await lookupConsentDetails();
+      if (!parentEmail) return null;
+      const freshToken = await refreshConsentToken(db, profileId);
+      return { parentEmail, freshToken };
     });
+    if (day14) {
+      await step.run('send-day-14-reminder', async () => {
+        await sendEmail(
+          formatConsentReminderEmail(
+            day14.parentEmail,
+            'your child',
+            16,
+            buildTokenUrl(day14.freshToken),
+          ),
+          emailOpts('day-14'),
+        );
+      });
+    }
 
     // Day 25 final warning
     await step.sleep('wait-11-more-days', '11d');

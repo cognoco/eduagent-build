@@ -802,4 +802,62 @@ describe('CreateProfileScreen', () => {
       expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // WI-297 — full birth date submitted with birthMonth + birthDay
+  // ---------------------------------------------------------------------------
+
+  describe('WI-297 — full birth date in POST body', () => {
+    it('[break-test] submitted body includes birthMonth and birthDay alongside birthYear', async () => {
+      const newProfile = {
+        id: 'wi297-id',
+        accountId: 'a1',
+        displayName: 'WI297 Test',
+        avatarUrl: null,
+        birthYear: 2005,
+        location: null,
+        isOwner: false,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('create-profile-name'),
+        'WI297 Test',
+      );
+
+      // Select June 15, 2005 — month=6, day=15
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2005, 5, 15)); // June 15 (0-based)
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      // Extract the request body from the fetch call
+      const fetchCall = mockFetch.mock.calls[0];
+      const requestInit = fetchCall?.[1] as RequestInit | undefined;
+      const body = JSON.parse(String(requestInit?.body)) as Record<
+        string,
+        unknown
+      >;
+
+      expect(body.birthYear).toBe(2005);
+      // WI-297: month is 1-based (June = 6)
+      expect(body.birthMonth).toBe(6);
+      expect(body.birthDay).toBe(15);
+    });
+  });
 });

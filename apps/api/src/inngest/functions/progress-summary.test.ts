@@ -113,6 +113,7 @@ function createDb(fallbackRows: Array<{ id: string; startedAt: Date }> = []) {
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
       },
+      consentStates: { findFirst: jest.fn() },
     },
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -187,8 +188,15 @@ function extractColumnsAndParams(expr: unknown): {
 }
 
 describe('progressSummaryGeneration', () => {
+  let sharedDb: ReturnType<typeof createDb>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    sharedDb = createDb([
+      { id: 'session-1', startedAt: new Date('2026-05-13T10:00:00Z') },
+    ]);
+    sharedDb.query.consentStates.findFirst.mockResolvedValue(undefined);
+    mockGetStepDatabase.mockReturnValue(sharedDb);
     mockBuildKnowledgeInventory.mockResolvedValue({
       profileId: 'child-1',
       snapshotDate: '2026-05-13',
@@ -257,6 +265,7 @@ describe('progressSummaryGeneration', () => {
       },
     ]);
     mockGetStepDatabase.mockReturnValue(db);
+    db.query.consentStates.findFirst.mockResolvedValue(undefined);
     mockGenerateProgressSummary.mockRejectedValue(new Error('LLM down'));
 
     await invokeProgressSummary({
@@ -272,5 +281,78 @@ describe('progressSummaryGeneration', () => {
         summary: 'Fallback summary for Emma.',
       }),
     );
+  });
+
+  // [WI-82] GDPR consent gate — background job must re-check consent at execution time
+  describe('GDPR consent gate', () => {
+    it.each([
+      ['WITHDRAWN', { status: 'WITHDRAWN' }],
+      ['PENDING', { status: 'PENDING' }],
+      ['PARENTAL_CONSENT_REQUESTED', { status: 'PARENTAL_CONSENT_REQUESTED' }],
+    ])(
+      'skips and returns consent_not_granted when consent status is %s',
+      async (_label, consentRow) => {
+        sharedDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+
+        const { result } = await invokeProgressSummary({
+          profileId: 'child-1',
+          sessionId: 'session-1',
+        });
+
+        expect(result).toEqual({
+          status: 'skipped',
+          reason: 'consent_not_granted',
+        });
+        expect(mockGenerateProgressSummary).not.toHaveBeenCalled();
+        expect(mockUpsertProgressSummary).not.toHaveBeenCalled();
+      },
+    );
+
+    it('proceeds normally when consent status is CONSENTED', async () => {
+      sharedDb.query.consentStates.findFirst.mockResolvedValue({
+        status: 'CONSENTED',
+      });
+      mockFindLatestCompletedLearningSession.mockResolvedValue({
+        id: 'session-1',
+        startedAt: new Date('2026-05-13T10:00:00Z'),
+      });
+
+      const { result } = await invokeProgressSummary({
+        profileId: 'child-1',
+        sessionId: 'session-1',
+      });
+
+      expect(result).toMatchObject({ status: 'generated' });
+      expect(mockGenerateProgressSummary).toHaveBeenCalled();
+      expect(mockUpsertProgressSummary).toHaveBeenCalled();
+    });
+
+    // [WI-82] Cross-step memoization regression: consent granted when
+    // gather-context ran, then withdrawn before generate-summary.
+    // The re-check INSIDE generate-summary must catch the withdrawal and
+    // return null, causing the handler to return consent_not_granted.
+    it('skips LLM and persist when consent is withdrawn between the gather and generate steps', async () => {
+      mockFindLatestCompletedLearningSession.mockResolvedValue({
+        id: 'session-1',
+        startedAt: new Date('2026-05-13T10:00:00Z'),
+      });
+      // First call (gather-context): CONSENTED → context becomes 'ok'.
+      // Second call (generate-summary): WITHDRAWN → return null → skipped.
+      sharedDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+
+      const { result } = await invokeProgressSummary({
+        profileId: 'child-1',
+        sessionId: 'session-1',
+      });
+
+      expect(mockGenerateProgressSummary).not.toHaveBeenCalled();
+      expect(mockUpsertProgressSummary).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+    });
   });
 });

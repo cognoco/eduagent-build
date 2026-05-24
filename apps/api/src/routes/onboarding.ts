@@ -28,6 +28,7 @@ import {
   updateConversationLanguage,
   updatePronouns,
   updateInterestsContext,
+  assertPronounsSelfEditAllowed,
   OnboardingNotFoundError,
 } from '../services/onboarding';
 
@@ -117,7 +118,12 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
-      // self-edit allowed: pronouns are personal identity, parent should not gate
+      // WI-278: Server-side age gate (mirrors the client's self-skip so a
+      // modified client cannot bypass it). The business rule lives in the
+      // service guard; the parent-managed /:profileId/pronouns route is exempt
+      // because a parent setting pronouns for their child is the allowed path.
+      // Throws ForbiddenError → 403 for under-min-age profiles.
+      assertPronounsSelfEditAllowed(c.get('profileMeta')?.birthYear);
       const { pronouns } = c.req.valid('json');
       try {
         await updatePronouns(db, profileId, account.id, pronouns);

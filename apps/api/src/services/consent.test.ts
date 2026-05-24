@@ -1,14 +1,20 @@
 import type { Database } from '@eduagent/database';
 import {
   calculateAge,
+  calculateAgeFromParts,
   checkConsentRequired,
+  checkConsentRequiredFromDate,
   createGrantedConsentState,
   createPendingConsentState,
   requestConsent,
   processConsentResponse,
   getConsentStatus,
+  isGdprProcessingAllowed,
   revokeConsent,
+  refreshConsentToken,
   EmailDeliveryError,
+  ConsentTokenExpiredError,
+  ConsentRecordNotFoundError,
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -46,6 +52,8 @@ function mockConsentRow(
       | 'CONSENTED'
       | 'WITHDRAWN';
     parentEmail: string | null;
+    expiresAt: Date | null;
+    consentToken: string | null;
   }>,
 ) {
   return {
@@ -56,7 +64,9 @@ function mockConsentRow(
     parentEmail: overrides?.parentEmail ?? 'parent@example.com',
     requestedAt: NOW,
     respondedAt: null,
-    expiresAt: null,
+    expiresAt: overrides?.expiresAt !== undefined ? overrides.expiresAt : null,
+    consentToken:
+      overrides?.consentToken !== undefined ? overrides.consentToken : null,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -158,6 +168,36 @@ describe('calculateAge', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:30:00.000Z'));
     expect(calculateAge(2010)).toBe(16);
   });
+});
+
+// ---------------------------------------------------------------------------
+// isGdprProcessingAllowed (WI-82: shared async-processing consent gate)
+// ---------------------------------------------------------------------------
+
+describe('isGdprProcessingAllowed', () => {
+  const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('allows processing when no consent row exists (pre-consent-flow account)', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    await expect(isGdprProcessingAllowed(db, PROFILE_ID)).resolves.toBe(true);
+  });
+
+  it('allows processing when the latest GDPR consent is CONSENTED', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({ status: 'CONSENTED' }),
+    });
+    await expect(isGdprProcessingAllowed(db, PROFILE_ID)).resolves.toBe(true);
+  });
+
+  it.each(['PENDING', 'PARENTAL_CONSENT_REQUESTED', 'WITHDRAWN'] as const)(
+    'blocks processing when the latest GDPR consent is %s',
+    async (status) => {
+      const db = createMockDb({ findFirstResult: mockConsentRow({ status }) });
+      await expect(isGdprProcessingAllowed(db, PROFILE_ID)).resolves.toBe(
+        false,
+      );
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -592,6 +632,114 @@ describe('createGrantedConsentState', () => {
 });
 
 // ---------------------------------------------------------------------------
+// processConsentResponse — token expiry (DS-020 regression)
+// ---------------------------------------------------------------------------
+
+describe('processConsentResponse — token expiry', () => {
+  it('[DS-020 RED→GREEN] rejects a token whose expiresAt is in the past', async () => {
+    const expiredRow = mockConsentRow({
+      expiresAt: new Date(Date.now() - 1000), // 1 second ago
+    });
+    const db = createMockDb({ findFirstResult: expiredRow });
+
+    await expect(
+      processConsentResponse(db, 'expired-token', true),
+    ).rejects.toThrow(ConsentTokenExpiredError);
+  });
+
+  it('[DS-020] accepts a token whose expiresAt is in the future', async () => {
+    const freshRow = mockConsentRow({
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+    const db = createMockDb({ findFirstResult: freshRow });
+    const result = await processConsentResponse(db, 'fresh-token', true);
+
+    expect(result.status).toBe('CONSENTED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// refreshConsentToken (DS-020 fix)
+// ---------------------------------------------------------------------------
+
+describe('refreshConsentToken', () => {
+  const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('[DS-020] updates consentToken and expiresAt in the DB', async () => {
+    const existingRow = mockConsentRow();
+    // updateReturning will resolve with the existing row but we only need
+    // the update chain to be called — the function returns the NEW token
+    // (generated inline), not the row token.
+    const db = createMockDb({ findFirstResult: existingRow });
+
+    const newToken = await refreshConsentToken(db, PROFILE_ID);
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(typeof newToken).toBe('string');
+    expect(newToken.length).toBeGreaterThan(0);
+  });
+
+  it('[DS-020] returned token differs from any prior stale token', async () => {
+    const staleToken = 'stale-token-from-7-days-ago';
+    const existingRow = mockConsentRow({ consentToken: staleToken });
+    const db = createMockDb({ findFirstResult: existingRow });
+
+    const newToken = await refreshConsentToken(db, PROFILE_ID);
+
+    // The function generates a fresh UUID — it will virtually never equal
+    // the static stale value.
+    expect(newToken).not.toBe(staleToken);
+  });
+
+  it('[DS-020] sets expiresAt at least 14 days into the future (covers day-14 reminder window)', async () => {
+    const existingRow = mockConsentRow();
+    const db = createMockDb({ findFirstResult: existingRow });
+
+    const before = Date.now();
+    await refreshConsentToken(db, PROFILE_ID);
+    const after = Date.now();
+
+    // Inspect what was passed to db.update().set(...)
+    const setCall = (db.update as jest.Mock).mock.results[0]!.value
+      .set as jest.Mock;
+    const setArgs = setCall.mock.calls[0]![0] as {
+      expiresAt: Date;
+      consentToken: string;
+    };
+
+    expect(setArgs.expiresAt).toBeInstanceOf(Date);
+    // Must expire at least 14 days from now (so a parent clicking the day-14 link is in time)
+    const minExpiry = new Date(before + 14 * 24 * 60 * 60 * 1000);
+    const maxExpiry = new Date(after + 30 * 24 * 60 * 60 * 1000);
+    expect(setArgs.expiresAt.getTime()).toBeGreaterThanOrEqual(
+      minExpiry.getTime(),
+    );
+    expect(setArgs.expiresAt.getTime()).toBeLessThanOrEqual(
+      maxExpiry.getTime(),
+    );
+  });
+
+  /**
+   * BREAK TEST [WI-82]: refreshConsentToken must throw ConsentRecordNotFoundError
+   * when no GDPR row exists for the profile. Previously the function returned
+   * the new token silently even though the UPDATE matched zero rows — the token
+   * was never persisted, so the reminder email would embed a dead link.
+   *
+   * RED: without `if (updated.length === 0) throw new ConsentRecordNotFoundError()`
+   *   the call would resolve with a token string instead of rejecting.
+   * GREEN: with the guard the call rejects with ConsentRecordNotFoundError.
+   */
+  it('[WI-82] throws ConsentRecordNotFoundError when no GDPR row exists (returning is empty)', async () => {
+    // createMockDb with no findFirstResult → updateReturning resolves []
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(refreshConsentToken(db, PROFILE_ID)).rejects.toThrow(
+      ConsentRecordNotFoundError,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // revokeConsent — nudge-suppression branch
 // ---------------------------------------------------------------------------
 
@@ -722,5 +870,92 @@ describe('revokeConsent — nudge-suppression branch', () => {
       'simulated DB rollback',
     );
     expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-297 — calculateAgeFromParts (exact age from full birth date)
+// ---------------------------------------------------------------------------
+
+describe('calculateAgeFromParts', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('returns exact age when birthday has already passed this year', () => {
+    // Born 2010-01-01; today is 2026-06-15 → exact age 16
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2010, 1, 1)).toBe(16);
+  });
+
+  it('returns one less than year-only age when birthday is still to come this year', () => {
+    // Born 2015-12-31; today is 2026-05-24 → birthday not yet reached → exact age 10
+    // Year-only would give 2026 - 2015 = 11
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2015, 12, 31)).toBe(10);
+  });
+
+  it('[boundary] born exactly on today → counts as birthday reached, age = year-diff', () => {
+    // Born 2013-05-24; today is 2026-05-24 → exact age 13
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2013, 5, 24)).toBe(13);
+  });
+
+  it('falls back to year-only calculation when month and day are not provided', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(calculateAgeFromParts(2013)).toBe(2026 - 2013);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-297 — checkConsentRequiredFromDate (exact consent check)
+// ---------------------------------------------------------------------------
+
+describe('checkConsentRequiredFromDate', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('[break-test] child still 10 (birthday later this year) is flagged belowMinimumAge', () => {
+    // birthYear = currentYear - 11, but birthday is Dec 31 → exact age still 10
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const birthYear = 2015; // 2026 - 2015 = 11 by year-only, but birthday Dec 31 → exact 10
+    const result = checkConsentRequiredFromDate(birthYear, 12, 31);
+    expect(result.belowMinimumAge).toBe(true);
+    expect(result.required).toBe(true);
+    expect(result.age).toBe(10);
+  });
+
+  it('child exactly 11 today (birthday today) is allowed with GDPR required', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const result = checkConsentRequiredFromDate(2015, 5, 24);
+    expect(result.belowMinimumAge).toBeUndefined();
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
+    expect(result.age).toBe(11);
+  });
+
+  it('child aged 16 with full date is still consent-required', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const result = checkConsentRequiredFromDate(2010, 1, 1);
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
+    expect(result.age).toBe(16);
+  });
+
+  it('adult aged 17 is not consent-required', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    const result = checkConsentRequiredFromDate(2009, 1, 1);
+    expect(result.required).toBe(false);
+    expect(result.consentType).toBeNull();
+  });
+
+  it('falls back to year-only when month/day not supplied', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    // year-only: 2026 - 2015 = 11 → belowMinimumAge is NOT set (age >= MINIMUM_AGE)
+    const result = checkConsentRequiredFromDate(2015);
+    expect(result.belowMinimumAge).toBeUndefined();
+    expect(result.required).toBe(true);
+    expect(result.age).toBe(11);
   });
 });
