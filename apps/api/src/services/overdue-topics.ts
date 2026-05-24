@@ -72,6 +72,9 @@ export async function getOverdueTopicsGrouped(
     topicIds,
   });
   const topicMap = new Map(ownedTopics.map((t) => [t.topicId, t]));
+  const ownedOverdueCards = overdueCards.filter((card) =>
+    topicMap.has(card.topicId),
+  );
 
   const subjectIds = [...new Set(ownedTopics.map((t) => t.subjectId))];
   const subjectsRows =
@@ -82,7 +85,7 @@ export async function getOverdueTopicsGrouped(
 
   const subjectMap = new Map<string, OverdueSubject>();
 
-  for (const card of overdueCards) {
+  for (const card of ownedOverdueCards) {
     const topic = topicMap.get(card.topicId);
     if (!topic) continue;
 
@@ -133,7 +136,7 @@ export async function getOverdueTopicsGrouped(
   // row) and we already hit the 500-row cap, we cannot know the true total —
   // assume truncated so the UI shows "500+" rather than a misleadingly-exact
   // number. This is conservative and correct.
-  const displayedCount = overdueCards.length;
+  const displayedCount = ownedOverdueCards.length;
   const countAvailable = countRow?.count != null;
   const truncated =
     displayedCount === 500 && (!countAvailable || totalOverdue > 500);

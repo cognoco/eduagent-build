@@ -209,6 +209,33 @@ function createMockDb(): Database {
   return db as unknown as Database;
 }
 
+type MockSelectChain = {
+  from: jest.Mock;
+  innerJoin: jest.Mock;
+  leftJoin: jest.Mock;
+  where: jest.Mock;
+  orderBy: jest.Mock;
+  limit: jest.Mock;
+  groupBy: jest.Mock;
+  for: jest.Mock;
+  then: PromiseLike<unknown[]>['then'];
+};
+
+function createSelectRows(rows: unknown[]): MockSelectChain {
+  const chain = {} as MockSelectChain;
+  chain.from = jest.fn(() => chain);
+  chain.innerJoin = jest.fn(() => chain);
+  chain.leftJoin = jest.fn(() => chain);
+  chain.where = jest.fn(() => chain);
+  chain.orderBy = jest.fn(() => chain);
+  chain.limit = jest.fn().mockResolvedValue(rows);
+  chain.groupBy = jest.fn().mockResolvedValue(rows);
+  chain.for = jest.fn().mockResolvedValue(rows);
+  const rowsPromise = Promise.resolve(rows);
+  chain.then = rowsPromise.then.bind(rowsPromise);
+  return chain;
+}
+
 interface StreakRowInput {
   currentStreak: number;
   longestStreak: number;
@@ -329,6 +356,71 @@ describe('precomputeCoachingCard', () => {
     expect('topicId' in card ? card.topicId : undefined).not.toBe(
       'foreign-topic',
     );
+  });
+
+  it('[WI-80] does not surface mixed-parent homework connection topics', async () => {
+    setupScopedRepo({ retentionCardsFindMany: [] });
+    const db = createMockDb() as unknown as Database & {
+      select: jest.Mock;
+    };
+    const query = db.query as unknown as Record<
+      string,
+      { findFirst?: jest.Mock; findMany?: jest.Mock }
+    >;
+    query.profiles = {
+      findFirst: jest.fn().mockResolvedValue({ birthYear: 2012 }),
+    };
+    query.curricula = {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([{ id: 'curr-owned', subjectId: 'subject-owned' }]),
+    };
+    db.select = jest
+      .fn()
+      .mockImplementation(() => createSelectRows([]))
+      .mockReturnValueOnce(createSelectRows([]))
+      .mockReturnValueOnce(
+        createSelectRows([
+          {
+            id: 'homework-session',
+            metadata: {
+              homeworkSummary: { practicedSkills: ['fractions'] },
+            },
+            subjectId: 'subject-owned',
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        createSelectRows([{ id: 'subject-owned', name: 'Math' }]),
+      )
+      .mockReturnValueOnce(
+        createSelectRows([
+          {
+            id: 'mixed-parent-topic',
+            title: 'Fractions',
+            description: 'Practice fractions',
+            bookId: 'foreign-book',
+            curriculumId: 'curr-owned',
+          },
+        ]),
+      )
+      .mockReturnValueOnce(createSelectRows([]))
+      .mockReturnValueOnce(
+        createSelectRows([
+          {
+            id: 'foreign-book',
+            title: 'Victim Book',
+            emoji: 'lock',
+            subjectId: 'foreign-subject',
+          },
+        ]),
+      );
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    expect(card.type).not.toBe('homework_connection');
+    expect(JSON.stringify(card)).not.toContain('mixed-parent-topic');
+    expect(JSON.stringify(card)).not.toContain('Victim Book');
   });
 
   it('scales review_due priority with overdue count (capped at 10)', async () => {

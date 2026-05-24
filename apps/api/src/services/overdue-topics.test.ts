@@ -312,6 +312,8 @@ describe('getOverdueTopicsGrouped', () => {
     expect(countChain.innerJoin).toHaveBeenCalledTimes(4);
     expect(ownedTopicsChain.innerJoin).toHaveBeenCalledTimes(3);
     expect(result.totalOverdue).toBe(1);
+    expect(result.displayedCount).toBe(1);
+    expect(result.truncated).toBe(false);
     expect(result.subjects).toHaveLength(1);
     expect(result.subjects[0]?.topics.map((topic) => topic.topicId)).toEqual([
       'owned-topic',

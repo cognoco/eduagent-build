@@ -790,8 +790,21 @@ async function findHomeworkConnectionCard(
 
   if (allTopics.length === 0) return null;
 
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: allTopics.map((topic) => topic.id),
+  });
+  const ownedTopicById = new Map(
+    ownedTopics.map((topic) => [topic.topicId, topic]),
+  );
+  const candidateTopics = allTopics.filter((topic) =>
+    ownedTopicById.has(topic.id),
+  );
+
+  if (candidateTopics.length === 0) return null;
+
   // Find topics that already have sessions (covered — real activity only)
-  const topicIds = allTopics.map((t) => t.id);
+  const topicIds = candidateTopics.map((t) => t.id);
   const sessionsForTopics = await db
     .select({ topicId: learningSessions.topicId })
     .from(learningSessions)
@@ -811,7 +824,9 @@ async function findHomeworkConnectionCard(
   // round-trip (previously: 1 findFirst per matched topic, up to ~30 per call).
   const uniqueBookIds = [
     ...new Set(
-      allTopics.map((t) => t.bookId).filter((id): id is string => id != null),
+      candidateTopics
+        .map((topic) => ownedTopicById.get(topic.id)?.bookId)
+        .filter((id): id is string => id != null),
     ),
   ];
   const booksById = new Map<
@@ -833,11 +848,14 @@ async function findHomeworkConnectionCard(
 
   // Match skills against uncovered topic titles/descriptions
   const allSkills = [...skillsBySubject.values()].flat();
-  for (const topic of allTopics) {
+  for (const topic of candidateTopics) {
     if (coveredTopicIds.has(topic.id)) continue;
 
-    const titleLower = topic.title.toLowerCase();
-    const descLower = (topic.description ?? '').toLowerCase();
+    const ownedTopic = ownedTopicById.get(topic.id);
+    if (!ownedTopic) continue;
+
+    const titleLower = ownedTopic.topicTitle.toLowerCase();
+    const descLower = (ownedTopic.topicDescription ?? '').toLowerCase();
 
     for (const skill of allSkills) {
       const skillLower = skill.toLowerCase();
@@ -847,21 +865,22 @@ async function findHomeworkConnectionCard(
         let bookEmoji: string | null = null;
         let matchSubjectId: string | null = null;
 
-        if (topic.bookId) {
-          const book = booksById.get(topic.bookId);
+        if (ownedTopic.bookId) {
+          bookTitle = ownedTopic.bookTitle;
+          matchSubjectId = ownedTopic.subjectId;
+          const book = booksById.get(ownedTopic.bookId);
           if (book) {
-            bookTitle = book.title;
             bookEmoji = book.emoji;
-            matchSubjectId = book.subjectId;
           }
         }
 
         // Resolve subject for boost check
         if (!matchSubjectId) {
           const curriculum = allCurricula.find(
-            (c) => c.id === topic.curriculumId,
+            (c) => c.id === ownedTopic.curriculumId,
           );
-          matchSubjectId = curriculum?.subjectId ?? null;
+          matchSubjectId =
+            ownedTopic.subjectId ?? curriculum?.subjectId ?? null;
         }
 
         const basePriority = 5;
