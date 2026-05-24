@@ -164,7 +164,9 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { bookRoutes } from './books';
 import {
   getBooks,
   getAllProfileBooks,
@@ -501,5 +503,56 @@ describe('book routes', () => {
 
       expect(res.status).toBe(404);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-139 / DS-050] Proxy-mode write guard
+//
+// Mini-Hono mount of bookRoutes with profileMeta.isOwner=false so
+// assertNotProxyMode rejects every write before the service is touched.
+// Mirrors proxy-guard.test.ts + assessments.test.ts.
+// ---------------------------------------------------------------------------
+describe('[WI-139 / DS-050] books proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'test-profile-id');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', bookRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /subjects/:subjectId/books/:bookId/generate-topics returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockClaimBookForGeneration).not.toHaveBeenCalled();
+  });
+
+  it('PATCH /subjects/:subjectId/books/:bookId/topics/:topicId/move returns 403 when caller is in proxy mode', async () => {
+    const TARGET_BOOK_ID = '550e8400-e29b-41d4-a716-446655440099';
+    const TOPIC_ID = '550e8400-e29b-41d4-a716-446655440042';
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/books/${BOOK_ID}/topics/${TOPIC_ID}/move`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetBookId: TARGET_BOOK_ID }),
+      },
+    );
+    expect(res.status).toBe(403);
   });
 });

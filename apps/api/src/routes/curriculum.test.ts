@@ -143,7 +143,9 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { curriculumRoutes } from './curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, TopicNotSkippedError } from '../errors';
 import { getProfile } from '../services/profile';
@@ -1035,5 +1037,71 @@ describe('curriculum routes', () => {
       );
       expect(res.status).toBe(401);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-147 / DS-058] Proxy-mode write guard
+//
+// Mini-Hono mount of curriculumRoutes with profileMeta.isOwner=false so
+// assertNotProxyMode rejects every write before the service is touched.
+// Mirrors proxy-guard.test.ts + assessments.test.ts.
+//
+// Note: clone-from-child and undo-clone-from-child handlers already enforce
+// assertOwnerProfile (stronger guard); they're not covered here.
+// ---------------------------------------------------------------------------
+describe('[WI-147 / DS-058] curriculum proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'test-profile-id');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', curriculumRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /subjects/:subjectId/curriculum/skip returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/curriculum/skip`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId: TOPIC_ID }),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockSkipTopic).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/:subjectId/curriculum/unskip returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/curriculum/unskip`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId: TOPIC_ID }),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockUnskipTopic).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/:subjectId/curriculum/challenge returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/curriculum/challenge`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback: 'too easy' }),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockChallengeCurriculum).not.toHaveBeenCalled();
   });
 });

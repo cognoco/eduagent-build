@@ -59,7 +59,10 @@ const MOCK_ITEM = {
 
 const NO_PROFILE = Symbol('no-profile');
 
-function createApp(profileId: string | typeof NO_PROFILE = 'test-profile-id') {
+function createApp(
+  profileId: string | typeof NO_PROFILE = 'test-profile-id',
+  opts?: { isOwner?: boolean },
+) {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('db' as never, {});
@@ -67,6 +70,11 @@ function createApp(profileId: string | typeof NO_PROFILE = 'test-profile-id') {
       c.set('profileId' as never, profileId);
     }
     c.set('user' as never, { id: 'test-user' });
+    // [WI-161 / DS-072] Mirror profileScopeMiddleware: set profileMeta so the
+    // server-derived proxy-mode guard can read isOwner. Default to owner so the
+    // pre-existing assertions still pass; tests that exercise the guard opt in
+    // with `{ isOwner: false }`.
+    c.set('profileMeta' as never, { isOwner: opts?.isOwner ?? true });
     await next();
   });
   app.route('/', parkingLotRoutes);
@@ -266,5 +274,25 @@ describe('POST /sessions/:sessionId/parking-lot', () => {
 
     expect(res.status).toBe(400);
     expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  // [WI-161 / DS-072] Proxy-mode child profile can add parking-lot items.
+  // Before this fix, a non-owner profile (parent acting on behalf of a child)
+  // could POST to the parking-lot endpoint and write items into the child's
+  // queue — exactly the proxy-mode write-bypass class the canonical guard
+  // assertNotProxyMode is meant to close. Mirrors the pattern proven in
+  // assessments.test.ts and proxy-guard.test.ts.
+  it('[WI-161 / DS-072] returns 403 when caller is in proxy mode (isOwner=false)', async () => {
+    const app = createApp('test-profile-id', { isOwner: false });
+
+    const res = await app.request(`/sessions/${TEST_SESSION_ID}/parking-lot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: 'What is quantum entanglement?' }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockAddParkingLotItem).not.toHaveBeenCalled();
   });
 });
