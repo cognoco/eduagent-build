@@ -1,3 +1,6 @@
+import { hmac } from '@noble/hashes/hmac';
+import { sha256 } from '@noble/hashes/sha2';
+
 import { Sentry } from './sentry';
 
 export type HomeworkOcrGateSource = 'local' | 'server';
@@ -46,20 +49,72 @@ export function track(
   });
 }
 
+/**
+ * [WI-315 / DS-226] Pseudonymise a profile ID for analytics tags.
+ *
+ * Pre-fix this used dual-FNV (non-cryptographic, 64 bits of output) keyed
+ * by `EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1` and silently fell back to a
+ * hardcoded string `local-analytics-key-v1` when the env var was unset.
+ * FNV has known weaknesses for keyed constructions, and the silent
+ * hardcoded fallback meant the privacy boundary the function claims to
+ * provide collapsed in any production build where the env var hadn't been
+ * injected.
+ *
+ * This implementation:
+ *   - Uses HMAC-SHA256 via @noble/hashes (pure JS, synchronous so the
+ *     caller-facing sync signature survives without rippling an async
+ *     refactor through use-mode-switch.ts, use-clone-from-child.ts,
+ *     progress/index.tsx).
+ *   - Truncates to the first 16 bytes (32 hex chars) — enough to keep
+ *     Sentry tag values short while remaining well above collision risk
+ *     across the user base.
+ *   - Bumps the output prefix to `v3_` so downstream consumers can
+ *     distinguish v2 (FNV) from v3 (HMAC-SHA256) hashes during the
+ *     transition.
+ *   - Drops the silent production fallback: throws when the env var is
+ *     missing and `__DEV__` is false. In dev, allows a clearly-named
+ *     dev-only fallback (so a leaked dev hash can never be confused with
+ *     a prod hash later).
+ *
+ * Residual limitation: `EXPO_PUBLIC_*` env vars are by construction baked
+ * into the client bundle at build time and therefore extractable from the
+ * app binary by anyone with the IPA/APK. This change closes the
+ * FNV-weakness and silent-hardcoded-fallback gaps. Closing the
+ * public-key gap requires moving the hash computation to the server side
+ * — tracked separately.
+ */
+const DEV_FALLBACK_SECRET = 'DEV-ONLY-not-for-prod-analytics-hash-key';
+
 export function hashProfileId(profileId: string): string {
-  const secret =
-    process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 ?? 'local-analytics-key-v1';
-  const input = `${secret}:${profileId}`;
-  let low = 0x811c9dc5;
-  let high = 0x27d4eb2d;
-  for (let i = 0; i < input.length; i += 1) {
-    const char = input.charCodeAt(i);
-    low = Math.imul(low ^ char, 0x01000193);
-    high = Math.imul(high ^ char, 0x85ebca6b);
+  const envSecret = process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
+  let secret: string;
+  if (envSecret) {
+    secret = envSecret;
+  } else {
+    // Bail loudly in production. The historical silent fallback to a
+    // hardcoded constant produced hashes that looked legitimate but
+    // provided zero pseudonymisation — anyone with the (constant) "secret"
+    // and the user-ID list could correlate every analytics event back to a
+    // profile. Make the misconfiguration visible at the first call site.
+    if (!(global as { __DEV__?: boolean }).__DEV__) {
+      throw new Error(
+        'analytics.hashProfileId: EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 is not ' +
+          'set. Provision the key via Doppler/EAS env injection. Refusing ' +
+          'to fall back to a hardcoded secret in production builds.',
+      );
+    }
+    secret = DEV_FALLBACK_SECRET;
   }
-  return `v2_${(high >>> 0).toString(16).padStart(8, '0')}${(low >>> 0)
-    .toString(16)
-    .padStart(8, '0')}`;
+  const tag = hmac(sha256, secret, profileId);
+  // Truncate to 16 bytes / 32 hex chars. SHA-256 truncation is sound for
+  // collision resistance at the user-base scale we care about (well under
+  // 2^64 distinct profiles), and shorter tag values are friendlier in
+  // Sentry's UI.
+  let hex = '';
+  for (let i = 0; i < 16; i += 1) {
+    hex += tag[i]!.toString(16).padStart(2, '0');
+  }
+  return `v3_${hex}`;
 }
 
 export function bucketAccountAge(createdAt: string | null | undefined): string {
