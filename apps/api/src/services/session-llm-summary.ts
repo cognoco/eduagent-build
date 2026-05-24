@@ -1,7 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
 import {
-  curriculumBooks,
-  curriculumTopics,
   sessionEvents,
   sessionSummaries,
   subjects,
@@ -13,6 +11,7 @@ import { createLogger } from './logger';
 import { projectAiResponseContent } from './llm/project-response';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { captureException } from './sentry';
+import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
 
 const logger = createLogger();
 
@@ -219,30 +218,17 @@ async function loadSummaryPromptInput(
         .limit(1)
     : [null];
 
-  // H2: scope topic lookup through the parent chain to enforce profileId.
-  // curriculumTopics has no direct subjectId; ownership is:
-  //   curriculumTopics.bookId → curriculumBooks.id → curriculumBooks.subjectId → subjects.id → subjects.profileId
-  const [topicRow] = input.topicId
-    ? await db
-        .select({ title: curriculumTopics.title })
-        .from(curriculumTopics)
-        .innerJoin(
-          curriculumBooks,
-          eq(curriculumBooks.id, curriculumTopics.bookId),
-        )
-        .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
-        .where(
-          and(
-            eq(curriculumTopics.id, input.topicId),
-            eq(subjects.profileId, input.profileId),
-          ),
-        )
-        .limit(1)
-    : [null];
+  const topicRow = input.topicId
+    ? await findOwnedCurriculumTopic(db, {
+        profileId: input.profileId,
+        topicId: input.topicId,
+        ...(input.subjectId ? { subjectId: input.subjectId } : {}),
+      })
+    : null;
 
   return {
     subjectName: subjectRow?.name ?? null,
-    topicTitle: topicRow?.title ?? null,
+    topicTitle: topicRow?.topicTitle ?? null,
     transcriptText: buildSessionSummaryTranscriptText(transcriptTurns),
   };
 }

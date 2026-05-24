@@ -39,7 +39,7 @@ import {
   registerLlmProviderFixture,
 } from '../../test-utils/llm-provider-fixtures';
 import { _resetCircuits } from '../llm';
-import { submitSummary } from './session-summary';
+import { getSessionSummary, submitSummary } from './session-summary';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -260,3 +260,80 @@ describeIfDb(
     });
   },
 );
+
+describeIfDb('getSessionSummary ownership hardening [WI-80]', () => {
+  beforeEach(async () => {
+    await cleanupByPrefix();
+  });
+
+  afterAll(async () => {
+    await cleanupByPrefix();
+  });
+
+  it('[WI-80] suppresses nextTopicTitle when nextTopicId is mixed-parent', async () => {
+    const { db, profileId, subjectId, sessionId } =
+      await seedFullSessionWithXpEntry();
+
+    const [foreignAccount] = await db
+      .insert(accounts)
+      .values({
+        clerkUserId: `${PREFIX}-foreign-clerk`,
+        email: `${PREFIX}-foreign@integration.test`,
+      })
+      .returning();
+    const [foreignProfile] = await db
+      .insert(profiles)
+      .values({
+        accountId: foreignAccount!.id,
+        displayName: 'Foreign Summary User',
+        birthYear: 2005,
+        isOwner: true,
+      })
+      .returning();
+    const [foreignSubject] = await db
+      .insert(subjects)
+      .values({
+        profileId: foreignProfile!.id,
+        name: 'Foreign Curriculum Subject',
+        status: 'active',
+      })
+      .returning();
+    const [foreignCurriculum] = await db
+      .insert(curricula)
+      .values({ subjectId: foreignSubject!.id, version: 1 })
+      .returning();
+    const [ownedBook] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId,
+        title: 'Owned Mixed Parent Book',
+        sortOrder: 1,
+      })
+      .returning();
+    const [mixedParentTopic] = await db
+      .insert(curriculumTopics)
+      .values({
+        curriculumId: foreignCurriculum!.id,
+        bookId: ownedBook!.id,
+        title: 'Mixed Parent Next Topic',
+        description: 'Book is owned, curriculum is not the session subject.',
+        sortOrder: 1,
+        estimatedMinutes: 20,
+      })
+      .returning();
+
+    await db.insert(sessionSummaries).values({
+      sessionId,
+      profileId,
+      content: 'Learner summary',
+      status: 'accepted',
+      nextTopicId: mixedParentTopic!.id,
+    });
+
+    const summary = await getSessionSummary(db, profileId, sessionId);
+
+    expect(summary).not.toBeNull();
+    expect(summary!.nextTopicId).toBe(mixedParentTopic!.id);
+    expect(summary!.nextTopicTitle).toBeNull();
+  });
+});

@@ -1,7 +1,7 @@
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 import { createScopedRepository } from './repository.js';
-import { subjects } from './schema/index.js';
+import { curricula, subjects } from './schema/index.js';
 
 // Recording mock: every chain method records its arguments so tests can
 // assert on SQL predicates, not just call counts.
@@ -70,17 +70,19 @@ describe('createScopedRepository → curriculumTopics', () => {
         bookSortOrder: 0,
         subjectId: 's1',
       });
-      // Must include two innerJoins — books + subjects — so ownership is
-      // enforced inside the query, not filtered post-hoc in JS.
-      expect(calls.innerJoin).toHaveLength(2);
-      // The second join must reference the subjects table (first argument
-      // to innerJoin). A typo that joined books→books would pass the count
-      // check but fail this reference-identity one — drizzle pgTable objects
-      // stringify as "[object Object]", so compare by identity instead.
+      // Must include three innerJoins — books + curricula + subjects — so
+      // ownership is enforced through both parent chains inside the query, not
+      // filtered post-hoc in JS.
+      expect(calls.innerJoin).toHaveLength(3);
       const secondJoin = calls.innerJoin[1];
       expect(secondJoin).not.toBeUndefined();
-      const secondJoinTable = secondJoin![0];
-      expect(secondJoinTable).toBe(subjects);
+      expect(secondJoin![0]).toBe(curricula);
+      // The final join must reference the subjects table (first argument
+      // to innerJoin). A typo that joined books→books would pass the count
+      // stringify as "[object Object]", so compare by identity instead.
+      const finalJoin = calls.innerJoin[2];
+      expect(finalJoin).not.toBeUndefined();
+      expect(finalJoin![0]).toBe(subjects);
       // Terminal limit(1) ensures we never scan the whole table.
       expect(calls.limit).toEqual([[1]]);
     });
@@ -101,7 +103,29 @@ describe('createScopedRepository → curriculumTopics', () => {
       const repo = createScopedRepository(chain as never, profileId);
       const rows = await repo.curriculumTopics.findLaterInBook('b1', 0, 50);
       expect(rows).toHaveLength(2);
-      expect(calls.innerJoin).toHaveLength(2);
+      expect(calls.innerJoin).toHaveLength(3);
+      expect(calls.innerJoin[1]![0]).toBe(curricula);
+      expect(calls.innerJoin[2]![0]).toBe(subjects);
+      expect(calls.orderBy).toHaveLength(1);
+      expect(calls.limit).toEqual([[50]]);
+    });
+  });
+
+  describe('findEarliestInLaterBooks', () => {
+    it('[WI-80] enforces both book and curriculum parent chains', async () => {
+      const { chain, calls } = createRecordingChain([
+        { id: 't4', title: 'Next book opening' },
+      ]);
+      const repo = createScopedRepository(chain as never, profileId);
+      const rows = await repo.curriculumTopics.findEarliestInLaterBooks(
+        's1',
+        0,
+        50,
+      );
+      expect(rows).toEqual([{ id: 't4', title: 'Next book opening' }]);
+      expect(calls.innerJoin).toHaveLength(3);
+      expect(calls.innerJoin[1]![0]).toBe(curricula);
+      expect(calls.innerJoin[2]![0]).toBe(subjects);
       expect(calls.orderBy).toHaveLength(1);
       expect(calls.limit).toEqual([[50]]);
     });
@@ -119,7 +143,9 @@ describe('createScopedRepository → curriculumTopics', () => {
         3,
       );
       expect(rows).toEqual([{ id: 't1', title: 'Photosynthesis' }]);
-      expect(calls.innerJoin).toHaveLength(2);
+      expect(calls.innerJoin).toHaveLength(3);
+      expect(calls.innerJoin[1]![0]).toBe(curricula);
+      expect(calls.innerJoin[2]![0]).toBe(subjects);
       expect(calls.limit).toEqual([[3]]);
     });
 

@@ -1,8 +1,15 @@
 // @inngest-admin: parent-chain (curriculumTopics looked up by IDs from event; familyLinks enforced by profileId)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { eq, inArray } from 'drizzle-orm';
-import { curriculumTopics, familyLinks, profiles } from '@eduagent/database';
+import { and, eq, inArray } from 'drizzle-orm';
+import {
+  curriculumBooks,
+  curricula,
+  curriculumTopics,
+  familyLinks,
+  profiles,
+  subjects,
+} from '@eduagent/database';
 import { resolveProfileRole } from '../../services/profile';
 import {
   formatRecallNudge,
@@ -56,12 +63,37 @@ export const recallNudgeSend = inngest.createFunction(
         return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
       }
 
-      // Look up topic titles
+      // Look up topic titles through both topic parent chains. The event payload
+      // is replayable/operator-controlled, so topTopicIds alone cannot prove
+      // profile ownership.
       const topics =
         topTopicIds.length > 0
-          ? await db.query.curriculumTopics.findMany({
-              where: inArray(curriculumTopics.id, topTopicIds),
-            })
+          ? await db
+              .select({
+                title: curriculumTopics.title,
+              })
+              .from(curriculumTopics)
+              .innerJoin(
+                curriculumBooks,
+                eq(curriculumBooks.id, curriculumTopics.bookId),
+              )
+              .innerJoin(
+                curricula,
+                eq(curricula.id, curriculumTopics.curriculumId),
+              )
+              .innerJoin(
+                subjects,
+                and(
+                  eq(subjects.id, curriculumBooks.subjectId),
+                  eq(subjects.id, curricula.subjectId),
+                ),
+              )
+              .where(
+                and(
+                  inArray(curriculumTopics.id, topTopicIds),
+                  eq(subjects.profileId, profileId),
+                ),
+              )
           : [];
 
       const topTopicTitle = topics[0]?.title ?? 'your fading topic';

@@ -23,6 +23,10 @@ import {
   profiles,
   accounts,
   retentionCards,
+  curriculumTopics,
+  curriculumBooks,
+  curricula,
+  subjects,
   notificationPreferences,
   notificationLog,
   consentStates,
@@ -55,15 +59,32 @@ export const recallNudge = inngest.createFunction(
           retentionCards,
           and(
             eq(retentionCards.profileId, profiles.id),
-            lt(retentionCards.nextReviewAt, sql`NOW()`)
-          )
+            lt(retentionCards.nextReviewAt, sql`NOW()`),
+          ),
+        )
+        .innerJoin(
+          curriculumTopics,
+          eq(curriculumTopics.id, retentionCards.topicId),
+        )
+        .innerJoin(
+          curriculumBooks,
+          eq(curriculumBooks.id, curriculumTopics.bookId),
+        )
+        .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+        .innerJoin(
+          subjects,
+          and(
+            eq(subjects.id, curriculumBooks.subjectId),
+            eq(subjects.id, curricula.subjectId),
+            eq(subjects.profileId, profiles.id),
+          ),
         )
         .innerJoin(
           notificationPreferences,
           and(
             eq(notificationPreferences.profileId, profiles.id),
-            eq(notificationPreferences.pushEnabled, true)
-          )
+            eq(notificationPreferences.pushEnabled, true),
+          ),
         )
         .where(
           and(
@@ -78,16 +99,16 @@ export const recallNudge = inngest.createFunction(
                   .where(
                     and(
                       eq(consentStates.profileId, profiles.id),
-                      eq(consentStates.status, 'CONSENTED')
-                    )
-                  )
+                      eq(consentStates.status, 'CONSENTED'),
+                    ),
+                  ),
               ),
               notExists(
                 db
                   .select({ _: sql`1` })
                   .from(consentStates)
-                  .where(eq(consentStates.profileId, profiles.id))
-              )
+                  .where(eq(consentStates.profileId, profiles.id)),
+              ),
             ),
             // Timezone bucketing: local time within 07:30–08:30 (single 1h window)
             // Prevents duplicate nudges across hourly cron runs while still
@@ -105,11 +126,11 @@ export const recallNudge = inngest.createFunction(
                   and(
                     eq(notificationLog.profileId, profiles.id),
                     eq(notificationLog.type, 'recall_nudge'),
-                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
-                  )
-                )
-            )
-          )
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`,
+                  ),
+                ),
+            ),
+          ),
         )
         .groupBy(profiles.id);
 
@@ -139,7 +160,7 @@ export const recallNudge = inngest.createFunction(
             fadingCount: profile.overdueCount,
             topTopicIds: profile.topTopicIds,
           },
-        }))
+        })),
       );
       sentEvents += chunk.length;
     }
@@ -149,5 +170,5 @@ export const recallNudge = inngest.createFunction(
       eligibleCount: eligible.length,
       sentEvents,
     };
-  }
+  },
 );

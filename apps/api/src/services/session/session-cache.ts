@@ -180,6 +180,7 @@ export async function getCachedHomeworkLibraryContext(
 
   entry.homeworkLibraryContext = await buildHomeworkLibraryContext(
     db,
+    profileId,
     session.subjectId,
   );
   entry.homeworkLibraryContextLoaded = true;

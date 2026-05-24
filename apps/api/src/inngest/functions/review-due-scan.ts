@@ -23,6 +23,10 @@ import {
   profiles,
   accounts,
   retentionCards,
+  curriculumTopics,
+  curriculumBooks,
+  curricula,
+  subjects,
   notificationPreferences,
   notificationLog,
   consentStates,
@@ -50,16 +54,33 @@ export const reviewDueScan = inngest.createFunction(
           retentionCards,
           and(
             eq(retentionCards.profileId, profiles.id),
-            lt(retentionCards.nextReviewAt, sql`NOW()`)
-          )
+            lt(retentionCards.nextReviewAt, sql`NOW()`),
+          ),
+        )
+        .innerJoin(
+          curriculumTopics,
+          eq(curriculumTopics.id, retentionCards.topicId),
+        )
+        .innerJoin(
+          curriculumBooks,
+          eq(curriculumBooks.id, curriculumTopics.bookId),
+        )
+        .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+        .innerJoin(
+          subjects,
+          and(
+            eq(subjects.id, curriculumBooks.subjectId),
+            eq(subjects.id, curricula.subjectId),
+            eq(subjects.profileId, profiles.id),
+          ),
         )
         .innerJoin(
           notificationPreferences,
           and(
             eq(notificationPreferences.profileId, profiles.id),
             eq(notificationPreferences.pushEnabled, true),
-            eq(notificationPreferences.reviewReminders, true)
-          )
+            eq(notificationPreferences.reviewReminders, true),
+          ),
         )
         .where(
           and(
@@ -72,16 +93,16 @@ export const reviewDueScan = inngest.createFunction(
                   .where(
                     and(
                       eq(consentStates.profileId, profiles.id),
-                      eq(consentStates.status, 'CONSENTED')
-                    )
-                  )
+                      eq(consentStates.status, 'CONSENTED'),
+                    ),
+                  ),
               ),
               notExists(
                 db
                   .select({ _: sql`1` })
                   .from(consentStates)
-                  .where(eq(consentStates.profileId, profiles.id))
-              )
+                  .where(eq(consentStates.profileId, profiles.id)),
+              ),
             ),
             // Dedup: skip profiles that already received a review_reminder today
             // (using account timezone for date boundary to handle DST correctly)
@@ -93,11 +114,11 @@ export const reviewDueScan = inngest.createFunction(
                   and(
                     eq(notificationLog.profileId, profiles.id),
                     eq(notificationLog.type, 'review_reminder'),
-                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
-                  )
-                )
-            )
-          )
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`,
+                  ),
+                ),
+            ),
+          ),
         )
         .groupBy(profiles.id);
 
@@ -126,7 +147,7 @@ export const reviewDueScan = inngest.createFunction(
             overdueCount: profile.overdueCount,
             topTopicIds: profile.topTopicIds,
           },
-        }))
+        })),
       );
       sentEvents += chunk.length;
     }
@@ -136,5 +157,5 @@ export const reviewDueScan = inngest.createFunction(
       eligibleCount: eligible.length,
       sentEvents,
     };
-  }
+  },
 );

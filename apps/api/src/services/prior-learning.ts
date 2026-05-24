@@ -7,11 +7,11 @@ import { eq, and, ne, desc, isNotNull } from 'drizzle-orm';
 import {
   learningSessions,
   sessionSummaries,
-  curriculumTopics,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 
 /** A previously completed topic available for context injection */
 export interface PriorTopic {
@@ -183,16 +183,11 @@ export async function fetchPriorTopics(
   const rows = await db
     .select({
       topicId: learningSessions.topicId,
-      title: curriculumTopics.title,
       summary: sessionSummaries.content,
       endedAt: learningSessions.endedAt,
     })
     .from(learningSessions)
     .innerJoin(subjects, eq(subjects.id, learningSessions.subjectId))
-    .innerJoin(
-      curriculumTopics,
-      eq(curriculumTopics.id, learningSessions.topicId),
-    )
     .leftJoin(
       sessionSummaries,
       and(
@@ -210,6 +205,15 @@ export async function fetchPriorTopics(
       ),
     )
     .orderBy(desc(learningSessions.endedAt));
+  const topicIds = rows
+    .map((row) => row.topicId)
+    .filter((topicId): topicId is string => Boolean(topicId));
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds,
+    subjectId,
+  });
+  const ownedById = new Map(ownedTopics.map((topic) => [topic.topicId, topic]));
 
   // Deduplicate by topicId (take most recent session per topic)
   const seen = new Set<string>();
@@ -217,10 +221,12 @@ export async function fetchPriorTopics(
 
   for (const row of rows) {
     if (!row.topicId || seen.has(row.topicId)) continue;
+    const ownedTopic = ownedById.get(row.topicId);
+    if (!ownedTopic) continue;
     seen.add(row.topicId);
     topics.push({
       topicId: row.topicId,
-      title: row.title,
+      title: ownedTopic.topicTitle,
       summary: row.summary ?? undefined,
       completedAt: row.endedAt?.toISOString() ?? new Date().toISOString(),
     });
@@ -254,14 +260,10 @@ export async function fetchCrossSubjectHighlights(
   const rows = await db
     .select({
       topicId: learningSessions.topicId,
-      title: curriculumTopics.title,
+      subjectId: learningSessions.subjectId,
       subjectName: subjects.name,
     })
     .from(learningSessions)
-    .innerJoin(
-      curriculumTopics,
-      eq(curriculumTopics.id, learningSessions.topicId),
-    )
     .innerJoin(subjects, eq(subjects.id, learningSessions.subjectId))
     .where(
       and(
@@ -278,16 +280,30 @@ export async function fetchCrossSubjectHighlights(
     )
     .orderBy(desc(learningSessions.endedAt))
     .limit(limit * 2); // fetch extra to account for deduplication
+  const topicIds = rows
+    .map((row) => row.topicId)
+    .filter((topicId): topicId is string => Boolean(topicId));
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds,
+  });
+  const ownedById = new Map(ownedTopics.map((topic) => [topic.topicId, topic]));
 
   // Deduplicate by subject:title
   const seen = new Set<string>();
   const highlights: CrossSubjectHighlight[] = [];
 
   for (const row of rows) {
-    const key = `${row.subjectName}:${row.title}`.toLowerCase();
+    if (!row.topicId) continue;
+    const ownedTopic = ownedById.get(row.topicId);
+    if (!ownedTopic || ownedTopic.subjectId !== row.subjectId) continue;
+    const key = `${row.subjectName}:${ownedTopic.topicTitle}`.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    highlights.push({ title: row.title, subjectName: row.subjectName });
+    highlights.push({
+      title: ownedTopic.topicTitle,
+      subjectName: row.subjectName,
+    });
     if (highlights.length >= limit) break;
   }
 

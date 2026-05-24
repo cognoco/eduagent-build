@@ -16,6 +16,9 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
   createDatabase,
+  curricula,
+  curriculumBooks,
+  curriculumTopics,
   generateUUIDv7,
   learningSessions,
   profiles,
@@ -41,6 +44,8 @@ describeIfDb('getSubjectSessions (integration)', () => {
   let otherSubjectId: string;
   let completedSessionId: string;
   let autoClosedSessionId: string;
+  let staleForeignTopicSessionId: string;
+  let foreignTopicTitle: string;
 
   beforeAll(async () => {
     db = createDatabase(process.env.DATABASE_URL!);
@@ -141,6 +146,43 @@ describeIfDb('getSubjectSessions (integration)', () => {
       status: 'completed',
       exchangeCount: 6,
     });
+
+    const [foreignCurriculum] = await db
+      .insert(curricula)
+      .values({ subjectId: otherSubjectId, version: 1 })
+      .returning({ id: curricula.id });
+    const [foreignBook] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: otherSubjectId,
+        title: 'Foreign Session Book',
+        sortOrder: 0,
+      })
+      .returning({ id: curriculumBooks.id });
+    foreignTopicTitle = `Foreign Session Topic ${RUN_ID}`;
+    const [foreignTopic] = await db
+      .insert(curriculumTopics)
+      .values({
+        curriculumId: foreignCurriculum!.id,
+        bookId: foreignBook!.id,
+        title: foreignTopicTitle,
+        description: `${foreignTopicTitle} description`,
+        sortOrder: 0,
+        estimatedMinutes: 20,
+      })
+      .returning({ id: curriculumTopics.id });
+
+    const [staleForeignTopicSession] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId: foreignTopic!.id,
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    staleForeignTopicSessionId = staleForeignTopicSession!.id;
   });
 
   afterAll(async () => {
@@ -154,9 +196,13 @@ describeIfDb('getSubjectSessions (integration)', () => {
 
     const ids = sessions.map((s: SubjectSession) => s.id);
     expect(ids).toEqual(
-      expect.arrayContaining([completedSessionId, autoClosedSessionId]),
+      expect.arrayContaining([
+        completedSessionId,
+        autoClosedSessionId,
+        staleForeignTopicSessionId,
+      ]),
     );
-    expect(ids).toHaveLength(2);
+    expect(ids).toHaveLength(3);
   });
 
   it("does not surface another profile's sessions when subjectId matches by chance", async () => {
@@ -165,5 +211,21 @@ describeIfDb('getSubjectSessions (integration)', () => {
     // this returns nothing — the cross-profile read is structurally blocked.
     const sessions = await getSubjectSessions(db, profileId, otherSubjectId);
     expect(sessions).toEqual([]);
+  });
+
+  it('[WI-80] suppresses topic metadata when a profile-owned subject session points at a foreign topic', async () => {
+    const sessions = await getSubjectSessions(db, profileId, subjectId);
+    const staleSession = sessions.find(
+      (session) => session.id === staleForeignTopicSessionId,
+    );
+
+    expect(staleSession).toBeDefined();
+    expect(staleSession!.topicId).toBeNull();
+    expect(staleSession!.topicTitle).toBeNull();
+    expect(staleSession!.bookId).toBeNull();
+    expect(staleSession!.bookTitle).toBeNull();
+    expect(sessions.map((session) => session.topicTitle)).not.toContain(
+      foreignTopicTitle,
+    );
   });
 });

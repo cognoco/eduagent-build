@@ -22,6 +22,7 @@ import {
   subjects,
   curricula,
   curriculumTopics,
+  curriculumBooks,
   retentionCards,
   needsDeepeningTopics,
   teachingPreferences,
@@ -61,6 +62,11 @@ import { captureException } from './sentry';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
 import { createLogger } from './logger';
+import {
+  assertOwnedCurriculumTopic,
+  findOwnedCurriculumTopic,
+  findOwnedCurriculumTopics,
+} from './curriculum-topic-ownership';
 
 const logger = createLogger();
 const DAY_MS = 1000 * 60 * 60 * 24;
@@ -185,6 +191,8 @@ export async function ensureRetentionCard(
   profileId: string,
   topicId: string,
 ): Promise<{ card: typeof retentionCards.$inferSelect; isNew: boolean }> {
+  await assertOwnedCurriculumTopic(db, { profileId, topicId });
+
   const existingCard = await db.query.retentionCards.findFirst({
     where: and(
       eq(retentionCards.profileId, profileId),
@@ -254,9 +262,17 @@ export async function getSubjectRetention(
   const topics = await db.query.curriculumTopics.findMany({
     where: eq(curriculumTopics.curriculumId, curriculum.id),
   });
-  const topicIds = topics.map((t) => t.id);
-  const topicTitleMap = new Map(topics.map((t) => [t.id, t.title]));
-  const topicBookIdMap = new Map(topics.map((t) => [t.id, t.bookId]));
+  const candidateTopicIds = topics.map((t) => t.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: candidateTopicIds,
+    subjectId,
+  });
+  const topicIds = ownedTopics.map((t) => t.topicId);
+  const topicTitleMap = new Map(
+    ownedTopics.map((t) => [t.topicId, t.topicTitle]),
+  );
+  const topicBookIdMap = new Map(ownedTopics.map((t) => [t.topicId, t.bookId]));
 
   // Get retention cards for this subject's topics (DB-level filter — issue #22.2)
   const subjectCards =
@@ -265,15 +281,19 @@ export async function getSubjectRetention(
           inArray(retentionCards.topicId, topicIds),
         )
       : [];
+  const ownedTopicIdSet = new Set(topicIds);
+  const ownedSubjectCards = subjectCards.filter((card) =>
+    ownedTopicIdSet.has(card.topicId),
+  );
 
   const now = new Date();
-  const reviewDueCount = subjectCards.filter(
+  const reviewDueCount = ownedSubjectCards.filter(
     (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime(),
   ).length;
 
   // F-023: Include not-started topics (those with no retention card) so the
   // Library Topics tab shows the full curriculum, not just started topics.
-  const cardByTopicId = new Map(subjectCards.map((c) => [c.topicId, c]));
+  const cardByTopicId = new Map(ownedSubjectCards.map((c) => [c.topicId, c]));
   const allTopics = topicIds.map((tid) => {
     const bookId = topicBookIdMap.get(tid) ?? '';
     const card = cardByTopicId.get(tid);
@@ -359,15 +379,18 @@ export async function getAllSubjectsRetention(
           where: inArray(curriculumTopics.curriculumId, curriculumIds),
         })
       : [];
-  const topicIds = allTopics.map((t) => t.id);
-  const topicTitleMap = new Map(allTopics.map((t) => [t.id, t.title]));
-  const topicBookIdMap = new Map(allTopics.map((t) => [t.id, t.bookId]));
-  // curriculumId → subjectId reverse lookup
-  const curriculumToSubject = new Map(
-    Array.from(curriculumBySubject.values()).map((c) => [c.id, c.subjectId]),
+  const candidateTopicIds = allTopics.map((t) => t.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: candidateTopicIds,
+  });
+  const topicIds = ownedTopics.map((t) => t.topicId);
+  const topicTitleMap = new Map(
+    ownedTopics.map((t) => [t.topicId, t.topicTitle]),
   );
+  const topicBookIdMap = new Map(ownedTopics.map((t) => [t.topicId, t.bookId]));
   const topicToSubject = new Map(
-    allTopics.map((t) => [t.id, curriculumToSubject.get(t.curriculumId) ?? '']),
+    ownedTopics.map((t) => [t.topicId, t.subjectId]),
   );
 
   // 4. All retention cards for those topics (one scoped query — RLS-aware).
@@ -378,7 +401,11 @@ export async function getAllSubjectsRetention(
         )
       : [];
 
-  const cardByTopicId = new Map(allCards.map((c) => [c.topicId, c]));
+  const ownedTopicIdSet = new Set(topicIds);
+  const ownedCards = allCards.filter((card) =>
+    ownedTopicIdSet.has(card.topicId),
+  );
+  const cardByTopicId = new Map(ownedCards.map((c) => [c.topicId, c]));
   const now = new Date();
 
   // Group results by subjectId in the same shape the per-subject route returns.
@@ -476,16 +503,67 @@ export async function getProfileOverdueCount(
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(retentionCards)
+      .innerJoin(
+        curriculumTopics,
+        eq(curriculumTopics.id, retentionCards.topicId),
+      )
+      .innerJoin(
+        curriculumBooks,
+        eq(curriculumBooks.id, curriculumTopics.bookId),
+      )
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .innerJoin(
+        subjects,
+        and(
+          eq(subjects.id, curriculumBooks.subjectId),
+          eq(subjects.id, curricula.subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      )
       .where(overdueWhere),
     db
       .select({ topicId: retentionCards.topicId })
       .from(retentionCards)
+      .innerJoin(
+        curriculumTopics,
+        eq(curriculumTopics.id, retentionCards.topicId),
+      )
+      .innerJoin(
+        curriculumBooks,
+        eq(curriculumBooks.id, curriculumTopics.bookId),
+      )
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .innerJoin(
+        subjects,
+        and(
+          eq(subjects.id, curriculumBooks.subjectId),
+          eq(subjects.id, curricula.subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      )
       .where(overdueWhere)
       .orderBy(asc(retentionCards.nextReviewAt))
       .limit(3),
     db
       .select({ nextReviewAt: retentionCards.nextReviewAt })
       .from(retentionCards)
+      .innerJoin(
+        curriculumTopics,
+        eq(curriculumTopics.id, retentionCards.topicId),
+      )
+      .innerJoin(
+        curriculumBooks,
+        eq(curriculumBooks.id, curriculumTopics.bookId),
+      )
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .innerJoin(
+        subjects,
+        and(
+          eq(subjects.id, curriculumBooks.subjectId),
+          eq(subjects.id, curricula.subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      )
       .where(
         and(
           eq(retentionCards.profileId, profileId),
@@ -504,25 +582,21 @@ export async function getProfileOverdueCount(
   let nextReviewTopic: NextReviewTopic | null = null;
   const topTopicId = topTopicIds[0];
   if (topTopicId) {
-    const topic = await db.query.curriculumTopics.findFirst({
-      where: eq(curriculumTopics.id, topTopicId),
+    const topic = await findOwnedCurriculumTopic(db, {
+      profileId,
+      topicId: topTopicId,
     });
     if (topic) {
-      const curriculum = await db.query.curricula.findFirst({
-        where: eq(curricula.id, topic.curriculumId),
-      });
-      if (curriculum) {
-        const subject = await repo.subjects.findFirst(
-          eq(subjects.id, curriculum.subjectId),
-        );
-        if (subject) {
-          nextReviewTopic = {
-            topicId: topTopicId,
-            subjectId: subject.id,
-            subjectName: subject.name,
-            topicTitle: topic.title,
-          };
-        }
+      const subject = await repo.subjects.findFirst(
+        eq(subjects.id, topic.subjectId),
+      );
+      if (subject) {
+        nextReviewTopic = {
+          topicId: topTopicId,
+          subjectId: subject.id,
+          subjectName: subject.name,
+          topicTitle: topic.topicTitle,
+        };
       }
     }
   }
@@ -544,6 +618,11 @@ export async function getTopicRetention(
   const card = await repo.retentionCards.findFirst(
     eq(retentionCards.topicId, topicId),
   );
+  if (!card) return null;
+
+  const topic = await findOwnedCurriculumTopic(db, { profileId, topicId });
+  if (!topic) return null;
+
   return card ? mapRetentionCardRow(card) : null;
 }
 
@@ -591,12 +670,20 @@ export async function getAssessmentEligibleTopics(
         .filter((topicId): topicId is string => typeof topicId === 'string'),
     ),
   );
+  const ownedTopics =
+    topicIds.length > 0
+      ? await findOwnedCurriculumTopics(db, { profileId, topicIds })
+      : [];
+  const ownedTopicById = new Map(
+    ownedTopics.map((topic) => [topic.topicId, topic]),
+  );
+  const ownedTopicIds = ownedTopics.map((topic) => topic.topicId);
   const activeAssessmentByTopicId = new Map<string, string>();
-  if (topicIds.length > 0) {
+  if (ownedTopicIds.length > 0) {
     const repo = createScopedRepository(db, profileId);
     const activeAssessments = await repo.assessments.findMany(
       and(
-        inArray(assessments.topicId, topicIds),
+        inArray(assessments.topicId, ownedTopicIds),
         eq(assessments.status, 'in_progress'),
       ),
     );
@@ -613,11 +700,14 @@ export async function getAssessmentEligibleTopics(
   const topics: AssessmentEligibleTopic[] = [];
   for (const row of rows) {
     if (!row.topicId || !row.endedAt || seen.has(row.topicId)) continue;
+    const ownedTopic = ownedTopicById.get(row.topicId);
+    if (!ownedTopic || ownedTopic.subjectId !== row.subjectId) continue;
     seen.add(row.topicId);
     topics.push({
       topicId: row.topicId,
-      topicTitle: row.topicTitle,
-      topicDescription: row.topicDescription,
+      topicTitle: ownedTopic.topicTitle,
+      topicDescription:
+        ownedTopic.topicDescription ?? row.topicDescription ?? '',
       subjectId: row.subjectId,
       subjectName: row.subjectName,
       pedagogyMode: row.pedagogyMode,
@@ -673,29 +763,12 @@ export async function processRecallTest(
 ): Promise<RecallTestResponse> {
   const repo = createScopedRepository(db, profileId);
 
-  // IDOR prevention: verify the topic belongs to one of the profile's subjects
-  // BEFORE creating any retention state or reading evaluation context.
-  // Mirrors the ownership check in startRelearn (lines 886-909).
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, input.topicId),
+  // IDOR prevention: verify the topic belongs to the profile through both topic
+  // parent chains before creating retention state or reading evaluation context.
+  const topic = await assertOwnedCurriculumTopic(db, {
+    profileId,
+    topicId: input.topicId,
   });
-  const curriculum = topic
-    ? await db.query.curricula.findFirst({
-        where: eq(curricula.id, topic.curriculumId),
-      })
-    : null;
-  const subjectId = curriculum?.subjectId ?? null;
-  if (subjectId) {
-    const ownedSubject = await repo.subjects.findFirst(
-      eq(subjects.id, subjectId),
-    );
-    if (!ownedSubject) {
-      throw new NotFoundError('Topic');
-    }
-  } else {
-    // Topic doesn't exist or has no curriculum chain — reject
-    throw new NotFoundError('Topic');
-  }
 
   const card = await repo.retentionCards.findFirst(
     eq(retentionCards.topicId, input.topicId),
@@ -730,9 +803,7 @@ export async function processRecallTest(
     };
   }
 
-  // topic was already fetched for the ownership check above — reuse it here
-  // for the LLM evaluation context (avoids a redundant DB round-trip).
-  const topicTitle = topic?.title ?? input.topicId;
+  const topicTitle = topic.topicTitle;
   const quality =
     attemptMode === 'dont_remember'
       ? 0
@@ -799,13 +870,11 @@ export async function processRecallTest(
   // pattern: post-atomic-write safeWrite so a ledger failure is captured in
   // Sentry but never aborts the recall test response.
   const recallCompletedAt = new Date();
-  // curriculum was already fetched during the ownership check above — reuse it.
-  const topicCurriculum = curriculum;
   await safeWrite(
     () =>
       recordPracticeActivityEvent(db, {
         profileId,
-        subjectId: topicCurriculum?.subjectId ?? null,
+        subjectId: topic.subjectId,
         activityType: 'review',
         activitySubtype: 'topic_recall',
         completedAt: recallCompletedAt,
@@ -864,7 +933,7 @@ export async function processRecallTest(
     attemptMode === 'dont_remember' &&
     result.failureAction !== 'redirect_to_library'
   ) {
-    response.hint = buildRecallHint(topicTitle, topic?.description);
+    response.hint = buildRecallHint(topicTitle, topic.topicDescription);
   }
 
   // Add remediation data when redirect is triggered (3+ failures)
@@ -902,31 +971,12 @@ export async function startRelearn(
   profileId: string,
   input: RelearnTopicInput,
 ): Promise<RelearnResponse> {
-  // Find subjectId through the topic's curriculum chain
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, input.topicId),
+  const topic = await assertOwnedCurriculumTopic(db, {
+    profileId,
+    topicId: input.topicId,
   });
-  const curriculum = topic
-    ? await db.query.curricula.findFirst({
-        where: eq(curricula.id, topic.curriculumId),
-      })
-    : null;
-
-  const subjectId = curriculum?.subjectId ?? null;
-
-  // Verify topic belongs to one of the profile's subjects (IDOR prevention).
+  const subjectId = topic.subjectId;
   const repo = createScopedRepository(db, profileId);
-  if (subjectId) {
-    const ownedSubject = await repo.subjects.findFirst(
-      eq(subjects.id, subjectId),
-    );
-    if (!ownedSubject) {
-      throw new NotFoundError('Topic');
-    }
-  } else {
-    // Topic doesn't exist or has no curriculum chain — reject
-    throw new NotFoundError('Topic');
-  }
 
   // Mark topic as needs deepening if not already
   const existing = await repo.needsDeepeningTopics.findMany(
@@ -1348,6 +1398,8 @@ export async function updateRetentionFromSession(
     eq(retentionCards.topicId, topicId),
   );
 
+  await assertOwnedCurriculumTopic(db, { profileId, topicId });
+
   // Auto-create retention card on first encounter
   const ensured = existing
     ? { card: existing, isNew: false }
@@ -1437,38 +1489,31 @@ export async function getStableTopics(
   profileId: string,
   subjectId?: string,
 ): Promise<TopicStability[]> {
+  const repo = createScopedRepository(db, profileId);
+
   if (subjectId) {
-    const curriculum = await db.query.curricula.findFirst({
-      where: eq(curricula.subjectId, subjectId),
-    });
-    if (!curriculum) return [];
-
-    const topics = await db.query.curriculumTopics.findMany({
-      where: eq(curriculumTopics.curriculumId, curriculum.id),
-    });
-    const topicIds = topics.map((t) => t.id);
-    if (topicIds.length === 0) return [];
-
-    // DB-level filter via scoped repo — issue #22.2
-    const repo = createScopedRepository(db, profileId);
-    const filteredCards = await repo.retentionCards.findMany(
-      inArray(retentionCards.topicId, topicIds),
+    const ownedSubject = await repo.subjects.findFirst(
+      eq(subjects.id, subjectId),
     );
+    if (!ownedSubject) return [];
+  }
 
-    return filteredCards.map((card) => ({
+  const allCards = await repo.retentionCards.findMany();
+  const topicIds = Array.from(new Set(allCards.map((card) => card.topicId)));
+  if (topicIds.length === 0) return [];
+
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds,
+    ...(subjectId ? { subjectId } : {}),
+  });
+  const ownedTopicIds = new Set(ownedTopics.map((topic) => topic.topicId));
+
+  return allCards
+    .filter((card) => ownedTopicIds.has(card.topicId))
+    .map((card) => ({
       topicId: card.topicId,
       isStable: isTopicStable(card.consecutiveSuccesses),
       consecutiveSuccesses: card.consecutiveSuccesses,
     }));
-  }
-
-  // No subject filter — return all cards for this profile
-  const repo = createScopedRepository(db, profileId);
-  const allCards = await repo.retentionCards.findMany();
-
-  return allCards.map((card) => ({
-    topicId: card.topicId,
-    isStable: isTopicStable(card.consecutiveSuccesses),
-    consecutiveSuccesses: card.consecutiveSuccesses,
-  }));
 }

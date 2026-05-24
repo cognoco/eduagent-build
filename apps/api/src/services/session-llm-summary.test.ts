@@ -171,6 +171,56 @@ describe('generateLlmSummary', () => {
     expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
+  it('[WI-80] does not include a mixed-parent topic title in the LLM prompt', async () => {
+    const db = createMockDb([
+      { eventType: 'user_message', content: 'Can we review this topic?' },
+      { eventType: 'ai_response', content: 'Yes, let us start.' },
+    ]) as unknown as Database & {
+      select: jest.Mock;
+    };
+    const chain: Record<string, unknown> = {};
+    let joinCount = 0;
+    chain.from = jest.fn().mockReturnValue(chain);
+    chain.innerJoin = jest.fn(() => {
+      joinCount += 1;
+      return chain;
+    });
+    chain.where = jest.fn().mockReturnValue(chain);
+    chain.limit = jest
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(
+          joinCount === 2 ? [{ title: 'Mixed Parent Topic' }] : [],
+        ),
+      );
+    db.select = jest.fn().mockReturnValue(chain);
+
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        narrative:
+          'The learner reviewed the topic setup and asked to continue with a concrete example.',
+        topicsCovered: ['topic setup'],
+        sessionState: 'completed',
+        reEntryRecommendation:
+          'Start with a concrete example and ask the learner to describe each step.',
+      }),
+    });
+
+    await generateLlmSummary(db, {
+      sessionId: 'session-mixed-parent',
+      profileId: 'profile-1',
+      topicId: 'mixed-parent-topic',
+    });
+
+    const messages = mockRouteAndCall.mock.calls[0]![0] as Array<{
+      role: string;
+      content: string;
+    }>;
+    const userMessage = messages.find((message) => message.role === 'user');
+    expect(userMessage?.content).toContain('<topic>freeform</topic>');
+    expect(userMessage?.content).not.toContain('Mixed Parent Topic');
+  });
+
   // H3 audit: Sentry extra must never contain narrative text or topic names
   // (spec line 288, AC 337). Both attempts return a narrative that is too long
   // so the Zod error's received-value could include the narrative — assert it
