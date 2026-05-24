@@ -14,6 +14,7 @@ import {
   refreshConsentToken,
   EmailDeliveryError,
   ConsentTokenExpiredError,
+  ConsentRecordNotFoundError,
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -706,6 +707,25 @@ describe('refreshConsentToken', () => {
     );
     expect(setArgs.expiresAt.getTime()).toBeLessThanOrEqual(
       maxExpiry.getTime(),
+    );
+  });
+
+  /**
+   * BREAK TEST [WI-82]: refreshConsentToken must throw ConsentRecordNotFoundError
+   * when no GDPR row exists for the profile. Previously the function returned
+   * the new token silently even though the UPDATE matched zero rows — the token
+   * was never persisted, so the reminder email would embed a dead link.
+   *
+   * RED: without `if (updated.length === 0) throw new ConsentRecordNotFoundError()`
+   *   the call would resolve with a token string instead of rejecting.
+   * GREEN: with the guard the call rejects with ConsentRecordNotFoundError.
+   */
+  it('[WI-82] throws ConsentRecordNotFoundError when no GDPR row exists (returning is empty)', async () => {
+    // createMockDb with no findFirstResult → updateReturning resolves []
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(refreshConsentToken(db, PROFILE_ID)).rejects.toThrow(
+      ConsentRecordNotFoundError,
     );
   });
 });

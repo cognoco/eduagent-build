@@ -836,12 +836,10 @@ describe('[WI-82] sendStruggleNotification push preference gating', () => {
     return {
       query: {
         familyLinks: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue({
-              parentProfileId: 'parent-pref',
-              childProfileId: 'child-pref',
-            }),
+          findFirst: jest.fn().mockResolvedValue({
+            parentProfileId: 'parent-pref',
+            childProfileId: 'child-pref',
+          }),
         },
         profiles: {
           findFirst: jest.fn().mockResolvedValue({ displayName: 'Lily' }),
@@ -937,5 +935,9 @@ describe('[WI-82] notifyParentToSubscribe push preference gating', () => {
     // push opt-out suppresses the push silently (same as no_push_token would).
     // Verify via fetch not called rather than the result code.
     expect(result.rateLimited).toBe(false);
+    // [CodeRabbit] push_disabled must not consume a notification-log / rate-limit slot.
+    // logNotification is only called after a successful Expo send — it must not
+    // fire here because the send was suppressed.
+    expect(mockLogNotification).not.toHaveBeenCalled();
   });
 });

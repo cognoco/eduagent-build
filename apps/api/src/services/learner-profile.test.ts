@@ -2027,3 +2027,108 @@ describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
     expect(txMock).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// applyAnalysis — in-transaction GDPR re-check / TOCTOU (WI-82)
+// ---------------------------------------------------------------------------
+
+describe('applyAnalysis — in-transaction GDPR re-check (WI-82 TOCTOU)', () => {
+  const profileId = 'profile-toctou-test-001';
+
+  const validAnalysis: SessionAnalysisOutput = {
+    confidence: 'high',
+    interests: ['astronomy'],
+    strengths: null,
+    struggles: null,
+    resolvedTopics: null,
+    communicationNotes: null,
+    engagementLevel: null,
+    explanationEffectiveness: null,
+  };
+
+  /**
+   * BREAK TEST [WI-82]: Simulates consent revoked in the window between the outer
+   * isGdprProcessingAllowed(db, ...) check and the same check inside the
+   * transaction. The outer db returns CONSENTED so the outer gate passes.
+   * The in-tx check returns WITHDRAWN, so the write must be aborted.
+   *
+   * RED: without the in-tx re-check the transaction proceeds and resolves with
+   *   non-empty finalFieldsUpdated.
+   * GREEN: with the guard applyAnalysis returns empty and the tx.update is never
+   *   called.
+   */
+  it('[WI-82] aborts write when consent is withdrawn between outer check and in-tx re-check', async () => {
+    // Minimal learning profile row needed so getOrCreateLearningProfileTx's
+    // first select returns a locked row (short-circuits the insert path).
+    const minimalProfile = {
+      profileId,
+      memoryConsentStatus: 'granted',
+      memoryCollectionEnabled: true,
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      interests: [],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      learningStyle: null,
+      effectivenessSessionCount: 0,
+      version: 0,
+      updatedAt: new Date(),
+      createdAt: new Date(),
+      id: 'lp-1',
+      activeUrgency: null,
+      lastSessionSummary: null,
+      lastSessionExchangeCount: null,
+      parkedQuestions: null,
+    };
+
+    const txUpdate = jest.fn();
+    const txInsert = jest.fn();
+
+    // tx.select().from().where().for().limit() → resolves [minimalProfile]
+    const limitFn = jest.fn().mockResolvedValue([minimalProfile]);
+    const forFn = jest.fn().mockReturnValue({ limit: limitFn });
+    const whereFn = jest.fn().mockReturnValue({ for: forFn });
+    const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+
+    // tx.query.consentStates.findFirst → WITHDRAWN (in-tx check)
+    const txConsentFindFirst = jest
+      .fn()
+      .mockResolvedValue({ status: 'WITHDRAWN', consentType: 'GDPR' });
+
+    const tx = {
+      select: jest.fn().mockReturnValue({ from: fromFn }),
+      update: txUpdate,
+      insert: txInsert,
+      query: {
+        consentStates: { findFirst: txConsentFindFirst },
+      },
+    };
+
+    // Outer db.query.consentStates.findFirst → CONSENTED (outer gate passes)
+    const outerConsentFindFirst = jest
+      .fn()
+      .mockResolvedValue({ status: 'CONSENTED', consentType: 'GDPR' });
+
+    const db = {
+      transaction: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: unknown) => Promise<unknown>) => callback(tx),
+        ),
+      query: {
+        consentStates: { findFirst: outerConsentFindFirst },
+      },
+    } as unknown as Database;
+
+    const result = await applyAnalysis(db, profileId, validAnalysis, null);
+
+    // In-tx re-check must have fired and blocked the write
+    expect(result.fieldsUpdated).toEqual([]);
+    expect(result.notifications).toEqual([]);
+    // The learningProfiles update must NOT have been called
+    expect(txUpdate).not.toHaveBeenCalled();
+    // The outer gate passed (CONSENTED) — transaction was entered
+    expect(db.transaction as jest.Mock).toHaveBeenCalledTimes(1);
+  });
+});

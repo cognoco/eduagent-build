@@ -561,7 +561,7 @@ export async function refreshConsentToken(
   // and stays well within the day-30 auto-delete cutoff.
   const newExpiresAt = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
 
-  await db
+  const updated = await db
     .update(consentStates)
     .set({
       consentToken: newToken,
@@ -576,7 +576,16 @@ export async function refreshConsentToken(
         eq(consentStates.profileId, profileId),
         eq(consentStates.consentType, 'GDPR'),
       ),
-    );
+    )
+    .returning({ id: consentStates.id });
+
+  // Fail fast if no GDPR row was updated: returning the token anyway would
+  // embed a link in the reminder email that points to a token never persisted
+  // (dead on arrival). Callers (consent reminders) only run while a PENDING
+  // GDPR row exists, so this is a defensive guard against an unexpected state.
+  if (updated.length === 0) {
+    throw new ConsentRecordNotFoundError();
+  }
 
   return newToken;
 }

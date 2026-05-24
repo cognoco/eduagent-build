@@ -1301,6 +1301,15 @@ export async function applyAnalysis(
         profileId,
       );
 
+      // [WI-221] Re-check GDPR consent INSIDE the transaction to close the
+      // TOCTOU window between the outer gate (above) and this write — consent
+      // could be withdrawn in the interval.
+      if (
+        !(await isGdprProcessingAllowed(tx as unknown as Database, profileId))
+      ) {
+        return { finalFieldsUpdated: [], finalNotifications: [] };
+      }
+
       if (
         profile.memoryConsentStatus !== 'granted' ||
         profile.memoryCollectionEnabled === false
