@@ -8,7 +8,6 @@ import {
   SettingsRow,
 } from '../../../components/more/settings-rows';
 import { useExportData } from '../../../hooks/use-account';
-import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useLinkedChildren } from '../../../lib/profile';
 import {
@@ -16,21 +15,15 @@ import {
   useWithdrawalArchivePreference,
 } from '../../../hooks/use-settings';
 import { formatApiError } from '../../../lib/format-api-error';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { platformAlert } from '../../../lib/platform-alert';
 
 export default function PrivacyScreen(): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
-  const role = useActiveProfileRole();
   const navigationContract = useNavigationContract();
   const linkedChildren = useLinkedChildren();
-  const showOwnerPrivacyGates = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showExportDelete
-    : role === 'owner';
-  const showWithdrawalArchive = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showRemoveFamilyMember
-    : role === 'owner';
+  const showOwnerPrivacyGates = navigationContract.gates.showExportDelete;
+  const showWithdrawalArchive = navigationContract.gates.showRemoveFamilyMember;
   const exportData = useExportData();
   const { data: withdrawalArchivePreference, isLoading: archivePrefLoading } =
     useWithdrawalArchivePreference();

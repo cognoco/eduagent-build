@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import type { CelebrationLevel } from '@eduagent/schemas';
 
 import { useProfile } from '../../../lib/profile';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useCelebrationLevel,
   useChildCelebrationLevel,
@@ -36,9 +35,7 @@ export default function CelebrationsScreen(): React.ReactElement {
     : undefined;
   const canEditChildPreferences =
     isChildMode &&
-    (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-      ? navigationContract.gates.showCelebrationsChildEditor
-      : activeProfile?.isOwner === true) &&
+    navigationContract.gates.showCelebrationsChildEditor &&
     childProfile?.isOwner === false;
 
   const selfCelebration = useCelebrationLevel();

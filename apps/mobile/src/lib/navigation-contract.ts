@@ -309,13 +309,26 @@ export function resolveNavigationContract(
   }
 
   const familyShape = shape === 'family';
-  const addChildGate =
-    isAdultOwner(context.activeProfile) &&
-    ownerRole &&
-    !context.isParentProxy &&
-    subscriptionReady &&
-    context.activeProfile !== null;
+  const isV1 = context.flags.MODE_NAV_V1_ENABLED === true;
+  const ownerNotProxy = ownerRole && !context.isParentProxy;
+  const addChildGate = isV1
+    ? isAdultOwner(context.activeProfile) &&
+      ownerRole &&
+      !context.isParentProxy &&
+      subscriptionReady &&
+      context.activeProfile !== null
+    : isAdultOwner(context.activeProfile) && ownerNotProxy;
   const childEditorGate = ownerRole && familyShape && !context.isParentProxy;
+  // More-screen child editors (accommodation/celebrations) and the linked-
+  // child removal/withdrawal-archive gate were previously V1-only because
+  // they required `familyShape`, which V0 never sets. V0's production
+  // behavior is broader — any owner (not in proxy) sees these affordances —
+  // so the V0 evaluation collapses to ownerNotProxy. This lets screens drop
+  // their `MODE_NAV_V1_ENABLED ? gate : raw owner read` splits.
+  const moreScreenChildEditorGate = isV1 ? childEditorGate : ownerNotProxy;
+  const removeFamilyMemberGate = isV1
+    ? childEditorGate && familyCapable
+    : ownerNotProxy;
   const learnThisTooGate =
     ownerRole &&
     familyShape &&
@@ -345,11 +358,11 @@ export function resolveNavigationContract(
     showAccountSecurity: ownerRole && !context.isParentProxy,
     showExportDelete: ownerRole && !context.isParentProxy,
     showAddChild: addChildGate,
-    showRemoveFamilyMember: childEditorGate && familyCapable,
+    showRemoveFamilyMember: removeFamilyMemberGate,
     showFamilyChildActivity: childEditorGate,
     showProgressProfilePicker: childEditorGate,
-    showAccommodationChildEditor: childEditorGate,
-    showCelebrationsChildEditor: childEditorGate,
+    showAccommodationChildEditor: moreScreenChildEditorGate,
+    showCelebrationsChildEditor: moreScreenChildEditorGate,
     showMentorMemoryChildConsent: childEditorGate,
     showInlineStudyInvite: ownerRole && familyCapable && !context.isParentProxy,
     showLearnThisToo: learnThisTooGate,

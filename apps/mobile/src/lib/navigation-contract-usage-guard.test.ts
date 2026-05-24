@@ -41,33 +41,33 @@ const NAVIGATION_CONTRACT_HOOKS = new Set([
 // rationale.
 const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] =
   [
-    // V0-fallback: More child-editor screen keeps owner/child discrimination only for legacy mode.
+    // Contract-only after PR 3: showAccommodationChildEditor is V0-safe in
+    // the contract, so the screen reads only the gate. The remaining raw
+    // read is `childProfile?.isOwner`, which classifies the EDIT TARGET
+    // profile (not the active user's navigation ownership).
     {
       file: 'apps/mobile/src/app/(app)/more/accommodation.tsx',
       reason:
-        'V0-fallback: child accommodation editor uses contract gates in V1 and raw owner checks only in the legacy branch.',
-      expectedFindings: { 'profile-owner-read': 2 },
-    },
-    // V0-fallback: Account sub-screen owner controls are contract-gated in V1.
-    {
-      file: 'apps/mobile/src/app/(app)/more/account.tsx',
-      reason:
-        'V0-fallback: account owner controls use contract gates in V1 and raw owner checks only in the legacy branch.',
+        'child-target read: childProfile?.isOwner classifies the edit target, not navigation ownership. Active-user gating flows through contract.gates.showAccommodationChildEditor.',
       expectedFindings: { 'profile-owner-read': 1 },
     },
-    // V0-fallback: More child-editor screen keeps owner/child discrimination only for legacy mode.
+    // Contract-only after PR 3: showCelebrationsChildEditor is V0-safe; the
+    // remaining raw read is the child target (`childProfile?.isOwner`).
     {
       file: 'apps/mobile/src/app/(app)/more/celebrations.tsx',
       reason:
-        'V0-fallback: child celebrations editor uses contract gates in V1 and raw owner checks only in the legacy branch.',
-      expectedFindings: { 'profile-owner-read': 2 },
+        'child-target read: childProfile?.isOwner classifies the edit target, not navigation ownership. Active-user gating flows through contract.gates.showCelebrationsChildEditor.',
+      expectedFindings: { 'profile-owner-read': 1 },
     },
-    // V0-fallback: More root keeps legacy linked-child row filtering until V0 is retired.
+    // Contract-only after PR 3: showAddChild and showRemoveFamilyMember are
+    // V0-safe in the contract. The remaining raw read filters the linked-
+    // children list rows (`p.isOwner`) — a list predicate, not a navigation
+    // ownership decision for the current user.
     {
       file: 'apps/mobile/src/app/(app)/more/index.tsx',
       reason:
-        'V0-fallback: More root uses contract gates in V1 and raw owner/child filtering only in the legacy branch.',
-      expectedFindings: { 'profile-owner-read': 2 },
+        'list filter: p.isOwner filters which sibling profiles appear in the linked-children list. Navigation gating flows through contract.gates.showAddChild and .showRemoveFamilyMember.',
+      expectedFindings: { 'profile-owner-read': 1 },
     },
     // V0-fallback: own-learning is the retained legacy route/redirect until the 5-tab fallback is retired.
     {
@@ -91,13 +91,13 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
         'study-family-mode-compare': 2,
       },
     },
-    // V0-fallback: saved progress keeps the explicit proxy fallback while V1 canEnter is gated off.
+    // V0-fallback: saved progress reads contract.gates.showLearningActions in V1 and falls back to the raw proxy hook in V0.
     {
       file: 'apps/mobile/src/app/(app)/progress/saved.tsx',
       reason:
-        'V0-fallback: saved progress retains raw proxy hook only for legacy proxy access.',
+        'V0-fallback: saved progress gates the delete action through contract.gates.showLearningActions in V1 and reads raw proxy state only in the legacy branch.',
       expectedFindings: {
-        'proxy-state-read': 3,
+        'proxy-state-read': 1,
         'raw-hook-call': 1,
         'raw-hook-import': 1,
       },
@@ -299,7 +299,7 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
         'contract primitive: resolveNavigationContract is the allowed owner/proxy decision point.',
       expectedFindings: {
         'profile-owner-read': 4,
-        'proxy-state-read': 23,
+        'proxy-state-read': 24,
       },
     },
     // V0-fallback: navigation helper maps legacy mode to return paths when V1 is disabled.

@@ -25,7 +25,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 
@@ -688,15 +687,10 @@ function SubscriptionContent(): React.ReactElement | null {
   // Account-identity fact: drives analytics and the child-paywall routing
   // decision below. Navigation UI visibility (billing card, remove-member
   // button) consumes the contract gates; this raw owner read covers the
-  // non-UI surfaces the plan keeps explicit, and is also the V0 fallback
-  // for the contract gates when MODE_NAV_V1_ENABLED is off.
+  // non-UI surfaces the plan keeps explicit.
   const isOwnerProfile = activeProfile?.isOwner === true;
-  const canUseOwnerBillingGates = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showBilling
-    : isOwnerProfile;
-  const canRemoveFamilyMember = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showRemoveFamilyMember
-    : isOwnerProfile;
+  const canUseOwnerBillingGates = navigationContract.gates.showBilling;
+  const canRemoveFamilyMember = navigationContract.gates.showRemoveFamilyMember;
   const linkedChildCount =
     canUseOwnerBillingGates && activeProfile
       ? profiles.filter((profile) => profile.id !== activeProfile.id).length

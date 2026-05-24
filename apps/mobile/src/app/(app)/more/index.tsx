@@ -10,11 +10,9 @@ import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
-import { isAdultOwner } from '@eduagent/schemas';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useProfile } from '../../../lib/profile';
-import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   useFamilySubscription,
@@ -26,7 +24,6 @@ import {
 } from '../../../hooks/use-settings';
 import { platformAlert } from '../../../lib/platform-alert';
 import { signOutWithCleanup } from '../../../lib/sign-out';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   SectionHeader,
   SettingsRow,
@@ -37,11 +34,8 @@ export default function MoreScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const { activeProfile, profiles } = useProfile();
-  const role = useActiveProfileRole();
   const navigationContract = useNavigationContract();
-  const isImpersonating = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.isParentProxy
-    : role === 'impersonated-child';
+  const isImpersonating = navigationContract.isParentProxy;
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: subscription } = useSubscription();
@@ -107,17 +101,10 @@ export default function MoreScreen() {
   }, [subscription, familyData, router, t]);
 
   const linkedChildren =
-    (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-      ? navigationContract.gates.showRemoveFamilyMember
-      : activeProfile?.isOwner === true) && activeProfile
+    navigationContract.gates.showRemoveFamilyMember && activeProfile
       ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
       : [];
-  const showAddChild = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showAddChild
-    : isAdultOwner({
-        role,
-        birthYear: activeProfile?.birthYear,
-      });
+  const showAddChild = navigationContract.gates.showAddChild;
 
   if (isImpersonating) {
     return (

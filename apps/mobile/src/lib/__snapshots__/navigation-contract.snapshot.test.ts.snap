@@ -885,11 +885,11 @@ exports[`navigation-contract matrix snapshot row-v0-flags-off: V0 hard constrain
   "gates": {
     "progressScope": "self",
     "sessionIsOwner": true,
-    "showAccommodationChildEditor": false,
+    "showAccommodationChildEditor": true,
     "showAccountSecurity": true,
     "showAddChild": true,
     "showBilling": true,
-    "showCelebrationsChildEditor": false,
+    "showCelebrationsChildEditor": true,
     "showExportDelete": true,
     "showFamilyChildActivity": false,
     "showFamilyHome": true,
@@ -898,7 +898,7 @@ exports[`navigation-contract matrix snapshot row-v0-flags-off: V0 hard constrain
     "showLearningActions": true,
     "showMentorMemoryChildConsent": false,
     "showProgressProfilePicker": false,
-    "showRemoveFamilyMember": false,
+    "showRemoveFamilyMember": true,
   },
   "home": {
     "iconName": "School",

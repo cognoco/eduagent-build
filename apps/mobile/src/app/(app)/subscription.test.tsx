@@ -166,6 +166,25 @@ jest.mock(
   }),
 );
 
+// useNavigationContract — V1-on tests override the gates to drive the
+// `canUseOwnerBillingGates` / `canRemoveFamilyMember` branches in
+// subscription.tsx (lines 694-699, 1553, 1648). Default is permissive so
+// the existing V0 tests (MODE_NAV_V1_ENABLED=false) are unaffected — the
+// V0 short-circuit reads `isOwnerProfile` directly and never consults the
+// mock value.
+const mockNavigationContractGates = {
+  showBilling: true,
+  showRemoveFamilyMember: true,
+};
+jest.mock(
+  '../../hooks/use-navigation-contract', // gc1-allow: unit test boundary — hook depends on full app provider tree; stub pins gates for deterministic V1 path coverage
+  () => ({
+    useNavigationContract: () => ({
+      gates: mockNavigationContractGates,
+    }),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Default mock data shapes (real API shapes from @eduagent/schemas)
 // ---------------------------------------------------------------------------
@@ -389,6 +408,10 @@ describe('SubscriptionScreen', () => {
       displayName: 'Alex',
       isOwner: true,
     });
+    // Reset navigation contract gates to permissive default (V0 path ignores
+    // these; V1-on tests override per case).
+    mockNavigationContractGates.showBilling = true;
+    mockNavigationContractGates.showRemoveFamilyMember = true;
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 
@@ -2032,6 +2055,205 @@ describe('SubscriptionScreen', () => {
           undefined,
           undefined,
         );
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // V1 navigation contract gates (MODE_NAV_V1_ENABLED=true)
+  //
+  // The V0 path (default in tests) reads `isOwnerProfile` directly. Under V1
+  // the screen consults `navigationContract.gates.showBilling` and
+  // `.showRemoveFamilyMember` instead — so a non-owner of those surfaces can
+  // be hidden even when the profile carries isOwner=true (e.g. proxy mode).
+  // These tests drive the V1 branch and prove the gates control the UI
+  // independently of the raw owner fact. The flag patch follows the canonical
+  // pattern from LearnerScreen.test.tsx:518-551.
+  // -------------------------------------------------------------------------
+
+  describe('V1 navigation contract gates', () => {
+    function withV1Flag(fn: () => Promise<void> | void) {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V1_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }
+      ).MODE_NAV_V1_ENABLED = true;
+      const restore = () => {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }
+        ).MODE_NAV_V1_ENABLED = original;
+      };
+      try {
+        const result = fn();
+        if (result instanceof Promise) {
+          return result.finally(restore);
+        }
+        restore();
+        return result;
+      } catch (err) {
+        restore();
+        throw err;
+      }
+    }
+
+    function setupFamilyTier(opts?: {
+      byProfile?: Array<{
+        profile_id: string;
+        name: string;
+        used: number;
+        usedToday: number;
+        is_self: boolean;
+      }>;
+      members?: Array<{
+        profileId: string;
+        displayName: string;
+        isOwner: boolean;
+      }>;
+    }) {
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: {
+                ...DEFAULT_SUBSCRIPTION,
+                tier: 'family',
+                status: 'active',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockFetch.setRoute(
+        '/usage',
+        () =>
+          new Response(
+            JSON.stringify({
+              usage: {
+                ...DEFAULT_USAGE,
+                byProfile: opts?.byProfile,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockFetch.setRoute(
+        '/subscription/family',
+        () =>
+          new Response(
+            JSON.stringify({
+              family: {
+                tier: 'family',
+                monthlyLimit: 1500,
+                usedThisMonth: 0,
+                remainingQuestions: 1500,
+                profileCount: opts?.members?.length ?? 2,
+                maxProfiles: 4,
+                members: opts?.members ?? [
+                  {
+                    profileId: 'profile-1',
+                    displayName: 'Alex',
+                    isOwner: true,
+                  },
+                  { profileId: 'p2', displayName: 'Kid', isOwner: false },
+                ],
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+    }
+
+    it('renders "Your share" label on owner usage row when showBilling=true', async () => {
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showBilling = true;
+        setupFamilyTier({
+          byProfile: [
+            {
+              profile_id: 'profile-1',
+              name: 'Alex',
+              used: 42,
+              usedToday: 3,
+              is_self: true,
+            },
+            {
+              profile_id: 'p2',
+              name: 'Kid',
+              used: 17,
+              usedToday: 1,
+              is_self: false,
+            },
+          ],
+        });
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('usage-profile-profile-1');
+        });
+        screen.getByText('Your share');
+        expect(screen.queryByText('Your usage')).toBeNull();
+      });
+    });
+
+    it('renders "Your usage" label when showBilling=false even for isOwner=true profile', async () => {
+      // Break test: V1 gate must override the raw owner fact. With
+      // showBilling=false the owner-facing "Your share" copy must NOT render
+      // even though activeProfile.isOwner is true — proves the screen reads
+      // canUseOwnerBillingGates (V1) rather than isOwnerProfile (V0).
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showBilling = false;
+        setupFamilyTier({
+          byProfile: [
+            {
+              profile_id: 'profile-1',
+              name: 'Alex',
+              used: 42,
+              usedToday: 3,
+              is_self: true,
+            },
+          ],
+        });
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('usage-profile-profile-1');
+        });
+        screen.getByText('Your usage');
+        expect(screen.queryByText('Your share')).toBeNull();
+      });
+    });
+
+    it('renders remove-family-member button when showRemoveFamilyMember=true', async () => {
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showRemoveFamilyMember = true;
+        setupFamilyTier();
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('remove-family-member-p2');
+        });
+      });
+    });
+
+    it('hides remove-family-member button when showRemoveFamilyMember=false even for isOwner=true profile', async () => {
+      // Break test: V1 gate must override the raw owner fact. Membership row
+      // still renders, but the destructive remove action is gated — proves
+      // the screen reads canRemoveFamilyMember (V1) not isOwnerProfile (V0).
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showRemoveFamilyMember = false;
+        setupFamilyTier();
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('family-member-p2');
+        });
+        expect(screen.queryByTestId('remove-family-member-p2')).toBeNull();
       });
     });
   });

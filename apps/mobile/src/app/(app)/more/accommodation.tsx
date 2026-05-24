@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import type { AccommodationMode } from '@eduagent/schemas';
 
 import { useProfile } from '../../../lib/profile';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useChildLearnerProfile,
   useLearnerProfile,
@@ -45,9 +44,7 @@ export default function AccommodationScreen(): React.ReactElement {
     : undefined;
   const canEditChildPreferences =
     isChildMode &&
-    (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-      ? navigationContract.gates.showAccommodationChildEditor
-      : activeProfile?.isOwner === true) &&
+    navigationContract.gates.showAccommodationChildEditor &&
     childProfile?.isOwner === false;
   const childName = childProfile?.displayName;
 
