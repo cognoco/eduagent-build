@@ -1,10 +1,9 @@
-ALTER TABLE "dictation_results" ADD COLUMN "completion_key" uuid;--> statement-breakpoint
+ALTER TABLE "dictation_results" ADD COLUMN "completion_key" uuid DEFAULT gen_random_uuid();--> statement-breakpoint
 WITH legacy_completion_keys AS (
   SELECT
     "id",
     md5('dictation-result:' || "profile_id"::text || ':' || "date"::text || ':' || "mode"::text) AS legacy_hex
   FROM "dictation_results"
-  WHERE "completion_key" IS NULL
 )
 UPDATE "dictation_results" AS result
 SET "completion_key" = (

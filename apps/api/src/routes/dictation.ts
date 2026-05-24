@@ -25,7 +25,6 @@ import {
   recordDictationResult,
   getDictationStreak,
   fetchGenerateContext,
-  deriveLegacyDictationCompletionKey,
 } from '../services/dictation';
 import { getLearningProfile } from '../services/learner-profile';
 import { checkAndLogRateLimit } from '../services/settings';
@@ -158,13 +157,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       }
 
       const row = await recordDictationResult(db, profileId, {
-        completionKey:
-          input.completionKey ??
-          deriveLegacyDictationCompletionKey(
-            profileId,
-            input.localDate,
-            input.mode,
-          ),
+        completionKey: input.completionKey,
         localDate: input.localDate,
         sentenceCount: input.sentenceCount,
         mistakeCount: input.mistakeCount ?? null,

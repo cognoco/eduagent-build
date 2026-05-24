@@ -79,7 +79,6 @@ import {
   recordDictationResult,
   getDictationStreak,
   fetchGenerateContext,
-  deriveLegacyDictationCompletionKey,
 } from '../services/dictation';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
@@ -402,7 +401,7 @@ describe('POST /v1/dictation/result', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
-  it('[WI-84 review] derives a stable completionKey when legacy clients omit it', async () => {
+  it('[WI-84 review] leaves legacy completionKey fallback to the dictation service', async () => {
     (recordDictationResult as jest.Mock).mockResolvedValueOnce({
       id: 'a0000000-0000-4000-a000-000000000001',
       profileId: 'a0000000-0000-4000-a000-000000000002',
@@ -434,11 +433,7 @@ describe('POST /v1/dictation/result', () => {
       expect.anything(),
       'test-profile-id',
       expect.objectContaining({
-        completionKey: deriveLegacyDictationCompletionKey(
-          'test-profile-id',
-          TODAY,
-          'homework',
-        ),
+        completionKey: undefined,
         localDate: TODAY,
         mode: 'homework',
       }),

@@ -10,7 +10,11 @@ import {
 import { SubjectNotFoundError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
-import { recordDictationResult, getDictationStreak } from './result';
+import {
+  deriveLegacyDictationCompletionKey,
+  recordDictationResult,
+  getDictationStreak,
+} from './result';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -260,6 +264,33 @@ describe('recordDictationResult (integration)', () => {
     expect(second.id).not.toBe(first.id);
     expect(retry.id).toBe(first.id);
     expect(rows.find((row) => row.id === first.id)?.sentenceCount).toBe(7);
+  });
+
+  it('[WI-84 review] derives the legacy completion key when old clients omit it', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    const first = await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 5,
+      mistakeCount: 2,
+      mode: 'homework',
+      reviewed: false,
+    });
+
+    const retry = await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 7,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: true,
+    });
+
+    expect(retry.id).toBe(first.id);
+    expect(retry.completionKey).toBe(
+      deriveLegacyDictationCompletionKey(profileId, today, 'homework'),
+    );
+    expect(retry.sentenceCount).toBe(7);
   });
 
   // [SECURITY-IDOR] CCR PR #241 break test. Without ownership validation, an

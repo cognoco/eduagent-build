@@ -22,6 +22,10 @@ describe('dictation completion key migration', () => {
     expect(migration).toContain('profile_id');
     expect(migration).toContain('date');
     expect(migration).toContain('mode');
+    expect(migration).toContain(
+      'add column "completion_key" uuid default gen_random_uuid()',
+    );
+    expect(migration).not.toContain('drop default');
     expect(migration).not.toContain('set "completion_key" = "id"');
   });
 

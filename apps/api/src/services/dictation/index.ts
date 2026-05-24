@@ -4,7 +4,6 @@ export type { GenerateContext } from './generate';
 export { reviewDictation } from './review';
 export type { DictationReviewResult } from './review';
 export {
-  deriveLegacyDictationCompletionKey,
   recordDictationResult,
   getDictationStreak,
   fetchGenerateContext,
