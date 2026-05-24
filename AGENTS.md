@@ -114,7 +114,7 @@ These deviations exist so reviewers do not try to fix them in unrelated PRs.
 
 Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (`lint-staged`, `tsc --build`, `scripts/pre-commit-tests.sh`). Verify locally while iterating, and focus on what hooks do not cover:
 
-- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. The pre-commit hook intentionally skips `.integration.test.` files.
+- Run integration tests before any commit that touches `apps/api/` or `tests/integration/`: `pnpm exec nx test:integration api`. The pre-commit and pre-push hooks both intentionally skip `.integration.test.` files, so unit tests don't catch DB/auth-scoping/Inngest-flow regressions.
 - Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshots are still failing.
 - No suppression, no shortcuts. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the code or improve the lint rule.
 
