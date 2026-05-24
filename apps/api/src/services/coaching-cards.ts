@@ -24,6 +24,7 @@ import {
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
 import { captureException } from './sentry';
+import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 
 // ---------------------------------------------------------------------------
 // silentDegrade — structured escalation for optional priority branches
@@ -165,6 +166,21 @@ export async function precomputeCoachingCard(
   // Fetch retention cards (scoped to profile)
   const repo = createScopedRepository(db, profileId);
   const allCards = await repo.retentionCards.findMany();
+  let ownedTopics: Awaited<ReturnType<typeof findOwnedCurriculumTopics>> = [];
+  try {
+    ownedTopics = await findOwnedCurriculumTopics(db, {
+      profileId,
+      topicIds: [...new Set(allCards.map((card) => card.topicId))],
+    });
+  } catch (err) {
+    silentDegrade(err, 'retention_card_topic_ownership', { profileId });
+  }
+  const ownedTopicById = new Map(
+    ownedTopics.map((topic) => [topic.topicId, topic]),
+  );
+  const ownedCards = allCards.filter((card) =>
+    ownedTopicById.has(card.topicId),
+  );
 
   // [BUG-912] Fetch streak through findCurrentForToday so the row is already
   // decayed-for-today before it reaches a display path. The returned object
@@ -192,7 +208,7 @@ export async function precomputeCoachingCard(
   }
 
   // --- Priority 1: review_due ---
-  const overdueCards = allCards.filter(
+  const overdueCards = ownedCards.filter(
     (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime(),
   );
 
@@ -216,21 +232,9 @@ export async function precomputeCoachingCard(
     let topicTitle: string | null = null;
     let bookTitle: string | null = null;
     try {
-      const rows = await db
-        .select({
-          topicTitle: curriculumTopics.title,
-          bookTitle: curriculumBooks.title,
-        })
-        .from(curriculumTopics)
-        .leftJoin(
-          curriculumBooks,
-          eq(curriculumBooks.id, curriculumTopics.bookId),
-        )
-        .where(eq(curriculumTopics.id, mostOverdue.topicId))
-        .limit(1);
-      const row = rows[0];
-      topicTitle = row?.topicTitle ?? null;
-      bookTitle = row?.bookTitle ?? null;
+      const topic = ownedTopicById.get(mostOverdue.topicId);
+      topicTitle = topic?.topicTitle ?? null;
+      bookTitle = topic?.bookTitle ?? null;
     } catch (err) {
       silentDegrade(err, 'review_due_book_enrichment', {
         profileId,
@@ -316,8 +320,8 @@ export async function precomputeCoachingCard(
   // If there are multiple retention cards and ALL of them are verified,
   // the learner has completed their curriculum. Require >= 3 to distinguish from
   // "just started and verified one topic" vs "completed entire curriculum."
-  if (allCards.length >= 3) {
-    const allComplete = allCards.every((c) => c.xpStatus === 'verified');
+  if (ownedCards.length >= 3) {
+    const allComplete = ownedCards.every((c) => c.xpStatus === 'verified');
     if (allComplete) {
       return {
         id,
@@ -361,7 +365,7 @@ export async function precomputeCoachingCard(
   }
 
   // --- Priority 4: insight (verified topics) ---
-  const verifiedCards = allCards.filter((c) => c.xpStatus === 'verified');
+  const verifiedCards = ownedCards.filter((c) => c.xpStatus === 'verified');
   if (verifiedCards.length > 0) {
     const firstVerified = verifiedCards[0];
     if (!firstVerified)
@@ -384,7 +388,7 @@ export async function precomputeCoachingCard(
   // [BUG-55] When no retention cards exist, find a topic from the curriculum
   // instead of using profileId as topicId (which is semantically wrong).
   const fallbackTopicId: string | null =
-    allCards.length > 0 ? (allCards[0]?.topicId ?? null) : null;
+    ownedCards.length > 0 ? (ownedCards[0]?.topicId ?? null) : null;
   // No retention cards = new learner, return curriculum_complete start prompt
   if (!fallbackTopicId) {
     return {
@@ -786,8 +790,21 @@ async function findHomeworkConnectionCard(
 
   if (allTopics.length === 0) return null;
 
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: allTopics.map((topic) => topic.id),
+  });
+  const ownedTopicById = new Map(
+    ownedTopics.map((topic) => [topic.topicId, topic]),
+  );
+  const candidateTopics = allTopics.filter((topic) =>
+    ownedTopicById.has(topic.id),
+  );
+
+  if (candidateTopics.length === 0) return null;
+
   // Find topics that already have sessions (covered — real activity only)
-  const topicIds = allTopics.map((t) => t.id);
+  const topicIds = candidateTopics.map((t) => t.id);
   const sessionsForTopics = await db
     .select({ topicId: learningSessions.topicId })
     .from(learningSessions)
@@ -807,7 +824,9 @@ async function findHomeworkConnectionCard(
   // round-trip (previously: 1 findFirst per matched topic, up to ~30 per call).
   const uniqueBookIds = [
     ...new Set(
-      allTopics.map((t) => t.bookId).filter((id): id is string => id != null),
+      candidateTopics
+        .map((topic) => ownedTopicById.get(topic.id)?.bookId)
+        .filter((id): id is string => id != null),
     ),
   ];
   const booksById = new Map<
@@ -829,11 +848,14 @@ async function findHomeworkConnectionCard(
 
   // Match skills against uncovered topic titles/descriptions
   const allSkills = [...skillsBySubject.values()].flat();
-  for (const topic of allTopics) {
+  for (const topic of candidateTopics) {
     if (coveredTopicIds.has(topic.id)) continue;
 
-    const titleLower = topic.title.toLowerCase();
-    const descLower = (topic.description ?? '').toLowerCase();
+    const ownedTopic = ownedTopicById.get(topic.id);
+    if (!ownedTopic) continue;
+
+    const titleLower = ownedTopic.topicTitle.toLowerCase();
+    const descLower = (ownedTopic.topicDescription ?? '').toLowerCase();
 
     for (const skill of allSkills) {
       const skillLower = skill.toLowerCase();
@@ -843,21 +865,22 @@ async function findHomeworkConnectionCard(
         let bookEmoji: string | null = null;
         let matchSubjectId: string | null = null;
 
-        if (topic.bookId) {
-          const book = booksById.get(topic.bookId);
+        if (ownedTopic.bookId) {
+          bookTitle = ownedTopic.bookTitle;
+          matchSubjectId = ownedTopic.subjectId;
+          const book = booksById.get(ownedTopic.bookId);
           if (book) {
-            bookTitle = book.title;
             bookEmoji = book.emoji;
-            matchSubjectId = book.subjectId;
           }
         }
 
         // Resolve subject for boost check
         if (!matchSubjectId) {
           const curriculum = allCurricula.find(
-            (c) => c.id === topic.curriculumId,
+            (c) => c.id === ownedTopic.curriculumId,
           );
-          matchSubjectId = curriculum?.subjectId ?? null;
+          matchSubjectId =
+            ownedTopic.subjectId ?? curriculum?.subjectId ?? null;
         }
 
         const basePriority = 5;

@@ -7,7 +7,6 @@ import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
-  curriculumTopics,
   retentionCards,
   vocabulary,
   subjects,
@@ -104,6 +103,10 @@ import {
   recordPracticeActivityEvent,
   type RecordPracticeActivityEventInput,
 } from '../practice-activity-events';
+import {
+  findOwnedCurriculumTopic,
+  findOwnedCurriculumTopics,
+} from '../curriculum-topic-ownership';
 
 /**
  * [BUG-92 / CR-2026-05-19-C4] Decide whether the interview / onboarding loop
@@ -883,10 +886,16 @@ export async function prepareExchangeContext(
     isFreeform,
     staticContext,
   );
+  const ownedSessionTopic = session.topicId
+    ? await findOwnedCurriculumTopic(db, {
+        profileId,
+        topicId: session.topicId,
+        subjectId: session.subjectId,
+      })
+    : null;
 
   const [
     subject,
-    topicRows,
     profileRows,
     retentionRows,
     priorTopicSessionRows,
@@ -898,34 +907,27 @@ export async function prepareExchangeContext(
     supp,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
-    session.topicId
-      ? db
-          .select()
-          .from(curriculumTopics)
-          .where(eq(curriculumTopics.id, session.topicId))
-          .limit(1)
-      : Promise.resolve([]),
     Promise.resolve(staticContext.profile ? [staticContext.profile] : []),
-    session.topicId
+    ownedSessionTopic
       ? db
           .select()
           .from(retentionCards)
           .where(
             and(
-              eq(retentionCards.topicId, session.topicId),
+              eq(retentionCards.topicId, ownedSessionTopic.topicId),
               eq(retentionCards.profileId, profileId),
             ),
           )
           .limit(1)
       : Promise.resolve([]),
-    session.topicId
+    ownedSessionTopic
       ? db
           .select({ id: learningSessions.id })
           .from(learningSessions)
           .where(
             and(
               eq(learningSessions.profileId, profileId),
-              eq(learningSessions.topicId, session.topicId),
+              eq(learningSessions.topicId, ownedSessionTopic.topicId),
               ne(learningSessions.id, sessionId),
               gte(learningSessions.exchangeCount, 1),
             ),
@@ -1037,10 +1039,9 @@ export async function prepareExchangeContext(
   const crossSubjectHighlights = supp.crossSubjectHighlights;
   const learningProfile = supp.learningProfile;
 
-  const topic = topicRows[0];
+  const topic = ownedSessionTopic;
   const [profile] = profileRows;
-  const isFirstEncounter =
-    Boolean(session.topicId) && priorTopicSessionRows.length === 0;
+  const isFirstEncounter = Boolean(topic) && priorTopicSessionRows.length === 0;
   if (!profile) {
     // Auth middleware loads the profile before reaching this point, so a missing
     // row here means a referential-integrity break (deleted profile mid-request,
@@ -1091,24 +1092,31 @@ export async function prepareExchangeContext(
     };
     const topicIds = meta.interleavedTopics?.map((t) => t.topicId) ?? [];
     if (topicIds.length > 0) {
-      const topicDetails = await db
-        .select({
-          id: curriculumTopics.id,
-          title: curriculumTopics.title,
-          description: curriculumTopics.description,
-        })
-        .from(curriculumTopics)
-        .where(inArray(curriculumTopics.id, topicIds));
-      const detailMap = new Map(topicDetails.map((t) => [t.id, t]));
-      interleavedTopics = topicIds.map((id) => {
-        const detail = detailMap.get(id);
-        const metaTopic = meta.interleavedTopics?.find((t) => t.topicId === id);
-        return {
-          topicId: id,
-          title: detail?.title ?? metaTopic?.topicTitle ?? 'Unknown',
-          description: detail?.description ?? undefined,
-        };
+      const ownedTopics = await findOwnedCurriculumTopics(db, {
+        profileId,
+        topicIds,
       });
+      const ownedById = new Map(
+        ownedTopics.map((owned) => [owned.topicId, owned]),
+      );
+      const resolvedTopics: NonNullable<ExchangeContext['interleavedTopics']> =
+        [];
+      for (const id of topicIds) {
+        const owned = ownedById.get(id);
+        const metaTopic = meta.interleavedTopics?.find((t) => t.topicId === id);
+        if (
+          !owned ||
+          (metaTopic?.subjectId && metaTopic.subjectId !== owned.subjectId)
+        ) {
+          continue;
+        }
+        resolvedTopics.push({
+          topicId: owned.topicId,
+          title: owned.topicTitle,
+          description: owned.topicDescription ?? undefined,
+        });
+      }
+      interleavedTopics = resolvedTopics;
     }
   }
 
@@ -1342,13 +1350,13 @@ export async function prepareExchangeContext(
   const crossSubjectContext =
     buildCrossSubjectContext(crossSubjectHighlights) || undefined;
   const learningHistoryParts = [
-    topic?.bookId && topic?.id
+    topic?.bookId && topic?.topicId
       ? await getCachedBookLearningHistoryContext(
           db,
           profileId,
           sessionId,
           session,
-          topic.id,
+          topic.topicId,
           topic.bookId,
         )
       : undefined,
@@ -1445,11 +1453,11 @@ export async function prepareExchangeContext(
       );
     const strongTopicIds = strongCards.map((row) => row.topicId);
     if (strongTopicIds.length > 0) {
-      const strongTopicRows = await db
-        .select({ title: curriculumTopics.title })
-        .from(curriculumTopics)
-        .where(inArray(curriculumTopics.id, strongTopicIds));
-      strongTopicTitles = strongTopicRows.map((row) => row.title);
+      const strongTopicRows = await findOwnedCurriculumTopics(db, {
+        profileId,
+        topicIds: strongTopicIds,
+      });
+      strongTopicTitles = strongTopicRows.map((row) => row.topicTitle);
     }
   }
 
@@ -1558,7 +1566,7 @@ export async function prepareExchangeContext(
         isFreeform
           ? (silentClassification?.subjectName ?? null)
           : (subject?.name ?? null),
-        topic?.title ?? null,
+        topic?.topicTitle ?? null,
         {
           status: retentionStatusValue,
           strongTopics: strongTopicTitles,
@@ -1596,8 +1604,10 @@ export async function prepareExchangeContext(
     sessionId,
     profileId,
     subjectName: effectiveSubjectName,
-    topicTitle: interleavedTopics ? undefined : topic?.title,
-    topicDescription: interleavedTopics ? undefined : topic?.description,
+    topicTitle: interleavedTopics ? undefined : topic?.topicTitle,
+    topicDescription: interleavedTopics
+      ? undefined
+      : (topic?.topicDescription ?? undefined),
     sessionType: session.sessionType,
     escalationRung: effectiveRung,
     exchangeHistory,

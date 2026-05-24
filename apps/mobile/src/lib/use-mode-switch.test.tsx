@@ -55,6 +55,16 @@ const familyAdult = createTestProfile({
   createdAt: '2026-01-01T00:00:00.000Z',
 });
 
+const studyDefaultFamilyAdult = createTestProfile({
+  id: 'study-default-family-adult',
+  displayName: 'Family Adult',
+  isOwner: true,
+  birthYear: 1985,
+  defaultAppContext: 'study',
+  hasFamilyLinks: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+});
+
 const child = createTestProfile({
   id: 'child',
   displayName: 'Child',
@@ -322,6 +332,53 @@ describe('useModeSwitch', () => {
       callbacks.onSuccess({
         ...familyAdult,
         defaultAppContext: 'study',
+      });
+    });
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('replaces to the canonical root after switching from study to family in V1', () => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      true;
+
+    const { result } = renderHook(
+      () => ({
+        appContext: useAppContext(),
+        modeSwitch: useModeSwitch(),
+      }),
+      { wrapper: makeWrapper({ activeProfile: studyDefaultFamilyAdult }) },
+    );
+
+    expect(result.current.appContext.mode).toBe('study');
+
+    act(() => {
+      result.current.modeSwitch.switchMode('family');
+    });
+
+    expect(result.current.appContext.mode).toBe('family');
+    expect(mockUpdateAppContextMutate).toHaveBeenCalledWith(
+      {
+        profileId: studyDefaultFamilyAdult.id,
+        defaultAppContext: 'family',
+      },
+      expect.any(Object),
+    );
+
+    const [, callbacks] = mockUpdateAppContextMutate.mock.calls[0] as [
+      unknown,
+      { onSuccess: (profile: Profile) => void },
+    ];
+    act(() => {
+      callbacks.onSuccess({
+        ...studyDefaultFamilyAdult,
+        defaultAppContext: 'family',
       });
     });
 

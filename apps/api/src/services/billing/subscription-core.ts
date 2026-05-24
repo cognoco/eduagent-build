@@ -177,6 +177,15 @@ export async function updateSubscriptionFromWebhook(
       ) {
         return { ...mapSubscriptionRow(existing), webhookApplied: false };
       }
+      if (
+        !Number.isNaN(existingTs) &&
+        !Number.isNaN(incomingTs) &&
+        incomingTs === existingTs &&
+        existing.status === 'active' &&
+        updates.status === 'past_due'
+      ) {
+        return { ...mapSubscriptionRow(existing), webhookApplied: false };
+      }
     }
     const setValues: Record<string, unknown> = {
       lastStripeEventTimestamp: new Date(updates.lastStripeEventTimestamp),

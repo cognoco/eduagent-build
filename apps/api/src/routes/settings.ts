@@ -26,6 +26,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
@@ -82,6 +83,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/notifications',
     zValidator('json', notificationPrefsSchema),
     async (c) => {
+      // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -117,6 +120,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/celebration-level',
     zValidator('json', celebrationLevelUpdateSchema),
     async (c) => {
+      // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -163,6 +168,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/withdrawal-archive',
     zValidator('json', withdrawalArchivePreferenceUpdateSchema),
     async (c) => {
+      // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -215,6 +222,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/family-pool-breakdown-sharing',
     zValidator('json', familyPoolBreakdownSharingUpdateSchema),
     async (c) => {
+      // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -245,6 +254,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/push-token',
     zValidator('json', pushTokenRegisterSchema),
     async (c) => {
+      // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -259,6 +270,12 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
 
   // Notify parent to subscribe (child-friendly paywall)
   .post('/settings/notify-parent-subscribe', async (c) => {
+    // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+    // Intentional: this endpoint is called from the CHILD profile when the
+    // child hits a paywall; a parent-proxy session reaching it means the
+    // parent is impersonating the child rather than the child themselves
+    // asking — block.
+    assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     // API_ORIGIN must be set — falling back to c.req.url would allow Host header
@@ -299,6 +316,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('param', subjectParamSchema),
     zValidator('json', analogyDomainUpdateSchema),
     async (c) => {
+      // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');
@@ -336,6 +355,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('param', subjectParamSchema),
     zValidator('json', nativeLanguageUpdateSchema),
     async (c) => {
+      // [WI-173 / DS-084] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');

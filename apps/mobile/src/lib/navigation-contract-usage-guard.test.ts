@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import * as ts from 'typescript';
 
 type RawNavigationGateKind =
+  | 'contract-diagnostic-read'
   | 'profile-owner-read'
   | 'proxy-state-read'
   | 'raw-hook-call'
@@ -17,8 +18,19 @@ type RawNavigationGateFinding = {
 
 type FindingCounts = Partial<Record<RawNavigationGateKind, number>>;
 
+// Three buckets, three meanings.
+//
+// `boundary`            Forever-allowed: file owns raw owner/proxy/mode reads
+//                       on behalf of the rest of the app, OR owns mode-write.
+// `v0-fallback`         Temporary: file dies when MODE_NAV_V0_ENABLED retires.
+// `non-nav-domain-read` `isOwner` (or mode) is read to classify a domain
+//                       entity (account, family-member row, child target),
+//                       not to gate the active user's navigation.
+type BoundaryCategory = 'boundary' | 'v0-fallback' | 'non-nav-domain-read';
+
 type LegitimateRawNavigationGateFile = {
   file: string;
+  category: BoundaryCategory;
   reason: string;
   expectedFindings: FindingCounts;
 };
@@ -27,329 +39,301 @@ const RAW_NAVIGATION_HOOKS = new Set(['useAppContext', 'useParentProxy']);
 const NAVIGATION_CONTRACT_HOOKS = new Set([
   'useNavigationContract',
   'useNavigationDataScopeContract',
+  'useNavigationHomeContract',
+  'useNavigationShellContract',
 ]);
 
-// Terminal navigation contract ratchet.
+// =====================================================================
+// Boundary allowlist (Phase 6 terminal shape)
+// =====================================================================
+// These files OWN the raw owner/proxy/mode reads on behalf of the rest of
+// the app, or own the Study/Family mode write boundary. They are the only
+// sites where the navigation contract's raw inputs may be touched.
 //
-// Raw owner/proxy/study-family checks are easy to copy into new screens and
-// silently bypass the centralized family/proxy navigation contract. This list
-// is not a migration backlog: each entry is a justified, fixed exception for
-// V0 fallback plumbing or a primitive that feeds the contract itself. If a
-// finding count changes, either remove the exception or update it with a fresh
-// rationale.
+// This set is pinned by the `boundary allowlist matches canonical Phase 6
+// boundary` test against CANONICAL_BOUNDARY_FILES below. Adding to or
+// removing from it requires updating CANONICAL_BOUNDARY_FILES and the
+// source spec.
+const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
+  {
+    file: 'apps/mobile/src/hooks/use-navigation-contract.ts',
+    category: 'boundary',
+    reason:
+      'boundary: useNavigationContract is the only hook adapter feeding raw app/proxy context into resolveNavigationContract.',
+    expectedFindings: {
+      'proxy-state-read': 7,
+      'raw-hook-call': 2,
+      'raw-hook-import': 2,
+    },
+  },
+  {
+    file: 'apps/mobile/src/lib/navigation-contract.ts',
+    category: 'boundary',
+    reason:
+      'boundary: resolveNavigationContract is the sole owner of raw owner/proxy decisions.',
+    expectedFindings: {
+      'profile-owner-read': 4,
+      'proxy-state-read': 24,
+    },
+  },
+  {
+    file: 'apps/mobile/src/lib/legacy-navigation-contract.ts',
+    category: 'boundary',
+    reason:
+      'boundary: legacy navigation compatibility layer owns MODE_NAV_V0 Study/Family tab branching.',
+    expectedFindings: {
+      'profile-owner-read': 2,
+      'study-family-mode-compare': 3,
+    },
+  },
+  {
+    file: 'apps/mobile/src/lib/app-context.tsx',
+    category: 'boundary',
+    reason:
+      'boundary: app-context owns V0 mode state and the MODE_NAV_V0/MODE_NAV_V1 short-circuits.',
+    expectedFindings: { 'profile-owner-read': 2 },
+  },
+  {
+    file: 'apps/mobile/src/lib/profile.ts',
+    category: 'boundary',
+    reason:
+      'boundary: profile provider owns raw owner/child profile selection and isExplicitProxyMode.',
+    expectedFindings: { 'profile-owner-read': 8 },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-parent-proxy.ts',
+    category: 'boundary',
+    reason:
+      'boundary: parent-proxy helper owns raw proxy-state derivation before the contract consumes it.',
+    expectedFindings: {
+      'profile-owner-read': 1,
+      'proxy-state-read': 2,
+    },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-active-profile-role.ts',
+    category: 'boundary',
+    reason:
+      'boundary: active-profile role resolver is an input to resolveNavigationContract.',
+    expectedFindings: {
+      'profile-owner-read': 1,
+      'proxy-state-read': 1,
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/lib/use-mode-switch.ts',
+    category: 'boundary',
+    reason:
+      'boundary: useModeSwitch is the write boundary for Study/Family context changes; useEnsureStudyMode and useEnterFamilyMode are lightweight setMode wrappers consumed by bridge navigations and the family-route opt-in CTA. The `mode !== "family"` short-circuit inside useEnsureStudyMode is the canonical bridge read that lets every consumer drop their own mode comparison.',
+    expectedFindings: {
+      'raw-hook-call': 3,
+      'raw-hook-import': 1,
+      'study-family-mode-compare': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-push-token-registration.ts',
+    category: 'boundary',
+    reason:
+      'boundary: push-token registration reads raw proxy state to avoid registering proxied child sessions on the parent device. Auxiliary to the canonical 8 — the test harness for this hook does not wire AppContext/QueryClient, so reading via useNavigationContract is not currently viable.',
+    expectedFindings: {
+      'proxy-state-read': 2,
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+];
+
+// Canonical Phase 6 boundary set. This array exists so the boundary
+// allowlist cannot drift silently — any change must update both. See
+// docs/specs/2026-05-21-navigation-contract.md.
+//
+// First 8 entries match the plan's "Expected final boundary files" list
+// verbatim. The 9th entry (use-push-token-registration) is an audited
+// auxiliary boundary — see its `reason` in BOUNDARY_FILES.
+const CANONICAL_BOUNDARY_FILES: readonly string[] = [
+  'apps/mobile/src/hooks/use-active-profile-role.ts',
+  'apps/mobile/src/hooks/use-navigation-contract.ts',
+  'apps/mobile/src/hooks/use-parent-proxy.ts',
+  'apps/mobile/src/hooks/use-push-token-registration.ts',
+  'apps/mobile/src/lib/app-context.tsx',
+  'apps/mobile/src/lib/legacy-navigation-contract.ts',
+  'apps/mobile/src/lib/navigation-contract.ts',
+  'apps/mobile/src/lib/profile.ts',
+  'apps/mobile/src/lib/use-mode-switch.ts',
+];
+
+// =====================================================================
+// V0-fallback exceptions
+// =====================================================================
+// Each entry implements an explicit V0 fallback branch (mostly query-scope
+// fallbacks and the legacy own-learning route). All entries die together
+// when MODE_NAV_V0_ENABLED is retired.
+const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
+  {
+    file: 'apps/mobile/src/app/(app)/own-learning.tsx',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: retained own-learning route reads legacy mode/proxy state for redirects until the 5-tab fallback is retired.',
+    expectedFindings: {
+      'raw-hook-call': 2,
+      'raw-hook-import': 2,
+      'study-family-mode-compare': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/app/(app)/progress/index.tsx',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: progress screen uses contract queryScope in V1 and legacy mode scope only when V1 is off.',
+    expectedFindings: {
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+      'study-family-mode-compare': 2,
+    },
+  },
+  {
+    file: 'apps/mobile/src/app/profiles.tsx',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: profile switcher resets legacy app context and still needs owner/child profile filtering until V0 is retired.',
+    expectedFindings: {
+      'profile-owner-read': 4,
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-dashboard.ts',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: dashboard data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
+    expectedFindings: {
+      'profile-owner-read': 1,
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-notification-response-handler.ts',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: notification tap handling uses contract queryScope in V1 and legacy app context in V0.',
+    expectedFindings: {
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-progress.ts',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: progress data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
+    expectedFindings: {
+      'profile-owner-read': 1,
+      'raw-hook-call': 2,
+      'raw-hook-import': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-sessions.ts',
+    category: 'v0-fallback',
+    reason:
+      'V0-fallback: session data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
+    expectedFindings: {
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+];
+
+// =====================================================================
+// Non-navigation domain reads
+// =====================================================================
+// These files contain `isOwner` reads, but the reads classify a domain
+// entity (account ownership, family-member row, child-target edit) — NOT
+// the active user's navigation ownership. They are NOT navigation gates
+// and must NOT be migrated to the contract.
+const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
+  {
+    file: 'apps/mobile/src/app/(app)/more/accommodation.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'child-target read: childProfile?.isOwner classifies the edit target, not navigation ownership. Active-user gating flows through contract.gates.showAccommodationChildEditor.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
+    file: 'apps/mobile/src/app/session-summary/[sessionId].tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'child-target read: useParentProxy() is consumed only for childProfile.consentStatus + childProfile.id, which describe the mentor-memory navigation target. Active-user proxy gating routes through contract.gates.showLearningActions.',
+    expectedFindings: {
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+  {
+    file: 'apps/mobile/src/app/(app)/more/celebrations.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'child-target read: childProfile?.isOwner classifies the edit target, not navigation ownership. Active-user gating flows through contract.gates.showCelebrationsChildEditor.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
+    file: 'apps/mobile/src/app/(app)/more/index.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'list filter: p.isOwner filters which sibling profiles appear in the linked-children list. Navigation gating flows through contract.gates.showAddChild and .showRemoveFamilyMember.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
+    file: 'apps/mobile/src/app/(app)/subscription.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'family-member labels: subscription gates UI visibility through the contract, keeps one consolidated owner read for analytics/paywall/V0 fallback, and reads member.isOwner on family-pool rows.',
+    expectedFindings: { 'profile-owner-read': 3 },
+  },
+  {
+    file: 'apps/mobile/src/app/create-profile.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'account ownership: create-profile validates parent-owned profile creation outside the tab contract.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
+    file: 'apps/mobile/src/app/delete-account.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'account ownership: delete-account validates owner-only account deletion outside the tab contract.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-consent.ts',
+    category: 'non-nav-domain-read',
+    reason:
+      'account ownership: consent status query is enabled only for parent-owned profiles.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-learner-profile.ts',
+    category: 'non-nav-domain-read',
+    reason:
+      'account ownership: learner-profile child editor query is enabled only for parent-owned profiles.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
+    file: 'apps/mobile/src/hooks/use-settings.ts',
+    category: 'non-nav-domain-read',
+    reason:
+      'account ownership: parent-owned settings queries remain outside the tab navigation contract.',
+    expectedFindings: { 'profile-owner-read': 3 },
+  },
+];
+
 const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] =
-  [
-    // V0-fallback: owns legacy tab computation and raw app/proxy context while V0 flags remain supported.
-    {
-      file: 'apps/mobile/src/app/(app)/_layout.tsx',
-      reason:
-        'V0-fallback: legacy tab shell keeps raw mode/proxy reads for MODE_NAV_V1 off.',
-      expectedFindings: {
-        'proxy-state-read': 11,
-        'raw-hook-call': 2,
-        'raw-hook-import': 2,
-        'study-family-mode-compare': 3,
-      },
-    },
-    // V0-fallback: home still passes legacy mode and owner audience when V1 is off.
-    {
-      file: 'apps/mobile/src/app/(app)/home.tsx',
-      reason:
-        'V0-fallback: celebration audience and LearnerScreen legacy mode prop remain for MODE_NAV_V1 off.',
-      expectedFindings: {
-        'profile-owner-read': 1,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // V0-fallback: More child-editor screen keeps owner/child discrimination only for legacy mode.
-    {
-      file: 'apps/mobile/src/app/(app)/more/accommodation.tsx',
-      reason:
-        'V0-fallback: child accommodation editor uses contract gates in V1 and raw owner checks only in the legacy branch.',
-      expectedFindings: { 'profile-owner-read': 2 },
-    },
-    // V0-fallback: Account sub-screen owner controls are contract-gated in V1.
-    {
-      file: 'apps/mobile/src/app/(app)/more/account.tsx',
-      reason:
-        'V0-fallback: account owner controls use contract gates in V1 and raw owner checks only in the legacy branch.',
-      expectedFindings: { 'profile-owner-read': 1 },
-    },
-    // V0-fallback: More child-editor screen keeps owner/child discrimination only for legacy mode.
-    {
-      file: 'apps/mobile/src/app/(app)/more/celebrations.tsx',
-      reason:
-        'V0-fallback: child celebrations editor uses contract gates in V1 and raw owner checks only in the legacy branch.',
-      expectedFindings: { 'profile-owner-read': 2 },
-    },
-    // V0-fallback: More root keeps legacy linked-child row filtering until V0 is retired.
-    {
-      file: 'apps/mobile/src/app/(app)/more/index.tsx',
-      reason:
-        'V0-fallback: More root uses contract gates in V1 and raw owner/child filtering only in the legacy branch.',
-      expectedFindings: { 'profile-owner-read': 2 },
-    },
-    // V0-fallback: own-learning is the retained legacy route/redirect until the 5-tab fallback is retired.
-    {
-      file: 'apps/mobile/src/app/(app)/own-learning.tsx',
-      reason:
-        'V0-fallback: retained own-learning route reads legacy mode/proxy state for redirects.',
-      expectedFindings: {
-        'raw-hook-call': 2,
-        'raw-hook-import': 2,
-        'study-family-mode-compare': 1,
-      },
-    },
-    // V0-fallback: progress screen keeps legacy study/family scope for MODE_NAV_V1 off.
-    {
-      file: 'apps/mobile/src/app/(app)/progress/index.tsx',
-      reason:
-        'V0-fallback: progress screen uses contract scope in V1 and legacy mode scope only when V1 is off.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-        'study-family-mode-compare': 2,
-      },
-    },
-    // V0-fallback: saved progress keeps the explicit proxy fallback while V1 canEnter is gated off.
-    {
-      file: 'apps/mobile/src/app/(app)/progress/saved.tsx',
-      reason:
-        'V0-fallback: saved progress retains raw proxy hook only for legacy proxy access.',
-      expectedFindings: {
-        'proxy-state-read': 3,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // V0-fallback: subscription uses contract billing/family gates in V1 and raw owner reads in legacy paths.
-    {
-      file: 'apps/mobile/src/app/(app)/subscription.tsx',
-      reason:
-        'V0-fallback: subscription billing/member controls are contract-gated in V1 and owner-read legacy paths remain.',
-      expectedFindings: { 'profile-owner-read': 8 },
-    },
-    // Account/profile ownership: profile creation still validates owner status outside app-tab navigation.
-    {
-      file: 'apps/mobile/src/app/create-profile.tsx',
-      reason:
-        'account/profile ownership: create-profile validates parent-owned profile creation outside the tab contract.',
-      expectedFindings: { 'profile-owner-read': 1 },
-    },
-    // Account/profile ownership: account deletion still validates owner status outside app-tab navigation.
-    {
-      file: 'apps/mobile/src/app/delete-account.tsx',
-      reason:
-        'account/profile ownership: delete-account validates owner-only account deletion outside the tab contract.',
-      expectedFindings: { 'profile-owner-read': 1 },
-    },
-    // V0-fallback: profile switcher keeps legacy app-context reset until V0 is retired.
-    {
-      file: 'apps/mobile/src/app/profiles.tsx',
-      reason:
-        'V0-fallback: profile switcher resets legacy app context and still needs owner/child profile filtering.',
-      expectedFindings: {
-        'profile-owner-read': 4,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // V0-fallback: session summary keeps explicit proxy compatibility outside the normal V1 review path.
-    {
-      file: 'apps/mobile/src/app/session-summary/[sessionId].tsx',
-      reason:
-        'V0-fallback: session summary still reads raw proxy state for retained legacy proxy summaries.',
-      expectedFindings: {
-        'proxy-state-read': 5,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // Contract primitive: compatibility guard owns legacy mode detection for screens that have not deleted V0.
-    {
-      file: 'apps/mobile/src/components/guards/RequireFamilyContext.tsx',
-      reason:
-        'contract primitive: compatibility guard owns legacy mode detection for family-only children.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // V0-fallback: learner home keeps raw legacy home-shape decisions when V1 is disabled.
-    {
-      file: 'apps/mobile/src/components/home/LearnerScreen.tsx',
-      reason:
-        'V0-fallback: learner home uses contract home shape in V1 and raw owner/mode checks only for legacy home selection.',
-      expectedFindings: {
-        'profile-owner-read': 2,
-        'proxy-state-read': 13,
-        'study-family-mode-compare': 1,
-      },
-    },
-    // Contract primitive: role resolver feeds resolveNavigationContract().
-    {
-      file: 'apps/mobile/src/hooks/use-active-profile-role.ts',
-      reason:
-        'contract primitive: active-profile role resolver is an input to resolveNavigationContract.',
-      expectedFindings: {
-        'profile-owner-read': 1,
-        'proxy-state-read': 1,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // Bridge context switch: Learn-this-too must switch the adult back to Study before opening Library.
-    {
-      file: 'apps/mobile/src/hooks/use-clone-from-child.ts',
-      reason:
-        'bridge context switch: Learn-this-too recovery action writes Study mode before opening Library.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // Account/profile ownership: consent APIs are parent-owned data surfaces, not tab visibility gates.
-    {
-      file: 'apps/mobile/src/hooks/use-consent.ts',
-      reason:
-        'account/profile ownership: consent status query is enabled only for parent-owned profiles.',
-      expectedFindings: { 'profile-owner-read': 1 },
-    },
-    // Data-scope fallback: dashboard query scope uses contract in V1 and legacy mode/profile in V0.
-    {
-      file: 'apps/mobile/src/hooks/use-dashboard.ts',
-      reason:
-        'V0-fallback: dashboard data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
-      expectedFindings: {
-        'profile-owner-read': 1,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // Account/profile ownership: learner-profile child editor queries are parent-owned data surfaces.
-    {
-      file: 'apps/mobile/src/hooks/use-learner-profile.ts',
-      reason:
-        'account/profile ownership: learner-profile child editor query is enabled only for parent-owned profiles.',
-      expectedFindings: { 'profile-owner-read': 1 },
-    },
-    // Contract primitive: hook adapter gathers raw context and feeds the pure resolver.
-    {
-      file: 'apps/mobile/src/hooks/use-navigation-contract.ts',
-      reason:
-        'contract primitive: useNavigationContract is the only hook adapter that feeds raw app/proxy context into the resolver.',
-      expectedFindings: {
-        'proxy-state-read': 1,
-        'raw-hook-call': 2,
-        'raw-hook-import': 2,
-      },
-    },
-    // Data-scope fallback: notification tap handling compares legacy app context when V1 is disabled.
-    {
-      file: 'apps/mobile/src/hooks/use-notification-response-handler.ts',
-      reason:
-        'V0-fallback: notification tap handling uses contract queryScope in V1 and legacy app context in V0.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // Contract primitive: parent-proxy helper is the raw proxy state owner.
-    {
-      file: 'apps/mobile/src/hooks/use-parent-proxy.ts',
-      reason:
-        'contract primitive: parent-proxy helper owns raw proxy-state derivation before the contract consumes it.',
-      expectedFindings: {
-        'profile-owner-read': 1,
-        'proxy-state-read': 2,
-      },
-    },
-    // Data-scope fallback: progress query scope uses contract in V1 and legacy mode/profile in V0.
-    {
-      file: 'apps/mobile/src/hooks/use-progress.ts',
-      reason:
-        'V0-fallback: progress data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
-      expectedFindings: {
-        'profile-owner-read': 1,
-        'raw-hook-call': 2,
-        'raw-hook-import': 1,
-      },
-    },
-    // Contract primitive: push-token registration must read raw proxy state before deciding registration eligibility.
-    {
-      file: 'apps/mobile/src/hooks/use-push-token-registration.ts',
-      reason:
-        'contract primitive: push-token registration reads raw proxy state to avoid registering proxied child sessions.',
-      expectedFindings: {
-        'proxy-state-read': 2,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // Data-scope fallback: session query scope uses contract in V1 and legacy mode/profile in V0.
-    {
-      file: 'apps/mobile/src/hooks/use-sessions.ts',
-      reason:
-        'V0-fallback: session data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-    // Account/profile ownership: settings hooks expose parent-owned settings, not tab visibility.
-    {
-      file: 'apps/mobile/src/hooks/use-settings.ts',
-      reason:
-        'account/profile ownership: parent-owned settings queries remain outside the tab navigation contract.',
-      expectedFindings: { 'profile-owner-read': 3 },
-    },
-    // Contract primitive: app-context owns V0 mode and capability short-circuits.
-    {
-      file: 'apps/mobile/src/lib/app-context.tsx',
-      reason:
-        'contract primitive: app-context owns V0 mode state and the required MODE_NAV_V0/MODE_NAV_V1 short-circuits.',
-      expectedFindings: { 'profile-owner-read': 2 },
-    },
-    // Contract primitive: pure resolver owns all final raw owner/proxy interpretation.
-    {
-      file: 'apps/mobile/src/lib/navigation-contract.ts',
-      reason:
-        'contract primitive: resolveNavigationContract is the allowed owner/proxy decision point.',
-      expectedFindings: {
-        'profile-owner-read': 4,
-        'proxy-state-read': 18,
-      },
-    },
-    // V0-fallback: navigation helper maps legacy mode to return paths when V1 is disabled.
-    {
-      file: 'apps/mobile/src/lib/navigation.ts',
-      reason:
-        'V0-fallback: navigation helper maps legacy app context to return destinations while V0 remains supported.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-        'study-family-mode-compare': 1,
-      },
-    },
-    // Profile primitive: profile provider owns raw owner/child profile selection and switching.
-    {
-      file: 'apps/mobile/src/lib/profile.ts',
-      reason:
-        'profile primitive: profile provider owns raw owner/child profile selection and switch bookkeeping.',
-      expectedFindings: { 'profile-owner-read': 8 },
-    },
-    // Mode mutation: app-context mutation helper is the write boundary for Study/Family mode.
-    {
-      file: 'apps/mobile/src/lib/use-mode-switch.ts',
-      reason:
-        'mode mutation: useModeSwitch is the write boundary for Study/Family context changes.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
-  ];
+  [...BOUNDARY_FILES, ...V0_FALLBACK_FILES, ...NON_NAV_DOMAIN_FILES];
 
 const SELF_FILE = 'apps/mobile/src/lib/navigation-contract-usage-guard.test.ts';
 
@@ -363,7 +347,7 @@ function normalizePath(path: string): string {
 
 function listMobileProductionSources(): string[] {
   const out = execSync(
-    'git ls-files "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
+    'git ls-files --cached --others --exclude-standard "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
     { cwd: repoRoot(), encoding: 'utf-8' },
   );
   return out
@@ -647,6 +631,20 @@ function rawNavigationGateFindings(
           snippet: normalizeSnippet(node.getText(sourceFile)),
         });
       }
+
+      // `contract.diagnostic.*` is for tests/snapshots only. Production
+      // code that branches on `diagnostic.reason` etc. is creating a
+      // hidden second public API for the contract — fail the guard.
+      if (
+        propertyName === 'diagnostic' &&
+        ts.isIdentifier(node.expression) &&
+        contractVariables.has(node.expression.text)
+      ) {
+        findings.push({
+          kind: 'contract-diagnostic-read',
+          snippet: normalizeSnippet(node.getText(sourceFile)),
+        });
+      }
     }
 
     if (
@@ -685,7 +683,13 @@ describe('navigation-contract terminal usage ratchet', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it('keeps every terminal exception justified and unique', () => {
+  it('boundary allowlist matches the canonical Phase 6 boundary set', () => {
+    const boundaryFiles = BOUNDARY_FILES.map((entry) => entry.file).sort();
+    const canonical = [...CANONICAL_BOUNDARY_FILES].sort();
+    expect(boundaryFiles).toEqual(canonical);
+  });
+
+  it('keeps every terminal exception justified, categorized, and unique', () => {
     expect(legitimateFiles.size).toBe(LEGITIMATE_RAW_NAV_GATE_FILES.length);
 
     const ungrounded = LEGITIMATE_RAW_NAV_GATE_FILES.filter(
@@ -693,7 +697,8 @@ describe('navigation-contract terminal usage ratchet', () => {
         !entry.reason.includes(':') ||
         entry.reason.toLowerCase().includes('todo') ||
         entry.reason.toLowerCase().includes('migration debt') ||
-        Object.keys(entry.expectedFindings).length === 0,
+        Object.keys(entry.expectedFindings).length === 0 ||
+        !entry.category,
     );
 
     expect(ungrounded).toEqual([]);
@@ -724,8 +729,9 @@ describe('navigation-contract terminal usage ratchet', () => {
             .join('\n') +
           `\n\nUse the navigation contract instead of new raw isOwner / ` +
           `isParentProxy / study-family mode checks. If a legacy fallback is ` +
-          `intentional, add a narrowly justified LEGITIMATE_RAW_NAV_GATE_FILES ` +
-          `entry with fixed expected finding counts.`,
+          `intentional, add a narrowly justified entry to BOUNDARY_FILES, ` +
+          `V0_FALLBACK_FILES, or NON_NAV_DOMAIN_FILES with fixed expected ` +
+          `finding counts.`,
       );
     }
   });
@@ -742,7 +748,8 @@ describe('navigation-contract terminal usage ratchet', () => {
 
       return [
         `${entry.file}\n` +
-          `  reason: ${entry.reason}\n` +
+          `  category: ${entry.category}\n` +
+          `  reason:   ${entry.reason}\n` +
           `  expected: ${formatCounts(expected)}\n` +
           `  actual:   ${formatCounts(actual)}\n` +
           `  findings: ${findings.map(findingKey).join('; ') || '(none)'}`,

@@ -1892,6 +1892,7 @@ export async function challengeCurriculum(
 
     await regenerateLanguageCurriculum(
       db,
+      profileId,
       subjectId,
       subject.languageCode,
       startingLevel,

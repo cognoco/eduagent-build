@@ -1,0 +1,124 @@
+diff --git a/apps/mobile/src/app/(app)/session/index.tsx b/apps/mobile/src/app/(app)/session/index.tsx
+--- a/apps/mobile/src/app/(app)/session/index.tsx
++++ b/apps/mobile/src/app/(app)/session/index.tsx
+@@ -97,6 +97,7 @@ import { getResumeBannerCopy } from '../../../components/session/resume-banner-c
+ import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
+ import { useTranslation } from 'react-i18next';
++import { track } from '../../../lib/analytics';
+ import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
+ import { ConfirmationToast } from './_components/ConfirmationToast';
+ import { useImageBase64 } from './_hooks/use-image-base64';
+@@ -842,12 +843,40 @@ function SessionScreenInner() {
+   useEffect(() => {
+     if (initialProblemText && !routeSessionId && !hasAutoSentRef.current) {
+       if (imageUri && imageAttachmentStatus === 'loading') {
+         return undefined;
+       }
+
++      // [HOMEWORK-06] If the learner attached a photo but conversion failed
++      // or timed out (>2.5s), surface a visible system message and emit a
++      // structured analytics event before falling back to text-only auto-send.
++      // Silent fallback is banned by CLAUDE.md "Fix Development Rules".
++      const imageAttachFailed =
++        !!imageUri &&
++        (imageAttachmentStatus === 'failed' ||
++          imageAttachmentStatus === 'timeout');
++
+       const timer = setTimeout(() => {
+         if (hasAutoSentRef.current) return;
+         hasAutoSentRef.current = true;
++
++        if (imageAttachFailed) {
++          track('homework_image_attach_dropped', {
++            reason: imageAttachmentStatus,
++            captureSource: homeworkCaptureSource ?? null,
++            hasOcrText: !!normalizedOcrText,
++          });
++          setMessages((prev) => [
++            ...prev,
++            {
++              id: createLocalMessageId('ai'),
++              role: 'assistant',
++              content:
++                imageAttachmentStatus === 'timeout'
++                  ? "Your photo took too long to load, so I'm starting with the text only. If something looks off, tap the camera again to retry."
++                  : "I couldn't open your photo, so I'm starting with the text only. If something looks off, tap the camera again to retry.",
++              isSystemPrompt: true,
++            },
++          ]);
++        }
++
+         // BUG-373: Mark homework auto-send as auto-sent
+         void handleSend(initialProblemText, {
+           isAutoSent: true,
+           imageUri: imageUri ?? undefined,
+           attachImage: imageAttachmentStatus === 'ready',
+         });
+       }, 500);
+       return () => clearTimeout(timer);
+     }
+     return undefined;
+   }, [
+     initialProblemText,
+     handleSend,
+     routeSessionId,
+     imageUri,
+     imageAttachmentStatus,
++    createLocalMessageId,
++    homeworkCaptureSource,
++    normalizedOcrText,
+   ]);
+diff --git a/apps/mobile/src/app/(app)/session/index.test.tsx b/apps/mobile/src/app/(app)/session/index.test.tsx
+--- a/apps/mobile/src/app/(app)/session/index.test.tsx
++++ b/apps/mobile/src/app/(app)/session/index.test.tsx
+@@ -724,6 +724,55 @@
++  // [HOMEWORK-06] Image conversion failure / timeout must NOT silently
++  // degrade to text-only. The learner sees a system message explaining the
++  // photo was dropped, and the auto-send proceeds with attachImage=false.
++  it('surfaces a system message and sends text-only when image conversion fails', async () => {
++    jest.useRealTimers();
++    mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
++    (useLocalSearchParams as jest.Mock).mockReturnValue({
++      mode: 'homework',
++      subjectId: 'subject-1',
++      subjectName: 'Math',
++      imageUri: 'file:///cache/homework-photo.jpg',
++      imageMimeType: 'image/jpeg',
++      problemText: 'Solve 2x + 5 = 17',
++      homeworkProblems: JSON.stringify([
++        {
++          id: 'problem-1',
++          text: 'Solve 2x + 5 = 17',
++          source: 'ocr',
++        },
++      ]),
++    });
++
++    const wrapper = createWrapper();
++    const testScreen = render(<SessionScreen />, { wrapper });
++
++    // System message tells the learner the photo was dropped.
++    await waitFor(() => {
++      expect(
++        testScreen.getByText(
++          /couldn't open your photo, so I'm starting with the text only/i,
++        ),
++      ).toBeTruthy();
++    });
++
++    // Auto-send still proceeds, but WITHOUT the image attachment.
++    await waitFor(() => {
++      expect(mockStream).toHaveBeenCalled();
++    });
++    const streamCall = mockStream.mock.calls.find(
++      (call: unknown[]) => call[0] === 'Solve 2x + 5 = 17',
++    );
++    expect(streamCall).toBeDefined();
++    const streamOpts = streamCall?.[4] as
++      | { imageBase64?: string; imageMimeType?: string }
++      | undefined;
++    expect(streamOpts?.imageBase64).toBeUndefined();
++    expect(streamOpts?.imageMimeType).toBeUndefined();
++  });
++
+   it('hides contextual chips on greeting but shows session tools above the composer', () => {

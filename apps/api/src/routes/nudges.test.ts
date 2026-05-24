@@ -61,7 +61,9 @@ jest.mock('../services/nudge' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { nudgeRoutes } from './nudges';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
 import {
   ConsentRequiredError,
@@ -352,5 +354,56 @@ describe('POST /v1/nudges/mark-read', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, count: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-159 / DS-070] Proxy-mode write guard
+//
+// Mini-Hono mount of nudgeRoutes with profileMeta.isOwner=false so
+// assertNotProxyMode rejects every write before the service is touched.
+// Mirrors proxy-guard.test.ts + assessments.test.ts.
+// ---------------------------------------------------------------------------
+describe('[WI-159 / DS-070] nudges proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, PARENT_ID);
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', nudgeRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /nudges returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request('/nudges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ toProfileId: CHILD_ID, template: 'you_got_this' }),
+    });
+    expect(res.status).toBe(403);
+    expect(mockCreateNudge).not.toHaveBeenCalled();
+  });
+
+  it('PATCH /nudges/:id/read returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(`/nudges/${NUDGE_ID}/read`, {
+      method: 'PATCH',
+    });
+    expect(res.status).toBe(403);
+    expect(mockMarkNudgeRead).not.toHaveBeenCalled();
+  });
+
+  it('POST /nudges/mark-read returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request('/nudges/mark-read', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(403);
+    expect(mockMarkAllNudgesRead).not.toHaveBeenCalled();
   });
 });

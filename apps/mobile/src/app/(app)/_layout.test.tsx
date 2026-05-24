@@ -100,10 +100,13 @@ jest.mock('expo-speech-recognition', () => ({
   },
 }));
 
-jest.mock('../../lib/profile', () => ({
-  ...jest.requireActual('../../lib/profile'),
-  useProfile: () => mockUseProfile(),
-}));
+jest.mock(
+  '../../lib/profile' /* gc1-allow: ProfileProvider context not available in jest; requireActual preserves pure helpers (isGuardianProfile etc.); only the context-dependent hook is stubbed */,
+  () => ({
+    ...jest.requireActual('../../lib/profile'),
+    useProfile: () => mockUseProfile(),
+  }),
+);
 
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
 // Routes: GET /consent/my-status, POST /consent/request
@@ -135,10 +138,13 @@ jest.mock(
   }),
 );
 
-jest.mock('../../hooks/use-mentor-language-sync', () => ({
-  ...jest.requireActual('../../hooks/use-mentor-language-sync'),
-  useMentorLanguageSync: jest.fn(),
-}));
+jest.mock(
+  '../../hooks/use-mentor-language-sync' /* gc1-allow: hook triggers i18next subscription + API mutations on mount; requireActual preserves module shape; only the side-effectful hook is stubbed */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-mentor-language-sync'),
+    useMentorLanguageSync: jest.fn(),
+  }),
+);
 
 jest.mock(
   '../../lib/sentry' /* gc1-allow: native-boundary — wraps @sentry/react-native SDK; observability sink that cannot run in jest */,
@@ -176,7 +182,7 @@ const {
   resolveHomeTabPresentation,
   resolveShellVisibleTabs,
   resolveTabShape,
-} = require('./_layout');
+} = require('../../lib/legacy-navigation-contract');
 const { resolveNavigationContract } = require('../../lib/navigation-contract');
 
 describe('mode tab helpers', () => {

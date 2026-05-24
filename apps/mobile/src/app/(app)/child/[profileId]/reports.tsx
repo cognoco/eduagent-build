@@ -326,7 +326,12 @@ export default function ChildReportsScreen(): React.ReactElement {
                 } as Href);
               }}
               onPressWeekly={(reportId) => {
-                setSelectedWeeklyReportId(reportId);
+                if (!profileId) return;
+                router.push({
+                  pathname:
+                    '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+                  params: { profileId, weeklyReportId: reportId },
+                } as Href);
               }}
               showNewBadge
               newReportId={latestWeeklyReport ? null : undefined}

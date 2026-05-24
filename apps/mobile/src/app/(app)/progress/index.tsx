@@ -779,9 +779,12 @@ export default function ProgressScreen(): React.ReactElement {
       : t('progress.pageTitleProfile', {
           name: selectedChildName ?? t('progress.pageTitleFallbackName'),
         });
-  const emptyProgressActionLabel = isParentProxyView
-    ? t('tabs.library')
-    : t('progress.startLearning');
+  // [B-600] Family-context users (proxy view or family progress tab) must not
+  // be offered the adult Study Library — route them to child curriculum instead.
+  const emptyProgressActionLabel =
+    isParentProxyView || isFamilyProgress
+      ? t('progress.guardian.goToChildCurriculum')
+      : t('progress.startLearning');
   const practiceActivityCount = isViewingSelf
     ? (overallProgressQuery.data?.practiceActivityCount ?? 0)
     : 0;
@@ -869,8 +872,17 @@ export default function ProgressScreen(): React.ReactElement {
       });
     }
 
-    if (isParentProxyView) {
-      router.push('/(app)/library' as Href);
+    // [B-600] Family-context users must never be routed to the adult Study
+    // Library or the adult Shelf. Route them to the child's curriculum instead.
+    if (isParentProxyView || isFamilyProgress) {
+      if (selectedProfileId) {
+        router.push({
+          pathname: '/(app)/child/[profileId]/curriculum',
+          params: { profileId: selectedProfileId },
+        } as Href);
+      } else {
+        router.push('/(app)/home' as Href);
+      }
       return;
     }
 
@@ -1028,7 +1040,11 @@ export default function ProgressScreen(): React.ReactElement {
                     </Text>
                   </View>
                   {/* [F-012] Show vocabulary pill for language subjects only. */}
-                  {hasLanguageSubject ? (
+                  {/* [LEARN-21 / Notion #603] Vocabulary browser is hard-wired
+                      to the active adult profile; only surface the tappable
+                      chip when viewing self to avoid leaking adult vocab into
+                      a child view. Render readonly count chip otherwise. */}
+                  {hasLanguageSubject && isViewingSelf ? (
                     <Pressable
                       onPress={() =>
                         router.push('/(app)/progress/vocabulary' as Href)
@@ -1052,6 +1068,18 @@ export default function ProgressScreen(): React.ReactElement {
                           : t('progress.stats.vocabularyLink')}
                       </Text>
                     </Pressable>
+                  ) : hasLanguageSubject &&
+                    inventory.global.vocabularyTotal > 0 ? (
+                    <View
+                      testID="progress-vocab-stat-readonly"
+                      className="bg-background rounded-full px-3 py-1.5"
+                    >
+                      <Text className="text-caption font-semibold text-text-primary">
+                        {t('progress.stats.wordsLink', {
+                          count: inventory.global.vocabularyTotal,
+                        })}
+                      </Text>
+                    </View>
                   ) : null}
                   {inventory.global.topicsMastered > 0 ||
                   inventory.global.topicsAttempted > 0 ? (

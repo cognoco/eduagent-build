@@ -25,7 +25,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 
@@ -50,24 +49,11 @@ import { useNotifyParentSubscribe } from '../../hooks/use-settings';
 import { useXpSummary } from '../../hooks/use-streaks';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { track } from '../../lib/analytics';
+import type { Translate, TranslateKey } from '../../i18n';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const TIER_LABELS: Record<SubscriptionTier, string> = {
-  free: 'Free',
-  plus: 'Plus',
-  family: 'Family',
-  pro: 'Pro',
-};
-
-const TIER_LIMITS: Record<SubscriptionTier, string> = {
-  free: '10 questions/day, 100/month',
-  plus: '700 questions/month',
-  family: '1,500 questions/month (shared)',
-  pro: '3,000 questions/month',
-};
 
 /**
  * Static tier features for display when RevenueCat offerings are unavailable.
@@ -77,28 +63,13 @@ const TIER_LIMITS: Record<SubscriptionTier, string> = {
  * (see `pricing_dual_cap.md`). Showing them as upgrade options creates
  * marketing/legal exposure and contradicts approved pricing.
  */
-const TIER_FEATURES: Array<{
+// Feature key indices per tier — resolved via t() in component using subscriptionScreen.tierFeatures.*
+const TIER_FEATURE_INDICES: Array<{
   tier: SubscriptionTier;
-  features: string[];
+  count: number;
 }> = [
-  {
-    tier: 'free',
-    features: [
-      '10 questions per day, 100 per month',
-      'All subjects',
-      'Spaced repetition',
-      'Library',
-    ],
-  },
-  {
-    tier: 'plus',
-    features: [
-      '700 questions per month, no daily limit',
-      'All Free features',
-      'Advanced AI help on harder study questions',
-      'Detailed progress analytics',
-    ],
-  },
+  { tier: 'free', count: 4 },
+  { tier: 'plus', count: 4 },
 ];
 
 /**
@@ -108,14 +79,9 @@ const TIER_FEATURES: Array<{
  * through a separate channel — this preserves BUG-899 (no upsell to public
  * users) while fixing the visibility gap for Family customers.
  */
-const FAMILY_TIER_ENTRY: { tier: SubscriptionTier; features: string[] } = {
+const FAMILY_TIER_ENTRY: { tier: SubscriptionTier; count: number } = {
   tier: 'family',
-  features: [
-    '1,500 questions per month (shared across pool)',
-    'Up to 6 child profiles',
-    'All Plus features',
-    'Managed by parent account',
-  ],
+  count: 4,
 };
 
 /**
@@ -124,26 +90,51 @@ const FAMILY_TIER_ENTRY: { tier: SubscriptionTier; features: string[] } = {
  * sold through the public store, so the card is read-only (same reasoning as
  * FAMILY_TIER_ENTRY above).
  */
-const PRO_TIER_ENTRY: { tier: SubscriptionTier; features: string[] } = {
+const PRO_TIER_ENTRY: { tier: SubscriptionTier; count: number } = {
   tier: 'pro',
-  features: [
-    '3,000 questions per month, no daily limit',
-    'All Plus features',
-    'Priority AI mentor',
-    'Advanced analytics',
-  ],
+  count: 4,
+};
+
+const TIER_LABEL_KEYS: Record<SubscriptionTier, TranslateKey> = {
+  free: 'subscriptionScreen.tierLabels.free',
+  plus: 'subscriptionScreen.tierLabels.plus',
+  family: 'subscriptionScreen.tierLabels.family',
+  pro: 'subscriptionScreen.tierLabels.pro',
+};
+
+const TIER_LIMIT_KEYS: Record<SubscriptionTier, TranslateKey> = {
+  free: 'subscriptionScreen.tierLimits.free',
+  plus: 'subscriptionScreen.tierLimits.plus',
+  family: 'subscriptionScreen.tierLimits.family',
+  pro: 'subscriptionScreen.tierLimits.pro',
 };
 
 function getTiersToCompare(
   currentTier: SubscriptionTier,
-): Array<{ tier: SubscriptionTier; features: string[] }> {
+): Array<{ tier: SubscriptionTier; count: number }> {
   if (currentTier === 'family') {
-    return [...TIER_FEATURES, FAMILY_TIER_ENTRY];
+    return [...TIER_FEATURE_INDICES, FAMILY_TIER_ENTRY];
   }
   if (currentTier === 'pro') {
-    return [...TIER_FEATURES, PRO_TIER_ENTRY];
+    return [...TIER_FEATURE_INDICES, PRO_TIER_ENTRY];
   }
-  return TIER_FEATURES;
+  return TIER_FEATURE_INDICES;
+}
+
+function getTierLabel(tier: SubscriptionTier, t: Translate): string {
+  return t(TIER_LABEL_KEYS[tier]);
+}
+
+function getTierLimit(tier: SubscriptionTier, t: Translate): string {
+  return t(TIER_LIMIT_KEYS[tier]);
+}
+
+function getTierFeatureLabel(
+  tier: SubscriptionTier,
+  index: number,
+  t: Translate,
+): string {
+  return t(`subscriptionScreen.tierFeatures.${tier}.${index}` as TranslateKey);
 }
 
 function childCountBucket(count: number): '0' | '1' | '2-3' | '4+' {
@@ -153,23 +144,24 @@ function childCountBucket(count: number): '0' | '1' | '2-3' | '4+' {
   return '4+';
 }
 
-/** Map RevenueCat PACKAGE_TYPE to human-readable period labels. */
-const PACKAGE_PERIOD_LABEL: Partial<Record<PACKAGE_TYPE, string>> = {
-  [PACKAGE_TYPE.MONTHLY]: 'Monthly',
-  [PACKAGE_TYPE.ANNUAL]: 'Annual',
-  [PACKAGE_TYPE.SIX_MONTH]: '6 Months',
-  [PACKAGE_TYPE.THREE_MONTH]: '3 Months',
-  [PACKAGE_TYPE.TWO_MONTH]: '2 Months',
-  [PACKAGE_TYPE.WEEKLY]: 'Weekly',
-  [PACKAGE_TYPE.LIFETIME]: 'Lifetime',
+/** Map RevenueCat PACKAGE_TYPE to i18n key suffixes for subscriptionScreen.packagePeriod.* */
+const PACKAGE_PERIOD_KEY: Partial<Record<PACKAGE_TYPE, TranslateKey>> = {
+  [PACKAGE_TYPE.MONTHLY]: 'subscriptionScreen.packagePeriod.monthly',
+  [PACKAGE_TYPE.ANNUAL]: 'subscriptionScreen.packagePeriod.annual',
+  [PACKAGE_TYPE.SIX_MONTH]: 'subscriptionScreen.packagePeriod.sixMonth',
+  [PACKAGE_TYPE.THREE_MONTH]: 'subscriptionScreen.packagePeriod.threeMonth',
+  [PACKAGE_TYPE.TWO_MONTH]: 'subscriptionScreen.packagePeriod.twoMonth',
+  [PACKAGE_TYPE.WEEKLY]: 'subscriptionScreen.packagePeriod.weekly',
+  [PACKAGE_TYPE.LIFETIME]: 'subscriptionScreen.packagePeriod.lifetime',
 };
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getPackagePeriodLabel(pkg: PurchasesPackage): string {
-  return PACKAGE_PERIOD_LABEL[pkg.packageType] ?? pkg.identifier;
+function getPackagePeriodLabel(pkg: PurchasesPackage, t: Translate): string {
+  const key = PACKAGE_PERIOD_KEY[pkg.packageType];
+  return key ? t(key) : pkg.identifier;
 }
 
 function isTopUpPackage(pkg: PurchasesPackage): boolean {
@@ -277,6 +269,7 @@ function PackageOption({
   onSelect,
   isPurchasing,
 }: PackageOptionProps): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={() => !isCurrentPlan && onSelect(pkg)}
@@ -284,9 +277,23 @@ function PackageOption({
       className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
         isCurrentPlan ? 'border border-primary' : ''
       }`}
-      accessibilityLabel={`${isCurrentPlan ? 'Current plan' : 'Subscribe to'} ${
-        pkg.product.title
-      } ${pkg.product.priceString}`}
+      accessibilityLabel={
+        isCurrentPlan
+          ? t(
+              'subscriptionScreen.packageOption.currentPlanAccessibilityLabel',
+              {
+                title: pkg.product.title,
+                price: pkg.product.priceString,
+              },
+            )
+          : t(
+              'subscriptionScreen.packageOption.subscribePlanAccessibilityLabel',
+              {
+                title: pkg.product.title,
+                price: pkg.product.priceString,
+              },
+            )
+      }
       accessibilityRole="button"
       testID={`package-option-${pkg.identifier}`}
     >
@@ -297,7 +304,7 @@ function PackageOption({
           </Text>
           <Text className="text-caption text-text-secondary mt-0.5">
             {pkg.product.priceString} /{' '}
-            {getPackagePeriodLabel(pkg).toLowerCase()}
+            {getPackagePeriodLabel(pkg, t).toLowerCase()}
           </Text>
           {pkg.product.description ? (
             <Text className="text-caption text-text-secondary mt-0.5">
@@ -307,11 +314,13 @@ function PackageOption({
         </View>
         {isCurrentPlan ? (
           <Text className="text-caption font-semibold text-primary">
-            Current plan
+            {t('subscriptionScreen.packageOption.currentPlanLabel')}
           </Text>
         ) : (
           <Text className="text-caption font-semibold text-primary">
-            {isPurchasing ? 'Processing...' : 'Subscribe'}
+            {isPurchasing
+              ? t('subscriptionScreen.packageOption.processingLabel')
+              : t('subscriptionScreen.packageOption.subscribeLabel')}
           </Text>
         )}
       </View>
@@ -344,21 +353,28 @@ function computeCooldownMsRemaining(notifiedAtMs: number): number {
   return Math.max(0, NOTIFY_COOLDOWN_MS - elapsed);
 }
 
-function formatCooldownLabel(msRemaining: number): string {
-  if (msRemaining <= 0) return '0 seconds';
+function formatCooldownLabel(msRemaining: number, t: Translate): string {
+  if (msRemaining <= 0)
+    return t('subscriptionScreen.childPaywall.cooldownZero');
 
   if (msRemaining >= 60 * 60 * 1000) {
     const hours = Math.ceil(msRemaining / (60 * 60 * 1000));
-    return hours === 1 ? '1 hour' : `${hours} hours`;
+    return t('subscriptionScreen.childPaywall.cooldownHours', {
+      count: hours,
+    });
   }
 
   if (msRemaining >= 60_000) {
     const minutes = Math.ceil(msRemaining / 60_000);
-    return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+    return t('subscriptionScreen.childPaywall.cooldownMinutes', {
+      count: minutes,
+    });
   }
 
   const seconds = Math.ceil(msRemaining / 1000);
-  return seconds === 1 ? '1 second' : `${seconds} seconds`;
+  return t('subscriptionScreen.childPaywall.cooldownSeconds', {
+    count: seconds,
+  });
 }
 
 function ChildPaywall(): React.ReactElement {
@@ -368,6 +384,7 @@ function ChildPaywall(): React.ReactElement {
   const { activeProfile } = useProfile();
   const notifyParent = useNotifyParentSubscribe();
   const { data: xpSummary } = useXpSummary();
+  const { t } = useTranslation();
 
   const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
   const [cooldownMsRemaining, setCooldownMsRemaining] = useState(0);
@@ -459,17 +476,20 @@ function ChildPaywall(): React.ReactElement {
             String(now),
           ).catch(() => undefined);
         }
-        platformAlert('Sent!', 'We let your parent know!');
+        platformAlert(
+          t('subscription.childPaywall.alerts.sentTitle'),
+          t('subscription.childPaywall.alerts.sentBody'),
+        );
       } else {
         platformAlert(
-          'Ask your parent',
-          'Ask your parent to open the app and subscribe.',
+          t('subscription.childPaywall.alerts.askParentTitle'),
+          t('subscription.childPaywall.alerts.askParentBody'),
         );
       }
     } catch {
       platformAlert(
-        'Could not send notification',
-        'Please check your connection and try again.',
+        t('subscription.childPaywall.alerts.notifyErrorTitle'),
+        t('subscription.childPaywall.alerts.notifyErrorBody'),
       );
     }
   }, [notifyParent, profileId]);
@@ -487,27 +507,31 @@ function ChildPaywall(): React.ReactElement {
         <Pressable
           onPress={() => router.replace('/(app)/more')}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t(
+            'subscription.childPaywall.backAccessibilityLabel',
+          )}
           accessibilityRole="button"
         >
-          <Text className="text-primary text-body font-semibold">Back</Text>
+          <Text className="text-primary text-body font-semibold">
+            {t('subscription.childPaywall.back')}
+          </Text>
         </Pressable>
       </View>
 
       <View className="flex-1 px-5 items-center justify-center">
         <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
-          Nice work so far!
+          {t('subscription.childPaywall.headline')}
         </Text>
         <Text className="text-body text-text-secondary mb-2 text-center">
           {topicsLearned > 0 || totalXp > 0
-            ? `You learned ${topicsLearned} topic${
-                topicsLearned !== 1 ? 's' : ''
-              } and earned ${totalXp} XP \u2014 great work!`
-            : "You've been exploring and learning \u2014 great start!"}
+            ? t('subscription.childPaywall.xpStats', {
+                count: topicsLearned,
+                xp: totalXp,
+              })
+            : t('subscription.childPaywall.greatStart')}
         </Text>
         <Text className="text-body text-text-secondary mb-8 text-center">
-          You've used all your free questions. Ask your parent to upgrade so you
-          can keep learning.
+          {t('subscription.childPaywall.usedAllQuestions')}
         </Text>
 
         <Pressable
@@ -519,7 +543,9 @@ function ChildPaywall(): React.ReactElement {
           testID="notify-parent-button"
           accessibilityRole="button"
           accessibilityLabel={
-            isNotified ? 'Parent already notified' : 'Notify my parent'
+            isNotified
+              ? t('subscription.childPaywall.notifyButtonAccessibilityNotified')
+              : t('subscription.childPaywall.notifyButtonAccessibilityNotify')
           }
         >
           {notifyParent.isPending ? (
@@ -530,7 +556,9 @@ function ChildPaywall(): React.ReactElement {
                 isNotified ? 'text-text-secondary' : 'text-text-inverse'
               }`}
             >
-              {isNotified ? 'Parent notified' : 'Notify My Parent'}
+              {isNotified
+                ? t('subscription.childPaywall.notifyButtonNotified')
+                : t('subscription.childPaywall.notifyButton')}
             </Text>
           )}
         </Pressable>
@@ -540,8 +568,9 @@ function ChildPaywall(): React.ReactElement {
             className="text-body-sm text-text-secondary text-center mb-3"
             testID="notify-countdown"
           >
-            You can remind them again in{' '}
-            {formatCooldownLabel(cooldownMsRemaining)}.
+            {t('subscription.childPaywall.cooldownReminder', {
+              label: formatCooldownLabel(cooldownMsRemaining, t),
+            })}
           </Text>
         )}
 
@@ -550,13 +579,11 @@ function ChildPaywall(): React.ReactElement {
             className="text-body-sm text-text-secondary text-center mb-4"
             testID="notified-explore-text"
           >
-            Your parent has been notified! While you wait, you can still
-            explore:
+            {t('subscription.childPaywall.notifiedExploreText')}
           </Text>
         ) : (
           <Text className="text-body-sm text-text-secondary text-center mb-4">
-            While you wait, you can still browse your Library and see your
-            progress.
+            {t('subscription.childPaywall.waitText')}
           </Text>
         )}
 
@@ -565,10 +592,12 @@ function ChildPaywall(): React.ReactElement {
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
           testID="browse-library-button"
           accessibilityRole="button"
-          accessibilityLabel="Browse Library"
+          accessibilityLabel={t(
+            'subscription.childPaywall.browseLibraryAccessibilityLabel',
+          )}
         >
           <Text className="text-body font-semibold text-primary">
-            Browse Library
+            {t('subscription.childPaywall.browseLibrary')}
           </Text>
         </Pressable>
 
@@ -577,10 +606,12 @@ function ChildPaywall(): React.ReactElement {
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
           testID="see-progress-button"
           accessibilityRole="button"
-          accessibilityLabel="See your progress"
+          accessibilityLabel={t(
+            'subscription.childPaywall.seeProgressAccessibilityLabel',
+          )}
         >
           <Text className="text-body font-semibold text-primary">
-            See your progress
+            {t('subscription.childPaywall.seeProgress')}
           </Text>
         </Pressable>
 
@@ -589,9 +620,13 @@ function ChildPaywall(): React.ReactElement {
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
           testID="go-home-button"
           accessibilityRole="button"
-          accessibilityLabel="Go Home"
+          accessibilityLabel={t(
+            'subscription.childPaywall.goHomeAccessibilityLabel',
+          )}
         >
-          <Text className="text-body font-semibold text-primary">Go Home</Text>
+          <Text className="text-body font-semibold text-primary">
+            {t('subscription.childPaywall.goHome')}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -646,21 +681,24 @@ function SubscriptionContent(): React.ReactElement | null {
     isRefetching: usageRefetching,
   } = useUsage();
   const { data: familySubscription, refetch: refetchFamilySubscription } =
-    useFamilySubscription(subscription?.tier === 'family');
+    useFamilySubscription(
+      subscription?.tier === 'family' || subscription?.tier === 'pro',
+    );
   const byokWaitlist = useJoinByokWaitlist();
   const removeFamilyProfile = useRemoveFamilyProfile();
-  const canUseOwnerBillingGates = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showBilling
-    : activeProfile?.isOwner === true;
-  const canRemoveFamilyMember = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showRemoveFamilyMember
-    : activeProfile?.isOwner === true;
+  // Account-identity fact: drives analytics and the child-paywall routing
+  // decision below. Navigation UI visibility (billing card, remove-member
+  // button) consumes the contract gates; this raw owner read covers the
+  // non-UI surfaces the plan keeps explicit.
+  const isOwnerProfile = activeProfile?.isOwner === true;
+  const canUseOwnerBillingGates = navigationContract.gates.showBilling;
+  const canRemoveFamilyMember = navigationContract.gates.showRemoveFamilyMember;
   const linkedChildCount =
     canUseOwnerBillingGates && activeProfile
       ? profiles.filter((profile) => profile.id !== activeProfile.id).length
       : 0;
   const breakdownAnalytics = {
-    is_owner: activeProfile?.isOwner === true,
+    is_owner: isOwnerProfile,
     breakdown_section_visible: Boolean(usage?.byProfile?.length),
     child_count_bucket: childCountBucket(linkedChildCount),
   };
@@ -668,10 +706,10 @@ function SubscriptionContent(): React.ReactElement | null {
   useEffect(() => {
     if (!usage) return;
     track('subscription_breakdown_mounted', {
-      is_owner: activeProfile?.isOwner === true,
+      is_owner: isOwnerProfile,
       child_count_bucket: childCountBucket(linkedChildCount),
     });
-  }, [activeProfile?.isOwner, linkedChildCount, usage]);
+  }, [isOwnerProfile, linkedChildCount, usage]);
 
   // BUG-399: Persistent "already joined" flag for BYOK waitlist
   const [byokJoined, setByokJoined] = useState(false);
@@ -723,7 +761,7 @@ function SubscriptionContent(): React.ReactElement | null {
   // We compute this early so the useEffect runs unconditionally (React hooks
   // rules require all hooks before any conditional early-returns below).
   // The effect is a no-op when data is still loading or the paywall should show.
-  const isChildEarly = activeProfile ? !activeProfile.isOwner : false;
+  const isChildEarly = activeProfile ? !isOwnerProfile : false;
   const subHasLoadErrorEarly =
     (subError && !subscription) || (usageError && !usage);
   const trialOrExpiredEarly =
@@ -770,8 +808,8 @@ function SubscriptionContent(): React.ReactElement | null {
       await restore.mutateAsync();
     } catch {
       platformAlert(
-        'Restore failed',
-        'Could not restore purchases. Please try again.',
+        t('subscription.restore.failedTitle'),
+        t('subscription.restore.failedBody'),
       );
       return;
     }
@@ -830,11 +868,11 @@ function SubscriptionContent(): React.ReactElement | null {
       );
     } else {
       platformAlert(
-        'No subscriptions found',
-        'We could not find any previous purchases to restore.',
+        t('subscription.restore.notFoundTitle'),
+        t('subscription.restore.notFoundBody'),
         [
           {
-            text: 'Check again',
+            text: t('subscriptionScreen.alerts.checkAgain'),
             onPress: () => {
               void refetchSub();
             },
@@ -870,28 +908,28 @@ function SubscriptionContent(): React.ReactElement | null {
           // [UX-DE-M8] Product already purchased — prompt restore instead of
           // showing a generic failure. handleRestore is stable (useCallback).
           platformAlert(
-            'Already purchased',
-            'It looks like you already own this subscription. Tap "Restore purchases" to activate it on this device.',
+            t('subscriptionScreen.alerts.alreadyPurchasedTitle'),
+            t('subscriptionScreen.alerts.alreadyPurchasedBody'),
             [
               {
-                text: 'Restore purchases',
+                text: t('subscriptionScreen.alerts.restorePurchasesButton'),
                 onPress: () => void handleRestore(),
               },
-              { text: 'Cancel', style: 'cancel' },
+              { text: t('common.cancel'), style: 'cancel' },
             ],
           );
           return;
         }
         if (isNetworkError(error)) {
           platformAlert(
-            'Network error',
-            'Please check your internet connection and try again.',
+            t('subscriptionScreen.alerts.networkErrorTitle'),
+            t('subscriptionScreen.alerts.networkErrorBody'),
           );
           return;
         }
         platformAlert(
-          'Purchase failed',
-          'Something unexpected happened with your purchase. Please try again.',
+          t('subscriptionScreen.alerts.purchaseFailedTitle'),
+          t('subscriptionScreen.alerts.purchaseFailedBody'),
         );
         return;
       }
@@ -976,11 +1014,11 @@ function SubscriptionContent(): React.ReactElement | null {
     } catch {
       // BUG-400: Provide retry + fallback URL so the user isn't stuck.
       platformAlert(
-        'Could not open subscription management',
-        `You can manage your subscription directly at:\n${url}`,
+        t('subscriptionScreen.alerts.manageBillingErrorTitle'),
+        t('subscriptionScreen.alerts.manageBillingErrorBody', { url }),
         [
           {
-            text: 'Try again',
+            text: t('subscriptionScreen.alerts.tryAgain'),
             onPress: () => {
               void openSubscriptionManagement().catch(() => {
                 // Second attempt also failed — user already has the URL from the alert.
@@ -1005,11 +1043,11 @@ function SubscriptionContent(): React.ReactElement | null {
     // If offerings failed to load, give a retry path
     if (offeringsError || !offerings) {
       platformAlert(
-        'Connection error',
-        "Couldn't load purchase options. Check your connection and try again.",
+        t('subscriptionScreen.alerts.topUpConnectionErrorTitle'),
+        t('subscriptionScreen.alerts.topUpConnectionErrorBody'),
         [
           {
-            text: 'Retry',
+            text: t('subscriptionScreen.alerts.topUpRetry'),
             onPress: () => {
               void refetchOfferings();
             },
@@ -1213,9 +1251,15 @@ function SubscriptionContent(): React.ReactElement | null {
       void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(
         () => undefined,
       );
-      platformAlert('Waitlist', 'You have been added to the BYOK waitlist.');
+      platformAlert(
+        t('subscription.byokWaitlist.alerts.successTitle'),
+        t('subscription.byokWaitlist.alerts.successBody'),
+      );
     } catch {
-      platformAlert('Error', 'Could not join waitlist. Try again.');
+      platformAlert(
+        t('subscription.byokWaitlist.alerts.errorTitle'),
+        t('subscription.byokWaitlist.alerts.errorBody'),
+      );
     }
   }, [byokWaitlist]);
 
@@ -1368,7 +1412,7 @@ function SubscriptionContent(): React.ReactElement | null {
           >
             <View className="flex-row items-center justify-between">
               <Text className="text-body font-semibold text-text-primary">
-                {TIER_LABELS[tier]}
+                {getTierLabel(tier, t)}
               </Text>
               <View className="bg-primary-soft rounded-full px-2.5 py-1">
                 <Text className="text-caption font-semibold text-primary capitalize">
@@ -1385,7 +1429,7 @@ function SubscriptionContent(): React.ReactElement | null {
               </View>
             </View>
             <Text className="text-caption text-text-secondary mt-1">
-              {TIER_LIMITS[tier]}
+              {getTierLimit(tier, t)}
             </Text>
             {subscription?.currentPeriodEnd && isPaidTier && (
               <Text className="text-caption text-text-secondary mt-1">
@@ -1696,8 +1740,14 @@ function SubscriptionContent(): React.ReactElement | null {
               <View className="bg-surface rounded-card px-4 py-3.5 mb-3">
                 <Text className="text-body-sm text-text-secondary">
                   {offeringsError
-                    ? `We could not load purchase options right now. You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}.`
-                    : `You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}. Here's what each plan includes — store purchasing isn't available on this device yet.`}
+                    ? t('subscriptionScreen.plans.offeringsError', {
+                        tier: getTierLabel(tier, t),
+                        limits: getTierLimit(tier, t),
+                      })
+                    : t('subscriptionScreen.plans.offeringsWebOnly', {
+                        tier: getTierLabel(tier, t),
+                        limits: getTierLimit(tier, t),
+                      })}
                 </Text>
               </View>
               {getTiersToCompare(tier).map((entry) => (
@@ -1710,17 +1760,19 @@ function SubscriptionContent(): React.ReactElement | null {
                 >
                   <View className="flex-row items-center justify-between mb-1.5">
                     <Text className="text-body font-semibold text-text-primary">
-                      {TIER_LABELS[entry.tier]}
+                      {getTierLabel(entry.tier, t)}
                     </Text>
                     {entry.tier === tier && (
                       <View className="bg-primary-soft rounded-full px-2.5 py-0.5">
                         <Text className="text-caption font-semibold text-primary">
-                          Current
+                          {t('subscriptionScreen.plans.currentBadge')}
                         </Text>
                       </View>
                     )}
                   </View>
-                  {entry.features.map((feature) => (
+                  {Array.from({ length: entry.count }, (_, index) =>
+                    getTierFeatureLabel(entry.tier, index, t),
+                  ).map((feature) => (
                     <Text
                       key={feature}
                       className="text-caption text-text-secondary ml-1 mb-0.5"
@@ -1736,22 +1788,26 @@ function SubscriptionContent(): React.ReactElement | null {
                     onPress={() => void refetchOfferings()}
                     className="flex-1 bg-primary rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
                     accessibilityRole="button"
-                    accessibilityLabel="Retry loading subscription offerings"
+                    accessibilityLabel={t(
+                      'subscriptionScreen.plans.retryOfferingsAccessibilityLabel',
+                    )}
                     testID="offerings-retry-button"
                   >
                     <Text className="text-body font-semibold text-text-inverse">
-                      Retry
+                      {t('subscriptionScreen.plans.retryOfferings')}
                     </Text>
                   </Pressable>
                   <Pressable
                     onPress={() => void handleContactSupport()}
                     className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
                     accessibilityRole="button"
-                    accessibilityLabel="Contact support"
+                    accessibilityLabel={t(
+                      'subscriptionScreen.plans.contactSupportAccessibilityLabel',
+                    )}
                     testID="offerings-contact-support"
                   >
                     <Text className="text-body font-semibold text-text-primary">
-                      Contact support
+                      {t('subscriptionScreen.plans.contactSupport')}
                     </Text>
                   </Pressable>
                 </View>
@@ -1765,7 +1821,7 @@ function SubscriptionContent(): React.ReactElement | null {
               onPress={handleRestore}
               disabled={restore.isPending || restorePolling}
               className="bg-surface rounded-card px-4 py-3.5"
-              accessibilityLabel="Restore purchases"
+              accessibilityLabel={t('subscription.restore.accessibilityLabel')}
               accessibilityRole="button"
               testID="restore-purchases-button"
             >
@@ -1779,13 +1835,13 @@ function SubscriptionContent(): React.ReactElement | null {
                     />
                     <Text className="text-body font-semibold text-primary ml-2">
                       {restorePolling
-                        ? 'Verifying purchase...'
-                        : 'Restoring...'}
+                        ? t('subscription.restore.verifying')
+                        : t('subscription.restore.restoring')}
                     </Text>
                   </View>
                 ) : (
                   <Text className="text-body font-semibold text-primary">
-                    Restore Purchases
+                    {t('subscription.restore.button')}
                   </Text>
                 )}
               </View>
@@ -1795,13 +1851,15 @@ function SubscriptionContent(): React.ReactElement | null {
                 onPress={() => {
                   setRestorePolling(false);
                   platformAlert(
-                    'Restore cancelled',
-                    'Restore will continue in background.',
+                    t('subscription.restore.cancelledTitle'),
+                    t('subscription.restore.cancelledBody'),
                   );
                 }}
                 className="mt-2 items-center py-2"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel restore"
+                accessibilityLabel={t(
+                  'subscription.restore.cancelAccessibilityLabel',
+                )}
                 testID="restore-polling-cancel"
               >
                 <Text className="text-body-sm text-primary font-semibold">
@@ -1918,13 +1976,11 @@ function SubscriptionContent(): React.ReactElement | null {
 
           <View className="mt-6" testID="byok-waitlist-section">
             <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-              Bring your own key
+              {t('subscription.byokWaitlist.heading')}
             </Text>
             <View className="bg-surface rounded-card px-4 py-3.5">
               <Text className="text-body-sm text-text-secondary mb-3">
-                Use your own API key to unlock unlimited questions. Join the
-                waitlist to be notified when available. We'll use your account
-                email.
+                {t('subscription.byokWaitlist.body')}
               </Text>
               <Pressable
                 onPress={handleByokSubmit}
@@ -1934,8 +1990,10 @@ function SubscriptionContent(): React.ReactElement | null {
                 }`}
                 accessibilityLabel={
                   byokJoined
-                    ? 'Already joined BYOK waitlist'
-                    : 'Join BYOK waitlist'
+                    ? t(
+                        'subscription.byokWaitlist.alreadyJoinedAccessibilityLabel',
+                      )
+                    : t('subscription.byokWaitlist.joinAccessibilityLabel')
                 }
                 accessibilityRole="button"
                 testID="join-byok-waitlist-button"
@@ -1948,11 +2006,11 @@ function SubscriptionContent(): React.ReactElement | null {
                   />
                 ) : byokJoined ? (
                   <Text className="text-text-secondary text-body font-semibold">
-                    Already joined
+                    {t('subscription.byokWaitlist.alreadyJoinedButton')}
                   </Text>
                 ) : (
                   <Text className="text-text-inverse text-body font-semibold">
-                    Join Waitlist
+                    {t('subscription.byokWaitlist.joinButton')}
                   </Text>
                 )}
               </Pressable>

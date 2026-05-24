@@ -18,10 +18,9 @@ import {
 } from '../../hooks/use-progress';
 import { useDashboard } from '../../hooks/use-dashboard';
 import { isInGracePeriod } from '../../lib/consent-grace';
-import { useSubscription } from '../../hooks/use-subscription';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
-import { useHasLinkedChildren, useProfile } from '../../lib/profile';
+import { useProfile } from '../../lib/profile';
 import {
   LEARNER_HOME_RETURN_TO,
   pushLearningResumeTarget,
@@ -33,7 +32,8 @@ import {
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
-import { useNavigationContract } from '../../hooks/use-navigation-contract';
+import { useEnsureStudyMode } from '../../lib/use-mode-switch';
+import { useNavigationHomeContract } from '../../hooks/use-navigation-contract';
 import { getSubjectTint, getSubjectTintMap } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
@@ -48,7 +48,6 @@ import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
 import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
-import type { AppMode } from '../../lib/app-context';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
@@ -103,16 +102,13 @@ export interface LearnerScreenProps {
   now?: Date;
   showParentHome?: boolean;
   returnToTab?: string;
-  mode?: AppMode | null;
 }
 
 export function LearnerScreen({
-  profiles,
   activeProfile,
   now,
   showParentHome = true,
   returnToTab = LEARNER_HOME_RETURN_TO,
-  mode = null,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -126,23 +122,17 @@ export function LearnerScreen({
   const { data: progressInventory } = useProgressInventory();
   const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
-  const { data: subscription } = useSubscription();
-  const { switchProfile, isExplicitProxyMode } = useProfile();
-  const navigationContract = useNavigationContract();
+  const { switchProfile } = useProfile();
+  const ensureStudyMode = useEnsureStudyMode();
+  const navigationHome = useNavigationHomeContract();
+  const navigationContract = navigationHome.contract;
+  const navigationProxy = navigationHome.proxy;
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
-  const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
     string | null
   >(null);
-  // [ACCOUNT-04] Use the explicit proxy flag from context instead of deriving
-  // from profile shape. A non-owner profile switched to via plain switchProfile()
-  // is a normal learner session — proxy chrome must not appear.
-  const isParentProxy = isExplicitProxyMode;
-  const parentProfile = isParentProxy
-    ? profiles.find((profile) => profile.isOwner)
-    : null;
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
   const totalTopicsCompleted = overallProgress?.totalTopicsCompleted ?? null;
   const totalSessions = progressInventory?.global.totalSessions ?? 0;
@@ -174,17 +164,17 @@ export function LearnerScreen({
   }, []);
 
   const openParentSessionSummaries = useCallback(async () => {
-    if (!activeProfile || !parentProfile) return;
+    if (!activeProfile || !navigationProxy.parentProfileId) return;
 
     const childProfileId = activeProfile.id;
-    const result = await switchProfile(parentProfile.id);
+    const result = await switchProfile(navigationProxy.parentProfileId);
     if (!result.success) return;
 
     router.push({
       pathname: '/(app)/child/[profileId]',
       params: { profileId: childProfileId },
     } as Href);
-  }, [activeProfile, parentProfile, switchProfile]);
+  }, [activeProfile, navigationProxy.parentProfileId, router, switchProfile]);
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const subjectsLoadFailed = isError && !subjects;
@@ -296,7 +286,7 @@ export function LearnerScreen({
   }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme]);
 
   const coachBand = useMemo(() => {
-    if (isParentProxy) return null;
+    if (navigationProxy.active) return null;
 
     if (recoveryMarker) {
       return {
@@ -382,13 +372,14 @@ export function LearnerScreen({
   }, [
     activeProfile?.id,
     dismissedQuizDiscoveryId,
-    isParentProxy,
     markQuizDiscoveryHandled,
+    navigationProxy.active,
     quizDiscovery,
     recoveryMarker,
     resumeTarget,
     returnParams,
     returnToTab,
+    router,
     reviewSummary,
   ]);
 
@@ -409,7 +400,7 @@ export function LearnerScreen({
             : returnParams,
       } as Href);
     },
-    [returnParams],
+    [returnParams, router],
   );
 
   if (isLoading) {
@@ -430,7 +421,7 @@ export function LearnerScreen({
         {loadingTimedOut && (
           <View className="mt-6 items-center" testID="learner-loading-timeout">
             <Text className="text-body text-text-secondary text-center">
-              Taking longer than usual...
+              {t('learnerHomeTimeout.loading')}
             </Text>
             <Pressable
               onPress={() => refetch()}
@@ -438,19 +429,23 @@ export function LearnerScreen({
               testID="learner-loading-retry"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Retry
+                {t('learnerHomeTimeout.retry')}
               </Text>
             </Pressable>
             {/* [HOME-08] Replace the self-referential "Go home" (which is this
                 screen) with escape routes that actually change state — matching
-                the recovery pattern already used in home.tsx:119. */}
+                the recovery pattern already used in home.tsx:119. Library is
+                only in STUDY_TABS, so ensureStudyMode switches family-mode
+                users to study first; the helper is a no-op otherwise. */}
             <Pressable
-              onPress={() => router.replace('/(app)/library' as Href)}
+              onPress={() =>
+                ensureStudyMode(() => router.replace('/(app)/library' as Href))
+              }
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
               testID="learner-loading-go-library"
             >
               <Text className="text-body text-primary font-medium">
-                Go to Library
+                {t('learnerHomeTimeout.goToLibrary')}
               </Text>
             </Pressable>
             <Pressable
@@ -459,7 +454,7 @@ export function LearnerScreen({
               testID="learner-loading-go-more"
             >
               <Text className="text-body text-primary font-medium">
-                More options
+                {t('learnerHomeTimeout.moreOptions')}
               </Text>
             </Pressable>
           </View>
@@ -471,20 +466,9 @@ export function LearnerScreen({
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
+  const showLearningActions = navigationContract.gates.showLearningActions;
 
-  const isFamilyPlanOwner =
-    activeProfile?.isOwner === true &&
-    (subscription?.tier === 'family' || subscription?.tier === 'pro');
-
-  const familyHomeFromContract =
-    navigationContract.home.screen === 'FamilyHome';
-  const shouldShowFamilyHome = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? familyHomeFromContract
-    : FEATURE_FLAGS.MODE_NAV_V0_ENABLED
-      ? mode === 'family'
-      : hasLinkedChildren || isFamilyPlanOwner;
-
-  if (showParentHome && !isParentProxy && shouldShowFamilyHome) {
+  if (showParentHome && navigationContract.gates.showFamilyHome) {
     return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
   }
 
@@ -499,11 +483,11 @@ export function LearnerScreen({
             <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
-            {!isParentProxy ? (
+            {showLearningActions ? (
               <ChildQuotaLine totalTopicsCompleted={totalTopicsCompleted} />
             ) : null}
           </View>
-          {!isParentProxy ? (
+          {showLearningActions ? (
             <Pressable
               onPress={() =>
                 router.push({
@@ -538,7 +522,7 @@ export function LearnerScreen({
         showsVerticalScrollIndicator={false}
       >
         <EarlyAdopterCard totalSessions={totalSessions} />
-        {!isParentProxy ? <NudgeBanner /> : null}
+        {showLearningActions ? <NudgeBanner /> : null}
 
         {showCoachBand && (
           <View>
@@ -560,7 +544,7 @@ export function LearnerScreen({
           />
         </View>
 
-        {!isParentProxy && (
+        {showLearningActions && (
           <View className={showCoachBand ? 'mt-1' : 'mt-5'}>
             <Text className="text-h3 font-bold text-text-primary px-5 mb-2">
               {t('home.learner.intentHeading')}
@@ -614,7 +598,7 @@ export function LearnerScreen({
           </View>
         )}
 
-        <View className={!isParentProxy ? 'mt-5' : 'mt-4'}>
+        <View className={showLearningActions ? 'mt-5' : 'mt-4'}>
           {subjectCards.length > 0 ? (
             <>
               <Text className="text-caption font-bold uppercase text-text-secondary px-5 mb-2.5">
@@ -646,7 +630,7 @@ export function LearnerScreen({
                     }
                   />
                 ))}
-                {!isParentProxy && (
+                {showLearningActions && (
                   <Pressable
                     testID="home-add-subject-tile"
                     onPress={() =>
@@ -668,7 +652,7 @@ export function LearnerScreen({
                 )}
               </ScrollView>
             </>
-          ) : !isParentProxy ? (
+          ) : showLearningActions ? (
             subjectsLoadFailed ? (
               <View
                 testID="home-subjects-load-error"
@@ -738,7 +722,7 @@ export function LearnerScreen({
           ) : null}
         </View>
 
-        {isParentProxy && (
+        {navigationProxy.active && (
           <View testID="intent-proxy-placeholder" className="px-5 mt-4">
             <View className="rounded-card bg-primary-soft px-4 py-4">
               <Text className="text-body font-semibold text-text-primary">
@@ -751,7 +735,7 @@ export function LearnerScreen({
                   name: activeProfile?.displayName ?? 'this learner',
                 })}
               </Text>
-              {parentProfile ? (
+              {navigationProxy.parentProfileId ? (
                 <Pressable
                   onPress={() => void openParentSessionSummaries()}
                   className="self-start rounded-button bg-primary px-4 py-3 mt-3"

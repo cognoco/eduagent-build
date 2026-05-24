@@ -14,16 +14,22 @@ const mockCanGoBack = jest.fn();
 
 jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    back: mockBack,
-    replace: mockReplace,
-    canGoBack: mockCanGoBack,
-  }),
-  useLocalSearchParams: () => ({
-    profileId: '550e8400-e29b-41d4-a716-446655440000',
-  }),
-}));
+jest.mock('expo-router', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    useRouter: () => ({
+      back: mockBack,
+      replace: mockReplace,
+      canGoBack: mockCanGoBack,
+    }),
+    useLocalSearchParams: () => ({
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
+    }),
+    Redirect: ({ href }: { href: string }) =>
+      React.createElement(Text, { testID: `mock-redirect-${href}` }, href),
+  };
+});
 
 let mockChildEmail: string | undefined = undefined;
 
@@ -43,8 +49,13 @@ const mockUseUser = jest.fn(
     },
   }),
 );
+const mockUseAuth = jest.fn(() => ({
+  isLoaded: true,
+  isSignedIn: true,
+}));
 
 jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => mockUseAuth(),
   useUser: () => mockUseUser(),
 }));
 
@@ -144,6 +155,10 @@ describe('ConsentScreen', () => {
     mockCanGoBack.mockReturnValue(true);
     mockUseNetworkStatus.mockReturnValue({ isOffline: false, isReady: true });
     // Restore default: Clerk hydrated, user present.
+    mockUseAuth.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
     mockUseUser.mockImplementation(() => ({
       isLoaded: true,
       user: {
@@ -737,6 +752,26 @@ describe('ConsentScreen', () => {
       fireEvent.press(screen.getByTestId('consent-submit'));
 
       expect(mockMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('auth gate [B-616 / ACCOUNT-19]', () => {
+    afterEach(() => {
+      mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    });
+
+    it('[B-616] redirects to /sign-in when not authenticated', () => {
+      mockUseAuth.mockReturnValueOnce({ isLoaded: true, isSignedIn: false });
+      render(<ConsentScreen />);
+      expect(screen.getByTestId('mock-redirect-/sign-in')).toBeTruthy();
+      expect(screen.queryByText('Almost there!')).toBeNull();
+    });
+
+    it('[B-616] shows loading spinner while Clerk is hydrating', () => {
+      mockUseAuth.mockReturnValueOnce({ isLoaded: false, isSignedIn: false });
+      render(<ConsentScreen />);
+      expect(screen.getByTestId('consent-auth-loading')).toBeTruthy();
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
     });
   });
 });

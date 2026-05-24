@@ -77,6 +77,8 @@ export interface ProfileContext {
 
 export interface NavigationGates {
   sessionIsOwner: boolean;
+  showFamilyHome: boolean;
+  showLearningActions: boolean;
   showBilling: boolean;
   showAccountSecurity: boolean;
   showExportDelete: boolean;
@@ -238,6 +240,13 @@ export function resolveNavigationContract(
   const familyCapable = isFamilyCapable(context.activeProfile);
   const ownerRole = isOwnerRole(context.role);
   const subscriptionReady = context.subscription.status === 'ready';
+  const familyPlanOwner =
+    isAdultOwner(context.activeProfile) &&
+    ownerRole &&
+    !context.isParentProxy &&
+    subscriptionReady &&
+    (context.subscription.tier === 'family' ||
+      context.subscription.tier === 'pro');
   const legacyV0ModeNavActive =
     context.flags.MODE_NAV_V1_ENABLED === false &&
     context.flags.MODE_NAV_V0_ENABLED === true;
@@ -259,11 +268,9 @@ export function resolveNavigationContract(
     isLegacyGuardian(context.activeProfile, linkedChildIds) &&
     !context.isParentProxy
   ) {
-    // Legacy V0 fallback: shape stays 'study' and family-gates stay false here
-    // by design. When V1 is off, every screen short-circuits the contract behind
-    // `FEATURE_FLAGS.MODE_NAV_V1_ENABLED ? contract : legacy`, so .gates/.shape
-    // are not read in production — the legacy V0 code path (app-context.tsx,
-    // _layout.tsx helpers) is authoritative. visibleTabs is informational only.
+    // Legacy V0 fallback: shape stays 'study' so V1-only family child routes
+    // stay closed, while the home contract below still reports FamilyHome for
+    // the production guardian surface. visibleTabs preserves the 5-tab shell.
     reason = 'legacy-v0-flags-off';
     visibleTabs = LEGACY_GUARDIAN_TABS;
   } else if (context.flags.MODE_NAV_V1_ENABLED === false) {
@@ -300,37 +307,67 @@ export function resolveNavigationContract(
   }
 
   const familyShape = shape === 'family';
-  const addChildGate =
-    isAdultOwner(context.activeProfile) &&
-    ownerRole &&
-    !context.isParentProxy &&
-    subscriptionReady &&
-    context.activeProfile !== null;
+  const isV1 = context.flags.MODE_NAV_V1_ENABLED === true;
+  const ownerNotProxy = ownerRole && !context.isParentProxy;
+  const addChildGate = isV1
+    ? isAdultOwner(context.activeProfile) &&
+      ownerRole &&
+      !context.isParentProxy &&
+      subscriptionReady &&
+      context.activeProfile !== null
+    : isAdultOwner(context.activeProfile) && ownerNotProxy;
   const childEditorGate = ownerRole && familyShape && !context.isParentProxy;
+  // More-screen child editors (accommodation/celebrations) and the linked-
+  // child removal/withdrawal-archive gate were previously V1-only because
+  // they required `familyShape`, which V0 never sets. V0's production
+  // behavior is broader — any owner (not in proxy) sees these affordances —
+  // so the V0 evaluation collapses to ownerNotProxy. This lets screens drop
+  // their `MODE_NAV_V1_ENABLED ? gate : raw owner read` splits.
+  const moreScreenChildEditorGate = isV1 ? childEditorGate : ownerNotProxy;
+  const removeFamilyMemberGate = isV1
+    ? childEditorGate && familyCapable
+    : ownerNotProxy;
   const learnThisTooGate =
     ownerRole &&
     familyShape &&
     !context.isParentProxy &&
     context.activeProfile?.hasFamilyLinks === true;
+  const showLegacyModeFamilyHome =
+    legacyV0ModeNavActive &&
+    legacyV0FamilyCapable &&
+    !context.isParentProxy &&
+    context.appContext === 'family';
+  const showLegacyFlagsOffFamilyHome =
+    context.flags.MODE_NAV_V1_ENABLED === false &&
+    context.flags.MODE_NAV_V0_ENABLED === false &&
+    !context.isParentProxy &&
+    (isLegacyGuardian(context.activeProfile, linkedChildIds) ||
+      familyPlanOwner);
+  const showFamilyHome =
+    context.flags.MODE_NAV_V1_ENABLED === true
+      ? familyShape && !context.isParentProxy
+      : showLegacyModeFamilyHome || showLegacyFlagsOffFamilyHome;
 
   const gates: NavigationGates = {
     sessionIsOwner: ownerRole && !context.isParentProxy,
+    showFamilyHome,
+    showLearningActions: !context.isParentProxy,
     showBilling: ownerRole && !context.isParentProxy,
     showAccountSecurity: ownerRole && !context.isParentProxy,
     showExportDelete: ownerRole && !context.isParentProxy,
     showAddChild: addChildGate,
-    showRemoveFamilyMember: childEditorGate && familyCapable,
+    showRemoveFamilyMember: removeFamilyMemberGate,
     showFamilyChildActivity: childEditorGate,
     showProgressProfilePicker: childEditorGate,
-    showAccommodationChildEditor: childEditorGate,
-    showCelebrationsChildEditor: childEditorGate,
+    showAccommodationChildEditor: moreScreenChildEditorGate,
+    showCelebrationsChildEditor: moreScreenChildEditorGate,
     showMentorMemoryChildConsent: childEditorGate,
     showInlineStudyInvite: ownerRole && familyCapable && !context.isParentProxy,
     showLearnThisToo: learnThisTooGate,
     progressScope: familyShape ? 'children' : 'self',
   };
 
-  const home: NavigationContract['home'] = familyShape
+  const home: NavigationContract['home'] = showFamilyHome
     ? {
         screen: 'FamilyHome',
         titleKey: 'tabs.children',

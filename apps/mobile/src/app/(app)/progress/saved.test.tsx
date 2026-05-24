@@ -107,11 +107,11 @@ jest.mock(
   }),
 );
 
-const mockUseParentProxy = jest.fn();
+const mockUseNavigationContract = jest.fn();
 jest.mock(
-  '../../../hooks/use-parent-proxy' /* gc1-allow: hook reads SecureStore (native) + profile context; stub pins proxy state for deterministic tests */,
+  '../../../hooks/use-navigation-contract' /* gc1-allow: hook depends on full app provider tree; stub pins gates for deterministic tests */,
   () => ({
-    useParentProxy: () => mockUseParentProxy(),
+    useNavigationContract: () => mockUseNavigationContract(),
   }),
 );
 
@@ -151,7 +151,16 @@ function mockHooks({
   isFetchingNextPage = false,
   fetchNextPage = jest.fn(),
   refetch = jest.fn(),
-  isParentProxy = false,
+  showLearningActions = true,
+}: {
+  bookmarks?: BookmarkFixture[];
+  isLoading?: boolean;
+  isError?: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  fetchNextPage?: jest.Mock;
+  refetch?: jest.Mock;
+  showLearningActions?: boolean;
 } = {}) {
   mockUseBookmarks.mockReturnValue({
     data: isLoading || isError ? undefined : { pages: [{ bookmarks }] },
@@ -168,7 +177,11 @@ function mockHooks({
     mutateAsync: mockDeleteBookmarkMutateAsync,
   });
 
-  mockUseParentProxy.mockReturnValue({ isParentProxy });
+  mockUseNavigationContract.mockReturnValue({
+    gates: {
+      showLearningActions,
+    },
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -356,16 +369,14 @@ describe('SavedBookmarksScreen', () => {
 
   describe('delete bookmark', () => {
     it('shows delete button for owner (non-proxy) users', () => {
-      mockHooks({ bookmarks: [BOOKMARK_1], isParentProxy: false });
+      mockHooks({ bookmarks: [BOOKMARK_1], showLearningActions: true });
       render(<SavedBookmarksScreen />);
       screen.getByTestId('bookmark-delete-bk-1');
     });
 
-    it('hides delete button for parent-proxy users', () => {
-      mockHooks({ bookmarks: [BOOKMARK_1], isParentProxy: true });
+    it('hides delete button when learning actions are blocked', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1], showLearningActions: false });
       render(<SavedBookmarksScreen />);
-      // BUG-CANDIDATE: If parent can see bookmarks but delete is hidden for proxy,
-      // verify the delete button is absent — this is the correct behavior.
       expect(screen.queryByTestId('bookmark-delete-bk-1')).toBeNull();
     });
 
@@ -453,13 +464,36 @@ describe('SavedBookmarksScreen', () => {
     it('shows bookmarks without delete buttons when in parent-proxy mode', () => {
       mockHooks({
         bookmarks: [BOOKMARK_1, BOOKMARK_2],
-        isParentProxy: true,
+        showLearningActions: false,
       });
       render(<SavedBookmarksScreen />);
       screen.getByTestId('bookmark-row-bk-1');
       screen.getByTestId('bookmark-row-bk-2');
       expect(screen.queryByTestId('bookmark-delete-bk-1')).toBeNull();
       expect(screen.queryByTestId('bookmark-delete-bk-2')).toBeNull();
+    });
+  });
+
+  // ── Navigation contract gate ──────────────────────────────────────────────
+
+  describe('navigation contract — showLearningActions drives delete affordance', () => {
+    it('hides delete button when gate is false', () => {
+      mockHooks({
+        bookmarks: [BOOKMARK_1],
+        showLearningActions: false,
+      });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('bookmark-row-bk-1');
+      expect(screen.queryByTestId('bookmark-delete-bk-1')).toBeNull();
+    });
+
+    it('shows delete button when gate is true', () => {
+      mockHooks({
+        bookmarks: [BOOKMARK_1],
+        showLearningActions: true,
+      });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('bookmark-delete-bk-1');
     });
   });
 });

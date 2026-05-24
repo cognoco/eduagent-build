@@ -116,14 +116,26 @@ const DictationCompleteScreen = require('./complete')
 describe('DictationCompleteScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // jest.clearAllMocks() clears call records but NOT mockReturnValueOnce
+    // queues.  Reset the mutation mocks explicitly so an unconsumed
+    // mockReturnValueOnce from a prior test cannot leak into the next one
+    // (e.g. BUG-692 blur test leaves pending resolved via resolve() but
+    // the mockReturnValueOnce was never consumed).
+    mockReviewMutateAsync.mockReset();
+    mockRecordMutateAsync.mockReset();
     jest.useFakeTimers();
     mockReviewIsPending = false;
     mockRecordIsPending = false;
-    mockReviewMutateAsync.mockReset();
     mockReviewReset.mockReset();
-    mockRecordMutateAsync.mockReset();
     mockLaunchCameraResult = { canceled: true };
     delete (global as any).__focusEffectCleanup;
+    // Restore default implementations that jest.clearAllMocks() wipes.
+    const picker = require('expo-image-picker');
+    (picker.launchCameraAsync as jest.Mock).mockImplementation(() =>
+      Promise.resolve(mockLaunchCameraResult),
+    );
+    const fs = require('expo-file-system/legacy');
+    (fs.readAsStringAsync as jest.Mock).mockResolvedValue('base64data');
   });
 
   afterEach(() => {
@@ -308,6 +320,77 @@ describe('DictationCompleteScreen', () => {
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
+  it('[WI-78 review] suppresses stale camera errors after screen blur', async () => {
+    const imagePicker = require('expo-image-picker') as {
+      launchCameraAsync: jest.Mock;
+    };
+    let rejectCamera!: (reason?: unknown) => void;
+    imagePicker.launchCameraAsync.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectCamera = reject;
+        }),
+    );
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+    });
+
+    const cleanup = (global as any).__focusEffectCleanup;
+    if (typeof cleanup === 'function') {
+      cleanup();
+    }
+
+    await act(async () => {
+      rejectCamera(new Error('camera rejected late'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] suppresses stale photo read errors after screen blur', async () => {
+    mockLaunchCameraResult = {
+      canceled: false,
+      assets: [{ uri: 'file://review.jpg', mimeType: 'image/jpeg' }],
+    };
+    const fs = require('expo-file-system/legacy') as {
+      readAsStringAsync: jest.Mock;
+    };
+    let rejectRead!: (reason?: unknown) => void;
+    fs.readAsStringAsync.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRead = reject;
+        }),
+    );
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const cleanup = (global as any).__focusEffectCleanup;
+    if (typeof cleanup === 'function') {
+      cleanup();
+    }
+
+    await act(async () => {
+      rejectRead(new Error('read rejected late'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+  });
+
   it('[WI-78 review] does not navigate when review resolves after timeout', async () => {
     mockLaunchCameraResult = {
       canceled: false,
@@ -343,5 +426,115 @@ describe('DictationCompleteScreen', () => {
 
     expect(mockSetData).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
+  // BUG-612: 20s review timeout must set reviewCancelledRef so a late
+  // successful response does not push to /dictation/review.
+  // -----------------------------------------------------------------------
+
+  it('[BUG-612] late review response after timeout does not push to /review', async () => {
+    // Arm an unresolved promise that simulates an in-flight review request.
+    // We control resolution below so the guard in handleCheckWriting can
+    // be checked at the exact moment we choose.
+    let resolveReview!: (v: unknown) => void;
+    const pendingReview = new Promise((r) => {
+      resolveReview = r;
+    });
+
+    const picker = require('expo-image-picker');
+    (picker.launchCameraAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///photo.jpg', mimeType: 'image/jpeg' }],
+    });
+
+    // mutateAsync returns the pending promise and never auto-resolves.
+    // Use a synchronous mock so that mutateAsync() RETURNS the promise
+    // immediately but does NOT use Promise.resolve() internally — this
+    // prevents act() from flushing the resolution through its microtask
+    // drain loop.
+    mockReviewMutateAsync.mockImplementation(() => pendingReview);
+
+    // Render in the non-reviewing state so the Check button is visible.
+    mockReviewIsPending = false;
+    const { getByTestId, rerender, queryByTestId } = render(
+      <DictationCompleteScreen />,
+    );
+
+    // Kick off the review. We use synchronous act so React processes the
+    // press synchronously (fires the event, queues effects) but does NOT
+    // drain the microtask queue beyond what React needs for synchronous
+    // state/effect work.  handleCheckWriting() begins executing — camera
+    // resolves (it's a microtask), then FileSystem resolves, then
+    // mutateAsync() is called, which returns pendingReview.  The async
+    // function suspends at `await pendingReview` and does NOT proceed to
+    // the guard check.
+    act(() => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+    });
+
+    // Give the microtask pipeline (camera + FS mocks) time to run so
+    // mutateAsync is actually called before we assert anything.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Simulate React Query flipping isPending=true: arm the 20-second timeout
+    // useEffect.
+    mockReviewIsPending = true;
+    act(() => {
+      rerender(<DictationCompleteScreen />);
+    });
+
+    // The timeout useEffect ran; advance past 20s so it fires.
+    act(() => {
+      jest.advanceTimersByTime(21_000);
+    });
+
+    // Flush the state update from setReviewTimedOut(true).
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Sanity check: the timeout UI is visible (timer fired, reviewTimedOut=true).
+    expect(queryByTestId('review-timeout-error')).not.toBeNull();
+
+    // Now the late response arrives.  reviewCancelledRef.current must be
+    // true (set by the timeout callback) so the guard suppresses navigation.
+    await act(async () => {
+      resolveReview({
+        mistakeCount: 0,
+        feedback: 'Great job!',
+        mistakes: [],
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The guard must have fired and blocked push.
+    expect(mockPush).not.toHaveBeenCalledWith('/(app)/dictation/review');
+  });
+
+  it('[BUG-612] review-timeout-error UI appears after 20s', async () => {
+    // Render in reviewing state so the timeout useEffect arms immediately.
+    mockReviewIsPending = true;
+    const { queryByTestId } = render(<DictationCompleteScreen />);
+
+    // Before timeout the error banner must not be visible.
+    expect(queryByTestId('review-timeout-error')).toBeNull();
+
+    // Fire the 20-second timeout.
+    act(() => {
+      jest.advanceTimersByTime(21_000);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // After timeout the error banner must be visible.
+    expect(queryByTestId('review-timeout-error')).not.toBeNull();
   });
 });

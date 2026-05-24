@@ -71,7 +71,9 @@ jest.mock(
   },
 );
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { retentionRoutes } from './retention';
 import {
   getSubjectRetention,
   getAllSubjectsRetention,
@@ -844,5 +846,51 @@ describe('retention routes', () => {
 
       expect(res.status).toBe(401);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-165 / DS-076] Proxy-mode write guard — teaching-preference PUT + DELETE
+// (other write handlers in retention.ts were already guarded pre-PR)
+// ---------------------------------------------------------------------------
+describe('[WI-165 / DS-076] retention proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', retentionRoutes);
+    return proxyApp;
+  }
+
+  const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('PUT /subjects/:subjectId/teaching-preference returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/teaching-preference`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subjectId: SUBJECT_ID,
+          method: 'visual_diagrams',
+        }),
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('DELETE /subjects/:subjectId/teaching-preference returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/teaching-preference`,
+      { method: 'DELETE' },
+    );
+    expect(res.status).toBe(403);
   });
 });

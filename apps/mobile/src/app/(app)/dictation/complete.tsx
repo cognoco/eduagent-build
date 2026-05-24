@@ -39,6 +39,9 @@ export default function DictationCompleteScreen(): React.ReactElement {
     if (isReviewing) {
       setReviewTimedOut(false);
       reviewTimeoutRef.current = setTimeout(() => {
+        // [BUG-612] Timeout counts as cancellation — block any late response
+        // from navigating to the review screen. Also invalidate the attempt
+        // token so stale retries cannot apply after the timeout UI appears.
         reviewCancelledRef.current = true;
         latestReviewAttemptRef.current += 1;
         setReviewTimedOut(true);
@@ -163,6 +166,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
         // only jpeg/png/webp, so normalize anything else to jpeg.
         assetMimeType = asset?.mimeType;
       } catch {
+        if (
+          reviewCancelledRef.current ||
+          latestReviewAttemptRef.current !== attemptId
+        )
+          return;
         platformAlert(
           t('dictation.complete.cameraErrorTitle'),
           t('dictation.complete.cameraErrorMessage'),
@@ -199,6 +207,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
           imageMimeType = 'image/jpeg';
         }
       } catch {
+        if (
+          reviewCancelledRef.current ||
+          latestReviewAttemptRef.current !== attemptId
+        )
+          return;
         platformAlert(
           t('dictation.complete.photoErrorTitle'),
           t('dictation.complete.photoErrorMessage'),

@@ -9,6 +9,7 @@ import {
   profileListResponseSchema,
   profileSwitchResponseSchema,
   ERROR_CODES,
+  ForbiddenError,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -151,12 +152,20 @@ export const profileRoutes = new Hono<ProfileEnv>()
         );
       }
 
-      const profile = await updateProfileAppContext(
-        db,
-        id,
-        account.id,
-        defaultAppContext,
-      );
+      let profile: Awaited<ReturnType<typeof updateProfileAppContext>>;
+      try {
+        profile = await updateProfileAppContext(
+          db,
+          id,
+          account.id,
+          defaultAppContext,
+        );
+      } catch (err) {
+        if (err instanceof ForbiddenError) {
+          return apiError(c, 403, ERROR_CODES.FORBIDDEN, err.message);
+        }
+        throw err;
+      }
       if (!profile) return notFound(c, 'Profile not found');
       return c.json(profileResponseSchema.parse({ profile }));
     },

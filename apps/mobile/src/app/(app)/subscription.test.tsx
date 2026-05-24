@@ -4,6 +4,7 @@ import {
   fireEvent,
   waitFor,
   act,
+  within,
 } from '@testing-library/react-native';
 import React from 'react';
 import { Alert, Linking, Platform } from 'react-native';
@@ -162,6 +163,25 @@ jest.mock(
       UNKNOWN: 'UNKNOWN',
       CUSTOM: 'CUSTOM',
     },
+  }),
+);
+
+// useNavigationContract — V1-on tests override the gates to drive the
+// `canUseOwnerBillingGates` / `canRemoveFamilyMember` branches in
+// subscription.tsx (lines 694-699, 1553, 1648). Default is permissive so
+// the existing V0 tests (MODE_NAV_V1_ENABLED=false) are unaffected — the
+// V0 short-circuit reads `isOwnerProfile` directly and never consults the
+// mock value.
+const mockNavigationContractGates = {
+  showBilling: true,
+  showRemoveFamilyMember: true,
+};
+jest.mock(
+  '../../hooks/use-navigation-contract', // gc1-allow: unit test boundary — hook depends on full app provider tree; stub pins gates for deterministic V1 path coverage
+  () => ({
+    useNavigationContract: () => ({
+      gates: mockNavigationContractGates,
+    }),
   }),
 );
 
@@ -388,6 +408,10 @@ describe('SubscriptionScreen', () => {
       displayName: 'Alex',
       isOwner: true,
     });
+    // Reset navigation contract gates to permissive default (V0 path ignores
+    // these; V1-on tests override per case).
+    mockNavigationContractGates.showBilling = true;
+    mockNavigationContractGates.showRemoveFamilyMember = true;
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 
@@ -586,7 +610,7 @@ describe('SubscriptionScreen', () => {
     expect(
       screen.queryByText(/Subscription plans will be available soon/),
     ).toBeNull();
-    screen.getByText(/store purchasing isn't available on this device yet/i);
+    screen.getByText(/store purchasing isn.t available on this device yet/i);
     // BUG-899: only Free and Plus are approved per pricing_dual_cap.md.
     // Family and Pro static cards must not be shown to non-Family users —
     // their store SKUs are not approved for public listing.
@@ -648,7 +672,7 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('static-tier-plus');
     // The fix:
     screen.getByTestId('static-tier-family');
-    screen.getByText(/1,500 questions per month \(shared/i);
+    screen.getByText(/1,500 shared questions\/month/i);
     // Pro is still hidden — it's not the user's tier and not approved
     // for public listing.
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
@@ -710,8 +734,8 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('static-tier-free');
     screen.getByTestId('static-tier-plus');
     // The fix:
-    screen.getByTestId('static-tier-pro');
-    screen.getByText(/3,000 questions per month/i);
+    const proCard = screen.getByTestId('static-tier-pro');
+    within(proCard).getByText(/Unlimited questions/i);
     // Family is still hidden — it's not this user's tier and not approved
     // for general public listing.
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
@@ -1543,6 +1567,56 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('remove-family-member-p3');
   });
 
+  it('shows live family pool details for pro subscriptions', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'pro',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'pro',
+              monthlyLimit: 1500,
+              usedThisMonth: 300,
+              remainingQuestions: 1200,
+              profileCount: 3,
+              maxProfiles: 4,
+              members: [
+                { profileId: 'p1', displayName: 'Parent', isOwner: true },
+                { profileId: 'p2', displayName: 'Alex', isOwner: false },
+                { profileId: 'p3', displayName: 'Mia', isOwner: false },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('family-pool-section');
+    });
+    screen.getByText('3 of 4 profiles connected');
+    screen.getByText(/1200 shared questions left/i);
+    screen.getByText('Parent (owner)');
+    screen.getByText('Alex');
+    screen.getByText('Mia');
+  });
+
   it('removes a non-owner profile from the family pool after confirmation', async () => {
     mockFetch.setRoute(
       '/subscription',
@@ -1812,6 +1886,31 @@ describe('SubscriptionScreen', () => {
         screen.getByText('You learned 1 topic and earned 50 XP — great work!'),
       ).toBeTruthy();
     });
+
+    it('[B-607] paywall strings flow through i18n (childPaywall + restore + byokWaitlist namespaces)', () => {
+      // Locale-key presence regression guard for B-607. If any of these key
+      // paths get deleted or renamed, this test fails immediately rather than
+      // letting non-EN locales silently fall back to key strings or English.
+      // The rendered-string assertions above (e.g. "You've been exploring..."
+      // at line ~1776) already validate runtime i18n; this guard makes the
+      // locale dependency explicit so a future contributor sees the contract.
+      const enJson = jest.requireActual('../../i18n/locales/en.json');
+      expect(enJson.subscription.childPaywall.greatStart).toBe(
+        "You've been exploring and learning — great start!",
+      );
+      expect(enJson.subscription.childPaywall.notifyButton).toBe(
+        'Notify My Parent',
+      );
+      expect(enJson.subscription.restore.button).toBe('Restore Purchases');
+      expect(enJson.subscription.byokWaitlist).toBeDefined();
+      // All 7 locales must define the namespaces.
+      for (const loc of ['de', 'es', 'ja', 'nb', 'pl', 'pt']) {
+        const j = jest.requireActual(`../../i18n/locales/${loc}.json`);
+        expect(j.subscription.childPaywall).toBeDefined();
+        expect(j.subscription.restore).toBeDefined();
+        expect(j.subscription.byokWaitlist).toBeDefined();
+      }
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -1943,8 +2042,8 @@ describe('SubscriptionScreen', () => {
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
-          'Connection error',
-          "Couldn't load purchase options. Check your connection and try again.",
+          'Network error',
+          'Please check your internet connection and try again.',
           expect.arrayContaining([expect.objectContaining({ text: 'Retry' })]),
           undefined,
         );
@@ -2052,6 +2151,205 @@ describe('SubscriptionScreen', () => {
           undefined,
           undefined,
         );
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // V1 navigation contract gates (MODE_NAV_V1_ENABLED=true)
+  //
+  // The V0 path (default in tests) reads `isOwnerProfile` directly. Under V1
+  // the screen consults `navigationContract.gates.showBilling` and
+  // `.showRemoveFamilyMember` instead — so a non-owner of those surfaces can
+  // be hidden even when the profile carries isOwner=true (e.g. proxy mode).
+  // These tests drive the V1 branch and prove the gates control the UI
+  // independently of the raw owner fact. The flag patch follows the canonical
+  // pattern from LearnerScreen.test.tsx:518-551.
+  // -------------------------------------------------------------------------
+
+  describe('V1 navigation contract gates', () => {
+    function withV1Flag(fn: () => Promise<void> | void) {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V1_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }
+      ).MODE_NAV_V1_ENABLED = true;
+      const restore = () => {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }
+        ).MODE_NAV_V1_ENABLED = original;
+      };
+      try {
+        const result = fn();
+        if (result instanceof Promise) {
+          return result.finally(restore);
+        }
+        restore();
+        return result;
+      } catch (err) {
+        restore();
+        throw err;
+      }
+    }
+
+    function setupFamilyTier(opts?: {
+      byProfile?: Array<{
+        profile_id: string;
+        name: string;
+        used: number;
+        usedToday: number;
+        is_self: boolean;
+      }>;
+      members?: Array<{
+        profileId: string;
+        displayName: string;
+        isOwner: boolean;
+      }>;
+    }) {
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: {
+                ...DEFAULT_SUBSCRIPTION,
+                tier: 'family',
+                status: 'active',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockFetch.setRoute(
+        '/usage',
+        () =>
+          new Response(
+            JSON.stringify({
+              usage: {
+                ...DEFAULT_USAGE,
+                byProfile: opts?.byProfile,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockFetch.setRoute(
+        '/subscription/family',
+        () =>
+          new Response(
+            JSON.stringify({
+              family: {
+                tier: 'family',
+                monthlyLimit: 1500,
+                usedThisMonth: 0,
+                remainingQuestions: 1500,
+                profileCount: opts?.members?.length ?? 2,
+                maxProfiles: 4,
+                members: opts?.members ?? [
+                  {
+                    profileId: 'profile-1',
+                    displayName: 'Alex',
+                    isOwner: true,
+                  },
+                  { profileId: 'p2', displayName: 'Kid', isOwner: false },
+                ],
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+    }
+
+    it('renders "Your share" label on owner usage row when showBilling=true', async () => {
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showBilling = true;
+        setupFamilyTier({
+          byProfile: [
+            {
+              profile_id: 'profile-1',
+              name: 'Alex',
+              used: 42,
+              usedToday: 3,
+              is_self: true,
+            },
+            {
+              profile_id: 'p2',
+              name: 'Kid',
+              used: 17,
+              usedToday: 1,
+              is_self: false,
+            },
+          ],
+        });
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('usage-profile-profile-1');
+        });
+        screen.getByText('Your share');
+        expect(screen.queryByText('Your usage')).toBeNull();
+      });
+    });
+
+    it('renders "Your usage" label when showBilling=false even for isOwner=true profile', async () => {
+      // Break test: V1 gate must override the raw owner fact. With
+      // showBilling=false the owner-facing "Your share" copy must NOT render
+      // even though activeProfile.isOwner is true — proves the screen reads
+      // canUseOwnerBillingGates (V1) rather than isOwnerProfile (V0).
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showBilling = false;
+        setupFamilyTier({
+          byProfile: [
+            {
+              profile_id: 'profile-1',
+              name: 'Alex',
+              used: 42,
+              usedToday: 3,
+              is_self: true,
+            },
+          ],
+        });
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('usage-profile-profile-1');
+        });
+        screen.getByText('Your usage');
+        expect(screen.queryByText('Your share')).toBeNull();
+      });
+    });
+
+    it('renders remove-family-member button when showRemoveFamilyMember=true', async () => {
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showRemoveFamilyMember = true;
+        setupFamilyTier();
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('remove-family-member-p2');
+        });
+      });
+    });
+
+    it('hides remove-family-member button when showRemoveFamilyMember=false even for isOwner=true profile', async () => {
+      // Break test: V1 gate must override the raw owner fact. Membership row
+      // still renders, but the destructive remove action is gated — proves
+      // the screen reads canRemoveFamilyMember (V1) not isOwnerProfile (V0).
+      await withV1Flag(async () => {
+        mockNavigationContractGates.showRemoveFamilyMember = false;
+        setupFamilyTier();
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('family-member-p2');
+        });
+        expect(screen.queryByTestId('remove-family-member-p2')).toBeNull();
       });
     });
   });

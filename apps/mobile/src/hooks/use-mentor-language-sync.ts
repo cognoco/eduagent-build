@@ -5,10 +5,14 @@ import { conversationLanguageSchema } from '@eduagent/schemas';
 import { useProfile } from '../lib/profile';
 import { useUpdateConversationLanguage } from './use-onboarding-dimensions';
 
+type SyncKey = { profileId: string; language: string };
+
 export function useMentorLanguageSync(): void {
   const { activeProfile } = useProfile();
   const { mutate, isPending } = useUpdateConversationLanguage();
-  const lastSyncedRef = useRef<string | null>(null);
+  // [BUG-599] Key by (profileId, language) so a profile switch re-runs sync
+  // even when the app language hasn't changed.
+  const lastSyncedRef = useRef<SyncKey | null>(null);
 
   useEffect(() => {
     if (!activeProfile || isPending) return;
@@ -17,8 +21,17 @@ export function useMentorLanguageSync(): void {
       const parsed = conversationLanguageSchema.safeParse(i18next.language);
       if (!parsed.success) return;
       if (parsed.data === activeProfile.conversationLanguage) return;
-      if (parsed.data === lastSyncedRef.current) return;
-      lastSyncedRef.current = parsed.data;
+      const last = lastSyncedRef.current;
+      if (
+        last &&
+        last.profileId === activeProfile.id &&
+        last.language === parsed.data
+      )
+        return;
+      lastSyncedRef.current = {
+        profileId: activeProfile.id,
+        language: parsed.data,
+      };
       mutate({ conversationLanguage: parsed.data });
     };
 

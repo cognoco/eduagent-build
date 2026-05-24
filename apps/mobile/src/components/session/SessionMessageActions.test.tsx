@@ -76,6 +76,11 @@ describe('SessionMessageActions stage gating', () => {
     expect(getByTestId('bookmark-toggle-evt-1').props.className).toContain(
       'min-h-[36px]',
     );
+    // [B-714] WCAG 44px tap target — the bookmark icon is 36px visual; hitSlop
+    // must extend the hit area by 4px top+bottom (and left+right) so the
+    // effective target reaches the 44px minimum.
+    const hitSlop = getByTestId('bookmark-toggle-evt-1').props.hitSlop;
+    expect(hitSlop).toEqual({ top: 4, bottom: 4, left: 4, right: 4 });
   });
 
   it('keeps learning chips before the compact feedback control group', () => {

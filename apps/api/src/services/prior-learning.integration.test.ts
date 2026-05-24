@@ -33,7 +33,10 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { fetchPriorTopics } from './prior-learning';
+import {
+  fetchCrossSubjectHighlights,
+  fetchPriorTopics,
+} from './prior-learning';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -62,6 +65,7 @@ interface SeededProfile {
   profileId: string;
   subjectId: string;
   topicId: string;
+  topicTitle: string;
 }
 
 async function seedProfileWithCompletedSession(
@@ -111,12 +115,13 @@ async function seedProfileWithCompletedSession(
     .returning({ id: curriculumBooks.id });
   if (!book) throw new Error('book insert failed');
 
+  const topicTitle = `Topic ${label} — ${RUN_ID}`;
   const [topic] = await database
     .insert(curriculumTopics)
     .values({
       curriculumId: curriculum.id,
       bookId: book.id,
-      title: `Topic ${label} — ${RUN_ID}`,
+      title: topicTitle,
       description: `Confidential topic for ${label}`,
       sortOrder: 0,
       estimatedMinutes: 30,
@@ -132,7 +137,30 @@ async function seedProfileWithCompletedSession(
     exchangeCount: 3,
   });
 
-  return { profileId: profile.id, subjectId: subject.id, topicId: topic.id };
+  return {
+    profileId: profile.id,
+    subjectId: subject.id,
+    topicId: topic.id,
+    topicTitle,
+  };
+}
+
+async function seedSubjectForProfile(
+  database: Database,
+  profileId: string,
+  label: string,
+): Promise<string> {
+  const [subject] = await database
+    .insert(subjects)
+    .values({
+      profileId,
+      name: `Subject ${label}`,
+      status: 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning({ id: subjects.id });
+  if (!subject) throw new Error('subject insert failed');
+  return subject.id;
 }
 
 async function cleanupByPrefix(database: Database): Promise<void> {
@@ -189,6 +217,62 @@ describeIfDb(
 
       expect(result.length).toBeGreaterThanOrEqual(1);
       expect(result[0]!.topicId).toBe(profileA.topicId);
+    });
+
+    it('[WI-80] excludes stale prior-session topic IDs that are not owned by the profile subject', async () => {
+      const profileA = await seedProfileWithCompletedSession(db, 'D');
+      const profileB = await seedProfileWithCompletedSession(db, 'E');
+
+      await db.insert(learningSessions).values({
+        profileId: profileA.profileId,
+        subjectId: profileA.subjectId,
+        topicId: profileB.topicId,
+        status: 'completed',
+        exchangeCount: 2,
+      });
+
+      const result = await fetchPriorTopics(
+        db,
+        profileA.profileId,
+        profileA.subjectId,
+      );
+
+      expect(result.map((topic) => topic.topicId)).toContain(profileA.topicId);
+      expect(result.map((topic) => topic.topicId)).not.toContain(
+        profileB.topicId,
+      );
+      expect(result.map((topic) => topic.title)).not.toContain(
+        profileB.topicTitle,
+      );
+    });
+
+    it('[WI-80] excludes cross-subject highlights whose topic is not owned by the session subject', async () => {
+      const profileA = await seedProfileWithCompletedSession(db, 'F');
+      const profileB = await seedProfileWithCompletedSession(db, 'G');
+      const ownedOtherSubjectId = await seedSubjectForProfile(
+        db,
+        profileA.profileId,
+        'F-other',
+      );
+
+      await db.insert(learningSessions).values({
+        profileId: profileA.profileId,
+        subjectId: ownedOtherSubjectId,
+        topicId: profileB.topicId,
+        status: 'completed',
+        exchangeCount: 2,
+      });
+
+      const result = await fetchCrossSubjectHighlights(
+        db,
+        profileA.profileId,
+        profileA.subjectId,
+        10,
+      );
+
+      expect(result.map((highlight) => highlight.title)).not.toContain(
+        profileB.topicTitle,
+      );
     });
   },
 );

@@ -83,6 +83,15 @@ describe('usePushTokenRegistration', () => {
       });
     // Restore resolved values after clearAllMocks
     mockMutateAsync.mockResolvedValue({ registered: true });
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+      expires: 'never',
+      granted: true,
+    });
+    (Notifications.getExpoPushTokenAsync as jest.Mock).mockResolvedValue({
+      data: 'ExponentPushToken[mock-token]',
+      type: 'expo',
+    });
     mockProfiles = null;
     mockIsExplicitProxyMode = false;
   });
@@ -103,9 +112,10 @@ describe('usePushTokenRegistration', () => {
     });
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        'ExponentPushToken[mock-token]',
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        profileId: 'profile-1',
+        token: 'ExponentPushToken[mock-token]',
+      });
     });
 
     await waitFor(() => {
@@ -179,9 +189,10 @@ describe('usePushTokenRegistration', () => {
     });
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        'ExponentPushToken[mock-token]',
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        profileId: 'profile-1',
+        token: 'ExponentPushToken[mock-token]',
+      });
     });
   });
 
@@ -203,6 +214,56 @@ describe('usePushTokenRegistration', () => {
     });
   });
 
+  it('[WI-80] skips API registration if active profile changes while token lookup is in flight', async () => {
+    let resolveFirstToken!: (value: { data: string }) => void;
+    (Notifications.getExpoPushTokenAsync as jest.Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstToken = resolve;
+          }),
+      )
+      .mockImplementation(() => new Promise(() => undefined));
+
+    const { rerender } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(Notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1);
+    });
+
+    mockActiveProfile = createTestProfile({ id: 'profile-2' });
+    rerender({});
+
+    await act(async () => {
+      resolveFirstToken({ data: 'ExponentPushToken[stale-profile]' });
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalledWith({
+      profileId: 'profile-1',
+      token: 'ExponentPushToken[stale-profile]',
+    });
+  });
+
+  it('[WI-80] passes the captured profile id into the API mutation', async () => {
+    mockMutateAsync.mockImplementationOnce(async () => {
+      mockActiveProfile = createTestProfile({ id: 'profile-2' });
+      return { registered: true };
+    });
+
+    renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        profileId: 'profile-1',
+        token: 'ExponentPushToken[mock-token]',
+      });
+    });
+  });
+
   it('registers again when the Expo push token rotates for the same profile', async () => {
     const getExpoPushTokenAsync =
       Notifications.getExpoPushTokenAsync as jest.Mock;
@@ -215,9 +276,10 @@ describe('usePushTokenRegistration', () => {
     });
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        'ExponentPushToken[first-token]',
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        profileId: 'profile-1',
+        token: 'ExponentPushToken[first-token]',
+      });
     });
 
     getExpoPushTokenAsync.mockResolvedValue({
@@ -229,9 +291,10 @@ describe('usePushTokenRegistration', () => {
     });
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        'ExponentPushToken[rotated-token]',
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        profileId: 'profile-1',
+        token: 'ExponentPushToken[rotated-token]',
+      });
     });
     expect(mockMutateAsync).toHaveBeenCalledTimes(2);
   });

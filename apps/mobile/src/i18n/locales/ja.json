@@ -240,7 +240,9 @@
         "reportsAction": "レポート",
         "nudgeAction": "Nudge"
       }
-    }
+    },
+    "goToProgress": "Go to Progress",
+    "goToProgressLabel": "Go to Progress"
   },
   "dashboard": {
     "backLabel": "戻る",
@@ -1066,7 +1068,9 @@
       "successPrompt": "準備ができたらライブラリに戻ってください。",
       "dontRemember": "覚えていません",
       "stillStuck": "まだわかりません",
-      "errorTitle": "問題が発生しました"
+      "errorTitle": "問題が発生しました",
+      "timeoutTitle": "まだ待機中…",
+      "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。"
     }
   },
   "subject": {
@@ -1680,8 +1684,8 @@
         "remembered_other": "Remembered after {{count}} days",
         "fading_one": "Getting fuzzy after {{count}} day",
         "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Slipping after {{count}} day",
-        "weak_other": "Slipping after {{count}} days",
+        "weak_one": "Ready for a refresh after {{count}} day",
+        "weak_other": "Ready for a refresh after {{count}} days",
         "forgotten_one": "Last seen {{count}} day ago",
         "forgotten_other": "Last seen {{count}} days ago"
       }
@@ -1753,7 +1757,8 @@
       "nudgeCta": "{{name}}さんにリマインダーを送って再開を促しましょう。",
       "nudgeA11y": "{{name}}さんにリマインダーを送信",
       "viewAllReports": "すべてのレポートを表示",
-      "subjectsTitle": "科目"
+      "subjectsTitle": "科目",
+      "goToChildCurriculum": "Open child curriculum"
     },
     "remediation": {
       "heading": "別のアプローチを試してみよう",
@@ -2476,6 +2481,63 @@
     "web": {
       "plansOnMobile": "プランはモバイルアプリでご利用いただけます",
       "storePurchaseUnavailable": "このデバイスではストア購入はご利用いただけません。"
+    },
+    "childPaywall": {
+      "headline": "Nice work so far!",
+      "greatStart": "You've been exploring and learning — great start!",
+      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
+      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "notifyButton": "Notify My Parent",
+      "notifyButtonNotified": "Parent notified",
+      "notifyButtonAccessibilityNotified": "Parent already notified",
+      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "cooldownReminder": "You can remind them again in {{label}}.",
+      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
+      "waitText": "While you wait, you can still browse your Library and see your progress.",
+      "browseLibrary": "Browse Library",
+      "browseLibraryAccessibilityLabel": "Browse Library",
+      "seeProgress": "See your progress",
+      "seeProgressAccessibilityLabel": "See your progress",
+      "goHome": "Go Home",
+      "goHomeAccessibilityLabel": "Go Home",
+      "back": "Back",
+      "backAccessibilityLabel": "Go back",
+      "alerts": {
+        "sentTitle": "Sent!",
+        "sentBody": "We let your parent know!",
+        "askParentTitle": "Ask your parent",
+        "askParentBody": "Ask your parent to open the app and subscribe.",
+        "notifyErrorTitle": "Could not send notification",
+        "notifyErrorBody": "Please check your connection and try again."
+      }
+    },
+    "restore": {
+      "button": "Restore Purchases",
+      "accessibilityLabel": "Restore purchases",
+      "verifying": "Verifying purchase...",
+      "restoring": "Restoring...",
+      "failedTitle": "Restore failed",
+      "failedBody": "Could not restore purchases. Please try again.",
+      "notFoundTitle": "No subscriptions found",
+      "notFoundBody": "We could not find any previous purchases to restore.",
+      "cancelledTitle": "Restore cancelled",
+      "cancelledBody": "Restore will continue in background.",
+      "cancelAccessibilityLabel": "Cancel restore"
+    },
+    "byokWaitlist": {
+      "heading": "Bring your own key",
+      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
+      "joinButton": "Join Waitlist",
+      "alreadyJoinedButton": "Already joined",
+      "joinAccessibilityLabel": "Join BYOK waitlist",
+      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "alerts": {
+        "successTitle": "Waitlist",
+        "successBody": "You have been added to the BYOK waitlist.",
+        "errorTitle": "Error",
+        "errorBody": "Could not join waitlist. Try again."
+      }
     }
   },
   "sessionSummary": {
@@ -2630,5 +2692,231 @@
     "dismiss": "Dismiss",
     "buttonLabel": "Add to my learning",
     "privacyNote": "Private to your learning"
+  },
+  "learnerHomeTimeout": {
+    "loading": "もうすぐです — もう少しお待ちください...",
+    "retry": "もう一度試す",
+    "goToLibrary": "ライブラリへ",
+    "moreOptions": "その他のオプション"
+  },
+  "subscriptionScreen": {
+    "back": "戻る",
+    "backAccessibilityLabel": "戻る",
+    "title": "サブスクリプション",
+    "loading": {
+      "error": "サブスクリプションの詳細を読み込めませんでした。もう一度お試しください。",
+      "retryAccessibilityLabel": "サブスクリプションを再読み込み",
+      "retry": "再試行"
+    },
+    "tierLabels": {
+      "free": "無料",
+      "plus": "Plus",
+      "family": "ファミリー",
+      "pro": "Pro"
+    },
+    "tierLimits": {
+      "free": "1日10問、月100問",
+      "plus": "月700問",
+      "family": "月1,500問共有",
+      "pro": "無制限"
+    },
+    "tierFeatures": {
+      "free": {
+        "0": "1日10問",
+        "1": "月10問",
+        "2": "基本学習トピック",
+        "3": "進捗管理"
+      },
+      "plus": {
+        "0": "月700問",
+        "1": "日次制限なし",
+        "2": "全学習トピック",
+        "3": "優先サポート"
+      },
+      "family": {
+        "0": "月1,500問共有",
+        "1": "最大10名まで",
+        "2": "家族進捗概要",
+        "3": "Plusの全機能"
+      },
+      "pro": {
+        "0": "無制限の質問",
+        "1": "新機能への早期アクセス",
+        "2": "専属サポート",
+        "3": "Familyの全機能"
+      }
+    },
+    "packagePeriod": {
+      "monthly": "月次",
+      "annual": "年次",
+      "weekly": "週次",
+      "lifetime": "永久",
+      "threeMonth": "3か月",
+      "sixMonth": "6か月",
+      "twoMonth": "2か月"
+    },
+    "currentPlan": {
+      "sectionHeader": "現在のプラン",
+      "statusCancelling": "解約中",
+      "statusPastDue": "未払い",
+      "statusExpired": "期限切れ",
+      "statusActive": "有効",
+      "accessUntil": "{{date}}まで利用可能",
+      "renews": "{{date}}に更新",
+      "upgradeButton": "アップグレード",
+      "upgradeAccessibilityLabel": "プランをアップグレード"
+    },
+    "cancellationNotice": {
+      "title": "サブスクリプション終了",
+      "body": "サブスクリプションがキャンセルされました。{{date}}まで全機能を引き続き使用できます。その後、アカウントは無料プランに戻ります。"
+    },
+    "usage": {
+      "sectionHeader": "今月の利用状況",
+      "dailyQuestions": "本日: {{used}} / {{limit}}問",
+      "topUpCreditsRemaining_one": "+ トップアップクレジット{{count}}残",
+      "topUpCreditsRemaining_other": "+ トップアップクレジット{{count}}残",
+      "yourShare": "自分の分",
+      "yourUsage": "自分の利用",
+      "questionsCount_one": "{{count}}問",
+      "questionsCount_other": "{{count}}問",
+      "familyAggregate": "家族合計",
+      "quotaResets": "クォータリセット: {{date}}",
+      "subscriptionRenews": "サブスクリプション更新日: {{date}}",
+      "dailyLimitResets": "日次上限 — 真夜にリセット"
+    },
+    "familyPool": {
+      "sectionHeader": "ファミリープール",
+      "profilesConnected": "/ {{max}}プロフィール接続中",
+      "questionsLeft": "今周の共有問残り",
+      "ownerSuffix": " (オーナー)",
+      "removingMember": "削除中…",
+      "removeMember": "削除"
+    },
+    "plans": {
+      "sectionHeader": "プラン",
+      "confirmingPurchase": "購入を確認中…",
+      "currentBadge": "現在",
+      "retryOfferings": "再試行",
+      "retryOfferingsAccessibilityLabel": "サブスクリプションオファーを再読み込み",
+      "contactSupport": "サポートに連絡",
+      "contactSupportAccessibilityLabel": "サポートに連絡",
+      "offeringsError": "購入オプションを読み込めませんでした。現在{{tier}}プラン・{{limits}}です。",
+      "offeringsWebOnly": "現在{{tier}}プラン・{{limits}}です。各プランの内容—このデバイスではまだストアでの購入はできません。"
+    },
+    "packageOption": {
+      "currentPlan": "現在のプラン",
+      "subscribeTo": "登録",
+      "subscribe": "登録",
+      "processing": "処理中…",
+      "currentPlanLabel": "現在のプラン",
+      "subscribeLabel": "登録",
+      "processingLabel": "処理中…",
+      "currentPlanAccessibilityLabel": "現在のプラン: {{title}}, {{price}}",
+      "subscribePlanAccessibilityLabel": "登録 {{title}}, {{price}}"
+    },
+    "restore": {
+      "sectionHeader": "購入を復元",
+      "checkLater": "後で確認"
+    },
+    "topUp": {
+      "sectionHeader": "質問が足りない？",
+      "buyAccessibilityLabel": "500クレジットを購入",
+      "buyButton": "500クレジットを購入",
+      "openingStore": "ストアを開く…",
+      "credits": "一回購入。クレジットは12か月後に消滅。",
+      "checkLater": "後で確認",
+      "checkLaterAccessibilityLabel": "トップアップ確認をキャンセル",
+      "confirmingPollMessage": "購入を確認中…",
+      "confirmingPollMessageLong": "トップアップ確認中 — 最大30秒かかることがあります。購入は安全です。"
+    },
+    "manageBilling": {
+      "sectionHeader": "管理",
+      "button": "支払い管理",
+      "buttonAccessibilityLabel": "支払い管理",
+      "webInfo": "支払い管理",
+      "webInfoSubtitle": "サブスクリプションはモバイルデバイスで管理されています",
+      "opensAppStore": "App Storeのサブスクリプションを開く",
+      "opensGooglePlay": "Google Playのサブスクリプションを開く"
+    },
+    "byokWaitlist": {
+      "joinButton": "ウェイトリストに登録",
+      "leaveButton": "ウェイトリストを退出",
+      "joiningButton": "登録中…",
+      "leavingButton": "退出中…"
+    },
+    "childPaywall": {
+      "title": "保護者に相談",
+      "body": "本日の質問を使い切りました。学習を続けるには保護者のアップグレードが必要です。",
+      "cooldownZero": "0秒",
+      "cooldownHours_one": "{{count}}時間",
+      "cooldownHours_other": "{{count}}時間",
+      "cooldownMinutes_one": "{{count}}分",
+      "cooldownMinutes_other": "{{count}}分",
+      "cooldownSeconds_one": "{{count}}秒",
+      "cooldownSeconds_other": "{{count}}秒",
+      "xpThisWeek_one": "今週{{count}} XP",
+      "xpThisWeek_other": "今週{{count}} XP",
+      "topicsThisWeek_one": "今週{{count}}トピック",
+      "topicsThisWeek_other": "今週{{count}}トピック"
+    },
+    "alerts": {
+      "topUpNotAvailableTitle": "利用不可",
+      "topUpNotAvailableBody": "トップアップクレジットは現在利用できません。後で再度お試しいただくか、サポートにお啔いしてください。",
+      "topUpRetry": "再試行",
+      "networkErrorTitle": "ネットワークエラー",
+      "networkErrorBody": "インターネット接続を確認して再度お試しください。",
+      "purchaseFailedTitle": "購入失敗",
+      "purchaseFailedBody": "購入中に予期せぬエラーが発生しました。もう一度お試しください。",
+      "alreadyPurchasedTitle": "購入済み",
+      "alreadyPurchasedBody": "このサブスクリプションはすでに購入済みのようです。'購入を復元'をタップしてこのデバイスで有効にしてください。",
+      "restorePurchasesButton": "購入を復元",
+      "manageBillingErrorTitle": "サブスクリプション管理を開けませんでした",
+      "manageBillingErrorBody": "次のURLで直接サブスクリプションを管理できます:\n{{url}}",
+      "tryAgain": "再試行",
+      "checkAgain": "再度確認",
+      "topUpPurchaseConfirmedTitle": "購入確認",
+      "topUpPurchaseConfirmedBody": "500クレジットが追加されています。通常1分以内に表示されます—下に引っ張って更新してください。",
+      "topUpCheckLaterTitle": "後で確認",
+      "topUpCheckLaterBody": "クレジットはすぐに表示されます—更新して確認してください。",
+      "contactSupportTitle": "サポートに連絡",
+      "contactSupportBody": "サブスクリプションについては support@mentomate.app までお問い合わせください。",
+      "removeFamilyTitle": "ファミリーから削除？",
+      "removeFamilyBody": "{{name}}のプロフィールはこのファミリープランから削除され、プロフィール切り替えから非表示になります。",
+      "removeFamilyConfirm": "削除",
+      "familyUpdatedTitle": "ファミリーを更新しました",
+      "familyUpdatedBody": "{{name}}がファミリープランから削除されました。",
+      "removeFamilyErrorTitle": "プロファイルを削除できませんでした",
+      "removeFamilyErrorBody": "接続を確認して再度お試しください。",
+      "topUpConnectionErrorTitle": "ネットワークエラー",
+      "topUpConnectionErrorBody": "インターネット接続を確認して再度お試しください。"
+    }
+  },
+  "passwordInput": {
+    "defaultPlaceholder": "パスワードを入力",
+    "hideLabel": "パスワードを隠す",
+    "showLabel": "パスワードを表示",
+    "hideText": "隠す",
+    "showText": "表示",
+    "requirementsHint": "8文字以上"
+  },
+  "accountSecurity": {
+    "securedVia": "{{provider}}で保護されています",
+    "changePasswordLabel": "パスワードを変更"
+  },
+  "changePassword": {
+    "errorCurrentRequired": "現在のパスワードを入力してください",
+    "errorTooShort": "パスワードは8文字以上にしてください",
+    "errorMismatch": "パスワードが一致しません",
+    "currentPlaceholder": "現在のパスワード",
+    "signingOut": "サインアウト中...",
+    "forgotPassword": "パスワードをお忘れですか?",
+    "newPlaceholder": "新しいパスワード",
+    "confirmPlaceholder": "新しいパスワードを確認",
+    "successMessage": "パスワードを更新しました",
+    "signOutErrorTitle": "サインアウトできませんでした",
+    "signOutErrorMessage": "もう一度お試しください。",
+    "updateLabel": "パスワードを更新",
+    "updating": "更新中...",
+    "updateButton": "パスワードを更新"
   }
 }

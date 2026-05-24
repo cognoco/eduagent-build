@@ -347,6 +347,8 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.gates).toEqual(
       expect.objectContaining({
         sessionIsOwner: true,
+        showFamilyHome: true,
+        showLearningActions: true,
         showAccommodationChildEditor: true,
         showAccountSecurity: true,
         showBilling: true,
@@ -378,6 +380,8 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.gates).toEqual(
       expect.objectContaining({
         sessionIsOwner: false,
+        showFamilyHome: false,
+        showLearningActions: true,
         showAccommodationChildEditor: false,
         showAccountSecurity: false,
         showAddChild: false,
@@ -410,6 +414,7 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.shape).toBe('study');
     expect(contract.gates.showAddChild).toBe(false);
     expect(contract.gates.showBilling).toBe(true);
+    expect(contract.gates.showFamilyHome).toBe(false);
   });
 
   it('does not infer V1 family capability from the local child profile list', () => {
@@ -438,13 +443,47 @@ describe('resolveNavigationContract gates', () => {
       makeContext({
         activeProfile: familyAdult,
         appContext: 'family',
-        flags: { MODE_NAV_V1_ENABLED: false },
+        flags: { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: false },
         profiles: [familyAdult, child],
       }),
     );
 
     expect(contract.diagnostic.reason).toBe('v1-disabled');
     expect(contract.gates.showLearnThisToo).toBe(false);
+    expect(contract.gates.showFamilyHome).toBe(true);
+  });
+
+  it('preserves V0-off family/pro owner home setup without linked children', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: adult,
+        appContext: null,
+        flags: {
+          MODE_NAV_V0_ENABLED: false,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [adult],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.diagnostic.reason).toBe('v1-disabled');
+    expect(contract.gates.showFamilyHome).toBe(true);
+    expect(contract.gates.showLearningActions).toBe(true);
+  });
+
+  it('hides learner write actions in proxy mode', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        isParentProxy: true,
+        profiles: [familyAdult, child],
+      }),
+    );
+
+    expect(contract.gates.showFamilyHome).toBe(false);
+    expect(contract.gates.showLearningActions).toBe(false);
   });
 });
 
@@ -758,7 +797,66 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
 
     expectTabs(contract, legacyGuardianTabs);
     expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
+    expect(contract.home.screen).toBe('FamilyHome');
+    expect(contract.gates.showFamilyHome).toBe(true);
     expect(contract.gates.showLearnThisToo).toBe(false);
+  });
+
+  it('exposes V0-safe More-screen gates for a family-capable adult when both flags are off', () => {
+    // PR 3 follow-up: showAccommodationChildEditor / showCelebrationsChildEditor /
+    // showRemoveFamilyMember used to be V1-only because they required the
+    // Family shape, which V0 never sets. Production V0 always showed these
+    // affordances to any non-proxy owner, so the screens carried
+    // `FEATURE_FLAGS.MODE_NAV_V1_ENABLED ? gate : raw owner read` splits.
+    // The contract now collapses to ownerNotProxy under V0 so screens can
+    // consume the gate directly.
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: null,
+        flags: {
+          MODE_NAV_V0_ENABLED: false,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
+    expect(contract.gates.showAccommodationChildEditor).toBe(true);
+    expect(contract.gates.showCelebrationsChildEditor).toBe(true);
+    expect(contract.gates.showRemoveFamilyMember).toBe(true);
+    expect(contract.gates.showAddChild).toBe(true);
+    // Other child-editor gates stay V1-only — their consumers retain V0 splits.
+    expect(contract.gates.showFamilyChildActivity).toBe(false);
+    expect(contract.gates.showProgressProfilePicker).toBe(false);
+    expect(contract.gates.showMentorMemoryChildConsent).toBe(false);
+  });
+
+  it('hides V0 More-screen gates when the active profile is a proxy', () => {
+    // V0 fallback for the four More-screen gates collapses to ownerNotProxy.
+    // A proxy session is never the owner of the current surface, so all four
+    // must be false even though V0-off treats every adult owner as broader
+    // than the V1 family shape.
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        flags: {
+          MODE_NAV_V0_ENABLED: false,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        isParentProxy: true,
+        profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.gates.showAccommodationChildEditor).toBe(false);
+    expect(contract.gates.showCelebrationsChildEditor).toBe(false);
+    expect(contract.gates.showRemoveFamilyMember).toBe(false);
+    expect(contract.gates.showAddChild).toBe(false);
   });
 
   it('reports v1-disabled and keeps the legacy V0 mode switcher in contract chrome', () => {
@@ -779,6 +877,7 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
     expect(contract.chrome.modeSwitcher).toBe('global-header');
     expect(contract.effectiveAppContext).toBe('family');
     expect(contract.shape).toBe('study');
+    expect(contract.home.screen).toBe('FamilyHome');
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
 });

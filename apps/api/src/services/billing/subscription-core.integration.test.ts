@@ -373,7 +373,7 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(row!.lastStripeEventId).toBe('evt_same_second_second');
   });
 
-  it('[WI-78 review] applies a distinct same-second payment_failed after active recovery', async () => {
+  it('[WI-78 review] rejects same-second payment_failed after active recovery', async () => {
     const db = createIntegrationDb();
     const acct = await seedAccount('webhook-same-second-past-due-stale');
 
@@ -399,17 +399,17 @@ describe('updateSubscriptionFromWebhook', () => {
 
     expect(result).toEqual(
       expect.objectContaining({
-        status: 'past_due',
-        lastStripeEventId: 'evt_payment_failed_same_second',
-        webhookApplied: true,
+        status: 'active',
+        lastStripeEventId: 'evt_payment_succeeded_same_second',
+        webhookApplied: false,
       }),
     );
 
     const row = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.accountId, acct.id),
     });
-    expect(row!.status).toBe('past_due');
-    expect(row!.lastStripeEventId).toBe('evt_payment_failed_same_second');
+    expect(row!.status).toBe('active');
+    expect(row!.lastStripeEventId).toBe('evt_payment_succeeded_same_second');
   });
 
   it('[WI-78 review] applies a distinct same-second active recovery after payment_failed', async () => {

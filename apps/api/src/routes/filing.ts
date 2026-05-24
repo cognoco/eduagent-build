@@ -12,6 +12,7 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { notFound } from '../errors';
 import {
   buildLibraryIndex,
@@ -61,6 +62,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     '/filing/request-retry',
     zValidator('json', retryRequestSchema),
     async (c) => {
+      // [WI-153 / DS-064] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId, sessionMode } = c.req.valid('json');
@@ -110,6 +113,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     },
   )
   .post('/filing', zValidator('json', filingRequestSchema), async (c) => {
+    // [WI-153 / DS-064] Server-derived proxy-mode write guard.
+    assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const body = c.req.valid('json');

@@ -10,6 +10,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getParkingLotItems,
   getParkingLotItemsForTopic,
@@ -73,6 +74,8 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     zValidator('param', sessionParamSchema),
     zValidator('json', parkingLotAddSchema),
     async (c) => {
+      // [WI-161 / DS-072] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const { question } = c.req.valid('json');
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));

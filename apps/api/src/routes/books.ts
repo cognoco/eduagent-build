@@ -16,6 +16,7 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { notFound, NotFoundError, apiError } from '../errors';
 import {
   getBooks,
@@ -109,6 +110,8 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     zValidator('param', bookParamSchema),
     zValidator('json', bookTopicGenerateInputSchema),
     async (c) => {
+      // [WI-139 / DS-050] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, bookId } = c.req.valid('param');
@@ -266,6 +269,8 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     ),
     zValidator('json', z.object({ targetBookId: z.string().uuid() })),
     async (c) => {
+      // [WI-139 / DS-050] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, bookId, topicId } = c.req.valid('param');

@@ -3,6 +3,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  act,
 } from '@testing-library/react-native';
 import { useSignIn } from '@clerk/clerk-expo';
 
@@ -285,6 +286,55 @@ describe('ForgotPasswordScreen', () => {
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/(auth)/sign-in' }),
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // [#617 / AUTH-06] Forgot-password reset request can spin indefinitely.
+  // Clerk's signIn.create has no client-side timeout; when it never resolves
+  // (network stall, dev email delivery hang) `loading` never flips back and
+  // the user is stranded on a disabled spinner with no actionable recovery.
+  // Break test: signIn.create returns a never-resolving promise; after 21s of
+  // fake time, the user-facing timeout message must render AND the primary
+  // button must be re-enabled.
+  // ---------------------------------------------------------------------------
+  it('[#617] surfaces a timeout error and re-enables the button when signIn.create hangs', async () => {
+    jest.useFakeTimers();
+    try {
+      // Never-resolving promise — simulates Clerk hang
+      mockCreate.mockImplementation(() => new Promise<never>(() => undefined));
+
+      render(<ForgotPasswordScreen />);
+
+      fireEvent.changeText(
+        screen.getByTestId('forgot-password-email'),
+        'stuck@example.com',
+      );
+      fireEvent.press(screen.getByTestId('send-reset-code-button'));
+
+      // Advance past the 20s timeout window
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(21_000);
+      });
+
+      // (a) Timeout message renders
+      await waitFor(() => {
+        screen.getByText(
+          "We couldn't reach the reset service in time. Check your connection and try again.",
+        );
+      });
+
+      // (b) Primary button is re-enabled (loading cleared, email still
+      // filled so canSubmitEmail is true again).
+      const button = screen.getByTestId('send-reset-code-button');
+      expect(button.props.accessibilityState).toEqual(
+        expect.objectContaining({ disabled: false }),
+      );
+
+      // Sanity: the screen did not advance to the reset-code form
+      expect(screen.queryByTestId('reset-code')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('displays error on reset failure', async () => {

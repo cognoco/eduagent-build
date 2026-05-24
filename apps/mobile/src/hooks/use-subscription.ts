@@ -27,7 +27,13 @@ export type SubscriptionData = Subscription;
 export type UsageData = Usage;
 
 /** Matches the warningLevel enum from @eduagent/schemas usageSchema */
-export type WarningLevel = 'none' | 'soft' | 'hard' | 'exceeded';
+// [BUG-640] 'top-up-available': monthly exhausted but credits remain
+export type WarningLevel =
+  | 'none'
+  | 'soft'
+  | 'hard'
+  | 'exceeded'
+  | 'top-up-available';
 
 interface ByokWaitlistResult {
   message: string;

@@ -35,6 +35,20 @@ arguments. Do not improvise beyond what is asked.
    reaches the remote. Skip push ONLY if the arguments explicitly say
    "no push" / "local only" / "do not push." On push failure, report
    and stop — do not force-push or rebase.
+1b. **NEVER rebase, NEVER force-push, NEVER rewrite history.** This
+    skill commits and pushes — that is the entire surface. No
+    `git rebase`, `git rebase --continue`, `git rebase --onto`,
+    `git push --force`, `git push --force-with-lease`, `git reset --hard`
+    to a non-HEAD ref, `git commit --amend` on an already-pushed commit,
+    `git cherry-pick` across branches, or `git filter-branch`. If you
+    discover an in-progress rebase (`.git/rebase-merge` or
+    `.git/rebase-apply` exists) when you start, **STOP and report it to
+    the caller — do not try to advance, abort, or work around it**.
+    Force-push to fix a non-fast-forward push is also forbidden;
+    `git pull --rebase` is forbidden. On any non-fast-forward push,
+    report and stop. The 2026-05-24 incident — fork unilaterally ran
+    `git rebase origin/main` and force-pushed, rewriting 12 PR SHAs and
+    stranding a PR description — is what this rule exists to prevent.
 1a. **NEVER create a PR** (`gh pr create`) unless the arguments
     explicitly say "create a pr" / "open a pr" / "and pr." Pushing is
     automatic; PR is not. Stop after push unless PR was requested.
@@ -63,6 +77,78 @@ arguments. Do not improvise beyond what is asked.
    no exceptions, no "but it's one logical feature." Shared-hook
    failures across scopes are the #1 cause of slow commits. Short-circuit
    only when one scope contains everything AND the total is < 100 files.
+
+## Timing instrumentation (MANDATORY)
+
+This skill emits a self-instrumented timing log so a coordinator running the
+fork can parse phase boundaries, durations, and recovery actions without
+seeing the fork's tool transcript.
+
+**Log location (fixed, overwritten per run):**
+
+```text
+.claude/logs/commit-skill-latest.log
+```
+
+**Step 0 — initialize the log as your very first Bash call**, before
+anything else (before `git status`, before `nx reset`, before reading
+arguments):
+
+```bash
+mkdir -p .claude/logs
+printf '=== commit-skill run start=%s args=%q ===\n' "$(date -Iseconds)" "$ARGUMENTS" \
+  > .claude/logs/commit-skill-latest.log
+```
+
+**At the start of every numbered step (1-9 below)**, emit a step marker as
+the first Bash call of that step:
+
+```bash
+printf '[%s] step=<step-name>\n' "$(date -Iseconds)" \
+  >> .claude/logs/commit-skill-latest.log
+```
+
+Step names to use (use these exact strings so the log is parseable):
+`scope`, `snapshot`, `safety-check`, `stage`, `xref-scan`, `draft`,
+`commit`, `handle-failure`, `push`, `report`.
+
+In BATCHED mode where step 4-8 loop per scope, suffix the iteration:
+`step=stage:apps-api`, `step=commit:apps-api`, `step=push:apps-api`, etc.
+
+**On every recovery action in §7 (Handle failure)**, emit a fix marker
+BEFORE taking the action, with a short kebab-case description:
+
+```bash
+printf '[%s] fix=<short-desc>\n' "$(date -Iseconds)" \
+  >> .claude/logs/commit-skill-latest.log
+```
+
+Examples of fix descriptions (use these when applicable):
+- `fix=nx-reset` — running `pnpm exec nx reset` for stale cache
+- `fix=stash-unrelated-wip` — stashing other agents' files before retry
+- `fix=unstage-tooling-noise` — unstaging unrelated failing files
+- `fix=unblock-unused-import` — narrow rule-5 exception
+- `fix=split-scope` — splitting because pre-commit failed cross-scope
+- `fix=stash-pop-conflict` — pop conflicted, leaving preserved ref
+- `fix=safety-net-ref-kept` — preserved ref left for caller recovery
+- `fix=retry-commit` — re-running `git commit` after a fix
+
+**At the end of step 9 (Report)**, emit a final marker and include the log
+path + a brief summary in the user-facing report:
+
+```bash
+printf '[%s] step=end\n' "$(date -Iseconds)" \
+  >> .claude/logs/commit-skill-latest.log
+cat .claude/logs/commit-skill-latest.log
+```
+
+The full log goes into the user-facing report under a heading
+`## Timing log`. Do NOT summarize or omit lines — emit the raw log
+verbatim so the caller can compute per-step deltas themselves.
+
+Inter-step gaps in the log ARE the "sleep time" / LLM-thinking time
+between phases — they need no separate marker; the deltas between
+consecutive `[ts]` lines capture them automatically.
 
 ## Arguments
 
@@ -402,3 +488,8 @@ Tell the user:
 - Which files were committed
 - Which files (if any) were excluded and why
 - Whether push was performed or skipped
+- **Timing log** — under a `## Timing log` heading, emit the raw contents
+  of `.claude/logs/commit-skill-latest.log` verbatim (use `cat` and paste
+  the output, do not paraphrase). Also include the log path so the caller
+  can re-read it later. Per the "Timing instrumentation" section above,
+  emit a final `step=end` marker first so the log has a clean tail.

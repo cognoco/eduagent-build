@@ -203,17 +203,109 @@ export function clearJWKSCache(): void {
 // Signature verification via Web Crypto
 // ---------------------------------------------------------------------------
 
-async function importRSAPublicKey(jwk: JWK): Promise<CryptoKey> {
+/**
+ * [CR-2026-05-21-095] Algorithm allowlist for JWT signature verification.
+ *
+ * The JWT header alg is attacker-controlled, so we MUST validate it against
+ * an allowlist before importing the key with that alg. The classic JWT
+ * vulnerabilities are (a) alg "none" bypassing verification, and (b) alg
+ * downgrade from asymmetric (RS*) to symmetric (HS*) which lets an attacker
+ * use the public key as the HMAC secret. The allowlist below covers the
+ * RS*, ES*, EdDSA families an IdP like Clerk could plausibly migrate to;
+ * HS* is intentionally omitted.
+ */
+const ALG_ALLOWLIST = new Set([
+  'RS256',
+  'RS384',
+  'RS512',
+  'ES256',
+  'ES384',
+  'ES512',
+  'EdDSA',
+]);
+
+interface AlgParams {
+  importParams: AlgorithmIdentifier | RsaHashedImportParams | EcKeyImportParams;
+  verifyParams: AlgorithmIdentifier | EcdsaParams;
+}
+
+function algParamsFor(alg: string): AlgParams {
+  switch (alg) {
+    case 'RS256':
+      return {
+        importParams: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+        verifyParams: 'RSASSA-PKCS1-v1_5',
+      };
+    case 'RS384':
+      return {
+        importParams: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' },
+        verifyParams: 'RSASSA-PKCS1-v1_5',
+      };
+    case 'RS512':
+      return {
+        importParams: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' },
+        verifyParams: 'RSASSA-PKCS1-v1_5',
+      };
+    case 'ES256':
+      return {
+        importParams: { name: 'ECDSA', namedCurve: 'P-256' },
+        verifyParams: { name: 'ECDSA', hash: 'SHA-256' },
+      };
+    case 'ES384':
+      return {
+        importParams: { name: 'ECDSA', namedCurve: 'P-384' },
+        verifyParams: { name: 'ECDSA', hash: 'SHA-384' },
+      };
+    case 'ES512':
+      return {
+        importParams: { name: 'ECDSA', namedCurve: 'P-521' },
+        verifyParams: { name: 'ECDSA', hash: 'SHA-512' },
+      };
+    case 'EdDSA':
+      return {
+        importParams: { name: 'Ed25519' },
+        verifyParams: 'Ed25519',
+      };
+    default:
+      throw new Error(`Unsupported JWT algorithm: ${alg}`);
+  }
+}
+
+/**
+ * Resolve and validate the signing algorithm.
+ *
+ * Rejects: missing header alg, alg "none", any alg outside the allowlist,
+ * and any case where the JWK's bound alg disagrees with the header alg
+ * (downgrade signal).
+ */
+function resolveAlg(headerAlg: string | undefined, jwk: JWK): string {
+  if (!headerAlg) {
+    throw new Error('Invalid JWT: missing alg in header');
+  }
+  if (headerAlg === 'none') {
+    throw new Error('Invalid JWT: alg "none" is not permitted');
+  }
+  if (!ALG_ALLOWLIST.has(headerAlg)) {
+    throw new Error(`Invalid JWT: alg "${headerAlg}" is not in the allowlist`);
+  }
+  if (jwk.alg && jwk.alg !== headerAlg) {
+    throw new Error(
+      `Invalid JWT: header alg "${headerAlg}" does not match JWK alg "${jwk.alg}"`,
+    );
+  }
+  return headerAlg;
+}
+
+async function importPublicKey(jwk: JWK, alg: string): Promise<CryptoKey> {
+  const { importParams } = algParamsFor(alg);
   return crypto.subtle.importKey(
     'jwk',
     {
-      kty: jwk.kty,
-      n: jwk.n,
-      e: jwk.e,
-      alg: 'RS256',
+      ...(jwk as JsonWebKey),
+      alg,
       ext: true,
     } as JsonWebKey,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    importParams,
     false,
     ['verify'],
   );
@@ -263,15 +355,22 @@ export async function verifyJWT(
     );
   }
 
-  // Import the public key
-  const cryptoKey = await importRSAPublicKey(jwk);
+  // [CR-2026-05-21-095] Resolve the effective signing algorithm from the
+  // header, validating against the allowlist (rejects "none" and any non-
+  // listed algorithm) and confirming it matches the JWK's bound alg.
+  const header = decodeJWTHeader(token);
+  const alg = resolveAlg(header.alg, jwk);
+  const { verifyParams } = algParamsFor(alg);
+
+  // Import the public key bound to the chosen algorithm
+  const cryptoKey = await importPublicKey(jwk, alg);
 
   // The data that was signed is the raw header.payload (ASCII bytes)
   const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
   const signature = base64UrlToUint8Array(signatureB64);
 
   const valid = await crypto.subtle.verify(
-    'RSASSA-PKCS1-v1_5',
+    verifyParams,
     cryptoKey,
     signature as Uint8Array<ArrayBuffer>,
     data,

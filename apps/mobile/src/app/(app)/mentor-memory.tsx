@@ -59,6 +59,12 @@ export default function MentorMemoryScreen() {
   const grantConsent = useGrantMemoryConsent();
   const updateInterestsContext = useUpdateInterestsContext();
   const navigationContract = useNavigationContract();
+  // Self-view mentor-memory uses sessionIsOwner (owner && !proxy), NOT the
+  // narrower showMentorMemoryChildConsent gate. The latter additionally
+  // requires familyShape and is the content gate for the child-consent
+  // editor at child/[profileId]/mentor-memory.tsx. A solo owner in study
+  // shape needs the consent-prompt + owner copy on their own screen, which
+  // only sessionIsOwner expresses.
   const isOwnerSelf = navigationContract.gates.sessionIsOwner;
   const [draft, setDraft] = useState('');
 

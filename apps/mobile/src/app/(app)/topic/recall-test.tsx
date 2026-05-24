@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -12,10 +12,12 @@ import {
   type RetentionStatus,
 } from '../../../components/progress';
 import { useSubmitRecallTest } from '../../../hooks/use-retention';
+import { useResolveTopicSubject } from '../../../hooks/use-progress';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 import { ErrorFallback } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useEnsureStudyMode } from '../../../lib/use-mode-switch';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
@@ -37,13 +39,36 @@ function deriveStatus(retentionStatus?: string): RetentionStatus {
 export default function RecallTestScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { topicId, subjectId, topicName } = useLocalSearchParams<{
+  const {
+    topicId,
+    subjectId: paramSubjectId,
+    topicName,
+  } = useLocalSearchParams<{
     topicId: string;
     subjectId: string;
     topicName?: string;
   }>();
 
+  // [LEARN-14] Recall deep links may omit subjectId. Resolve from topicId so
+  // the Relearn CTA can route correctly; matches the F-009 pattern in
+  // topic/[topicId].tsx.
+  const needsResolve = !paramSubjectId && !!topicId;
+  const { data: resolved } = useResolveTopicSubject(
+    needsResolve ? topicId : undefined,
+  );
+  const subjectId = paramSubjectId || resolved?.subjectId;
+
   const submitRecallTest = useSubmitRecallTest();
+  const ensureStudyMode = useEnsureStudyMode();
+
+  // /library belongs to STUDY_TABS. V1 family-mode users would land outside
+  // their tab shape if we routed there directly; ensureStudyMode auto-
+  // switches them to study mode first so the destination is in their
+  // navigation surface.
+  const goToLibrary = useCallback(
+    () => ensureStudyMode(() => goBackOrReplace(router, '/(app)/library')),
+    [ensureStudyMode, router],
+  );
 
   const [messages, setMessages] = useState<ChatMessage[]>([OPENING_MESSAGE]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -54,16 +79,37 @@ export default function RecallTestScreen() {
     cooldownEndsAt?: string;
     retentionStatus: RetentionStatus;
   } | null>(null);
+  const [submissionTimedOut, setSubmissionTimedOut] = useState(false);
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const dontRememberPendingRef = useRef(false);
+  const submissionInFlightRef = useRef(false);
+  const releaseSubmissionBlock = useCallback(() => {
+    submissionInFlightRef.current = false;
+  }, []);
   const releaseDontRememberBlock = useCallback(() => {
     dontRememberPendingRef.current = false;
   }, []);
+  // Token bumped whenever the user abandons an in-flight submission (timeout
+  // retry). Callbacks captured by an older mutate() check this before applying
+  // state so a late-arriving response cannot mutate the UI the user has
+  // already left behind.
+  const submissionTokenRef = useRef(0);
+
+  // Hard timeout: if a submission stays pending beyond 30s the network or
+  // backend is hung — surface an actionable timeout state so the user is
+  // never stuck waiting for a reply that never arrives.
+  useEffect(() => {
+    if (!submitRecallTest.isPending) return;
+    const timer = setTimeout(() => setSubmissionTimedOut(true), 30_000);
+    return () => clearTimeout(timer);
+  }, [submitRecallTest.isPending]);
 
   const handleSend = useCallback(
     (text: string) => {
       if (!topicId) return;
+      if (submissionInFlightRef.current || isStreaming) return;
+      submissionInFlightRef.current = true;
 
       // Add user message
       const userMsg: ChatMessage = {
@@ -73,10 +119,12 @@ export default function RecallTestScreen() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
+      const token = ++submissionTokenRef.current;
       submitRecallTest.mutate(
         { topicId, answer: text },
         {
           onSuccess: (result) => {
+            if (token !== submissionTokenRef.current) return;
             if (result.passed) {
               // Success — animate a congratulatory response
               cleanupRef.current = animateResponse(
@@ -85,6 +133,7 @@ export default function RecallTestScreen() {
                 setIsStreaming,
                 () => {
                   setInputDisabled(true);
+                  releaseSubmissionBlock();
                 },
               );
             } else if (result.failureAction === 'feedback_only') {
@@ -93,6 +142,7 @@ export default function RecallTestScreen() {
                 "Not quite there yet, but that's okay! Think about the key concepts and try explaining again. What stands out most to you?",
                 setMessages,
                 setIsStreaming,
+                releaseSubmissionBlock,
               );
             } else if (result.failureAction === 'redirect_to_library') {
               // 3+ failures — show remediation card
@@ -108,11 +158,14 @@ export default function RecallTestScreen() {
                       result.remediation?.retentionStatus,
                     ),
                   });
+                  releaseSubmissionBlock();
                 },
               );
             }
           },
           onError: (err: Error) => {
+            if (token !== submissionTokenRef.current) return;
+            releaseSubmissionBlock();
             // UX-DE-L8: error is not an AI reply
             platformAlert(
               t('topic.recallTest.errorTitle'),
@@ -122,7 +175,7 @@ export default function RecallTestScreen() {
         },
       );
     },
-    [topicId, submitRecallTest, t],
+    [isStreaming, releaseSubmissionBlock, submitRecallTest, topicId, t],
   );
 
   const handleReviewRetest = useCallback(() => {
@@ -134,10 +187,18 @@ export default function RecallTestScreen() {
   }, []);
 
   const handleRelearnTopic = useCallback(() => {
-    if (!topicId || !subjectId) return;
+    if (!topicId) return;
+    // [LEARN-14] If subjectId is still unresolved (deep link without it +
+    // resolver hasn't returned), route to relearn anyway — the relearn screen
+    // falls back to its subject picker phase, giving the user an actionable
+    // recovery instead of a silent no-op tap. UX Resilience: never silent.
     router.push({
       pathname: '/(app)/topic/relearn',
-      params: { topicId, subjectId, ...(topicName ? { topicName } : {}) },
+      params: {
+        topicId,
+        ...(subjectId ? { subjectId } : {}),
+        ...(topicName ? { topicName } : {}),
+      },
     });
   }, [router, topicId, subjectId, topicName]);
 
@@ -157,10 +218,12 @@ export default function RecallTestScreen() {
     };
     setMessages((prev) => [...prev, userMsg]);
 
+    const token = ++submissionTokenRef.current;
     submitRecallTest.mutate(
       { topicId, attemptMode: 'dont_remember' },
       {
         onSuccess: (result) => {
+          if (token !== submissionTokenRef.current) return;
           setDontRememberPending(false);
           if (
             result.failureAction === 'redirect_to_library' ||
@@ -192,6 +255,7 @@ export default function RecallTestScreen() {
           );
         },
         onError: (err: Error) => {
+          if (token !== submissionTokenRef.current) return;
           dontRememberPendingRef.current = false;
           setDontRememberPending(false);
           setDontRememberCount((prev) => Math.max(prev - 1, 0));
@@ -220,9 +284,40 @@ export default function RecallTestScreen() {
         message={t('topic.recallTest.missingMessage')}
         primaryAction={{
           label: t('topic.recallTest.goToLibrary'),
-          onPress: () => goBackOrReplace(router, '/(app)/library'),
+          onPress: goToLibrary,
           testID: 'recall-test-missing-topic',
         }}
+      />
+    );
+  }
+
+  if (submissionTimedOut) {
+    return (
+      <ErrorFallback
+        variant="centered"
+        title={t('topic.recallTest.timeoutTitle')}
+        message={t('topic.recallTest.timeoutMessage')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => {
+            // Invalidate the hung submission so its late-arriving callbacks
+            // cannot mutate state after the user has dismissed the timeout
+            // screen and resumed typing.
+            submissionTokenRef.current += 1;
+            releaseSubmissionBlock();
+            releaseDontRememberBlock();
+            setDontRememberPending(false);
+            submitRecallTest.reset();
+            setSubmissionTimedOut(false);
+          },
+          testID: 'recall-test-timeout-retry',
+        }}
+        secondaryAction={{
+          label: t('topic.recallTest.goToLibrary'),
+          onPress: goToLibrary,
+          testID: 'recall-test-timeout-back',
+        }}
+        testID="recall-test-timeout"
       />
     );
   }
@@ -241,7 +336,7 @@ export default function RecallTestScreen() {
         {t('topic.recallTest.successPrompt')}
       </Text>
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(app)/library')}
+        onPress={goToLibrary}
         className="bg-primary rounded-button px-6 py-3 items-center"
         accessibilityRole="button"
         accessibilityLabel={t('topic.recallTest.goToLibrary')}

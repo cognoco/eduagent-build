@@ -224,7 +224,10 @@ export const subjectProgressSchema = z.object({
   topicsCompleted: z.number().int(),
   topicsVerified: z.number().int(),
   urgencyScore: z.number(),
-  retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']),
+  // [L1.C1.11] 'unknown' represents a subject with zero retention cards —
+  // the learner has no retention data to summarize. UI should treat 'unknown'
+  // as a neutral placeholder, NOT as 'strong'.
+  retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten', 'unknown']),
   lastSessionAt: isoDateField.nullable(),
 });
 export type SubjectProgress = z.infer<typeof subjectProgressSchema>;
@@ -312,7 +315,13 @@ export const dashboardChildSchema = z.object({
     z.object({
       subjectId: z.string().uuid().optional(),
       name: z.string(),
-      retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']),
+      retentionStatus: z.enum([
+        'strong',
+        'fading',
+        'weak',
+        'forgotten',
+        'unknown',
+      ]),
       rawInput: z.string().nullable().optional(),
     }),
   ),

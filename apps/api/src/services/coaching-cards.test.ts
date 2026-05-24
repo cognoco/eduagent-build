@@ -99,6 +99,86 @@ function createMockDb(): Database {
     }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                {
+                  topicId,
+                  topicTitle: 'Topic 1',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+                {
+                  topicId: 'topic-1',
+                  topicTitle: 'Topic 1',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+                {
+                  topicId: 'topic-2',
+                  topicTitle: 'Topic 2',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+                {
+                  topicId: 'topic-3',
+                  topicTitle: 'Topic 3',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+                {
+                  topicId: 'topic-4',
+                  topicTitle: 'Topic 4',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+                {
+                  topicId: 'topic-newer',
+                  topicTitle: 'Newer Topic',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+                {
+                  topicId: 'topic-older',
+                  topicTitle: 'Older Topic',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+                {
+                  topicId: 'topic-break',
+                  topicTitle: 'Break Topic',
+                  topicDescription: 'Topic description',
+                  bookId: 'book-1',
+                  bookTitle: 'Book 1',
+                  curriculumId: 'curriculum-1',
+                  subjectId: 'subject-1',
+                },
+              ]),
+            }),
+          }),
+        }),
         // [BUG-NOTION-263] review_due enrichment uses a leftJoin; default to
         // an empty result so happy-path tests (no overdue topic in mock DB)
         // produce a null book context without throwing.
@@ -127,6 +207,33 @@ function createMockDb(): Database {
     .fn()
     .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
   return db as unknown as Database;
+}
+
+type MockSelectChain = {
+  from: jest.Mock;
+  innerJoin: jest.Mock;
+  leftJoin: jest.Mock;
+  where: jest.Mock;
+  orderBy: jest.Mock;
+  limit: jest.Mock;
+  groupBy: jest.Mock;
+  for: jest.Mock;
+  then: PromiseLike<unknown[]>['then'];
+};
+
+function createSelectRows(rows: unknown[]): MockSelectChain {
+  const chain = {} as MockSelectChain;
+  chain.from = jest.fn(() => chain);
+  chain.innerJoin = jest.fn(() => chain);
+  chain.leftJoin = jest.fn(() => chain);
+  chain.where = jest.fn(() => chain);
+  chain.orderBy = jest.fn(() => chain);
+  chain.limit = jest.fn().mockResolvedValue(rows);
+  chain.groupBy = jest.fn().mockResolvedValue(rows);
+  chain.for = jest.fn().mockResolvedValue(rows);
+  const rowsPromise = Promise.resolve(rows);
+  chain.then = rowsPromise.then.bind(rowsPromise);
+  return chain;
 }
 
 interface StreakRowInput {
@@ -180,6 +287,140 @@ describe('precomputeCoachingCard', () => {
       expect(card.easeFactor).toBe(2.5);
       expect(typeof card.dueAt).toBe('string');
     }
+  });
+
+  it('[WI-80] does not enrich review_due copy with an unowned topic title', async () => {
+    const overdueCard = mockRetentionCardRow({
+      topicId: 'foreign-topic',
+      nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardsFindMany: [overdueCard] });
+    const db = createMockDb();
+    db.select = jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        leftJoin: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([
+              {
+                topicTitle: 'Victim Secret Topic',
+                bookTitle: 'Victim Book',
+              },
+            ]),
+          }),
+        }),
+      }),
+    });
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    expect(card.type).not.toBe('review_due');
+    expect(card.body).not.toContain('Victim Secret Topic');
+    expect(card.body).not.toContain('Victim Book');
+  });
+
+  it('[WI-80] does not surface stale foreign retention cards as review_due cards', async () => {
+    const foreignOverdue = mockRetentionCardRow({
+      topicId: 'foreign-topic',
+      nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardsFindMany: [foreignOverdue] });
+    const db = createMockDb();
+    db.select = jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        where: jest.fn().mockReturnValue({
+          for: jest.fn().mockResolvedValue([]),
+        }),
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    expect(card.type).not.toBe('review_due');
+    expect('topicId' in card ? card.topicId : undefined).not.toBe(
+      'foreign-topic',
+    );
+  });
+
+  it('[WI-80] does not surface mixed-parent homework connection topics', async () => {
+    setupScopedRepo({ retentionCardsFindMany: [] });
+    const db = createMockDb() as unknown as Database & {
+      select: jest.Mock;
+    };
+    const query = db.query as unknown as Record<
+      string,
+      { findFirst?: jest.Mock; findMany?: jest.Mock }
+    >;
+    query.profiles = {
+      findFirst: jest.fn().mockResolvedValue({ birthYear: 2012 }),
+    };
+    query.curricula = {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([{ id: 'curr-owned', subjectId: 'subject-owned' }]),
+    };
+    db.select = jest
+      .fn()
+      .mockImplementation(() => createSelectRows([]))
+      .mockReturnValueOnce(createSelectRows([]))
+      .mockReturnValueOnce(
+        createSelectRows([
+          {
+            id: 'homework-session',
+            metadata: {
+              homeworkSummary: { practicedSkills: ['fractions'] },
+            },
+            subjectId: 'subject-owned',
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        createSelectRows([{ id: 'subject-owned', name: 'Math' }]),
+      )
+      .mockReturnValueOnce(
+        createSelectRows([
+          {
+            id: 'mixed-parent-topic',
+            title: 'Fractions',
+            description: 'Practice fractions',
+            bookId: 'foreign-book',
+            curriculumId: 'curr-owned',
+          },
+        ]),
+      )
+      .mockReturnValueOnce(createSelectRows([]))
+      .mockReturnValueOnce(
+        createSelectRows([
+          {
+            id: 'foreign-book',
+            title: 'Victim Book',
+            emoji: 'lock',
+            subjectId: 'foreign-subject',
+          },
+        ]),
+      );
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    expect(card.type).not.toBe('homework_connection');
+    expect(JSON.stringify(card)).not.toContain('mixed-parent-topic');
+    expect(JSON.stringify(card)).not.toContain('Victim Book');
   });
 
   it('scales review_due priority with overdue count (capped at 10)', async () => {
@@ -506,7 +747,7 @@ describe('precomputeCoachingCard', () => {
     expect(expiresAt.getTime()).toBe(expected.getTime());
   });
 
-  it('[BREAK] review_due book-enrichment DB throw still returns review_due card AND calls captureException with surface=coaching-cards', async () => {
+  it('[BREAK] retention-card ownership DB throw is captured and does not surface a stale topic', async () => {
     // Arrange: one overdue card so the review_due branch is entered
     const overdueCard = mockRetentionCardRow({
       topicId: 'topic-break',
@@ -515,17 +756,8 @@ describe('precomputeCoachingCard', () => {
     setupScopedRepo({ retentionCardsFindMany: [overdueCard] });
     const db = createMockDb();
 
-    // [BUG-NOTION-263] Enrichment is now a single leftJoin via db.select().
-    // Make the joined select chain throw so the catch block in
-    // precomputeCoachingCard fires.
-    (db.select as jest.Mock).mockReturnValueOnce({
-      from: jest.fn().mockReturnValue({
-        leftJoin: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockRejectedValue(new Error('DB connection lost')),
-          }),
-        }),
-      }),
+    (db.select as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('DB connection lost');
     });
 
     mockCaptureException.mockClear();
@@ -533,8 +765,11 @@ describe('precomputeCoachingCard', () => {
     // Act
     const card = await precomputeCoachingCard(db, profileId);
 
-    // Assert 1: fallthrough behaviour preserved — card is still returned
-    expect(card.type).toBe('review_due');
+    // Assert 1: fail closed for topic-carrying retention cards.
+    expect(card.type).not.toBe('review_due');
+    expect('topicId' in card ? card.topicId : undefined).not.toBe(
+      'topic-break',
+    );
 
     // Assert 2: escalation fired at least once, including the enrichment site,
     // with the correct surface in extra (birthYear_lookup may also fire due to

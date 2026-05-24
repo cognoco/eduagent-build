@@ -319,15 +319,22 @@ export function useUpdateFamilyPoolBreakdownSharing(): UseMutationResult<
 export function useRegisterPushToken(): UseMutationResult<
   { registered: boolean },
   Error,
-  string
+  { profileId: string; token: string }
 > {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async (token: string) => {
-      const res = await client.settings['push-token'].$post({
-        json: { token },
-      });
+    mutationFn: async ({ profileId, token }) => {
+      const res = await client.settings['push-token'].$post(
+        {
+          json: { token },
+        },
+        {
+          init: {
+            headers: { 'X-Profile-Id': profileId },
+          },
+        },
+      );
       await assertOk(res);
       const data = await res.json();
       return data;

@@ -222,7 +222,8 @@ describe('usageSchema', () => {
     expect(parsed.dailyRemainingQuestions).toBeNull();
   });
 
-  it.each(['none', 'soft', 'hard', 'exceeded'])(
+  // [BUG-640] 'top-up-available' added to warningLevel enum
+  it.each(['none', 'soft', 'hard', 'exceeded', 'top-up-available'])(
     'accepts warningLevel "%s"',
     (warningLevel) => {
       const parsed = usageSchema.parse({ ...validUsage, warningLevel });

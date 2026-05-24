@@ -1,4 +1,4 @@
-// @inngest-admin: parent-chain (curriculumTopics joined to subjects via curricula to resolve subject names)
+// @inngest-admin: parent-chain (curriculumTopics joined through book+curriculum subject chains)
 // ---------------------------------------------------------------------------
 // Review Due Send — Handles a single app/retention.review-due event,
 // resolves subject names from the topic chain, and sends a push notification.
@@ -6,8 +6,13 @@
 
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { eq, inArray } from 'drizzle-orm';
-import { curriculumTopics, curricula, subjects } from '@eduagent/database';
+import { and, eq, inArray } from 'drizzle-orm';
+import {
+  curriculumBooks,
+  curriculumTopics,
+  curricula,
+  subjects,
+} from '@eduagent/database';
 import {
   formatReviewReminderBody,
   sendPushNotification,
@@ -69,9 +74,24 @@ export const reviewDueSend = inngest.createFunction(
             subjectName: subjects.name,
           })
           .from(curriculumTopics)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumBooks.id, curriculumTopics.bookId),
+          )
           .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
-          .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
-          .where(inArray(curriculumTopics.id, topTopicIds));
+          .innerJoin(
+            subjects,
+            and(
+              eq(subjects.id, curriculumBooks.subjectId),
+              eq(subjects.id, curricula.subjectId),
+            ),
+          )
+          .where(
+            and(
+              inArray(curriculumTopics.id, topTopicIds),
+              eq(subjects.profileId, profileId),
+            ),
+          );
 
         // Deduplicate subject names (multiple topics may share a subject)
         subjectNames = [...new Set(topicRows.map((r) => r.subjectName))];

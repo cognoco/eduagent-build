@@ -13,7 +13,9 @@ const V0_RESOLVERS = new Set([
 const V0_RESOLVER_ALLOWED_FILES = new Set([
   'apps/mobile/src/app/(app)/_layout.tsx',
   'apps/mobile/src/app/(app)/own-learning.tsx',
+  'apps/mobile/src/hooks/use-navigation-contract.ts',
   'apps/mobile/src/lib/app-context.tsx',
+  'apps/mobile/src/lib/legacy-navigation-contract.ts',
   'apps/mobile/src/lib/navigation-contract.ts',
 ]);
 
@@ -23,6 +25,20 @@ const DIAGNOSTIC_ALLOWED_FILES = new Set([
   'apps/mobile/src/lib/navigation-contract.snapshot.test.ts',
   'apps/mobile/src/lib/navigation-contract.guard.test.ts',
 ]);
+
+// No route-name allowlist by design. The route check below scans only
+// `Tabs.Screen` declarations in the root `(app)/_layout.tsx` — the contract's
+// top-level navigation surface — and every name there must resolve to a
+// `TabKey` or `RouteKey` union member. Adding a route exemption would mean
+// admitting a tab that the contract cannot gate; instead, update `TabKey` /
+// `RouteKey` so `resolveNavigationContract` decides visibility.
+//
+// `Stack.Screen` declarations inside nested `_layout.tsx` files (e.g.
+// `recaps/_layout.tsx` → `[recapId]`, `more/_layout.tsx` → `account`) are
+// intentionally NOT scanned: they are sub-tree fragments owned by their
+// parent `RouteKey` (`recaps/[recapId]`, `more/account`), not standalone
+// gateable routes. A nested stack route is governed by whichever ancestor
+// `RouteKey` covers it.
 
 function repoRoot(): string {
   return resolve(__dirname, '../../../..');
@@ -34,7 +50,7 @@ function normalizePath(path: string): string {
 
 function allMobileSources(): string[] {
   const out = execSync(
-    'git ls-files "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
+    'git ls-files --cached --others --exclude-standard "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
     { cwd: repoRoot(), encoding: 'utf-8' },
   );
   return out

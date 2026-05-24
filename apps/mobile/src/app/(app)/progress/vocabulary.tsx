@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { FlatList, ScrollView, Text, View, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
 import { useProgressInventory } from '../../../hooks/use-progress';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { isNewLearner } from '../../../lib/progressive-disclosure';
 import type { SubjectInventory } from '@eduagent/schemas';
@@ -94,6 +96,13 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const navigationContract = useNavigationContract();
+  const canEnterVocabulary = navigationContract.canEnter('progress/vocabulary');
+  useEffect(() => {
+    if (!canEnterVocabulary) {
+      router.replace('/(app)/progress' as Href);
+    }
+  }, [canEnterVocabulary, router]);
   const {
     data: inventory,
     isLoading,

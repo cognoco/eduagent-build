@@ -41,7 +41,7 @@ import {
   getFamilyPoolStatus,
 } from '../services/billing';
 import {
-  getWarningLevel,
+  resolveWarningLevel,
   calculateRemainingQuestions,
 } from '../services/metering';
 import { getTierConfig } from '../services/subscription';
@@ -54,6 +54,7 @@ import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireAccount } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 const logger = createLogger();
 
@@ -202,6 +203,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     '/subscription/checkout',
     zValidator('json', checkoutRequestSchema),
     async (c) => {
+      // [WI-137 / DS-048] Owner-profile authorization. Billing operations are
+      // account-level; a parent-proxy session must not initiate them on a
+      // child profile context.
+      assertNotProxyMode(c);
       const { tier, interval } = c.req.valid('json');
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -291,6 +296,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Dormant for mobile -- kept for future web client. Mobile cancellation
   // handled by platform subscription management (App Store / Google Play).
   .post('/subscription/cancel', async (c) => {
+    // [WI-137 / DS-048] Owner-profile authorization (defense-in-depth alongside
+    // the downstream owner check).
+    assertNotProxyMode(c);
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
@@ -365,6 +373,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     '/subscription/top-up',
     zValidator('json', topUpRequestSchema),
     async (c) => {
+      // [WI-137 / DS-048] Owner-profile authorization.
+      assertNotProxyMode(c);
       const { amount } = c.req.valid('json');
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -485,7 +495,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       dailyLimit,
       usedToday,
     });
-    const warningLevel = getWarningLevel(usedThisMonth, monthlyLimit);
+    // [BUG-640] Emit 'top-up-available' when monthly exhausted but credits remain
+    const warningLevel = resolveWarningLevel(
+      usedThisMonth,
+      monthlyLimit,
+      topUpCreditsRemaining,
+    );
     const activeProfileId = c.get('profileId');
     const activeProfileMeta = c.get('profileMeta');
     const cycleResetAt = quota?.cycleResetAt ?? new Date().toISOString();
@@ -529,7 +544,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const visibleRemaining = remaining;
     const visibleWarningLevel = usageBreakdown?.isOwnerBreakdownViewer
       ? warningLevel
-      : getWarningLevel(visibleUsedThisMonth, monthlyLimit);
+      : // [BUG-640] top-up credits are pool-level, apply to all viewers
+        resolveWarningLevel(
+          visibleUsedThisMonth,
+          monthlyLimit,
+          topUpCreditsRemaining,
+        );
     // Non-owner viewers must see only their own daily usage; the
     // subscription-level `usedToday` is a family aggregate that would let a
     // child infer siblings' activity. Owners and non-family accounts see raw.
@@ -575,6 +595,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // Dormant for mobile -- kept for future web client. Mobile billing managed
   // through platform subscription management (App Store / Google Play).
   .post('/subscription/portal', async (c) => {
+    // [WI-137 / DS-048] Owner-profile authorization (defense-in-depth alongside
+    // the downstream owner check).
+    assertNotProxyMode(c);
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
@@ -726,6 +749,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     '/subscription/family/add',
     zValidator('json', familyAddProfileSchema),
     async (c) => {
+      // [WI-137 / DS-048] Owner-profile authorization.
+      assertNotProxyMode(c);
       const { profileId } = c.req.valid('json');
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -780,6 +805,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     '/subscription/family/remove',
     zValidator('json', familyRemoveProfileSchema),
     async (c) => {
+      // [WI-137 / DS-048] Owner-profile authorization.
+      assertNotProxyMode(c);
       const { profileId } = c.req.valid('json');
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -839,6 +866,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
   // Join BYOK waitlist
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {
+    // [WI-137 / DS-048] Owner-profile authorization for waitlist signup.
+    assertNotProxyMode(c);
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));

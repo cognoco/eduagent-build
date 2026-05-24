@@ -240,7 +240,9 @@
         "reportsAction": "Relatórios",
         "nudgeAction": "Nudge"
       }
-    }
+    },
+    "goToProgress": "Go to Progress",
+    "goToProgressLabel": "Go to Progress"
   },
   "nudge": {
     "sheet": {
@@ -1091,7 +1093,9 @@
       "successPrompt": "Volte para sua Biblioteca quando estiver pronto.",
       "dontRemember": "Não me lembro",
       "stillStuck": "Ainda com dificuldade",
-      "errorTitle": "Algo deu errado"
+      "errorTitle": "Algo deu errado",
+      "timeoutTitle": "Ainda aguardando…",
+      "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente."
     }
   },
   "subject": {
@@ -1705,8 +1709,8 @@
         "remembered_other": "Remembered after {{count}} days",
         "fading_one": "Getting fuzzy after {{count}} day",
         "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Slipping after {{count}} day",
-        "weak_other": "Slipping after {{count}} days",
+        "weak_one": "Ready for a refresh after {{count}} day",
+        "weak_other": "Ready for a refresh after {{count}} days",
         "forgotten_one": "Last seen {{count}} day ago",
         "forgotten_other": "Last seen {{count}} days ago"
       }
@@ -1778,7 +1782,8 @@
       "nudgeCta": "Um pequeno incentivo pode ajudar {{name}} a recomeçar",
       "nudgeA11y": "Enviar um incentivo para {{name}}",
       "viewAllReports": "Ver todos os relatórios",
-      "subjectsTitle": "Matérias"
+      "subjectsTitle": "Matérias",
+      "goToChildCurriculum": "Open child curriculum"
     },
     "remediation": {
       "heading": "Try a different approach",
@@ -2501,6 +2506,63 @@
     "web": {
       "plansOnMobile": "Os planos estão disponíveis no aplicativo móvel",
       "storePurchaseUnavailable": "As compras na loja não estão disponíveis neste dispositivo."
+    },
+    "childPaywall": {
+      "headline": "Nice work so far!",
+      "greatStart": "You've been exploring and learning — great start!",
+      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
+      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "notifyButton": "Notify My Parent",
+      "notifyButtonNotified": "Parent notified",
+      "notifyButtonAccessibilityNotified": "Parent already notified",
+      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "cooldownReminder": "You can remind them again in {{label}}.",
+      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
+      "waitText": "While you wait, you can still browse your Library and see your progress.",
+      "browseLibrary": "Browse Library",
+      "browseLibraryAccessibilityLabel": "Browse Library",
+      "seeProgress": "See your progress",
+      "seeProgressAccessibilityLabel": "See your progress",
+      "goHome": "Go Home",
+      "goHomeAccessibilityLabel": "Go Home",
+      "back": "Back",
+      "backAccessibilityLabel": "Go back",
+      "alerts": {
+        "sentTitle": "Sent!",
+        "sentBody": "We let your parent know!",
+        "askParentTitle": "Ask your parent",
+        "askParentBody": "Ask your parent to open the app and subscribe.",
+        "notifyErrorTitle": "Could not send notification",
+        "notifyErrorBody": "Please check your connection and try again."
+      }
+    },
+    "restore": {
+      "button": "Restore Purchases",
+      "accessibilityLabel": "Restore purchases",
+      "verifying": "Verifying purchase...",
+      "restoring": "Restoring...",
+      "failedTitle": "Restore failed",
+      "failedBody": "Could not restore purchases. Please try again.",
+      "notFoundTitle": "No subscriptions found",
+      "notFoundBody": "We could not find any previous purchases to restore.",
+      "cancelledTitle": "Restore cancelled",
+      "cancelledBody": "Restore will continue in background.",
+      "cancelAccessibilityLabel": "Cancel restore"
+    },
+    "byokWaitlist": {
+      "heading": "Bring your own key",
+      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
+      "joinButton": "Join Waitlist",
+      "alreadyJoinedButton": "Already joined",
+      "joinAccessibilityLabel": "Join BYOK waitlist",
+      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "alerts": {
+        "successTitle": "Waitlist",
+        "successBody": "You have been added to the BYOK waitlist.",
+        "errorTitle": "Error",
+        "errorBody": "Could not join waitlist. Try again."
+      }
     }
   },
   "sessionSummary": {
@@ -2630,5 +2692,231 @@
     "dismiss": "Dismiss",
     "buttonLabel": "Add to my learning",
     "privacyNote": "Private to your learning"
+  },
+  "learnerHomeTimeout": {
+    "loading": "Quase lá — só mais um momento...",
+    "retry": "Tentar novamente",
+    "goToLibrary": "Ir para a biblioteca",
+    "moreOptions": "Mais opções"
+  },
+  "subscriptionScreen": {
+    "back": "Voltar",
+    "backAccessibilityLabel": "Voltar",
+    "title": "Assinatura",
+    "loading": {
+      "error": "Não foi possível carregar os detalhes da assinatura. Tente novamente.",
+      "retryAccessibilityLabel": "Tentar carregar assinatura novamente",
+      "retry": "Tentar novamente"
+    },
+    "tierLabels": {
+      "free": "Gratuito",
+      "plus": "Plus",
+      "family": "Familiar",
+      "pro": "Pro"
+    },
+    "tierLimits": {
+      "free": "10 perguntas/dia, 100/mês",
+      "plus": "700 perguntas/mês",
+      "family": "1.500 perguntas compartilhadas/mês",
+      "pro": "Perguntas ilimitadas"
+    },
+    "tierFeatures": {
+      "free": {
+        "0": "10 perguntas por dia",
+        "1": "100 perguntas por mês",
+        "2": "Tópicos básicos de aprendizado",
+        "3": "Rastreamento de progresso"
+      },
+      "plus": {
+        "0": "700 perguntas por mês",
+        "1": "Sem limite diário",
+        "2": "Todos os tópicos de aprendizado",
+        "3": "Suporte prioritário"
+      },
+      "family": {
+        "0": "1.500 perguntas compartilhadas/mês",
+        "1": "Até 5 membros da família",
+        "2": "Visão geral do progresso familiar",
+        "3": "Todos os recursos Plus"
+      },
+      "pro": {
+        "0": "Perguntas ilimitadas",
+        "1": "Acesso antecipado a novos recursos",
+        "2": "Suporte dedicado",
+        "3": "Todos os recursos Familiar"
+      }
+    },
+    "packagePeriod": {
+      "monthly": "Mensal",
+      "annual": "Anual",
+      "weekly": "Semanal",
+      "lifetime": "Vitalício",
+      "threeMonth": "3 meses",
+      "sixMonth": "6 meses",
+      "twoMonth": "2 meses"
+    },
+    "currentPlan": {
+      "sectionHeader": "Plano atual",
+      "statusCancelling": "Cancelando",
+      "statusPastDue": "Vencido",
+      "statusExpired": "Expirado",
+      "statusActive": "Ativo",
+      "accessUntil": "Acesso até {{date}}",
+      "renews": "Renova em {{date}}",
+      "upgradeButton": "Fazer upgrade",
+      "upgradeAccessibilityLabel": "Fazer upgrade do plano"
+    },
+    "cancellationNotice": {
+      "title": "Assinatura encerrando",
+      "body": "Sua assinatura foi cancelada. Você pode continuar usando todos os recursos até {{date}}. Após isso, sua conta reverterá para o plano Gratuito."
+    },
+    "usage": {
+      "sectionHeader": "Uso deste mês",
+      "dailyQuestions": "Hoje: {{used}} / {{limit}} perguntas diárias",
+      "topUpCreditsRemaining_one": "+ {{count}} crédito extra restante",
+      "topUpCreditsRemaining_other": "+ {{count}} créditos extras restantes",
+      "yourShare": "Sua parte",
+      "yourUsage": "Seu uso",
+      "questionsCount_one": "{{count}} pergunta",
+      "questionsCount_other": "{{count}} perguntas",
+      "familyAggregate": "Total familiar",
+      "quotaResets": "Cota reinicia em {{date}}",
+      "subscriptionRenews": "Assinatura renova em {{date}}",
+      "dailyLimitResets": "Limite diário — reinicia à meia-noite"
+    },
+    "familyPool": {
+      "sectionHeader": "Pool familiar",
+      "profilesConnected": "de {{max}} perfis conectados",
+      "questionsLeft": "perguntas compartilhadas restantes neste ciclo.",
+      "ownerSuffix": " (proprietário)",
+      "removingMember": "Removendo…",
+      "removeMember": "Remover"
+    },
+    "plans": {
+      "sectionHeader": "Planos",
+      "confirmingPurchase": "Confirmando compra…",
+      "currentBadge": "Atual",
+      "retryOfferings": "Tentar novamente",
+      "retryOfferingsAccessibilityLabel": "Tentar carregar ofertas de assinatura novamente",
+      "contactSupport": "Contatar suporte",
+      "contactSupportAccessibilityLabel": "Contatar suporte",
+      "offeringsError": "Não foi possível carregar as opções de compra agora. Você está no plano {{tier}} com {{limits}}.",
+      "offeringsWebOnly": "Você está no plano {{tier}} com {{limits}}. Veja o que cada plano inclui — a compra na loja ainda não está disponível neste dispositivo."
+    },
+    "packageOption": {
+      "currentPlan": "Plano atual",
+      "subscribeTo": "Assinar",
+      "subscribe": "Assinar",
+      "processing": "Processando…",
+      "currentPlanLabel": "Plano atual",
+      "subscribeLabel": "Assinar",
+      "processingLabel": "Processando…",
+      "currentPlanAccessibilityLabel": "Plano atual: {{title}}, {{price}}",
+      "subscribePlanAccessibilityLabel": "Assinar {{title}}, {{price}}"
+    },
+    "restore": {
+      "sectionHeader": "Restaurar compras",
+      "checkLater": "Verificar mais tarde"
+    },
+    "topUp": {
+      "sectionHeader": "Precisa de mais perguntas?",
+      "buyAccessibilityLabel": "Comprar 500 créditos",
+      "buyButton": "Comprar 500 créditos",
+      "openingStore": "Abrindo loja…",
+      "credits": "Compra única. Créditos expiram em 12 meses.",
+      "checkLater": "Verificar mais tarde",
+      "checkLaterAccessibilityLabel": "Cancelar confirmação de recarga",
+      "confirmingPollMessage": "Confirmando sua compra…",
+      "confirmingPollMessageLong": "Ainda confirmando — isso pode levar até 30 segundos. Sua compra está segura."
+    },
+    "manageBilling": {
+      "sectionHeader": "Gerenciar",
+      "button": "Gerenciar cobranças",
+      "buttonAccessibilityLabel": "Gerenciar cobranças",
+      "webInfo": "Gerenciar cobranças",
+      "webInfoSubtitle": "A assinatura é gerenciada no seu dispositivo móvel",
+      "opensAppStore": "Abre assinaturas da App Store",
+      "opensGooglePlay": "Abre assinaturas do Google Play"
+    },
+    "byokWaitlist": {
+      "joinButton": "Entrar na lista de espera",
+      "leaveButton": "Sair da lista de espera",
+      "joiningButton": "Entrando…",
+      "leavingButton": "Saindo…"
+    },
+    "childPaywall": {
+      "title": "Pergunte a um responsável",
+      "body": "Você usou todas as suas perguntas de hoje. Seu responsável precisa fazer upgrade para continuar aprendendo.",
+      "cooldownZero": "0 segundos",
+      "cooldownHours_one": "{{count}} hora",
+      "cooldownHours_other": "{{count}} horas",
+      "cooldownMinutes_one": "{{count}} minuto",
+      "cooldownMinutes_other": "{{count}} minutos",
+      "cooldownSeconds_one": "{{count}} segundo",
+      "cooldownSeconds_other": "{{count}} segundos",
+      "xpThisWeek_one": "{{count}} XP nesta semana",
+      "xpThisWeek_other": "{{count}} XP nesta semana",
+      "topicsThisWeek_one": "{{count}} tópico nesta semana",
+      "topicsThisWeek_other": "{{count}} tópicos nesta semana"
+    },
+    "alerts": {
+      "topUpNotAvailableTitle": "Não disponível",
+      "topUpNotAvailableBody": "Créditos de recarga não estão disponíveis agora. Tente novamente mais tarde ou entre em contato com o suporte.",
+      "topUpRetry": "Tentar novamente",
+      "networkErrorTitle": "Erro de rede",
+      "networkErrorBody": "Por favor verifique sua conexão com a internet e tente novamente.",
+      "purchaseFailedTitle": "Compra falhou",
+      "purchaseFailedBody": "Algo inesperado aconteceu com sua compra. Por favor tente novamente.",
+      "alreadyPurchasedTitle": "Já adquirido",
+      "alreadyPurchasedBody": "Parece que você já possui esta assinatura. Toque em 'Restaurar compras' para ativá-la neste dispositivo.",
+      "restorePurchasesButton": "Restaurar compras",
+      "manageBillingErrorTitle": "Não foi possível abrir o gerenciamento de assinatura",
+      "manageBillingErrorBody": "Você pode gerenciar sua assinatura diretamente em:\n{{url}}",
+      "tryAgain": "Tentar novamente",
+      "checkAgain": "Verificar novamente",
+      "topUpPurchaseConfirmedTitle": "Compra confirmada",
+      "topUpPurchaseConfirmedBody": "Seus 500 créditos estão sendo adicionados. Eles geralmente aparecem em um minuto — puxe para baixo para atualizar seu uso.",
+      "topUpCheckLaterTitle": "Verificar mais tarde",
+      "topUpCheckLaterBody": "Os créditos aparecerão em breve — toque em atualizar para verificar.",
+      "contactSupportTitle": "Contatar suporte",
+      "contactSupportBody": "Envie um e-mail para support@mentomate.app para ajuda com assinaturas.",
+      "removeFamilyTitle": "Remover da família?",
+      "removeFamilyBody": "O perfil de {{name}} será removido deste plano familiar e ocultado da troca de perfil.",
+      "removeFamilyConfirm": "Remover",
+      "familyUpdatedTitle": "Família atualizada",
+      "familyUpdatedBody": "{{name}} foi removido do seu plano familiar.",
+      "removeFamilyErrorTitle": "Não foi possível remover o perfil",
+      "removeFamilyErrorBody": "Por favor verifique sua conexão e tente novamente.",
+      "topUpConnectionErrorTitle": "Erro de rede",
+      "topUpConnectionErrorBody": "Por favor verifique sua conexão com a internet e tente novamente."
+    }
+  },
+  "passwordInput": {
+    "defaultPlaceholder": "Inserir senha",
+    "hideLabel": "Ocultar senha",
+    "showLabel": "Mostrar senha",
+    "hideText": "Ocultar",
+    "showText": "Mostrar",
+    "requirementsHint": "Pelo menos 8 caracteres"
+  },
+  "accountSecurity": {
+    "securedVia": "Protegido via {{provider}}",
+    "changePasswordLabel": "Alterar senha"
+  },
+  "changePassword": {
+    "errorCurrentRequired": "Insira sua senha atual",
+    "errorTooShort": "A senha deve ter pelo menos 8 caracteres",
+    "errorMismatch": "As senhas não coincidem",
+    "currentPlaceholder": "Senha atual",
+    "signingOut": "Saindo...",
+    "forgotPassword": "Esqueceu sua senha?",
+    "newPlaceholder": "Nova senha",
+    "confirmPlaceholder": "Confirmar nova senha",
+    "successMessage": "Senha atualizada",
+    "signOutErrorTitle": "Não foi possível sair",
+    "signOutErrorMessage": "Por favor, tente novamente.",
+    "updateLabel": "Atualizar senha",
+    "updating": "Atualizando...",
+    "updateButton": "Atualizar senha"
   }
 }

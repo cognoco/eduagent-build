@@ -13,6 +13,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError } from '../errors';
 import {
   buildKnowledgeInventory,
@@ -73,6 +74,8 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     },
   )
   .post('/progress/refresh', async (c) => {
+    // [WI-174 / DS-085] Server-derived proxy-mode write guard.
+    assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 

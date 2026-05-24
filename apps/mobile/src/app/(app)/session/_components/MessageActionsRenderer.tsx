@@ -46,7 +46,7 @@ export function renderSessionMessageActions(
       <View className="flex-row gap-2 mt-2">
         <Pressable
           onPress={handleStartNewSession}
-          className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
+          className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[44px]"
           accessibilityRole="button"
           accessibilityLabel="Start new session"
           testID="session-expired-new-session"
@@ -57,7 +57,7 @@ export function renderSessionMessageActions(
         </Pressable>
         <Pressable
           onPress={handleHomeBack}
-          className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
+          className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[44px]"
           accessibilityRole="button"
           accessibilityLabel="Go Home"
           testID="session-expired-go-home"
