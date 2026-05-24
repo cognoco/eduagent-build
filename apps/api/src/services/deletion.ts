@@ -310,6 +310,7 @@ export async function deleteProfileIfNoConsent(
       AND EXISTS (
         SELECT 1 FROM consent_states
         WHERE consent_states.profile_id = ${profileId}
+        AND consent_states.consent_type = 'GDPR'
         AND consent_states.requested_at >= ${requestedAt}
         AND consent_states.requested_at < ${requestedAtUpperBound}
         AND consent_states.status NOT IN ('CONSENTED', 'WITHDRAWN')
@@ -322,6 +323,7 @@ export async function deleteProfileIfNoConsent(
     AND NOT EXISTS (
       SELECT 1 FROM consent_states
       WHERE consent_states.profile_id = ${profileId}
+      AND consent_states.consent_type = 'GDPR'
       AND consent_states.status IN ('CONSENTED', 'WITHDRAWN')
     )
     ${requestGenerationPredicate}

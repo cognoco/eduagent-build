@@ -664,4 +664,22 @@ describe('deleteProfileIfNoConsent (CI-11)', () => {
     expect(sqlText).toContain('2026-05-01t00:00:00.000z');
     expect(sqlText).toContain('2026-05-01t00:00:00.001z');
   });
+
+  it('[WI-84 review] scopes the terminal-consent shield to GDPR only', async () => {
+    const db = {
+      ...createMockDb(),
+      execute: jest.fn().mockResolvedValue({ rowCount: 0 }),
+    } as unknown as Database;
+
+    await deleteProfileIfNoConsent(
+      db,
+      'profile-1',
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
+
+    const sqlArg = (db.execute as jest.Mock).mock.calls[0]?.[0];
+    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
+    expect(sqlText).toContain('consent_type');
+    expect(sqlText).toContain('gdpr');
+  });
 });

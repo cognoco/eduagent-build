@@ -8,10 +8,7 @@ import {
 } from '../helpers';
 import { and, eq, gte, lt } from 'drizzle-orm';
 import { consentStates } from '@eduagent/database';
-import {
-  getConsentStatus,
-  refreshConsentTokenForRequest,
-} from '../../services/consent';
+import { refreshConsentTokenForRequest } from '../../services/consent';
 import {
   sendEmail,
   formatConsentReminderEmail,
@@ -39,9 +36,14 @@ export const consentReminder = inngest.createFunction(
       if (!requestedAtDate || !requestedAtUpperBound) return null;
       return and(
         eq(consentStates.profileId, profileId),
+        eq(consentStates.consentType, 'GDPR'),
         gte(consentStates.requestedAt, requestedAtDate),
         lt(consentStates.requestedAt, requestedAtUpperBound),
       );
+    }
+
+    function isTerminalConsentStatus(status: string | null): boolean {
+      return status === 'CONSENTED' || status === 'WITHDRAWN';
     }
 
     // [BUG-699] Build email options. Each reminder step passes a deterministic
@@ -81,15 +83,15 @@ export const consentReminder = inngest.createFunction(
       };
     }
 
-    async function isCurrentConsentRequest(): Promise<boolean> {
+    async function getCurrentConsentRequestStatus(): Promise<string | null> {
       const where = currentConsentRequestWhere();
-      if (!where) return false;
+      if (!where) return null;
       const db = getStepDatabase();
       const row = await db.query.consentStates.findFirst({
         where,
-        columns: { id: true },
+        columns: { status: true },
       });
-      return Boolean(row);
+      return row?.status ?? null;
     }
 
     async function refreshCurrentConsentToken(): Promise<{
@@ -118,10 +120,8 @@ export const consentReminder = inngest.createFunction(
     // new token, dead-linking the email the parent already received.
     await step.sleep('wait-7-days', '7d');
     const day7 = await step.run('refresh-day-7-token', async () => {
-      const db = getStepDatabase();
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
-        return null;
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return null;
       return refreshCurrentConsentToken();
     });
     if (day7) {
@@ -143,10 +143,8 @@ export const consentReminder = inngest.createFunction(
     // had a 7-day TTL), and the mint must be its own step to survive retries.
     await step.sleep('wait-7-more-days', '7d');
     const day14 = await step.run('refresh-day-14-token', async () => {
-      const db = getStepDatabase();
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
-        return null;
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return null;
       return refreshCurrentConsentToken();
     });
     if (day14) {
@@ -166,10 +164,8 @@ export const consentReminder = inngest.createFunction(
     // Day 25 final warning
     await step.sleep('wait-11-more-days', '11d');
     await step.run('send-day-25-warning', async () => {
-      const db = getStepDatabase();
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      if (!(await isCurrentConsentRequest())) return;
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return;
       const { parentEmail } = await lookupConsentDetails();
       if (!parentEmail) return;
       await sendEmail(
@@ -193,10 +189,9 @@ export const consentReminder = inngest.createFunction(
     await step.sleep('wait-5-more-days', '5d');
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
-      // Fast guard: bail out if consent was already granted/withdrawn.
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      if (!(await isCurrentConsentRequest())) return;
+      // Fast guard: bail out if this GDPR request was already granted/withdrawn.
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return;
       if (!requestedAt) return;
       // CI-11: Use service function instead of raw SQL.
       // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.

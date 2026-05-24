@@ -155,11 +155,13 @@ async function executeHandler(
     consentType: 'GDPR',
     requestedAt: '2026-05-01T00:00:00.000Z',
   },
+  latestAnyConsentStatusSequence: (string | null)[] = statusSequence,
 ): Promise<void> {
-  let callIndex = 0;
+  let latestStatusCallIndex = 0;
   mockGetConsentStatus.mockImplementation(async () => {
-    const status = statusSequence[callIndex] ?? null;
-    callIndex++;
+    const status =
+      latestAnyConsentStatusSequence[latestStatusCallIndex] ?? null;
+    latestStatusCallIndex++;
     return status;
   });
 
@@ -171,14 +173,27 @@ async function executeHandler(
     profileState?.requestedAt instanceof Date
       ? profileState.requestedAt.toISOString()
       : (profileState?.requestedAt ?? null);
-  mockConsentFindFirst.mockResolvedValue(
-    eventRequestedAt && stateRequestedAt === eventRequestedAt
-      ? {
-          parentEmail: profileState?.parentEmail ?? null,
-          consentToken: 'test-token-abc123',
-        }
-      : null,
-  );
+  let currentRequestStatusCallIndex = 0;
+  mockConsentFindFirst.mockImplementation(async (query: unknown) => {
+    const currentRequestMatches =
+      eventRequestedAt && stateRequestedAt === eventRequestedAt;
+    if (!currentRequestMatches) return null;
+
+    const columns = (query as { columns?: Record<string, boolean> }).columns;
+    if (columns?.status) {
+      const status = statusSequence[currentRequestStatusCallIndex] ?? null;
+      currentRequestStatusCallIndex++;
+      if (!status) return null;
+      return { status };
+    }
+
+    return {
+      id: 'consent-state-1',
+      parentEmail: profileState?.parentEmail ?? null,
+      consentToken: 'test-token-abc123',
+      consentType: profileState?.consentType ?? 'GDPR',
+    };
+  });
   mockRefreshConsentTokenForRequest.mockResolvedValue(
     eventRequestedAt && stateRequestedAt === eventRequestedAt
       ? profileState?.parentEmail
@@ -350,6 +365,22 @@ describe('consentReminder', () => {
 
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
     expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 review] ignores terminal COPPA status when the GDPR request is still pending', async () => {
+    await executeHandler(
+      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+      undefined,
+      undefined,
+      ['CONSENTED', 'CONSENTED', 'CONSENTED', 'CONSENTED'],
+    );
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(3);
+    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-1',
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
   });
 
   it('does not send email when parentEmail is not found in DB', async () => {
