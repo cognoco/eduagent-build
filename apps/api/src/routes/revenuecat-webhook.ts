@@ -19,6 +19,7 @@ import {
   activateSubscriptionFromRevenuecat,
   transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
+  type AppliedSubscriptionRow,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
@@ -34,6 +35,17 @@ import type { Database } from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
 export const LATE_REVENUECAT_EVENT_OBSERVATION_MS = 48 * 60 * 60 * 1000;
+
+function shouldRefreshRevenuecatKv(
+  updated: AppliedSubscriptionRow | null,
+  eventId: string,
+): updated is AppliedSubscriptionRow {
+  return (
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastRevenuecatEventId === eventId)
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
@@ -311,7 +323,7 @@ async function handleRenewal(
           renewalUpdates,
         );
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -349,7 +361,7 @@ async function handleCancellation(
     cancelledAt: new Date().toISOString(),
   });
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -390,7 +402,7 @@ async function handleExpiration(
       event.event_timestamp_ms,
     );
 
-    if (updated && updated.webhookApplied !== false) {
+    if (shouldRefreshRevenuecatKv(updated, event.id)) {
       await safeRefreshKvCache(
         kv,
         db,
@@ -422,7 +434,7 @@ async function handleExpiration(
     },
   );
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -454,7 +466,7 @@ async function handleBillingIssue(
     (updated.webhookApplied !== false ||
       updated.lastRevenuecatEventId === event.id);
 
-  if (updated) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -600,7 +612,7 @@ async function handleProductChange(
     },
   );
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -716,7 +728,7 @@ async function handleUncancellation(
     cancelledAt: null,
   });
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,

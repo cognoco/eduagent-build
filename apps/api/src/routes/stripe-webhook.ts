@@ -26,7 +26,10 @@ import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
-import type { WebhookSubscriptionUpdate } from '../services/billing';
+import type {
+  AppliedSubscriptionRow,
+  WebhookSubscriptionUpdate,
+} from '../services/billing';
 
 const logger = createLogger();
 
@@ -68,6 +71,17 @@ function extractSubscriptionIdFromInvoice(
 // ---------------------------------------------------------------------------
 
 const PAID_TIERS = new Set<string>(['plus', 'family', 'pro']);
+
+function shouldRefreshStripeKv(
+  updated: AppliedSubscriptionRow | null,
+  stripeEventId: string,
+): updated is AppliedSubscriptionRow {
+  return (
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastStripeEventId === stripeEventId)
+  );
+}
 
 /** Validates and extracts a paid tier from metadata. */
 function extractPaidTier(
@@ -277,7 +291,7 @@ async function handleSubscriptionEvent(
     return result;
   });
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -333,7 +347,7 @@ async function handleSubscriptionDeleted(
     return result;
   });
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -474,7 +488,7 @@ async function handlePaymentFailed(
     (updated.webhookApplied !== false ||
       updated.lastStripeEventId === stripeEventId);
 
-  if (updated) {
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -562,7 +576,7 @@ async function handlePaymentSucceeded(
     },
   );
 
-  if (updated && updated.webhookApplied !== false) {
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,

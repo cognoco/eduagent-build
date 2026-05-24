@@ -646,6 +646,35 @@ describe('customer.subscription.updated', () => {
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
 
+  it('[WI-78 review] refreshes KV when a subscription retry is already applied', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({
+        lastStripeEventId: 'evt_subscription_retry',
+        webhookApplied: false,
+      }),
+    );
+    const stripeSub = makeSubscription({ status: 'active' });
+    const event = makeStripeEvent('customer.subscription.updated', stripeSub);
+    event.id = 'evt_subscription_retry';
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(writeSubscriptionStatus).toHaveBeenCalledWith(
+      mockKv,
+      'acc-1',
+      expect.objectContaining({ status: 'active' }),
+    );
+  });
+
   // [CR-052 break test] A second subscription.updated event fired AFTER
   // cancellation (e.g. a period-end reminder) must NOT clobber cancelledAt
   // back to null. Pre-fix, the else branch always set cancelledAt = null when

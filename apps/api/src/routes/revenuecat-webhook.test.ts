@@ -786,6 +786,32 @@ describe('RENEWAL', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
+  it('[WI-78 review] refreshes KV when a renewal retry is already applied', async () => {
+    (
+      updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
+    ).mockResolvedValueOnce(
+      mockSubscriptionRow({
+        status: 'active',
+        lastRevenuecatEventId: 'evt_renewal_retry',
+        webhookApplied: false,
+      }),
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('RENEWAL', {
+        id: 'evt_renewal_retry',
+        product_id: 'com.eduagent.pro.monthly',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(writeSubscriptionStatus).toHaveBeenCalledWith(
+      mockKv,
+      'acc-1',
+      expect.objectContaining({ status: 'active' }),
+    );
+  });
+
   // [BUG-447] BREAK TEST: when updateSubscriptionFromRevenuecatWebhook throws
   // (invalid transition), handleRenewal must NOT call updateQuotaPoolLimit.
   // Pre-fix, the function returned the existing row, callers treated that as
