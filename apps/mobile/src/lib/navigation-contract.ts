@@ -32,6 +32,7 @@ export type RouteKey =
   | 'quiz'
   | 'practice'
   | 'mentor-memory'
+  | 'session-summary/[sessionId]'
   | 'topic/relearn'
   | 'child/[profileId]'
   | 'child/[profileId]/reports'
@@ -171,6 +172,7 @@ const LEARNING_ROUTES = new Set<RouteKey>([
   'quiz',
   'practice',
   'mentor-memory',
+  'session-summary/[sessionId]',
   'topic/relearn',
 ]);
 

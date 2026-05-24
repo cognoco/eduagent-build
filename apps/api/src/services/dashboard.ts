@@ -98,6 +98,7 @@ import {
   getProfileSessions,
   getSessionMetadata,
   formatSessionDisplayTitle,
+  normalizeHomeworkSummary,
   parseEngagementSignal,
 } from './session/session-crud';
 import type {
@@ -1381,7 +1382,9 @@ export async function getChildSessionDetail(
   if (!session) return null;
 
   const metadata = getSessionMetadata(session.metadata);
-  const homeworkSummary = metadata.homeworkSummary ?? null;
+  const homeworkSummary = normalizeHomeworkSummary(
+    metadata.homeworkSummary ?? null,
+  );
 
   // [BUG-526] Fetch highlight + structured subject/topic names + drill scores
   // in parallel. Drill rows mirror the sparse query pattern in

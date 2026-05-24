@@ -22,8 +22,26 @@ ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "pronouns" text;--> statement-br
 ALTER TABLE "session_summaries" ADD COLUMN IF NOT EXISTS "narrative" text;--> statement-breakpoint
 ALTER TABLE "session_summaries" ADD COLUMN IF NOT EXISTS "conversation_prompt" text;--> statement-breakpoint
 ALTER TABLE "session_summaries" ADD COLUMN IF NOT EXISTS "engagement_signal" text;--> statement-breakpoint
-ALTER TABLE "weekly_reports" ADD CONSTRAINT "weekly_reports_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "weekly_reports" ADD CONSTRAINT "weekly_reports_child_profile_id_profiles_id_fk" FOREIGN KEY ("child_profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'weekly_reports_profile_id_profiles_id_fk'
+      AND conrelid = '"weekly_reports"'::regclass
+  ) THEN
+    ALTER TABLE "weekly_reports" ADD CONSTRAINT "weekly_reports_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;
+  END IF;
+END$$;--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'weekly_reports_child_profile_id_profiles_id_fk'
+      AND conrelid = '"weekly_reports"'::regclass
+  ) THEN
+    ALTER TABLE "weekly_reports" ADD CONSTRAINT "weekly_reports_child_profile_id_profiles_id_fk" FOREIGN KEY ("child_profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;
+  END IF;
+END$$;--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "weekly_reports_parent_child_week_uq" ON "weekly_reports" USING btree ("profile_id","child_profile_id","report_week");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "weekly_reports_child_week_idx" ON "weekly_reports" USING btree ("child_profile_id","report_week");--> statement-breakpoint
 DO $$

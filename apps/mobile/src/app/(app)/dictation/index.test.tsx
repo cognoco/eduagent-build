@@ -55,6 +55,7 @@ const mockGoBackOrReplace = jest.fn();
 jest.mock('../../../lib/navigation', () => ({
   ...jest.requireActual('../../../lib/navigation'),
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  PRACTICE_HREF: '/(app)/practice',
 }));
 
 jest.mock('../../../lib/platform-alert', () => ({
@@ -115,6 +116,21 @@ describe('DictationChoiceScreen', () => {
     const { getByTestId } = render(<DictationChoiceScreen />);
     getByTestId('dictation-homework');
     getByTestId('dictation-surprise');
+  });
+
+  it('returns to the practice hub from the choice screen', () => {
+    const { getByTestId } = render(<DictationChoiceScreen />);
+
+    fireEvent.press(getByTestId('dictation-choice-back'));
+
+    // goBackOrReplace pops the dictation entry when canGoBack, preserving the
+    // practice screen's existing params (returnTo, etc.) — the prior
+    // router.replace(PRACTICE_HREF) regressed cross-tab back chain by
+    // remounting practice without params.
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/practice',
+    );
   });
 
   it('calls generateMutation when Surprise Me is pressed', async () => {

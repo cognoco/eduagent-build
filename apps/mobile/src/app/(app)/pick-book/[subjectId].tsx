@@ -17,7 +17,9 @@ import {
   classifyApiError,
   formatApiError,
 } from '../../../lib/format-api-error';
+import { resolveLoadingMotionPreset } from '../../../lib/motion-presets';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { LoadingMomentOverlay } from '../../../components/common/LoadingMomentOverlay';
 import {
   BookPageFlipAnimation,
   MagicPenAnimation,
@@ -168,6 +170,10 @@ export default function PickBookScreen(): React.ReactElement {
     ? suggestions.filter((s) => s.category === null)
     : [];
   const subject = subjects?.find((s) => s.id === subjectId);
+  const screenLoadingMotion = resolveLoadingMotionPreset({
+    surface: 'screen',
+    contentDensity: 'sparse',
+  });
   const suggestionsError =
     suggestionsQuery.isError && !suggestionsQuery.data
       ? classifyApiError(suggestionsQuery.error)
@@ -320,7 +326,11 @@ export default function PickBookScreen(): React.ReactElement {
         style={{ paddingTop: insets.top }}
         testID="pick-book-loading"
       >
-        <MagicPenAnimation size={150} color={colors.accent} />
+        <MagicPenAnimation
+          size={screenLoadingMotion.size}
+          color={colors.accent}
+          testID="pick-book-loading-animation"
+        />
         <Text className="text-body text-text-secondary mt-4">
           {LOADING_MESSAGES[loadingMessageIndex]}
         </Text>
@@ -622,14 +632,19 @@ export default function PickBookScreen(): React.ReactElement {
 
       {/* Loading overlay during filing */}
       {filing.isPending ? (
-        <View
-          className="absolute inset-0 bg-background/80 items-center justify-center"
+        <LoadingMomentOverlay
+          animationTestID="pick-book-filing-animation"
+          message="Organizing your library..."
+          panelTestID="pick-book-filing-overlay-panel"
+          renderAnimation={({ size, testID }) => (
+            <BookPageFlipAnimation
+              size={size}
+              color={colors.accent}
+              testID={testID}
+            />
+          )}
           testID="pick-book-filing-overlay"
         >
-          <BookPageFlipAnimation size={150} color={colors.accent} />
-          <Text className="text-body-sm text-text-secondary mt-3">
-            Organizing your library...
-          </Text>
           {showSkip && (
             <Pressable
               onPress={() => {
@@ -654,7 +669,7 @@ export default function PickBookScreen(): React.ReactElement {
               </Text>
             </Pressable>
           )}
-        </View>
+        </LoadingMomentOverlay>
       ) : null}
     </View>
   );

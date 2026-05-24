@@ -1,5 +1,6 @@
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   fetchCallsMatching,
@@ -58,7 +59,20 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('../../../../components/common', () => ({
   // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
-  BookPageFlipAnimation: () => null,
+  BookPageFlipAnimation: ({
+    size,
+    testID,
+  }: {
+    size?: number;
+    testID?: string;
+  }) => {
+    const React = require('react');
+    const { View } = require('react-native');
+    return React.createElement(View, {
+      testID,
+      style: { width: size, height: size },
+    });
+  },
 }));
 
 const mockPush = jest.fn();
@@ -79,6 +93,9 @@ jest.mock('../../../../lib/theme', () => ({
   // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#00bfa5',
+    background: '#faf5ee',
+    border: '#e8e0d4',
+    surface: '#ffffff',
     textSecondary: '#888',
     textInverse: '#fff',
   }),
@@ -254,6 +271,9 @@ describe('ShelfScreen', () => {
       wrapper: TestWrapper,
     });
     getByTestId('shelf-loading');
+    expect(
+      StyleSheet.flatten(getByTestId('shelf-loading-animation').props.style),
+    ).toEqual(expect.objectContaining({ width: 150, height: 150 }));
     getByText('Opening your shelf...');
 
     // Resolve to prevent test teardown warnings
@@ -717,9 +737,19 @@ describe('ShelfScreen', () => {
     // Re-render to pick up isPending state
     rerender(<ShelfScreen />);
 
+    let overlay: ReturnType<typeof getByTestId>;
     await waitFor(() => {
-      getByTestId('shelf-filing-overlay');
+      overlay = getByTestId('shelf-filing-overlay');
     });
+    getByTestId('shelf-filing-overlay-panel');
+    expect(
+      StyleSheet.flatten(getByTestId('shelf-filing-animation').props.style),
+    ).toEqual(expect.objectContaining({ width: 96, height: 96 }));
+    expect(StyleSheet.flatten(overlay!.props.style)).toEqual(
+      expect.objectContaining({
+        backgroundColor: '#faf5eef5',
+      }),
+    );
 
     // Advance past the 15s skip-button delay
     await act(async () => {

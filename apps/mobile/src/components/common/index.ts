@@ -12,6 +12,7 @@ export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
 export { DeskLampAnimation } from './DeskLampAnimation';
 export { LightBulbAnimation } from './LightBulbAnimation';
+export { LoadingMomentOverlay } from './LoadingMomentOverlay';
 export { MagicPenAnimation } from './MagicPenAnimation';
 export { ProfileSwitcher } from './ProfileSwitcher';
 export { RewardBurst } from './RewardBurst';

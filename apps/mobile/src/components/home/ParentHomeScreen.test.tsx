@@ -4,11 +4,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import type {
-  DashboardData,
-  LearningResumeTarget,
-  Profile,
-} from '@eduagent/schemas';
+import type { DashboardData, Profile } from '@eduagent/schemas';
 
 import { ParentHomeScreen } from './ParentHomeScreen';
 
@@ -26,8 +22,6 @@ jest.mock(
 
 let mockLinkedChildren: Profile[] = [];
 let mockDashboardData: DashboardData | undefined;
-let mockParentResumeTarget: LearningResumeTarget | null | undefined;
-const mockSwitchMode = jest.fn();
 
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
@@ -47,24 +41,6 @@ jest.mock(
   '../../hooks/use-dashboard' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
     useDashboard: () => ({ data: mockDashboardData }),
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-progress' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useLearningResumeTarget: () => ({ data: mockParentResumeTarget }),
-  }),
-);
-
-jest.mock(
-  '../../lib/use-mode-switch' /* gc1-allow: mode switch invalidates TanStack queries; tests assert home routing only */,
-  () => ({
-    useModeSwitch: () => ({
-      switchMode: mockSwitchMode,
-      isSwitching: false,
-      isSwitchingRef: { current: false },
-    }),
   }),
 );
 
@@ -168,21 +144,6 @@ const CHILD_B = makeProfile({
   isOwner: false,
 });
 
-const makeResumeTarget = (
-  overrides: Partial<LearningResumeTarget> = {},
-): LearningResumeTarget => ({
-  subjectId: '11111111-1111-4111-8111-111111111111',
-  subjectName: 'Math',
-  topicId: '22222222-2222-4222-8222-222222222222',
-  topicTitle: 'Fractions',
-  sessionId: null,
-  resumeFromSessionId: null,
-  resumeKind: 'recent_topic',
-  lastActivityAt: '2026-05-15T08:00:00.000Z',
-  reason: 'recent_topic',
-  ...overrides,
-});
-
 async function waitForParentTransitionNotice(): Promise<void> {
   await waitFor(() => {
     screen.getByTestId('parent-transition-notice');
@@ -205,7 +166,6 @@ describe('ParentHomeScreen', () => {
     jest.clearAllMocks();
     mockLinkedChildren = [];
     mockDashboardData = undefined;
-    mockParentResumeTarget = undefined;
     capturedBannerProps = null;
   });
 
@@ -236,7 +196,10 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Your family');
     screen.getByTestId('parent-home-family-summary');
     screen.getByText('Add profile');
-    screen.getByText("Show them how it's done: start a quick session.");
+    expect(screen.queryByText('Continue your own learning')).toBeNull();
+    expect(
+      screen.queryByText("Show them how it's done: start a quick session."),
+    ).toBeNull();
     expect(screen.queryByTestId('child-accommodation-row-child-a')).toBeNull();
     expect(screen.queryByTestId('child-accommodation-row-child-b')).toBeNull();
   });
@@ -252,7 +215,6 @@ describe('ParentHomeScreen', () => {
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a', mode: 'progress' },
     });
-    expect(mockSwitchMode).not.toHaveBeenCalled();
   });
 
   it('routes the child initial to child profile settings', async () => {
@@ -266,7 +228,6 @@ describe('ParentHomeScreen', () => {
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a', mode: 'settings' },
     });
-    expect(mockSwitchMode).not.toHaveBeenCalled();
   });
 
   it('routes the progress action to the child quick progress screen', async () => {
@@ -280,37 +241,20 @@ describe('ParentHomeScreen', () => {
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a', mode: 'progress' },
     });
-    expect(mockSwitchMode).not.toHaveBeenCalled();
   });
 
-  it('routes recent child activity to the child quick progress screen', async () => {
+  it('does not render duplicate recent activity or own learning actions', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
     await waitForParentTransitionNotice();
 
-    fireEvent.press(screen.getByTestId('parent-home-recent-child-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a', mode: 'progress' },
-    });
-    expect(mockSwitchMode).not.toHaveBeenCalled();
-  });
-
-  it('switches to student view from the compact My Learning action', async () => {
-    mockLinkedChildren = [CHILD_A];
-
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    screen.getByTestId('parent-home-study-activation');
-    screen.getByText('Continue your own learning');
-    expect(screen.queryByText('Want to study too?')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('parent-home-study-activation-action'));
-
-    expect(mockSwitchMode).toHaveBeenCalledTimes(1);
-    expect(mockSwitchMode).toHaveBeenLastCalledWith('study');
+    expect(
+      screen.queryByTestId('parent-home-recent-child-activity'),
+    ).toBeNull();
+    expect(screen.queryByTestId('parent-home-study-activation')).toBeNull();
+    expect(screen.queryByText('Recent child activity')).toBeNull();
+    expect(screen.queryByText('Continue your own learning')).toBeNull();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -393,16 +337,18 @@ describe('ParentHomeScreen', () => {
     expect(screen.queryByTestId('parent-home-tonight-section')).toBeNull();
     screen.getByTestId('parent-home-child-prompts-child-a');
     screen.getByText('Conversation starters');
-    screen.getByText('What made Fractions click today?');
+    screen.getByText('What felt clearer in Fractions this week?');
     screen.getByText("What's the trickiest part of Fractions right now?");
-    screen.getByText('What should we focus on tomorrow?');
+    screen.getByText('Want to pick one small Fractions goal for this week?');
     expect(
-      screen.queryByText('Emma: What made Fractions click today?'),
+      screen.queryByText('Emma: What felt clearer in Fractions this week?'),
     ).toBeNull();
+    expect(screen.queryByText('What made Fractions click today?')).toBeNull();
+    expect(screen.queryByText('What should we focus on tomorrow?')).toBeNull();
     const promptCardStyles = [
-      resolvedStyle('parent-home-tonight-child-a-primary'),
+      resolvedStyle('parent-home-tonight-child-a-active-focus'),
       resolvedStyle('parent-home-tonight-child-a-trickiest'),
-      resolvedStyle('parent-home-tonight-child-a-tomorrow'),
+      resolvedStyle('parent-home-tonight-child-a-next-goal'),
     ];
     promptCardStyles.forEach((style) => {
       expect(style).toEqual(
@@ -427,16 +373,19 @@ describe('ParentHomeScreen', () => {
     );
     const childAccent = resolvedStyle('parent-home-check-child-child-a')
       .shadowColor as string;
-    const promptBorder = resolvedStyle('parent-home-tonight-child-a-primary')
-      .borderColor as string;
+    const promptBorder = resolvedStyle(
+      'parent-home-tonight-child-a-active-focus',
+    ).borderColor as string;
     expect(promptBorder.toLowerCase()).toMatch(
       new RegExp(`^${childAccent.toLowerCase()}`),
     );
     expect(
-      screen.getByTestId('parent-home-tonight-child-a-primary').props
+      screen.getByTestId('parent-home-tonight-child-a-active-focus').props
         .accessibilityRole,
     ).toBeUndefined();
-    expect(resolvedStyle('parent-home-tonight-icon-child-a-primary')).toEqual(
+    expect(
+      resolvedStyle('parent-home-tonight-icon-child-a-active-focus'),
+    ).toEqual(
       expect.objectContaining({
         backgroundColor: expect.any(String),
         borderColor: expect.any(String),
@@ -446,7 +395,7 @@ describe('ParentHomeScreen', () => {
       }),
     );
     const promptTextStyle = resolvedStyle(
-      'parent-home-tonight-text-child-a-primary',
+      'parent-home-tonight-text-child-a-active-focus',
     );
     expect(promptTextStyle).toEqual(
       expect.objectContaining({
@@ -463,9 +412,59 @@ describe('ParentHomeScreen', () => {
     screen.getByText('2 of 5 profiles used');
   });
 
-  it('includes the parent in the family summary when they have been learning', async () => {
+  it('uses restart prompts when a child has a focus but no activity this week', async () => {
     mockLinkedChildren = [CHILD_A];
-    mockParentResumeTarget = makeResumeTarget();
+    mockDashboardData = {
+      children: [
+        {
+          profileId: 'child-a',
+          displayName: 'Emma',
+          consentStatus: null,
+          respondedAt: null,
+          summary: '',
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 1,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 12,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 6,
+          trend: 'stable',
+          subjects: [
+            {
+              subjectId: 'subject-programming',
+              name: 'Programming',
+              retentionStatus: 'strong',
+            },
+          ],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable',
+          totalSessions: 3,
+          weeklyHeadline: undefined,
+          currentlyWorkingOn: ['Programming'],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    };
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    screen.getByText('Want to pick one small Programming goal for this week?');
+    screen.getByText("What's the trickiest part of Programming right now?");
+    screen.getByText('Should we make Programming easier to restart?');
+    expect(screen.queryByText('What made Programming click today?')).toBeNull();
+    expect(
+      screen.queryByText('What felt clearer in Programming this week?'),
+    ).toBeNull();
+  });
+
+  it('keeps the family summary focused on child activity', async () => {
+    mockLinkedChildren = [CHILD_A];
     mockDashboardData = {
       children: [
         {
@@ -502,10 +501,11 @@ describe('ParentHomeScreen', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
     await waitForParentTransitionNotice();
 
-    screen.getByText('You + Emma');
-    screen.getByText('Emma: 18 min this week');
-    screen.getByText('You: Fractions in Math');
-    screen.getByText('You lead by example.');
+    screen.getByText('Emma · 18 min this week');
+    screen.getByText('2 of 5 profiles used');
+    expect(screen.queryByText('You + Emma')).toBeNull();
+    expect(screen.queryByText('You: Fractions in Math')).toBeNull();
+    expect(screen.queryByText('You lead by example.')).toBeNull();
   });
 
   it('shows one activity-based prompt inside each child card when multiple children are linked', async () => {
@@ -571,29 +571,31 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice();
 
     const emmaPrompt = screen.getByTestId(
-      'parent-home-tonight-child-a-primary',
+      'parent-home-tonight-child-a-active-focus',
     );
     const liamPrompt = screen.getByTestId(
-      'parent-home-tonight-child-b-primary',
+      'parent-home-tonight-child-b-restart',
     );
     screen.getByTestId('parent-home-child-prompts-child-a');
     screen.getByTestId('parent-home-child-prompts-child-b');
-    screen.getByText('What made Math click today?');
-    screen.getByText('What would make starting feel easy tonight?');
+    screen.getByText('What felt clearer in Math this week?');
+    screen.getByText('What would make starting feel easy this week?');
     expect(
       screen.queryByTestId('parent-home-tonight-child-a-trickiest'),
     ).toBeNull();
     expect(
-      screen.queryByTestId('parent-home-tonight-child-b-curious'),
-    ).toBeNull();
-    expect(screen.queryByText('Emma: What made Math click today?')).toBeNull();
-    expect(
-      screen.queryByText('Liam: What would make starting feel easy tonight?'),
+      screen.queryByTestId('parent-home-tonight-child-b-restart-easier'),
     ).toBeNull();
     expect(
-      resolvedStyle('parent-home-tonight-child-a-primary').borderColor,
+      screen.queryByText('Emma: What felt clearer in Math this week?'),
+    ).toBeNull();
+    expect(
+      screen.queryByText('Liam: What would make starting feel easy this week?'),
+    ).toBeNull();
+    expect(
+      resolvedStyle('parent-home-tonight-child-a-active-focus').borderColor,
     ).not.toBe(
-      resolvedStyle('parent-home-tonight-child-b-primary').borderColor,
+      resolvedStyle('parent-home-tonight-child-b-restart').borderColor,
     );
     expect(
       resolvedStyle('parent-home-check-child-child-a').shadowColor,

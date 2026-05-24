@@ -56,6 +56,7 @@ import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { formatSourceLine } from '../../../../../lib/format-note-source';
 import { withOpacity } from '../../../../../lib/color-opacity';
+import { resolveLoadingMotionPreset } from '../../../../../lib/motion-presets';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 import { computeUpNextTopic } from '../../../../../lib/up-next-topic';
@@ -283,6 +284,10 @@ export default function BookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
+  const screenLoadingMotion = resolveLoadingMotionPreset({
+    surface: 'screen',
+    contentDensity: 'sparse',
+  });
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRole();
   const proxyChildProfileId =
@@ -1373,7 +1378,10 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-generating"
       >
-        <MagicPenAnimation size={150} color={themeColors.accent} />
+        <MagicPenAnimation
+          size={screenLoadingMotion.size}
+          color={themeColors.accent}
+        />
         {book?.emoji && <Text className="text-3xl mt-4">{book.emoji}</Text>}
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
           {book?.title ?? 'Writing your book...'}

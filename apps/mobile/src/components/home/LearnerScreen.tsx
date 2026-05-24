@@ -25,6 +25,7 @@ import {
   LEARNER_HOME_RETURN_TO,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
+import { resolveLoadingMotionPreset } from '../../lib/motion-presets';
 import {
   clearSessionRecoveryMarker,
   isRecoveryMarkerFresh,
@@ -127,6 +128,10 @@ export function LearnerScreen({
   const navigationHome = useNavigationHomeContract();
   const navigationContract = navigationHome.contract;
   const navigationProxy = navigationHome.proxy;
+  const screenLoadingMotion = resolveLoadingMotionPreset({
+    surface: 'screen',
+    contentDensity: 'sparse',
+  });
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
@@ -417,7 +422,7 @@ export function LearnerScreen({
         }}
         testID="learner-loading-state"
       >
-        <BookPageFlipAnimation size={150} />
+        <BookPageFlipAnimation size={screenLoadingMotion.size} />
         {loadingTimedOut && (
           <View className="mt-6 items-center" testID="learner-loading-timeout">
             <Text className="text-body text-text-secondary text-center">

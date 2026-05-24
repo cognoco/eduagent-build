@@ -159,22 +159,12 @@
       "familySummary": {
         "nameListWithMore_one": "{{names}} + {{count}} weitere",
         "nameListWithMore_other": "{{names}} + {{count}} weitere",
-        "withParent": "Du + {{memberNames}}",
         "parentOnly": "Du",
         "withMinutes_one": "{{memberNames}} · {{count}} Min. diese Woche",
         "withMinutes_other": "{{memberNames}} · {{count}} Min. diese Woche",
         "withSessions_one": "{{memberNames}} · {{count}} Sitzung diese Woche",
         "withSessions_other": "{{memberNames}} · {{count}} Sitzungen diese Woche",
         "noActivity": "{{memberNames}} · keine Sitzungen diese Woche",
-        "childMinutes_one": "{{memberNames}}: {{count}} Min. diese Woche",
-        "childMinutes_other": "{{memberNames}}: {{count}} Min. diese Woche",
-        "childSessions_one": "{{memberNames}}: {{count}} Sitzung diese Woche",
-        "childSessions_other": "{{memberNames}}: {{count}} Sitzungen diese Woche",
-        "childNoActivity": "{{memberNames}}: keine Sitzungen diese Woche",
-        "parentLearningWithTopic": "Du: {{topicTitle}} in {{subjectName}}",
-        "parentLearningWithSubject": "Du: {{subjectName}}",
-        "parentExampleLead": "Du gehst mit gutem Beispiel voran.",
-        "parentExampleNudge": "Zeig, wie es geht: starte eine kurze Sitzung.",
         "attentionChild": "{{childName}} braucht vielleicht Aufmerksamkeit",
         "profileLimit": "{{count}} von {{max}} Profilen verwendet",
         "addProfileAction": "Profil hinzufügen",
@@ -183,24 +173,13 @@
       "encouragementNote": "Nudges sind sanfte Ermutigungen in eine Richtung.",
       "transitionNoticeTitle": "Du begleitest jetzt {{childNames}}",
       "transitionNoticeBody": "Probiere heute Abend eine dieser Einstiegsfragen aus.",
-      "recentActivity": {
-        "title": "Aktuelle Aktivität der Kinder"
-      },
-      "studyActivation": {
-        "title": "Möchtest du auch lernen?",
-        "body": "Wechsle zu Mein Lernen, wenn jetzt deine Lernzeit ist.",
-        "action": "Zu Mein Lernen"
-      },
       "cards": {
         "checkChild": "Schau nach, wie es {{childName}} geht",
         "checkChildFallback": "Tippe, um den Fortschritt dieser Woche zu sehen",
         "weeklyReport": "Lies den Wochenbericht von {{childName}}",
         "weeklyReportSubtitle": "Hol dir die neueste Zusammenfassung",
         "sendNudge": "Sende {{childName}} einen Nudge",
-        "sendNudgeSubtitle": "Wähle eine kurze Ermutigung",
-        "continueOwn": "Mit deinem eigenen Lernen weitermachen",
-        "continueOwnSubtitle": "Mach mit {{topicTitle}} in {{subjectName}} weiter",
-        "continueOwnEmptySubtitle": "Mach dort weiter, wo du aufgehört hast"
+        "sendNudgeSubtitle": "Wähle eine kurze Ermutigung"
       },
       "snapshot": {
         "noActivity": "Keine Aktivität diese Woche",
@@ -211,12 +190,13 @@
         "titleMorning": "Gesprächseinstiege",
         "titleAfternoon": "Gesprächseinstiege",
         "titleEvening": "Gesprächseinstiege",
-        "promptWithTopic": "Was hat {{topic}} heute einleuchten lassen?",
-        "promptNoActivity": "Was würde es heute Abend leichter machen, anzufangen?",
-        "promptFallback": "Was hat sich heute leichter angefühlt als gestern?",
+        "promptWithTopic": "Was wurde bei {{topic}} diese Woche klarer?",
+        "promptNoActivity": "Was würde es diese Woche leichter machen, anzufangen?",
+        "promptFallback": "Was hat sich diese Woche leichter angefühlt als beim letzten Mal?",
         "promptTrickiestWithTopic": "Was ist gerade der schwierigste Teil bei {{topic}}?",
-        "promptTomorrow": "Worauf sollen wir uns morgen konzentrieren?",
-        "promptCurious": "Worüber bist du neugierig?"
+        "promptNextGoalWithTopic": "Wollen wir ein kleines Ziel für {{topic}} diese Woche wählen?",
+        "promptRestartWithTopic": "Wollen wir ein kleines Ziel für {{topic}} diese Woche wählen?",
+        "promptRestartEasierWithTopic": "Sollen wir {{topic}} leichter wieder starten?"
       },
       "empty": {
         "title": "Your family dashboard starts here",

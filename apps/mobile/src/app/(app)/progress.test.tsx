@@ -272,6 +272,7 @@ let mockActiveProfile: Profile = {
   createdAt: '2026-01-01T00:00:00Z',
   isOwner: true,
 } as Profile;
+let mockLegacyMode: 'study' | 'family' | null | undefined;
 jest.mock('../../lib/profile', () => ({
   // gc1-allow: ProfileProvider + useProfile require SecureStore, QueryClient,
   // and network (via useProfiles) — not runnable in this unit env without a
@@ -303,17 +304,21 @@ jest.mock(
   '../../lib/app-context' /* gc1-allow: progress screen tests need deterministic study/family mode without provider side effects */,
   () => ({
     ...jest.requireActual('../../lib/app-context'),
-    useAppContext: () => ({
-      mode:
+    useAppContext: () => {
+      const inferredMode =
         mockSearchParams.profileId &&
         mockLinkedChildren.some(
           (child) => child.id === mockSearchParams.profileId,
         )
           ? 'family'
-          : 'study',
-      setMode: jest.fn(),
-      familyCapable: mockLinkedChildren.length > 0,
-    }),
+          : 'study';
+
+      return {
+        mode: mockLegacyMode === undefined ? inferredMode : mockLegacyMode,
+        setMode: jest.fn(),
+        familyCapable: mockLinkedChildren.length > 0,
+      };
+    },
   }),
 );
 jest.mock(
@@ -609,6 +614,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     } as Profile;
     mockUseSubjects.mockReturnValue({ data: [] });
     mockLinkedChildren = [];
+    mockLegacyMode = undefined;
     mockSearchParams = {};
   });
 
@@ -1212,6 +1218,34 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('My progress');
     expect(useChildInventory).toHaveBeenCalledWith(undefined, {
       enabled: false,
+    });
+  });
+
+  it('keeps linked child pills selectable in the 5-tab legacy fallback', async () => {
+    mockLegacyMode = null;
+    mockLinkedChildren = [childProgressProfile];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('My progress');
+    fireEvent.press(screen.getByTestId('progress-pill-child-1'));
+
+    await waitFor(() => {
+      expect(useChildInventory).toHaveBeenLastCalledWith('child-1', {
+        enabled: true,
+      });
+      screen.getByText("Emma's progress");
+      screen.getByText('6 sessions');
     });
   });
 

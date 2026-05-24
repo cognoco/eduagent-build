@@ -23,6 +23,8 @@ const DIAGNOSTIC_ALLOWED_FILES = new Set([
   'apps/mobile/src/lib/navigation-contract.ts',
   'apps/mobile/src/lib/navigation-contract.test.ts',
   'apps/mobile/src/lib/navigation-contract.snapshot.test.ts',
+  'apps/mobile/src/lib/navigation-contract.property.test.ts',
+  'apps/mobile/src/lib/navigation-contract.totality.test.ts',
   'apps/mobile/src/lib/navigation-contract.guard.test.ts',
 ]);
 

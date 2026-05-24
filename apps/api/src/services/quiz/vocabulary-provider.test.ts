@@ -101,6 +101,20 @@ describe('buildVocabularyPrompt', () => {
     expect(prompt).toContain('French');
     expect(prompt).toContain('Choose an age-appropriate theme');
   });
+
+  it('asks for practical daily words and reusable phrase chunks', () => {
+    const prompt = buildVocabularyPrompt({
+      discoveryCount: 4,
+      ageBracket: 'adolescent',
+      recentAnswers: [],
+      languageCode: 'it',
+      cefrCeiling: 'A1',
+    });
+
+    expect(prompt).toContain('common daily situations');
+    expect(prompt).toContain('short reusable chunks/phrases');
+    expect(prompt).toContain('at least one common daily phrase/chunk');
+  });
 });
 
 describe('validateVocabularyRound', () => {

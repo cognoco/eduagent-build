@@ -345,16 +345,88 @@ describe('PracticeScreen', () => {
     fireEvent.press(screen.getByTestId('practice-recitation'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'recitation' },
+      params: { mode: 'recitation', returnTo: 'practice' },
     });
 
     fireEvent.press(screen.getByTestId('practice-dictation'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/dictation');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/dictation',
+      params: { returnTo: 'practice' },
+    });
 
     fireEvent.press(screen.getByTestId('practice-quiz-history'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/history',
       params: { returnTo: 'practice' },
+    });
+  });
+
+  it('renders and routes a vocabulary quiz for every active language subject', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [
+        {
+          id: 'subject-it',
+          name: 'Italian',
+          pedagogyMode: 'four_strands',
+          languageCode: 'it',
+          status: 'active',
+        },
+        {
+          id: 'subject-ja',
+          name: 'Japanese',
+          pedagogyMode: 'four_strands',
+          languageCode: 'ja',
+          status: 'active',
+        },
+        {
+          id: 'subject-history',
+          name: 'History',
+          pedagogyMode: 'socratic',
+          languageCode: null,
+          status: 'active',
+        },
+        {
+          id: 'subject-archived-es',
+          name: 'Spanish',
+          pedagogyMode: 'four_strands',
+          languageCode: 'es',
+          status: 'archived',
+        },
+      ],
+      isError: false,
+    });
+
+    render(<PracticeScreen />);
+
+    screen.getByText('Italian basics');
+    screen.getByText('Japanese basics');
+    expect(
+      screen.queryByTestId('practice-vocabulary-subject-history'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('practice-vocabulary-subject-archived-es'),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByTestId('practice-vocabulary-subject-it'));
+    fireEvent.press(screen.getByTestId('practice-vocabulary-subject-ja'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/launch',
+      params: {
+        activityType: 'vocabulary',
+        subjectId: 'subject-it',
+        languageName: 'Italian',
+        returnTo: 'practice',
+      },
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/launch',
+      params: {
+        activityType: 'vocabulary',
+        subjectId: 'subject-ja',
+        languageName: 'Japanese',
+        returnTo: 'practice',
+      },
     });
   });
 
