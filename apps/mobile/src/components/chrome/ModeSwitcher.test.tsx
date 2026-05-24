@@ -8,32 +8,29 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-// gc1-allow: useNavigationContract internally composes useAppContext +
-// useProfile + useSubscription + feature flags. Wiring all four providers in a
-// chrome-component unit test would duplicate the navigation-contract.test.ts
-// scope without adding contract coverage (which lives in that file and the
-// snapshot test). Risk: this test cannot catch a regression in the contract
-// resolution itself — only that ModeSwitcher reads the contract correctly.
+// useNavigationContract internally composes useAppContext + useProfile +
+// useSubscription + feature flags. Pattern A: spread the real module so other
+// exports remain real, override only the hook with our spy. Real hook is never
+// invoked because the override replaces the named export.
 // TODO(zk): promote ModeSwitcher coverage to an integration test under
 // _layout that mounts the real provider chain (tracked as parallel-review
 // follow-up).
 const mockUseNavigationContract = jest.fn();
 jest.mock('../../hooks/use-navigation-contract', () => ({
-  // gc1-allow: see block comment above — composes 4 providers; full mock keeps this a focused chrome unit test.
+  ...jest.requireActual('../../hooks/use-navigation-contract'),
   useNavigationContract: (...args: unknown[]) =>
     mockUseNavigationContract(...args),
 }));
 
-// gc1-allow: useModeSwitch internally uses useRouter + useQueryClient +
-// useAppContext.setMode (a TanStack mutation with onError/onSuccess). The
-// switch-error state we surface here is a UI consequence of setMode's onError
-// callback; the mode-switching logic itself is covered in use-mode-switch.test.
+// useModeSwitch internally uses useRouter + useQueryClient + useAppContext.setMode
+// (a TanStack mutation). Pattern A: spread the real module, override only the
+// hook. switch-error UI behavior is covered here; mutation logic in use-mode-switch.test.
 const mockSwitchMode = jest.fn();
 const mockDismissError = jest.fn();
 let mockIsSwitching = false;
 let mockSwitchError: 'study' | 'family' | null = null;
 jest.mock('../../lib/use-mode-switch', () => ({
-  // gc1-allow: see block comment above — useModeSwitch is a TanStack mutation; full mock keeps this a focused chrome unit test.
+  ...jest.requireActual('../../lib/use-mode-switch'),
   useModeSwitch: () => ({
     switchMode: mockSwitchMode,
     isSwitching: mockIsSwitching,
