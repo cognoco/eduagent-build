@@ -435,6 +435,31 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
+  it('[WI-78 review] skips same-second Stripe past_due downgrade after active recovery', async () => {
+    const existing = mockSubscriptionRow({
+      stripeSubscriptionId: 'sub_stripe_1',
+      status: 'active',
+      lastStripeEventId: 'evt_payment_succeeded_same_second',
+      lastStripeEventTimestamp: NOW,
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await updateSubscriptionFromWebhook(db, 'sub_stripe_1', {
+      status: 'past_due',
+      stripeEventId: 'evt_payment_failed_same_second',
+      lastStripeEventTimestamp: NOW.toISOString(),
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        lastStripeEventId: 'evt_payment_succeeded_same_second',
+        webhookApplied: false,
+      }),
+    );
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
   it('skips update when Stripe event id was already processed', async () => {
     const existing = mockSubscriptionRow({
       stripeSubscriptionId: 'sub_stripe_1',

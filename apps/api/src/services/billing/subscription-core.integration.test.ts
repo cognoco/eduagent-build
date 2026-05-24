@@ -373,6 +373,45 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(row!.lastStripeEventId).toBe('evt_same_second_second');
   });
 
+  it('[WI-78 review] rejects same-second payment_failed after active recovery', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('webhook-same-second-past-due-stale');
+
+    const ts = new Date('2026-06-10T10:00:00.000Z');
+    await db.insert(subscriptions).values({
+      accountId: acct.id,
+      tier: 'plus',
+      status: 'active',
+      stripeSubscriptionId: 'sub_same_second_past_due_001',
+      lastStripeEventTimestamp: ts,
+      lastStripeEventId: 'evt_payment_succeeded_same_second',
+    });
+
+    const result = await updateSubscriptionFromWebhook(
+      db,
+      'sub_same_second_past_due_001',
+      {
+        status: 'past_due',
+        lastStripeEventTimestamp: ts.toISOString(),
+        stripeEventId: 'evt_payment_failed_same_second',
+      },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        lastStripeEventId: 'evt_payment_succeeded_same_second',
+        webhookApplied: false,
+      }),
+    );
+
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('active');
+    expect(row!.lastStripeEventId).toBe('evt_payment_succeeded_same_second');
+  });
+
   // [BREAK CR-2026-05-19-M11] Two concurrent deliveries of the same Stripe event
   // ID must result in exactly ONE write. Pre-fix: both calls saw "not yet processed"
   // (timestamp ordering check outside tx) and both wrote — divergent billing state.
