@@ -1389,7 +1389,10 @@ export async function getChildSessionDetail(
   // count stays bounded.
   const [summary, subjectRow, topicRow, drillRows] = await Promise.all([
     db.query.sessionSummaries.findFirst({
-      where: eq(sessionSummaries.sessionId, sessionId),
+      where: and(
+        eq(sessionSummaries.sessionId, sessionId),
+        eq(sessionSummaries.profileId, childProfileId),
+      ),
       columns: {
         highlight: true,
         narrative: true,
@@ -1421,6 +1424,7 @@ export async function getChildSessionDetail(
       .where(
         and(
           eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.profileId, childProfileId),
           eq(sessionEvents.eventType, 'ai_response'),
           isNotNull(sessionEvents.drillTotal),
         ),

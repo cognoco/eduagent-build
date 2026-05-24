@@ -331,6 +331,8 @@ async function seedSessionEvent(input: {
   eventType: typeof sessionEvents.$inferInsert.eventType;
   content: string;
   createdAt: Date;
+  drillCorrect?: number | null;
+  drillTotal?: number | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   await db.insert(sessionEvents).values({
@@ -341,6 +343,8 @@ async function seedSessionEvent(input: {
     eventType: input.eventType,
     content: input.content,
     createdAt: input.createdAt,
+    drillCorrect: input.drillCorrect ?? null,
+    drillTotal: input.drillTotal ?? null,
     metadata: input.metadata ?? {},
   });
 }
@@ -1604,6 +1608,82 @@ describe('dashboard service integration', () => {
     expect(JSON.stringify(session)).not.toContain(
       'Foreign Curriculum List Topic',
     );
+  });
+
+  it('[WI-80] parent session detail filters secondary rows by child profile', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Detail Secondary Parent',
+      birthYear: 1979,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Detail Secondary Child',
+      birthYear: 2013,
+    });
+    const { profileId: siblingProfileId } = await seedProfile({
+      displayName: 'Detail Secondary Sibling',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const subjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Secondary Row Subject',
+    });
+    const { topicIds } = await seedCurriculum(subjectId, ['Secondary Topic']);
+    const sessionId = await seedSession({
+      profileId: childProfileId,
+      subjectId,
+      topicId: topicIds[0],
+      sessionType: 'learning',
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
+      endedAt: subtractDays(getStableMidWeekNow(), 1),
+      exchangeCount: 4,
+    });
+
+    await seedSessionSummary({
+      sessionId,
+      profileId: childProfileId,
+      topicId: topicIds[0],
+      highlight: 'Owned highlight',
+      narrative: 'Owned narrative',
+      conversationPrompt: 'Owned prompt?',
+      engagementSignal: 'curious',
+    });
+    await seedSessionSummary({
+      sessionId,
+      profileId: siblingProfileId,
+      topicId: topicIds[0],
+      highlight: 'LEAK sibling highlight',
+      narrative: 'LEAK sibling narrative',
+      conversationPrompt: 'LEAK sibling prompt?',
+      engagementSignal: 'confused',
+    });
+    await seedSessionEvent({
+      sessionId,
+      profileId: siblingProfileId,
+      subjectId,
+      topicId: topicIds[0],
+      eventType: 'ai_response',
+      content: 'LEAK sibling drill',
+      createdAt: getStableMidWeekNow(),
+      drillCorrect: 1,
+      drillTotal: 9,
+    });
+
+    const detail = await getChildSessionDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      sessionId,
+    );
+
+    expect(detail).not.toBeNull();
+    expect(detail!.highlight).toBe('Owned highlight');
+    expect(detail!.narrative).toBe('Owned narrative');
+    expect(detail!.conversationPrompt).toBe('Owned prompt?');
+    expect(detail!.engagementSignal).toBe('curious');
+    expect(detail!.drills).toEqual([]);
+    expect(JSON.stringify(detail)).not.toContain('LEAK');
   });
 
   it('profile boundary: getChildrenForParent returns ONLY the linked child, not another child linked to a different parent', async () => {
