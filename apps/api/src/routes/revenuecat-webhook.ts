@@ -19,6 +19,7 @@ import {
   activateSubscriptionFromRevenuecat,
   transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
+  type AppliedSubscriptionRow,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
@@ -34,6 +35,14 @@ import type { Database } from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
 export const LATE_REVENUECAT_EVENT_OBSERVATION_MS = 48 * 60 * 60 * 1000;
+
+function shouldDispatchBillingIssueEvent(
+  updated: AppliedSubscriptionRow,
+  eventId: string,
+): boolean {
+  if (updated.webhookApplied !== false) return true;
+  return updated.lastRevenuecatEventId === eventId;
+}
 
 // ---------------------------------------------------------------------------
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
@@ -459,10 +468,15 @@ async function handleBillingIssue(
         eventId: event.id,
       },
     );
+  }
 
+  if (!updated) return;
+
+  if (shouldDispatchBillingIssueEvent(updated, event.id)) {
     // core-send: payment-failed alert - billing observability cannot be silent.
     // A swallowed dispatch leaves the failed payment unobserved by alerting.
     await inngest.send({
+      id: `revenuecat-payment-failed:${event.id}`,
       name: 'app/payment.failed',
       data: {
         subscriptionId: updated.id,

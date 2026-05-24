@@ -1167,7 +1167,36 @@ describe('BILLING_ISSUE', () => {
     const res = await makeRequest(makeWebhookPayload('BILLING_ISSUE'));
     expect(res.status).toBe(200);
 
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: expect.stringMatching(/^revenuecat-payment-failed:evt_/),
+        name: 'app/payment.failed',
+        data: expect.objectContaining({
+          subscriptionId: 'sub-internal-1',
+          accountId: 'acc-1',
+          source: 'revenuecat',
+        }),
+      }),
+    );
+  });
+
+  it('[WI-78 review] re-emits payment.failed when retry sees duplicate RevenueCat event stamp', async () => {
+    const payload = makeWebhookPayload('BILLING_ISSUE', {
+      id: 'evt_rc_payment_failed_retry',
+    });
+    (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({
+        status: 'past_due',
+        lastRevenuecatEventId: 'evt_rc_payment_failed_retry',
+        webhookApplied: false,
+      }),
+    );
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
     expect(inngest.send).toHaveBeenCalledWith({
+      id: 'revenuecat-payment-failed:evt_rc_payment_failed_retry',
       name: 'app/payment.failed',
       data: expect.objectContaining({
         subscriptionId: 'sub-internal-1',
@@ -1175,6 +1204,23 @@ describe('BILLING_ISSUE', () => {
         source: 'revenuecat',
       }),
     });
+  });
+
+  it('[WI-78 review] does not emit payment.failed for stale non-duplicate RevenueCat events', async () => {
+    const payload = makeWebhookPayload('BILLING_ISSUE', {
+      id: 'evt_rc_payment_failed_stale',
+    });
+    (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({
+        status: 'active',
+        lastRevenuecatEventId: 'evt_rc_newer_event_already_applied',
+        webhookApplied: false,
+      }),
+    );
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   it('does not emit event when subscription not found', async () => {
