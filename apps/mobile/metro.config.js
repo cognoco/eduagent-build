@@ -4,7 +4,19 @@ const { withNativeWind } = require('nativewind/metro');
 
 const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 
-const defaultConfig = getSentryExpoConfig(__dirname);
+// [WI-260 / DS-171] Disable Sentry's source-context Metro middleware. With the
+// default `getSentryExpoConfig(__dirname)`, @sentry/react-native installs a
+// `/__sentry/context` middleware that accepts JSON stack frames and reads
+// `frame.filename` directly with `fs.readFile`, returning the surrounding
+// source lines. There is no path restriction to the project root and no
+// authentication; Expo start defaults to LAN mode and Metro binds without an
+// explicit localhost-only bind, so anyone on the same network (or a tunnel
+// reaching the dev server) can request a few lines from arbitrary readable
+// local files by varying `lineno`. We don't rely on this middleware for
+// debugging — turn it off so the dev server stops handing out file contents.
+const defaultConfig = getSentryExpoConfig(__dirname, {
+  enableSourceContextInDevelopment: false,
+});
 const { assetExts, sourceExts } = defaultConfig.resolver;
 
 const monorepoRoot = path.resolve(__dirname, '../..');

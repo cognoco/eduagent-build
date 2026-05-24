@@ -849,9 +849,22 @@ function SessionScreenInner() {
         if (hasAutoSentRef.current) return;
         hasAutoSentRef.current = true;
         // BUG-373: Mark homework auto-send as auto-sent
+        // [WI-87 review / DS-195 defense-in-depth] Only forward imageUri to
+        // the send pipeline (which both attaches the base64 to the LLM call
+        // AND renders the URI inline in the chat thread via
+        // ChatShell's <Image>) when the URI passed the useImageBase64
+        // allowlist — `imageAttachmentStatus === 'ready'` is true iff the
+        // hook successfully read the file, which only happens for URIs the
+        // allowlist accepted. Without this gate, a deep-link-controlled
+        // URI rejected by the read step would still flow to <Image source>
+        // and render an attacker-pointed file inline.
+        const safeImageUri =
+          imageAttachmentStatus === 'ready'
+            ? (imageUri ?? undefined)
+            : undefined;
         void handleSend(initialProblemText, {
           isAutoSent: true,
-          imageUri: imageUri ?? undefined,
+          imageUri: safeImageUri,
           attachImage: imageAttachmentStatus === 'ready',
         });
       }, 500);

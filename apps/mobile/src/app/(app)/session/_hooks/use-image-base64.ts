@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as FileSystem from 'expo-file-system';
 
+import { isAllowedImageUri } from './_image-uri-allowlist';
+
 type Mime = 'image/jpeg' | 'image/png' | 'image/webp';
 export type ImageAttachmentStatus =
   | 'none'
@@ -38,6 +40,21 @@ export function useImageBase64(
 
     if (!imageUri) {
       setImageAttachmentStatus('none');
+      return undefined;
+    }
+
+    // [WI-284 / DS-195] Refuse to read URIs that didn't originate inside the
+    // app's cache/document sandbox. Pre-fix, any URI handed in via Expo
+    // Router params (including deep-link-controlled values like
+    // `file:///etc/hosts`) would be read by `readAsStringAsync` and shipped
+    // as base64 to the homework LLM pipeline. The legitimate capture flow
+    // always lands the URI inside FileSystem.cacheDirectory (see
+    // use-homework-ocr.ts).
+    if (!isAllowedImageUri(imageUri)) {
+      console.warn(
+        '[Session] Refusing imageUri outside the app cache/document sandbox',
+      );
+      setImageAttachmentStatus('failed');
       return undefined;
     }
 
