@@ -223,7 +223,7 @@ describe('recordDictationResult (integration)', () => {
     expect(second.mode).toBe('surprise');
   });
 
-  it('[WI-84 DS-115] same-day same-mode completions are distinct by completionKey while retries upsert', async () => {
+  it('[WI-84 rollout] keeps same-day same-mode writes on the legacy conflict target until contract migration', async () => {
     const db = createIntegrationDb();
     const today = getServerDate();
     const keyA = completionKey(5);
@@ -259,9 +259,8 @@ describe('recordDictationResult (integration)', () => {
     const rows = await db.query.dictationResults.findMany({
       where: eq(dictationResults.profileId, profileId),
     });
-    expect(rows).toHaveLength(2);
-    expect(rows[0]!.id).toBe(first.id);
-    expect(second.id).not.toBe(first.id);
+    expect(rows).toHaveLength(1);
+    expect(second.id).toBe(first.id);
     expect(retry.id).toBe(first.id);
     expect(rows.find((row) => row.id === first.id)?.sentenceCount).toBe(7);
   });

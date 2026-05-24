@@ -29,14 +29,32 @@ describe('dictation completion key migration', () => {
     expect(migration).not.toContain('set "completion_key" = "id"');
   });
 
-  it('[WI-84 automated review] rollback dedupes tied timestamps deterministically', () => {
+  it('[WI-84 review] keeps the legacy unique index for migration-before-deploy safety', () => {
+    const migration = readFileSync(
+      join(__dirname, '../drizzle/0092_dictation_completion_key.sql'),
+      'utf8',
+    ).toLowerCase();
+
+    expect(migration).not.toContain(
+      'drop index if exists "uniq_dictation_results_profile_date_mode"',
+    );
+    expect(migration).not.toContain(
+      'create index if not exists "idx_dictation_results_profile_date_mode"',
+    );
+  });
+
+  it('[WI-84 review] rollback leaves the preserved legacy unique index alone', () => {
     const rollback = readFileSync(
       join(__dirname, '../drizzle/0092_dictation_completion_key.rollback.md'),
       'utf8',
     ).toLowerCase();
 
-    expect(rollback).toContain('a.created_at < b.created_at');
-    expect(rollback).toContain('a.created_at = b.created_at');
-    expect(rollback).toContain('a.id < b.id');
+    expect(rollback).toContain(
+      'drop index if exists "uniq_dictation_results_profile_completion_key"',
+    );
+    expect(rollback).toContain('drop column if exists "completion_key"');
+    expect(rollback).not.toContain(
+      'create unique index "uniq_dictation_results_profile_date_mode"',
+    );
   });
 });

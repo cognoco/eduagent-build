@@ -792,18 +792,21 @@ export function createScopedRepository(db: Database, profileId: string) {
         mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
       }) {
-        // [WI-84 DS-115] Idempotent on (profile_id, completion_key): retries
-        // of one completion upsert, while legitimate same-day same-mode
-        // completions use different keys and land in separate rows.
+        // [WI-84 rollout] Keep the legacy conflict target for the expand
+        // deploy. Old Workers still need uniq_dictation_results_profile_date_mode
+        // during the migration-to-deploy window; a contract migration can move
+        // this upsert to completionKey after those Workers are gone.
         const [row] = await db
           .insert(dictationResults)
           .values({ profileId, ...values })
           .onConflictDoUpdate({
             target: [
               dictationResults.profileId,
-              dictationResults.completionKey,
+              dictationResults.date,
+              dictationResults.mode,
             ],
             set: {
+              completionKey: values.completionKey,
               sentenceCount: values.sentenceCount,
               mistakeCount: values.mistakeCount,
               reviewed: values.reviewed,

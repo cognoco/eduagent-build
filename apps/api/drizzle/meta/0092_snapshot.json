@@ -1443,8 +1443,8 @@
           "method": "btree",
           "with": {}
         },
-        "idx_dictation_results_profile_date_mode": {
-          "name": "idx_dictation_results_profile_date_mode",
+        "uniq_dictation_results_profile_date_mode": {
+          "name": "uniq_dictation_results_profile_date_mode",
           "columns": [
             {
               "expression": "profile_id",
@@ -1465,7 +1465,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}

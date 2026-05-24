@@ -1,26 +1,12 @@
 ## Rollback - 0092 dictation completion key
 
-This migration changes dictation result idempotency from `(profile_id, date, mode)` to `(profile_id, completion_key)`.
+This expand migration adds `completion_key` and its unique index while preserving the legacy `(profile_id, date, mode)` unique index for migration-before-deploy safety.
 
-Rollback is not lossless once users have created multiple same-day same-mode dictation results. To restore the old unique constraint, first choose which duplicate rows to keep, archive or delete the extras, then run:
+Rollback is lossless for the column/index shape because this migration does not yet allow multiple same-day same-mode dictation rows. To restore the previous schema, run:
 
 ```sql
 DROP INDEX IF EXISTS "uniq_dictation_results_profile_completion_key";
-DROP INDEX IF EXISTS "idx_dictation_results_profile_date_mode";
-
-DELETE FROM "dictation_results" a
-USING "dictation_results" b
-WHERE a.profile_id = b.profile_id
-  AND a.date = b.date
-  AND a.mode = b.mode
-  AND (
-    a.created_at < b.created_at
-    OR (a.created_at = b.created_at AND a.id < b.id)
-  );
-
 ALTER TABLE "dictation_results" DROP COLUMN IF EXISTS "completion_key";
-CREATE UNIQUE INDEX "uniq_dictation_results_profile_date_mode"
-  ON "dictation_results" USING btree ("profile_id","date","mode");
 ```
 
-Data loss: possible. The delete step keeps the newest row per old uniqueness key and removes legitimate additional completions that the forward migration allowed.
+Data loss: none expected from rollback. The dropped `completion_key` values can be regenerated from `(profile_id,date,mode)` by re-running the forward migration.

@@ -1,7 +1,6 @@
 import {
   boolean,
   date,
-  index,
   uniqueIndex,
   integer,
   pgEnum,
@@ -36,15 +35,16 @@ export const dictationResults = pgTable(
       .notNull()
       .defaultNow(),
   },
-  // [WI-84 DS-115] Idempotency is per completion, not per date/mode. A learner
-  // can legitimately complete multiple same-mode dictations on the same day;
-  // client retries reuse completionKey and upsert this row.
+  // [WI-84 rollout] Keep the legacy date/mode uniqueness during the expand
+  // deploy so old Workers still have a backing ON CONFLICT target. A follow-up
+  // contract migration can replace this with a non-unique read index once all
+  // deployed Workers write against completionKey.
   (table) => [
     uniqueIndex('uniq_dictation_results_profile_completion_key').on(
       table.profileId,
       table.completionKey,
     ),
-    index('idx_dictation_results_profile_date_mode').on(
+    uniqueIndex('uniq_dictation_results_profile_date_mode').on(
       table.profileId,
       table.date,
       table.mode,
