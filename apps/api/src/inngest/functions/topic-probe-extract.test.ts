@@ -5,36 +5,44 @@ const mockInngestTransport = createInngestTransportCapture();
 const mockGetStepDatabase = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../client', () => {
-  // gc1-allow: pattern-a conversion
-  const actual = jest.requireActual('../client') as typeof import('../client');
-  return {
-    ...actual,
-    inngest: mockInngestTransport.inngest,
-  };
-});
+jest.mock(
+  '../client', // gc1-allow: Inngest client boundary
+  () => {
+    const actual = jest.requireActual(
+      '../client',
+    ) as typeof import('../client');
+    return {
+      ...actual,
+      inngest: mockInngestTransport.inngest,
+    };
+  },
+);
 
-jest.mock('../helpers', () => {
-  // gc1-allow: pattern-a conversion
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: () => mockGetStepDatabase(),
-  };
-});
+jest.mock(
+  '../helpers', // gc1-allow: step DB boundary
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockGetStepDatabase(),
+    };
+  },
+);
 
-jest.mock('../../services/sentry', () => {
-  // gc1-allow: pattern-a conversion
-  const actual = jest.requireActual(
-    '../../services/sentry',
-  ) as typeof import('../../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
+jest.mock(
+  '../../services/sentry', // gc1-allow: Sentry boundary
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
 import { topicProbeExtract } from './topic-probe-extract';
 
