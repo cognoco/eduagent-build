@@ -26,10 +26,7 @@ import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
-import type {
-  AppliedSubscriptionRow,
-  WebhookSubscriptionUpdate,
-} from '../services/billing';
+import type { WebhookSubscriptionUpdate } from '../services/billing';
 
 const logger = createLogger();
 
@@ -71,14 +68,6 @@ function extractSubscriptionIdFromInvoice(
 // ---------------------------------------------------------------------------
 
 const PAID_TIERS = new Set<string>(['plus', 'family', 'pro']);
-
-function shouldDispatchPaymentFailedEvent(
-  updated: AppliedSubscriptionRow,
-  stripeEventId: string,
-): boolean {
-  if (updated.webhookApplied !== false) return true;
-  return updated.lastStripeEventId === stripeEventId;
-}
 
 /** Validates and extracts a paid tier from metadata. */
 function extractPaidTier(
@@ -480,9 +469,7 @@ async function handlePaymentFailed(
     },
   );
 
-  const shouldDispatchPaymentFailed =
-    updated !== null &&
-    shouldDispatchPaymentFailedEvent(updated, stripeEventId);
+  const shouldDispatchPaymentFailed = updated !== null;
 
   if (updated && shouldDispatchPaymentFailed) {
     await safeRefreshKvCache(

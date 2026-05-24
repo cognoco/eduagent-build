@@ -836,10 +836,10 @@ describe('invoice.payment_failed', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
-  it('[WI-78 review] does not emit payment.failed for stale non-duplicate events', async () => {
+  it('[WI-78 review] re-emits payment.failed when retry sees a newer Stripe event stamp', async () => {
     const invoice = makeInvoice({ attempt_count: 3 });
     const event = makeStripeEvent('invoice.payment_failed', invoice);
-    event.id = 'evt_payment_failed_stale';
+    event.id = 'evt_payment_failed_stale_retry';
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
     (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
       mockUpdatedSubscription({
@@ -859,7 +859,16 @@ describe('invoice.payment_failed', () => {
       TEST_ENV,
     );
 
-    expect(inngest.send).not.toHaveBeenCalled();
+    expect(inngest.send).toHaveBeenCalledWith({
+      id: 'stripe-payment-failed:evt_payment_failed_stale_retry',
+      name: 'app/payment.failed',
+      data: expect.objectContaining({
+        subscriptionId: 'sub-internal-1',
+        stripeSubscriptionId: 'sub_stripe_123',
+        accountId: 'acc-1',
+        attempt: 3,
+      }),
+    });
   });
 
   it('does not emit event when subscription not found', async () => {

@@ -19,7 +19,6 @@ import {
   activateSubscriptionFromRevenuecat,
   transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
-  type AppliedSubscriptionRow,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
@@ -35,14 +34,6 @@ import type { Database } from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
 export const LATE_REVENUECAT_EVENT_OBSERVATION_MS = 48 * 60 * 60 * 1000;
-
-function shouldDispatchBillingIssueEvent(
-  updated: AppliedSubscriptionRow,
-  eventId: string,
-): boolean {
-  if (updated.webhookApplied !== false) return true;
-  return updated.lastRevenuecatEventId === eventId;
-}
 
 // ---------------------------------------------------------------------------
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
@@ -458,8 +449,7 @@ async function handleBillingIssue(
     status: 'past_due',
   });
 
-  const shouldDispatchBillingIssue =
-    updated !== null && shouldDispatchBillingIssueEvent(updated, event.id);
+  const shouldDispatchBillingIssue = updated !== null;
 
   if (updated && shouldDispatchBillingIssue) {
     await safeRefreshKvCache(
