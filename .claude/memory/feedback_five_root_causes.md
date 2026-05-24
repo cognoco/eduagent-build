@@ -20,7 +20,3 @@ Full-app audit (2026-04-05) across code reviews (Epics 1-13), security bug-fix-p
 
 **How to apply:**
 - Global CLAUDE.md has all 5 rules
-- BMAD architecture step-05 has UX Resilience Patterns section
-- BMAD epic step-03 requires failure mode ACs in stories
-- BMAD dev-story checklist has 5 new UX checks
-- BMAD code-review checklist has 6 new UX checks
