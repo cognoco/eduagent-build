@@ -901,9 +901,9 @@ exports[`navigation-contract matrix snapshot row-v0-flags-off: V0 hard constrain
     "showRemoveFamilyMember": true,
   },
   "home": {
-    "iconName": "School",
-    "screen": "LearnerHome",
-    "titleKey": "tabs.myLearning",
+    "iconName": "Users",
+    "screen": "FamilyHome",
+    "titleKey": "tabs.children",
   },
   "isFamilyCapable": true,
   "isParentProxy": false,

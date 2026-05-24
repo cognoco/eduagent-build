@@ -35,6 +35,7 @@ jest.mock(
 );
 
 let mockOnAllComplete: (() => void) | null = null;
+let mockLastLearnerScreenProps: Record<string, unknown> | null = null;
 
 jest.mock(
   '../../hooks/use-celebration' /* gc1-allow: avoids native celebration animation timers and async side effects in render tests */,
@@ -49,6 +50,7 @@ jest.mock(
 const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
 let mockNavigationEffectiveAppContext: 'study' | 'family' = 'study';
+let mockNavigationHomeScreen: 'LearnerHome' | 'FamilyHome' = 'LearnerHome';
 let mockNavigationSessionIsOwner = true;
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
@@ -58,6 +60,15 @@ jest.mock(
   '../../hooks/use-navigation-contract' /* gc1-allow: home.test.tsx pins navigation-contract outputs without mounting the full shell adapter */,
   () => ({
     useNavigationContract: () => ({
+      home: {
+        screen: mockNavigationHomeScreen,
+        titleKey:
+          mockNavigationHomeScreen === 'FamilyHome'
+            ? 'tabs.children'
+            : 'tabs.myLearning',
+        iconName:
+          mockNavigationHomeScreen === 'FamilyHome' ? 'Users' : 'School',
+      },
       effectiveAppContext: mockNavigationEffectiveAppContext,
       gates: { sessionIsOwner: mockNavigationSessionIsOwner },
       queryScope: {
@@ -79,9 +90,17 @@ jest.mock(
   () => {
     const { Text, View } = require('react-native');
     return {
-      LearnerScreen: () => (
-        <View testID="learner-screen">
-          <Text>LearnerScreen</Text>
+      LearnerScreen: (props: Record<string, unknown>) => {
+        mockLastLearnerScreenProps = props;
+        return (
+          <View testID="learner-screen">
+            <Text>LearnerScreen</Text>
+          </View>
+        );
+      },
+      ParentHomeScreen: () => (
+        <View testID="parent-home-screen">
+          <Text>ParentHomeScreen</Text>
         </View>
       ),
     };
@@ -144,7 +163,9 @@ describe('HomeScreen intent router', () => {
     jest.clearAllMocks();
     mockOnAllComplete = null;
     mockNavigationEffectiveAppContext = 'study';
+    mockNavigationHomeScreen = 'LearnerHome';
     mockNavigationSessionIsOwner = true;
+    mockLastLearnerScreenProps = null;
   });
 
   it('renders LearnerScreen for owner with no children [BUG-522]', () => {
@@ -163,6 +184,9 @@ describe('HomeScreen intent router', () => {
     // BUG-522: owners without children always see LearnerScreen — no forced
     // add-child gate regardless of subscription tier
     screen.getByTestId('learner-screen');
+    expect(mockLastLearnerScreenProps).toEqual(
+      expect.objectContaining({ showParentHome: false }),
+    );
   });
 
   it('renders LearnerScreen directly for owner with linked children', () => {
@@ -184,6 +208,34 @@ describe('HomeScreen intent router', () => {
     render(<HomeScreen />, { wrapper });
 
     screen.getByTestId('learner-screen');
+    expect(screen.queryByTestId('parent-home-screen')).toBeNull();
+    expect(mockLastLearnerScreenProps).toEqual(
+      expect.objectContaining({ showParentHome: false }),
+    );
+  });
+
+  it('renders ParentHomeScreen when the navigation contract selects FamilyHome', () => {
+    mockNavigationEffectiveAppContext = 'family';
+    mockNavigationHomeScreen = 'FamilyHome';
+    const parent = createTestProfile({
+      id: 'p1',
+      displayName: 'Maria',
+      isOwner: true,
+    });
+    const child = createTestProfile({
+      id: 'c1',
+      displayName: 'Emma',
+      isOwner: false,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, child],
+    });
+
+    render(<HomeScreen />, { wrapper });
+
+    screen.getByTestId('parent-home-screen');
+    expect(screen.queryByTestId('learner-screen')).toBeNull();
   });
 
   it('renders LearnerScreen when active profile is a child (non-owner)', () => {
@@ -227,6 +279,7 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     mockNavigationEffectiveAppContext = 'study';
+    mockNavigationHomeScreen = 'LearnerHome';
     mockNavigationSessionIsOwner = true;
     ({ wrapper: Wrapper } = createScreenWrapper({
       activeProfile: null,
@@ -298,6 +351,7 @@ describe('HomeScreen B-600: family mode timeout state routes to Progress not Lib
     jest.useFakeTimers();
     jest.clearAllMocks();
     mockNavigationEffectiveAppContext = 'family';
+    mockNavigationHomeScreen = 'LearnerHome';
     mockNavigationSessionIsOwner = true;
     ({ wrapper: Wrapper } = createScreenWrapper({
       activeProfile: null,
@@ -362,6 +416,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockOnAllComplete = null;
+    mockNavigationHomeScreen = 'LearnerHome';
   });
 
   it('logs error when markCelebrationsSeen.mutateAsync rejects — no unhandled rejection [SF-1]', async () => {

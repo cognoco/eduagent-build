@@ -8,7 +8,11 @@ import {
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { useAppContext, type AppMode } from './app-context';
+import {
+  useAppContext,
+  type AppMode,
+  type AppModeSwitchCallbacks,
+} from './app-context';
 import { bucketAccountAge, hashProfileId, track } from './analytics';
 import { FEATURE_FLAGS } from './feature-flags';
 import { MODE_SCOPED_KEYS } from './mode-scoped-keys';
@@ -156,10 +160,20 @@ export function useEnsureStudyMode(): (then: () => void) => void {
  * those are appropriate for a global mode switch, but the family-route
  * guard wants to render its protected child immediately at the current
  * URL once the mode flips.
+ *
+ * Accepts callbacks so the caller can surface a failed switch instead of
+ * navigating silently. With the server-side guard in `profile.ts` that
+ * 403s on a non-eligible family-context switch (commit `add34c732`), the
+ * mutation can now reject — `onError` is no longer dead code.
  */
-export function useEnterFamilyMode(): () => void {
+export function useEnterFamilyMode(): (
+  callbacks?: AppModeSwitchCallbacks,
+) => void {
   const { setMode } = useAppContext();
-  return useCallback(() => {
-    setMode('family');
-  }, [setMode]);
+  return useCallback(
+    (callbacks?: AppModeSwitchCallbacks): void => {
+      setMode('family', callbacks);
+    },
+    [setMode],
+  );
 }

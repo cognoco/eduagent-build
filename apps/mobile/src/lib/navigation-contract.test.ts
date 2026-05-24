@@ -797,6 +797,7 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
 
     expectTabs(contract, legacyGuardianTabs);
     expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
+    expect(contract.home.screen).toBe('FamilyHome');
     expect(contract.gates.showFamilyHome).toBe(true);
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
@@ -876,6 +877,7 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
     expect(contract.chrome.modeSwitcher).toBe('global-header');
     expect(contract.effectiveAppContext).toBe('family');
     expect(contract.shape).toBe('study');
+    expect(contract.home.screen).toBe('FamilyHome');
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
 });
