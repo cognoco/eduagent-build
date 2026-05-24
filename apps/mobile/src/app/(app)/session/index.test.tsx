@@ -269,8 +269,25 @@ jest.mock('expo-file-system', () => {
   (
     global as { __sessionTestReadAsStringAsync?: typeof readAsStringAsync }
   ).__sessionTestReadAsStringAsync = readAsStringAsync;
-  return { readAsStringAsync };
+  // [WI-284] Provide cacheDirectory + documentDirectory so the
+  // useImageBase64 allowlist accepts test fixture URIs that live under
+  // these prefixes (see e.g. 'file:///cache/homework-photo.jpg').
+  return {
+    readAsStringAsync,
+    cacheDirectory: 'file:///cache/',
+    documentDirectory: 'file:///documents/',
+  };
 });
+
+// [WI-284] The image-URI allowlist imports from `expo-file-system/legacy`
+// (the only entry that exposes `cacheDirectory` / `documentDirectory` as
+// plain strings in SDK 54+). Mirror the directory constants so the
+// allowlist accepts the test fixture URIs that the session screen
+// renders with.
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  documentDirectory: 'file:///documents/',
+}));
 
 const mockReadAsStringAsync = (
   global as { __sessionTestReadAsStringAsync?: jest.Mock }
