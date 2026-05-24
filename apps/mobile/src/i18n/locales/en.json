@@ -1138,7 +1138,9 @@
       "successPrompt": "Head back to your Library whenever you're ready.",
       "dontRemember": "I don't remember",
       "stillStuck": "Still stuck",
-      "errorTitle": "Something went wrong"
+      "errorTitle": "Something went wrong",
+      "timeoutTitle": "Still waiting…",
+      "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again."
     }
   },
   "subject": {
@@ -1799,8 +1801,8 @@
         "remembered_other": "Remembered after {{count}} days",
         "fading_one": "Getting fuzzy after {{count}} day",
         "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Slipping after {{count}} day",
-        "weak_other": "Slipping after {{count}} days",
+        "weak_one": "Ready for a refresh after {{count}} day",
+        "weak_other": "Ready for a refresh after {{count}} days",
         "forgotten_one": "Last seen {{count}} day ago",
         "forgotten_other": "Last seen {{count}} days ago"
       }

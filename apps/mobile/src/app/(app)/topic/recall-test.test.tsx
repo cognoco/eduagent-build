@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -18,6 +19,7 @@ jest.mock('expo-localization', () => ({
 
 const mockPush = jest.fn();
 const mockRecallMutate = jest.fn();
+const mockRecallState = { isPending: false };
 let queuedRecallResults: Array<Record<string, unknown>> = [];
 
 jest.mock('expo-router', () => ({
@@ -33,6 +35,9 @@ jest.mock(
   () => ({
     useSubmitRecallTest: () => ({
       mutate: mockRecallMutate,
+      get isPending() {
+        return mockRecallState.isPending;
+      },
     }),
   }),
 );
@@ -105,6 +110,7 @@ describe('RecallTestScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     queuedRecallResults = [];
+    mockRecallState.isPending = false;
     mockRecallMutate.mockImplementation(
       (
         _input: Record<string, unknown>,
@@ -227,6 +233,39 @@ describe('RecallTestScreen', () => {
     await waitFor(() => {
       screen.getByText(/your memory of this is solid/);
     });
+  });
+
+  it('[BUG-680] shows timeout fallback when submission hangs past 30s', () => {
+    jest.useFakeTimers();
+    try {
+      mockRecallState.isPending = true;
+      render(<RecallTestScreen />);
+      act(() => {
+        jest.advanceTimersByTime(31_000);
+      });
+      screen.getByTestId('recall-test-timeout');
+      screen.getByTestId('recall-test-timeout-retry');
+      screen.getByTestId('recall-test-timeout-back');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[BUG-680] timeout retry clears the timeout state', () => {
+    jest.useFakeTimers();
+    try {
+      mockRecallState.isPending = true;
+      render(<RecallTestScreen />);
+      act(() => {
+        jest.advanceTimersByTime(31_000);
+      });
+      const retry = screen.getByTestId('recall-test-timeout-retry');
+      mockRecallState.isPending = false;
+      fireEvent.press(retry);
+      expect(screen.queryByTestId('recall-test-timeout')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shows error message and rolls back count on failure', async () => {

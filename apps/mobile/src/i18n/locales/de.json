@@ -1068,7 +1068,9 @@
       "successPrompt": "Gehe zurück zu deiner Bibliothek, wann immer du bereit bist.",
       "dontRemember": "Ich erinnere mich nicht",
       "stillStuck": "Hängst du fest?",
-      "errorTitle": "Etwas ist schiefgelaufen"
+      "errorTitle": "Etwas ist schiefgelaufen",
+      "timeoutTitle": "Noch am Warten…",
+      "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal."
     }
   },
   "subject": {
@@ -1682,8 +1684,8 @@
         "remembered_other": "Remembered after {{count}} days",
         "fading_one": "Getting fuzzy after {{count}} day",
         "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Slipping after {{count}} day",
-        "weak_other": "Slipping after {{count}} days",
+        "weak_one": "Ready for a refresh after {{count}} day",
+        "weak_other": "Ready for a refresh after {{count}} days",
         "forgotten_one": "Last seen {{count}} day ago",
         "forgotten_other": "Last seen {{count}} days ago"
       }

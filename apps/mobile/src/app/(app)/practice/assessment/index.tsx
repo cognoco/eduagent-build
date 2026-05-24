@@ -342,7 +342,7 @@ export default function AssessmentScreen() {
           : masteryPercent >= 60
             ? t('assessment.bands.coreIdeas')
             : t('assessment.bands.needsReview');
-  const weakAreas = terminalResult?.evaluation.weakAreas ?? [];
+  const focusTopics = terminalResult?.evaluation.weakAreas ?? [];
 
   // Quality rating chip: show when present and non-zero (0 = not rated).
   const qualityRating =
@@ -415,7 +415,7 @@ export default function AssessmentScreen() {
                     subjectId,
                     topicId,
                     mode: 'gap_fill',
-                    gaps: JSON.stringify(weakAreas),
+                    gaps: JSON.stringify(focusTopics),
                   },
                 } as Href)
               }

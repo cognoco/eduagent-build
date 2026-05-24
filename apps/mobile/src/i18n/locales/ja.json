@@ -1068,7 +1068,9 @@
       "successPrompt": "準備ができたらライブラリに戻ってください。",
       "dontRemember": "覚えていません",
       "stillStuck": "まだわかりません",
-      "errorTitle": "問題が発生しました"
+      "errorTitle": "問題が発生しました",
+      "timeoutTitle": "まだ待機中…",
+      "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。"
     }
   },
   "subject": {
@@ -1682,8 +1684,8 @@
         "remembered_other": "Remembered after {{count}} days",
         "fading_one": "Getting fuzzy after {{count}} day",
         "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Slipping after {{count}} day",
-        "weak_other": "Slipping after {{count}} days",
+        "weak_one": "Ready for a refresh after {{count}} day",
+        "weak_other": "Ready for a refresh after {{count}} days",
         "forgotten_one": "Last seen {{count}} day ago",
         "forgotten_other": "Last seen {{count}} days ago"
       }

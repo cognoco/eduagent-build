@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -53,8 +53,18 @@ export default function RecallTestScreen() {
     cooldownEndsAt?: string;
     retentionStatus: RetentionStatus;
   } | null>(null);
+  const [submissionTimedOut, setSubmissionTimedOut] = useState(false);
 
   const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Hard timeout: if a submission stays pending beyond 30s the network or
+  // backend is hung — surface an actionable timeout state so the user is
+  // never stuck waiting for a reply that never arrives.
+  useEffect(() => {
+    if (!submitRecallTest.isPending) return;
+    const timer = setTimeout(() => setSubmissionTimedOut(true), 30_000);
+    return () => clearTimeout(timer);
+  }, [submitRecallTest.isPending]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -203,6 +213,27 @@ export default function RecallTestScreen() {
           onPress: () => goBackOrReplace(router, '/(app)/library'),
           testID: 'recall-test-missing-topic',
         }}
+      />
+    );
+  }
+
+  if (submissionTimedOut) {
+    return (
+      <ErrorFallback
+        variant="centered"
+        title={t('topic.recallTest.timeoutTitle')}
+        message={t('topic.recallTest.timeoutMessage')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => setSubmissionTimedOut(false),
+          testID: 'recall-test-timeout-retry',
+        }}
+        secondaryAction={{
+          label: t('topic.recallTest.goToLibrary'),
+          onPress: () => goBackOrReplace(router, '/(app)/library'),
+          testID: 'recall-test-timeout-back',
+        }}
+        testID="recall-test-timeout"
       />
     );
   }
