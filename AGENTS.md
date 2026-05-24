@@ -30,18 +30,63 @@ Key skills:
 |-------|-------------|------|
 | commit | User asks to commit, save changes, or push | `.agents/skills/commit/SKILL.md` |
 | project-memory | Substantial repo work, user says "remember" or "add to memory" | `.agents/skills/project-memory/SKILL.md` |
+| worktree-setup | Starting isolated work (parallel agents, autonomous WI execution, risky changes) | `.agents/skills/worktree-setup/SKILL.md` |
 | build | EAS build checks, triggers, or status for mobile app | `.agents/skills/build/SKILL.md` |
 | e2e | Mobile Maestro smoke runs | `.agents/skills/e2e/SKILL.md` |
 | maestro-testing | Writing or debugging Maestro flows | `.agents/skills/maestro-testing/SKILL.md` |
 | deep-bugfixing | Adversarial runtime-assumption reviews | `.agents/skills/deep-bugfixing/SKILL.md` |
 | learning-evolution-next | Learning-product evolution audit | `.agents/skills/learning-evolution-next/SKILL.md` |
 | notion | EduAgent/MentoMate Notion work items | `.agents/skills/notion/SKILL.md` |
+| receiving-code-review | Receiving review feedback (human or automated) | `.agents/skills/receiving-code-review/SKILL.md` |
+| test-driven-development | Implementing any feature or bugfix, before writing code | `.agents/skills/test-driven-development/SKILL.md` |
+| systematic-debugging | Any bug, test failure, or unexpected behavior | `.agents/skills/systematic-debugging/SKILL.md` |
+| verification-before-completion | About to claim work is done, fixed, or passing | `.agents/skills/verification-before-completion/SKILL.md` |
 
 ## Git Commits
 
 Always load the commit skill from `.agents/skills/commit/SKILL.md` before committing. It is the single source of truth for staging, message format, hook handling, and push behavior. Never use ad-hoc commit flows, `--no-verify`, or broad staging without first checking scope.
 
-Subagents must never run `git add`, `git commit`, or `git push`, except when a structured workflow explicitly prescribes the git step or the user explicitly asks for a one-off commit subagent. The coordinator commits sequentially.
+Subagents may run `/commit` only from within an isolated worktree they own (see Worktree Placement below). When operating in the coordinator's working tree (no worktree isolation), subagents must NOT run `git add`/`git commit`/`git push` — the coordinator handles all git operations there.
+
+## Worktree Placement
+
+All isolated worktrees go under `.worktrees/<branch-name>/` at the repo root. The path is gitignored.
+
+- For Cosmo work items: use the WI ID as the branch name (e.g. `WI-78`).
+- For other work: a short kebab-case slug derived from intent.
+
+Always load the worktree-setup skill (`.agents/skills/worktree-setup/SKILL.md`) before creating a worktree — it handles placement, branch creation, `pnpm install`, and `pnpm env:sync`. Do not use Claude Code's `EnterWorktree` tool or `superpowers:using-git-worktrees` for this repo; both place the worktree in the wrong location.
+
+Creating a worktree via this skill is NOT a "branch switch" — it creates a new branch in a separate directory while leaving your current CWD's branch untouched. This is allowed and is the standard pattern for parallel/isolated work.
+
+## Skill Overrides
+
+This repo overrides specific upstream skills. Use the repo version, not the upstream version. Adding a new override = adding a row.
+
+| Upstream | Use instead | Why |
+|----------|-------------|-----|
+| `superpowers:using-git-worktrees` | `.agents/skills/worktree-setup/SKILL.md` | Canonical placement at `.worktrees/`; adds `pnpm install` + `pnpm env:sync` |
+| `EnterWorktree` (Claude Code built-in) | `.agents/skills/worktree-setup/SKILL.md` | Same reason; built-in default `.claude/worktrees/` is wrong for this repo |
+| `superpowers:finishing-a-development-branch` | `.agents/skills/commit/SKILL.md` (commit + push); manual PR creation via `gh pr create` | This repo has an opinionated PR/push flow via the commit skill; the superpowers menu would create competing guidance |
+| `superpowers:writing-plans` | Native plan mode + the Planning Discipline section below | The superpowers skill's rigid TDD-step template fits greenfield feature work; this repo's plans are a mix of feature work, migrations, audits, and refactors |
+
+## Skill Authoring
+
+When writing or editing skills:
+
+- The `description:` frontmatter field describes ONLY *when* to use, not what the skill does. Start with "Use when …" and list specific triggering conditions and symptoms.
+- A description that summarizes workflow creates a shortcut agents take instead of reading the skill body. Trigger-only descriptions force agents to load the full skill before acting.
+
+## Cross-runtime File Sync
+
+Two derived files/directories are generated, not edited directly:
+
+- `CLAUDE.md` is generated from `AGENTS.md` by `scripts/sync-agent-docs.mjs`. Edit `AGENTS.md`, then run `pnpm sync-agent-docs` (or rely on the pre-commit hook). Direct edits to `CLAUDE.md` will be overwritten.
+- `.claude/skills/<name>/` is generated from `.agents/skills/<name>/` by `scripts/sync-skills.mjs`. Edit the master in `.agents/skills/`, then run `pnpm sync-skills` (or rely on the pre-commit hook). Direct edits to `.claude/skills/` will be overwritten on next sync.
+
+The pre-commit hook runs `--check` on both. If drift is detected, the commit is blocked with an error pointing at the sync command.
+
+When a rule applies to one runtime only, label it in-band inside the master document (e.g. "**For Claude Code only:** …"). Do NOT introduce per-platform sections that exist in CLAUDE.md but not AGENTS.md — the sync check enforces byte-equality apart from the H1 title and the generated-file header.
 
 ## Non-Negotiable Engineering Rules
 
@@ -114,6 +159,15 @@ Changed code is not fixed code. Every fix must be verified.
 - When removing a feature, grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, and fallback branches.
 - Verify JSX handler references exist after adding any `Pressable` or `Button`.
 
+## Planning Discipline
+
+When writing implementation plans (via Claude Code plan mode, written specs, or otherwise):
+
+- No placeholders ("TBD", "implement later", "add validation"). If a step says what to do, include how.
+- Show actual code/commands for steps that need them. A step that changes code must show the code.
+- Check type and name consistency across tasks. A function called `clearLayers` in Task 3 must still be `clearLayers` in Task 7.
+- Use TDD step decomposition for greenfield logic; use design-doc + acceptance criteria for migrations, audits, refactors.
+
 ## Secrets Management
 
 All secrets are managed through Doppler. Assume the `doppler` CLI is installed and on PATH. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or platform-specific secret management. When secrets need to be set, say "add to Doppler."
@@ -177,4 +231,4 @@ C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web
 ```
 
-Last updated: 2026-05-23
+Last updated: 2026-05-24
