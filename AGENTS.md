@@ -79,14 +79,9 @@ When writing or editing skills:
 
 ## Cross-runtime File Sync
 
-Two derived files/directories are generated, not edited directly:
+`.claude/skills/<name>/` is generated from `.agents/skills/<name>/` by `scripts/sync-skills.mjs`. Edit the master in `.agents/skills/`, then run `pnpm sync-skills` (or rely on the pre-commit hook). Direct edits to `.claude/skills/` will be overwritten on next sync.
 
-- `CLAUDE.md` is generated from `AGENTS.md` by `scripts/sync-agent-docs.mjs`. Edit `AGENTS.md`, then run `pnpm sync-agent-docs` (or rely on the pre-commit hook). Direct edits to `CLAUDE.md` will be overwritten.
-- `.claude/skills/<name>/` is generated from `.agents/skills/<name>/` by `scripts/sync-skills.mjs`. Edit the master in `.agents/skills/`, then run `pnpm sync-skills` (or rely on the pre-commit hook). Direct edits to `.claude/skills/` will be overwritten on next sync.
-
-The pre-commit hook runs `--check` on both. If drift is detected, the commit is blocked with an error pointing at the sync command.
-
-When a rule applies to one runtime only, label it in-band inside the master document (e.g. "**For Claude Code only:** …"). Do NOT introduce per-platform sections that exist in CLAUDE.md but not AGENTS.md — the sync check enforces byte-equality apart from the H1 title and the generated-file header.
+`CLAUDE.md` and `AGENTS.md` are currently maintained by hand and may diverge. A future work item will unify them — see `.claude/memory/project_agent_doc_and_memory_architecture_revisit.md` for the pending design discussion. For now, mirror any change that should reach both runtimes to both files manually.
 
 ## Non-Negotiable Engineering Rules
 
