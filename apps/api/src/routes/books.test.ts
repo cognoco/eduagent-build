@@ -438,6 +438,34 @@ describe('book routes', () => {
       expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
     });
 
+    it('[WI-78 review] treats skipped-only generated topics as empty', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: { ...mockBook, topicsGenerated: true },
+        topics: mockBookWithTopics.topics.map((topic) => ({
+          ...topic,
+          skipped: true,
+        })),
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toMatchObject({
+        code: ERROR_CODES.CONFLICT,
+      });
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
     it('expands an already-generated thin book when requested', async () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
       mockGetBookWithTopics.mockResolvedValueOnce(mockBookWithTopics as never);

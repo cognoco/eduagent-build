@@ -141,7 +141,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           const activeTopicCount = existing.topics.filter(
             (topic) => !topic.skipped,
           ).length;
-          if (existing.book.topicsGenerated && existing.topics.length === 0) {
+          if (existing.book.topicsGenerated && activeTopicCount === 0) {
             return apiError(
               c,
               409,
