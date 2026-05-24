@@ -75,6 +75,35 @@ import { runDedupForProfile } from '../../services/memory/dedup-pass';
 
 const logger = createLogger();
 
+// [PROFILE-SCOPE-GUARD] Verify ownership via the parent chain
+// (topics → books → subjects.profileId) before exposing the title.
+// Mirrors the pattern in services/notes.ts:verifyTopicOwnership so a
+// stale/spoofed topicId cannot leak titles across accounts.
+// Hoisted from a closure inside processSessionCompleted so the integration
+// test can exercise the WHERE-clause ownership predicate directly (a unit-
+// level db mock has no SQL engine and cannot evaluate the predicate).
+export async function loadTopicTitle(
+  db: Database,
+  currentTopicId: string | null | undefined,
+  ownerProfileId: string,
+): Promise<string | null> {
+  if (!currentTopicId) return null;
+  const [topic] = await db
+    .select({ title: curriculumTopics.title })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.profileId, ownerProfileId),
+      ),
+    )
+    .where(eq(curriculumTopics.id, currentTopicId))
+    .limit(1);
+  return topic?.title ?? null;
+}
+
 export async function embedNewFactsForProfile(
   db: Database,
   profileId: string,
@@ -394,35 +423,6 @@ export const sessionCompleted = inngest.createFunction(
     }
 
     const outcomes: StepOutcome[] = [];
-
-    // [PROFILE-SCOPE-GUARD] Verify ownership via the parent chain
-    // (topics → books → subjects.profileId) before exposing the title.
-    // Mirrors the pattern in services/notes.ts:verifyTopicOwnership so a
-    // stale/spoofed topicId cannot leak titles across accounts.
-    const loadTopicTitle = async (
-      db: ReturnType<typeof getStepDatabase>,
-      currentTopicId: string | null | undefined,
-      ownerProfileId: string,
-    ): Promise<string | null> => {
-      if (!currentTopicId) return null;
-      const [topic] = await db
-        .select({ title: curriculumTopics.title })
-        .from(curriculumTopics)
-        .innerJoin(
-          curriculumBooks,
-          eq(curriculumTopics.bookId, curriculumBooks.id),
-        )
-        .innerJoin(
-          subjects,
-          and(
-            eq(subjects.id, curriculumBooks.subjectId),
-            eq(subjects.profileId, ownerProfileId),
-          ),
-        )
-        .where(eq(curriculumTopics.id, currentTopicId))
-        .limit(1);
-      return topic?.title ?? null;
-    };
 
     const computeSessionMedianResponseSeconds = async () => {
       const db = getStepDatabase();

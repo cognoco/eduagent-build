@@ -48,7 +48,7 @@ import * as config from '../../config';
 import * as sentry from '../../services/sentry';
 
 import * as llm from '../../services/llm';
-import { sessionCompleted } from './session-completed';
+import { loadTopicTitle, sessionCompleted } from './session-completed';
 
 // ── Database env bootstrap ────────────────────────────────────────────────────
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -1448,6 +1448,45 @@ describe('session-completed integration', () => {
   });
 });
 
+// ── loadTopicTitle ownership break test ───────────────────────────────────────
+//
+// [PROFILE-SCOPE-GUARD break test] loadTopicTitle joins topics ⋈ books ⋈
+// subjects and constrains subjects.profileId = ownerProfileId. The unit test
+// uses a mock db that returns [] regardless of predicates and cannot prove
+// the WHERE clause works — only a real query engine can. If the
+// eq(subjects.profileId, ownerProfileId) line is deleted from the join,
+// the cross-account assertion below must start returning the leaked title.
+// See CLAUDE.md § Fix Development Rules — "security fixes require a break test."
+describe('loadTopicTitle — ownership chain enforcement', () => {
+  it('returns title for the owning profile and null for an unrelated profile', async () => {
+    const { accountId: accountA } = await seedAccount();
+    const { profileId: profileA } = await seedProfile(accountA);
+    const { subjectId } = await seedSubject(profileA);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const { accountId: accountB } = await seedAccount();
+    const { profileId: profileB } = await seedProfile(accountB);
+
+    // Positive: owning profile sees the title.
+    await expect(loadTopicTitle(db, topicId, profileA)).resolves.toBe(
+      'Photosynthesis',
+    );
+
+    // Break test: unrelated profile must NOT see the title even with a
+    // valid, real topicId. If the subjects.profileId predicate is removed
+    // from the join, this assertion fails (returns 'Photosynthesis').
+    await expect(loadTopicTitle(db, topicId, profileB)).resolves.toBeNull();
+  });
+
+  it('returns null for a null or undefined topicId', async () => {
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+
+    await expect(loadTopicTitle(db, null, profileId)).resolves.toBeNull();
+    await expect(loadTopicTitle(db, undefined, profileId)).resolves.toBeNull();
+  });
+});
+
 // ── Scenario coverage index ────────────────────────────────────────────────────
 //
 // done as: freeform session — waitForEvent succeeds [session-completed-integration-2]
@@ -1460,3 +1499,4 @@ describe('session-completed integration', () => {
 // done as: silence_timeout close reason [session-completed-integration-8]
 // done as: memory dedup rollout [session-completed-integration-9]
 // done as: waitForEvent timeout — filing-timed-out event emission [session-completed-integration-10]
+// done as: loadTopicTitle parent-chain ownership break test [session-completed-integration-11]
