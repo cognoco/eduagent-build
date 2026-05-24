@@ -1,8 +1,7 @@
 // @inngest-admin: parent-chain (profiles updated with explicit childProfileId + archivedAt guard)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { profiles } from '@eduagent/database';
+import { sql } from 'drizzle-orm';
 import {
   calculateAge,
   getFamilyOwnerProfileId,
@@ -139,23 +138,22 @@ export const consentRevocation = inngest.createFunction(
           if (status !== 'WITHDRAWN') {
             return { archived: false, reason: 'consent_restored' };
           }
-          const archivedRows = await db
-            .update(profiles)
-            .set({ archivedAt: new Date() })
-            .where(
-              and(
-                eq(profiles.id, childProfileId),
-                isNull(profiles.archivedAt),
-                sql`EXISTS (
-                  SELECT 1 FROM consent_states
-                  WHERE consent_states.profile_id = ${childProfileId}
-                  AND consent_states.consent_type = 'GDPR'
-                  AND consent_states.status = 'WITHDRAWN'
-                )`,
-              ),
+          const archivedAt = new Date();
+          const archiveResult = await db.execute(sql`
+            WITH locked_consent AS (
+              SELECT 1 FROM consent_states
+              WHERE consent_states.profile_id = ${childProfileId}
+              AND consent_states.consent_type = 'GDPR'
+              AND consent_states.status = 'WITHDRAWN'
+              FOR UPDATE
             )
-            .returning({ id: profiles.id });
-          if (archivedRows.length === 0) {
+            UPDATE profiles
+            SET archived_at = ${archivedAt}
+            WHERE id = ${childProfileId}
+            AND archived_at IS NULL
+            AND EXISTS (SELECT 1 FROM locked_consent)
+          `);
+          if ((archiveResult.rowCount ?? 0) === 0) {
             return { archived: false, reason: 'consent_restored' };
           }
           return { archived: true };

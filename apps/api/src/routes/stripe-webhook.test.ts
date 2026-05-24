@@ -1464,6 +1464,33 @@ describe('tier metadata in subscription events', () => {
     );
   });
 
+  it('[WI-78 review] returns 500 when quota pool update fails after subscription update', async () => {
+    const stripeSub = makeSubscription({
+      status: 'active',
+      metadata: { tier: 'pro' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub),
+    );
+    (updateQuotaPoolLimit as jest.Mock).mockRejectedValueOnce(
+      new Error('Missing quota pool for subscription sub-internal-1'),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(500);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalled();
+    expect(updateQuotaPoolLimit).toHaveBeenCalled();
+  });
+
   it('ignores invalid tier in metadata', async () => {
     const stripeSub = makeSubscription({
       status: 'active',

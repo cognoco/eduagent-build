@@ -38,6 +38,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
     if (isReviewing) {
       setReviewTimedOut(false);
       reviewTimeoutRef.current = setTimeout(() => {
+        latestReviewAttemptRef.current += 1;
         setReviewTimedOut(true);
       }, 20_000);
     } else {

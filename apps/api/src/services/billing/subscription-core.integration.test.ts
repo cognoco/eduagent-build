@@ -668,6 +668,22 @@ describe('updateQuotaPoolLimit', () => {
     expect(pool!.usedThisMonth).toBe(50);
     expect(pool!.usedToday).toBe(3);
   });
+
+  it('[WI-78 review] rejects when quota pool is missing', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('update-pool-limit-missing');
+    const sub = await createSubscription(
+      db,
+      acct.id,
+      'free',
+      getTierConfig('free').monthlyQuota,
+    );
+    await db.delete(quotaPools).where(eq(quotaPools.subscriptionId, sub.id));
+
+    await expect(updateQuotaPoolLimit(db, sub.id, 700, null)).rejects.toThrow(
+      'quota pool',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

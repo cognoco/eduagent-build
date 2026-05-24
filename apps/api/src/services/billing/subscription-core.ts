@@ -532,14 +532,21 @@ export async function updateQuotaPoolLimit(
   newLimit: number,
   dailyLimit: number | null,
 ): Promise<void> {
-  await db
+  const updatedRows = await db
     .update(quotaPools)
     .set({
       monthlyLimit: newLimit,
       dailyLimit,
       updatedAt: new Date(),
     })
-    .where(eq(quotaPools.subscriptionId, subscriptionId));
+    .where(eq(quotaPools.subscriptionId, subscriptionId))
+    .returning({ id: quotaPools.id });
+
+  if (updatedRows.length === 0) {
+    throw new Error(
+      `Missing quota pool for subscription ${subscriptionId}; rolling back quota limit update`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

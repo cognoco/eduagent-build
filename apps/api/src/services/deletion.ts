@@ -290,14 +290,16 @@ export async function deleteProfileIfConsentWithdrawn(
   profileId: string,
 ): Promise<boolean> {
   const result = await db.execute(sql`
-    DELETE FROM profiles
-    WHERE id = ${profileId}
-    AND EXISTS (
+    WITH locked_consent AS (
       SELECT 1 FROM consent_states
       WHERE consent_states.profile_id = ${profileId}
       AND consent_states.consent_type = 'GDPR'
       AND consent_states.status = 'WITHDRAWN'
+      FOR UPDATE
     )
+    DELETE FROM profiles
+    WHERE id = ${profileId}
+    AND EXISTS (SELECT 1 FROM locked_consent)
   `);
   return (result.rowCount ?? 0) > 0;
 }

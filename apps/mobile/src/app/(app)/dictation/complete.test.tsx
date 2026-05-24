@@ -326,4 +326,41 @@ describe('DictationCompleteScreen', () => {
     expect(mockReviewMutateAsync).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
+
+  it('[WI-78 review] does not navigate when review resolves after timeout', async () => {
+    mockLaunchCameraResult = {
+      canceled: false,
+      assets: [{ uri: 'file://review.jpg', mimeType: 'image/jpeg' }],
+    };
+    let resolveReview!: (v: unknown) => void;
+    mockReviewMutateAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveReview = resolve;
+      }),
+    );
+
+    const { getByTestId, rerender } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    mockReviewIsPending = true;
+    rerender(<DictationCompleteScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+
+    await act(async () => {
+      resolveReview({ mistakeCount: 0, feedback: 'Late', mistakes: [] });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSetData).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

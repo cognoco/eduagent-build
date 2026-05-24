@@ -126,6 +126,37 @@ jest.mock(
 
 import { consentRevocation } from './consent-revocation';
 
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['value'] === 'string') values.push(obj['value'].toLowerCase());
+  if (Array.isArray(obj['value'])) {
+    for (const item of obj['value']) {
+      values.push(...extractSqlTextAndValues(item, visited));
+    }
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
+}
+
 async function executeRevocation(
   eventData: {
     childProfileId: string;
@@ -150,6 +181,9 @@ beforeEach(() => {
   jest.useFakeTimers({ now: new Date('2026-01-15T00:00:00.000Z') });
   jest.clearAllMocks();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValue({
+    rowCount: 1,
+  });
   mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
   mockGetProfileDisplayName.mockResolvedValue('Liam');
   mockGetProfileForConsentRevocation.mockResolvedValue({
@@ -508,6 +542,29 @@ describe('archive path — auto preference, age 14', () => {
         type: 'consent_archived',
       }),
     );
+  });
+
+  it('[WI-78 review] locks the GDPR consent row before archiving the profile', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: null,
+    });
+
+    await executeRevocation({
+      childProfileId: 'child-014',
+      parentProfileId: 'parent-001',
+    });
+
+    const sqlArg = (mockDatabaseModule.db.execute as jest.Mock).mock
+      .calls[0]?.[0];
+    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
+    expect(sqlText).toContain('with locked_consent');
+    expect(sqlText).toContain('for update');
+    expect(sqlText).toContain('consent_type');
+    expect(sqlText).toContain('gdpr');
+    expect(sqlText).toContain('withdrawn');
   });
 });
 

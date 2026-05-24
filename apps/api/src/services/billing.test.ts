@@ -990,11 +990,19 @@ describe('canAddProfile', () => {
 
 describe('updateQuotaPoolLimit', () => {
   it('updates monthlyLimit on quota pool', async () => {
-    const db = createMockDb();
+    const db = createMockDb({ updateReturning: [{ id: 'pool-1' }] });
 
     await updateQuotaPoolLimit(db, subscriptionId, 1500, null);
 
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] throws when the quota pool row is missing', async () => {
+    const db = createMockDb({ updateReturning: [] });
+
+    await expect(
+      updateQuotaPoolLimit(db, subscriptionId, 1500, null),
+    ).rejects.toThrow('quota pool');
   });
 });
 
@@ -1814,7 +1822,7 @@ function createFamilyMockDb({
   profileFindMany = [] as ReturnType<typeof mockProfileRow>[],
   selectResult = [] as unknown[],
   insertReturning = [] as unknown[],
-  updateReturning = [] as unknown[],
+  updateReturning = [{ id: 'updated-row' }] as unknown[],
 }: {
   subscriptionFindFirst?: ReturnType<typeof mockSubscriptionRow>;
   quotaPoolFindFirst?: ReturnType<typeof mockQuotaPoolRow>;
