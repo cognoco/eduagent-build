@@ -10,6 +10,13 @@ assistants:
     webSearchMode: live           # 'disabled' | 'cached' | 'live'
     additionalDirectories:
 
+paths:
+  # Standardize Archon worktrees alongside the repo's canonical .worktrees/
+  # location (see AGENTS.md "Worktree Placement"). Default would be
+  # ~/.archon/worktrees; using a repo-local path keeps all worktrees for this
+  # repo in one place across both Archon and the worktree-setup skill.
+  worktrees: .worktrees
+
 worktree:
   baseBranch: main
   copyFiles:
