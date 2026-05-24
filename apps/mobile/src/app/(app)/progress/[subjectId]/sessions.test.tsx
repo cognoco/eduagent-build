@@ -264,14 +264,53 @@ describe('SubjectSessionsScreen', () => {
         refetch: jest.fn(),
       });
       render(<SubjectSessionsScreen />);
+      // Source threshold is 15_000ms; assert just past the boundary so the
+      // test pins the actual cutoff and a regression to a slower threshold
+      // (e.g. 20s) would fail here.
       act(() => {
-        jest.advanceTimersByTime(16_000);
+        jest.advanceTimersByTime(15_001);
       });
       fireEvent.press(screen.getByTestId('subject-sessions-timeout-back'));
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         mockRouter,
         '/(app)/progress/s1',
       );
+    });
+
+    it('[BUG-686] timeout state Retry calls refetch and clears the timeout', () => {
+      jest.useFakeTimers();
+      const refetch = jest.fn();
+      mockUseSubjectSessions.mockReturnValue({
+        isLoading: true,
+        isError: false,
+        data: undefined,
+        error: null,
+        refetch,
+      });
+      render(<SubjectSessionsScreen />);
+      act(() => {
+        jest.advanceTimersByTime(15_001);
+      });
+      screen.getByTestId('subject-sessions-timeout');
+      fireEvent.press(screen.getByTestId('subject-sessions-timeout-retry'));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('[BUG-686] timeout does NOT fire below the 15s threshold', () => {
+      jest.useFakeTimers();
+      mockUseSubjectSessions.mockReturnValue({
+        isLoading: true,
+        isError: false,
+        data: undefined,
+        error: null,
+        refetch: jest.fn(),
+      });
+      render(<SubjectSessionsScreen />);
+      act(() => {
+        jest.advanceTimersByTime(14_999);
+      });
+      expect(screen.queryByTestId('subject-sessions-timeout')).toBeNull();
+      screen.getByTestId('subject-sessions-loading');
     });
   });
 });
