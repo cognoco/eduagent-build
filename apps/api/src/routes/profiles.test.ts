@@ -30,6 +30,7 @@ jest.mock(
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
+import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import {
@@ -44,7 +45,6 @@ import {
   ProfileValidationError,
 } from '../services/profile';
 import { profileRoutes } from './profiles';
-import { ERROR_CODES } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Canonical UUIDs for test data
@@ -607,6 +607,33 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
 
     expect(res.status).toBe(400);
     expect(updateProfileAppContextMock).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] returns 403 when family context is not allowed for the target profile', async () => {
+    updateProfileAppContextMock.mockRejectedValue(
+      new ForbiddenError(
+        'Family mode is only available to adult owner profiles with family links.',
+      ),
+    );
+
+    const res = await makeApp().request(
+      `/v1/profiles/${PROFILE_ID_A}/app-context`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAppContext: 'family' }),
+      },
+    );
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    expect(updateProfileAppContextMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID_A,
+      ACCOUNT_ID,
+      'family',
+    );
   });
 
   // [CR-2026-05-19-H1] Break test — non-owner active on PROFILE_ID_A must not
