@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
 import {
   createScopedRepository,
   curricula,
@@ -9,7 +9,6 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { OverdueSubject, OverdueTopicsResponse } from '@eduagent/schemas';
-import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -24,20 +23,6 @@ export async function getOverdueTopicsGrouped(
 ): Promise<OverdueTopicsResponse> {
   const repo = createScopedRepository(db, profileId);
   const now = new Date();
-
-  const overdueCards = await repo.retentionCards.findMany(
-    lt(retentionCards.nextReviewAt, now),
-    { limit: 500, orderBy: 'nextReviewAtAsc' },
-  );
-
-  if (overdueCards.length === 0) {
-    return {
-      totalOverdue: 0,
-      subjects: [],
-      truncated: false,
-      displayedCount: 0,
-    };
-  }
 
   // Real total may exceed the 500-card display cap. Run a separate count so
   // the UI can show "500+" or the true backlog without loading all rows.
@@ -64,19 +49,52 @@ export async function getOverdueTopicsGrouped(
         lt(retentionCards.nextReviewAt, now),
       ),
     );
+  const countAvailable = countRow?.count != null;
+
+  const overdueCards = await db
+    .select({
+      topicId: retentionCards.topicId,
+      nextReviewAt: retentionCards.nextReviewAt,
+      failureCount: retentionCards.failureCount,
+      topicTitle: curriculumTopics.title,
+      subjectId: subjects.id,
+    })
+    .from(retentionCards)
+    .innerJoin(
+      curriculumTopics,
+      eq(curriculumTopics.id, retentionCards.topicId),
+    )
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.id, curricula.subjectId),
+        eq(subjects.profileId, profileId),
+      ),
+    )
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        lt(retentionCards.nextReviewAt, now),
+      ),
+    )
+    .orderBy(asc(retentionCards.nextReviewAt))
+    .limit(500);
+
   const totalOverdue = countRow?.count ?? overdueCards.length;
 
-  const topicIds = [...new Set(overdueCards.map((c) => c.topicId))];
-  const ownedTopics = await findOwnedCurriculumTopics(db, {
-    profileId,
-    topicIds,
-  });
-  const topicMap = new Map(ownedTopics.map((t) => [t.topicId, t]));
-  const ownedOverdueCards = overdueCards.filter((card) =>
-    topicMap.has(card.topicId),
-  );
+  if (totalOverdue === 0 && overdueCards.length === 0) {
+    return {
+      totalOverdue: 0,
+      subjects: [],
+      truncated: false,
+      displayedCount: 0,
+    };
+  }
 
-  const subjectIds = [...new Set(ownedTopics.map((t) => t.subjectId))];
+  const subjectIds = [...new Set(overdueCards.map((card) => card.subjectId))];
   const subjectsRows =
     subjectIds.length > 0
       ? await repo.subjects.findMany(inArray(subjects.id, subjectIds))
@@ -85,11 +103,8 @@ export async function getOverdueTopicsGrouped(
 
   const subjectMap = new Map<string, OverdueSubject>();
 
-  for (const card of ownedOverdueCards) {
-    const topic = topicMap.get(card.topicId);
-    if (!topic) continue;
-
-    const subject = subjectLookup.get(topic.subjectId);
+  for (const card of overdueCards) {
+    const subject = subjectLookup.get(card.subjectId);
     if (!subject) continue;
 
     const entry = subjectMap.get(subject.id) ?? {
@@ -102,7 +117,7 @@ export async function getOverdueTopicsGrouped(
     entry.overdueCount += 1;
     entry.topics.push({
       topicId: card.topicId,
-      topicTitle: topic.topicTitle,
+      topicTitle: card.topicTitle,
       overdueDays: toOverdueDays(now, card.nextReviewAt),
       failureCount: card.failureCount ?? 0,
     });
@@ -136,8 +151,7 @@ export async function getOverdueTopicsGrouped(
   // row) and we already hit the 500-row cap, we cannot know the true total —
   // assume truncated so the UI shows "500+" rather than a misleadingly-exact
   // number. This is conservative and correct.
-  const displayedCount = ownedOverdueCards.length;
-  const countAvailable = countRow?.count != null;
+  const displayedCount = overdueCards.length;
   const truncated =
     displayedCount === 500 && (!countAvailable || totalOverdue > 500);
 

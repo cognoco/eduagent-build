@@ -25,42 +25,60 @@ function createSelectChain(resolvedRows: unknown[]) {
   const chain = {
     from: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockResolvedValue(resolvedRows),
+    where: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockResolvedValue(resolvedRows),
+    then: (
+      resolve: (value: unknown[]) => unknown,
+      reject?: (reason: unknown) => unknown,
+    ) => Promise.resolve(resolvedRows).then(resolve, reject),
   };
   return chain;
 }
 
 function createMockDb(options: {
   topicsRows?: { id: string; title: string; curriculumId: string }[];
+  displayedRows?: Array<{
+    topicId: string;
+    nextReviewAt: Date | null;
+    failureCount?: number | null;
+  }>;
   curriculaRows?: { id: string; subjectId: string }[];
   totalOverdue?: number;
 }): Database {
   // Order of select() calls in getOverdueTopicsGrouped:
   // 1. count(*) for totalOverdue
-  // 2. curriculumTopics ⋈ curricula ⋈ subjects (scoped)
-  // 3. curricula ⋈ subjects (scoped)
+  // 2. retentionCards ⋈ curriculumTopics ⋈ curricula ⋈ subjects (scoped display rows)
   const totalOverdueRows =
     options.totalOverdue != null ? [{ count: options.totalOverdue }] : [];
+  const topicById = new Map((options.topicsRows ?? []).map((t) => [t.id, t]));
   const subjectByCurriculum = new Map(
     (options.curriculaRows ?? []).map((curriculum) => [
       curriculum.id,
       curriculum.subjectId,
     ]),
   );
-  const ownedTopicRows = (options.topicsRows ?? []).map((topic) => ({
-    topicId: topic.id,
-    topicTitle: topic.title,
-    topicDescription: null,
-    bookId: `book-${topic.id}`,
-    bookTitle: 'Book',
-    curriculumId: topic.curriculumId,
-    subjectId: subjectByCurriculum.get(topic.curriculumId) ?? 'subject-1',
-  }));
+  const displayedRows = (options.displayedRows ?? []).flatMap((card) => {
+    const topic = topicById.get(card.topicId);
+    if (!topic) return [];
+    return [
+      {
+        topicId: topic.id,
+        topicTitle: topic.title,
+        topicDescription: null,
+        bookId: `book-${topic.id}`,
+        bookTitle: 'Book',
+        curriculumId: topic.curriculumId,
+        subjectId: subjectByCurriculum.get(topic.curriculumId) ?? 'subject-1',
+        nextReviewAt: card.nextReviewAt,
+        failureCount: card.failureCount ?? 0,
+      },
+    ];
+  });
   const selectFn = jest.fn();
   selectFn
     .mockReturnValueOnce(createSelectChain(totalOverdueRows))
-    .mockReturnValueOnce(createSelectChain(ownedTopicRows))
-    .mockReturnValueOnce(createSelectChain(options.curriculaRows ?? []));
+    .mockReturnValueOnce(createSelectChain(displayedRows));
 
   return { select: selectFn } as unknown as Database;
 }
@@ -113,6 +131,18 @@ describe('getOverdueTopicsGrouped', () => {
       topicsRows: [
         { id: 'topic-1', title: 'Fractions', curriculumId: 'curriculum-1' },
         { id: 'topic-2', title: 'Cells', curriculumId: 'curriculum-2' },
+      ],
+      displayedRows: [
+        {
+          topicId: 'topic-1',
+          nextReviewAt: new Date('2026-05-01T10:00:00.000Z'),
+          failureCount: 2,
+        },
+        {
+          topicId: 'topic-2',
+          nextReviewAt: new Date('2026-05-02T10:00:00.000Z'),
+          failureCount: 1,
+        },
       ],
       curriculaRows: [
         { id: 'curriculum-1', subjectId: 'subject-1' },
@@ -179,6 +209,20 @@ describe('getOverdueTopicsGrouped', () => {
         { id: 'topic-2', title: 'Geometry', curriculumId: 'curriculum-1' },
         { id: 'topic-3', title: 'Fractions', curriculumId: 'curriculum-1' },
       ],
+      displayedRows: [
+        {
+          topicId: 'topic-1',
+          nextReviewAt: new Date('2026-05-02T10:00:00.000Z'),
+        },
+        {
+          topicId: 'topic-2',
+          nextReviewAt: new Date('2026-04-29T10:00:00.000Z'),
+        },
+        {
+          topicId: 'topic-3',
+          nextReviewAt: new Date('2026-05-01T10:00:00.000Z'),
+        },
+      ],
       curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
     });
 
@@ -213,6 +257,20 @@ describe('getOverdueTopicsGrouped', () => {
         { id: 'topic-a1', title: 'Topic A1', curriculumId: 'curriculum-a' },
         { id: 'topic-a2', title: 'Topic A2', curriculumId: 'curriculum-a' },
         { id: 'topic-b1', title: 'Topic B1', curriculumId: 'curriculum-b' },
+      ],
+      displayedRows: [
+        {
+          topicId: 'topic-a1',
+          nextReviewAt: new Date('2026-05-01T10:00:00.000Z'),
+        },
+        {
+          topicId: 'topic-a2',
+          nextReviewAt: new Date('2026-05-02T10:00:00.000Z'),
+        },
+        {
+          topicId: 'topic-b1',
+          nextReviewAt: new Date('2026-05-02T10:00:00.000Z'),
+        },
       ],
       curriculaRows: [
         { id: 'curriculum-a', subjectId: 'subject-a' },
@@ -254,6 +312,12 @@ describe('getOverdueTopicsGrouped', () => {
       topicsRows: [
         { id: 'topic-1', title: 'Fractions', curriculumId: 'curriculum-1' },
       ],
+      displayedRows: [
+        {
+          topicId: 'topic-1',
+          nextReviewAt: new Date('2026-04-30T10:00:00.000Z'),
+        },
+      ],
       curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
     });
 
@@ -274,7 +338,7 @@ describe('getOverdueTopicsGrouped', () => {
 
   it('[WI-80] filters overdue topic grouping through the dual topic parent chain', async () => {
     const countChain = createSelectChain([{ count: 1 }]);
-    const ownedTopicsChain = createSelectChain([
+    const displayedChain = createSelectChain([
       {
         topicId: 'owned-topic',
         topicTitle: 'Owned Topic',
@@ -283,13 +347,15 @@ describe('getOverdueTopicsGrouped', () => {
         bookTitle: 'Book',
         curriculumId: 'curriculum-1',
         subjectId: 'subject-1',
+        nextReviewAt: new Date('2026-05-01T10:00:00.000Z'),
+        failureCount: 2,
       },
     ]);
     const db = {
       select: jest
         .fn()
         .mockReturnValueOnce(countChain)
-        .mockReturnValueOnce(ownedTopicsChain),
+        .mockReturnValueOnce(displayedChain),
     } as unknown as Database;
     setupScopedRepo({
       retentionCardsFindMany: [
@@ -310,11 +376,51 @@ describe('getOverdueTopicsGrouped', () => {
     const result = await getOverdueTopicsGrouped(db, profileId);
 
     expect(countChain.innerJoin).toHaveBeenCalledTimes(4);
-    expect(ownedTopicsChain.innerJoin).toHaveBeenCalledTimes(3);
+    expect(displayedChain.innerJoin).toHaveBeenCalledTimes(4);
     expect(result.totalOverdue).toBe(1);
     expect(result.displayedCount).toBe(1);
     expect(result.truncated).toBe(false);
     expect(result.subjects).toHaveLength(1);
+    expect(result.subjects[0]?.topics.map((topic) => topic.topicId)).toEqual([
+      'owned-topic',
+    ]);
+  });
+
+  it('[WI-80] applies the display cap after dual parent-chain ownership filtering', async () => {
+    const staleCards = Array.from({ length: 500 }, (_, i) => ({
+      topicId: `stale-topic-${i}`,
+      nextReviewAt: new Date(NOW.getTime() - (i + 10) * DAY_MS),
+      failureCount: 0,
+    }));
+    const countChain = createSelectChain([{ count: 1 }]);
+    const displayedChain = createSelectChain([
+      {
+        topicId: 'owned-topic',
+        topicTitle: 'Owned Topic',
+        topicDescription: null,
+        bookId: 'book-owned',
+        bookTitle: 'Book',
+        curriculumId: 'curriculum-1',
+        subjectId: 'subject-1',
+        nextReviewAt: new Date('2026-05-02T10:00:00.000Z'),
+        failureCount: 1,
+      },
+    ]);
+    const db = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce(countChain)
+        .mockReturnValueOnce(displayedChain),
+    } as unknown as Database;
+    setupScopedRepo({
+      retentionCardsFindMany: staleCards,
+      subjectsFindManyResults: [{ id: 'subject-1', name: 'Math' }],
+    });
+
+    const result = await getOverdueTopicsGrouped(db, profileId);
+
+    expect(result.totalOverdue).toBe(1);
+    expect(result.displayedCount).toBe(1);
     expect(result.subjects[0]?.topics.map((topic) => topic.topicId)).toEqual([
       'owned-topic',
     ]);
@@ -339,6 +445,7 @@ describe('getOverdueTopicsGrouped', () => {
       topicsRows: [
         { id: 'topic-1', title: 'Fractions', curriculumId: 'curriculum-1' },
       ],
+      displayedRows: cards,
       curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
       // Real count is 501 — list is truncated at 500.
       totalOverdue: 501,
@@ -360,6 +467,13 @@ describe('getOverdueTopicsGrouped', () => {
     const db = createMockDb({
       topicsRows: [
         { id: 'topic-1', title: 'Fractions', curriculumId: 'curriculum-1' },
+      ],
+      displayedRows: [
+        {
+          topicId: 'topic-1',
+          nextReviewAt: new Date('2026-04-30T10:00:00.000Z'),
+          failureCount: 0,
+        },
       ],
       curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
       totalOverdue: 1,

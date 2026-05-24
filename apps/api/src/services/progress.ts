@@ -1296,33 +1296,18 @@ export async function resolveTopicSubject(
 } | null> {
   const repo = createScopedRepository(db, profileId);
 
-  // curriculumTopics and curricula are shared reference tables without a
-  // profileId column, so they cannot be queried through createScopedRepository.
-  // Profile-scoping is enforced by the final repo.subjects.findFirst gate
-  // below — if the resolved subject doesn't belong to this profile, we
-  // return null and no data leaks.
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, topicId),
-    columns: { id: true, title: true, curriculumId: true },
-  });
+  const topic = await findOwnedCurriculumTopic(db, { profileId, topicId });
   if (!topic) return null;
 
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.id, topic.curriculumId),
-    columns: { subjectId: true },
-  });
-  if (!curriculum) return null;
-
-  // Gate: verify the subject belongs to this profile via scoped repository
   const subject = await repo.subjects.findFirst(
-    eq(subjects.id, curriculum.subjectId),
+    eq(subjects.id, topic.subjectId),
   );
   if (!subject) return null;
 
   return {
     subjectId: subject.id,
     subjectName: subject.name,
-    topicTitle: topic.title,
+    topicTitle: topic.topicTitle,
   };
 }
 
@@ -1460,12 +1445,21 @@ export async function getLearningResumeTarget(
     ),
     orderBy: asc(curriculumTopics.sortOrder),
   });
-  const topicsById = new Map(topics.map((topic) => [topic.id, topic]));
+  const ownedTopics =
+    topics.length > 0
+      ? await findOwnedCurriculumTopics(db, {
+          profileId,
+          topicIds: topics.map((topic) => topic.id),
+        })
+      : [];
+  const ownedTopicIds = new Set(ownedTopics.map((topic) => topic.topicId));
+  const scopedTopics = topics.filter((topic) => ownedTopicIds.has(topic.id));
+  const topicsById = new Map(scopedTopics.map((topic) => [topic.id, topic]));
 
   if (scope.topicId && !topicsById.has(scope.topicId)) return null;
 
   const scopedTopicIds = new Set(
-    topics
+    scopedTopics
       .filter((topic) => {
         if (scope.topicId && topic.id !== scope.topicId) return false;
         if (scope.bookId && topic.bookId !== scope.bookId) return false;
@@ -1478,7 +1472,10 @@ export async function getLearningResumeTarget(
     return null;
   }
 
-  const scopedSessions = allSessions.filter((session) => {
+  const ownedTopicSessions = allSessions.filter(
+    (session) => !session.topicId || topicsById.has(session.topicId),
+  );
+  const scopedSessions = ownedTopicSessions.filter((session) => {
     if (scope.topicId) return session.topicId === scope.topicId;
     if (scope.bookId) {
       return !!session.topicId && scopedTopicIds.has(session.topicId);
@@ -1541,7 +1538,7 @@ export async function getLearningResumeTarget(
   }
 
   const latestCurriculumIds = [...new Set(latestCurriculumBySubject.values())];
-  const latestTopics = topics.filter((topic) =>
+  const latestTopics = scopedTopics.filter((topic) =>
     latestCurriculumIds.includes(topic.curriculumId),
   );
   const latestTopicIds = latestTopics.map((topic) => topic.id);
@@ -1553,14 +1550,22 @@ export async function getLearningResumeTarget(
     ),
     repo.assessments.findMany(inArray(assessments.topicId, latestTopicIds)),
   ]);
+  const latestTopicIdSet = new Set(latestTopicIds);
   const verifiedTopicIds = new Set(
     cards
-      .filter((card) => card.xpStatus === 'verified')
+      .filter(
+        (card) =>
+          latestTopicIdSet.has(card.topicId) && card.xpStatus === 'verified',
+      )
       .map((card) => card.topicId),
   );
   const passedTopicIds = new Set(
     topicAssessments
-      .filter((assessment) => assessment.status === 'passed')
+      .filter(
+        (assessment) =>
+          latestTopicIdSet.has(assessment.topicId) &&
+          assessment.status === 'passed',
+      )
       .map((assessment) => assessment.topicId),
   );
 
@@ -1676,7 +1681,16 @@ export async function getContinueSuggestion(
   });
   if (topics.length === 0) return null;
 
-  const topicIds = topics.map((topic) => topic.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: topics.map((topic) => topic.id),
+  });
+  const ownedTopicIds = new Set(ownedTopics.map((topic) => topic.topicId));
+  const scopedTopics = topics.filter((topic) => ownedTopicIds.has(topic.id));
+  if (scopedTopics.length === 0) return null;
+
+  const topicIds = scopedTopics.map((topic) => topic.id);
+  const topicIdSet = new Set(topicIds);
   const [cards, topicAssessments] = await Promise.all([
     repo.retentionCards.findMany(inArray(retentionCards.topicId, topicIds)),
     repo.assessments.findMany(inArray(assessments.topicId, topicIds)),
@@ -1684,17 +1698,22 @@ export async function getContinueSuggestion(
 
   const verifiedTopicIds = new Set(
     cards
-      .filter((card) => card.xpStatus === 'verified')
+      .filter(
+        (card) => topicIdSet.has(card.topicId) && card.xpStatus === 'verified',
+      )
       .map((card) => card.topicId),
   );
   const passedTopicIds = new Set(
     topicAssessments
-      .filter((assessment) => assessment.status === 'passed')
+      .filter(
+        (assessment) =>
+          topicIdSet.has(assessment.topicId) && assessment.status === 'passed',
+      )
       .map((assessment) => assessment.topicId),
   );
 
-  const topicsByCurriculum = new Map<string, typeof topics>();
-  for (const topic of topics) {
+  const topicsByCurriculum = new Map<string, typeof scopedTopics>();
+  for (const topic of scopedTopics) {
     const list = topicsByCurriculum.get(topic.curriculumId) ?? [];
     list.push(topic);
     topicsByCurriculum.set(topic.curriculumId, list);

@@ -1283,6 +1283,59 @@ describe('getLearningResumeTarget', () => {
     });
   });
 
+  it('[WI-80] does not resume a session attached to a mixed-parent topic', async () => {
+    const subject = mockSubjectRow();
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Book Topic',
+      bookId: 'foreign-book',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'mixed-parent-session',
+          topicId: 'mixed-parent-topic',
+          status: 'active',
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        }),
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [mixedParentTopic],
+      ownedTopicRows: [],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toBeNull();
+  });
+
+  it('[WI-80] does not suggest a next topic from a mixed parent chain', async () => {
+    const subject = mockSubjectRow();
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Book Topic',
+      bookId: 'foreign-book',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [mixedParentTopic],
+      ownedTopicRows: [],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toBeNull();
+  });
+
   it('resumes a subject-level session even when no curriculum exists yet', async () => {
     const subject = mockSubjectRow({ name: 'Biography' });
     setupScopedRepo({
@@ -1398,6 +1451,32 @@ describe('getContinueSuggestion', () => {
     expect(result!.subjectId).toBe(subjectId);
     expect(result!.subjectName).toBe('Mathematics');
     expect(result!.lastSessionId).toBeNull();
+  });
+
+  it('[WI-80] does not suggest a mixed-parent topic', async () => {
+    const subject = mockSubjectRow();
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Book Topic',
+      bookId: 'foreign-book',
+      sortOrder: 1,
+    });
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [mixedParentTopic],
+      ownedTopicRows: [],
+    });
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).toBeNull();
   });
 
   it('includes lastSessionId when an active session exists', async () => {
@@ -1640,6 +1719,26 @@ describe('resolveTopicSubject', () => {
     });
 
     const result = await resolveTopicSubject(db, profileId, topicId);
+    expect(result).toBeNull();
+  });
+
+  it('[WI-80] returns null when the topic has a mixed parent chain', async () => {
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow({ name: 'Mathematics' }),
+    });
+    const db = createMockDb({
+      topicFindFirst: mockTopicRow({
+        id: topicId,
+        title: 'Foreign Book Topic',
+        curriculumId,
+        bookId: 'foreign-book',
+      }),
+      curriculumFindFirst: { id: curriculumId, subjectId },
+      ownedTopicRows: [],
+    });
+
+    const result = await resolveTopicSubject(db, profileId, topicId);
+
     expect(result).toBeNull();
   });
 
