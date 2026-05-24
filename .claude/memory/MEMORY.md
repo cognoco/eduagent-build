@@ -115,6 +115,8 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Development Process & Feedback
 
+- [project_commit_skill_drift.md](project_commit_skill_drift.md) — `.claude/skills/commit/` and `.agents/skills/commit/` diverged before sync existed; sync skips it. Follow-up to unify.
+- [project_sync_script_extension.md](project_sync_script_extension.md) — Two narrow sync scripts today. Generalize when a third sync need arises (N=3 trigger). Don't preemptively refactor.
 - [feedback_audit_check_deleted_concepts.md](feedback_audit_check_deleted_concepts.md) — Before governance posture on rule violations, check if the concept was deleted by an epic. Literal grep misses aliases.
 - [feedback_spec_failure_modes.md](feedback_spec_failure_modes.md) — Every spec needs Failure Modes table.
 - [feedback_five_root_causes.md](feedback_five_root_causes.md) — 5 systemic root causes.
