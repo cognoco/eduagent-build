@@ -4,7 +4,7 @@
 
 **Goal:** Remediate WI-84 / WP-DATA: 11 DeepSec findings where deploys, background jobs, seed tooling, consent/account deletion, feedback retry, dictation results, or Neon pool lifecycle can lose data or durable work.
 
-**Architecture:** Keep changes scoped to the flagged surfaces. Regulatory deletion and retry-critical background work must fail loudly when the durable handoff cannot be accepted; non-core telemetry remains best-effort. Dictation idempotency must move from `(profileId,date,mode)` to a per-completion key so retries dedupe without collapsing legitimate same-day completions.
+**Architecture:** Keep changes scoped to the flagged surfaces. Regulatory deletion and retry-critical background work must fail loudly when the durable handoff cannot be accepted; non-core telemetry remains best-effort. Dictation idempotency uses an expand/contract rollout: first add and populate `completionKey` without breaking old deployed Workers, then a follow-up contract migration can move the write conflict target from `(profileId,date,mode)` to `(profileId,completionKey)` so retries dedupe without collapsing legitimate same-day completions.
 
 **Tech Stack:** TypeScript, Hono, Inngest v3, Drizzle ORM, Neon serverless, Jest, Nx, Cloudflare Workers, wrangler.toml.
 
@@ -316,7 +316,7 @@ In `createClerkTestUser`, if `findClerkUserByEmail` returns a user whose `extern
 
 Run the test-seed Jest files. For API behavior changes, also run `pnpm exec jest apps/api/src/routes/test-seed.test.ts --runInBand --no-coverage`.
 
-## Task 9: DS-115 / WI-204 - Dictation Result Idempotency Must Be Per Completion
+## Task 9: DS-115 / WI-204 - Dictation Completion Key Expand Step
 
 **Files:**
 - Modify: `packages/schemas/src/dictation.ts` and `.test.ts`
@@ -327,19 +327,21 @@ Run the test-seed Jest files. For API behavior changes, also run `pnpm exec jest
 - Modify: `apps/api/src/services/dictation/result.integration.test.ts`
 - Add: new `apps/api/drizzle/0092_*` migration SQL and rollback doc
 
+**Rollout note:** This PR must be the expand step only. Production migrations run before the Worker deploy, so dropping `uniq_dictation_results_profile_date_mode` in the same deploy would break the old compiled Worker, whose insert still uses `ON CONFLICT (profile_id,date,mode)`. Keep that unique index and the repository conflict target in this PR. Follow-up #394, after this Worker is deployed everywhere, should drop the legacy unique index, add a non-unique read index if needed, and switch the repository conflict target to `(profileId, completionKey)`.
+
 - [ ] **Step 1: Write RED schema/route tests**
 
 Add `completionKey` to `recordDictationResultInputSchema` as required UUID or bounded opaque string. Tests should fail until schema accepts and route forwards it to `recordDictationResult`.
 
 - [ ] **Step 2: Write RED integration test**
 
-Change the same-date/same-mode integration coverage:
+Add rollout-safe integration coverage:
 
 ```ts
 const first = await recordDictationResult(db, profileId, { localDate: today, mode: 'homework', completionKey: keyA, ... });
 const second = await recordDictationResult(db, profileId, { localDate: today, mode: 'homework', completionKey: keyB, ... });
-expect(rows).toHaveLength(2);
-expect(second.id).not.toBe(first.id);
+expect(rows).toHaveLength(1);
+expect(second.id).toBe(first.id);
 
 const retry = await recordDictationResult(db, profileId, { localDate: today, mode: 'homework', completionKey: keyA, ...updated });
 expect(retry.id).toBe(first.id);
@@ -355,11 +357,11 @@ Run integration only if DB env is available:
 
 `pnpm exec jest apps/api/src/services/dictation/result.integration.test.ts --runInBand --no-coverage`
 
-Expected: FAIL because no `completionKey` exists and unique constraint is `(profile_id,date,mode)`.
+Expected: FAIL because no `completionKey` exists yet.
 
 - [ ] **Step 4: Implement GREEN**
 
-Add `completion_key` to `dictation_results`, unique on `(profile_id, completion_key)`, and keep a non-unique index for `(profile_id,date,mode)` if streak/query performance needs it. Update repository upsert target to `(profileId, completionKey)`. Update mobile/API schema callers only as needed by compile errors; client should generate a stable per-completion UUID and reuse it on retry.
+Add `completion_key` to `dictation_results`, backfill existing rows with the same deterministic legacy key used by omitted-key clients, set a database default for old Worker inserts during the migration-to-deploy window, and create the new unique `(profile_id, completion_key)` index. Preserve `uniq_dictation_results_profile_date_mode` and the repository's legacy conflict target until the contract follow-up. Update mobile/API schema callers so clients can generate and submit a stable per-completion UUID; the server stores the key now even though same-day same-mode distinction is gated on the later contract step.
 
 - [ ] **Step 5: Verify GREEN**
 
@@ -483,4 +485,5 @@ Open a PR from branch `WI-84`. Monitor `gh pr checks`, automated review comments
 - Spec coverage: all 11 child items are mapped to Tasks 1-10, with bundle validation in Task 11.
 - Placeholder scan: no task is intentionally deferred; Task 5 has one external-state branch because real Cloudflare KV namespace ids may not be present in repo/Doppler.
 - Type consistency: `completionKey` is the API/domain property, `completion_key` is the DB column.
+- Rollout split: DS-115's schema/client expand step ships here. The same-day same-mode behavior remains blocked by the preserved legacy unique index until tracked follow-up #394 runs after the new Worker is deployed.
 - Risk: this is a broad P1 bundle. If implementation becomes too large for one PR, split only after preserving traceability and getting explicit approval because WI-84 Definition of Done is work-package-level.
