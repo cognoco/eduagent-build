@@ -5,11 +5,17 @@ const mockInngestTransport = createInngestTransportCapture();
 const mockGetStepDatabase = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
-  return mockInngestTransport.module;
+jest.mock('../client', () => {
+  // gc1-allow: pattern-a conversion
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    inngest: mockInngestTransport.inngest,
+  };
 });
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
+  // gc1-allow: pattern-a conversion
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -19,7 +25,8 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
+  // gc1-allow: pattern-a conversion
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');

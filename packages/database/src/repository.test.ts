@@ -395,6 +395,25 @@ describe('createScopedRepository', () => {
     });
   });
 
+  describe('consentStates.findFirst ordering', () => {
+    it('preserves orderBy while auto-injecting profileId', async () => {
+      const { db, findFirst } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const extraCondition = sql`1 = 1`;
+      const orderBy = sql`${consentStates.requestedAt} DESC`;
+
+      await repo.consentStates.findFirst(extraCondition, orderBy);
+
+      expect(findFirst).toHaveBeenCalledWith({
+        where: and(
+          eq(consentStates.profileId, TEST_PROFILE_ID),
+          extraCondition,
+        ),
+        orderBy,
+      });
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Shape: verify all namespaces are present
   // ---------------------------------------------------------------------------

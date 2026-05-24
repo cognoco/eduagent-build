@@ -20,6 +20,7 @@ import {
   familyLinks,
   nudges,
   profiles,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -687,13 +688,11 @@ export async function isConsentRevocationGenerationCurrent(
   profileId: string,
   revokedAt?: Date,
 ): Promise<boolean> {
-  const row = await db.query.consentStates.findFirst({
-    where: and(
-      eq(consentStates.profileId, profileId),
-      eq(consentStates.consentType, 'GDPR'),
-    ),
-    orderBy: desc(consentStates.requestedAt),
-  });
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.consentStates.findFirst(
+    eq(consentStates.consentType, 'GDPR'),
+    desc(consentStates.requestedAt),
+  );
   if (row?.status !== 'WITHDRAWN') return false;
   if (!revokedAt) return true;
 

@@ -367,9 +367,10 @@ export function createScopedRepository(db: Database, profileId: string) {
           where: scopedWhere(consentStates, extraWhere),
         });
       },
-      async findFirst(extraWhere?: SQL) {
+      async findFirst(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
         return db.query.consentStates.findFirst({
           where: scopedWhere(consentStates, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
         });
       },
     },

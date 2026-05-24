@@ -190,7 +190,12 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             generated.connections,
           );
         } catch (error) {
-          await releaseBookGenerationClaimIfEmpty(db, subjectId, bookId);
+          await releaseBookGenerationClaimIfEmpty(
+            db,
+            subjectId,
+            bookId,
+            profileId,
+          );
           throw error;
         }
 

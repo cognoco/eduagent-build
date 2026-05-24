@@ -845,6 +845,7 @@ export async function releaseBookGenerationClaimIfEmpty(
   db: Database,
   subjectId: string,
   bookId: string,
+  profileId: string,
 ): Promise<void> {
   await db
     .update(curriculumBooks)
@@ -853,6 +854,11 @@ export async function releaseBookGenerationClaimIfEmpty(
       and(
         eq(curriculumBooks.id, bookId),
         eq(curriculumBooks.subjectId, subjectId),
+        sql`EXISTS (
+          SELECT 1 FROM subjects
+          WHERE subjects.id = ${subjectId}
+          AND subjects.profile_id = ${profileId}
+        )`,
         sql`NOT EXISTS (
           SELECT 1 FROM curriculum_topics
           WHERE curriculum_topics.book_id = ${bookId}

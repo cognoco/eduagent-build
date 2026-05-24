@@ -535,6 +535,22 @@ describe('getConsentStatus', () => {
 });
 
 describe('isConsentRevocationGenerationCurrent', () => {
+  it('returns true when latest GDPR state is withdrawn and revokedAt is omitted', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({
+        status: 'WITHDRAWN',
+        respondedAt: new Date('2026-01-12T10:00:00.000Z'),
+      }),
+    });
+
+    await expect(
+      isConsentRevocationGenerationCurrent(
+        db,
+        '550e8400-e29b-41d4-a716-446655440000',
+      ),
+    ).resolves.toBe(true);
+  });
+
   it('returns true when the current GDPR withdrawal has the same respondedAt as the event generation', async () => {
     const revokedAt = new Date('2026-01-10T10:00:00.000Z');
     const db = createMockDb({
