@@ -47,7 +47,7 @@ For each row:
 
 Most bugs are filed and the tester moves on. The exception is a blocking bug.
 
-A blocking bug is any P0/P1 issue that prevents judging this flow and likely blocks downstream flows, such as app launch failure, sign-in failure, profile load failure, family-link access failure, child data leak, broken tab shell, broken child route stack, Recaps dead tab, or parent proxy accidentally replacing normal mentor review.
+A blocking bug is any P0/P1 issue (see severity guide in §3) that prevents judging this flow and likely blocks downstream flows, such as app launch failure, sign-in failure, profile load failure, family-link access failure, child data leak, broken tab shell, broken child route stack, Recaps dead tab, or parent proxy accidentally replacing normal mentor review.
 
 When this happens:
 
@@ -71,21 +71,34 @@ Required properties:
 | Field | Value |
 | --- | --- |
 | Bug | `[FLOW-ID] short summary` |
-| Status | `Not started` |
-| Priority | `P0`, `P1`, `P2`, or `P3` |
-| Platform | `Mobile-Android`, `Mobile-iOS`, `Mobile-Web`, `API`, `Packages`, or `CI` as applicable |
+| Status | `Not started` — property type is `status`, not `select`; REST payload must be `{"status": {"name": "Not started"}}` |
+| Priority | `P0`, `P1`, `P2`, or `P3` (see severity guide below) |
+| Platform | `Mobile-Android`, `Mobile-iOS`, `Mobile-Web`, `API`, `Packages`, or `CI` as applicable (multi-select) |
 | Found In | `mentor-flow-revision-2026-05-22 / Batch N / FLOW-ID` |
 | Reported | test date |
 
 Bug body:
 
-- Repro steps.
-- Expected behavior from the inventories.
-- Actual behavior.
-- Screenshot or recording link when available.
-- Build SHA, API target, device, and account slot.
+- **Repro steps** — numbered list, observable preconditions first.
+- **Expected** — what the inventories say should happen.
+- **Actual** — what you observed.
+- **Screenshot or recording** — attach via the `Screenshots` property (REST file upload) or paste a hosted URL.
+- **Build SHA, API target, device, and account slot** (e.g. `M-B`).
 
-Before creating a bug, search the Open tracker for the same title or `Found In` tag. If the same bug already exists, link it instead of duplicating it. Never reopen a Done bug; file a new regression and relate it.
+Severity guide:
+
+| Priority | Use when |
+| --- | --- |
+| P0 | Crash, data loss, security/privacy leak, billing wrong, consent gate bypassed, child data leak, parent proxy accidentally replacing normal mentor review |
+| P1 | Flow blocked or unusable for a primary mentor persona; back button dead-ends; key feature broken; family-link access broken; Recaps dead tab |
+| P2 | Flow works but UX is degraded; copy wrong; layout broken on small screen |
+| P3 | Cosmetic, polish, nice-to-have |
+
+**One bug = one fix.** Do not bundle two unrelated defects into a single Notion page. If a row has multiple defects, file each separately and paste every URL into the row's `Bugs` column, comma-separated.
+
+**Search before filing.** Query the Open tracker (REST `databases/{id}/query` with a title or `Found In` filter) to avoid duplicates. If the same bug already exists, link it instead of duplicating it. Never reopen a Done bug — file a new regression and relate it. See `feedback_notion_resolution_recording.md`.
+
+**Done → Resolved move.** When a bug moves to Done, the same agent that closed it moves the row from `Issue Tracker - Open` (`3598bce9-1f7c-8070-86eb-e012bd99f184`) to `Issue Tracker - Resolved` (`b8ce802f-1126-4a2f-a123-be5f888cbb23`). See `/fix-notion-bugs` for the move recipe.
 
 ### 4. Test Account Slots
 
