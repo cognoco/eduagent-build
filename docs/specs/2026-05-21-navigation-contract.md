@@ -382,16 +382,77 @@ Client rules:
 
 ## Onboarding Intent
 
-The first-run Study/Family choice belongs after sign-up and before profile setup completes, at `/(app)/onboarding/intent`.
+The first-run Study/Family choice lives at `/(app)/onboarding/intent`. It runs **after** `create-profile` (which captures `birthYear`) so that under-18 users skip the screen entirely rather than seeing a button they can't pick.
 
-Rules:
+### Sequence
 
-- The pre-profile intent is route/UI state only.
-- Do not write Study/Family intent to SecureStore.
+First-run today is `sign-up → create-profile → home`. `pronouns` and `language-setup` are subject-creation screens (triggered from `create-subject.tsx:299`), not part of first-run profile setup. The intent insert sits between `create-profile` and home, gated on age:
+
+1. Sign-up (Clerk)
+2. `create-profile` — captures `birthYear`
+3. **On success:**
+   - 18+ first-time user → `intent` screen
+   - Under-18 first-time user → home directly
+   - Parent adding a child → existing post-create behavior (unchanged)
+4. From `intent`:
+   - "I'm learning" → home
+   - "I'm helping someone learn" → `family/setup` screen
+5. From `family/setup`: Add child / Link child / Continue studying (Study home)
+
+### Screen contract
+
+- **Two options, both mandatory** (no skip — adults must pick one):
+  - "I'm learning" → `intent='study'`
+  - "I'm helping someone learn" → `intent='family'`
+- Copy is age-neutral and avoids app jargon (no "mode", no "Study/Family" as button labels).
+- Visual: two stacked cards, each with a one-line description.
+
+### State
+
+- Intent is route/component state only — passed forward as a router param (`?intent=study|family`).
+- Do not write intent to SecureStore.
 - If email verification, app reload, or auth restart loses the route state, showing the intent step again is acceptable.
-- Once a profile exists, durable default context is stored only as `profiles.default_app_context`.
-- If an adult chooses Family but has no child relationship yet, show Family setup choices without entering the Family tab shell.
-- Under-18 users and child/non-owner profiles enter Study only.
+- Once a profile exists, durable default context is stored only as `profiles.default_app_context`, set server-side at profile-create time based on `{ intent, birthYear, isOwner }`.
+
+### Server resolution
+
+See the "Server resolution — corrected" subsection below the Family setup section. Intent is **not** persisted at profile-create time; it's a router param consumed by post-onboarding navigation, and `defaultAppContext = 'family'` only gets written after the user actually adds a child (because the existing API rejects it otherwise).
+
+### Family setup screen
+
+`Family` intent lands on a new screen `apps/mobile/src/app/(app)/family/setup.tsx` that offers three actions:
+
+- **Add a child** → `create-profile?for=child`
+- **Link an existing child account** → existing link flow (or "Coming soon" placeholder if not yet built)
+- **Continue studying for now** → Study home, with `defaultAppContext` left null. The server rejects `defaultAppContext = 'family'` for profiles without family_links (`updateProfileAppContext` in `apps/api/src/services/profile.ts:547`), so we cannot durably remember "wanted Family but skipped." Users who skip can return to Family setup via Add Child from the More menu when ready.
+
+Never trap the adult in Add Child as the only path (CLAUDE.md: `feedback_never_force_add_child`).
+
+### Server resolution — corrected
+
+Because of the family-link constraint above, the post-create-profile API call cannot accept `intent: 'family'` and write `defaultAppContext = 'family'` in one shot. The flow is:
+
+1. `POST /v1/profiles` creates the adult profile. Does **not** take an `intent` field.
+2. Mobile reads `intent` from router params.
+3. If `intent === 'family'`, mobile routes to `family/setup` after `language-setup`. No server write is needed at this stage.
+4. When the user actually adds/links a child on `family/setup`, the existing add-child flow runs. Mobile *then* calls `PATCH /v1/profiles/:id/app-context` with `family` — which now succeeds because `hasFamilyLinks === true`.
+5. If the user picks "Continue studying" on `family/setup`, no app-context write happens. `defaultAppContext` stays null; navigation-contract inference treats this as Study.
+
+This means **intent never needs to be persisted server-side** during onboarding. It lives in router params only, exactly as the original "ephemeral, no SecureStore" rule intended.
+
+### Analytics
+
+Emit `mode_intent_chosen` at the moment the user taps Continue on the intent screen, with payload:
+
+```ts
+{
+  intent: 'study' | 'family',
+  resolvedTo: 'study' | 'family' | 'family-setup',
+  hashedProfileId: string,
+}
+```
+
+`resolvedTo` is filled in after profile creation completes, so a single event captures both the user's choice and the server's resolution (e.g. `family` → `study` for an under-18 who slipped through the UI guard).
 
 ---
 
