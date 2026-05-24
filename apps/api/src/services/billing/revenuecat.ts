@@ -15,7 +15,11 @@ import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
-import { mapSubscriptionRow, type SubscriptionRow } from './types';
+import {
+  mapSubscriptionRow,
+  type AppliedSubscriptionRow,
+  type SubscriptionRow,
+} from './types';
 
 const logger = createLogger();
 import { getSubscriptionByAccountId } from './subscription-core';
@@ -90,7 +94,7 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     eventId: string;
     eventTimestampMs?: number;
   },
-): Promise<SubscriptionRow | null> {
+): Promise<AppliedSubscriptionRow | null> {
   return db.transaction(async (tx) => {
     // Known Drizzle pattern: PgTransaction → Database cast (see feedback_drizzle_transaction_cast.md)
     const txDb = tx as unknown as Database;
@@ -104,7 +108,7 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     // serialize here; the second will see the already-stamped eventId and return
     // early without a second write.
     if (existing.lastRevenuecatEventId === updates.eventId) {
-      return mapSubscriptionRow(existing);
+      return { ...mapSubscriptionRow(existing), webhookApplied: false };
     }
     if (
       updates.eventTimestampMs != null &&
@@ -113,7 +117,7 @@ export async function updateSubscriptionFromRevenuecatWebhook(
       const lastTs = Number(existing.lastRevenuecatEventTimestampMs);
       if (!Number.isNaN(lastTs) && updates.eventTimestampMs < lastTs) {
         // Stale retry — event is older than the last persisted event.
-        return mapSubscriptionRow(existing);
+        return { ...mapSubscriptionRow(existing), webhookApplied: false };
       }
     }
 
@@ -199,6 +203,13 @@ export async function updateSubscriptionFromRevenuecatWebhook(
       ne(subscriptions.lastRevenuecatEventId, updates.eventId),
     );
     if (eventIdPredicate) whereParts.push(eventIdPredicate);
+    if (updates.eventTimestampMs != null) {
+      const eventTimestampPredicate = or(
+        isNull(subscriptions.lastRevenuecatEventTimestampMs),
+        sql`(${subscriptions.lastRevenuecatEventTimestampMs})::bigint <= ${updates.eventTimestampMs}`,
+      );
+      if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
+    }
 
     const [updated] = await tx
       .update(subscriptions)
@@ -211,13 +222,23 @@ export async function updateSubscriptionFromRevenuecatWebhook(
       // stamped this eventId. Re-read and confirm before short-circuiting.
       const recheck = await repo.subscriptions.findFirst();
       if (recheck && recheck.lastRevenuecatEventId === updates.eventId) {
-        return mapSubscriptionRow(recheck);
+        return { ...mapSubscriptionRow(recheck), webhookApplied: false };
+      }
+      if (
+        recheck &&
+        updates.eventTimestampMs != null &&
+        recheck.lastRevenuecatEventTimestampMs != null
+      ) {
+        const lastTs = Number(recheck.lastRevenuecatEventTimestampMs);
+        if (!Number.isNaN(lastTs) && updates.eventTimestampMs < lastTs) {
+          return { ...mapSubscriptionRow(recheck), webhookApplied: false };
+        }
       }
       throw new Error(
         'Subscription update did not return a row — concurrent status mutation detected or row missing',
       );
     }
-    return mapSubscriptionRow(updated);
+    return { ...mapSubscriptionRow(updated), webhookApplied: true };
   });
 }
 

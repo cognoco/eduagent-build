@@ -6,6 +6,7 @@
 // Shared types and mappers
 export type {
   SubscriptionRow,
+  AppliedSubscriptionRow,
   QuotaPoolRow,
   WebhookSubscriptionUpdate,
 } from './types';

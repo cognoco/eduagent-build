@@ -30,6 +30,10 @@ export interface SubscriptionRow {
   updatedAt: string;
 }
 
+export type AppliedSubscriptionRow = SubscriptionRow & {
+  webhookApplied: boolean;
+};
+
 export interface QuotaPoolRow {
   id: string;
   subscriptionId: string;

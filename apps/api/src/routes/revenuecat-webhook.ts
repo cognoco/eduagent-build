@@ -294,7 +294,7 @@ async function handleRenewal(
   });
 
   // Only update quota pool when the tier actually changed.
-  if (updated && tierChanged && eventTier) {
+  if (updated && updated.webhookApplied !== false && tierChanged && eventTier) {
     const tierConfig = getTierConfig(eventTier);
     await updateQuotaPoolLimit(
       db,
@@ -304,7 +304,7 @@ async function handleRenewal(
     );
   }
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -342,7 +342,7 @@ async function handleCancellation(
     cancelledAt: new Date().toISOString(),
   });
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -410,7 +410,7 @@ async function handleExpiration(
     cancelledAt: new Date().toISOString(),
   });
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     const freeConfig = getTierConfig('free');
     await updateQuotaPoolLimit(
       db,
@@ -444,7 +444,7 @@ async function handleBillingIssue(
     status: 'past_due',
   });
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -576,7 +576,7 @@ async function handleProductChange(
     status: 'active',
   });
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     const tierConfig = getTierConfig(newTier);
     await updateQuotaPoolLimit(
       db,
@@ -699,7 +699,7 @@ async function handleUncancellation(
     cancelledAt: null,
   });
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,

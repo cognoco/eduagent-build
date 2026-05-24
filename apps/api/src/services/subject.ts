@@ -334,43 +334,29 @@ export async function createSubjectWithStructure(
 
     await ensureCurriculum(db, targetSubject.id);
 
-    // Check if a book with this focus already exists on the subject.
-    // The second pass catches one-character LLM/user spelling drift such as
-    // "Mesopotania" beside "Mesopotamia" without merging short ambiguous names.
-    const exactExistingBook = await db.query.curriculumBooks.findFirst({
-      where: and(
-        eq(curriculumBooks.subjectId, targetSubject.id),
-        sql`LOWER(${curriculumBooks.title}) = LOWER(${effectiveFocus})`,
-      ),
-    });
-    const existingBook =
-      exactExistingBook ??
-      (
-        await db.query.curriculumBooks.findMany({
-          where: eq(curriculumBooks.subjectId, targetSubject.id),
-        })
-      ).find((book) => areEquivalentBookTitles(book.title, effectiveFocus));
-    if (existingBook) {
-      if (!existingBook.topicsGenerated) {
-        await dispatchCurriculumPrewarm({
-          subjectId: targetSubject.id,
-          profileId,
-          bookId: existingBook.id,
-        });
-      }
-      return {
-        subject: targetSubject,
-        structureType: 'focused_book' as SubjectStructureType,
-        bookId: existingBook.id,
-        bookTitle: existingBook.title,
-        bookCount: 1,
-      };
-    }
-
     const bookRow = await db.transaction(async (tx) => {
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${targetSubject.id}))`,
       );
+
+      // Check for an existing focused book while holding the per-subject lock.
+      // Without this in-lock recheck, two concurrent focused-book requests can
+      // both observe no match before serialising and then both insert.
+      const exactExistingBook = await tx.query.curriculumBooks.findFirst({
+        where: and(
+          eq(curriculumBooks.subjectId, targetSubject.id),
+          sql`LOWER(${curriculumBooks.title}) = LOWER(${effectiveFocus})`,
+        ),
+      });
+      const existingBook =
+        exactExistingBook ??
+        (
+          await tx.query.curriculumBooks.findMany({
+            where: eq(curriculumBooks.subjectId, targetSubject.id),
+          })
+        ).find((book) => areEquivalentBookTitles(book.title, effectiveFocus));
+      if (existingBook) return existingBook;
+
       const maxOrderResult = await tx
         .select({
           maxOrder: sql<number>`COALESCE(MAX(${curriculumBooks.sortOrder}), 0)`,
@@ -396,16 +382,18 @@ export async function createSubjectWithStructure(
 
     if (!bookRow)
       throw new Error('Insert curriculum book did not return a row');
-    await dispatchCurriculumPrewarm({
-      subjectId: targetSubject.id,
-      profileId,
-      bookId: bookRow.id,
-    });
+    if (!bookRow.topicsGenerated) {
+      await dispatchCurriculumPrewarm({
+        subjectId: targetSubject.id,
+        profileId,
+        bookId: bookRow.id,
+      });
+    }
     return {
       subject: targetSubject,
       structureType: 'focused_book',
       bookId: bookRow.id,
-      bookTitle: effectiveFocus,
+      bookTitle: bookRow.title,
       bookCount: 1,
     };
   }

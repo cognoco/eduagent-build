@@ -5,7 +5,7 @@
 // markSubscriptionCancelled, updateQuotaPoolLimit, activateSubscriptionFromCheckout
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, ne, or } from 'drizzle-orm';
+import { and, eq, isNull, lte, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   subscriptions,
@@ -25,6 +25,7 @@ import {
   mapSubscriptionRow,
   mapQuotaPoolRow,
   type SubscriptionRow,
+  type AppliedSubscriptionRow,
   type QuotaPoolRow,
   type WebhookSubscriptionUpdate,
 } from './types';
@@ -141,7 +142,7 @@ export async function updateSubscriptionFromWebhook(
   db: Database,
   stripeSubscriptionId: string,
   updates: WebhookSubscriptionUpdate,
-): Promise<SubscriptionRow | null> {
+): Promise<AppliedSubscriptionRow | null> {
   return db.transaction(async (tx) => {
     // Load current row inside the transaction (BD-10: via standalone helper —
     // keyed by Stripe ID, not accountId).
@@ -162,7 +163,7 @@ export async function updateSubscriptionFromWebhook(
       updates.stripeEventId &&
       existing.lastStripeEventId === updates.stripeEventId
     ) {
-      return mapSubscriptionRow(existing);
+      return { ...mapSubscriptionRow(existing), webhookApplied: false };
     }
 
     // Idempotency check: skip if incoming event is older (NaN-safe) [1C.6]
@@ -174,7 +175,7 @@ export async function updateSubscriptionFromWebhook(
         !Number.isNaN(incomingTs) &&
         incomingTs < existingTs
       ) {
-        return mapSubscriptionRow(existing);
+        return { ...mapSubscriptionRow(existing), webhookApplied: false };
       }
     }
 
@@ -248,6 +249,12 @@ export async function updateSubscriptionFromWebhook(
       );
       if (eventIdPredicate) whereParts.push(eventIdPredicate);
     }
+    const incomingEventTimestamp = new Date(updates.lastStripeEventTimestamp);
+    const eventTimestampPredicate = or(
+      isNull(subscriptions.lastStripeEventTimestamp),
+      lte(subscriptions.lastStripeEventTimestamp, incomingEventTimestamp),
+    );
+    if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
 
     const [updated] = await tx
       .update(subscriptions)
@@ -267,11 +274,22 @@ export async function updateSubscriptionFromWebhook(
         updates.stripeEventId &&
         recheck.lastStripeEventId === updates.stripeEventId
       ) {
-        return mapSubscriptionRow(recheck);
+        return { ...mapSubscriptionRow(recheck), webhookApplied: false };
+      }
+      const recheckTs = recheck?.lastStripeEventTimestamp?.getTime();
+      const incomingTs = incomingEventTimestamp.getTime();
+      if (
+        recheck &&
+        recheckTs != null &&
+        !Number.isNaN(recheckTs) &&
+        !Number.isNaN(incomingTs) &&
+        incomingTs < recheckTs
+      ) {
+        return { ...mapSubscriptionRow(recheck), webhookApplied: false };
       }
       throw new Error('Subscription webhook update did not return a row');
     }
-    return mapSubscriptionRow(updated);
+    return { ...mapSubscriptionRow(updated), webhookApplied: true };
   });
 }
 

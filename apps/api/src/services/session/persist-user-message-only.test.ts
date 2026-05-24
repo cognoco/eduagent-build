@@ -8,24 +8,31 @@ import {
 describe('persistUserMessageOnly', () => {
   let mockDb: any;
   let insertChain: any;
+  let sessionRow: any;
 
   beforeEach(() => {
+    sessionRow = {
+      id: 'sess-1',
+      profileId: 'p-1',
+      subjectId: 'subj-1',
+      status: 'active',
+    };
     insertChain = {
       values: jest.fn().mockReturnThis(),
       onConflictDoNothing: jest.fn().mockResolvedValue([]),
     };
+    const selectChain = {
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      for: jest.fn().mockReturnThis(),
+      limit: jest
+        .fn()
+        .mockImplementation(async () => (sessionRow ? [sessionRow] : [])),
+    };
     mockDb = {
-      query: {
-        learningSessions: {
-          findFirst: jest.fn().mockResolvedValue({
-            id: 'sess-1',
-            profileId: 'p-1',
-            subjectId: 'subj-1',
-            status: 'active',
-          }),
-        },
-      },
+      select: jest.fn().mockReturnValue(selectChain),
       insert: jest.fn().mockReturnValue(insertChain),
+      transaction: jest.fn(async (fn) => fn(mockDb)),
     };
   });
 
@@ -53,18 +60,18 @@ describe('persistUserMessageOnly', () => {
       clientId: 'c-1',
       orphanReason: 'llm_stream_error',
     });
-    expect(mockDb.query.learningSessions.findFirst).toHaveBeenCalled();
-    const orderRead =
-      mockDb.query.learningSessions.findFirst.mock.invocationCallOrder[0];
+    expect(mockDb.transaction).toHaveBeenCalled();
+    expect(mockDb.select().for).toHaveBeenCalledWith('update');
+    const orderRead = mockDb.select().limit.mock.invocationCallOrder[0];
     const orderInsert = mockDb.insert.mock.invocationCallOrder[0];
     expect(orderRead).toBeLessThan(orderInsert);
   });
 
   it('refuses to write when session belongs to another profile', async () => {
-    mockDb.query.learningSessions.findFirst.mockResolvedValue({
+    sessionRow = {
       id: 'sess-1',
       profileId: 'other',
-    });
+    };
     await expect(
       persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {
         clientId: 'c-1',
@@ -75,7 +82,7 @@ describe('persistUserMessageOnly', () => {
   });
 
   it('refuses to write when session does not exist', async () => {
-    mockDb.query.learningSessions.findFirst.mockResolvedValue(undefined);
+    sessionRow = undefined;
     await expect(
       persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {
         clientId: 'c-1',
@@ -87,12 +94,12 @@ describe('persistUserMessageOnly', () => {
   it.each(['completed', 'auto_closed'] as const)(
     '[WI-78 DS-242] refuses to write orphan user messages to %s sessions',
     async (status) => {
-      mockDb.query.learningSessions.findFirst.mockResolvedValue({
+      sessionRow = {
         id: 'sess-1',
         profileId: 'p-1',
         subjectId: 'subj-1',
         status,
-      });
+      };
 
       await expect(
         persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {

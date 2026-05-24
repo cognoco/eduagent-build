@@ -253,7 +253,7 @@ async function handleSubscriptionEvent(
       updates,
     );
 
-    if (result) {
+    if (result && result.webhookApplied !== false) {
       if (isExpired) {
         const freeTier = getTierConfig('free');
         await updateQuotaPoolLimit(
@@ -277,7 +277,7 @@ async function handleSubscriptionEvent(
     return result;
   });
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -320,7 +320,7 @@ async function handleSubscriptionDeleted(
       updates,
     );
 
-    if (result) {
+    if (result && result.webhookApplied !== false) {
       const freeTier = getTierConfig('free');
       await updateQuotaPoolLimit(
         txDb,
@@ -333,7 +333,7 @@ async function handleSubscriptionDeleted(
     return result;
   });
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -469,7 +469,7 @@ async function handlePaymentFailed(
     },
   );
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -552,7 +552,7 @@ async function handlePaymentSucceeded(
     },
   );
 
-  if (updated) {
+  if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
       kv,
       db,

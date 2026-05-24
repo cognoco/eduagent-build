@@ -477,6 +477,36 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
     });
   });
 
+  it('[WI-78 review] checks duplicate focused books after taking the subject lock', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Botany',
+    });
+    setupScopedRepo({ findManyResult: [subjectRow] });
+    const existingBook = mockBookRow({ id: uuidExistingBookId, title: 'Tea' });
+    const db = createFocusedBookDb({
+      subjectRow,
+      existingBook,
+    });
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      focus: 'Tea',
+    });
+
+    expect(result.bookId).toBe(uuidExistingBookId);
+    expect(db.execute).toHaveBeenCalled();
+    const lockOrder = (db.execute as jest.Mock).mock.invocationCallOrder[0];
+    const duplicateReadOrder = (db.query.curriculumBooks.findFirst as jest.Mock)
+      .mock.invocationCallOrder[0];
+    if (lockOrder == null || duplicateReadOrder == null) {
+      throw new Error('Expected lock and duplicate-read call order');
+    }
+    expect(lockOrder).toBeLessThan(duplicateReadOrder);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it('does not fire curriculum prewarm for an existing book that already has topics', async () => {
     const subjectRow = mockSubjectRow({
       id: uuidSubjectId,

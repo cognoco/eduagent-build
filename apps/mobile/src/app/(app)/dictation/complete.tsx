@@ -32,7 +32,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const reviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestReviewRequestRef = useRef<Promise<unknown> | null>(null);
+  const latestReviewAttemptRef = useRef(0);
 
   useEffect(() => {
     if (isReviewing) {
@@ -121,6 +121,8 @@ export default function DictationCompleteScreen(): React.ReactElement {
   const handleCheckWriting = async (
     source: 'camera' | 'gallery' = 'camera',
   ) => {
+    const attemptId = latestReviewAttemptRef.current + 1;
+    latestReviewAttemptRef.current = attemptId;
     // [BUG-692] Reset the cancelled flag at the start of each new attempt.
     reviewCancelledRef.current = false;
 
@@ -140,6 +142,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
               quality: 0.8,
               allowsEditing: false,
             });
+      if (
+        reviewCancelledRef.current ||
+        latestReviewAttemptRef.current !== attemptId
+      )
+        return;
       if (result.canceled) return;
       const asset = result.assets?.[0];
       uri = asset?.uri;
@@ -166,6 +173,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
       imageBase64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
+      if (
+        reviewCancelledRef.current ||
+        latestReviewAttemptRef.current !== attemptId
+      )
+        return;
       if (
         assetMimeType === 'image/png' ||
         assetMimeType === 'image/webp' ||
@@ -200,14 +212,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
         sentences,
         language,
       });
-      latestReviewRequestRef.current = request;
       const reviewResult = await request;
 
       // [BUG-692] If the user navigated away (hardware back, Cancel button,
       // or screen blur) while the review was in flight, skip navigation.
       if (
         reviewCancelledRef.current ||
-        latestReviewRequestRef.current !== request
+        latestReviewAttemptRef.current !== attemptId
       )
         return;
 
@@ -220,7 +231,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       // [BUG-692] Don't pop an alert if the user already navigated away.
       if (
         reviewCancelledRef.current ||
-        latestReviewRequestRef.current !== request
+        latestReviewAttemptRef.current !== attemptId
       )
         return;
       const message = err instanceof Error ? err.message : t('errors.generic');
