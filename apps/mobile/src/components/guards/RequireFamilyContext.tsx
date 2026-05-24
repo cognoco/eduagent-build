@@ -6,7 +6,7 @@ import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { LEARNER_HOME_HREF } from '../../lib/navigation';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { type RouteKey, type RouteParams } from '../../lib/navigation-contract';
-import { useAppContext } from '../../lib/app-context';
+import { useEnterFamilyMode } from '../../lib/use-mode-switch';
 
 // [PARENT-03] RequireFamilyContext is a READ-ONLY route guard.
 // It renders children only when the user is already in Family mode.
@@ -29,7 +29,7 @@ export function RequireFamilyContext({
   params?: RouteParams;
 }): ReactNode {
   const router = useRouter();
-  const { setMode } = useAppContext();
+  const enterFamilyMode = useEnterFamilyMode();
   const contract = useNavigationContract();
 
   if (
@@ -58,7 +58,7 @@ export function RequireFamilyContext({
   }
 
   function handleSwitchToFamily(): void {
-    setMode('family');
+    enterFamilyMode();
     router.replace('/(app)/home');
   }
 

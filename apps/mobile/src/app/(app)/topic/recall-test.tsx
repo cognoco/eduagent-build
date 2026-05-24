@@ -16,7 +16,7 @@ import { classifyApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 import { ErrorFallback } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
-import { useAppContext } from '../../../lib/app-context';
+import { useEnsureStudyMode } from '../../../lib/use-mode-switch';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
@@ -45,21 +45,16 @@ export default function RecallTestScreen() {
   }>();
 
   const submitRecallTest = useSubmitRecallTest();
-  const { mode, setMode } = useAppContext();
+  const ensureStudyMode = useEnsureStudyMode();
 
   // /library belongs to STUDY_TABS. V1 family-mode users would land outside
-  // their tab shape if we routed them there directly; auto-switch them to
-  // study mode first so the destination is in their navigation surface.
-  const goToLibrary = useCallback(() => {
-    if (mode === 'family') {
-      setMode('study', {
-        onSuccess: () => goBackOrReplace(router, '/(app)/library'),
-        onError: () => goBackOrReplace(router, '/(app)/library'),
-      });
-    } else {
-      goBackOrReplace(router, '/(app)/library');
-    }
-  }, [mode, router, setMode]);
+  // their tab shape if we routed there directly; ensureStudyMode auto-
+  // switches them to study mode first so the destination is in their
+  // navigation surface.
+  const goToLibrary = useCallback(
+    () => ensureStudyMode(() => goBackOrReplace(router, '/(app)/library')),
+    [ensureStudyMode, router],
+  );
 
   const [messages, setMessages] = useState<ChatMessage[]>([OPENING_MESSAGE]);
   const [isStreaming, setIsStreaming] = useState(false);

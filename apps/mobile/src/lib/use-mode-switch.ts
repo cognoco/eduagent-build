@@ -116,3 +116,50 @@ export function useModeSwitch(): {
 
   return { switchMode, isSwitching, isSwitchingRef, switchError, dismissError };
 }
+
+/**
+ * Lightweight bridge: ensure the user is in Study mode before running
+ * `then`. If already in Study (or any non-Family mode), `then` runs
+ * synchronously. If in Family, `setMode('study', ...)` runs first and
+ * `then` runs in either branch — so destinations in STUDY_TABS (e.g.
+ * `/library`) stay reachable from family-context screens.
+ *
+ * Why this exists here: the only Study/Family mode-write boundary is
+ * `useAppContext().setMode`. Consumers that read `mode` + call `setMode`
+ * inline duplicate that boundary across screens and trip the navigation
+ * usage guard. This hook is the canonical wrapper for the
+ * "switch-to-Study-then-navigate" pattern (recall-test, LearnerScreen
+ * loading fallback, Learn-this-too bridge).
+ */
+export function useEnsureStudyMode(): (then: () => void) => void {
+  const { mode, setMode } = useAppContext();
+
+  return useCallback(
+    (then: () => void): void => {
+      if (mode !== 'family') {
+        then();
+        return;
+      }
+      setMode('study', {
+        onSuccess: () => then(),
+        onError: () => then(),
+      });
+    },
+    [mode, setMode],
+  );
+}
+
+/**
+ * Lightweight bridge: enter Family mode via the explicit-opt-in CTA in
+ * RequireFamilyContext. Unlike `useModeSwitch.switchMode`, this does NOT
+ * invalidate query caches, fire analytics, or `router.replace('/home')` —
+ * those are appropriate for a global mode switch, but the family-route
+ * guard wants to render its protected child immediately at the current
+ * URL once the mode flips.
+ */
+export function useEnterFamilyMode(): () => void {
+  const { setMode } = useAppContext();
+  return useCallback(() => {
+    setMode('family');
+  }, [setMode]);
+}
