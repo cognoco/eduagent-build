@@ -1104,7 +1104,7 @@ describe('LearnerScreen', () => {
       jest.useRealTimers();
     });
 
-    it('shows the timeout container with "Taking longer than usual..." after 15 s', async () => {
+    it('shows the timeout container with loading message after 15 s', async () => {
       render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
       // Loading state appears immediately — no timeout text yet.
@@ -1116,7 +1116,7 @@ describe('LearnerScreen', () => {
 
       await waitFor(() => {
         screen.getByTestId('learner-loading-timeout');
-        screen.getByText('Taking longer than usual...');
+        screen.getByText('Almost there — just a moment more...');
       });
     });
 

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../lib/platform-alert';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter, type Href } from 'expo-router';
@@ -15,6 +16,7 @@ export function ChangePassword(): React.JSX.Element {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
+  const { t } = useTranslation();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -34,17 +36,17 @@ export function ChangePassword(): React.JSX.Element {
     // feedback. Match the server's minimum (Clerk enforces ≥8 characters);
     // we don't accept anything shorter than the server contract.
     if (currentPassword.length < 8) {
-      setError('Enter your current password');
+      setError(t('changePassword.errorCurrentRequired'));
       return;
     }
 
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t('changePassword.errorTooShort'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('changePassword.errorMismatch'));
       return;
     }
 
@@ -63,7 +65,7 @@ export function ChangePassword(): React.JSX.Element {
     } finally {
       setIsSubmitting(false);
     }
-  }, [user, currentPassword, newPassword, confirmPassword]);
+  }, [user, currentPassword, newPassword, confirmPassword, t]);
 
   const handleForgotPassword = useCallback(async () => {
     setIsSigningOut(true);
@@ -74,20 +76,23 @@ export function ChangePassword(): React.JSX.Element {
         profileIds: profiles.map((p) => p.id),
       });
     } catch {
-      platformAlert('Could not sign out', 'Please try again.');
+      platformAlert(
+        t('changePassword.signOutErrorTitle'),
+        t('changePassword.signOutErrorMessage'),
+      );
       return;
     } finally {
       setIsSigningOut(false);
     }
     router.replace('/(auth)/sign-in' as Href);
-  }, [signOut, router, queryClient, profiles]);
+  }, [signOut, router, queryClient, profiles, t]);
 
   return (
     <View className="mt-3">
       <PasswordInput
         value={currentPassword}
         onChangeText={setCurrentPassword}
-        placeholder="Current password"
+        placeholder={t('changePassword.currentPlaceholder')}
         testID="current-password"
       />
 
@@ -97,14 +102,16 @@ export function ChangePassword(): React.JSX.Element {
         className="mt-1 mb-3"
       >
         <Text className="text-xs text-primary">
-          {isSigningOut ? 'Signing out...' : 'Forgot your password?'}
+          {isSigningOut
+            ? t('changePassword.signingOut')
+            : t('changePassword.forgotPassword')}
         </Text>
       </Pressable>
 
       <PasswordInput
         value={newPassword}
         onChangeText={setNewPassword}
-        placeholder="New password"
+        placeholder={t('changePassword.newPlaceholder')}
         testID="new-password"
         showRequirements
       />
@@ -113,7 +120,7 @@ export function ChangePassword(): React.JSX.Element {
         <PasswordInput
           value={confirmPassword}
           onChangeText={setConfirmPassword}
-          placeholder="Confirm new password"
+          placeholder={t('changePassword.confirmPlaceholder')}
           testID="confirm-password"
         />
       </View>
@@ -125,19 +132,23 @@ export function ChangePassword(): React.JSX.Element {
       )}
 
       {success && (
-        <Text className="text-xs text-success mt-2">Password updated</Text>
+        <Text className="text-xs text-success mt-2">
+          {t('changePassword.successMessage')}
+        </Text>
       )}
 
       <Pressable
         onPress={handleSubmit}
         disabled={isSubmitting}
         className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
-        accessibilityLabel="Update password"
+        accessibilityLabel={t('changePassword.updateLabel')}
         accessibilityRole="button"
         testID="update-password-button"
       >
         <Text className="text-body font-semibold text-text-inverse">
-          {isSubmitting ? 'Updating...' : 'Update Password'}
+          {isSubmitting
+            ? t('changePassword.updating')
+            : t('changePassword.updateButton')}
         </Text>
       </Pressable>
     </View>

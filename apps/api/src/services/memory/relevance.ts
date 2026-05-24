@@ -26,7 +26,13 @@ const STAGE1_CANDIDATE_MULTIPLIER = 4;
 
 export interface RelevanceResult {
   snapshot: MemorySnapshot;
-  source: 'relevance' | 'recency_fallback' | 'consent_gate' | 'no_profile';
+  // [BUG-641] 'no-match': vector search returned rows but all had max distance
+  source:
+    | 'relevance'
+    | 'recency_fallback'
+    | 'consent_gate'
+    | 'no_profile'
+    | 'no-match';
 }
 
 export interface GetRelevantMemoriesArgs {
@@ -50,7 +56,7 @@ type RelevantMemoryFactRow = Awaited<
 >[number];
 
 export async function getRelevantMemories(
-  args: GetRelevantMemoriesArgs
+  args: GetRelevantMemoriesArgs,
 ): Promise<RelevanceResult> {
   const weights = { ...DEFAULT_WEIGHTS, ...(args.weights ?? {}) };
   const now = args.now ?? new Date();
@@ -78,7 +84,7 @@ export async function getRelevantMemories(
 
   const candidates = await args.scoped.memoryFacts.findRelevant(
     queryVector,
-    args.k * STAGE1_CANDIDATE_MULTIPLIER
+    args.k * STAGE1_CANDIDATE_MULTIPLIER,
   );
   if (candidates.length === 0) {
     return {
@@ -87,17 +93,32 @@ export async function getRelevantMemories(
     };
   }
 
-  const topRows = candidates
+  const scored = candidates
     .map((row) => ({ row, score: scoreRow(row, weights, now) }))
     .sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id))
-    .slice(0, args.k)
-    .map(({ row }) => row);
+    .slice(0, args.k);
 
+  // [BUG-641] When every candidate has max distance (2.0), the vector index
+  // returned rows but none were semantically related. Fall back to recency
+  // and report 'no-match' so telemetry can distinguish from true relevance.
+  const MAX_DISTANCE = 2;
+  const allAtMaxDistance = scored.every(
+    ({ row }) =>
+      Math.min(MAX_DISTANCE, Math.max(0, row.distance)) >= MAX_DISTANCE,
+  );
+  if (allAtMaxDistance) {
+    return {
+      snapshot: await readMemorySnapshotFromFacts(args.scoped, args.profile),
+      source: 'no-match',
+    };
+  }
+
+  const topRows = scored.map(({ row }) => row);
   return { snapshot: rowsToSnapshot(topRows), source: 'relevance' };
 }
 
 async function resolveQueryVector(
-  args: GetRelevantMemoriesArgs
+  args: GetRelevantMemoriesArgs,
 ): Promise<number[] | null> {
   if (args.queryVector && args.queryVector.length > 0) return args.queryVector;
   if (!args.queryText || !args.embedder) return null;
@@ -109,13 +130,13 @@ async function resolveQueryVector(
 function scoreRow(
   row: RelevantMemoryFactRow,
   weights: RelevanceWeights,
-  now: Date
+  now: Date,
 ): number {
   const observedAt =
     row.observedAt instanceof Date ? row.observedAt : new Date(row.observedAt);
   const ageDays = Math.max(
     0,
-    (now.getTime() - observedAt.getTime()) / 86_400_000
+    (now.getTime() - observedAt.getTime()) / 86_400_000,
   );
   const distance = Math.min(2, Math.max(0, row.distance));
   const relevance = 1 - distance / 2;
@@ -125,7 +146,7 @@ function scoreRow(
 }
 
 function rowsToSnapshot(
-  rows: ReadonlyArray<RelevantMemoryFactRow>
+  rows: ReadonlyArray<RelevantMemoryFactRow>,
 ): MemorySnapshot {
   const snapshot = emptyMemorySnapshot();
   for (const row of rows) {

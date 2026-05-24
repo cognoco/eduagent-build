@@ -221,6 +221,8 @@ jest.mock('react-i18next', () => ({
         return `Send ${opts?.name ?? ''} a nudge`;
       if (key === 'progress.guardian.viewAllReports') return 'View all reports';
       if (key === 'progress.guardian.subjectsTitle') return 'Subjects';
+      if (key === 'progress.guardian.goToChildCurriculum')
+        return 'Go to curriculum';
       // Common fallbacks
       if (key === 'common.tryAgain') return 'Try again';
       if (key === 'common.goBack') return 'Go Back';
@@ -1025,7 +1027,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
   });
 
-  it('uses child-facing title and parent-safe action in proxy progress mode', () => {
+  it('uses child-facing title and routes to child curriculum in proxy progress mode [B-600]', () => {
     mockUseActiveProfileRole.mockReturnValue('impersonated-child');
     mockActiveProfile = {
       id: 'child-id',
@@ -1047,12 +1049,19 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText("Lilly's progress");
     screen.getByText('Progress appears after the first study session');
     expect(screen.queryByText(/Programming/)).toBeNull();
-    screen.getByText('Library');
+    // [B-600] Parent-proxy must NOT see the adult Study Library CTA
+    expect(screen.queryByText('Library')).toBeNull();
+    // [B-600] Must show child-curriculum CTA label
+    screen.getByText('Go to curriculum');
 
     fireEvent.press(screen.getByTestId('progress-start-learning'));
-    expect(
-      jest.requireMock('expo-router').useRouter().push,
-    ).toHaveBeenCalledWith('/(app)/library');
+    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
+    // [B-600] Must route to child curriculum, never to adult library
+    expect(push).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/curriculum',
+      params: { profileId: 'child-id' },
+    });
+    expect(push).not.toHaveBeenCalledWith('/(app)/library');
   });
 
   it('keeps Lilly report visible in proxy mode even when inventory is empty', () => {
@@ -1119,6 +1128,70 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(useChildInventory).toHaveBeenCalledWith('child-1', {
       enabled: true,
     });
+  });
+
+  // [LEARN-21 / Notion #603] Regression: child-scoped vocab chip must NOT
+  // route to the adult-scoped vocabulary browser.
+  it('hides the tappable vocabulary chip when viewing a linked child [LEARN-21]', () => {
+    mockLinkedChildren = [childProgressProfile];
+    mockSearchParams = { profileId: 'child-1' };
+    const languageSubject = {
+      ...fullSubject,
+      subjectId: 's-lang',
+      subjectName: 'Spanish',
+      pedagogyMode: 'four_strands',
+      vocabulary: {
+        total: 42,
+        mastered: 20,
+        learning: 15,
+        new: 7,
+        byCefrLevel: { A1: 30, A2: 12 },
+      },
+    };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 10, vocabularyTotal: 8 },
+        subjects: [languageSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 6, vocabularyTotal: 42 },
+        subjects: [languageSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    expect(screen.queryByTestId('progress-vocab-stat')).toBeNull();
+    screen.getByTestId('progress-vocab-stat-readonly');
+  });
+
+  it('shows the tappable vocabulary chip when viewing self [LEARN-21 pair]', () => {
+    mockLinkedChildren = [];
+    mockSearchParams = {};
+    const languageSubject = {
+      ...fullSubject,
+      subjectId: 's-lang',
+      subjectName: 'Spanish',
+      pedagogyMode: 'four_strands',
+      vocabulary: {
+        total: 18,
+        mastered: 10,
+        learning: 5,
+        new: 3,
+        byCefrLevel: { A1: 12, A2: 6 },
+      },
+    };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 10, vocabularyTotal: 18 },
+        subjects: [languageSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-vocab-stat');
+    expect(screen.queryByTestId('progress-vocab-stat-readonly')).toBeNull();
   });
 
   it('defaults the bottom progress tab to the parent profile even when children exist', () => {
@@ -1565,5 +1638,89 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-pill-row')).toBeNull();
     // Regular progress content is still visible
     screen.getByText('My progress');
+  });
+  // [B-600] Family progress empty state must not route to adult Study Library
+  it('shows child-curriculum CTA label in family progress empty state [B-600]', () => {
+    mockLinkedChildren = [
+      {
+        id: 'child-1',
+        displayName: 'Emma',
+        createdAt: '2026-01-01T00:00:00Z',
+        isOwner: false,
+      } as Profile,
+    ];
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 0 },
+        subjects: [],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    // [B-600] Must show child-curriculum label, never adult library label
+    screen.getByText('Go to curriculum');
+    expect(screen.queryByText('Library')).toBeNull();
+    expect(screen.queryByText('Start learning')).toBeNull();
+  });
+
+  it('routes family progress empty CTA to child curriculum [B-600]', () => {
+    mockLinkedChildren = [
+      {
+        id: 'child-1',
+        displayName: 'Emma',
+        createdAt: '2026-01-01T00:00:00Z',
+        isOwner: false,
+      } as Profile,
+    ];
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 0 },
+        subjects: [],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    fireEvent.press(screen.getByTestId('progress-start-learning'));
+    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
+    // [B-600] Must route to child curriculum, never to adult library or shelf
+    expect(push).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/curriculum',
+      params: { profileId: 'child-1' },
+    });
+    expect(push).not.toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('solo learner empty state still routes to library when not in family mode [B-600 guard]', () => {
+    // Break test: solo learner (non-family) must still route to library unchanged.
+    mockUseActiveProfileRole.mockReturnValue('owner');
+    mockActiveProfile = {
+      id: 'solo-owner',
+      displayName: 'Alex',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: true,
+    } as Profile;
+    mockLinkedChildren = [];
+    mockSearchParams = {};
+    mockUseSubjects.mockReturnValue({ data: [] });
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+    });
+
+    render(<ProgressScreen />);
+
+    fireEvent.press(screen.getByTestId('progress-start-learning'));
+    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
+    expect(push).toHaveBeenCalledWith('/(app)/library');
+    expect(push).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]/curriculum',
+      }),
+    );
   });
 });

@@ -196,4 +196,50 @@ describe('getRelevantMemories', () => {
 
     expect(embedder).not.toHaveBeenCalled();
   });
+
+  it('[BUG-641] returns no-match when all candidates have max distance (2.0)', async () => {
+    // All rows at max distance mean the vector index found rows but none related
+    const scoped = stubScoped({
+      relevant: [
+        makeRelevantRow({ text: 'unrelated note A', distance: 2.0 }),
+        makeRelevantRow({ text: 'unrelated note B', distance: 2.0 }),
+      ],
+      active: [makeRelevantRow({ text: 'recency fallback note' })],
+    });
+
+    const result = await getRelevantMemories({
+      profileId: 'p1',
+      queryText: 'fractions',
+      k: 5,
+      profile: grantedProfile(),
+      scoped,
+      embedder: stubEmbedder(),
+    });
+
+    // All at max distance: fall back to recency and report 'no-match'
+    expect(result.source).toBe('no-match');
+    expect(result.snapshot.communicationNotes).toEqual([
+      'recency fallback note',
+    ]);
+  });
+
+  it('[BUG-641] returns relevance when at least one candidate is below max distance', async () => {
+    const scoped = stubScoped({
+      relevant: [
+        makeRelevantRow({ text: 'unrelated note', distance: 2.0 }),
+        makeRelevantRow({ text: 'matching note', distance: 0.3 }),
+      ],
+    });
+
+    const result = await getRelevantMemories({
+      profileId: 'p1',
+      queryText: 'fractions',
+      k: 5,
+      profile: grantedProfile(),
+      scoped,
+      embedder: stubEmbedder(),
+    });
+
+    expect(result.source).toBe('relevance');
+  });
 });

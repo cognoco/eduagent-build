@@ -160,8 +160,16 @@ export const notificationLog = pgTable(
     sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('notification_log_profile_sent_idx').on(
+    // [L10.L5 / BUG-673] Daily-reminder, review-due-scan, recall-nudge,
+    // and weekly-progress-push all filter notification_log by
+    // (profileId, type, sentAt). The original (profile_id, sent_at) index
+    // forced a full scan of every prior notification for the profile and
+    // only filtered on type after the fact. Lead with profile_id + type
+    // so the planner jumps straight to the (profile, type) bucket and only
+    // range-scans the per-day slice of sent_at within it.
+    index('notification_log_profile_type_sent_idx').on(
       table.profileId,
+      table.type,
       table.sentAt,
     ),
   ],

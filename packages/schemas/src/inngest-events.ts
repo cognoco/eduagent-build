@@ -173,22 +173,32 @@ export type SummaryReconciliationRequeuedEvent = z.infer<
 // Ask-classification observability events (CCR-PR126-NEW-2)
 // ---------------------------------------------------------------------------
 
+// [CR-2026-05-21-175 / BUG-580] These payloads previously had every field
+// optional, so a misconfigured sender could deliver an empty payload and
+// the observability handler would happily log 'unknown' for every
+// dimension — defeating the purpose of the observe terminus. The senders
+// in ask-silent-classify.ts ALWAYS supply the fields below for the
+// success + skipped paths, so requiring them here is the correct
+// contract. The failure path may legitimately send the event with no
+// sessionId / exchangeCount when the input payload was malformed before
+// classification ran (see ask-silent-classify.ts:69-78), so those two
+// stay optional on the failed schema — only error is required there.
 export const classificationCompletedEventSchema = z.object({
-  sessionId: z.string().optional(),
-  exchangeCount: z.number().optional(),
-  subjectId: z.string().optional(),
-  subjectName: z.string().optional(),
-  confidence: z.number().optional(),
+  sessionId: z.string(),
+  exchangeCount: z.number(),
+  subjectId: z.string(),
+  subjectName: z.string(),
+  confidence: z.number(),
 });
 export type ClassificationCompletedEvent = z.infer<
   typeof classificationCompletedEventSchema
 >;
 
 export const classificationSkippedEventSchema = z.object({
-  sessionId: z.string().optional(),
-  exchangeCount: z.number().optional(),
-  reason: z.string().optional(),
-  topConfidence: z.number().optional(),
+  sessionId: z.string(),
+  exchangeCount: z.number(),
+  reason: z.string(),
+  topConfidence: z.number(),
 });
 export type ClassificationSkippedEvent = z.infer<
   typeof classificationSkippedEventSchema
@@ -200,7 +210,7 @@ export const classificationFailedEventSchema = z.object({
   // Callers must scrub PII before constructing this message — raw transcript
   // fragments, image URLs with tokens, or retried message bodies must not be
   // included. Cap prevents unbounded payloads in Inngest observability sinks.
-  error: z.string().max(2000).optional(),
+  error: z.string().min(1).max(2000),
 });
 export type ClassificationFailedEvent = z.infer<
   typeof classificationFailedEventSchema

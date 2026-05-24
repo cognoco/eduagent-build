@@ -89,7 +89,10 @@ export default function HomeScreen(): React.ReactElement {
   }
 
   if (loadingTimedOut) {
-    // [3B.11] Secondary navigation actions prevent dead-end when home times out
+    // [3B.11] Secondary navigation actions prevent dead-end when home times out.
+    // [B-600] Family-mode users must not be routed to the adult Study Library —
+    // they get a Progress shortcut instead, keeping them in a mentor-safe context.
+    const isFamilyMode = legacyMode === 'family';
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-6"
@@ -109,17 +112,31 @@ export default function HomeScreen(): React.ReactElement {
             {t('common.retry')}
           </Text>
         </Pressable>
-        <Pressable
-          onPress={() => router.replace('/(app)/library' as Href)}
-          className="mt-3 px-6 py-3 min-h-[48px] items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel={t('home.goToLibraryLabel')}
-          testID="timeout-library-button"
-        >
-          <Text className="text-primary text-body font-medium">
-            {t('home.goToLibrary')}
-          </Text>
-        </Pressable>
+        {isFamilyMode ? (
+          <Pressable
+            onPress={() => router.replace('/(app)/progress' as Href)}
+            className="mt-3 px-6 py-3 min-h-[48px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('home.goToProgressLabel')}
+            testID="timeout-progress-button"
+          >
+            <Text className="text-primary text-body font-medium">
+              {t('home.goToProgress')}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => router.replace('/(app)/library' as Href)}
+            className="mt-3 px-6 py-3 min-h-[48px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('home.goToLibraryLabel')}
+            testID="timeout-library-button"
+          >
+            <Text className="text-primary text-body font-medium">
+              {t('home.goToLibrary')}
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           onPress={() => router.replace('/(app)/more' as Href)}
           className="px-6 py-3 min-h-[48px] items-center justify-center"

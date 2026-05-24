@@ -159,7 +159,7 @@ export const MIN_TREND_SESSIONS = 3;
  */
 export function calculateRetentionTrend(
   subjectRetentionData: Array<{
-    status: 'strong' | 'fading' | 'weak' | 'forgotten';
+    status: 'strong' | 'fading' | 'weak' | 'forgotten' | 'unknown';
   }>,
   totalSessions?: number,
 ): 'improving' | 'declining' | 'stable' {

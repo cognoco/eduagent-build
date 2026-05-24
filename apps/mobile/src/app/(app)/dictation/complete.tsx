@@ -37,6 +37,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
     if (isReviewing) {
       setReviewTimedOut(false);
       reviewTimeoutRef.current = setTimeout(() => {
+        // [BUG-612] Timeout counts as cancellation — block any late response
+        // from navigating to the review screen (mirrors index.tsx and
+        // text-preview.tsx where generateCancelledRef / prepareCancelledRef
+        // are set true inside the same timeout handler).
+        reviewCancelledRef.current = true;
         setReviewTimedOut(true);
       }, 20_000);
     } else {
@@ -201,6 +206,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
       // [BUG-692] If the user navigated away (hardware back, Cancel button,
       // or screen blur) while the review was in flight, skip navigation.
+      // [BUG-612] Also fires when the 20-second timeout set reviewCancelledRef.
       if (reviewCancelledRef.current) return;
 
       // 4. Store review result in context then navigate

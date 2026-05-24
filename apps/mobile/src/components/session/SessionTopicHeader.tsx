@@ -28,6 +28,7 @@ export function SessionTopicHeader({
       <Pressable
         onPress={onChangeTopic}
         className="rounded-full bg-surface-elevated px-3 py-1.5 min-h-[36px] items-center justify-center"
+        hitSlop={{ top: 4, bottom: 4 }}
         accessibilityRole="button"
         accessibilityLabel={t('session.topicHeader.changeTopicLabel', {
           topic: topicName,

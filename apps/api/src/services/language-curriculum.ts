@@ -254,7 +254,7 @@ function nextLevel(level: CefrLevel): CefrLevel | null {
 
 function buildTargetCounts(
   level: CefrLevel,
-  index: number
+  index: number,
 ): {
   targetWordCount: number;
   targetChunkCount: number;
@@ -285,7 +285,7 @@ function buildTargetCounts(
 function buildMilestonesForLevel(
   level: CefrLevel,
   requestedCount: number,
-  languageName: string
+  languageName: string,
 ): GeneratedTopic[] {
   const library = MILESTONE_LIBRARY[level];
   const total = Math.min(requestedCount, library.length);
@@ -307,7 +307,7 @@ function buildMilestonesForLevel(
 
 export function generateLanguageCurriculum(
   languageCode: string,
-  startingLevel: CefrLevel = 'A1'
+  startingLevel: CefrLevel = 'A1',
 ): GeneratedTopic[] {
   const language = getLanguageByCode(languageCode);
   if (!language) {
@@ -322,13 +322,13 @@ export function generateLanguageCurriculum(
   // regenerateLanguageCurriculum (BUG-611).
   const languageDisplayName = (language.names[0] ?? languageCode).replace(
     /^./,
-    (c) => c.toUpperCase()
+    (c) => c.toUpperCase(),
   );
 
   const currentLevelMilestones = buildMilestonesForLevel(
     startingLevel,
     language.cefrMilestones[startingLevel],
-    languageDisplayName
+    languageDisplayName,
   );
 
   const upcomingLevel = nextLevel(startingLevel);
@@ -339,7 +339,7 @@ export function generateLanguageCurriculum(
   const nextLevelMilestones = buildMilestonesForLevel(
     upcomingLevel,
     Math.max(2, Math.min(4, language.cefrMilestones[upcomingLevel])),
-    languageDisplayName
+    languageDisplayName,
   );
 
   return [...currentLevelMilestones, ...nextLevelMilestones];
@@ -347,10 +347,24 @@ export function generateLanguageCurriculum(
 
 export async function regenerateLanguageCurriculum(
   db: Database,
+  profileId: string,
   subjectId: string,
   languageCode: string,
-  startingLevel: CefrLevel = 'A1'
+  startingLevel: CefrLevel = 'A1',
 ): Promise<void> {
+  // [BUG-655 / L3.M3.1] Verify (subjectId, profileId) ownership BEFORE the
+  // delete. Without this, a leaked subjectId from another account could
+  // cascade-delete the victim's curriculum, topics, vocabulary and progress.
+  const ownedSubject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+    columns: { id: true },
+  });
+  if (!ownedSubject) {
+    throw new Error(
+      `[BUG-655] regenerateLanguageCurriculum: subject ${subjectId} does not belong to profile ${profileId}`,
+    );
+  }
+
   // Delete old curricula — topics, progress, etc. cascade-delete via FKs.
   // This prevents unique-constraint violations when the same bookId is reused.
   await db.delete(curricula).where(eq(curricula.subjectId, subjectId));
@@ -391,7 +405,7 @@ export async function regenerateLanguageCurriculum(
       cefrSublevel: topic.cefrSublevel ?? null,
       targetWordCount: topic.targetWordCount ?? null,
       targetChunkCount: topic.targetChunkCount ?? null,
-    }))
+    })),
   );
 }
 
@@ -399,7 +413,7 @@ function calculateMilestoneProgress(
   wordsMastered: number,
   wordsTarget: number,
   chunksMastered: number,
-  chunksTarget: number
+  chunksTarget: number,
 ): number {
   const wordRatio = wordsTarget > 0 ? wordsMastered / wordsTarget : 1;
   const chunkRatio = chunksTarget > 0 ? chunksMastered / chunksTarget : 1;
@@ -409,7 +423,7 @@ function calculateMilestoneProgress(
 export async function getCurrentLanguageProgress(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<LanguageProgress | null> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -441,7 +455,7 @@ export async function getCurrentLanguageProgress(
   const milestones = await db.query.curriculumTopics.findMany({
     where: and(
       eq(curriculumTopics.curriculumId, curriculum.id),
-      eq(curriculumTopics.skipped, false)
+      eq(curriculumTopics.skipped, false),
     ),
     orderBy: asc(curriculumTopics.sortOrder),
   });
@@ -456,8 +470,8 @@ export async function getCurrentLanguageProgress(
     .where(
       and(
         eq(vocabulary.profileId, profileId),
-        eq(vocabulary.subjectId, subjectId)
-      )
+        eq(vocabulary.subjectId, subjectId),
+      ),
     );
 
   const countsByMilestone = new Map<
@@ -481,11 +495,11 @@ export async function getCurrentLanguageProgress(
   const progressRows: LanguageMilestoneProgress[] = milestones
     .filter(
       (
-        milestone
+        milestone,
       ): milestone is typeof milestone & {
         cefrLevel: CefrLevel;
         cefrSublevel: string;
-      } => Boolean(milestone.cefrLevel && milestone.cefrSublevel)
+      } => Boolean(milestone.cefrLevel && milestone.cefrSublevel),
     )
     .map((milestone) => {
       const counts = countsByMilestone.get(milestone.id) ?? {
@@ -507,7 +521,7 @@ export async function getCurrentLanguageProgress(
           counts.wordsMastered,
           wordsTarget,
           counts.chunksMastered,
-          chunksTarget
+          chunksTarget,
         ),
       };
     });
@@ -527,7 +541,7 @@ export async function getCurrentLanguageProgress(
   const currentIndex = progressRows.findIndex(
     (milestone) =>
       milestone.wordsMastered < milestone.wordsTarget ||
-      milestone.chunksMastered < milestone.chunksTarget
+      milestone.chunksMastered < milestone.chunksTarget,
   );
   const resolvedIndex =
     currentIndex === -1 ? progressRows.length - 1 : currentIndex;
@@ -558,7 +572,7 @@ export async function getCurrentLanguageProgress(
 export async function getCurrentLanguageMilestoneId(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<string | null> {
   const progress = await getCurrentLanguageProgress(db, profileId, subjectId);
   return progress?.currentMilestone?.milestoneId ?? null;

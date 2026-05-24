@@ -4,6 +4,7 @@ import {
   fireEvent,
   waitFor,
   act,
+  within,
 } from '@testing-library/react-native';
 import React from 'react';
 import { Alert, Linking, Platform } from 'react-native';
@@ -586,7 +587,7 @@ describe('SubscriptionScreen', () => {
     expect(
       screen.queryByText(/Subscription plans will be available soon/),
     ).toBeNull();
-    screen.getByText(/store purchasing isn't available on this device yet/i);
+    screen.getByText(/store purchasing isn.t available on this device yet/i);
     // BUG-899: only Free and Plus are approved per pricing_dual_cap.md.
     // Family and Pro static cards must not be shown to non-Family users —
     // their store SKUs are not approved for public listing.
@@ -648,7 +649,7 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('static-tier-plus');
     // The fix:
     screen.getByTestId('static-tier-family');
-    screen.getByText(/1,500 questions per month \(shared/i);
+    screen.getByText(/1,500 shared questions\/month/i);
     // Pro is still hidden — it's not the user's tier and not approved
     // for public listing.
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
@@ -710,8 +711,8 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('static-tier-free');
     screen.getByTestId('static-tier-plus');
     // The fix:
-    screen.getByTestId('static-tier-pro');
-    screen.getByText(/3,000 questions per month/i);
+    const proCard = screen.getByTestId('static-tier-pro');
+    within(proCard).getByText(/Unlimited questions/i);
     // Family is still hidden — it's not this user's tier and not approved
     // for general public listing.
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
@@ -1943,8 +1944,8 @@ describe('SubscriptionScreen', () => {
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
-          'Connection error',
-          "Couldn't load purchase options. Check your connection and try again.",
+          'Network error',
+          'Please check your internet connection and try again.',
           expect.arrayContaining([expect.objectContaining({ text: 'Retry' })]),
           undefined,
         );

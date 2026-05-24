@@ -191,15 +191,26 @@ function createMockDb({
     version: number;
   }>,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
-  topicFindFirst = undefined as
-    | { id: string; title: string; curriculumId: string }
-    | undefined,
+  topicFindFirst = undefined as Record<string, unknown> | undefined,
+  // [BUG-656] Result for the topic↔subject parent-chain ownership join used
+  // by getTopicProgress. Default is the positive case (singleton array) so
+  // existing tests pass; empty array simulates the foreign-topic case.
+  topicSubjectJoinRows = [{ topicId }] as Array<{ topicId: string }>,
 } = {}): Database {
+  // The select mock covers two chain shapes used by progress.ts:
+  //   (a) .select(...).from(...).where(...).orderBy(...) -> curriculumSelectRows
+  //   (b) .select(...).from(...).innerJoin(...).where(...).limit(...)
+  //       -> topicSubjectJoinRows (BUG-656 ownership join)
   return {
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnValue({
           orderBy: jest.fn().mockResolvedValue(curriculumSelectRows),
+        }),
+        innerJoin: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue(topicSubjectJoinRows),
+          }),
         }),
       }),
     }),
@@ -506,16 +517,52 @@ describe('getTopicProgress', () => {
 
   it('returns null when topic not found', async () => {
     setupScopedRepo({ subjectFindFirst: mockSubjectRow() });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(undefined),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    // [BUG-656] Parent-chain ownership join returns empty -> null short-circuit.
+    const db = createMockDb({
+      topicSubjectJoinRows: [],
+      topicFindFirst: undefined,
+    });
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
+    expect(result).toBeNull();
+  });
+
+  // [BUG-656 / L3.M3.2] BREAK TEST — cross-profile topic read attempt
+  // Pre-fix: topic was fetched by `eq(curriculumTopics.id, topicId)` alone,
+  // so a crafted topicId from another profile returned its title,
+  // description, and downstream progress (xpStatus, struggleStatus,
+  // summaryExcerpt). Subject was verified for the caller but the topic was
+  // NOT joined back to that subject.
+  // Post-fix: parent-chain join (curriculum_topics -> curricula ->
+  // subjects.id = subjectId) returns 0 rows when the topic belongs to a
+  // different subject; function returns null without ever surfacing the
+  // foreign topic's data.
+  it('[BUG-656] returns null when topicId belongs to a different subject (no leak)', async () => {
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      // These would fire ONLY if the function continued past the ownership
+      // check — they must not be reached for a foreign topicId.
+      retentionCardFindFirst: mockRetentionCard(),
+      assessmentsFindMany: [
+        mockAssessmentRow({ status: 'passed', masteryScore: 0.95 }),
+      ],
+      sessionsFindMany: [mockSessionRow({ topicId })],
+      xpLedgerFindMany: [{ topicId, status: 'pending', createdAt: NOW }],
+    });
+    // Parent-chain join returns 0 rows — simulates an attacker passing a
+    // leaked topicId that lives under another profile's subject.
+    // topicFindFirst is still set to the foreign topic so pre-fix the
+    // function would have returned it.
+    const db = createMockDb({
+      topicSubjectJoinRows: [],
+      topicFindFirst: {
+        id: topicId,
+        title: 'Victim Topic Title',
+        curriculumId: 'other-curriculum',
+      },
+    });
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
     expect(result).toBeNull();
   });
 
@@ -531,19 +578,11 @@ describe('getTopicProgress', () => {
       needsDeepeningFindMany: [],
       xpLedgerFindMany: [{ topicId, status: 'pending', createdAt: NOW }],
     });
-    const db = {
-      query: {
-        curricula: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue({ id: curriculumId, subjectId }),
-        },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([topic]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({
+      curriculumFindFirst: { id: curriculumId, subjectId },
+      topicFindFirst: topic,
+      topicsFindMany: [topic],
+    });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -567,13 +606,7 @@ describe('getTopicProgress', () => {
       needsDeepeningFindMany: [],
       xpLedgerFindMany: [],
     });
-    const db = {
-      query: {
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -591,15 +624,7 @@ describe('getTopicProgress', () => {
       needsDeepeningFindMany: [{ topicId, status: 'active' }],
       xpLedgerFindMany: [],
     });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -616,15 +641,7 @@ describe('getTopicProgress', () => {
       needsDeepeningFindMany: [],
       xpLedgerFindMany: [],
     });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -641,15 +658,7 @@ describe('getTopicProgress', () => {
       needsDeepeningFindMany: [{ topicId, status: 'active' }],
       xpLedgerFindMany: [],
     });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -676,15 +685,7 @@ describe('getTopicProgress', () => {
       needsDeepeningFindMany: [],
       xpLedgerFindMany: [],
     });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -1616,15 +1617,7 @@ describe('getTopicProgress — null recap fields', () => {
       xpLedgerFindMany: [],
       sessionSummariesFindMany: [], // No summary rows
     });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -1643,15 +1636,7 @@ describe('getTopicProgress — null recap fields', () => {
       needsDeepeningFindMany: [],
       xpLedgerFindMany: [],
     });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
@@ -1671,15 +1656,7 @@ describe('getTopicProgress — null recap fields', () => {
       needsDeepeningFindMany: [],
       xpLedgerFindMany: [], // No XP
     });
-    const db = {
-      query: {
-        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        curriculumTopics: {
-          findFirst: jest.fn().mockResolvedValue(topic),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
-    } as unknown as Database;
+    const db = createMockDb({ topicFindFirst: topic });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 

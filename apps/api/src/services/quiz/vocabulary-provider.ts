@@ -9,6 +9,16 @@ import { VocabularyContextError } from '../../errors';
 import type { LibraryItem } from './content-resolver';
 import { describeAgeBracket, type AgeBracket, type Interest } from './config';
 import { shuffle } from './shuffle';
+import { sanitizeXmlValue } from '../llm/sanitize';
+
+// [L15.MED3 prompt-injection] Sanitize free-text interest labels before
+// prompt interpolation. Interests can originate from LLM extraction
+// (topic-probe / session analysis) or onboarding free text.
+function safeInterestLabels(values: Interest[]): string[] {
+  return values
+    .map((i) => sanitizeXmlValue(i.label, 60))
+    .filter((label) => label.length > 0);
+}
 
 const logger = createLogger();
 
@@ -68,7 +78,7 @@ export type VocabularyMasteryQuestionResult =
     };
 
 function tryNormalizeCefrLevel(
-  level: string | null | undefined
+  level: string | null | undefined,
 ): CefrLevel | null {
   if (!level) return null;
   const normalized = level.trim().toUpperCase();
@@ -81,7 +91,7 @@ function getMasteredCefrIndices(
     cefrLevel: string | null;
     repetitions: number | null;
   }>,
-  minRepetitions: number
+  minRepetitions: number,
 ): number[] {
   return vocabWithCards
     .filter((item) => (item.repetitions ?? 0) >= minRepetitions)
@@ -133,11 +143,11 @@ export function detectCefrCeilingMasteryWeighted(
     cefrLevel: string | null;
     repetitions: number | null;
   }>,
-  minRepetitions = 3
+  minRepetitions = 3,
 ): CefrLevel {
   const masteredIndices = getMasteredCefrIndices(
     vocabWithCards,
-    minRepetitions
+    minRepetitions,
   );
   if (masteredIndices.length === 0) return 'A1';
   return getPercentileCefrLevel(masteredIndices);
@@ -148,11 +158,11 @@ export function getCefrCeilingForDiscovery(
     cefrLevel: string | null;
     repetitions: number | null;
   }>,
-  minRepetitions = 3
+  minRepetitions = 3,
 ): CefrLevel {
   const masteredIndices = getMasteredCefrIndices(
     vocabWithCards,
-    minRepetitions
+    minRepetitions,
   );
   if (masteredIndices.length === 0) return 'A1';
   return nextCefrLevel(getPercentileCefrLevel(masteredIndices));
@@ -169,7 +179,7 @@ export function getLanguageDisplayName(code: string): string {
 
     const normalized = canonical.toLowerCase();
     const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(
-      normalized
+      normalized,
     );
 
     if (!name || name.toLowerCase() === normalized) {
@@ -204,7 +214,7 @@ const L1_AWARE_PAIRS: ReadonlySet<string> = new Set([
 
 function buildL1DistractorHint(
   learnerNativeLanguage: string | undefined,
-  languageCode: string
+  languageCode: string,
 ): string {
   if (!learnerNativeLanguage) return '';
   const pairKey = `${learnerNativeLanguage.trim().toLowerCase()}-${languageCode
@@ -215,7 +225,7 @@ function buildL1DistractorHint(
   let nativeName: string;
   try {
     nativeName = new Intl.DisplayNames(['en'], { type: 'language' }).of(
-      learnerNativeLanguage.trim().toLowerCase()
+      learnerNativeLanguage.trim().toLowerCase(),
     ) as string;
     if (
       !nativeName ||
@@ -255,7 +265,7 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
   const recentExclusions =
     recentAnswers.length > 0
       ? `Do NOT repeat these recently seen English answers: ${recentAnswers.join(
-          ', '
+          ', ',
         )}`
       : 'No recent-answer exclusions.';
   const bankExclusions =
@@ -269,15 +279,17 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
   // Interest-driven theme: prefer explicit themePreference, then build from interests
   let themeInstruction: string;
   if (themePreference) {
-    themeInstruction = `Theme: "${themePreference}"`;
+    // [L15.MED3] themePreference is user-typed; sanitize before interpolation.
+    themeInstruction = `Theme: "${sanitizeXmlValue(themePreference, 120)}"`;
   } else if (interests.length > 0) {
-    const interestLabels = interests
-      .filter((i) => i.context === 'free_time' || i.context === 'both')
-      .map((i) => i.label);
+    const filtered = interests.filter(
+      (i) => i.context === 'free_time' || i.context === 'both',
+    );
+    const interestLabels = safeInterestLabels(filtered);
     const allLabels =
       interestLabels.length > 0
         ? interestLabels
-        : interests.map((i) => i.label);
+        : safeInterestLabels(interests);
     themeInstruction = `Choose a vocabulary theme that connects to the learner's interests: ${allLabels
       .slice(0, 5)
       .join(', ')}. (e.g. "${languageName} ${allLabels[0] ?? 'Animals'}")`;
@@ -297,7 +309,7 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
       ? `\nRecent weaker areas: ${recentStruggles
           .slice(0, 10)
           .join(
-            '; '
+            '; ',
           )}. Where it fits the theme, prefer vocabulary from these semantic fields so the learner gets extra reps on what they find hard — do not force it if the fit is weak.`
       : '';
 
@@ -306,13 +318,13 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
       ? `\nRecently missed vocabulary (re-surface where the theme and CEFR fit): ${recentlyMissedItems
           .slice(0, 8)
           .join(
-            ', '
+            ', ',
           )}. Include at least one of these as a question when the chosen theme and CEFR ceiling allow it.`
       : '';
 
   const l1DistractorHint = buildL1DistractorHint(
     learnerNativeLanguage,
-    languageCode
+    languageCode,
   );
 
   return `You are generating a multiple-choice vocabulary quiz for a ${ageLabel} learner studying ${languageName}.
@@ -354,7 +366,7 @@ Respond with ONLY valid JSON in this shape:
 
 export function validateVocabularyRound(
   llmOutput: VocabularyLlmOutput,
-  cefrCeiling: string
+  cefrCeiling: string,
 ): ValidatedVocabularyRound {
   const normalizedCeiling = normalizeCefrLevelOrThrow(cefrCeiling);
   const maxIdx = CEFR_ORDER.indexOf(normalizedCeiling);
@@ -372,10 +384,10 @@ export function validateVocabularyRound(
       ...question.acceptedAnswers,
     ]);
     const acceptedAnswerSet = new Set(
-      acceptedAnswers.map((answer) => answer.toLowerCase())
+      acceptedAnswers.map((answer) => answer.toLowerCase()),
     );
     const distractors = dedupeCaseInsensitive(question.distractors).filter(
-      (distractor) => !acceptedAnswerSet.has(distractor.toLowerCase())
+      (distractor) => !acceptedAnswerSet.has(distractor.toLowerCase()),
     );
 
     if (acceptedAnswers.length === 0 || distractors.length < 3) return [];
@@ -402,7 +414,7 @@ export function validateVocabularyRound(
 export function pickDistractors(
   correctTranslation: string,
   allVocabulary: Array<{ translation: string }>,
-  count = 3
+  count = 3,
 ): string[] {
   const correctLower = correctTranslation.trim().toLowerCase();
   const pool: string[] = [];
@@ -425,7 +437,7 @@ export function pickDistractors(
 export function buildVocabularyMasteryQuestion(
   item: LibraryItem,
   allVocabulary: Array<{ translation: string }>,
-  fallbackCefrLevel: string
+  fallbackCefrLevel: string,
 ): VocabularyMasteryQuestionResult {
   const distractors = pickDistractors(item.answer, allVocabulary, 3);
   if (distractors.length < 3) {

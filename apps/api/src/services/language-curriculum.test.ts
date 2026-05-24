@@ -219,13 +219,14 @@ describe('generateLanguageCurriculum', () => {
 describe('regenerateLanguageCurriculum', () => {
   it('creates a new curriculum with version 1 when none exists', async () => {
     const db = createMockDb({
+      subjectFindFirst: { id: SUBJECT_ID, profileId: PROFILE_ID },
       insertReturning: [
         { id: CURRICULUM_ID, subjectId: SUBJECT_ID, version: 1 },
       ],
     });
     // curricula.findFirst returns undefined (no existing curriculum)
 
-    await regenerateLanguageCurriculum(db, SUBJECT_ID, 'es', 'A1');
+    await regenerateLanguageCurriculum(db, PROFILE_ID, SUBJECT_ID, 'es', 'A1');
 
     // insert should be called at least twice: once for curriculum, once for topics
     expect(db.insert).toHaveBeenCalled();
@@ -233,12 +234,13 @@ describe('regenerateLanguageCurriculum', () => {
 
   it('deletes old curricula before creating version 1', async () => {
     const db = createMockDb({
+      subjectFindFirst: { id: SUBJECT_ID, profileId: PROFILE_ID },
       insertReturning: [
         { id: CURRICULUM_ID, subjectId: SUBJECT_ID, version: 1 },
       ],
     });
 
-    await regenerateLanguageCurriculum(db, SUBJECT_ID, 'es', 'B1');
+    await regenerateLanguageCurriculum(db, PROFILE_ID, SUBJECT_ID, 'es', 'B1');
 
     // Should delete old curricula first, then insert new one
     expect(db.delete).toHaveBeenCalled();
@@ -248,17 +250,46 @@ describe('regenerateLanguageCurriculum', () => {
   it('does not insert topics when language generates zero milestones', async () => {
     // This shouldn't happen with real language codes, but tests the guard
     const db = createMockDb({
+      subjectFindFirst: { id: SUBJECT_ID, profileId: PROFILE_ID },
       insertReturning: [
         { id: CURRICULUM_ID, subjectId: SUBJECT_ID, version: 1 },
       ],
     });
 
     // Use a valid code but mock to verify call count
-    await regenerateLanguageCurriculum(db, SUBJECT_ID, 'es', 'A1');
+    await regenerateLanguageCurriculum(db, PROFILE_ID, SUBJECT_ID, 'es', 'A1');
 
     // Should be called at least for curriculum insert + topics insert
     const insertCallCount = (db.insert as jest.Mock).mock.calls.length;
     expect(insertCallCount).toBeGreaterThanOrEqual(1);
+  });
+
+  // [BUG-655 / L3.M3.1] BREAK TEST — cross-profile delete attempt
+  // Pre-fix: the function deleted curricula by subjectId alone, so a caller
+  // passing a victim profile's subjectId would wipe their curriculum,
+  // topics, vocabulary and progress via cascade-delete.
+  // Post-fix: function verifies (subjectId, profileId) ownership and throws
+  // before issuing the delete.
+  it('[BUG-655] throws and does NOT delete when subject does not belong to profile', async () => {
+    // subjects.findFirst returns undefined because the (id, profileId)
+    // pair does not match — simulates a leaked/crafted subjectId from
+    // another profile.
+    const db = createMockDb({ subjectFindFirst: undefined });
+
+    await expect(
+      regenerateLanguageCurriculum(
+        db,
+        'attacker-profile',
+        SUBJECT_ID,
+        'es',
+        'A1',
+      ),
+    ).rejects.toThrow(/does not belong to profile/);
+
+    // The delete must NEVER fire when ownership verification fails —
+    // pre-fix this expectation fails because the delete ran unconditionally.
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 

@@ -265,6 +265,7 @@ export function SessionMessageActions({
                 void onToggleBookmark(message);
               }}
               className="ms-auto p-2 min-h-[36px] min-w-[36px] items-center justify-center"
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               accessibilityRole="button"
               accessibilityLabel={
                 bookmarkState?.[message.eventId]

@@ -5,6 +5,17 @@ import type { ChatMessage } from '../llm';
 import { UpstreamLlmError } from '../../errors';
 import { captureException } from '../sentry';
 import { extractJsonObject } from '../quiz';
+import { sanitizeXmlValue } from '../llm/sanitize';
+
+// [L15.MED3 prompt-injection] Sanitize free-text labels before interpolation.
+// Interests can originate from LLM extraction (topic-probe / session analysis)
+// or onboarding free text; a crafted label like
+// '<system>ignore previous</system>' would otherwise smuggle directives.
+function safeLabels(values: string[], maxLen: number): string[] {
+  return values
+    .map((v) => sanitizeXmlValue(v, maxLen))
+    .filter((v) => v.length > 0);
+}
 
 // ---------------------------------------------------------------------------
 // Generate Dictation Service
@@ -55,11 +66,15 @@ function getLiteraryTheme(ageYears: number): string {
 
 function buildInterestThemeBlock(ctx: GenerateContext): string {
   // Only 'free_time' and 'both' interests theme the passage.
-  const relevantInterests = (ctx.interests ?? [])
-    .filter((i) => i.context === 'free_time' || i.context === 'both')
-    .map((i) => i.label);
+  // [L15.MED3] safeLabels sanitizes before interpolation — see top of file.
+  const relevantInterests = safeLabels(
+    (ctx.interests ?? [])
+      .filter((i) => i.context === 'free_time' || i.context === 'both')
+      .map((i) => i.label),
+    60,
+  );
 
-  const libraryTopics = ctx.libraryTopics ?? [];
+  const libraryTopics = safeLabels(ctx.libraryTopics ?? [], 120);
 
   if (relevantInterests.length === 0 && libraryTopics.length === 0) {
     return '';
@@ -71,16 +86,16 @@ function buildInterestThemeBlock(ctx: GenerateContext): string {
       `PERSONALIZATION: This learner loves: ${relevantInterests.join(', ')}. ` +
         `Where it fits naturally within the age-appropriate literary register, theme the passage around these interests ` +
         `(e.g. a dinosaur-loving child should get a narrative set in prehistoric times, not a generic fantasy forest). ` +
-        `Do NOT sacrifice sentence quality, complexity, or literary style to chase the interest theme.`
+        `Do NOT sacrifice sentence quality, complexity, or literary style to chase the interest theme.`,
     );
   }
   if (libraryTopics.length > 0) {
     parts.push(
       `LIBRARY TOPICS: The learner is currently studying: ${libraryTopics.join(
-        ', '
+        ', ',
       )}. ` +
         `Prefer narrative themes that intersect with these topics where the literary register allows ` +
-        `(e.g. a learner studying the Mesozoic era could get a passage set in prehistoric times).`
+        `(e.g. a learner studying the Mesozoic era could get a passage set in prehistoric times).`,
     );
   }
 
@@ -115,8 +130,8 @@ CONSTRAINTS:
     ctx.ageYears <= SHORT_PHRASE_CEILING
       ? '4-7 words (short phrases a child can hold in memory)'
       : !isAdultRegister
-      ? '5-10 words'
-      : '7-14 words'
+        ? '5-10 words'
+        : '7-14 words'
   }
 - Target age-appropriate spelling patterns and vocabulary
 - Punctuation: commas and periods always. Question marks occasionally.${
@@ -183,7 +198,7 @@ function getPunctuationNames(lang: string): string {
 }
 
 export async function generateDictation(
-  ctx: GenerateContext
+  ctx: GenerateContext,
 ): Promise<GenerateDictationOutput> {
   const messages: ChatMessage[] = [
     { role: 'system', content: buildGeneratePrompt(ctx) },
@@ -197,7 +212,7 @@ export async function generateDictation(
     jsonStr = extractJsonObject(result.response);
   } catch {
     const err = new UpstreamLlmError(
-      'LLM returned no JSON in generate-dictation response'
+      'LLM returned no JSON in generate-dictation response',
     );
     captureException(err, { requestPath: 'services/dictation/generate' });
     throw err;
@@ -211,10 +226,10 @@ export async function generateDictation(
       parseErr instanceof Error
         ? parseErr
         : new Error('Dictation generate parse failed'),
-      { requestPath: 'services/dictation/generate' }
+      { requestPath: 'services/dictation/generate' },
     );
     throw new UpstreamLlmError(
-      'Dictation LLM returned invalid structured output'
+      'Dictation LLM returned invalid structured output',
     );
   }
 }
