@@ -1,7 +1,7 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12 (last refreshed 2026-05-19)
-**Status:** Framework complete (Phases 0-4); P0 drained; P1/P2 grew during W1-W17 coverage-hardening swarm (2026-05-16/18) — see "Reality Drift 2026-05-19" below. Cleanup work resumes on `test-coverage-hardening`.
+**Date:** 2026-05-12 (last refreshed 2026-05-24)
+**Status:** Framework complete (Phases 0-4); P0 drained; bare-mock backlog collapsed from 131 → 23 between 2026-05-19 and 2026-05-24 via successive sweeps. Wave 3 (2026-05-24) hit the top-20 most-edited test files — they were already mostly clean.
 
 > **Note (2026-05-23):** Inventory counts in this file are point-in-time snapshots. Regenerate with `pnpm exec tsx scripts/generate-internal-mock-cleanup-inventory.ts` for current state.
 **Goal:** Reduce internal mocks that hide route/service/background-job contract drift while preserving true external boundary shims.
@@ -24,39 +24,35 @@ The W1-W17 Notion bug-fix swarm (commit `1391d7490`) and Wave 2 coverage hardeni
 - Internal-ish mocks: **618 → 718** (+100). P1 grew by 31, P2 by 69.
 - The integration mock guard (`apps/api/src/test-utils/integration-mock-guard.test.ts`) is still green — `P0 = 0`. Forward-only ratchet held.
 
-### Annotation Status Audit (2026-05-19, post-Wave-2)
+### Annotation Status Audit (2026-05-24, post-Wave-3)
 
-The inventory generator was extended to record an `annotation` column distinguishing already-converted mocks from true forward-only risks. Of the **718 internal-ish mock rows**:
+The inventory generator was extended to record an `annotation` column distinguishing already-converted mocks from true forward-only risks. Of the **705 internal-ish mock rows**:
 
 | Annotation status | Count | Meaning |
 | --- | ---: | --- |
-| `gc1-allow` | 280 | Annotated with a boundary label (`external-boundary`, `transport-boundary`, etc.) but not factored via `requireActual`. Mostly route/middleware tests where the target is a DB-shaped or service-shaped boundary the test legitimately replaces. |
-| `pattern-a; gc1-allow` | 266 | `jest.requireActual('<target>')` + `gc1-allow:` label — fully converted. |
-| `pattern-a` | 28 | `requireActual` used but no explicit `gc1-allow:` label. Cosmetic gap; should be annotated. |
-| **`bare`** | **131** | **True forward-only risk — no annotation, no `requireActual`. This is the real cleanup queue.** |
+| `gc1-allow` | 343 | Annotated with a boundary label (`external-boundary`, `transport-boundary`, etc.) but not factored via `requireActual`. Mostly route/middleware tests where the target is a DB-shaped or service-shaped boundary the test legitimately replaces. |
+| `pattern-a; gc1-allow` | 293 | `jest.requireActual('<target>')` + `gc1-allow:` label — fully converted. |
+| `pattern-a` | 46 | `requireActual` used but no explicit `gc1-allow:` label. Cosmetic gap; should be annotated. |
+| **`bare`** | **23** | **True forward-only risk — no annotation, no `requireActual`. Down from 131 (2026-05-19) → 23 (2026-05-24).** |
 
-Implication: the raw "P1 = 345 / P2 = 373" totals overstate real risk by ~5.5×. The W1-W17 swarm authored break tests with `gc1-allow` discipline; the inventory previously couldn't see that. **The 131 bare rows are the actionable backlog.**
+Implication: of the 23 remaining bare mocks, **15 live in a single file** (`apps/mobile/src/app/_layout.test.tsx`). The other 8 are spread across 7 files with 1-2 each. **The real cleanup queue is now one file, then long-tail singletons.**
 
 > Pre-fix snapshot (2026-05-19, before generator regex fix): the first pass reported 180 bare mocks because the `gc1-allow` detection regex used `$` without the `m` flag, so trailing-line-comment annotations on `jest.mock(...)` calls were not matched. After fixing the regex (commit pending), 49 false-bare entries reclassified to `gc1-allow`. Always trust the regenerated post-fix snapshot.
 
-### Top Files with BARE Mocks (refreshed 2026-05-19, post-Wave-2)
+### Top Files with BARE Mocks (refreshed 2026-05-24, post-Wave-3)
 
 | File | Bare count | Notes |
 | --- | ---: | --- |
-| `apps/mobile/src/app/(app)/subscription.test.tsx` | 6 | P2 billing/IAP screen — top bare-mock concentration after mentor-memory cleanup. |
-| `apps/mobile/src/app/(app)/_layout.test.tsx` | 5 | App-shell layout test; mocks `./_layout` and friends. |
-| `apps/mobile/src/app/(app)/progress/[subjectId]/sessions.test.tsx` | 5 | Progress drill-down. |
-| `apps/mobile/src/app/(app)/progress.test.tsx` | 4 | Progress tab. |
-| `apps/mobile/src/app/create-subject.test.tsx` | 4 | Subject creation flow. Has existing routed-fetch usage — partial conversion. |
-| `apps/mobile/src/app/(app)/home.test.tsx` | 3 | Home tab. |
-| `apps/mobile/src/app/(app)/homework/camera.test.tsx` | 3 | Camera/OCR screen. |
-| `apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx` | 3 | Book picker. |
-| `apps/mobile/src/app/(app)/practice/index.test.tsx` | 3 | Practice landing. |
-| `apps/mobile/src/app/(app)/quiz/index.test.tsx` | 3 | Quiz landing. |
-| `apps/mobile/src/app/(app)/quiz/launch.test.tsx` | 3 | Quiz launch. |
-| `apps/mobile/src/app/(app)/topic/recall-test.test.tsx` | 3 | Recall test. |
+| `apps/mobile/src/app/_layout.test.tsx` | 15 | **Single-file concentration — 65% of remaining bare backlog.** Root layout test mocks the app-shell modules directly. Next sweep target. |
+| `apps/mobile/src/app/session-summary/[sessionId].test.tsx` | 2 | Session summary screen. |
+| `apps/mobile/src/app/(app)/dictation/playback.test.tsx` | 1 | Dictation playback. |
+| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 1 | One residual bare mock; rest already converted. |
+| `apps/mobile/src/app/create-profile.test.tsx` | 1 | Profile creation flow. |
+| `apps/mobile/src/app/session-transcript/[sessionId].test.tsx` | 1 | Session transcript. |
+| `apps/mobile/src/components/family/AddToMyLearningButton.test.tsx` | 1 | Family add-to-learning button. |
+| `apps/mobile/src/hooks/use-network-status.test.ts` | 1 | Network status hook. |
 
-The bare backlog is **entirely mobile screens** at this point. The new `apps/mobile/src/test-utils/screen-render.tsx` harness (built in Wave 2) is the canonical replacement pattern for these conversions.
+The bare backlog is **entirely mobile** and dominated by one file. Cleaning `apps/mobile/src/app/_layout.test.tsx` would drop the backlog from 23 → 8. The new `apps/mobile/src/test-utils/screen-render.tsx` harness (built in Wave 2) is the canonical replacement pattern for these conversions.
 
 ### Wave 1 (2026-05-19) — Outcomes
 
@@ -87,6 +83,25 @@ Five parallel agents on mobile bare-mock files. Net result:
 
 **Bare-mock count: 180 → 131** (after both the agent work and the generator regex fix that surfaced 49 already-annotated mocks the prior pass missed). All five tests passed without weakening any assertion.
 
+### Wave 3 (2026-05-24) — Top-20 Most-Edited Test Files
+
+Ten parallel sonnet agents swept the top 20 most-edited test files (`git log --name-only --since="1 year ago"` ranked by frequency). Hypothesis: high-edit files = highest reader load = best ROI for cleanup. Reality: those files were already mostly cleaned by prior sweeps. Net result:
+
+| File | Mocks removed | Converted to requireActual | gc1-allow added/rewritten | Tests pass |
+| --- | ---: | ---: | ---: | :---: |
+| `apps/mobile/src/app/(app)/progress.test.tsx` | 0 | 2 (`app-context`, `use-navigation-contract`) | 0 | 35/35 |
+| `apps/mobile/src/components/session/ChatShell.test.tsx` | 1 (`math-format` — pure JS, real impl works) | 0 | 0 | 82/82 |
+| `apps/api/src/services/retention-data.test.ts` | 0 | 0 | 4 rewritten (placeholder → real justifications) | 75/75 |
+| `apps/mobile/src/app/(app)/_layout.test.tsx` | 0 | 0 | 2 added (already had requireActual+spread) | 64/64 |
+| `apps/mobile/src/app/create-subject.test.tsx` | 0 | 0 | 1 added + 3-arg form | 44/44 |
+| Other 8 files | 0 | 0 | 0 | All pass — already canonical |
+
+**Outcome:** Top-edited ≠ top-bare. Eight of the 13 files with internal mocks were already fully pattern-A converted by prior sweeps (W1-W17 swarm + Waves 1-2). The remaining 5 needed only cosmetic gc1-allow annotations or trivial requireActual additions. **No bugs were found** — no mocks were hiding real failures.
+
+**Takeaway for next sweep:** Stop targeting "most-edited" — those files are already clean because everyone touches them. Target the BARE-mock list instead. `apps/mobile/src/app/_layout.test.tsx` is the obvious next target (15 bare mocks = 65% of remaining backlog).
+
+Commits: `0589a70eb` (API retention-data annotations) + `380c75055` (mobile annotations + ChatShell math-format removal + progress.tsx requireActual spreads).
+
 ### Known follow-up
 
 - `mockApiClientFactory` helper (`apps/mobile/src/test-utils/mock-api-routes.ts`) had a path-specific Hono client interop issue in the mentor-memory conversion — inlining the factory body in the test fixed it; the helper still works for shallower paths (`create-subject.test.tsx`). Worth hardening so it resolves `hono/client` consistently regardless of caller depth.
@@ -110,37 +125,41 @@ Raw rows are written to `docs/plans/2026-05-12-internal-mock-cleanup-inventory.c
 | API eval-llm tests | 0 | 1 | Eval harness LLM transport mock is classified as an external boundary. |
 | **Total** | **615** | **441** | **1,056 mock call rows across 281 test files, including 1,055 `jest.mock(...)` rows.** |
 
-**Refreshed 2026-05-19** (after W1-W17 Notion bug-fix swarm + Wave 2 coverage hardening landed many new test files):
+**Refreshed 2026-05-24** (after Wave 3 top-20-edited sweep):
 
 | Area | Internal-ish mocks | External mocks |
 | --- | ---: | ---: |
-| Mobile tests | 373 | 407 |
-| API Inngest tests | 128 | 52 |
-| API route + top-level integration tests | 135 | 57 |
-| API service/middleware unit tests | 82 | 29 |
+| Mobile tests | 351 | 438 |
+| API Inngest tests | 132 | 66 |
+| API route + top-level integration tests | 138 | 57 |
+| API service/middleware unit tests | 84 | 40 |
 | API eval-llm tests | 0 | 1 |
-| **Total** | **718** | **546** |
+| **Total** | **705** | **602** |
 
 Refreshed risk-class counts:
 
 | Risk class | Count |
 | --- | ---: |
 | `P0` | 0 |
-| `P1` | 345 |
-| `P2` | 373 |
-| `P3` | 546 |
+| `P1` | 354 |
+| `P2` | 351 |
+| `P3` | 602 |
+
+> Raw P1/P2 counts overstate real risk by ~30× — only **23 of the 705 internal-ish mocks are bare** (no annotation, no requireActual). See "Annotation Status Audit" above.
 
 Per-target deltas (top targets):
 
-| Target | Count 2026-05-12 | Count 2026-05-14 | Count 2026-05-19 |
-| --- | ---: | ---: | ---: |
-| `@eduagent/database` | 54 | 55 | 58 |
-| `../lib/profile` | 26 | 26 | 33 |
-| `../lib/api-client` | 23 | 23 | 30 |
-| `../services/account` | 23 | 22 | 26 |
-| `../helpers` | 22 | 23 | 24 |
-| `../services/profile` | 18 | — | 23 |
-| `../../../lib/profile` | — | — | 17 |
+| Target | Count 2026-05-12 | Count 2026-05-14 | Count 2026-05-19 | Count 2026-05-24 |
+| --- | ---: | ---: | ---: | ---: |
+| `@eduagent/database` | 54 | 55 | 58 | 58 |
+| `../lib/profile` | 26 | 26 | 33 | 15 |
+| `../lib/api-client` | 23 | 23 | 30 | 10 |
+| `../services/account` | 23 | 22 | 26 | 26 |
+| `../helpers` | 22 | 23 | 24 | 26 |
+| `../services/profile` | 18 | — | 23 | 24 |
+| `../../../lib/profile` | — | — | 17 | 15 |
+| `../../lib/profile` | — | — | — | 12 |
+| `./llm` | — | — | — | 12 |
 
 Top internal-ish mocked targets:
 
@@ -158,23 +177,22 @@ Top internal-ish mocked targets:
 | `../../../lib/profile` | 9 | Medium; UI tests often bypass provider/state behavior. |
 | `../../services/settings` | 9 | High where rate-limit, learning-mode, or notification settings behavior is replaced. |
 
-Top files by internal-ish mock count (refreshed 2026-05-19):
+Top files by internal-ish mock count (refreshed 2026-05-24):
 
 | File | Count | Notes |
 | --- | ---: | --- |
-| `apps/api/src/inngest/functions/session-completed.test.ts` | 18 | P1 high-risk workflow orchestrator mock cluster — still the top target for Batch 2. |
-| `apps/mobile/src/app/(app)/library.test.tsx` | 12 | P2 UI screen harness debt; grew by +1 after BUG-NOTION-254 virtualization break test. |
+| `apps/api/src/inngest/functions/session-completed.test.ts` | 19 | P1 high-risk workflow orchestrator mock cluster — but all are pattern-A + gc1-allow (verified Wave 3). |
+| `apps/mobile/src/app/_layout.test.tsx` | 15 | **15 of 15 are BARE.** Single-file dominant target for next sweep — 65% of remaining bare backlog. |
+| `apps/mobile/src/app/(app)/library.test.tsx` | 13 | P2 UI screen harness debt. |
 | `apps/mobile/src/app/(app)/session/index.test.tsx` | 11 | P2/P1 because session recovery/streaming is user-critical. |
-| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 11 | P2 UI screen harness debt. |
-| `apps/api/src/routes/progress.test.ts` | 9 | **NEW in top files (2026-05-19)** — P1 progress-API contract risk. Not yet annotated. |
-| `apps/api/src/inngest/functions/monthly-report-cron.test.ts` | 8 | **Regressed from "✅ Done"** — +1 mock since 2026-05-14. Re-verify whether step-runner conversion still holds or new test added a mock. |
-| `apps/api/src/middleware/metering.test.ts` | 8 | **Regressed from "✅ Done" (was 9 → 7 after cleanup → 8)** — BUG-93 break test added a new external-LLM-boundary `gc1-allow` mock for `services/subject-resolve`. Annotation is correct; count is higher because the previous "✅ Done" snapshot only counted internal mocks. Worth a re-audit. |
-| `apps/mobile/src/components/home/LearnerScreen.test.tsx` | 8 | P2 UI harness debt; real theme path restored, remaining mocks are API/profile/subtree follow-up. |
-| `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` | 8 | P2 UI screen harness debt, already annotated with many `gc1-allow` reasons. |
-| `apps/api/src/inngest/functions/email-digest-channel.test.ts` | 7 | **NEW in top files (2026-05-19)** — P1 critical-workflow cluster (notifications/settings/snapshot/weekly-report). |
-| `apps/api/src/routes/filing.test.ts` | 7 | P1 LLM/session/filing contract risk — unchanged. |
-| `apps/api/src/routes/sessions.test.ts` | 7 | Previously ✅ Done; still 7 mocks (mostly external boundaries). Re-verify after next sweep. |
-| `apps/api/src/inngest/functions/trial-expiry.test.ts` | 7 | ✅ Done in prior batch — verify still holds. |
+| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 11 | Verified Wave 3 — 9 pattern-A + 3 gc1-allow (one residual bare). 42/42 pass. |
+| `apps/api/src/middleware/metering.test.ts` | 9 | Verified Wave 3 — all 9 pattern-A + gc1-allow. 45/45 pass. |
+| `apps/api/src/routes/progress.test.ts` | 9 | P1 progress-API contract risk. Not yet swept. |
+| `apps/mobile/src/components/home/LearnerScreen.test.tsx` | 9 | P2 UI harness debt; remaining mocks are API/profile/subtree follow-up. |
+| `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` | 9 | P2 UI screen harness debt, already annotated with many `gc1-allow` reasons. |
+| `apps/api/src/inngest/functions/monthly-report-cron.test.ts` | 8 | Already fully annotated as of Wave 1. |
+| `apps/mobile/src/app/(app)/more/account.test.tsx` | 8 | **NEW in top files (2026-05-24)** — account screen test, not yet swept. |
+| `apps/mobile/src/app/(app)/progress.test.tsx` | 8 | Verified Wave 3 — 2 mocks converted to requireActual+spread. 35/35 pass. |
 
 Mobile internal-ish groups:
 
