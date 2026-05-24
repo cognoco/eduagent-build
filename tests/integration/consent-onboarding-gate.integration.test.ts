@@ -186,6 +186,6 @@ describe('Integration: WI-130 — onboarding PATCH consent gate', () => {
       TEST_ENV,
     );
 
-    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(404);
   });
 });
