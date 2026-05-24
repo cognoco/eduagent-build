@@ -194,20 +194,48 @@ describe('parseNumericToDriver — finiteness guard [WI-318]', () => {
     );
   });
 
-  it('[BREAK] throws when given a non-number runtime value', () => {
-    // The TS signature widens to defend against the same class of refactor
-    // that could regress the from-side guard: a caller passing through a
-    // user-provided or LLM-parsed value that landed as a string or null at
-    // runtime despite the `data: number` declaration.
-    expect(() =>
+  it('accepts numeric strings (historical drizzle round-trip path) and re-emits them in normalised form', () => {
+    // Historical callers (round-tripping a driver-typed string through
+    // toDriver) pass strings legitimately; mirror parseNumericFromDriver's
+    // tolerance. The finiteness check still applies.
+    expect(
       parseNumericToDriver('1.5' as unknown as number, 'mastery_score'),
-    ).toThrow(/expected number/);
+    ).toBe('1.5');
+    expect(
+      parseNumericToDriver('0.85' as unknown as number, 'mastery_score'),
+    ).toBe('0.85');
+  });
+
+  it('[BREAK] throws on null / undefined with the column name', () => {
     expect(() =>
       parseNumericToDriver(null as unknown as number, 'ease_factor'),
-    ).toThrow(/expected number/);
+    ).toThrow(/null.*for column "ease_factor"/);
     expect(() =>
       parseNumericToDriver(undefined as unknown as number, 'ease_factor'),
-    ).toThrow(/expected number/);
+    ).toThrow(/undefined.*for column "ease_factor"/);
+  });
+
+  it('[BREAK] throws on empty/whitespace strings (same trap as the from-driver guard)', () => {
+    for (const blank of ['', ' ', '\t', '\n']) {
+      expect(() =>
+        parseNumericToDriver(blank as unknown as number, 'mastery_score'),
+      ).toThrow(/empty\/whitespace string for column "mastery_score"/);
+    }
+  });
+
+  it('[BREAK] throws on a non-numeric string', () => {
+    expect(() =>
+      parseNumericToDriver(
+        'not-a-number' as unknown as number,
+        'mastery_score',
+      ),
+    ).toThrow(/non-finite string value "not-a-number"/);
+  });
+
+  it('[BREAK] throws on a non-number / non-string runtime value', () => {
+    expect(() => parseNumericToDriver({} as unknown as number, 'col')).toThrow(
+      /expected finite number/,
+    );
   });
 
   it('[BREAK] customType toDriver hook surfaces the same throw', () => {
