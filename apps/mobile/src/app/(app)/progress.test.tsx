@@ -300,6 +300,7 @@ jest.mock('../../lib/api-client', () => ({
 jest.mock(
   '../../lib/app-context' /* gc1-allow: progress screen tests need deterministic study/family mode without provider side effects */,
   () => ({
+    ...jest.requireActual('../../lib/app-context'),
     useAppContext: () => ({
       mode:
         mockSearchParams.profileId &&
@@ -316,6 +317,7 @@ jest.mock(
 jest.mock(
   '../../hooks/use-navigation-contract' /* gc1-allow: progress screen tests pin the contract shape without mounting app shell providers */,
   () => ({
+    ...jest.requireActual('../../hooks/use-navigation-contract'),
     useNavigationContract: () => {
       const familyMode =
         mockSearchParams.profileId &&
