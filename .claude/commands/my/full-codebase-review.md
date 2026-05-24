@@ -1,4 +1,4 @@
-ull Codebase Review
+# Full Codebase Review
 
   15 reviewers in parallel, then fix critical findings locally. Same dispatch pattern as
   parallel-code-review but expanded scope (entire repo, not branch diff) and broader lens coverage.
