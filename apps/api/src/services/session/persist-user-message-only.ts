@@ -5,7 +5,11 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { OrphanReason } from '@eduagent/schemas';
-import { BadRequestError, ForbiddenError } from '@eduagent/schemas';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+} from '@eduagent/schemas';
 
 interface Options {
   clientId: string;
@@ -26,32 +30,52 @@ export async function persistUserMessageOnly(
     );
   }
 
-  const owningSession = await db.query.learningSessions.findFirst({
-    where: and(
-      eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, profileId),
-    ),
-    columns: { id: true, profileId: true, subjectId: true },
-  });
-  if (!owningSession || owningSession.profileId !== profileId) {
-    throw new ForbiddenError(
-      'persistUserMessageOnly: session does not belong to profile',
-    );
-  }
+  await db.transaction(async (tx) => {
+    const [owningSession] = await tx
+      .select({
+        id: learningSessions.id,
+        profileId: learningSessions.profileId,
+        subjectId: learningSessions.subjectId,
+        status: learningSessions.status,
+      })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
 
-  await db
-    .insert(sessionEvents)
-    .values({
-      sessionId,
-      profileId,
-      subjectId: owningSession.subjectId,
-      eventType: 'user_message' as const,
-      content: message,
-      clientId: options.clientId,
-      orphanReason: options.orphanReason,
-    })
-    .onConflictDoNothing({
-      target: [sessionEvents.sessionId, sessionEvents.clientId],
-      where: sql`${sessionEvents.clientId} IS NOT NULL`,
-    });
+    if (!owningSession || owningSession.profileId !== profileId) {
+      throw new ForbiddenError(
+        'persistUserMessageOnly: session does not belong to profile',
+      );
+    }
+    if (
+      owningSession.status === 'completed' ||
+      owningSession.status === 'auto_closed'
+    ) {
+      throw new ConflictError(
+        'persistUserMessageOnly: session is closed and cannot accept messages',
+      );
+    }
+
+    await tx
+      .insert(sessionEvents)
+      .values({
+        sessionId,
+        profileId,
+        subjectId: owningSession.subjectId,
+        eventType: 'user_message' as const,
+        content: message,
+        clientId: options.clientId,
+        orphanReason: options.orphanReason,
+      })
+      .onConflictDoNothing({
+        target: [sessionEvents.sessionId, sessionEvents.clientId],
+        where: sql`${sessionEvents.clientId} IS NOT NULL`,
+      });
+  });
 }

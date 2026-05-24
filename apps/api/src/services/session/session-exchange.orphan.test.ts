@@ -9,19 +9,27 @@ import {
 
 describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () => {
   describe('persistUserMessageOnly security regression', () => {
-    it('throws ForbiddenError when profileId does not match session owner', async () => {
-      const mockDb: any = {
-        query: {
-          learningSessions: {
-            findFirst: jest.fn().mockResolvedValue({
-              id: 'sess-victim',
-              profileId: 'victim-profile',
-              subjectId: 'sub-1',
-            }),
-          },
-        },
-        insert: jest.fn(),
+    function createPersistUserMessageOnlyDb(sessionRow: unknown): any {
+      const selectChain = {
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        for: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(sessionRow ? [sessionRow] : []),
       };
+      const db: any = {
+        select: jest.fn().mockReturnValue(selectChain),
+        insert: jest.fn(),
+        transaction: jest.fn(async (fn) => fn(db)),
+      };
+      return db;
+    }
+
+    it('throws ForbiddenError when profileId does not match session owner', async () => {
+      const mockDb = createPersistUserMessageOnlyDb({
+        id: 'sess-victim',
+        profileId: 'victim-profile',
+        subjectId: 'sub-1',
+      });
       await expect(
         persistUserMessageOnly(
           mockDb,
@@ -35,14 +43,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
     });
 
     it('throws ForbiddenError when session does not exist', async () => {
-      const mockDb: any = {
-        query: {
-          learningSessions: {
-            findFirst: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        insert: jest.fn(),
-      };
+      const mockDb = createPersistUserMessageOnlyDb(undefined);
       await expect(
         persistUserMessageOnly(mockDb, 'p', 'nonexistent', 'msg', {
           clientId: 'c-1',
@@ -53,10 +54,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
     });
 
     it('throws BadRequestError when clientId is missing (no ULID fallback)', async () => {
-      const mockDb: any = {
-        query: { learningSessions: { findFirst: jest.fn() } },
-        insert: jest.fn(),
-      };
+      const mockDb = createPersistUserMessageOnlyDb(undefined);
       await expect(
         persistUserMessageOnly(mockDb, 'p', 's', 'msg', {
           clientId: '',

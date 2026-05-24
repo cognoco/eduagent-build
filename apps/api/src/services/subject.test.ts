@@ -135,6 +135,52 @@ function setupScopedRepo({
   });
 }
 
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['name'] === 'string') {
+    values.push(obj['name'].toLowerCase());
+  }
+  if (
+    'value' in obj &&
+    (typeof obj['value'] === 'string' ||
+      typeof obj['value'] === 'number' ||
+      obj['value'] instanceof Date)
+  ) {
+    const value = obj['value'];
+    values.push(
+      value instanceof Date
+        ? value.toISOString().toLowerCase()
+        : String(value).toLowerCase(),
+    );
+  }
+  if (Array.isArray(obj['value'])) {
+    for (const item of obj['value']) {
+      values.push(...extractSqlTextAndValues(item, visited));
+    }
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
+}
+
 describe('listSubjects', () => {
   it('returns empty array when no subjects', async () => {
     setupScopedRepo({ findManyResult: [] });
@@ -371,7 +417,11 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
           onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
         })),
       })),
+      execute: jest.fn().mockResolvedValue(undefined),
     };
+    (db as unknown as { transaction: jest.Mock }).transaction = jest.fn(
+      async (fn: (tx: typeof db) => unknown) => fn(db),
+    );
 
     return db as unknown as Database;
   }
@@ -471,6 +521,87 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
         bookId: uuidExistingBookId,
       }),
     });
+  });
+
+  it('[WI-78 review] checks duplicate focused books after taking the subject lock', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Botany',
+    });
+    setupScopedRepo({ findManyResult: [subjectRow] });
+    const existingBook = mockBookRow({ id: uuidExistingBookId, title: 'Tea' });
+    const db = createFocusedBookDb({
+      subjectRow,
+      existingBook,
+    });
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      focus: 'Tea',
+    });
+
+    expect(result.bookId).toBe(uuidExistingBookId);
+    expect(db.execute).toHaveBeenCalled();
+    const lockOrder = (db.execute as jest.Mock).mock.invocationCallOrder[0];
+    const duplicateReadOrder = (db.query.curriculumBooks.findFirst as jest.Mock)
+      .mock.invocationCallOrder[0];
+    if (lockOrder == null || duplicateReadOrder == null) {
+      throw new Error('Expected lock and duplicate-read call order');
+    }
+    expect(lockOrder).toBeLessThan(duplicateReadOrder);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] takes the subject-name lock before finding or creating a focused subject', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      subjects: {
+        findMany,
+        findFirst: jest.fn(),
+      },
+    });
+    const db = createFocusedBookDb();
+
+    await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      rawInput: 'tea',
+    });
+
+    const lockOrder = (db.execute as jest.Mock).mock.invocationCallOrder[0];
+    const lookupOrder = findMany.mock.invocationCallOrder[0];
+    if (lockOrder == null || lookupOrder == null) {
+      throw new Error('Expected lock and subject lookup call order');
+    }
+    expect(lockOrder).toBeLessThan(lookupOrder);
+  });
+
+  it('[WI-78 review] uses the trimmed subject name for focused-subject lookup', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Botany',
+    });
+    const findMany = jest.fn((whereClause: unknown) => {
+      const values = extractSqlTextAndValues(whereClause);
+      return Promise.resolve(values.includes('botany') ? [subjectRow] : []);
+    });
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      subjects: {
+        findMany,
+        findFirst: jest.fn(),
+      },
+    });
+    const db = createFocusedBookDb({ subjectRow });
+
+    await createSubjectWithStructure(db, uuidProfileId, {
+      name: ' Botany ',
+      focus: 'Tea',
+    });
+
+    const values = extractSqlTextAndValues(findMany.mock.calls[0]?.[0]);
+    expect(values).toContain('botany');
+    expect(values).not.toContain(' botany ');
   });
 
   it('does not fire curriculum prewarm for an existing book that already has topics', async () => {

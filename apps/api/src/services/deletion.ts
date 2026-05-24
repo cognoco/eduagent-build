@@ -285,6 +285,35 @@ export async function deleteProfile(
   await db.delete(profiles).where(eq(profiles.id, profileId));
 }
 
+export async function deleteProfileIfConsentWithdrawn(
+  db: Database,
+  profileId: string,
+  revokedAt?: Date | string,
+): Promise<boolean> {
+  const revokedAtDate =
+    revokedAt instanceof Date
+      ? revokedAt
+      : revokedAt
+        ? new Date(revokedAt)
+        : undefined;
+  if (revokedAtDate && Number.isNaN(revokedAtDate.getTime())) return false;
+
+  const result = await db.execute(sql`
+    WITH locked_consent AS (
+      SELECT 1 FROM consent_states
+      WHERE consent_states.profile_id = ${profileId}
+      AND consent_states.consent_type = 'GDPR'
+      AND consent_states.status = 'WITHDRAWN'
+      ${revokedAtDate ? sql`AND consent_states.responded_at = ${revokedAtDate}` : sql``}
+      FOR UPDATE
+    )
+    DELETE FROM profiles
+    WHERE id = ${profileId}
+    AND EXISTS (SELECT 1 FROM locked_consent)
+  `);
+  return (result.rowCount ?? 0) > 0;
+}
+
 /**
  * CI-11: Atomically deletes a profile only if no CONSENTED or WITHDRAWN
  * consent state exists. Used by the consent-reminder Inngest function

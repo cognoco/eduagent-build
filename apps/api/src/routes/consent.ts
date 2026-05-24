@@ -352,6 +352,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             data: {
               childProfileId,
               parentProfileId,
+              revokedAt: state.respondedAt,
               timestamp: new Date().toISOString(),
             },
           }),

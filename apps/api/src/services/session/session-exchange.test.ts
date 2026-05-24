@@ -8,7 +8,7 @@ import {
   type ExchangeHistoryEvent,
 } from './session-exchange';
 import type { processMessage, streamMessage } from './session-exchange';
-import { MAX_EXCHANGES_PER_SESSION } from '@eduagent/schemas';
+import { ConflictError, MAX_EXCHANGES_PER_SESSION } from '@eduagent/schemas';
 import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
 import { SessionExchangeLimitError } from './session-crud';
 
@@ -565,6 +565,7 @@ function makeExchangeLimitDb(
     profileId: string;
     exchangeCount: number;
     subjectId: string;
+    status?: 'active' | 'completed' | 'auto_closed';
   } | null,
 ) {
   return {
@@ -618,11 +619,29 @@ describe('checkExchangeLimit', () => {
       profileId: 'prof-1',
       exchangeCount: MAX_EXCHANGES_PER_SESSION - 1,
       subjectId: 'subj-1',
+      status: 'active',
     });
     await expect(
       checkExchangeLimit(db, 'prof-1', 'sess-under-limit'),
     ).resolves.toBeUndefined();
   });
+
+  it.each(['completed', 'auto_closed'] as const)(
+    '[WI-78 DS-313] rejects exchange attempts against %s sessions',
+    async (status) => {
+      const db = makeExchangeLimitDb({
+        id: `sess-${status}`,
+        profileId: 'prof-1',
+        exchangeCount: 1,
+        subjectId: 'subj-1',
+        status,
+      });
+
+      await expect(
+        checkExchangeLimit(db, 'prof-1', `sess-${status}`),
+      ).rejects.toBeInstanceOf(ConflictError);
+    },
+  );
 
   it('does not allow a different profile to check a session it does not own', async () => {
     // The scoped repo scopes findFirst to the caller's profileId. A session owned

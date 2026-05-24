@@ -841,6 +841,32 @@ export async function claimBookForGeneration(
   return updated[0] ?? null;
 }
 
+export async function releaseBookGenerationClaimIfEmpty(
+  db: Database,
+  subjectId: string,
+  bookId: string,
+  profileId: string,
+): Promise<void> {
+  await db
+    .update(curriculumBooks)
+    .set({ topicsGenerated: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+        sql`EXISTS (
+          SELECT 1 FROM subjects
+          WHERE subjects.id = ${subjectId}
+          AND subjects.profile_id = ${profileId}
+        )`,
+        sql`NOT EXISTS (
+          SELECT 1 FROM curriculum_topics
+          WHERE curriculum_topics.book_id = ${bookId}
+        )`,
+      ),
+    );
+}
+
 export async function getBooks(
   db: Database,
   profileId: string,

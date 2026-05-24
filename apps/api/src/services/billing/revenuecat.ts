@@ -4,7 +4,7 @@
 // activateSubscriptionFromRevenuecat
 // ---------------------------------------------------------------------------
 
-import { eq, and, isNull, ne, or } from 'drizzle-orm';
+import { eq, and, isNull, ne, or, sql } from 'drizzle-orm';
 import {
   subscriptions,
   quotaPools,
@@ -15,7 +15,11 @@ import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
-import { mapSubscriptionRow, type SubscriptionRow } from './types';
+import {
+  mapSubscriptionRow,
+  type AppliedSubscriptionRow,
+  type SubscriptionRow,
+} from './types';
 
 const logger = createLogger();
 import { getSubscriptionByAccountId } from './subscription-core';
@@ -31,6 +35,11 @@ export interface RevenuecatWebhookUpdate {
   currentPeriodEnd?: string;
   cancelledAt?: string | null;
   trialEndsAt?: string | null;
+}
+
+export interface RevenuecatQuotaUpdate {
+  monthlyQuota: number;
+  dailyLimit: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,136 +99,202 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     eventId: string;
     eventTimestampMs?: number;
   },
-): Promise<SubscriptionRow | null> {
+): Promise<AppliedSubscriptionRow | null> {
   return db.transaction(async (tx) => {
-    // Known Drizzle pattern: PgTransaction → Database cast (see feedback_drizzle_transaction_cast.md)
+    return applySubscriptionUpdateFromRevenuecat(
+      tx as unknown as Database,
+      accountId,
+      updates,
+    );
+  });
+}
+
+export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
+  db: Database,
+  accountId: string,
+  updates: RevenuecatWebhookUpdate & {
+    eventId: string;
+    eventTimestampMs?: number;
+  },
+  quota: RevenuecatQuotaUpdate,
+): Promise<AppliedSubscriptionRow | null> {
+  return db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
-    const repo = createAccountRepository(txDb, accountId);
-    const existing = await repo.subscriptions.findFirst();
-
-    if (!existing) return null;
-
-    // [CR-2026-05-19-M11] Idempotency check INSIDE the transaction so the read is
-    // coherent with the write. Two concurrent calls with the same eventId will
-    // serialize here; the second will see the already-stamped eventId and return
-    // early without a second write.
-    if (existing.lastRevenuecatEventId === updates.eventId) {
-      return mapSubscriptionRow(existing);
-    }
-    if (
-      updates.eventTimestampMs != null &&
-      existing.lastRevenuecatEventTimestampMs != null
-    ) {
-      const lastTs = Number(existing.lastRevenuecatEventTimestampMs);
-      if (!Number.isNaN(lastTs) && updates.eventTimestampMs < lastTs) {
-        // Stale retry — event is older than the last persisted event.
-        return mapSubscriptionRow(existing);
-      }
-    }
-
-    const setValues: Partial<typeof subscriptions.$inferInsert> = {
-      lastRevenuecatEventId: updates.eventId,
-      updatedAt: new Date(),
-    };
-
-    if (updates.eventTimestampMs != null) {
-      setValues.lastRevenuecatEventTimestampMs = String(
-        updates.eventTimestampMs,
-      );
-    }
-
-    if (updates.tier !== undefined) {
-      setValues.tier = updates.tier;
-    }
-    if (updates.status !== undefined && updates.status !== existing.status) {
-      if (!isValidTransition(existing.status, updates.status)) {
-        // [BUG-447] Throw so callers (handleRenewal, handleProductChange) do NOT
-        // proceed to updateQuotaPoolLimit. Returning the existing row silently
-        // caused quota pool to reflect newTier while subscription.tier stayed
-        // at oldTier — divergent billing state. Throwing surfaces the problem
-        // immediately and prevents the downstream quota update from firing.
-        const transitionErr = new Error(
-          `Invalid subscription transition: ${existing.status} -> ${updates.status}`,
-        );
-        logger.error('Invalid subscription transition — aborting update', {
-          from: existing.status,
-          to: updates.status,
-          subscriptionId: existing.id,
-          tag: 'billing.invalid_transition',
-        });
-        captureException(transitionErr, {
-          extra: {
-            subscriptionId: existing.id,
-            fromStatus: existing.status,
-            toStatus: updates.status,
-            tag: 'billing.invalid_transition',
-          },
-        });
-        throw transitionErr;
-      }
-      setValues.status = updates.status;
-    }
-    if (updates.currentPeriodStart !== undefined) {
-      setValues.currentPeriodStart = new Date(updates.currentPeriodStart);
-    }
-    if (updates.currentPeriodEnd !== undefined) {
-      setValues.currentPeriodEnd = new Date(updates.currentPeriodEnd);
-    }
-    if (updates.cancelledAt !== undefined) {
-      setValues.cancelledAt = updates.cancelledAt
-        ? new Date(updates.cancelledAt)
-        : null;
-    }
-    if (updates.trialEndsAt !== undefined) {
-      setValues.trialEndsAt = updates.trialEndsAt
-        ? new Date(updates.trialEndsAt)
-        : null;
-    }
-
-    // [CR-2026-05-19-M3] SITE 4: SQL-level status guard in WHERE clause.
-    // If a status transition was validated above, include
-    // `AND status = existing.status` in the WHERE so the UPDATE is rejected
-    // (0 rows returned) if the row was concurrently mutated to a different
-    // status between our SELECT and this UPDATE — even within a transaction
-    // (e.g. a savepoint rollback + retry scenario). The JS throw above handles
-    // the semantics; this guard closes the storage-layer gap.
-    //
-    // Concurrent-delivery defense: under READ COMMITTED two transactions can
-    // both see lastRevenuecatEventId !== updates.eventId at SELECT time and
-    // both proceed to UPDATE the same row (last-writer-wins). Adding the
-    // event-ID predicate makes the second UPDATE re-evaluate against the
-    // post-commit row and return 0 rows, so we can detect the duplicate and
-    // return the existing snapshot instead of double-writing.
-    const whereParts = [eq(subscriptions.id, existing.id)];
-    if (updates.status !== undefined && updates.status !== existing.status) {
-      whereParts.push(eq(subscriptions.status, existing.status));
-    }
-    whereParts.push(
-      or(
-        isNull(subscriptions.lastRevenuecatEventId),
-        ne(subscriptions.lastRevenuecatEventId, updates.eventId),
-      )!,
+    const updated = await applySubscriptionUpdateFromRevenuecat(
+      txDb,
+      accountId,
+      updates,
     );
 
-    const [updated] = await tx
-      .update(subscriptions)
-      .set(setValues)
-      .where(and(...whereParts))
-      .returning();
+    if (updated && updated.webhookApplied !== false) {
+      const quotaRows = await tx
+        .update(quotaPools)
+        .set({
+          monthlyLimit: quota.monthlyQuota,
+          dailyLimit: quota.dailyLimit,
+          updatedAt: new Date(),
+        })
+        .where(eq(quotaPools.subscriptionId, updated.id))
+        .returning({ id: quotaPools.id });
 
-    if (!updated) {
-      // 0 rows returned most likely means a concurrent delivery already
-      // stamped this eventId. Re-read and confirm before short-circuiting.
-      const recheck = await repo.subscriptions.findFirst();
-      if (recheck && recheck.lastRevenuecatEventId === updates.eventId) {
-        return mapSubscriptionRow(recheck);
+      if (quotaRows.length === 0) {
+        throw new Error(
+          `Missing quota pool for subscription ${updated.id}; rolling back RevenueCat subscription update`,
+        );
       }
-      throw new Error(
-        'Subscription update did not return a row — concurrent status mutation detected or row missing',
-      );
     }
-    return mapSubscriptionRow(updated);
+
+    return updated;
   });
+}
+
+async function applySubscriptionUpdateFromRevenuecat(
+  db: Database,
+  accountId: string,
+  updates: RevenuecatWebhookUpdate & {
+    eventId: string;
+    eventTimestampMs?: number;
+  },
+): Promise<AppliedSubscriptionRow | null> {
+  const repo = createAccountRepository(db, accountId);
+  const existing = await repo.subscriptions.findFirst();
+
+  if (!existing) return null;
+
+  // [CR-2026-05-19-M11] Idempotency check INSIDE the transaction so the read is
+  // coherent with the write. Two concurrent calls with the same eventId will
+  // serialize here; the second will see the already-stamped eventId and return
+  // early without a second write.
+  if (existing.lastRevenuecatEventId === updates.eventId) {
+    return { ...mapSubscriptionRow(existing), webhookApplied: false };
+  }
+  if (
+    updates.eventTimestampMs != null &&
+    existing.lastRevenuecatEventTimestampMs != null
+  ) {
+    const lastTs = Number(existing.lastRevenuecatEventTimestampMs);
+    if (!Number.isNaN(lastTs) && updates.eventTimestampMs < lastTs) {
+      // Stale retry — event is older than the last persisted event.
+      return { ...mapSubscriptionRow(existing), webhookApplied: false };
+    }
+  }
+
+  const setValues: Partial<typeof subscriptions.$inferInsert> = {
+    lastRevenuecatEventId: updates.eventId,
+    updatedAt: new Date(),
+  };
+
+  if (updates.eventTimestampMs != null) {
+    setValues.lastRevenuecatEventTimestampMs = String(updates.eventTimestampMs);
+  }
+
+  if (updates.tier !== undefined) {
+    setValues.tier = updates.tier;
+  }
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    if (!isValidTransition(existing.status, updates.status)) {
+      // [BUG-447] Throw so callers (handleRenewal, handleProductChange) do NOT
+      // proceed to updateQuotaPoolLimit. Returning the existing row silently
+      // caused quota pool to reflect newTier while subscription.tier stayed
+      // at oldTier — divergent billing state. Throwing surfaces the problem
+      // immediately and prevents the downstream quota update from firing.
+      const transitionErr = new Error(
+        `Invalid subscription transition: ${existing.status} -> ${updates.status}`,
+      );
+      logger.error('Invalid subscription transition — aborting update', {
+        from: existing.status,
+        to: updates.status,
+        subscriptionId: existing.id,
+        tag: 'billing.invalid_transition',
+      });
+      captureException(transitionErr, {
+        extra: {
+          subscriptionId: existing.id,
+          fromStatus: existing.status,
+          toStatus: updates.status,
+          tag: 'billing.invalid_transition',
+        },
+      });
+      throw transitionErr;
+    }
+    setValues.status = updates.status;
+  }
+  if (updates.currentPeriodStart !== undefined) {
+    setValues.currentPeriodStart = new Date(updates.currentPeriodStart);
+  }
+  if (updates.currentPeriodEnd !== undefined) {
+    setValues.currentPeriodEnd = new Date(updates.currentPeriodEnd);
+  }
+  if (updates.cancelledAt !== undefined) {
+    setValues.cancelledAt = updates.cancelledAt
+      ? new Date(updates.cancelledAt)
+      : null;
+  }
+  if (updates.trialEndsAt !== undefined) {
+    setValues.trialEndsAt = updates.trialEndsAt
+      ? new Date(updates.trialEndsAt)
+      : null;
+  }
+
+  // [CR-2026-05-19-M3] SITE 4: SQL-level status guard in WHERE clause.
+  // If a status transition was validated above, include
+  // `AND status = existing.status` in the WHERE so the UPDATE is rejected
+  // (0 rows returned) if the row was concurrently mutated to a different
+  // status between our SELECT and this UPDATE — even within a transaction
+  // (e.g. a savepoint rollback + retry scenario). The JS throw above handles
+  // the semantics; this guard closes the storage-layer gap.
+  //
+  // Concurrent-delivery defense: under READ COMMITTED two transactions can
+  // both see lastRevenuecatEventId !== updates.eventId at SELECT time and
+  // both proceed to UPDATE the same row (last-writer-wins). Adding the
+  // event-ID predicate makes the second UPDATE re-evaluate against the
+  // post-commit row and return 0 rows, so we can detect the duplicate and
+  // return the existing snapshot instead of double-writing.
+  const whereParts = [eq(subscriptions.id, existing.id)];
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    whereParts.push(eq(subscriptions.status, existing.status));
+  }
+  const eventIdPredicate = or(
+    isNull(subscriptions.lastRevenuecatEventId),
+    ne(subscriptions.lastRevenuecatEventId, updates.eventId),
+  );
+  if (eventIdPredicate) whereParts.push(eventIdPredicate);
+  if (updates.eventTimestampMs != null) {
+    const eventTimestampPredicate = or(
+      isNull(subscriptions.lastRevenuecatEventTimestampMs),
+      sql`(${subscriptions.lastRevenuecatEventTimestampMs})::bigint <= ${updates.eventTimestampMs}`,
+    );
+    if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
+  }
+
+  const [updated] = await db
+    .update(subscriptions)
+    .set(setValues)
+    .where(and(...whereParts))
+    .returning();
+
+  if (!updated) {
+    // 0 rows returned most likely means a concurrent delivery already
+    // stamped this eventId. Re-read and confirm before short-circuiting.
+    const recheck = await repo.subscriptions.findFirst();
+    if (recheck && recheck.lastRevenuecatEventId === updates.eventId) {
+      return { ...mapSubscriptionRow(recheck), webhookApplied: false };
+    }
+    if (
+      recheck &&
+      updates.eventTimestampMs != null &&
+      recheck.lastRevenuecatEventTimestampMs != null
+    ) {
+      const lastTs = Number(recheck.lastRevenuecatEventTimestampMs);
+      if (!Number.isNaN(lastTs) && updates.eventTimestampMs < lastTs) {
+        return { ...mapSubscriptionRow(recheck), webhookApplied: false };
+      }
+    }
+    throw new Error(
+      'Subscription update did not return a row — concurrent status mutation detected or row missing',
+    );
+  }
+  return { ...mapSubscriptionRow(updated), webhookApplied: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -275,48 +350,65 @@ export async function activateSubscriptionFromRevenuecat(
   const status = isTrial ? 'trial' : 'active';
 
   if (!existing) {
-    // Create new subscription + quota pool
-    const [subRow] = await db
-      .insert(subscriptions)
-      .values({
-        accountId,
-        tier,
-        status,
-        lastRevenuecatEventId: eventId,
-        lastRevenuecatEventTimestampMs:
-          options?.eventTimestampMs != null
-            ? String(options.eventTimestampMs)
+    const subRow = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(subscriptions)
+        .values({
+          accountId,
+          tier,
+          status,
+          lastRevenuecatEventId: eventId,
+          lastRevenuecatEventTimestampMs:
+            options?.eventTimestampMs != null
+              ? String(options.eventTimestampMs)
+              : null,
+          revenuecatOriginalAppUserId:
+            options?.revenuecatOriginalAppUserId ?? null,
+          currentPeriodStart: options?.currentPeriodStart
+            ? new Date(options.currentPeriodStart)
             : null,
-        revenuecatOriginalAppUserId:
-          options?.revenuecatOriginalAppUserId ?? null,
-        currentPeriodStart: options?.currentPeriodStart
-          ? new Date(options.currentPeriodStart)
-          : null,
-        currentPeriodEnd: options?.currentPeriodEnd
-          ? new Date(options.currentPeriodEnd)
-          : null,
-        trialEndsAt: options?.trialEndsAt
-          ? new Date(options.trialEndsAt)
-          : null,
-      })
-      .returning();
+          currentPeriodEnd: options?.currentPeriodEnd
+            ? new Date(options.currentPeriodEnd)
+            : null,
+          trialEndsAt: options?.trialEndsAt
+            ? new Date(options.trialEndsAt)
+            : null,
+        })
+        .returning();
 
-    if (!subRow) throw new Error('Subscription insert did not return a row');
+      if (!inserted)
+        throw new Error('Subscription insert did not return a row');
 
-    const now = new Date();
-    const cycleResetAt = new Date(now);
-    cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+      const now = new Date();
+      const cycleResetAt = new Date(now);
+      cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
 
-    await db.insert(quotaPools).values({
-      subscriptionId: subRow.id,
-      monthlyLimit: tierConfig.monthlyQuota,
-      usedThisMonth: 0,
-      dailyLimit: tierConfig.dailyLimit,
-      usedToday: 0,
-      cycleResetAt,
+      await tx.insert(quotaPools).values({
+        subscriptionId: inserted.id,
+        monthlyLimit: tierConfig.monthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: tierConfig.dailyLimit,
+        usedToday: 0,
+        cycleResetAt,
+      });
+
+      return inserted;
     });
 
     return mapSubscriptionRow(subRow);
+  }
+
+  if (existing.lastRevenuecatEventId === eventId) {
+    return existing;
+  }
+  if (
+    options?.eventTimestampMs != null &&
+    existing.lastRevenuecatEventTimestampMs != null
+  ) {
+    const lastTs = Number(existing.lastRevenuecatEventTimestampMs);
+    if (!Number.isNaN(lastTs) && options.eventTimestampMs < lastTs) {
+      return existing;
+    }
   }
 
   // Update existing subscription
@@ -348,14 +440,33 @@ export async function activateSubscriptionFromRevenuecat(
   // subscriptions.tier at the new value while the quota pool still carries the
   // old limit (billing leak). Wrap in a transaction so both commit or neither does.
   const updated = await db.transaction(async (tx) => {
+    const whereParts = [eq(subscriptions.id, existing.id)];
+    const eventIdPredicate = or(
+      isNull(subscriptions.lastRevenuecatEventId),
+      ne(subscriptions.lastRevenuecatEventId, eventId),
+    );
+    if (eventIdPredicate) whereParts.push(eventIdPredicate);
+    if (options?.eventTimestampMs != null) {
+      const eventTimestampPredicate = or(
+        isNull(subscriptions.lastRevenuecatEventTimestampMs),
+        sql`(${subscriptions.lastRevenuecatEventTimestampMs})::bigint <= ${options.eventTimestampMs}`,
+      );
+      if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
+    }
+
     const [row] = await tx
       .update(subscriptions)
       .set(setValues)
-      .where(eq(subscriptions.id, existing.id))
+      .where(and(...whereParts))
       .returning();
 
-    if (!row)
+    if (!row) {
+      const latest = await tx.query.subscriptions.findFirst({
+        where: eq(subscriptions.accountId, accountId),
+      });
+      if (latest) return latest;
       throw new Error('Subscription update (revenuecat) did not return a row');
+    }
 
     // Update quota pool limit to match the new tier (inside same tx)
     const [quotaPool] = await tx

@@ -92,6 +92,7 @@ function mockSubscriptionRow(
     currentPeriodStart: Date | null;
     currentPeriodEnd: Date | null;
     cancelledAt: Date | null;
+    lastStripeEventId: string | null;
     lastStripeEventTimestamp: Date | null;
     lastRevenuecatEventId: string | null;
     lastRevenuecatEventTimestampMs: string | null;
@@ -108,6 +109,7 @@ function mockSubscriptionRow(
     currentPeriodStart: overrides?.currentPeriodStart ?? null,
     currentPeriodEnd: overrides?.currentPeriodEnd ?? null,
     cancelledAt: overrides?.cancelledAt ?? null,
+    lastStripeEventId: overrides?.lastStripeEventId ?? null,
     lastRevenuecatEventId: overrides?.lastRevenuecatEventId ?? null,
     lastRevenuecatEventTimestampMs:
       overrides?.lastRevenuecatEventTimestampMs ?? null,
@@ -433,15 +435,42 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it('skips update when timestamps are equal', async () => {
+  it('[WI-78 review] rejects same-second Stripe past_due events after active recovery', async () => {
     const existing = mockSubscriptionRow({
       stripeSubscriptionId: 'sub_stripe_1',
+      status: 'active',
+      lastStripeEventId: 'evt_payment_succeeded_same_second',
+      lastStripeEventTimestamp: NOW,
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await updateSubscriptionFromWebhook(db, 'sub_stripe_1', {
+      status: 'past_due',
+      stripeEventId: 'evt_payment_failed_same_second',
+      lastStripeEventTimestamp: NOW.toISOString(),
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        lastStripeEventId: 'evt_payment_succeeded_same_second',
+        webhookApplied: false,
+      }),
+    );
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('skips update when Stripe event id was already processed', async () => {
+    const existing = mockSubscriptionRow({
+      stripeSubscriptionId: 'sub_stripe_1',
+      lastStripeEventId: 'evt_same',
       lastStripeEventTimestamp: NOW,
     });
     const db = createMockDb({ subscriptionFindFirst: existing });
 
     await updateSubscriptionFromWebhook(db, 'sub_stripe_1', {
       status: 'active',
+      stripeEventId: 'evt_same',
       lastStripeEventTimestamp: NOW.toISOString(), // same timestamp
     });
 
@@ -615,6 +644,79 @@ describe('decrementQuota', () => {
     expect(result.success).toBe(true);
     expect(result.source).toBe('top_up');
     expect(result.remainingTopUp).toBe(99);
+  });
+
+  it('[WI-78 review] advances past three contended top-up credits before declaring exhaustion', async () => {
+    const topUps = [
+      mockTopUpRow({ id: 'tu-1', remaining: 1 }),
+      mockTopUpRow({ id: 'tu-2', remaining: 1 }),
+      mockTopUpRow({ id: 'tu-3', remaining: 1 }),
+      mockTopUpRow({ id: 'tu-4', remaining: 1 }),
+    ];
+    const updatedTopUp = mockTopUpRow({ id: 'tu-4', remaining: 0 });
+    const db = createMockDb({
+      quotaPoolFindFirst: mockQuotaPoolRow({
+        monthlyLimit: 100,
+        usedThisMonth: 100,
+        dailyLimit: null,
+        usedToday: 0,
+      }),
+      updateReturningSequence: [
+        [], // monthly atomic UPDATE: WHERE used < limit fails
+        [], // tu-1 lost to a concurrent consumer
+        [], // tu-2 lost to a concurrent consumer
+        [], // tu-3 lost to a concurrent consumer
+        [updatedTopUp], // tu-4 is still available and should be used
+        [{ dailyLimit: null, usedToday: 1 }], // daily counter increment
+      ],
+    });
+    const findTopUp = (db as any).query.topUpCredits.findFirst as jest.Mock;
+    findTopUp
+      .mockResolvedValueOnce(topUps[0])
+      .mockResolvedValueOnce(topUps[1])
+      .mockResolvedValueOnce(topUps[2])
+      .mockResolvedValueOnce(topUps[3]);
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(true);
+    expect(result.source).toBe('top_up');
+    expect(result.topUpCreditId).toBe('tu-4');
+    expect(findTopUp).toHaveBeenCalledTimes(4);
+  });
+
+  it('[WI-78 review] reports daily_exceeded when the last top-up race also consumes the daily slot', async () => {
+    const stalePool = mockQuotaPoolRow({
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: 10,
+      usedToday: 9,
+    });
+    const refreshedPool = mockQuotaPoolRow({
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: 10,
+      usedToday: 10,
+    });
+    const topUp = mockTopUpRow({ remaining: 1 });
+    const db = createMockDb({
+      updateReturningSequence: [
+        [], // monthly atomic UPDATE: WHERE used < limit fails
+        [], // top-up decrement lost to the request that filled the daily cap
+      ],
+    });
+    const findPool = (db as any).query.quotaPools.findFirst as jest.Mock;
+    findPool
+      .mockResolvedValueOnce(stalePool)
+      .mockResolvedValueOnce(refreshedPool);
+    const findTopUp = (db as any).query.topUpCredits.findFirst as jest.Mock;
+    findTopUp.mockResolvedValueOnce(topUp).mockResolvedValueOnce(undefined);
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('daily_exceeded');
+    expect(result.remainingDaily).toBe(0);
   });
 
   it('returns failure when both monthly and top-up are exhausted', async () => {
@@ -888,11 +990,19 @@ describe('canAddProfile', () => {
 
 describe('updateQuotaPoolLimit', () => {
   it('updates monthlyLimit on quota pool', async () => {
-    const db = createMockDb();
+    const db = createMockDb({ updateReturning: [{ id: 'pool-1' }] });
 
     await updateQuotaPoolLimit(db, subscriptionId, 1500, null);
 
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] throws when the quota pool row is missing', async () => {
+    const db = createMockDb({ updateReturning: [] });
+
+    await expect(
+      updateQuotaPoolLimit(db, subscriptionId, 1500, null),
+    ).rejects.toThrow('quota pool');
   });
 });
 
@@ -1712,7 +1822,7 @@ function createFamilyMockDb({
   profileFindMany = [] as ReturnType<typeof mockProfileRow>[],
   selectResult = [] as unknown[],
   insertReturning = [] as unknown[],
-  updateReturning = [] as unknown[],
+  updateReturning = [{ id: 'updated-row' }] as unknown[],
 }: {
   subscriptionFindFirst?: ReturnType<typeof mockSubscriptionRow>;
   quotaPoolFindFirst?: ReturnType<typeof mockQuotaPoolRow>;

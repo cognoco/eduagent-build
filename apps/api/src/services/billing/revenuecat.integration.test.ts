@@ -28,6 +28,7 @@ import { resolve } from 'path';
 import {
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
 } from './revenuecat';
 import { getTierConfig } from '../subscription';
@@ -505,6 +506,85 @@ describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => 
   });
 });
 
+describe('updateSubscriptionAndQuotaFromRevenuecatWebhook (integration) [WI-78 review]', () => {
+  it('stamps the RevenueCat event and updates quota in one billing helper call', async () => {
+    const account = await seedAccount(1);
+    const { subscription } = await seedSubscriptionWithQuota(
+      account.id,
+      'plus',
+    );
+    const db = createIntegrationDb();
+    const familyConfig = getTierConfig('family');
+
+    const result = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      account.id,
+      {
+        eventId: 'evt-atomic-quota',
+        eventTimestampMs: 1_800_000_000_000,
+        tier: 'family',
+        status: 'active',
+      },
+      {
+        monthlyQuota: familyConfig.monthlyQuota,
+        dailyLimit: familyConfig.dailyLimit,
+      },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: subscription.id,
+        tier: 'family',
+        webhookApplied: true,
+      }),
+    );
+
+    const row = await loadSubscription(account.id);
+    expect(row!.tier).toBe('family');
+    expect(row!.lastRevenuecatEventId).toBe('evt-atomic-quota');
+    expect(row!.lastRevenuecatEventTimestampMs).toBe('1800000000000');
+
+    const pool = await loadQuotaPool(subscription.id);
+    expect(pool!.monthlyLimit).toBe(familyConfig.monthlyQuota);
+    expect(pool!.dailyLimit).toBe(familyConfig.dailyLimit);
+  });
+
+  it('rolls back the subscription update when the quota row is missing', async () => {
+    const account = await seedAccount(1);
+    const { subscription } = await seedSubscriptionWithQuota(
+      account.id,
+      'plus',
+    );
+    const db = createIntegrationDb();
+    const familyConfig = getTierConfig('family');
+
+    await db
+      .delete(quotaPools)
+      .where(eq(quotaPools.subscriptionId, subscription.id));
+
+    await expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook(
+        db,
+        account.id,
+        {
+          eventId: 'evt-missing-quota',
+          eventTimestampMs: 1_800_000_000_000,
+          tier: 'family',
+          status: 'active',
+        },
+        {
+          monthlyQuota: familyConfig.monthlyQuota,
+          dailyLimit: familyConfig.dailyLimit,
+        },
+      ),
+    ).rejects.toThrow('quota pool');
+
+    const row = await loadSubscription(account.id);
+    expect(row!.tier).toBe('plus');
+    expect(row!.lastRevenuecatEventId).not.toBe('evt-missing-quota');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // activateSubscriptionFromRevenuecat
 // ---------------------------------------------------------------------------
@@ -618,6 +698,29 @@ describe('activateSubscriptionFromRevenuecat (integration)', () => {
     const row = await loadSubscription(account.id);
     expect(row!.lastRevenuecatEventId).toBe(eventId);
     expect(row!.tier).toBe('family');
+  });
+
+  it('[WI-78 DS-188] rejects stale activation events for existing subscriptions', async () => {
+    const account = await seedAccount(4);
+    await seedSubscriptionWithQuota(account.id, 'family', {
+      lastRevenuecatEventId: 'evt-newer-activation',
+      lastRevenuecatEventTimestampMs: String(1_800_000_000_000),
+    });
+    const db = createIntegrationDb();
+
+    const result = await activateSubscriptionFromRevenuecat(
+      db,
+      account.id,
+      'plus',
+      'evt-older-activation',
+      { eventTimestampMs: 1_700_000_000_000 },
+    );
+
+    expect(result.tier).toBe('family');
+
+    const row = await loadSubscription(account.id);
+    expect(row!.tier).toBe('family');
+    expect(row!.lastRevenuecatEventId).toBe('evt-newer-activation');
   });
 
   it('updates quota pool to new tier limits when subscription already exists', async () => {

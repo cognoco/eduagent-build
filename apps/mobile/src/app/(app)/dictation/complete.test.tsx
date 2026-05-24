@@ -74,9 +74,11 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
-// Mock expo-image-picker — not testing camera in unit tests
+let mockLaunchCameraResult: unknown = { canceled: true };
+
+// Mock expo-image-picker — configurable for review request tests
 jest.mock('expo-image-picker', () => ({
-  launchCameraAsync: jest.fn().mockResolvedValue({ canceled: true }),
+  launchCameraAsync: jest.fn(() => Promise.resolve(mockLaunchCameraResult)),
   MediaTypeOptions: { Images: 'Images' },
 }));
 
@@ -124,12 +126,14 @@ describe('DictationCompleteScreen', () => {
     jest.useFakeTimers();
     mockReviewIsPending = false;
     mockRecordIsPending = false;
+    mockReviewReset.mockReset();
+    mockLaunchCameraResult = { canceled: true };
     delete (global as any).__focusEffectCleanup;
     // Restore default implementations that jest.clearAllMocks() wipes.
     const picker = require('expo-image-picker');
-    (picker.launchCameraAsync as jest.Mock).mockResolvedValue({
-      canceled: true,
-    });
+    (picker.launchCameraAsync as jest.Mock).mockImplementation(() =>
+      Promise.resolve(mockLaunchCameraResult),
+    );
     const fs = require('expo-file-system/legacy');
     (fs.readAsStringAsync as jest.Mock).mockResolvedValue('base64data');
   });
@@ -228,6 +232,199 @@ describe('DictationCompleteScreen', () => {
     });
 
     // push must NOT fire because blur set reviewCancelledRef=true
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 DS-187] blocks duplicate review while the first attempt is in flight', async () => {
+    mockLaunchCameraResult = {
+      canceled: false,
+      assets: [{ uri: 'file://review.jpg', mimeType: 'image/jpeg' }],
+    };
+    let resolveFirst!: (v: unknown) => void;
+    mockReviewMutateAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+    });
+
+    expect(mockReviewMutateAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirst({ mistakeCount: 0, feedback: 'Only', mistakes: [] });
+      await Promise.resolve();
+    });
+
+    expect(mockSetData).toHaveBeenCalledTimes(1);
+    expect(mockSetData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewResult: expect.objectContaining({ feedback: 'Only' }),
+      }),
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-78 review] blocks duplicate attempts before the first review mutation starts', async () => {
+    const imagePicker = require('expo-image-picker') as {
+      launchCameraAsync: jest.Mock;
+    };
+    let resolveFirstCamera!: (value: unknown) => void;
+    imagePicker.launchCameraAsync.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstCamera = resolve;
+        }),
+    );
+    mockReviewMutateAsync.mockResolvedValueOnce({
+      mistakeCount: 0,
+      feedback: 'First',
+      mistakes: [],
+    });
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(imagePicker.launchCameraAsync).toHaveBeenCalledTimes(1);
+    expect(mockReviewMutateAsync).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveFirstCamera({
+        canceled: false,
+        assets: [{ uri: 'file://first.jpg', mimeType: 'image/jpeg' }],
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockReviewMutateAsync).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-78 review] suppresses stale camera errors after screen blur', async () => {
+    const imagePicker = require('expo-image-picker') as {
+      launchCameraAsync: jest.Mock;
+    };
+    let rejectCamera!: (reason?: unknown) => void;
+    imagePicker.launchCameraAsync.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectCamera = reject;
+        }),
+    );
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+    });
+
+    const cleanup = (global as any).__focusEffectCleanup;
+    if (typeof cleanup === 'function') {
+      cleanup();
+    }
+
+    await act(async () => {
+      rejectCamera(new Error('camera rejected late'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] suppresses stale photo read errors after screen blur', async () => {
+    mockLaunchCameraResult = {
+      canceled: false,
+      assets: [{ uri: 'file://review.jpg', mimeType: 'image/jpeg' }],
+    };
+    const fs = require('expo-file-system/legacy') as {
+      readAsStringAsync: jest.Mock;
+    };
+    let rejectRead!: (reason?: unknown) => void;
+    fs.readAsStringAsync.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRead = reject;
+        }),
+    );
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const cleanup = (global as any).__focusEffectCleanup;
+    if (typeof cleanup === 'function') {
+      cleanup();
+    }
+
+    await act(async () => {
+      rejectRead(new Error('read rejected late'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] does not navigate when review resolves after timeout', async () => {
+    mockLaunchCameraResult = {
+      canceled: false,
+      assets: [{ uri: 'file://review.jpg', mimeType: 'image/jpeg' }],
+    };
+    let resolveReview!: (v: unknown) => void;
+    mockReviewMutateAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveReview = resolve;
+      }),
+    );
+
+    const { getByTestId, rerender } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    mockReviewIsPending = true;
+    rerender(<DictationCompleteScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+
+    await act(async () => {
+      resolveReview({ mistakeCount: 0, feedback: 'Late', mistakes: [] });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSetData).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
