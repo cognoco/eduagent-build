@@ -351,6 +351,17 @@ describe('consentReminder', () => {
     expect(whereText).toContain('2026-05-01t00:00:00.000z');
   });
 
+  it('[WI-84 review] matches requestedAt with a half-open millisecond window', async () => {
+    await executeHandler(['PENDING', 'CONSENTED', 'CONSENTED', 'CONSENTED']);
+
+    const firstCall = mockConsentFindFirst.mock.calls[0]?.[0] as
+      | { where?: unknown }
+      | undefined;
+    const whereText = extractSqlTextAndValues(firstCall?.where).join(' ');
+    expect(whereText).toContain('2026-05-01t00:00:00.000z');
+    expect(whereText).toContain('2026-05-01t00:00:00.001z');
+  });
+
   // [BUG-699] Inngest step retries can replay sendEmail. Each reminder step
   // must pass a deterministic Idempotency-Key bound to (profileId, eventId,
   // stepId) so Resend dedupes duplicate calls across retries.

@@ -6,7 +6,7 @@ import {
   getStepEmailFrom,
   getStepAppUrl,
 } from '../helpers';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, lt } from 'drizzle-orm';
 import { consentStates } from '@eduagent/database';
 import { getConsentStatus } from '../../services/consent';
 import {
@@ -27,8 +27,19 @@ export const consentReminder = inngest.createFunction(
         ? event.data.requestedAt
         : null;
     const requestedAtDate = requestedAt ? new Date(requestedAt) : null;
-    const hasValidRequestedAt =
-      requestedAtDate != null && !Number.isNaN(requestedAtDate.getTime());
+    const requestedAtUpperBound =
+      requestedAtDate != null && !Number.isNaN(requestedAtDate.getTime())
+        ? new Date(requestedAtDate.getTime() + 1)
+        : null;
+
+    function currentConsentRequestWhere() {
+      if (!requestedAtDate || !requestedAtUpperBound) return null;
+      return and(
+        eq(consentStates.profileId, profileId),
+        gte(consentStates.requestedAt, requestedAtDate),
+        lt(consentStates.requestedAt, requestedAtUpperBound),
+      );
+    }
 
     // [BUG-699] Build email options. Each reminder step passes a deterministic
     // idempotency key so Inngest step retries cannot deliver the same reminder
@@ -52,15 +63,13 @@ export const consentReminder = inngest.createFunction(
       parentEmail: string | null;
       consentToken: string | null;
     }> {
-      if (!hasValidRequestedAt) {
+      const where = currentConsentRequestWhere();
+      if (!where) {
         return { parentEmail: null, consentToken: null };
       }
       const db = getStepDatabase();
       const row = await db.query.consentStates.findFirst({
-        where: and(
-          eq(consentStates.profileId, profileId),
-          eq(consentStates.requestedAt, requestedAtDate),
-        ),
+        where,
         columns: { parentEmail: true, consentToken: true },
       });
       return {
@@ -70,13 +79,11 @@ export const consentReminder = inngest.createFunction(
     }
 
     async function isCurrentConsentRequest(): Promise<boolean> {
-      if (!hasValidRequestedAt) return false;
+      const where = currentConsentRequestWhere();
+      if (!where) return false;
       const db = getStepDatabase();
       const row = await db.query.consentStates.findFirst({
-        where: and(
-          eq(consentStates.profileId, profileId),
-          eq(consentStates.requestedAt, requestedAtDate),
-        ),
+        where,
         columns: { id: true },
       });
       return Boolean(row);
