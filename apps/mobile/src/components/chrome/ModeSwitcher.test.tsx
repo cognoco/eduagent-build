@@ -19,6 +19,7 @@ jest.mock(
 // follow-up).
 const mockUseNavigationContract = jest.fn();
 jest.mock('../../hooks/use-navigation-contract', () => ({
+  // gc1-allow: see block comment above — composes 4 providers; full mock keeps this a focused chrome unit test.
   useNavigationContract: (...args: unknown[]) =>
     mockUseNavigationContract(...args),
 }));
@@ -32,6 +33,7 @@ const mockDismissError = jest.fn();
 let mockIsSwitching = false;
 let mockSwitchError: 'study' | 'family' | null = null;
 jest.mock('../../lib/use-mode-switch', () => ({
+  // gc1-allow: see block comment above — useModeSwitch is a TanStack mutation; full mock keeps this a focused chrome unit test.
   useModeSwitch: () => ({
     switchMode: mockSwitchMode,
     isSwitching: mockIsSwitching,
