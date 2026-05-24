@@ -186,11 +186,11 @@ describe('wrangler.toml config guards', () => {
     });
 
     it('[WI-84 review] blocks missing IDEMPOTENCY_KV before migrations run', () => {
-      expect(
-        hasEnvBinding('staging') ||
-          hasEnvBinding('production') ||
-          deployWorkflowBlocksBeforeMigrations(),
-      ).toBe(true);
+      const guardBeforeMigrations = deployWorkflowBlocksBeforeMigrations();
+      if (!hasEnvBinding('staging')) expect(guardBeforeMigrations).toBe(true);
+      if (!hasEnvBinding('production')) {
+        expect(guardBeforeMigrations).toBe(true);
+      }
     });
   });
 

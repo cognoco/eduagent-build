@@ -6,12 +6,9 @@ import {
   getStepEmailFrom,
   getStepAppUrl,
 } from '../helpers';
-import { eq, desc } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { consentStates } from '@eduagent/database';
-import {
-  getConsentStatus,
-  getProfileConsentState,
-} from '../../services/consent';
+import { getConsentStatus } from '../../services/consent';
 import {
   sendEmail,
   formatConsentReminderEmail,
@@ -29,15 +26,9 @@ export const consentReminder = inngest.createFunction(
       typeof event.data.requestedAt === 'string'
         ? event.data.requestedAt
         : null;
-
-    function isMatchingRequest(liveRequestedAt: string | Date | null): boolean {
-      if (!requestedAt || !liveRequestedAt) return false;
-      const liveIso =
-        liveRequestedAt instanceof Date
-          ? liveRequestedAt.toISOString()
-          : new Date(liveRequestedAt).toISOString();
-      return liveIso === requestedAt;
-    }
+    const requestedAtDate = requestedAt ? new Date(requestedAt) : null;
+    const hasValidRequestedAt =
+      requestedAtDate != null && !Number.isNaN(requestedAtDate.getTime());
 
     // [BUG-699] Build email options. Each reminder step passes a deterministic
     // idempotency key so Inngest step retries cannot deliver the same reminder
@@ -61,31 +52,34 @@ export const consentReminder = inngest.createFunction(
       parentEmail: string | null;
       consentToken: string | null;
     }> {
-      const db = getStepDatabase();
-      const state = await getProfileConsentState(db, profileId);
-      if (!state?.parentEmail) return { parentEmail: null, consentToken: null };
-      if (!isMatchingRequest(state.requestedAt)) {
+      if (!hasValidRequestedAt) {
         return { parentEmail: null, consentToken: null };
       }
-
-      // Fetch the live token separately — getProfileConsentState intentionally
-      // omits it to keep the return surface minimal. We need it here so every
-      // reminder email contains a direct action link [UX-DE-H9].
+      const db = getStepDatabase();
       const row = await db.query.consentStates.findFirst({
-        where: eq(consentStates.profileId, profileId),
-        orderBy: desc(consentStates.requestedAt),
-        columns: { consentToken: true },
+        where: and(
+          eq(consentStates.profileId, profileId),
+          eq(consentStates.requestedAt, requestedAtDate),
+        ),
+        columns: { parentEmail: true, consentToken: true },
       });
       return {
-        parentEmail: state.parentEmail,
+        parentEmail: row?.parentEmail ?? null,
         consentToken: row?.consentToken ?? null,
       };
     }
 
     async function isCurrentConsentRequest(): Promise<boolean> {
+      if (!hasValidRequestedAt) return false;
       const db = getStepDatabase();
-      const state = await getProfileConsentState(db, profileId);
-      return isMatchingRequest(state?.requestedAt ?? null);
+      const row = await db.query.consentStates.findFirst({
+        where: and(
+          eq(consentStates.profileId, profileId),
+          eq(consentStates.requestedAt, requestedAtDate),
+        ),
+        columns: { id: true },
+      });
+      return Boolean(row);
     }
 
     /** Builds the direct consent page URL from a token. */

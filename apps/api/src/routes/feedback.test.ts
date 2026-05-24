@@ -204,6 +204,9 @@ describe('POST /feedback', () => {
       body: JSON.stringify({
         category: 'bug',
         message: 'Crash on launch',
+        appVersion: '1.2.3',
+        platform: 'ios',
+        osVersion: '17.5',
       }),
     });
 
@@ -217,6 +220,9 @@ describe('POST /feedback', () => {
         message: 'Crash on launch',
         supportTo: 'support@mentomate.com',
         metaLines: expect.stringContaining('Profile ID: profile-bug767-fail'),
+        appVersion: '1.2.3',
+        platform: 'ios',
+        osVersion: '17.5',
       }),
     });
   });

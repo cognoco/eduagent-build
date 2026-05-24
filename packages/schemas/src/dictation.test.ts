@@ -300,6 +300,15 @@ describe('recordDictationResultInputSchema', () => {
     expect(parsed.completionKey).toBeUndefined();
   });
 
+  it('[WI-84 review] rejects malformed completionKey when provided', () => {
+    const result = recordDictationResultInputSchema.safeParse({
+      ...validInput,
+      completionKey: 'not-a-uuid',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('defaults reviewed to false', () => {
     const { reviewed: _, ...rest } = validInput;
     const parsed = recordDictationResultInputSchema.parse(rest);

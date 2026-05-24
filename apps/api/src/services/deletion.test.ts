@@ -659,7 +659,8 @@ describe('deleteProfileIfNoConsent (CI-11)', () => {
     const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
     expect(sqlText).toContain('requested_at');
     expect(sqlText).toContain('>=');
-    expect(sqlText).toContain('<');
+    expect(sqlText).toContain('requested_at <');
+    expect(sqlText).not.toContain('requested_at <=');
     expect(sqlText).toContain('2026-05-01t00:00:00.000z');
     expect(sqlText).toContain('2026-05-01t00:00:00.001z');
   });

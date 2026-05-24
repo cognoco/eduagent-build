@@ -35,7 +35,9 @@ describe('deploy migration baseline guard', () => {
 
     expect(workflow).not.toMatch(/Baseline migration journal/);
     expect(workflow).not.toMatch(/baseline-migrations\.mjs/);
-    expect(workflow).toMatch(/pnpm exec drizzle-kit migrate/);
+    expect(workflow).toMatch(
+      /api-deploy:[\s\S]*?- name: Run database migrations[\s\S]*?pnpm exec drizzle-kit migrate/,
+    );
   });
 
   it('repairs the subscription Stripe event column drift before parent-bridge schema changes', () => {

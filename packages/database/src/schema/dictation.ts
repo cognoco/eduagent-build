@@ -9,6 +9,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
 import { profiles } from './profiles';
 
@@ -26,7 +27,9 @@ export const dictationResults = pgTable(
     profileId: uuid('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
-    completionKey: uuid('completion_key').notNull(),
+    completionKey: uuid('completion_key')
+      .notNull()
+      .default(sql`gen_random_uuid()`),
     date: date('date').notNull(),
     sentenceCount: integer('sentence_count').notNull(),
     mistakeCount: integer('mistake_count'),

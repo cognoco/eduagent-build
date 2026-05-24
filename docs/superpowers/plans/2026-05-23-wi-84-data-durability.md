@@ -327,11 +327,11 @@ Run the test-seed Jest files. For API behavior changes, also run `pnpm exec jest
 - Modify: `apps/api/src/services/dictation/result.integration.test.ts`
 - Add: new `apps/api/drizzle/0093_*` migration SQL and rollback doc
 
-**Rollout note:** This PR must be the expand step only. Production migrations run before the Worker deploy, so dropping `uniq_dictation_results_profile_date_mode` in the same deploy would break the old compiled Worker, whose insert still uses `ON CONFLICT (profile_id,date,mode)`. Keep that unique index and the repository conflict target in this PR. The new completion-key index is intentionally non-unique until the contract rollout because the repository still targets the legacy conflict key. Follow-up #394, after this Worker is deployed everywhere, must re-run the deterministic completion-key backfill for rows old Workers inserted with database-generated placeholders, then drop the legacy unique index, add the unique `(profile_id, completion_key)` index, add a non-unique date/mode read index if needed, and switch the repository conflict target to `(profileId, completionKey)`.
+**Rollout note:** This PR must be the expand step only. Production migrations run before the Worker deploy, so dropping `uniq_dictation_results_profile_date_mode` in the same deploy would break the old compiled Worker, whose insert still uses `ON CONFLICT (profile_id,date,mode)`. Keep that unique index and the repository conflict target in this PR. The new completion-key index is intentionally non-unique until the contract rollout because the repository still targets the legacy conflict key. Follow-up #394, after this Worker is deployed everywhere, must re-run the deterministic completion-key backfill for rows old Workers inserted with database-generated placeholders, then `ALTER TABLE "dictation_results" ALTER COLUMN "completion_key" DROP DEFAULT`, drop the legacy unique index, add the unique `(profile_id, completion_key)` index, add a non-unique date/mode read index if needed, and switch the repository conflict target to `(profileId, completionKey)`.
 
 - [ ] **Step 1: Write RED schema/route tests**
 
-Add `completionKey` to `recordDictationResultInputSchema` as required UUID or bounded opaque string. Tests should fail until schema accepts and route forwards it to `recordDictationResult`.
+Add `completionKey` to `recordDictationResultInputSchema` as an optional UUID for the expand rollout. Tests should fail until the schema accepts modern clients with a UUID, accepts legacy clients that omit it, and the route forwards it to `recordDictationResult`.
 
 - [ ] **Step 2: Write RED integration test**
 

@@ -148,6 +148,7 @@ import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import {
   cancelDeletion,
+  getProfileIdsForAccount,
   getDeletionStatus,
   scheduleDeletion,
 } from '../services/deletion';
@@ -320,7 +321,40 @@ describe('account routes', () => {
       });
     });
 
-    it('does not dispatch a second deletion event when already scheduled', async () => {
+    it('[WI-84 review] rolls back and returns 503 if profile lookup fails after scheduling', async () => {
+      const lookupError = new Error('profile lookup unavailable');
+      (getProfileIdsForAccount as jest.Mock).mockRejectedValueOnce(lookupError);
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+
+      expect(res.status).toBe(503);
+      expect(body).toMatchObject({
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+      expect(cancelDeletion).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id',
+      );
+      expect(captureException).toHaveBeenCalledWith(lookupError, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send',
+          accountId: 'test-account-id',
+        },
+      });
+      expect(inngest.send).not.toHaveBeenCalled();
+    });
+
+    it('[WI-84 review] dispatches an idempotent deletion event when deletion was already scheduled', async () => {
       (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',
         scheduledNow: false,
@@ -342,7 +376,14 @@ describe('account routes', () => {
         message: 'Deletion scheduled',
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',
       });
-      expect(inngest.send).not.toHaveBeenCalled();
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/account.deletion-scheduled',
+        data: expect.objectContaining({
+          accountId: 'test-account-id',
+          profileIds: ['profile-1'],
+          timestamp: expect.any(String),
+        }),
+      });
     });
 
     it('returns 401 without auth header', async () => {

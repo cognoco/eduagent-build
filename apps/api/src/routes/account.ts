@@ -70,27 +70,30 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       account.id,
     );
 
-    if (scheduledNow) {
+    try {
       const profileIds = await getProfileIdsForAccount(db, account.id);
 
-      try {
-        // core-send: account deletion must not claim scheduling if Inngest rejects the durable handoff.
-        await inngest.send({
-          name: 'app/account.deletion-scheduled',
-          data: {
-            accountId: account.id,
-            profileIds,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      } catch (error) {
-        captureException(error, {
-          extra: {
-            surface: 'account.deletion',
-            kind: 'core-send',
-            accountId: account.id,
-          },
-        });
+      // core-send: account deletion must not claim scheduling if Inngest rejects the durable handoff.
+      // Re-dispatch for already scheduled deletions too; the Inngest function
+      // is idempotent by accountId, and retrying recovers a prior orphaned
+      // schedule where the DB write succeeded but the durable handoff did not.
+      await inngest.send({
+        name: 'app/account.deletion-scheduled',
+        data: {
+          accountId: account.id,
+          profileIds,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      captureException(error, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send',
+          accountId: account.id,
+        },
+      });
+      if (scheduledNow) {
         try {
           await cancelDeletion(db, account.id);
         } catch (rollbackError) {
@@ -102,13 +105,13 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
             },
           });
         }
-        return apiError(
-          c,
-          503,
-          ERROR_CODES.SERVICE_UNAVAILABLE,
-          'Account deletion could not be scheduled. Please try again.',
-        );
       }
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Account deletion could not be scheduled. Please try again.',
+      );
     }
 
     return c.json(

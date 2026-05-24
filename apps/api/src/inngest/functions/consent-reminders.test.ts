@@ -2,6 +2,10 @@ const mockGetConsentStatus = jest.fn();
 const mockGetProfileConsentState = jest.fn();
 const mockDeleteProfileIfNoConsent = jest.fn().mockResolvedValue(true);
 const mockSendEmail = jest.fn();
+const mockConsentFindFirst = jest.fn().mockResolvedValue({
+  parentEmail: 'parent@example.com',
+  consentToken: 'test-token-abc123',
+});
 const mockFormatConsentReminderEmail = jest.fn(
   (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
     to: _email,
@@ -22,9 +26,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
     getStepDatabase: jest.fn(() => ({
       query: {
         consentStates: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue({ consentToken: 'test-token-abc123' }),
+          findFirst: mockConsentFindFirst,
         },
       },
     })),
@@ -90,6 +92,45 @@ interface ProfileConsentState {
   requestedAt?: string | Date;
 }
 
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['name'] === 'string') values.push(obj['name'].toLowerCase());
+  if (
+    'value' in obj &&
+    (typeof obj['value'] === 'string' ||
+      typeof obj['value'] === 'number' ||
+      obj['value'] instanceof Date)
+  ) {
+    const value = obj['value'];
+    values.push(
+      value instanceof Date
+        ? value.toISOString().toLowerCase()
+        : String(value).toLowerCase(),
+    );
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
+}
+
 async function executeHandler(
   statusSequence: (string | null)[],
   profileState: ProfileConsentState | null = {
@@ -113,6 +154,20 @@ async function executeHandler(
 
   // parentEmail is looked up from DB via getProfileConsentState
   mockGetProfileConsentState.mockResolvedValue(profileState);
+  const eventRequestedAt =
+    typeof eventData.requestedAt === 'string' ? eventData.requestedAt : null;
+  const stateRequestedAt =
+    profileState?.requestedAt instanceof Date
+      ? profileState.requestedAt.toISOString()
+      : (profileState?.requestedAt ?? null);
+  mockConsentFindFirst.mockResolvedValue(
+    eventRequestedAt && stateRequestedAt === eventRequestedAt
+      ? {
+          parentEmail: profileState?.parentEmail ?? null,
+          consentToken: 'test-token-abc123',
+        }
+      : null,
+  );
 
   const { step } = createInngestStepRunner();
 
@@ -129,6 +184,10 @@ async function executeHandler(
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockConsentFindFirst.mockResolvedValue({
+    parentEmail: 'parent@example.com',
+    consentToken: 'test-token-abc123',
+  });
 });
 
 describe('consentReminder', () => {
@@ -279,6 +338,17 @@ describe('consentReminder', () => {
 
     expect(mockSendEmail).not.toHaveBeenCalled();
     expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 review] reads reminder contact details from the same requestedAt generation', async () => {
+    await executeHandler(['PENDING', 'CONSENTED', 'CONSENTED', 'CONSENTED']);
+
+    const firstCall = mockConsentFindFirst.mock.calls[0]?.[0] as
+      | { where?: unknown }
+      | undefined;
+    const whereText = extractSqlTextAndValues(firstCall?.where).join(' ');
+    expect(whereText).toContain('profile-1');
+    expect(whereText).toContain('2026-05-01t00:00:00.000z');
   });
 
   // [BUG-699] Inngest step retries can replay sendEmail. Each reminder step
