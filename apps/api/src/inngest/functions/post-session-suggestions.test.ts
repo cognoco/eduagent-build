@@ -37,6 +37,7 @@ const mockDb = {
     curriculumBooks: { findFirst: jest.fn() },
     subjects: { findFirst: jest.fn() },
     curriculumTopics: { findMany: jest.fn() },
+    consentStates: { findFirst: jest.fn() },
   },
   select: jest.fn(),
   insert: jest.fn(),
@@ -101,6 +102,8 @@ beforeEach(() => {
   // insert chain: insert().values()
   const valuesThunk = jest.fn().mockResolvedValue(undefined);
   mockDb.insert.mockReturnValue({ values: valuesThunk });
+  // Default: no consent row → processing allowed (pre-consent-flow account).
+  mockDb.query.consentStates.findFirst.mockResolvedValue(undefined);
 });
 
 const validEventData = {
@@ -203,5 +206,50 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
         suggestions: ['A', 'B'],
       }),
     );
+  });
+});
+
+describe('post-session-suggestions [WI-116] consent re-check', () => {
+  // This job runs on the Inngest endpoint, outside the HTTP consent
+  // middleware. A filing event queued before GDPR consent was withdrawn (or
+  // a replay) must NOT send learner curriculum data to the LLM or persist
+  // derived suggestions for a profile whose consent is no longer granted.
+  it.each(['WITHDRAWN', 'PENDING', 'PARENTAL_CONSENT_REQUESTED'] as const)(
+    'skips without calling the LLM or inserting when GDPR consent is %s',
+    async (status) => {
+      mockDb.query.consentStates.findFirst.mockResolvedValue({
+        status,
+        consentType: 'GDPR',
+      });
+      mockRouteAndCall.mockResolvedValue({
+        response: '{"suggestions": ["A", "B"]}',
+      });
+
+      const result = await runHandler(validEventData);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'skipped',
+          reason: 'consent_not_granted',
+        }),
+      );
+      expect(mockRouteAndCall).not.toHaveBeenCalled();
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('proceeds when GDPR consent is CONSENTED', async () => {
+    mockDb.query.consentStates.findFirst.mockResolvedValue({
+      status: 'CONSENTED',
+      consentType: 'GDPR',
+    });
+    mockRouteAndCall.mockResolvedValue({
+      response: '{"suggestions": ["A", "B"]}',
+    });
+
+    const result = await runHandler(validEventData);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'completed' }));
+    expect(mockRouteAndCall).toHaveBeenCalled();
   });
 });

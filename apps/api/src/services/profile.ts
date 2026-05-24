@@ -39,7 +39,7 @@ export class ProfileValidationError extends Error {
 }
 import {
   getConsentStatus,
-  checkConsentRequired,
+  checkConsentRequiredFromDate,
   createPendingConsentState,
   createGrantedConsentState,
 } from './consent';
@@ -281,8 +281,14 @@ export async function createProfile(
 ): Promise<Profile> {
   const birthYear = input.birthYear;
 
-  // Pre-compute consent check (single call — used for both age gate and consent state)
-  const consentCheck = checkConsentRequired(birthYear);
+  // Pre-compute consent check using full date when available (WI-297).
+  // birthMonth/birthDay are NOT persisted — used only for precise age calculation
+  // at creation time to prevent year-only overestimation from bypassing the age gate.
+  const consentCheck = checkConsentRequiredFromDate(
+    birthYear,
+    input.birthMonth,
+    input.birthDay,
+  );
 
   // Enforce minimum age (PRD line 386: ages 6-10 out of scope)
   if (consentCheck?.belowMinimumAge) {

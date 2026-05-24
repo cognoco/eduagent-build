@@ -37,6 +37,7 @@ import { extractFirstJsonObject } from './llm/extract-json';
 import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
+import { isGdprProcessingAllowed } from './consent';
 
 const logger = createLogger();
 
@@ -1285,12 +1286,29 @@ export async function applyAnalysis(
     return { fieldsUpdated: [], notifications: [] };
   }
 
+  // [WI-221] GDPR regulatory consent gate — checked on the outer db BEFORE
+  // opening a transaction. revokeConsent sets GDPR status to WITHDRAWN without
+  // clearing memoryConsentStatus, so the existing memory gate alone is
+  // insufficient.
+  if (!(await isGdprProcessingAllowed(db, profileId))) {
+    return { fieldsUpdated: [], notifications: [] };
+  }
+
   const { finalFieldsUpdated, finalNotifications } = await db.transaction(
     async (tx) => {
       const profile = await getOrCreateLearningProfileTx(
         tx as unknown as Database,
         profileId,
       );
+
+      // [WI-221] Re-check GDPR consent INSIDE the transaction to close the
+      // TOCTOU window between the outer gate (above) and this write — consent
+      // could be withdrawn in the interval.
+      if (
+        !(await isGdprProcessingAllowed(tx as unknown as Database, profileId))
+      ) {
+        return { finalFieldsUpdated: [], finalNotifications: [] };
+      }
 
       if (
         profile.memoryConsentStatus !== 'granted' ||

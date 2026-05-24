@@ -143,6 +143,34 @@ describe('evaluateSentryForProfile', () => {
 });
 
 // ---------------------------------------------------------------------------
+// WI-316 — COPPA boundary: year-only age overestimates, gate must use <= 13
+// ---------------------------------------------------------------------------
+
+describe('WI-316 — COPPA rounding boundary', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('[break-test] year-only age-13 child (born late in year, actually 12) is treated as under-13', () => {
+    // A child born on Dec 31 of (currentYear - 13) computes as
+    // year-only age = 13, but is actually still 12. The gate must use
+    // age <= 13 so this child lands in the COPPA branch (disabled unless CONSENTED).
+    const birthYear = new Date().getUTCFullYear() - 13;
+    // child is "age 13" by year-only, but we're testing that the gate
+    // treats year-only-13 as potentially under-13 (uses <= not <).
+    evaluateSentryForProfile(birthYear, null); // no consent
+    // Should be DISABLED (under-13 COPPA branch), not enabled as 13-year-old.
+    expect(isSentryEnabled()).toBe(false);
+  });
+
+  it('[break-test] year-only age-13 with CONSENTED is enabled (parent consented)', () => {
+    const birthYear = new Date().getUTCFullYear() - 13;
+    evaluateSentryForProfile(birthYear, 'CONSENTED');
+    expect(isSentryEnabled()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [BUG-555] Sentry user scope on profile switch
 //
 // Root cause: on profile switch (parent↔child proxy mode), evaluateSentryForProfile

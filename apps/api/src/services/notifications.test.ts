@@ -2,6 +2,7 @@ import {
   sendPushNotification,
   sendEmail,
   sendStruggleNotification,
+  notifyParentToSubscribe,
   isExpoPushToken,
   formatReviewReminderBody,
   formatDailyReminderBody,
@@ -22,6 +23,7 @@ const mockGetPushToken = jest.fn();
 const mockGetDailyNotificationCount = jest.fn();
 const mockLogNotification = jest.fn();
 const mockCheckAndLogRateLimitInternal = jest.fn();
+const mockIsPushEnabled = jest.fn().mockResolvedValue(true);
 
 jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -35,6 +37,7 @@ jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => {
     logNotification: (...args: unknown[]) => mockLogNotification(...args),
     checkAndLogRateLimitInternal: (...args: unknown[]) =>
       mockCheckAndLogRateLimitInternal(...args),
+    isPushEnabled: (...args: unknown[]) => mockIsPushEnabled(...args),
   };
 });
 
@@ -748,5 +751,193 @@ describe('sendEmail structured logging', () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-82] sendPushNotification — respectPushPreference option
+// ---------------------------------------------------------------------------
+
+describe('[WI-82] sendPushNotification respectPushPreference', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const payload: NotificationPayload = {
+    profileId: 'profile-pref',
+    title: 'Test',
+    body: 'Test body',
+    type: 'review_reminder',
+  };
+
+  it('returns push_disabled and does NOT call fetch when pushEnabled=false and respectPushPreference=true', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockIsPushEnabled.mockResolvedValue(false);
+
+    const result = await sendPushNotification(mockDb, payload, {
+      respectPushPreference: true,
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'push_disabled' });
+    expect(mockFetchFn).not.toHaveBeenCalled();
+    expect(mockIsPushEnabled).toHaveBeenCalledWith(mockDb, payload.profileId);
+  });
+
+  it('proceeds with fetch when pushEnabled=true and respectPushPreference=true', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockIsPushEnabled.mockResolvedValue(true);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-pref' } }),
+    });
+    mockLogNotification.mockResolvedValue(undefined);
+
+    const result = await sendPushNotification(mockDb, payload, {
+      respectPushPreference: true,
+    });
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-pref' });
+    expect(mockFetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT call isPushEnabled when respectPushPreference is omitted (default behavior unchanged)', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-no-pref' } }),
+    });
+    mockLogNotification.mockResolvedValue(undefined);
+
+    await sendPushNotification(mockDb, payload);
+
+    expect(mockIsPushEnabled).not.toHaveBeenCalled();
+    expect(mockFetchFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-82] sendStruggleNotification — push preference gating
+// ---------------------------------------------------------------------------
+
+describe('[WI-82] sendStruggleNotification push preference gating', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function dbWithConsentAndPushPref(
+    pushEnabled: boolean,
+    consentStatus: 'CONSENTED' | null = 'CONSENTED',
+  ) {
+    const consentStateRow =
+      consentStatus != null ? { status: consentStatus } : null;
+    return {
+      query: {
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue({
+            parentProfileId: 'parent-pref',
+            childProfileId: 'child-pref',
+          }),
+        },
+        profiles: {
+          findFirst: jest.fn().mockResolvedValue({ displayName: 'Lily' }),
+        },
+        consentStates: {
+          findFirst: jest.fn().mockResolvedValue(consentStateRow),
+        },
+      },
+    } as unknown as Database;
+  }
+
+  it('GDPR CONSENTED + pushEnabled=false ⇒ push_disabled (push not delivered)', async () => {
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockIsPushEnabled.mockResolvedValue(false);
+
+    const result = await sendStruggleNotification(
+      dbWithConsentAndPushPref(false),
+      'child-pref',
+      { type: 'struggle_noticed', topic: 'Fractions', subject: null },
+    );
+
+    expect(result).toEqual({ sent: false, reason: 'push_disabled' });
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('GDPR CONSENTED + pushEnabled=true ⇒ delivered', async () => {
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockIsPushEnabled.mockResolvedValue(true);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-struggle' } }),
+    });
+
+    const result = await sendStruggleNotification(
+      dbWithConsentAndPushPref(true),
+      'child-pref',
+      { type: 'struggle_noticed', topic: 'Fractions', subject: null },
+    );
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-struggle' });
+    expect(mockFetchFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-82] notifyParentToSubscribe — push preference gating
+// ---------------------------------------------------------------------------
+
+describe('[WI-82] notifyParentToSubscribe push preference gating', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function dbForSubscribe(pushEnabled: boolean) {
+    return {
+      query: {
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue({
+            parentProfileId: 'parent-sub',
+            childProfileId: 'child-sub',
+          }),
+        },
+        profiles: {
+          findFirst: jest.fn().mockResolvedValue({ displayName: 'Max' }),
+        },
+        consentStates: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as unknown as Database;
+  }
+
+  it('pushEnabled=false ⇒ push not delivered (push_disabled) but function does not error', async () => {
+    // checkAndLogRateLimitInternal returns false (not rate-limited)
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockIsPushEnabled.mockResolvedValue(false);
+
+    const result = await notifyParentToSubscribe(
+      dbForSubscribe(false),
+      'child-sub',
+    );
+
+    // notifyParentToSubscribe doesn't propagate the inner push result directly,
+    // but the push should not be delivered (fetch not called).
+    expect(mockFetchFn).not.toHaveBeenCalled();
+    // The function itself still returns sent:true because it completed without error —
+    // push opt-out suppresses the push silently (same as no_push_token would).
+    // Verify via fetch not called rather than the result code.
+    expect(result.rateLimited).toBe(false);
+    // [CodeRabbit] push_disabled must not consume a notification-log / rate-limit slot.
+    // logNotification is only called after a successful Expo send — it must not
+    // fire here because the send was suppressed.
+    expect(mockLogNotification).not.toHaveBeenCalled();
   });
 });

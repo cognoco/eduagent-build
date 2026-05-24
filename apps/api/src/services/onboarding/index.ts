@@ -21,12 +21,35 @@ import type {
   InterestEntry,
   Pronouns,
 } from '@eduagent/schemas';
+import { ForbiddenError, PRONOUNS_PROMPT_MIN_AGE } from '@eduagent/schemas';
+import { calculateAge } from '../consent';
 import { getOrCreateLearningProfile } from '../learner-profile';
 
 export class OnboardingNotFoundError extends Error {
   constructor(profileId: string) {
     super(`profile not found: ${profileId}`);
     this.name = 'OnboardingNotFoundError';
+  }
+}
+
+/**
+ * Authorization guard (WI-278): a learner may only SELF-set pronouns at or
+ * above `PRONOUNS_PROMPT_MIN_AGE`. The mobile client hides the pronouns screen
+ * for younger profiles; this enforces the same boundary server-side so a
+ * modified client cannot bypass it. Year-only age is used deliberately to match
+ * the client gate (`use-consent`/pronouns screen). A parent setting pronouns
+ * for a child uses the separate parent-managed route, which is intentionally
+ * exempt. Throws `ForbiddenError` (→ 403) when the profile is under the minimum
+ * age. A null/unknown `birthYear` is allowed (birthYear is NOT NULL in practice;
+ * this mirrors the prior route behavior and fails open only on impossible input).
+ */
+export function assertPronounsSelfEditAllowed(
+  birthYear: number | null | undefined,
+): void {
+  if (birthYear != null && calculateAge(birthYear) < PRONOUNS_PROMPT_MIN_AGE) {
+    throw new ForbiddenError(
+      'Pronouns cannot be self-set for profiles under the minimum age.',
+    );
   }
 }
 
@@ -44,7 +67,7 @@ export async function updateConversationLanguage(
   db: Database,
   profileId: string,
   accountId: string,
-  conversationLanguage: ConversationLanguage
+  conversationLanguage: ConversationLanguage,
 ): Promise<void> {
   const result = await db
     .update(profiles)
@@ -68,7 +91,7 @@ export async function updatePronouns(
   db: Database,
   profileId: string,
   accountId: string,
-  pronouns: Pronouns | null
+  pronouns: Pronouns | null,
 ): Promise<void> {
   const result = await db
     .update(profiles)
@@ -100,7 +123,7 @@ export async function updateInterestsContext(
   db: Database,
   profileId: string,
   accountId: string,
-  interests: InterestEntry[]
+  interests: InterestEntry[],
 ): Promise<void> {
   // Guard: verify the profile belongs to the calling account — mirrors the
   // accountId check in updateConversationLanguage / updatePronouns. The

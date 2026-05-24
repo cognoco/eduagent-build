@@ -35,6 +35,9 @@ const mockSessionCompletedDb = createTransactionalMockDb({
       }),
     },
     streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+    // [WI-221] GDPR gate reads the latest consent row; undefined ⇒ allowed
+    // (pre-consent-flow account), so the happy-path analysis tests proceed.
+    consentStates: { findFirst: jest.fn().mockResolvedValue(undefined) },
     // analyze-learner-profile reads the session row for rawInput
     learningSessions: {
       findFirst: jest.fn().mockResolvedValue({ rawInput: null, topicId: null }),
@@ -104,6 +107,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
     },
     profiles: { id: col('id'), displayName: col('displayName') },
     streaks: { profileId: col('profileId') },
+    // [WI-221] columns used by isGdprProcessingAllowed's query builder.
+    consentStates: {
+      profileId: col('profileId'),
+      consentType: col('consentType'),
+      requestedAt: col('requestedAt'),
+    },
   },
 });
 
@@ -1772,6 +1781,24 @@ describe('sessionCompleted', () => {
         'inferred',
         SUBJECT_ID,
       );
+    });
+
+    it('[WI-221 break] does not transmit the transcript to the LLM when GDPR consent is WITHDRAWN even though memory consent is still granted', async () => {
+      // revokeConsent sets GDPR status WITHDRAWN without clearing
+      // memoryConsentStatus, so the memory gate passes — the GDPR gate must
+      // block BEFORE analyzeSessionTranscript transmits learner data.
+      mockGetLearningProfile.mockResolvedValue({
+        memoryConsentStatus: 'granted',
+        memoryCollectionEnabled: true,
+      });
+      mockSessionCompletedDb.query.consentStates.findFirst.mockResolvedValueOnce(
+        { status: 'WITHDRAWN', consentType: 'GDPR' },
+      );
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockAnalyzeSessionTranscript).not.toHaveBeenCalled();
+      expect(mockApplyAnalysis).not.toHaveBeenCalled();
     });
 
     it('does not call applyAnalysis when analyzeSessionTranscript returns null', async () => {

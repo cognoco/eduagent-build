@@ -29,6 +29,9 @@ jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => {
     checkConsentRequired: jest
       .fn()
       .mockReturnValue({ required: false, consentType: null, age: 30 }),
+    checkConsentRequiredFromDate: jest
+      .fn()
+      .mockReturnValue({ required: false, consentType: null, age: 30 }),
     createPendingConsentState: jest.fn().mockResolvedValue({
       id: 'consent-1',
       profileId: 'profile-1',
@@ -66,7 +69,7 @@ import {
   getProfileDisplayName,
 } from './profile';
 import {
-  checkConsentRequired,
+  checkConsentRequiredFromDate,
   createPendingConsentState,
   createGrantedConsentState,
 } from './consent';
@@ -313,10 +316,10 @@ describe('createProfile', () => {
   });
 
   it('creates PENDING consent state for child under 16', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+    (checkConsentRequiredFromDate as jest.Mock).mockReturnValueOnce({
       required: true,
       consentType: 'GDPR',
-      age: 9,
+      age: 13,
     });
     const row = mockProfileRow();
     const db = createMockDb({ insertReturning: [row] });
@@ -324,17 +327,21 @@ describe('createProfile', () => {
     const result = await createProfile(
       db,
       'account-123',
-      { displayName: 'Child', birthYear: 2016 },
+      { displayName: 'Child', birthYear: 2013 },
       false,
     );
 
-    expect(checkConsentRequired).toHaveBeenCalledWith(2016);
+    expect(checkConsentRequiredFromDate).toHaveBeenCalledWith(
+      2013,
+      undefined,
+      undefined,
+    );
     expect(createPendingConsentState).toHaveBeenCalledWith(db, row.id, 'GDPR');
     expect(result.consentStatus).toBe('PENDING');
   });
 
   it('does not create consent state for adult', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+    (checkConsentRequiredFromDate as jest.Mock).mockReturnValueOnce({
       required: false,
       consentType: null,
     });
@@ -354,7 +361,7 @@ describe('createProfile', () => {
 
   // BUG-239: Parent adding child must get CONSENTED, not PENDING
   it('creates CONSENTED consent state when parent adds child (parentProfileId set)', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+    (checkConsentRequiredFromDate as jest.Mock).mockReturnValueOnce({
       required: true,
       consentType: 'GDPR',
       age: 13,
@@ -381,7 +388,7 @@ describe('createProfile', () => {
   });
 
   it('[BREAK] creates family link when parent adds child aged 17+ (consent not required)', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+    (checkConsentRequiredFromDate as jest.Mock).mockReturnValueOnce({
       required: false,
       consentType: null,
       age: 17,
@@ -402,7 +409,7 @@ describe('createProfile', () => {
   });
 
   it('does not create family link when no parentProfileId', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+    (checkConsentRequiredFromDate as jest.Mock).mockReturnValueOnce({
       required: false,
       consentType: null,
       age: 30,
@@ -422,7 +429,7 @@ describe('createProfile', () => {
 
   // BUG-239: Child self-registering (no parentProfileId) still gets PENDING
   it('creates PENDING consent state when child self-registers (no parentProfileId)', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+    (checkConsentRequiredFromDate as jest.Mock).mockReturnValueOnce({
       required: true,
       consentType: 'GDPR',
       age: 13,

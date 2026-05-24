@@ -139,12 +139,68 @@ export function calculateAge(birthYear: number): number {
   return new Date().getUTCFullYear() - birthYear;
 }
 
+/** Minimum age to use the platform (PRD line 386: "Ages 6-10 Out of Scope") */
+export const MINIMUM_AGE = 11;
+
+/**
+ * Calculates exact age from a full birth date (year, month 1-based, day) and
+ * the current UTC date.
+ *
+ * Subtracts 1 if today is before this year's birthday — i.e., the child has
+ * not yet had their birthday this calendar year.
+ *
+ * Month is 1-based (January = 1). When month or day are not supplied, falls
+ * back to the same year-only approximation as calculateAge().
+ */
+export function calculateAgeFromParts(
+  birthYear: number,
+  birthMonth?: number,
+  birthDay?: number,
+): number {
+  const now = new Date();
+  const yearDiff = now.getUTCFullYear() - birthYear;
+  if (birthMonth == null || birthDay == null) {
+    return yearDiff;
+  }
+  // 1-based month → 0-based for Date constructor
+  const birthdayThisYear = new Date(
+    Date.UTC(now.getUTCFullYear(), birthMonth - 1, birthDay),
+  );
+  return now < birthdayThisYear ? yearDiff - 1 : yearDiff;
+}
+
+/**
+ * Determines whether parental consent is required using an exact birth date
+ * when month and day are available, falling back to year-only otherwise.
+ *
+ * Applies the same thresholds as checkConsentRequired():
+ * - age < MINIMUM_AGE  → belowMinimumAge + GDPR required
+ * - age <= 16          → GDPR required
+ * - age > 16           → not required
+ */
+export function checkConsentRequiredFromDate(
+  birthYear: number,
+  birthMonth?: number,
+  birthDay?: number,
+): {
+  required: boolean;
+  consentType: ConsentType | null;
+  belowMinimumAge?: boolean;
+  age: number;
+} {
+  const age = calculateAgeFromParts(birthYear, birthMonth, birthDay);
+  if (age < MINIMUM_AGE) {
+    return { required: true, consentType: 'GDPR', belowMinimumAge: true, age };
+  }
+  if (age <= 16) {
+    return { required: true, consentType: 'GDPR', age };
+  }
+  return { required: false, consentType: null, age };
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
-
-/** Minimum age to use the platform (PRD line 386: "Ages 6-10 Out of Scope") */
-export const MINIMUM_AGE = 11;
 
 /**
  * Determines whether parental consent is required based on age alone.
@@ -481,6 +537,60 @@ export async function processConsentResponse(
 }
 
 /**
+ * Refreshes the consent token and its expiry for a profile.
+ *
+ * Called by the consent-reminder workflow before embedding an approval link
+ * in each reminder email. Tokens minted by `requestConsent` expire after 7
+ * days (PRD line 414). The day-7 reminder link is race-prone and the day-14
+ * link is always expired without this refresh — parents who click a stale
+ * link receive a ConsentTokenExpiredError and cannot approve (DS-020).
+ *
+ * Sets expiresAt to 16 days from now so the link is valid for the full
+ * reminder window (day-14 reminder + 2-day click buffer) without running
+ * past the day-30 auto-delete cutoff.
+ *
+ * Returns the new token so the caller can build the approval URL without a
+ * second round-trip. Reads no PII from the event payload (invariant upheld).
+ */
+export async function refreshConsentToken(
+  db: Database,
+  profileId: string,
+): Promise<string> {
+  const newToken = crypto.randomUUID();
+  // 16 days: covers day-14 reminder window plus a 2-day click buffer,
+  // and stays well within the day-30 auto-delete cutoff.
+  const newExpiresAt = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
+
+  const updated = await db
+    .update(consentStates)
+    .set({
+      consentToken: newToken,
+      expiresAt: newExpiresAt,
+      updatedAt: new Date(),
+    })
+    // Scope to the GDPR row: (profileId, consentType) is unique, so without the
+    // consentType predicate this would clobber a coexisting COPPA row and write
+    // the same token to both, breaking the token-uniqueness the lookup relies on.
+    .where(
+      and(
+        eq(consentStates.profileId, profileId),
+        eq(consentStates.consentType, 'GDPR'),
+      ),
+    )
+    .returning({ id: consentStates.id });
+
+  // Fail fast if no GDPR row was updated: returning the token anyway would
+  // embed a link in the reminder email that points to a token never persisted
+  // (dead on arrival). Callers (consent reminders) only run while a PENDING
+  // GDPR row exists, so this is a defensive guard against an unexpected state.
+  if (updated.length === 0) {
+    throw new ConsentRecordNotFoundError();
+  }
+
+  return newToken;
+}
+
+/**
  * Returns the current consent status for a profile (latest consent record).
  *
  * Uses raw db query with explicit profileId filter because the consent flow
@@ -496,6 +606,35 @@ export async function getConsentStatus(
     orderBy: desc(consentStates.requestedAt),
   });
   return row?.status ?? null;
+}
+
+/**
+ * Whether async/background processing of a profile's learner data is currently
+ * permitted by GDPR consent state.
+ *
+ * Centralizes the guard that was previously duplicated inline across cron and
+ * notification paths (WI-82). Background jobs run outside the HTTP consent
+ * middleware, so each must re-check current consent at execution time before
+ * sending learner data to an LLM/external provider or persisting derived data.
+ *
+ * Semantics (matches the pre-existing inline guards):
+ * - no GDPR consent row ⇒ allowed (pre-consent-flow account, treated as not
+ *   yet gated)
+ * - latest GDPR row is `CONSENTED` ⇒ allowed
+ * - `PENDING` / `PARENTAL_CONSENT_REQUESTED` / `WITHDRAWN` ⇒ blocked
+ */
+export async function isGdprProcessingAllowed(
+  db: Database,
+  profileId: string,
+): Promise<boolean> {
+  const row = await db.query.consentStates.findFirst({
+    where: and(
+      eq(consentStates.profileId, profileId),
+      eq(consentStates.consentType, 'GDPR'),
+    ),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  return row == null || row.status === 'CONSENTED';
 }
 
 /**

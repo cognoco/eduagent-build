@@ -8,8 +8,13 @@
 // profiles. The cross-profile scan is intentional — it's a system-wide
 // maintenance job, not a per-user request.
 
-import { memoryFacts, vectorToDriver } from '@eduagent/database';
-import { and, asc, gt, isNull, sql } from 'drizzle-orm';
+import {
+  learningProfiles,
+  memoryFacts,
+  profiles,
+  vectorToDriver,
+} from '@eduagent/database';
+import { and, asc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 
 import { inngest } from '../client';
 import { getStepDatabase, getStepVoyageApiKey } from '../helpers';
@@ -110,6 +115,29 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
             .orderBy(asc(memoryFacts.id))
             .limit(BATCH_SIZE);
 
+          // [WI-113] Per-batch eligibility filter — check consent + archive
+          // status for the distinct profileIds in this batch. Done as a single
+          // JOIN query rather than N per-row lookups. Any row whose profile is
+          // not eligible is skipped (not sent to Voyage) and treated like a
+          // non-retryable failure for cursor-advancement: we advance past it
+          // so it does not block the batch, but we do NOT embed it.
+          const distinctProfileIds = [...new Set(rows.map((r) => r.profileId))];
+          let eligibleProfileIds = new Set<string>();
+          if (distinctProfileIds.length > 0) {
+            const eligibleRows = await db
+              .select({ profileId: learningProfiles.profileId })
+              .from(learningProfiles)
+              .innerJoin(profiles, eq(profiles.id, learningProfiles.profileId))
+              .where(
+                and(
+                  inArray(learningProfiles.profileId, distinctProfileIds),
+                  eq(learningProfiles.memoryConsentStatus, 'granted'),
+                  isNull(profiles.archivedAt),
+                ),
+              );
+            eligibleProfileIds = new Set(eligibleRows.map((r) => r.profileId));
+          }
+
           const updates: Array<{
             id: string;
             profileId: string;
@@ -125,6 +153,19 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
           let lastSafeAdvanceId: string | null = cursor;
           let haltedByRetryableFailure = false;
           for (const row of rows) {
+            // [WI-113] Skip rows whose profile lost consent or was archived
+            // after the fact was written. Advance the cursor past this row so
+            // it doesn't block the batch (same treatment as non-retryable) —
+            // but ONLY while the cursor hasn't already been pinned by a
+            // retryable failure earlier in this batch, otherwise an ineligible
+            // row sorted after a failed-but-eligible row would skip the latter
+            // and strand it un-retried (defeats the BUG-366 halt mechanism).
+            if (!eligibleProfileIds.has(row.profileId)) {
+              if (!haltedByRetryableFailure) {
+                lastSafeAdvanceId = row.id;
+              }
+              continue;
+            }
             logger.info('[memory_facts.embed_backfill] row attempted', {
               event: 'memory_facts.embed_backfill.row_attempted',
               profileId: row.profileId,
