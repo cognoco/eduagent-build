@@ -75,10 +75,12 @@ export const notificationPayloadSchema = z.union([
 ]);
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
-export const nudgeCreateSchema = z.object({
-  toProfileId: z.string().uuid(),
-  template: nudgeTemplateSchema,
-});
+export const nudgeCreateSchema = z
+  .object({
+    toProfileId: z.string().uuid(),
+    template: nudgeTemplateSchema,
+  })
+  .strict();
 export type NudgeCreateInput = z.infer<typeof nudgeCreateSchema>;
 
 export const nudgeSchema = z.object({

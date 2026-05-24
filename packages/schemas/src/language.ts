@@ -22,15 +22,19 @@ export const languageDetectionSchema = z.object({
 });
 export type LanguageDetection = z.infer<typeof languageDetectionSchema>;
 
-export const languageSetupSchema = z.object({
-  nativeLanguage: z.string().min(2).max(50),
-  startingLevel: cefrLevelSchema,
-});
+export const languageSetupSchema = z
+  .object({
+    nativeLanguage: z.string().min(2).max(50),
+    startingLevel: cefrLevelSchema,
+  })
+  .strict();
 export type LanguageSetupInput = z.infer<typeof languageSetupSchema>;
 
-export const nativeLanguageUpdateSchema = z.object({
-  nativeLanguage: z.string().min(2).max(50).nullable(),
-});
+export const nativeLanguageUpdateSchema = z
+  .object({
+    nativeLanguage: z.string().min(2).max(50).nullable(),
+  })
+  .strict();
 export type NativeLanguageUpdateInput = z.infer<
   typeof nativeLanguageUpdateSchema
 >;
@@ -58,13 +62,15 @@ export const vocabularySchema = z.object({
 });
 export type Vocabulary = z.infer<typeof vocabularySchema>;
 
-export const vocabularyCreateSchema = z.object({
-  term: z.string().min(1).max(200),
-  translation: z.string().min(1).max(500),
-  type: vocabTypeSchema.default('word'),
-  cefrLevel: cefrLevelSchema.optional(),
-  milestoneId: z.string().uuid().optional(),
-});
+export const vocabularyCreateSchema = z
+  .object({
+    term: z.string().min(1).max(200),
+    translation: z.string().min(1).max(500),
+    type: vocabTypeSchema.default('word'),
+    cefrLevel: cefrLevelSchema.optional(),
+    milestoneId: z.string().uuid().optional(),
+  })
+  .strict();
 export type VocabularyCreateInput = z.infer<typeof vocabularyCreateSchema>;
 
 export const vocabularyUpdateSchema = z.object({
@@ -76,9 +82,11 @@ export const vocabularyUpdateSchema = z.object({
 });
 export type VocabularyUpdateInput = z.infer<typeof vocabularyUpdateSchema>;
 
-export const vocabularyReviewSchema = z.object({
-  quality: z.number().int().min(0).max(5),
-});
+export const vocabularyReviewSchema = z
+  .object({
+    quality: z.number().int().min(0).max(5),
+  })
+  .strict();
 export type VocabularyReviewInput = z.infer<typeof vocabularyReviewSchema>;
 
 export const vocabularyRetentionCardSchema = z.object({

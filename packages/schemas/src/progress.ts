@@ -50,16 +50,20 @@ export type WithdrawalArchivePreference = z.infer<
   typeof withdrawalArchivePreferenceSchema
 >;
 
-export const withdrawalArchivePreferenceUpdateSchema = z.object({
-  value: withdrawalArchivePreferenceSchema,
-});
+export const withdrawalArchivePreferenceUpdateSchema = z
+  .object({
+    value: withdrawalArchivePreferenceSchema,
+  })
+  .strict();
 export type WithdrawalArchivePreferenceUpdate = z.infer<
   typeof withdrawalArchivePreferenceUpdateSchema
 >;
 
-export const familyPoolBreakdownSharingUpdateSchema = z.object({
-  value: z.boolean(),
-});
+export const familyPoolBreakdownSharingUpdateSchema = z
+  .object({
+    value: z.boolean(),
+  })
+  .strict();
 export type FamilyPoolBreakdownSharingUpdate = z.infer<
   typeof familyPoolBreakdownSharingUpdateSchema
 >;
@@ -92,21 +96,25 @@ export const xpSummarySchema = z.object({
 });
 export type XpSummary = z.infer<typeof xpSummarySchema>;
 
-export const notificationPrefsSchema = z.object({
-  reviewReminders: z.boolean(),
-  dailyReminders: z.boolean(),
-  weeklyProgressPush: z.boolean().optional(),
-  weeklyProgressEmail: z.boolean().optional(),
-  monthlyProgressEmail: z.boolean().optional(),
-  pushEnabled: z.boolean(),
-  maxDailyPush: z.number().int().min(1).max(10).optional(),
-});
+export const notificationPrefsSchema = z
+  .object({
+    reviewReminders: z.boolean(),
+    dailyReminders: z.boolean(),
+    weeklyProgressPush: z.boolean().optional(),
+    weeklyProgressEmail: z.boolean().optional(),
+    monthlyProgressEmail: z.boolean().optional(),
+    pushEnabled: z.boolean(),
+    maxDailyPush: z.number().int().min(1).max(10).optional(),
+  })
+  .strict();
 export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
 
-export const celebrationLevelUpdateSchema = z.object({
-  celebrationLevel: celebrationLevelSchema,
-  childProfileId: z.string().uuid().optional(),
-});
+export const celebrationLevelUpdateSchema = z
+  .object({
+    celebrationLevel: celebrationLevelSchema,
+    childProfileId: z.string().uuid().optional(),
+  })
+  .strict();
 export type CelebrationLevelUpdate = z.infer<
   typeof celebrationLevelUpdateSchema
 >;
@@ -116,14 +124,18 @@ export const celebrationLevelQuerySchema = z.object({
 });
 export type CelebrationLevelQuery = z.infer<typeof celebrationLevelQuerySchema>;
 
-export const celebrationSeenSchema = z.object({
-  viewer: z.enum(['child', 'parent']),
-});
+export const celebrationSeenSchema = z
+  .object({
+    viewer: z.enum(['child', 'parent']),
+  })
+  .strict();
 export type CelebrationSeenInput = z.infer<typeof celebrationSeenSchema>;
 
-export const pushTokenRegisterSchema = z.object({
-  token: z.string().min(1),
-});
+export const pushTokenRegisterSchema = z
+  .object({
+    token: z.string().min(1),
+  })
+  .strict();
 export type PushTokenRegisterInput = z.infer<typeof pushTokenRegisterSchema>;
 
 // ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@ export * from './common';
 export * from './errors';
 export * from './age';
 export * from './ids';
+export * from './health';
 
 // Profiles
 export * from './profiles';
