@@ -670,12 +670,20 @@ export async function getAssessmentEligibleTopics(
         .filter((topicId): topicId is string => typeof topicId === 'string'),
     ),
   );
+  const ownedTopics =
+    topicIds.length > 0
+      ? await findOwnedCurriculumTopics(db, { profileId, topicIds })
+      : [];
+  const ownedTopicById = new Map(
+    ownedTopics.map((topic) => [topic.topicId, topic]),
+  );
+  const ownedTopicIds = ownedTopics.map((topic) => topic.topicId);
   const activeAssessmentByTopicId = new Map<string, string>();
-  if (topicIds.length > 0) {
+  if (ownedTopicIds.length > 0) {
     const repo = createScopedRepository(db, profileId);
     const activeAssessments = await repo.assessments.findMany(
       and(
-        inArray(assessments.topicId, topicIds),
+        inArray(assessments.topicId, ownedTopicIds),
         eq(assessments.status, 'in_progress'),
       ),
     );
@@ -692,11 +700,14 @@ export async function getAssessmentEligibleTopics(
   const topics: AssessmentEligibleTopic[] = [];
   for (const row of rows) {
     if (!row.topicId || !row.endedAt || seen.has(row.topicId)) continue;
+    const ownedTopic = ownedTopicById.get(row.topicId);
+    if (!ownedTopic || ownedTopic.subjectId !== row.subjectId) continue;
     seen.add(row.topicId);
     topics.push({
       topicId: row.topicId,
-      topicTitle: row.topicTitle,
-      topicDescription: row.topicDescription,
+      topicTitle: ownedTopic.topicTitle,
+      topicDescription:
+        ownedTopic.topicDescription ?? row.topicDescription ?? '',
       subjectId: row.subjectId,
       subjectName: row.subjectName,
       pedagogyMode: row.pedagogyMode,

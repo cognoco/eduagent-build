@@ -1093,7 +1093,19 @@ export async function getTopicProgressBatch(
   if (topics.length === 0) return [];
 
   const repo = createScopedRepository(db, profileId);
-  const topicIds = topics.map((t) => t.id);
+  const requestedTopicIds = topics.map((t) => t.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: requestedTopicIds,
+  });
+  const ownedTopicById = new Map(
+    ownedTopics.map((topic) => [topic.topicId, topic]),
+  );
+  const scopedTopics = topics.filter((topic) => ownedTopicById.has(topic.id));
+  if (scopedTopics.length === 0) return [];
+
+  const topicIds = scopedTopics.map((t) => t.id);
+  const topicIdSet = new Set(topicIds);
 
   // 6 batch queries in parallel — constant count regardless of N topics
   const [allCards, allAssessments, allSessions, allDeepening, allXp] =
@@ -1114,21 +1126,26 @@ export async function getTopicProgressBatch(
 
   // Index by topicId for O(1) lookups
   const cardsByTopic = new Map<string, typeof allCards>();
-  for (const c of allCards) {
+  for (const c of allCards.filter((card) => topicIdSet.has(card.topicId))) {
     const list = cardsByTopic.get(c.topicId) ?? [];
     list.push(c);
     cardsByTopic.set(c.topicId, list);
   }
 
   const assessmentsByTopic = new Map<string, typeof allAssessments>();
-  for (const a of allAssessments) {
+  for (const a of allAssessments.filter((assessment) =>
+    topicIdSet.has(assessment.topicId),
+  )) {
     const list = assessmentsByTopic.get(a.topicId) ?? [];
     list.push(a);
     assessmentsByTopic.set(a.topicId, list);
   }
 
   const sessionsByTopic = new Map<string, typeof allSessions>();
-  for (const s of allSessions) {
+  const scopedSessions = allSessions.filter(
+    (session) => session.topicId != null && topicIdSet.has(session.topicId),
+  );
+  for (const s of scopedSessions) {
     if (!s.topicId) continue;
     const list = sessionsByTopic.get(s.topicId) ?? [];
     list.push(s);
@@ -1136,14 +1153,18 @@ export async function getTopicProgressBatch(
   }
 
   const deepeningByTopic = new Map<string, typeof allDeepening>();
-  for (const d of allDeepening) {
+  for (const d of allDeepening.filter((deepening) =>
+    topicIdSet.has(deepening.topicId),
+  )) {
     const list = deepeningByTopic.get(d.topicId) ?? [];
     list.push(d);
     deepeningByTopic.set(d.topicId, list);
   }
 
   const xpByTopic = new Map<string, typeof allXp>();
-  for (const x of allXp) {
+  for (const x of allXp.filter(
+    (xp) => xp.topicId != null && topicIdSet.has(xp.topicId),
+  )) {
     if (!x.topicId) continue;
     const list = xpByTopic.get(x.topicId) ?? [];
     list.push(x);
@@ -1153,7 +1174,7 @@ export async function getTopicProgressBatch(
   // Batch-fetch summaries for all topic sessions. We use all summaries for
   // completion signals, and the latest session's summary for the excerpt.
   const lastSessionByTopic = new Map<string, string>();
-  for (const topic of topics) {
+  for (const topic of scopedTopics) {
     const topicSessions = sessionsByTopic.get(topic.id) ?? [];
     const sorted = topicSessions.sort(
       (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
@@ -1164,7 +1185,7 @@ export async function getTopicProgressBatch(
     }
   }
 
-  const allSessionIds = allSessions.map((session) => session.id);
+  const allSessionIds = scopedSessions.map((session) => session.id);
   const allSummaries =
     allSessionIds.length > 0
       ? await repo.sessionSummaries.findMany(
@@ -1174,7 +1195,8 @@ export async function getTopicProgressBatch(
   const summaryBySessionId = new Map(allSummaries.map((s) => [s.sessionId, s]));
 
   // Assemble per-topic progress in-memory
-  return topics.map((topic) => {
+  return scopedTopics.map((topic) => {
+    const ownedTopic = ownedTopicById.get(topic.id);
     const topicCards = cardsByTopic.get(topic.id) ?? [];
     const retentionCard = topicCards[0] ?? null;
 
@@ -1242,8 +1264,8 @@ export async function getTopicProgressBatch(
 
     return {
       topicId: topic.id,
-      title: topic.title,
-      description: topic.description,
+      title: ownedTopic?.topicTitle ?? topic.title,
+      description: ownedTopic?.topicDescription ?? topic.description,
       completionStatus,
       retentionStatus: extendedRetentionStatus,
       daysSinceLastReview: retentionCard
@@ -1266,6 +1288,9 @@ export async function getActiveSessionForTopic(
   profileId: string,
   topicId: string,
 ): Promise<{ sessionId: string } | null> {
+  const topic = await findOwnedCurriculumTopic(db, { profileId, topicId });
+  if (!topic) return null;
+
   const repo = createScopedRepository(db, profileId);
   const sessions = await repo.sessions.findMany(
     and(

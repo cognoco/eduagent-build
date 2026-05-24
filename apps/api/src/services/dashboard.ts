@@ -74,6 +74,7 @@ import {
   selectCurrentlyWorkingOn,
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
+import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 import { generateWeeklyReportData } from './weekly-report';
 import {
   isoDate,
@@ -1281,7 +1282,13 @@ export async function getChildSubjectTopics(
     where: eq(curriculumTopics.curriculumId, curriculum.id),
   });
 
-  const topicIds = topics.map((topic) => topic.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId: childProfileId,
+    topicIds: topics.map((topic) => topic.id),
+  });
+  const ownedTopicIds = new Set(ownedTopics.map((topic) => topic.topicId));
+  const scopedTopics = topics.filter((topic) => ownedTopicIds.has(topic.id));
+  const topicIds = scopedTopics.map((topic) => topic.id);
   const topicSessionCounts =
     topicIds.length > 0
       ? await db
@@ -1316,7 +1323,7 @@ export async function getChildSubjectTopics(
   // [F-PV-06] Batch all per-topic queries into ~6 inArray queries (constant
   // subrequest count) instead of 7 queries × N topics which blows past the
   // Cloudflare Workers 50-subrequest limit for subjects with > 6 topics.
-  const results = await getTopicProgressBatch(db, childProfileId, topics);
+  const results = await getTopicProgressBatch(db, childProfileId, scopedTopics);
 
   // Only return topics where the student had at least 1 exchange.
   // Topics with no sessions have no connection to the student.

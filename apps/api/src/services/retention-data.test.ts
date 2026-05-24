@@ -95,6 +95,7 @@ import {
   evaluateRecallQuality,
   ensureRetentionCard,
   getProfileOverdueCount,
+  getAssessmentEligibleTopics,
   computeDaysSinceLastReview,
   getStableTopics,
 } from './retention-data';
@@ -254,6 +255,12 @@ function setupScopedRepo({
     consecutiveSuccessCount: number;
     profileId?: string;
   }>,
+  assessmentsFindMany = [] as Array<{
+    id: string;
+    topicId: string;
+    updatedAt: Date;
+    status: string;
+  }>,
   latestSummary = undefined as { learnerRecap: string | null } | undefined,
 } = {}) {
   const summaryRows = latestSummary ? [latestSummary] : [];
@@ -269,6 +276,9 @@ function setupScopedRepo({
     needsDeepeningTopics: {
       findMany: jest.fn().mockResolvedValue(needsDeepeningFindMany),
     },
+    assessments: {
+      findMany: jest.fn().mockResolvedValue(assessmentsFindMany),
+    },
     db: {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
@@ -281,6 +291,29 @@ function setupScopedRepo({
       }),
     },
   });
+}
+
+function makeSelectChain<T>(rows: T[]) {
+  const promise = Promise.resolve(rows);
+  const chain = {} as {
+    from: jest.Mock;
+    innerJoin: jest.Mock;
+    where: jest.Mock;
+    orderBy: jest.Mock;
+    limit: jest.Mock;
+    then: typeof promise.then;
+    catch: typeof promise.catch;
+    finally: typeof promise.finally;
+  };
+  chain.from = jest.fn(() => chain);
+  chain.innerJoin = jest.fn(() => chain);
+  chain.where = jest.fn(() => chain);
+  chain.orderBy = jest.fn(() => promise);
+  chain.limit = jest.fn(() => promise);
+  chain.then = promise.then.bind(promise);
+  chain.catch = promise.catch.bind(promise);
+  chain.finally = promise.finally.bind(promise);
+  return chain;
 }
 
 beforeEach(() => {
@@ -2520,5 +2553,74 @@ describe('getStableTopics', () => {
     const result = await getStableTopics(db, profileId, subjectId);
 
     expect(result.map((topic) => topic.topicId)).toEqual(['owned-topic']);
+  });
+});
+
+describe('getAssessmentEligibleTopics', () => {
+  it('[WI-80] excludes completed-session topics that fail the dual parent-chain ownership check', async () => {
+    const endedAt = new Date('2026-02-14T10:00:00.000Z');
+    const sessionRows = [
+      {
+        topicId: 'owned-topic',
+        topicTitle: 'Owned Topic',
+        topicDescription: 'Owned description',
+        subjectId,
+        subjectName: 'Math',
+        pedagogyMode: 'socratic',
+        languageCode: null,
+        endedAt,
+        lastActivityAt: endedAt,
+      },
+      {
+        topicId: 'mixed-parent-topic',
+        topicTitle: 'Foreign Topic',
+        topicDescription: 'Foreign description',
+        subjectId,
+        subjectName: 'Math',
+        pedagogyMode: 'socratic',
+        languageCode: null,
+        endedAt,
+        lastActivityAt: endedAt,
+      },
+    ];
+    const ownedTopicRows = [
+      {
+        topicId: 'owned-topic',
+        topicTitle: 'Owned Topic',
+        topicDescription: 'Owned description',
+        bookId: 'book-owned',
+        bookTitle: 'Book',
+        curriculumId,
+        subjectId,
+      },
+    ];
+    setupScopedRepo({
+      assessmentsFindMany: [
+        {
+          id: 'assessment-owned',
+          topicId: 'owned-topic',
+          status: 'in_progress',
+          updatedAt: new Date('2026-02-15T10:00:00.000Z'),
+        },
+        {
+          id: 'assessment-foreign',
+          topicId: 'mixed-parent-topic',
+          status: 'in_progress',
+          updatedAt: new Date('2026-02-15T11:00:00.000Z'),
+        },
+      ],
+    });
+    const db = createMockDb();
+    db.select = jest
+      .fn()
+      .mockReturnValueOnce(makeSelectChain(sessionRows))
+      .mockReturnValueOnce(makeSelectChain(ownedTopicRows)) as never;
+
+    const result = await getAssessmentEligibleTopics(db, profileId);
+
+    expect(result.map((topic) => topic.topicId)).toEqual(['owned-topic']);
+    expect(result[0]!.activeAssessmentId).toBe('assessment-owned');
+    expect(JSON.stringify(result)).not.toContain('Foreign Topic');
+    expect(JSON.stringify(result)).not.toContain('assessment-foreign');
   });
 });

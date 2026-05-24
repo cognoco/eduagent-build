@@ -50,6 +50,7 @@ import { createScopedRepository } from '@eduagent/database';
 import {
   getSubjectProgress,
   getTopicProgress,
+  getTopicProgressBatch,
   getOverallProgress,
   getOverallProgressBatch,
   getContinueSuggestion,
@@ -777,6 +778,69 @@ describe('getTopicProgress', () => {
     expect(rendered).toContain('exchange_count');
   });
 });
+
+// ---------------------------------------------------------------------------
+// getTopicProgressBatch
+// ---------------------------------------------------------------------------
+
+describe('getTopicProgressBatch', () => {
+  it('[WI-80] excludes mixed-parent topics from batched topic progress', async () => {
+    const ownedTopic = mockTopicRow({
+      id: 'owned-topic',
+      title: 'Owned Topic',
+    });
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Topic',
+      bookId: 'foreign-book',
+    });
+
+    setupScopedRepo({
+      retentionCardsFindMany: [
+        mockRetentionCard({
+          topicId: 'owned-topic',
+          xpStatus: 'verified',
+        }),
+        mockRetentionCard({
+          topicId: 'mixed-parent-topic',
+          xpStatus: 'verified',
+        }),
+      ],
+      assessmentsFindMany: [
+        mockAssessmentRow({
+          topicId: 'mixed-parent-topic',
+          status: 'passed',
+          masteryScore: 0.95,
+        }),
+      ],
+      sessionsFindMany: [
+        mockSessionRow({ topicId: 'owned-topic' }),
+        mockSessionRow({ topicId: 'mixed-parent-topic' }),
+      ],
+    });
+    const db = createMockDb({
+      topicsFindMany: [ownedTopic, mixedParentTopic],
+      ownedTopicRows: [mockOwnedTopicRow(ownedTopic)],
+    });
+
+    const result = await getTopicProgressBatch(db, profileId, [
+      {
+        id: 'owned-topic',
+        title: 'Owned Topic',
+        description: 'Owned description',
+      },
+      {
+        id: 'mixed-parent-topic',
+        title: 'Foreign Topic',
+        description: 'Foreign description',
+      },
+    ]);
+
+    expect(result.map((topic) => topic.topicId)).toEqual(['owned-topic']);
+    expect(JSON.stringify(result)).not.toContain('Foreign Topic');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // getOverallProgress
 // ---------------------------------------------------------------------------
@@ -1659,7 +1723,7 @@ describe('getActiveSessionForTopic', () => {
     setupScopedRepo({
       sessionsFindMany: [olderSession, newerSession],
     });
-    const db = createMockDb();
+    const db = createMockDb({ topicFindFirst: mockTopicRow() });
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
 
@@ -1672,6 +1736,26 @@ describe('getActiveSessionForTopic', () => {
       sessionsFindMany: [],
     });
     const db = createMockDb();
+
+    const result = await getActiveSessionForTopic(db, profileId, topicId);
+
+    expect(result).toBeNull();
+  });
+
+  it('[WI-80] returns null when the topic is not owned through the parent chain', async () => {
+    setupScopedRepo({
+      sessionsFindMany: [
+        {
+          ...mockSessionRow({ topicId }),
+          id: 'stale-session',
+          status: 'active' as const,
+        },
+      ],
+    });
+    const db = createMockDb({
+      topicFindFirst: mockTopicRow({ id: topicId, bookId: 'foreign-book' }),
+      ownedTopicRows: [],
+    });
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
 
