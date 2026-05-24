@@ -66,30 +66,53 @@ export type { OverdueTopic, OverdueSubject, OverdueTopicsResponse };
 function useProgressNavigationScope(): {
   activeProfile: ReturnType<typeof useProfile>['activeProfile'];
   mode: ReturnType<typeof useAppContext>['mode'];
+  profileId: string | undefined;
   canAccessFamilyChildData: boolean;
 } {
   const { activeProfile } = useProfile();
   const { mode: legacyMode } = useAppContext();
   const navigationContract = useNavigationDataScopeContract();
   const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.effectiveAppContext
+    ? navigationContract.queryScope.appContext
     : legacyMode;
+  const profileId = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? (navigationContract.queryScope.profileId ?? undefined)
+    : activeProfile?.id;
   const canAccessFamilyChildData = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.gates.showFamilyChildActivity
     : legacyMode !== 'study' && activeProfile?.isOwner === true;
 
-  return { activeProfile, mode, canAccessFamilyChildData };
+  return { activeProfile, mode, profileId, canAccessFamilyChildData };
+}
+
+function useSelfProgressNavigationScope(): {
+  activeProfile: ReturnType<typeof useProfile>['activeProfile'];
+  mode: ReturnType<typeof useAppContext>['mode'];
+  profileId: string | undefined;
+} {
+  const { activeProfile } = useProfile();
+  const { mode: legacyMode } = useAppContext();
+  const navigationContract = useNavigationDataScopeContract();
+
+  if (!FEATURE_FLAGS.MODE_NAV_V1_ENABLED) {
+    return { activeProfile, mode: legacyMode, profileId: activeProfile?.id };
+  }
+
+  return {
+    activeProfile,
+    mode: navigationContract.queryScope.appContext,
+    profileId: navigationContract.queryScope.profileId ?? undefined,
+  };
 }
 
 export function useSubjectProgress(
   subjectId: string,
 ): UseQueryResult<SubjectProgress> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.subject(mode, subjectId, activeProfile?.id),
+    queryKey: queryKeys.progress.subject(mode, subjectId, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -127,11 +150,10 @@ export interface OverallProgressResponse {
 
 export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery<OverallProgressResponse>({
-    queryKey: queryKeys.progress.overview(mode, activeProfile?.id),
+    queryKey: queryKeys.progress.overview(mode, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -151,11 +173,10 @@ export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
 
 export function useContinueSuggestion() {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.continue(mode, activeProfile?.id),
+    queryKey: queryKeys.progress.continue(mode, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -208,11 +229,10 @@ export function useLearningResumeTarget(
   scope: LearningResumeScope = {},
 ): UseQueryResult<LearningResumeTarget | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.resumeTarget(mode, activeProfile?.id, scope),
+    queryKey: queryKeys.progress.resumeTarget(mode, profileId, scope),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -228,10 +248,10 @@ export function useLearningResumeTarget(
 
 export function useResumeNudge() {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
+  const { activeProfile, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.resumeNudge.root(activeProfile?.id),
+    queryKey: queryKeys.resumeNudge.root(profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -259,14 +279,13 @@ export function useResumeNudge() {
 
 export function useActiveSessionForTopic(topicId: string | undefined) {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.activeSessionForTopic(
       mode,
       topicId,
-      activeProfile?.id,
+      profileId,
     ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -287,15 +306,10 @@ export function useActiveSessionForTopic(topicId: string | undefined) {
 // [F-009] Resolve subjectId from topicId — for deep-link resolution
 export function useResolveTopicSubject(topicId: string | undefined) {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.resolveTopicSubject(
-      mode,
-      topicId,
-      activeProfile?.id,
-    ),
+    queryKey: queryKeys.progress.resolveTopicSubject(mode, topicId, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -319,11 +333,10 @@ export function useResolveTopicSubject(topicId: string | undefined) {
 
 export function useReviewSummary(): UseQueryResult<ReviewSummary> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.reviewSummary(mode, activeProfile?.id),
+    queryKey: queryKeys.progress.reviewSummary(mode, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -343,11 +356,10 @@ export function useReviewSummary(): UseQueryResult<ReviewSummary> {
 
 export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.overdueTopics(mode, activeProfile?.id),
+    queryKey: queryKeys.progress.overdueTopics(mode, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -370,15 +382,14 @@ export function useTopicProgress(
   topicId: string,
 ): UseQueryResult<TopicProgress> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.topicProgress(
       mode,
       subjectId,
       topicId,
-      activeProfile?.id,
+      profileId,
     ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -402,11 +413,10 @@ export function useTopicProgress(
 
 export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.inventory(mode, activeProfile?.id),
+    queryKey: queryKeys.progress.inventory(mode, profileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -430,11 +440,10 @@ export function useProgressMilestones(
   limit = 5,
 ): UseQueryResult<MilestoneRecord[]> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.milestones(mode, activeProfile?.id, limit),
+    queryKey: queryKeys.progress.milestones(mode, profileId, limit),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -459,19 +468,23 @@ export function useProfileSessions(
   profileId: string | undefined,
 ): UseQueryResult<ChildSession[]> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useProgressNavigationScope();
+  const {
+    activeProfile,
+    mode,
+    profileId: viewerProfileId,
+    canAccessFamilyChildData,
+  } = useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.profileSessions(
       mode,
       profileId,
-      activeProfile?.id,
+      viewerProfileId,
     ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const isActiveProfile = profileId === activeProfile?.id;
+        const isActiveProfile = profileId === viewerProfileId;
         const res = isActiveProfile
           ? await client.progress.sessions.$get(
               { query: {} },
@@ -491,7 +504,7 @@ export function useProfileSessions(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id || canAccessFamilyChildData),
+      (profileId === viewerProfileId || canAccessFamilyChildData),
   });
 }
 
@@ -500,12 +513,15 @@ export function useProfileSessionsArchive(
   options?: { limit?: number },
 ): UseInfiniteQueryResult<InfiniteData<ChildSessionsPageResponse>, Error> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const {
+    activeProfile,
+    mode,
+    profileId: viewerProfileId,
+  } = useSelfProgressNavigationScope();
 
   return useInfiniteQuery({
     queryKey: [
-      ...queryKeys.progress.profileSessions(mode, profileId, activeProfile?.id),
+      ...queryKeys.progress.profileSessions(mode, profileId, viewerProfileId),
       'archive',
     ],
     initialPageParam: undefined as string | undefined,
@@ -528,7 +544,7 @@ export function useProfileSessionsArchive(
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !!activeProfile && !!profileId && profileId === activeProfile.id,
+    enabled: !!activeProfile && !!profileId && profileId === viewerProfileId,
   });
 }
 
@@ -536,19 +552,23 @@ export function useProfileReports(
   profileId: string | undefined,
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useProgressNavigationScope();
+  const {
+    activeProfile,
+    mode,
+    profileId: viewerProfileId,
+    canAccessFamilyChildData,
+  } = useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.profileReports(
       mode,
       profileId,
-      activeProfile?.id,
+      viewerProfileId,
     ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const isActiveProfile = profileId === activeProfile?.id;
+        const isActiveProfile = profileId === viewerProfileId;
         const res = isActiveProfile
           ? await client.progress.reports.$get({}, { init: { signal } })
           : await client.dashboard.children[':profileId'].reports.$get(
@@ -565,7 +585,7 @@ export function useProfileReports(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id || canAccessFamilyChildData),
+      (profileId === viewerProfileId || canAccessFamilyChildData),
   });
 }
 
@@ -573,19 +593,23 @@ export function useProfileWeeklyReports(
   profileId: string | undefined,
 ): UseQueryResult<WeeklyReportSummary[]> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useProgressNavigationScope();
+  const {
+    activeProfile,
+    mode,
+    profileId: viewerProfileId,
+    canAccessFamilyChildData,
+  } = useProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.profileWeeklyReports(
       mode,
       profileId,
-      activeProfile?.id,
+      viewerProfileId,
     ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const isActiveProfile = profileId === activeProfile?.id;
+        const isActiveProfile = profileId === viewerProfileId;
         const res = isActiveProfile
           ? await client.progress['weekly-reports'].$get(
               {},
@@ -607,7 +631,7 @@ export function useProfileWeeklyReports(
     enabled:
       !!activeProfile &&
       !!profileId &&
-      (profileId === activeProfile.id || canAccessFamilyChildData),
+      (profileId === viewerProfileId || canAccessFamilyChildData),
   });
 }
 
@@ -638,7 +662,7 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
+  const { profileId } = useSelfProgressNavigationScope();
 
   return useMutation<RefreshProgressResponse, Error, void>({
     mutationFn: async () => {
@@ -647,7 +671,7 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
       return (await res.json()) as RefreshProgressResponse;
     },
     onSuccess: () => {
-      invalidateProgressSnapshotQueries(queryClient, activeProfile?.id);
+      invalidateProgressSnapshotQueries(queryClient, profileId);
     },
   });
 }
@@ -807,15 +831,10 @@ export function useProfileReportDetail(
   reportId: string | undefined,
 ): UseQueryResult<MonthlyReportRecord | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.profileReportDetail(
-      mode,
-      activeProfile?.id,
-      reportId,
-    ),
+    queryKey: queryKeys.progress.profileReportDetail(mode, profileId, reportId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -851,7 +870,7 @@ export function useMarkChildReportViewed(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { mode } = useAppContext();
+  const { mode } = useProgressNavigationScope();
 
   return useMutation({
     // [BUG-550] Best-effort tracking — never retry on failure
@@ -995,13 +1014,12 @@ export function useProfileWeeklyReportDetail(
   reportId: string | undefined,
 ): UseQueryResult<WeeklyReportRecord | null> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
     queryKey: queryKeys.progress.profileWeeklyReportDetail(
       mode,
-      activeProfile?.id,
+      profileId,
       reportId,
     ),
     queryFn: async ({ signal: querySignal }) => {
@@ -1039,7 +1057,7 @@ export function useMarkWeeklyReportViewed(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { mode } = useAppContext();
+  const { mode } = useProgressNavigationScope();
 
   return useMutation({
     // [SUGG-4] Best-effort tracking — never retry on failure
@@ -1082,8 +1100,7 @@ export function useMarkProfileReportViewed(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
   return useMutation({
     retry: 0,
@@ -1107,12 +1124,12 @@ export function useMarkProfileReportViewed(): UseMutationResult<
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: ['progress', mode, 'profile', activeProfile?.id, 'reports'],
+        queryKey: ['progress', mode, 'profile', profileId, 'reports'],
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.progress.profileReportDetail(
           mode,
-          activeProfile?.id,
+          profileId,
           variables.reportId,
         ),
       });
@@ -1127,8 +1144,7 @@ export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
   return useMutation({
     retry: 0,
@@ -1152,18 +1168,12 @@ export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: [
-          'progress',
-          mode,
-          'profile',
-          activeProfile?.id,
-          'weekly-reports',
-        ],
+        queryKey: ['progress', mode, 'profile', profileId, 'weekly-reports'],
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.progress.profileWeeklyReportDetail(
           mode,
-          activeProfile?.id,
+          profileId,
           variables.reportId,
         ),
       });

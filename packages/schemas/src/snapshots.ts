@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoDateSchema } from './common.ts';
+import { isoDateField, isoDateSchema } from './common.ts';
 
 const pedagogyModeSchema = z.enum(['socratic', 'four_strands']);
 
@@ -20,7 +20,7 @@ export const subjectProgressMetricsSchema = z.object({
   activeMinutes: z.number().int(),
   // [F-045] Wall-clock minutes per subject — default(0) for pre-existing snapshots
   wallClockMinutes: z.number().int().default(0),
-  lastSessionAt: z.string().datetime().nullable(),
+  lastSessionAt: isoDateField.nullable(),
 });
 export type SubjectProgressMetrics = z.infer<
   typeof subjectProgressMetricsSchema
@@ -69,7 +69,7 @@ export const subjectInventorySchema = z.object({
   }),
   estimatedProficiency: z.string().nullable(),
   estimatedProficiencyLabel: z.string().nullable(),
-  lastSessionAt: z.string().datetime().nullable(),
+  lastSessionAt: isoDateField.nullable(),
   activeMinutes: z.number().int(),
   // [F-045] Wall-clock minutes for user-facing display (parent/child surfaces).
   // Defaults to 0 for backward compat with snapshots computed before this field.
@@ -159,8 +159,8 @@ export const milestoneRecordSchema = z.object({
   subjectId: z.string().uuid().nullable().optional(),
   bookId: z.string().uuid().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),
-  celebratedAt: z.string().datetime().nullable().optional(),
-  createdAt: z.string().datetime(),
+  celebratedAt: isoDateField.nullable().optional(),
+  createdAt: isoDateField,
 });
 export type MilestoneRecord = z.infer<typeof milestoneRecordSchema>;
 
@@ -328,16 +328,16 @@ export const monthlyReportRecordSchema = z.object({
   childProfileId: z.string().uuid(),
   reportMonth: z.string(),
   reportData: monthlyReportDataSchema,
-  viewedAt: z.string().datetime().nullable().optional(),
-  createdAt: z.string().datetime(),
+  viewedAt: isoDateField.nullable().optional(),
+  createdAt: isoDateField,
 });
 export type MonthlyReportRecord = z.infer<typeof monthlyReportRecordSchema>;
 
 export const monthlyReportSummarySchema = z.object({
   id: z.string().uuid(),
   reportMonth: z.string(),
-  viewedAt: z.string().datetime().nullable().optional(),
-  createdAt: z.string().datetime(),
+  viewedAt: isoDateField.nullable().optional(),
+  createdAt: isoDateField,
   headlineStat: monthlyReportHeadlineSchema,
   highlights: z.array(z.string()).default([]),
   nextSteps: z.array(z.string()).default([]),
@@ -379,16 +379,16 @@ export const weeklyReportRecordSchema = z.object({
   childProfileId: z.string().uuid(),
   reportWeek: z.string(),
   reportData: weeklyReportDataSchema,
-  viewedAt: z.string().datetime().nullable().optional(),
-  createdAt: z.string().datetime(),
+  viewedAt: isoDateField.nullable().optional(),
+  createdAt: isoDateField,
 });
 export type WeeklyReportRecord = z.infer<typeof weeklyReportRecordSchema>;
 
 export const weeklyReportSummarySchema = z.object({
   id: z.string().uuid(),
   reportWeek: z.string(),
-  viewedAt: z.string().datetime().nullable().optional(),
-  createdAt: z.string().datetime(),
+  viewedAt: isoDateField.nullable().optional(),
+  createdAt: isoDateField,
   headlineStat: monthlyReportHeadlineSchema,
   thisWeek: monthMetricsSchema.optional(),
   practiceSummary: reportPracticeSummarySchema.optional(),

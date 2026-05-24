@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LearningSession } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
-import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useNavigationDataScopeContract } from './use-navigation-contract';
 
 export function useRetryFiling() {
   const client = useApiClient();
@@ -11,7 +11,8 @@ export function useRetryFiling() {
   // [BUG-553] profileId is required by matchAnyMode / matchTranscriptAnyMode
   // so invalidation is scoped to the active profile and never crosses account
   // boundaries on a shared device.
-  const { activeProfile } = useProfile();
+  const { queryScope } = useNavigationDataScopeContract();
+  const profileId = queryScope.profileId ?? undefined;
 
   return useMutation({
     mutationFn: async ({
@@ -32,11 +33,14 @@ export function useRetryFiling() {
     onSuccess: (_data, { sessionId }) => {
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchAnyMode(sessionId, activeProfile?.id)(query.queryKey),
+          queryKeys.sessions.matchAnyMode(sessionId, profileId)(query.queryKey),
       });
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchTranscriptAnyMode(sessionId, activeProfile?.id)(query.queryKey),
+          queryKeys.sessions.matchTranscriptAnyMode(
+            sessionId,
+            profileId,
+          )(query.queryKey),
       });
     },
   });

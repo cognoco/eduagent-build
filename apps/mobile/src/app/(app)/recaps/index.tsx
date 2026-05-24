@@ -1,15 +1,13 @@
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Redirect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { ErrorFallback } from '../../../components/common';
+import {
+  Button,
+  ErrorFallback,
+  TimeoutLoader,
+} from '../../../components/common';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useRecaps } from '../../../hooks/use-recaps';
 import { formatRelativeDate } from '../../../lib/format-relative-date';
@@ -43,8 +41,22 @@ export default function RecapsScreen(): React.ReactElement {
         </Text>
 
         {recapsQuery.isLoading ? (
-          <View className="py-16 items-center" testID="recaps-loading">
-            <ActivityIndicator size="large" />
+          <View className="py-16" testID="recaps-loading">
+            <TimeoutLoader
+              isLoading={recapsQuery.isLoading}
+              timeoutMs={15_000}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                onPress: () => void recapsQuery.refetch(),
+                testID: 'recaps-timeout-retry',
+              }}
+              secondaryAction={{
+                label: t('common.goHome'),
+                onPress: () => router.push('/(app)/home' as Href),
+                testID: 'recaps-timeout-home',
+              }}
+              testID="recaps-loading-spinner"
+            />
           </View>
         ) : recapsQuery.isError ? (
           <ErrorFallback
@@ -70,9 +82,15 @@ export default function RecapsScreen(): React.ReactElement {
             <Text className="text-body font-semibold text-text-primary">
               {t('recaps.emptyTitle')}
             </Text>
-            <Text className="text-body-sm text-text-secondary mt-2">
+            <Text className="text-body-sm text-text-secondary mt-2 mb-4">
               {t('recaps.emptyBody')}
             </Text>
+            <Button
+              variant="primary"
+              label={t('recaps.emptyCtaStartSession')}
+              onPress={() => router.push('/(app)/home' as Href)}
+              testID="recaps-empty-start-session"
+            />
           </View>
         ) : (
           <View className="gap-3">

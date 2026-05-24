@@ -479,15 +479,17 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const quota = await getQuotaPool(db, subscription.id);
+    // [L7-F6] Parallelize: getQuotaPool and getTopUpCreditsRemaining are
+    // independent reads. Sequential awaits double the round-trip cost on
+    // the /usage hot path.
+    const [quota, topUpCreditsRemaining] = await Promise.all([
+      getQuotaPool(db, subscription.id),
+      getTopUpCreditsRemaining(db, subscription.id),
+    ]);
     const monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
     const usedThisMonth = quota?.usedThisMonth ?? 0;
     const dailyLimit = quota?.dailyLimit ?? null;
     const usedToday = quota?.usedToday ?? 0;
-    const topUpCreditsRemaining = await getTopUpCreditsRemaining(
-      db,
-      subscription.id,
-    );
     const remaining = calculateRemainingQuestions({
       monthlyLimit,
       usedThisMonth,

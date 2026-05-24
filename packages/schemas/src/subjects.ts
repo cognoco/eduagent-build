@@ -1,17 +1,10 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 import {
   cefrLevelSchema,
   languageCodeSchema,
   pedagogyModeSchema,
 } from './language.ts';
-
-// neon-serverless returns raw Date objects; neon-http returns ISO strings.
-// Accept either so response schemas don't break when a service forgets to map.
-// See `project_drizzle_date_objects.md` memory entry.
-const isoDateField = z.union([
-  z.string().datetime(),
-  z.date().transform((d) => d.toISOString()),
-]);
 
 // Enums
 

@@ -319,4 +319,3 @@ Open a PR that references WI-89, WI-163, WI-230, WI-282 and lists red-green test
 - [ ] **Step 5: Drive PR green**
 
 Check CI and automated reviews. Fix all critical/high/medium findings. Do not mark the goal complete until CI is clean and reviewer findings at those severities are resolved.
-

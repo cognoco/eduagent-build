@@ -12,6 +12,7 @@ import {
 } from './snapshots';
 import { consentStatusSchema } from './consent';
 import { struggleStatusSchema } from './struggle-status';
+import { isoDateField } from './common';
 
 export const celebrationNameSchema = z.enum([
   'polar_star',
@@ -67,7 +68,7 @@ export const pendingCelebrationSchema = z.object({
   celebration: celebrationNameSchema,
   reason: celebrationReasonSchema,
   detail: z.string().nullable().optional(),
-  queuedAt: z.string().datetime(),
+  queuedAt: isoDateField,
 });
 export type PendingCelebration = z.infer<typeof pendingCelebrationSchema>;
 
@@ -224,7 +225,7 @@ export const subjectProgressSchema = z.object({
   topicsVerified: z.number().int(),
   urgencyScore: z.number(),
   retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']),
-  lastSessionAt: z.string().datetime().nullable(),
+  lastSessionAt: isoDateField.nullable(),
 });
 export type SubjectProgress = z.infer<typeof subjectProgressSchema>;
 
@@ -243,7 +244,7 @@ export const topicProgressSchema = z.object({
   daysSinceLastReview: z.number().int().min(0).nullable(),
   struggleStatus: struggleStatusSchema,
   masteryScore: z.number().min(0).max(1).nullable(),
-  masteryChallengeVerifiedAt: z.string().datetime().nullable().optional(),
+  masteryChallengeVerifiedAt: isoDateField.nullable().optional(),
   summaryExcerpt: z.string().nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']).nullable(),
   totalSessions: z.number().int().min(0),
@@ -274,7 +275,7 @@ export const learningResumeTargetSchema = z.object({
   sessionId: z.string().uuid().nullable(),
   resumeFromSessionId: z.string().uuid().nullable(),
   resumeKind: learningResumeKindSchema,
-  lastActivityAt: z.string().datetime().nullable(),
+  lastActivityAt: isoDateField.nullable(),
   reason: z.string(),
 });
 export type LearningResumeTarget = z.infer<typeof learningResumeTargetSchema>;
@@ -298,7 +299,7 @@ export const dashboardChildSchema = z.object({
   profileId: z.string().uuid(),
   displayName: z.string(),
   consentStatus: consentStatusSchema.nullable(),
-  respondedAt: z.string().datetime().nullable(),
+  respondedAt: isoDateField.nullable(),
   summary: z.string(),
   sessionsThisWeek: z.number().int(),
   sessionsLastWeek: z.number().int(),
@@ -339,7 +340,7 @@ export const pendingNoticeSchema = z.object({
   payload: z.object({
     childName: z.string(),
   }),
-  createdAt: z.string().datetime(),
+  createdAt: isoDateField,
 });
 export type PendingNotice = z.infer<typeof pendingNoticeSchema>;
 
@@ -377,8 +378,8 @@ const baseCoachingCardFields = {
   title: z.string(),
   body: z.string(),
   priority: z.number().int().min(1).max(10),
-  expiresAt: z.string().datetime().nullable(),
-  createdAt: z.string().datetime(),
+  expiresAt: isoDateField.nullable(),
+  createdAt: isoDateField,
 };
 
 export const streakCardSchema = z.object({
@@ -401,7 +402,7 @@ export const reviewDueCardSchema = z.object({
   ...baseCoachingCardFields,
   type: z.literal('review_due'),
   topicId: z.string().uuid(),
-  dueAt: z.string().datetime(),
+  dueAt: isoDateField,
   easeFactor: z.number().min(1.3),
 });
 export type ReviewDueCard = z.infer<typeof reviewDueCardSchema>;
@@ -741,8 +742,8 @@ export type ChildProgressHistoryResponse = z.infer<
 
 export const progressSummarySchema = z.object({
   summary: z.string().max(500).nullable(),
-  generatedAt: z.string().datetime().nullable(),
-  basedOnLastSessionAt: z.string().datetime().nullable(),
+  generatedAt: isoDateField.nullable(),
+  basedOnLastSessionAt: isoDateField.nullable(),
   latestSessionId: z.string().uuid().nullable(),
   activityState: z.enum(['fresh', 'no_recent_activity', 'stale']),
   nudgeRecommended: z.boolean(),
@@ -772,7 +773,7 @@ const homeworkSummaryInlineSchema = z.object({
 const childSessionDrillScoreSchema = z.object({
   correct: z.number().int().min(0),
   total: z.number().int().min(1),
-  createdAt: z.string().datetime(),
+  createdAt: isoDateField,
 });
 
 export const childSessionSchema = z.object({
@@ -782,8 +783,8 @@ export const childSessionSchema = z.object({
   topicId: z.string().uuid().nullable(),
   topicTitle: z.string().nullable(),
   sessionType: z.enum(['learning', 'homework', 'interleaved']),
-  startedAt: z.string().datetime(),
-  endedAt: z.string().datetime().nullable(),
+  startedAt: isoDateField,
+  endedAt: isoDateField.nullable(),
   exchangeCount: z.number().int(),
   escalationRung: z.number().int().min(1).max(5),
   durationSeconds: z.number().int().nullable(),

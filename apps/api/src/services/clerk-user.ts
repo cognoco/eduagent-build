@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { captureException } from './sentry';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
 const VERIFIED_EMAIL_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -144,7 +148,16 @@ export async function resolveVerifiedClerkEmail({
         headers: { Authorization: `Bearer ${clerkSecretKey}` },
       },
     );
-  } catch {
+  } catch (err) {
+    logger.warn('[clerk-user] verified-email lookup failed', {
+      event: 'clerk_user.lookup.network_error',
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      userId,
+      tags: { surface: 'clerk_lookup', reason: 'network_error' },
+    });
     return {
       ok: false,
       reason: 'lookup-unavailable',

@@ -27,20 +27,26 @@ const mockSwitchProfile = jest.fn(async () => ({ success: true }));
 let mockIsExplicitProxyMode = false;
 let mockContractHomeScreen: 'LearnerHome' | 'FamilyHome' = 'LearnerHome';
 
+const mockNavContract = () => ({
+  home: {
+    screen: mockContractHomeScreen,
+    titleKey: 'tabs.myLearning',
+    iconName: 'School',
+  },
+  chrome: { modeSwitcher: 'hidden', proxyBanner: 'hidden' },
+  gates: { sessionIsOwner: true, showFamilyChildActivity: false },
+  canEnter: () => true,
+  isSurfaced: () => true,
+  queryScope: { appContext: 'study' as const, profileId: 'test-profile-id' },
+  effectiveAppContext: 'study' as const,
+  isParentProxy: false,
+});
+
 jest.mock(
   '../../hooks/use-navigation-contract' /* gc1-allow: hook wraps profile context, subscription query, and feature flags; not exercisable in isolation */,
   () => ({
-    useNavigationContract: () => ({
-      home: {
-        screen: mockContractHomeScreen,
-        titleKey: 'tabs.myLearning',
-        iconName: 'School',
-      },
-      chrome: { modeSwitcher: 'hidden', proxyBanner: 'hidden' },
-      gates: { sessionIsOwner: true },
-      canEnter: () => true,
-      isSurfaced: () => true,
-    }),
+    useNavigationContract: () => mockNavContract(),
+    useNavigationDataScopeContract: () => mockNavContract(),
   }),
 );
 

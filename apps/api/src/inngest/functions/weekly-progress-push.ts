@@ -246,13 +246,15 @@ export const weeklyProgressPushCron = inngest.createFunction(
       // Push still requires pushEnabled + weeklyProgressPush; email is its own
       // channel and must not be gated by push permission. Missing preference
       // rows use defaults, where weeklyProgressEmail is enabled.
-      const links = await db.query.familyLinks.findMany({
-        columns: { parentProfileId: true },
-      });
+      // [L7-F3] selectDistinct returns one row per parent instead of one
+      // per link, removing duplicate parentProfileId rows. Combined with the
+      // notificationPreferences filter below, the working set stays bounded
+      // to parents who have at least one linked child.
+      const linkRows = await db
+        .selectDistinct({ parentProfileId: familyLinks.parentProfileId })
+        .from(familyLinks);
 
-      const linkedParentIds = Array.from(
-        new Set(links.map((link) => link.parentProfileId)),
-      );
+      const linkedParentIds = linkRows.map((link) => link.parentProfileId);
 
       if (linkedParentIds.length === 0) return [];
 

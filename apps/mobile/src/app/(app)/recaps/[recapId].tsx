@@ -1,10 +1,4 @@
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import {
   Redirect,
   useLocalSearchParams,
@@ -15,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { ErrorFallback } from '../../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 import { AddToMyLearningButton } from '../../../components/family/AddToMyLearningButton';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useRecap } from '../../../hooks/use-recaps';
@@ -85,8 +79,22 @@ export default function RecapDetailScreen(): React.ReactElement {
         </View>
 
         {recapQuery.isLoading ? (
-          <View className="py-16 items-center" testID="recap-detail-loading">
-            <ActivityIndicator size="large" />
+          <View className="py-16" testID="recap-detail-loading">
+            <TimeoutLoader
+              isLoading={recapQuery.isLoading}
+              timeoutMs={15_000}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                onPress: () => void recapQuery.refetch(),
+                testID: 'recap-detail-timeout-retry',
+              }}
+              secondaryAction={{
+                label: t('recaps.backLabel'),
+                onPress: handleBack,
+                testID: 'recap-detail-timeout-back',
+              }}
+              testID="recap-detail-loading-spinner"
+            />
           </View>
         ) : recapQuery.isError ? (
           <View className="mt-4">

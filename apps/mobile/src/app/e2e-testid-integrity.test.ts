@@ -243,10 +243,16 @@ function isMaestroEnvVar(id: string): boolean {
 
 describe('E2E testID integrity', () => {
   const yamlFiles = collectFiles(E2E_FLOWS_DIR, '.yaml');
-  const tsxFiles = collectFiles(SOURCE_DIR, '.tsx');
+  // Scan both .tsx and .ts — testIDs can live in non-JSX modules too (e.g.,
+  // hooks that return toast configs with a `testID:` field, like
+  // use-clone-from-child.ts → 'clone-toast-open').
+  const sourceFiles = [
+    ...collectFiles(SOURCE_DIR, '.tsx'),
+    ...collectFiles(SOURCE_DIR, '.ts'),
+  ];
   const maestroIds = extractMaestroIds(yamlFiles);
   const { staticIds, dynamicPrefixes, derivedSuffixes } =
-    extractSourceTestIds(tsxFiles);
+    extractSourceTestIds(sourceFiles);
 
   function hasMatchingDerivedSuffix(id: string): boolean {
     return derivedSuffixes.some(

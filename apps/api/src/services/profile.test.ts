@@ -66,7 +66,6 @@ import {
   getProfileDisplayName,
 } from './profile';
 import {
-  getConsentStatus,
   checkConsentRequired,
   createPendingConsentState,
   createGrantedConsentState,
@@ -118,7 +117,26 @@ function createMockDb({
   familyFindFirstResult = undefined as
     | { childProfileId: string; createdAt: Date }
     | undefined,
+  consentSelectResult = [] as Array<{
+    profileId: string;
+    status:
+      | 'PENDING'
+      | 'PARENTAL_CONSENT_REQUESTED'
+      | 'CONSENTED'
+      | 'WITHDRAWN';
+    requestedAt: Date;
+  }>,
 } = {}): Database {
+  // [L7-F1] db.select(...).from(...).where(...).orderBy(...) chain used by
+  // listProfiles for the batched consent lookup. Returns consentSelectResult
+  // as a thenable so `await` resolves directly.
+  const selectChain = {
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        orderBy: jest.fn().mockResolvedValue(consentSelectResult),
+      }),
+    }),
+  };
   return {
     query: {
       profiles: {
@@ -130,6 +148,7 @@ function createMockDb({
         findFirst: jest.fn().mockResolvedValue(familyFindFirstResult),
       },
     },
+    select: jest.fn().mockReturnValue(selectChain),
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue(insertReturning),
@@ -168,17 +187,25 @@ describe('listProfiles', () => {
     expect(result[0]!.createdAt).toBe('2025-01-15T10:00:00.000Z');
   });
 
-  it('includes consentStatus from consent service', async () => {
-    const mockGetConsent = getConsentStatus as jest.Mock;
-    mockGetConsent
-      .mockResolvedValueOnce('PARENTAL_CONSENT_REQUESTED')
-      .mockResolvedValueOnce(null);
-
+  it('includes consentStatus from batched consent query', async () => {
+    // [L7-F1] listProfiles now reads consent_states directly in a single
+    // batched query instead of calling getConsentStatus per row. The mock
+    // returns the latest-first rows for both profiles; null for adult-1 is
+    // expressed by omitting the row entirely.
     const rows = [
       mockProfileRow({ id: 'child-1', displayName: 'Child' }),
       mockProfileRow({ id: 'adult-1', displayName: 'Adult' }),
     ];
-    const db = createMockDb({ findManyResult: rows });
+    const db = createMockDb({
+      findManyResult: rows,
+      consentSelectResult: [
+        {
+          profileId: 'child-1',
+          status: 'PARENTAL_CONSENT_REQUESTED',
+          requestedAt: NOW,
+        },
+      ],
+    });
     const result = await listProfiles(db, 'account-123');
 
     expect(result[0]!.consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');

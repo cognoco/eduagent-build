@@ -15,6 +15,7 @@ import {
 } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
 import { routeAndCall, type ChatMessage } from './llm';
+import { extractFirstJsonObject } from './llm/extract-json';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 
@@ -182,8 +183,11 @@ export async function generateReportHighlights(
     },
     {
       role: 'user',
+      // [SEC] Do NOT pass real child PII (name) to the external LLM. The
+      // prompt must read identically regardless of which child it concerns;
+      // `reportData.childName` remains available for client-side render.
       content: JSON.stringify({
-        childName: reportData.childName,
+        childName: 'the learner',
         month: reportData.month,
         thisMonth: reportData.thisMonth,
         lastMonth: reportData.lastMonth,
@@ -192,9 +196,30 @@ export async function generateReportHighlights(
     },
   ];
 
+  const fallback = {
+    highlights: ['Great progress this month!'],
+    nextSteps: [],
+    comparison: null,
+  };
+
   try {
     const result = await routeAndCall(messages, 1);
-    const parsed = JSON.parse(result.response) as {
+    // [SEC/BUG] Use the canonical brace-depth extractor instead of a raw
+    // JSON.parse so leading/trailing prose from the model does not throw.
+    const jsonStr = extractFirstJsonObject(result.response);
+    if (jsonStr === null) {
+      logger.warn(
+        'generateReportHighlights: no JSON object found in LLM response',
+        {
+          // The prompt no longer contains a real name, so a truncated
+          // response preview is PII-safe to log.
+          responsePreview: result.response.slice(0, 200),
+        },
+      );
+      return fallback;
+    }
+
+    const parsed = JSON.parse(jsonStr) as {
       equivalent?: unknown;
       highlights?: unknown;
       nextSteps?: unknown;
@@ -215,14 +240,16 @@ export async function generateReportHighlights(
         typeof parsed.equivalent === 'string' ? parsed.equivalent : null,
     };
   } catch (error) {
+    // CLAUDE.md "Silent recovery without escalation is banned" — escalate
+    // to Sentry AND structured logs so this fallback is observable.
+    logger.error('generateReportHighlights: LLM call or parse failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     captureException(error, {
+      tags: { surface: 'monthly_report' },
       extra: { context: 'monthly-report-highlights' },
     });
-    return {
-      highlights: ['Great progress this month!'],
-      nextSteps: [],
-      comparison: null,
-    };
+    return fallback;
   }
 }
 

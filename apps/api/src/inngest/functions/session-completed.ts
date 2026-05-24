@@ -30,7 +30,6 @@ import {
   processTeachBackCompletion,
 } from '../../services/verification-completion';
 import * as sentry from '../../services/sentry';
-import { safeSend } from '../../services/safe-non-core';
 import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
 import {
@@ -41,6 +40,7 @@ import {
 import { generateLearnerRecap } from '../../services/session-recap';
 import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import {
+  curriculumBooks,
   curriculumTopics,
   createScopedRepository,
   learningSessions,
@@ -52,6 +52,8 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { escapeXml } from '../../services/llm/sanitize';
+import { projectAiResponseContent } from '../../services/llm/project-response';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { cefrLevelSchema, verificationTypeSchema } from '@eduagent/schemas';
 import {
@@ -72,6 +74,35 @@ import {
 import { runDedupForProfile } from '../../services/memory/dedup-pass';
 
 const logger = createLogger();
+
+// [PROFILE-SCOPE-GUARD] Verify ownership via the parent chain
+// (topics → books → subjects.profileId) before exposing the title.
+// Mirrors the pattern in services/notes.ts:verifyTopicOwnership so a
+// stale/spoofed topicId cannot leak titles across accounts.
+// Hoisted from a closure inside processSessionCompleted so the integration
+// test can exercise the WHERE-clause ownership predicate directly (a unit-
+// level db mock has no SQL engine and cannot evaluate the predicate).
+export async function loadTopicTitle(
+  db: Database,
+  currentTopicId: string | null | undefined,
+  ownerProfileId: string,
+): Promise<string | null> {
+  if (!currentTopicId) return null;
+  const [topic] = await db
+    .select({ title: curriculumTopics.title })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.profileId, ownerProfileId),
+      ),
+    )
+    .where(eq(curriculumTopics.id, currentTopicId))
+    .limit(1);
+  return topic?.title ?? null;
+}
 
 export async function embedNewFactsForProfile(
   db: Database,
@@ -106,15 +137,32 @@ export async function embedNewFactsForProfile(
   let failed = 0;
   const embeddedIds: string[] = [];
   const failedIds: string[] = [];
-  for (const row of rows) {
-    logger.info('[memory_facts] embed-on-write attempted', {
-      event: 'memory_facts.embed_on_write.attempted',
-      profileId,
-      category: row.category,
-      source: 'embed_on_write',
-    });
 
-    const result = await embedder(row.text);
+  // [L7-F8] Parallelize the per-row Voyage call. The underlying embedder is
+  // single-text (Voyage batch API not currently wired into FactEmbedder), but
+  // Promise.all eliminates the serial-HTTP latency stack while still going
+  // through `embedFactText`'s classification and 4xx/5xx handling. If Voyage
+  // rate-limits, the per-row classifier marks the row `rate_limited` /
+  // `transient` and Inngest step retry covers re-scan on next tick.
+  //
+  // [L9-F2] Removed orphan `app/embed.skipped` dispatch — no handler exists
+  // for the event anywhere in the codebase (grep 2026-05-23), so each retry
+  // multiplied a no-op observability emit. Failure surfacing now lives in the
+  // structured logger.warn below plus the Sentry path for unexpected classes.
+  const results = await Promise.all(
+    rows.map(async (row) => {
+      logger.info('[memory_facts] embed-on-write attempted', {
+        event: 'memory_facts.embed_on_write.attempted',
+        profileId,
+        category: row.category,
+        source: 'embed_on_write',
+      });
+      const result = await embedder(row.text);
+      return { row, result };
+    }),
+  );
+
+  for (const { row, result } of results) {
     if (!result.ok) {
       failed += 1;
       failedIds.push(row.id);
@@ -124,39 +172,14 @@ export async function embedNewFactsForProfile(
         category: row.category,
         reason: result.reason,
       });
-      // [CR-2026-05-19-M1] Observability: expected/documented failure classes
-      // (`invalid_input` = Voyage 4xx poison-pill; `no_voyage_key` = missing
-      // config) should NOT go to Sentry (they are not bugs), but we still need
-      // a queryable counter so ops can measure the skip rate without digging
-      // through raw logs. All other failure classes are unexpected and DO get
-      // Sentry escalation so they page on sustained transient/rate-limit spikes.
-      //
-      // KNOWN-LIMITATION: this helper is invoked from inside a step.run, so on
-      // step retry the same rows (still embedding=NULL) re-scan and re-emit
-      // `app/embed.skipped`. The metric is inflated by the retry multiplier
-      // (default 3 → up to 4× per skipped row). Acceptable because the event
-      // is observability-only; a future refactor should return `skipped[]`
-      // from this function and let the caller emit via step.sendEvent (which
-      // Inngest memoizes across retries). Sentry's own fingerprint dedup
-      // handles the `captureException` path below.
+      // [CR-2026-05-19-M1] Documented benign classes (`invalid_input` = Voyage
+      // 4xx poison-pill; `no_voyage_key` = missing config) are NOT routed to
+      // Sentry. Other classes are unexpected and DO escalate so transient/
+      // rate-limit spikes page on sustained drift.
       if (
-        result.class === 'invalid_input' ||
-        result.class === 'no_voyage_key'
+        result.class !== 'invalid_input' &&
+        result.class !== 'no_voyage_key'
       ) {
-        await safeSend(
-          () =>
-            inngest.send({
-              name: 'app/embed.skipped',
-              data: {
-                profileId,
-                reason: result.reason,
-                category: row.category,
-              },
-            }),
-          'memory_facts.embed_on_write.skipped',
-          { profileId, reason: result.reason },
-        );
-      } else {
         sentry.captureException(new Error(result.message), {
           extra: {
             surface: 'session_completed.embed_new_facts',
@@ -382,7 +405,10 @@ export const sessionCompleted = inngest.createFunction(
       const freshSession = await step.run('re-read-session', async () => {
         const db = getStepDatabase();
         const row = await db.query.learningSessions.findFirst({
-          where: eq(learningSessions.id, sessionId),
+          where: and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId),
+          ),
         });
         return row
           ? { topicId: row.topicId, exchangeCount: row.exchangeCount }
@@ -397,19 +423,6 @@ export const sessionCompleted = inngest.createFunction(
     }
 
     const outcomes: StepOutcome[] = [];
-
-    const loadTopicTitle = async (
-      db: ReturnType<typeof getStepDatabase>,
-      currentTopicId: string | null | undefined,
-    ): Promise<string | null> => {
-      if (!currentTopicId) return null;
-      const [topic] = await db
-        .select({ title: curriculumTopics.title })
-        .from(curriculumTopics)
-        .where(eq(curriculumTopics.id, currentTopicId))
-        .limit(1);
-      return topic?.title ?? null;
-    };
 
     const computeSessionMedianResponseSeconds = async () => {
       const db = getStepDatabase();
@@ -642,15 +655,19 @@ export const sessionCompleted = inngest.createFunction(
         }
         return runCritical('update-retention', async () => {
           const db = getStepDatabase();
-          for (const tid of retentionTopicIds) {
-            await updateRetentionFromSession(
-              db,
-              profileId,
-              tid,
-              effectiveQuality,
-              timestamp,
-            );
-          }
+          // [L7-F7] Parallelize per-topic SM-2 updates — they are independent
+          // writes against retention_cards keyed by (profileId, topicId).
+          await Promise.all(
+            retentionTopicIds.map((tid) =>
+              updateRetentionFromSession(
+                db,
+                profileId,
+                tid,
+                effectiveQuality,
+                timestamp,
+              ),
+            ),
+          );
         });
       }),
     );
@@ -790,14 +807,17 @@ export const sessionCompleted = inngest.createFunction(
         }
         return runIsolated('update-needs-deepening', profileId, async () => {
           const db = getStepDatabase();
-          for (const tid of retentionTopicIds) {
-            await updateNeedsDeepeningProgress(
-              db,
-              profileId,
-              tid,
-              completionQualityRating,
-            );
-          }
+          // [L7-F7] Parallelize per-topic needs-deepening updates.
+          await Promise.all(
+            retentionTopicIds.map((tid) =>
+              updateNeedsDeepeningProgress(
+                db,
+                profileId,
+                tid,
+                completionQualityRating,
+              ),
+            ),
+          );
         });
       }),
     );
@@ -918,13 +938,20 @@ export const sessionCompleted = inngest.createFunction(
               columns: { eventType: true, content: true },
             });
 
+            // [PROMPT-INJECT] Mirror buildRecapTranscriptText in
+            // services/session-recap.ts: strip envelope JSON from assistant
+            // turns via projectAiResponseContent, then escapeXml every value
+            // so a learner cannot smuggle directives out of the data section.
             const transcriptText = transcriptEvents
-              .map(
-                (e) =>
-                  `${e.eventType === 'user_message' ? 'Student' : 'Mentor'}: ${
-                    e.content
-                  }`,
-              )
+              .map((e) => {
+                const content =
+                  e.eventType === 'ai_response'
+                    ? projectAiResponseContent(e.content, { silent: true })
+                    : e.content;
+                return `${
+                  e.eventType === 'user_message' ? 'Student' : 'Mentor'
+                }: ${escapeXml(content)}`;
+              })
               .join('\n\n');
 
             const result = await generateSessionInsights(transcriptText);
@@ -971,7 +998,7 @@ export const sessionCompleted = inngest.createFunction(
               .where(eq(profiles.id, profileId))
               .limit(1);
             const topicTitle = topicId
-              ? await loadTopicTitle(db, topicId)
+              ? await loadTopicTitle(db, topicId, profileId)
               : null;
             // [BUG-526 / BUG-878] Pass the shared freeform sentinel so the
             // highlight builder renders friendly "had a learning session"
@@ -985,7 +1012,12 @@ export const sessionCompleted = inngest.createFunction(
               ? await db
                   .select({ name: subjects.name })
                   .from(subjects)
-                  .where(eq(subjects.id, subjectId))
+                  .where(
+                    and(
+                      eq(subjects.id, subjectId),
+                      eq(subjects.profileId, profileId),
+                    ),
+                  )
                   .limit(1)
               : [null];
 
@@ -995,7 +1027,12 @@ export const sessionCompleted = inngest.createFunction(
                 durationSeconds: learningSessions.durationSeconds,
               })
               .from(learningSessions)
-              .where(eq(learningSessions.id, sessionId))
+              .where(
+                and(
+                  eq(learningSessions.id, sessionId),
+                  eq(learningSessions.profileId, profileId),
+                ),
+              )
               .limit(1);
             const duration =
               session?.wallClockSeconds ?? session?.durationSeconds ?? 60;
@@ -1271,7 +1308,7 @@ export const sessionCompleted = inngest.createFunction(
               : [null];
 
             const topicTitle = topicId
-              ? await loadTopicTitle(db, topicId)
+              ? await loadTopicTitle(db, topicId, profileId)
               : null;
             const sessionRow = await db.query.learningSessions.findFirst({
               where: and(
@@ -1554,7 +1591,11 @@ export const sessionCompleted = inngest.createFunction(
               .limit(1);
 
             if ((retentionCard?.repetitions ?? 0) > 2) {
-              const topicTitle = await loadTopicTitle(db, currentTopicId);
+              const topicTitle = await loadTopicTitle(
+                db,
+                currentTopicId,
+                profileId,
+              );
               await queueCelebration(
                 db,
                 profileId,

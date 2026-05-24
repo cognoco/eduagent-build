@@ -51,14 +51,14 @@ function BridgeToast({
           {toast.primaryAction ? (
             <Pressable
               onPress={toast.primaryAction.onPress}
-              className="min-h-[44px] justify-center rounded-button bg-primary px-4 py-2"
+              disabled={isCloning}
+              className={`min-h-[44px] justify-center rounded-button bg-primary px-4 py-2${
+                isCloning ? ' opacity-60' : ''
+              }`}
               accessibilityRole="button"
               accessibilityLabel={toast.primaryAction.label}
-              testID={
-                toast.primaryAction.testID === 'clone-toast-open'
-                  ? 'clone-toast-open'
-                  : toast.primaryAction.testID
-              }
+              accessibilityState={{ disabled: isCloning }}
+              testID={toast.primaryAction.testID}
             >
               <Text className="text-body-sm font-semibold text-text-inverse">
                 {toast.primaryAction.label}

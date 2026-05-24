@@ -250,5 +250,18 @@ export const consentStates = pgTable(
       table.profileId,
       table.consentType,
     ),
+    // [L7-F4] Supports getConsentStatus() — orderBy desc(requestedAt) per
+    // profileId. Without this index, the query falls back to a sequential
+    // scan of all consent rows for the profile.
+    index('consent_states_profile_requested_idx').on(
+      table.profileId,
+      table.requestedAt,
+    ),
+    // [L7-F5] Supports processConsentResponse() + getChildNameByToken()
+    // token-lookup hot path. Partial WHERE clause skips the (large) set of
+    // rows whose token has been cleared after a response.
+    index('consent_states_token_idx')
+      .on(table.consentToken)
+      .where(sql`${table.consentToken} IS NOT NULL`),
   ],
 );
