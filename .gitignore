@@ -118,13 +118,6 @@ _scratchpad.md
 .claude/zdx-tts/
 apps/mobile/.claude/
 
-# Ignore ephemeral .agents/ session artifacts, but keep the canonical
-# skill definitions under .agents/skills/ tracked. Use .agents/* (not
-# .agents/) so re-inclusion of .agents/skills/ works — git can't re-
-# include children of a parent directory excluded with a trailing slash.
-.agents/*
-!.agents/skills/
-
 # Hook log output (Claude Code session_start / user_prompt_submit / session_end)
 /logs/
 apps/mobile/logs/
