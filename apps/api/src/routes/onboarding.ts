@@ -16,7 +16,6 @@ import {
   onboardingPronounsPatchSchema,
   onboardingInterestsContextPatchSchema,
   onboardingSuccessResponseSchema,
-  PRONOUNS_PROMPT_MIN_AGE,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -25,11 +24,11 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { assertOwnerAndParentAccess } from '../services/family-access';
 import { notFound, forbidden } from '../errors';
-import { calculateAge } from '../services/consent';
 import {
   updateConversationLanguage,
   updatePronouns,
   updateInterestsContext,
+  assertPronounsSelfEditAllowed,
   OnboardingNotFoundError,
 } from '../services/onboarding';
 
@@ -119,21 +118,12 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
-      // WI-278: Server-side age gate — the client skips the pronouns screen for
-      // under-13 users, but we enforce the same boundary on the server so that
-      // a modified client cannot bypass it. Year-only age is used here (matches
-      // the client gate). The parent-managed /:profileId/pronouns route is exempt
+      // WI-278: Server-side age gate (mirrors the client's self-skip so a
+      // modified client cannot bypass it). The business rule lives in the
+      // service guard; the parent-managed /:profileId/pronouns route is exempt
       // because a parent setting pronouns for their child is the allowed path.
-      const profileMetaPronouns = c.get('profileMeta');
-      if (
-        profileMetaPronouns?.birthYear != null &&
-        calculateAge(profileMetaPronouns.birthYear) < PRONOUNS_PROMPT_MIN_AGE
-      ) {
-        return forbidden(
-          c,
-          'Pronouns cannot be self-set for profiles under the minimum age.',
-        );
-      }
+      // Throws ForbiddenError → 403 for under-min-age profiles.
+      assertPronounsSelfEditAllowed(c.get('profileMeta')?.birthYear);
       const { pronouns } = c.req.valid('json');
       try {
         await updatePronouns(db, profileId, account.id, pronouns);
