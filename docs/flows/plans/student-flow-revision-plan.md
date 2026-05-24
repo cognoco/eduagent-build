@@ -8,7 +8,7 @@ Navigation target reference: [`2026-05-21-navigation-contract.md`](../../specs/2
 
 ## Purpose
 
-Walk every flow mapped to the **student / Study** audience, verify that the old flow still works for the active learner, file every defect in Notion, and update the docs when the mapped access or flow description has drifted.
+Walk every flow mapped to the **student / Study** audience, verify that the old flow still works for the active learner, file every defect in Notion, and update the docs when the mapped access or flow description has drifted. Do not use tests. Use the app directly just like an end user would. 
 
 This plan is intentionally about access and behavior, not implementation. A student can be an under-18 learner, a child/non-owner profile, an adult learner, or an adult who also has mentor access but is currently studying as themselves.
 
@@ -36,6 +36,7 @@ For each row:
 5. Update `student-flow-access-inventory.md` for access drift. Update `mobile-app-flow-inventory.md` only when the canonical flow description itself is wrong.
 6. Update this row: final `Tested` symbol, `Result` word, `Bugs` URL(s), `Doc Updated` tick + date, and a one-line note.
 7. Move to the next independent flow.
+8. Use seed files for auth and sign in. 
 
 ### 2. Blocking Bug Rule
 

@@ -8,7 +8,7 @@ Navigation target reference: [`2026-05-21-navigation-contract.md`](../../specs/2
 
 ## Purpose
 
-Walk every flow mapped to the **mentor / Family** audience, verify that mentor access is parent-native and correctly scoped, file every defect in Notion, and update the docs when mapped access or flow descriptions have drifted.
+Walk every flow mapped to the **mentor / Family** audience, verify that mentor access is parent-native and correctly scoped, file every defect in Notion, and update the docs when mapped access or flow descriptions have drifted. Do not use tests. Use the app directly just like end user would. 
 
 This plan treats "mentor" as an adult family-support role. It does not mean the AI tutor/mentor voice. Adults can be both mentors and students, so mentor testing must also verify that Family access does not replace the adult's own Study access.
 
@@ -42,6 +42,7 @@ For each row:
 6. Update `mentor-flow-access-inventory.md` for access drift. Update `mobile-app-flow-inventory.md` only when the canonical flow description itself is wrong.
 7. Update this row: final `Tested` symbol, `Result` word, `Bugs` URL(s), `Doc Updated` tick + date, and a one-line note.
 8. Move to the next independent flow.
+9. Use seed files for auth and sign in. 
 
 ### 2. Blocking Bug Rule
 
