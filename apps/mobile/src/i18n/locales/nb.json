@@ -240,7 +240,9 @@
         "reportsAction": "Rapporter",
         "nudgeAction": "Nudge"
       }
-    }
+    },
+    "goToProgress": "Go to Progress",
+    "goToProgressLabel": "Go to Progress"
   },
   "dashboard": {
     "backLabel": "Tilbake",
@@ -1753,7 +1755,8 @@
       "nudgeCta": "Et lite dytt kan hjelpe {{name}} i gang igjen",
       "nudgeA11y": "Send {{name}} et dytt",
       "viewAllReports": "Se alle rapporter",
-      "subjectsTitle": "Emner"
+      "subjectsTitle": "Emner",
+      "goToChildCurriculum": "Open child curriculum"
     },
     "remediation": {
       "heading": "Prøv en annen tilnærming",
@@ -2476,6 +2479,63 @@
     "web": {
       "plansOnMobile": "Abonnementer er tilgjengelige i mobilappen",
       "storePurchaseUnavailable": "Butikkjøp er ikke tilgjengelig på denne enheten."
+    },
+    "childPaywall": {
+      "headline": "Nice work so far!",
+      "greatStart": "You've been exploring and learning — great start!",
+      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
+      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "notifyButton": "Notify My Parent",
+      "notifyButtonNotified": "Parent notified",
+      "notifyButtonAccessibilityNotified": "Parent already notified",
+      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "cooldownReminder": "You can remind them again in {{label}}.",
+      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
+      "waitText": "While you wait, you can still browse your Library and see your progress.",
+      "browseLibrary": "Browse Library",
+      "browseLibraryAccessibilityLabel": "Browse Library",
+      "seeProgress": "See your progress",
+      "seeProgressAccessibilityLabel": "See your progress",
+      "goHome": "Go Home",
+      "goHomeAccessibilityLabel": "Go Home",
+      "back": "Back",
+      "backAccessibilityLabel": "Go back",
+      "alerts": {
+        "sentTitle": "Sent!",
+        "sentBody": "We let your parent know!",
+        "askParentTitle": "Ask your parent",
+        "askParentBody": "Ask your parent to open the app and subscribe.",
+        "notifyErrorTitle": "Could not send notification",
+        "notifyErrorBody": "Please check your connection and try again."
+      }
+    },
+    "restore": {
+      "button": "Restore Purchases",
+      "accessibilityLabel": "Restore purchases",
+      "verifying": "Verifying purchase...",
+      "restoring": "Restoring...",
+      "failedTitle": "Restore failed",
+      "failedBody": "Could not restore purchases. Please try again.",
+      "notFoundTitle": "No subscriptions found",
+      "notFoundBody": "We could not find any previous purchases to restore.",
+      "cancelledTitle": "Restore cancelled",
+      "cancelledBody": "Restore will continue in background.",
+      "cancelAccessibilityLabel": "Cancel restore"
+    },
+    "byokWaitlist": {
+      "heading": "Bring your own key",
+      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
+      "joinButton": "Join Waitlist",
+      "alreadyJoinedButton": "Already joined",
+      "joinAccessibilityLabel": "Join BYOK waitlist",
+      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "alerts": {
+        "successTitle": "Waitlist",
+        "successBody": "You have been added to the BYOK waitlist.",
+        "errorTitle": "Error",
+        "errorBody": "Could not join waitlist. Try again."
+      }
     }
   },
   "sessionSummary": {
@@ -2630,5 +2690,231 @@
     "dismiss": "Lukk",
     "buttonLabel": "Legg til i min læring",
     "privacyNote": "Privat for din læring"
+  },
+  "learnerHomeTimeout": {
+    "loading": "Nesten klar — bare et øyeblikk til...",
+    "retry": "Prøv igjen",
+    "goToLibrary": "Gå til biblioteket",
+    "moreOptions": "Flere alternativer"
+  },
+  "subscriptionScreen": {
+    "back": "Tilbake",
+    "backAccessibilityLabel": "Gå tilbake",
+    "title": "Abonnement",
+    "loading": {
+      "error": "Kunne ikke laste abonnementsdetaljer. Prøv igjen.",
+      "retryAccessibilityLabel": "Last inn abonnement på nytt",
+      "retry": "Prøv igjen"
+    },
+    "tierLabels": {
+      "free": "Gratis",
+      "plus": "Plus",
+      "family": "Familie",
+      "pro": "Pro"
+    },
+    "tierLimits": {
+      "free": "10 spørsmål/dag, 100/måned",
+      "plus": "700 spørsmål/måned",
+      "family": "1 500 delte spørsmål/måned",
+      "pro": "Ubegrenset"
+    },
+    "tierFeatures": {
+      "free": {
+        "0": "10 spørsmål per dag",
+        "1": "100 spørsmål per måned",
+        "2": "Kjerne-læringsemner",
+        "3": "Fremgangsspøring"
+      },
+      "plus": {
+        "0": "700 spørsmål per måned",
+        "1": "Ingen daglig grense",
+        "2": "Alle læringsemner",
+        "3": "Prioritert støtte"
+      },
+      "family": {
+        "0": "1 500 delte spørsmål/måned",
+        "1": "Opptil 5 familiemedlemmer",
+        "2": "Familiefremgangs-oversikt",
+        "3": "Alle Plus-funksjoner"
+      },
+      "pro": {
+        "0": "Ubegrenset antall spørsmål",
+        "1": "Tidlig tilgang til nye funksjoner",
+        "2": "Dedikert støtte",
+        "3": "Alle Familie-funksjoner"
+      }
+    },
+    "packagePeriod": {
+      "monthly": "Månedlig",
+      "annual": "Årlig",
+      "weekly": "Ukentlig",
+      "lifetime": "Livstid",
+      "threeMonth": "3 måneder",
+      "sixMonth": "6 måneder",
+      "twoMonth": "2 måneder"
+    },
+    "currentPlan": {
+      "sectionHeader": "Nåværende plan",
+      "statusCancelling": "Avbestilles",
+      "statusPastDue": "Forfalt",
+      "statusExpired": "Utløpt",
+      "statusActive": "Aktiv",
+      "accessUntil": "Tilgang til {{date}}",
+      "renews": "Fornyes {{date}}",
+      "upgradeButton": "Oppgrader",
+      "upgradeAccessibilityLabel": "Oppgrader plan"
+    },
+    "cancellationNotice": {
+      "title": "Abonnement avsluttes",
+      "body": "Abonnementet ditt er avbestilt. Du kan fortsette å bruke alle funksjoner til {{date}}. Etter det vil kontoen din gå tilbake til Gratis-nivå."
+    },
+    "usage": {
+      "sectionHeader": "Bruk denne måneden",
+      "dailyQuestions": "I dag: {{used}} / {{limit}} daglige spørsmål",
+      "topUpCreditsRemaining_one": "+ {{count}} påfyllings-kreditt gjenstår",
+      "topUpCreditsRemaining_other": "+ {{count}} påfyllings-kreditter gjenstår",
+      "yourShare": "Din andel",
+      "yourUsage": "Din bruk",
+      "questionsCount_one": "{{count}} spørsmål",
+      "questionsCount_other": "{{count}} spørsmål",
+      "familyAggregate": "Familie totalt",
+      "quotaResets": "Kvote tilbakestilles {{date}}",
+      "subscriptionRenews": "Abonnement fornyes {{date}}",
+      "dailyLimitResets": "Daglig grense — tilbakestilles ved midnatt"
+    },
+    "familyPool": {
+      "sectionHeader": "Familiepott",
+      "profilesConnected": "av {{max}} profiler tilkoblet",
+      "questionsLeft": "delte spørsmål igjen denne syklusen.",
+      "ownerSuffix": " (eier)",
+      "removingMember": "Fjerner…",
+      "removeMember": "Fjern"
+    },
+    "plans": {
+      "sectionHeader": "Planer",
+      "confirmingPurchase": "Bekrefter kjøp…",
+      "currentBadge": "Nåværende",
+      "retryOfferings": "Prøv igjen",
+      "retryOfferingsAccessibilityLabel": "Last inn abonnementstilbud på nytt",
+      "contactSupport": "Kontakt support",
+      "contactSupportAccessibilityLabel": "Kontakt support",
+      "offeringsError": "Kunne ikke laste kjøpsalternativer akkurat nå. Du er på {{tier}}-planen med {{limits}}.",
+      "offeringsWebOnly": "Du er på {{tier}}-planen med {{limits}}. Her er hva hver plan inkluderer — butikkjøp er ikke tilgjengelig på denne enheten ennå."
+    },
+    "packageOption": {
+      "currentPlan": "Nåværende plan",
+      "subscribeTo": "Abonner på",
+      "subscribe": "Abonner",
+      "processing": "Behandler…",
+      "currentPlanLabel": "Nåværende plan",
+      "subscribeLabel": "Abonner",
+      "processingLabel": "Behandler…",
+      "currentPlanAccessibilityLabel": "Nåværende plan: {{title}}, {{price}}",
+      "subscribePlanAccessibilityLabel": "Abonner på {{title}}, {{price}}"
+    },
+    "restore": {
+      "sectionHeader": "Gjenopprett kjøp",
+      "checkLater": "Sjekk senere"
+    },
+    "topUp": {
+      "sectionHeader": "Trenger du flere spørsmål?",
+      "buyAccessibilityLabel": "Kjøp 500 kreditter",
+      "buyButton": "Kjøp 500 kreditter",
+      "openingStore": "Åpner butikk…",
+      "credits": "Engangs-kjøp. Kreditter utløper etter 12 måneder.",
+      "checkLater": "Sjekk senere",
+      "checkLaterAccessibilityLabel": "Avbryt påfyllings-bekreftelse",
+      "confirmingPollMessage": "Bekrefter kjøpet ditt…",
+      "confirmingPollMessageLong": "Bekrefter fortsatt — dette kan ta opptil 30 sekunder. Kjøpet ditt er trygt."
+    },
+    "manageBilling": {
+      "sectionHeader": "Administrer",
+      "button": "Administrer fakturering",
+      "buttonAccessibilityLabel": "Administrer fakturering",
+      "webInfo": "Administrer fakturering",
+      "webInfoSubtitle": "Abonnementet administreres på mobilenheten din",
+      "opensAppStore": "Åpner App Store-abonnementer",
+      "opensGooglePlay": "Åpner Google Play-abonnementer"
+    },
+    "byokWaitlist": {
+      "joinButton": "Bli med på ventelisten",
+      "leaveButton": "Forlat ventelisten",
+      "joiningButton": "Blir med…",
+      "leavingButton": "Forlater…"
+    },
+    "childPaywall": {
+      "title": "Spør en foresatt",
+      "body": "Du har brukt alle spørsmålene dine for i dag. Den foresatte må oppgradere for å fortsette læringen.",
+      "cooldownZero": "0 sekunder",
+      "cooldownHours_one": "{{count}} time",
+      "cooldownHours_other": "{{count}} timer",
+      "cooldownMinutes_one": "{{count}} minutt",
+      "cooldownMinutes_other": "{{count}} minutter",
+      "cooldownSeconds_one": "{{count}} sekund",
+      "cooldownSeconds_other": "{{count}} sekunder",
+      "xpThisWeek_one": "{{count}} XP denne uken",
+      "xpThisWeek_other": "{{count}} XP denne uken",
+      "topicsThisWeek_one": "{{count}} emne denne uken",
+      "topicsThisWeek_other": "{{count}} emner denne uken"
+    },
+    "alerts": {
+      "topUpNotAvailableTitle": "Ikke tilgjengelig",
+      "topUpNotAvailableBody": "Påfyllings-kreditter er ikke tilgjengelig akkurat nå. Prøv igjen senere eller kontakt support.",
+      "topUpRetry": "Prøv igjen",
+      "networkErrorTitle": "Nettverksfeil",
+      "networkErrorBody": "Vennligst sjekk internettforbindelsen din og prøv igjen.",
+      "purchaseFailedTitle": "Kjøp mislyktes",
+      "purchaseFailedBody": "Noe uventet skjedde med kjøpet ditt. Vennligst prøv igjen.",
+      "alreadyPurchasedTitle": "Allerede kjøpt",
+      "alreadyPurchasedBody": "Det ser ut til at du allerede eier dette abonnementet. Trykk 'Gjenopprett kjøp' for å aktivere det på denne enheten.",
+      "restorePurchasesButton": "Gjenopprett kjøp",
+      "manageBillingErrorTitle": "Kunne ikke åpne abonnementsadministrasjon",
+      "manageBillingErrorBody": "Du kan administrere abonnementet ditt direkte på:\n{{url}}",
+      "tryAgain": "Prøv igjen",
+      "checkAgain": "Sjekk igjen",
+      "topUpPurchaseConfirmedTitle": "Kjøp bekreftet",
+      "topUpPurchaseConfirmedBody": "Dine 500 kreditter legges til. De vises vanligvis innen ett minutt — dra ned for å oppdatere bruken din.",
+      "topUpCheckLaterTitle": "Sjekk senere",
+      "topUpCheckLaterBody": "Kreditter vil snart vises — trykk oppdater for å sjekke.",
+      "contactSupportTitle": "Kontakt support",
+      "contactSupportBody": "E-post support@mentomate.app for hjelp med abonnementer.",
+      "removeFamilyTitle": "Fjerne fra familie?",
+      "removeFamilyBody": "Profilen til {{name}} vil bli fjernet fra denne familieplanen og skjult fra profilbytte.",
+      "removeFamilyConfirm": "Fjern",
+      "familyUpdatedTitle": "Familie oppdatert",
+      "familyUpdatedBody": "{{name}} ble fjernet fra familieplanen din.",
+      "removeFamilyErrorTitle": "Kunne ikke fjerne profil",
+      "removeFamilyErrorBody": "Vennligst sjekk tilkoblingen din og prøv igjen.",
+      "topUpConnectionErrorTitle": "Nettverksfeil",
+      "topUpConnectionErrorBody": "Vennligst sjekk internettforbindelsen din og prøv igjen."
+    }
+  },
+  "passwordInput": {
+    "defaultPlaceholder": "Skriv inn passord",
+    "hideLabel": "Skjul passord",
+    "showLabel": "Vis passord",
+    "hideText": "Skjul",
+    "showText": "Vis",
+    "requirementsHint": "Minst 8 tegn"
+  },
+  "accountSecurity": {
+    "securedVia": "Sikret via {{provider}}",
+    "changePasswordLabel": "Endre passord"
+  },
+  "changePassword": {
+    "errorCurrentRequired": "Skriv inn ditt nåværende passord",
+    "errorTooShort": "Passordet må ha minst 8 tegn",
+    "errorMismatch": "Passordene stemmer ikke overens",
+    "currentPlaceholder": "Nåværende passord",
+    "signingOut": "Logger av...",
+    "forgotPassword": "Glemt passordet ditt?",
+    "newPlaceholder": "Nytt passord",
+    "confirmPlaceholder": "Bekreft nytt passord",
+    "successMessage": "Passord oppdatert",
+    "signOutErrorTitle": "Kunne ikke logge av",
+    "signOutErrorMessage": "Prøv igjen.",
+    "updateLabel": "Oppdater passord",
+    "updating": "Oppdaterer...",
+    "updateButton": "Oppdater passord"
   }
 }

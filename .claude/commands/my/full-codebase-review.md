@@ -16,8 +16,10 @@
 
   Hard Constraints
 
-  1. No commits, no pushes, no PRs. This skill produces a clean working tree of fixes. The user (or
-  /commit) decides what to commit.
+  1. Stage but never commit. No pushes, no PRs. When the coordinator (or a fix-it subagent) edits
+  files to address findings, `git add` each file as it's saved — staging locks the change in the
+  index so concurrent watchers (Codex, VS Code autosave) and parallel agents can't silently revert
+  it. The user (or /commit) decides what to commit. Read-only review agents do not stage.
   2. Other agents may be active in the same tree. Before any edit, snapshot WIP (git status --short) and
   treat files with uncommitted changes from other sessions as off-limits. Note them in the report.
   3. Read-only fan-out. All 15 subagents are strictly read-only. Only the coordinator edits files.

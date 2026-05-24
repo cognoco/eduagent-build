@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { createHash } from 'crypto';
+import { feedbackSubmissionSchema } from '@eduagent/schemas';
 import { z } from 'zod';
 import { inngest } from '../client';
 import {
@@ -20,14 +21,13 @@ import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
 const logger = createLogger();
 
-// [BUG-767 / A-24] Category enum must match the route's submission schema
-// (`feedbackCategorySchema` in `@eduagent/schemas`). The route persists
-// `body.category` directly into the event payload, so a mismatch here would
-// silently safeParse-fail every event the route fires — exactly the
-// "wired-but-untriggered" anti-pattern A-24 was filed to prevent.
-const eventDataSchema = z.object({
-  profileId: z.string(),
-  category: z.enum(['bug', 'suggestion', 'other']),
+// [BUG-767 / A-24] Compose from the shared route submission schema so the
+// retry consumer cannot drift from the API-facing feedback contract.
+const eventDataSchema = feedbackSubmissionSchema.extend({
+  profileId: z.string().min(1),
+  userId: z.string().min(1),
+  supportTo: z.string().email().optional(),
+  metaLines: z.string().min(1).max(2000),
 });
 
 export const feedbackDeliveryFailed = inngest.createFunction(
@@ -68,7 +68,17 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       );
       return { status: 'skipped' as const, reason: 'invalid_payload', issues };
     }
-    const { profileId, category } = validated.data;
+    const {
+      profileId,
+      userId,
+      category,
+      message,
+      supportTo,
+      metaLines,
+      appVersion,
+      platform,
+      osVersion,
+    } = validated.data;
 
     const categoryLabel =
       category === 'bug'
@@ -110,7 +120,17 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           'retry-delivery',
         );
       } else {
-        const hashInput = JSON.stringify({ profileId, category });
+        const hashInput = JSON.stringify({
+          profileId,
+          userId,
+          category,
+          message,
+          supportTo,
+          metaLines,
+          appVersion,
+          platform,
+          osVersion,
+        });
         const hash = createHash('sha256')
           .update(hashInput)
           .digest('hex')
@@ -127,6 +147,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             surface: 'feedback-delivery-failed',
             reason: 'missing_event_id',
             profileId,
+            userId,
             category,
           },
         );
@@ -139,6 +160,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
               surface: 'feedback-delivery-failed',
               reason: 'missing_event_id',
               profileId,
+              userId,
               category,
             },
           },
@@ -147,12 +169,12 @@ export const feedbackDeliveryFailed = inngest.createFunction(
 
       const result = await sendEmail(
         {
-          to: getStepSupportEmail(),
+          to: supportTo ?? getStepSupportEmail(),
           subject: `[MentoMate ${categoryLabel}] delivery-retry for ${profileId.slice(
             0,
             8,
           )}`,
-          body: `[Delayed delivery] Category: ${category}\nProfile: ${profileId}\nOriginal delivery failed — this is a retry from the Inngest queue.`,
+          body: `${message}\n\n---\n${metaLines}`,
           type: 'feedback',
         },
         { resendApiKey, emailFrom, idempotencyKey },

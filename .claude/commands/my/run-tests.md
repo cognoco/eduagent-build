@@ -28,7 +28,7 @@ For integration tests, prepend `C:/Tools/doppler/doppler.exe run -- ` so `DATABA
 4. **For every test file you opened in step 3, run the mock-on-touch sweep below before declaring that file done.**
 5. **Re-run.** Repeat 1–4 until clean.
 
-**Parallel agents:** when the failure surface is wide (multiple packages, route groups, Inngest function families), fan out via `/my:dispatch` — it owns the planning, agent contract, post-fan-out validation, and safety limits. Don't roll your own fan-out logic here. Subagents do not commit; they report changed files; the coordinator commits via `/commit`.
+**Parallel agents:** when the failure surface is wide (multiple packages, route groups, Inngest function families), fan out via `/my:dispatch` — it owns the planning, agent contract, post-fan-out validation, and safety limits. Don't roll your own fan-out logic here. Subagents stage (`git add`) as they edit but NEVER commit; they report changed files; the coordinator commits via `/commit`.
 
 ## Mock-on-touch sweep (GC6)
 
@@ -111,5 +111,5 @@ If you didn't touch any of the above, say so explicitly in the report ("docs unc
 - Weaken an assertion to make a failing test pass (`optional: true`, broadening `text:` matches, deleting the failing step, `try/catch` around an `expect`).
 - Add a new internal `jest.mock('./...')` / `jest.mock('../...')` / `jest.mock('@eduagent/...')` without `// gc1-allow: <reason>` on the same line.
 - Mock the database, repositories, services, middleware, or your own modules in an integration test.
-- Have a subagent commit. Coordinator commits via `/commit`.
+- Have a subagent commit. Subagents stage (`git add`) but coordinator commits via `/commit`.
 - Skip the failure loop and declare a partial run "good enough". Either drive to clean or report exactly which failures remain and why they're deferred.

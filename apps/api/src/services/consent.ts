@@ -3,7 +3,18 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, desc, and, sql, inArray, isNull } from 'drizzle-orm';
+import {
+  eq,
+  desc,
+  and,
+  sql,
+  inArray,
+  isNull,
+  isNotNull,
+  gte,
+  lt,
+  notInArray,
+} from 'drizzle-orm';
 import {
   consentStates,
   familyLinks,
@@ -502,31 +513,45 @@ export async function processConsentResponse(
   //    but only the first UPDATE will match the non-terminal status.
   const newStatus = approved ? 'CONSENTED' : 'WITHDRAWN';
   const now = new Date();
+  const consentStateId = row.id;
+  const consentProfileId = row.profileId;
 
-  const [updated] = await db
-    .update(consentStates)
-    .set({
-      status: newStatus,
-      respondedAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(consentStates.id, row.id),
-        eq(consentStates.profileId, row.profileId),
-        sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`,
-      ),
-    )
-    .returning();
+  async function updateStatus(
+    executor: Pick<Database, 'update'>,
+  ): Promise<void> {
+    const [updated] = await executor
+      .update(consentStates)
+      .set({
+        status: newStatus,
+        respondedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(consentStates.id, consentStateId),
+          eq(consentStates.profileId, consentProfileId),
+          sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`,
+        ),
+      )
+      .returning();
 
-  if (!updated) {
-    throw new ConsentAlreadyProcessedError();
+    if (!updated) {
+      throw new ConsentAlreadyProcessedError();
+    }
   }
 
-  // 3. If denied (FR10): cascade-delete the child's profile.
-  //    CASCADE FKs handle all child data (subjects, sessions, etc.)
-  if (!approved) {
-    await db.delete(profiles).where(eq(profiles.id, row.profileId));
+  if (approved) {
+    await updateStatus(db);
+  } else {
+    // 3. If denied (FR10): cascade-delete the child's profile.
+    //    CASCADE FKs handle all child data (subjects, sessions, etc.).
+    //    The denial status and destructive delete must commit or roll back
+    //    together; otherwise a delete failure can leave a withdrawn-but-live
+    //    child profile without a recovery path.
+    await db.transaction(async (tx) => {
+      await updateStatus(tx);
+      await tx.delete(profiles).where(eq(profiles.id, consentProfileId));
+    });
   }
 
   return mapConsentRow({
@@ -588,6 +613,55 @@ export async function refreshConsentToken(
   }
 
   return newToken;
+}
+
+export interface RefreshConsentTokenForRequestInput {
+  profileId: string;
+  requestedAt: Date;
+  requestedAtUpperBound: Date;
+}
+
+export interface RefreshedConsentTokenForRequest {
+  parentEmail: string;
+  freshToken: string;
+}
+
+/**
+ * Refreshes a reminder token only if the original consent-request generation
+ * is still current. Stale Inngest runs must not mint a valid token onto a newer
+ * request, because token possession authorizes the consent response.
+ */
+export async function refreshConsentTokenForRequest(
+  db: Database,
+  input: RefreshConsentTokenForRequestInput,
+): Promise<RefreshedConsentTokenForRequest | null> {
+  const freshToken = crypto.randomUUID();
+  // 16 days: covers day-14 reminder window plus a 2-day click buffer,
+  // and stays well within the day-30 auto-delete cutoff.
+  const newExpiresAt = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
+
+  const updated = await db
+    .update(consentStates)
+    .set({
+      consentToken: freshToken,
+      expiresAt: newExpiresAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(consentStates.profileId, input.profileId),
+        eq(consentStates.consentType, 'GDPR'),
+        gte(consentStates.requestedAt, input.requestedAt),
+        lt(consentStates.requestedAt, input.requestedAtUpperBound),
+        notInArray(consentStates.status, ['CONSENTED', 'WITHDRAWN']),
+        isNotNull(consentStates.parentEmail),
+      ),
+    )
+    .returning({ parentEmail: consentStates.parentEmail });
+
+  const parentEmail = updated[0]?.parentEmail;
+  if (!parentEmail) return null;
+  return { parentEmail, freshToken };
 }
 
 /**
@@ -721,6 +795,7 @@ export async function getProfileConsentState(
   status: ConsentStatus;
   parentEmail: string | null;
   consentType: ConsentType;
+  requestedAt: string;
 } | null> {
   const row = await db.query.consentStates.findFirst({
     where: eq(consentStates.profileId, profileId),
@@ -731,6 +806,7 @@ export async function getProfileConsentState(
     status: row.status,
     parentEmail: row.parentEmail ?? null,
     consentType: row.consentType,
+    requestedAt: row.requestedAt.toISOString(),
   };
 }
 

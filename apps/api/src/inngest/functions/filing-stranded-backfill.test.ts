@@ -121,6 +121,39 @@ describe('filingStrandedBackfill', () => {
     });
   });
 
+  it('[BUG-643] synthetic-timeout event timestamp is dispatch time, not session creation time', async () => {
+    // Session was created 7 days ago - timestamp must be close to now, not to createdAt
+    const oldCreatedAt = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    mockFindMany.mockResolvedValue([
+      {
+        id: uuid('aaaaaaaa', 0),
+        profileId: uuid('bbbbbbbb', 0),
+        sessionType: 'learning',
+        createdAt: oldCreatedAt,
+      },
+    ]);
+    const { step, sendEventCalls } = createInngestStepRunner();
+    const beforeDispatch = Date.now();
+
+    await getHandler()({ event: { data: {} }, step });
+
+    const afterDispatch = Date.now();
+    const timeoutCall = sendEventCalls.find((c) =>
+      c.name.startsWith('synthetic-timeout-'),
+    );
+    expect(timeoutCall).not.toBeUndefined();
+    const payload = timeoutCall!.payload as { data: { timestamp: string } };
+    const dispatchedAt = new Date(payload.data.timestamp).getTime();
+
+    // timestamp must be close to dispatch time (within this test execution window)
+    expect(dispatchedAt).toBeGreaterThanOrEqual(beforeDispatch);
+    expect(dispatchedAt).toBeLessThanOrEqual(afterDispatch + 100); // 100ms slack
+    // And NOT close to session creation time (would be ~7 days ago)
+    expect(dispatchedAt).toBeGreaterThan(
+      oldCreatedAt.getTime() + 6 * 24 * 60 * 60 * 1000,
+    );
+  });
+
   it('returns capped:false and does NOT self-trigger when below the 500 limit', async () => {
     mockFindMany.mockResolvedValue(makeStrandedRows(499));
     const { step, sendEventCalls, sleepCalls } = createInngestStepRunner();

@@ -95,8 +95,12 @@ function computeRetentionStatus(
 
 function computeAggregateRetentionStatus(
   statuses: Array<'strong' | 'fading' | 'weak' | 'forgotten'>,
-): 'strong' | 'fading' | 'weak' | 'forgotten' {
-  if (statuses.length === 0) return 'strong';
+): 'strong' | 'fading' | 'weak' | 'forgotten' | 'unknown' {
+  // [L1.C1.11] Zero cards = no retention signal. Returning 'strong' here would
+  // falsely advertise that the learner has retained material they never
+  // attempted; 'unknown' makes the absence of data explicit to UI consumers
+  // (they can show a neutral placeholder rather than a green checkmark).
+  if (statuses.length === 0) return 'unknown';
   const forgottenCount = statuses.filter((s) => s === 'forgotten').length;
   const weakCount = statuses.filter((s) => s === 'weak').length;
   const fadingCount = statuses.filter((s) => s === 'fading').length;

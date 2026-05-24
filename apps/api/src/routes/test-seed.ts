@@ -152,27 +152,28 @@ testSeedRoutes.post('/__test/reset', async (c) => {
   };
   const prefix = c.req.query('prefix')?.trim() || undefined;
 
-  // Optional body param: `clerkUserIds` lets callers (e.g.,
+  // Optional body param: `verifiedSeedClerkUserIds` lets callers (e.g.,
   // scripts/clean-clerk-test-users.mjs) pre-delete Clerk users locally and
   // have the server only handle DB cleanup. Avoids the CF Worker
   // 50-subrequest limit on bulk cleanup (~49 users × 2 calls > 50).
-  let clerkUserIds: string[] | undefined;
+  let verifiedSeedClerkUserIds: string[] | undefined;
   const contentType = c.req.header('content-type') ?? '';
   if (contentType.includes('application/json')) {
     const body = (await c.req.json().catch(() => ({}))) as {
+      verifiedSeedClerkUserIds?: unknown;
       clerkUserIds?: unknown;
     };
     if (
-      Array.isArray(body.clerkUserIds) &&
-      body.clerkUserIds.every((id) => typeof id === 'string')
+      Array.isArray(body.verifiedSeedClerkUserIds) &&
+      body.verifiedSeedClerkUserIds.every((id) => typeof id === 'string')
     ) {
-      clerkUserIds = body.clerkUserIds as string[];
+      verifiedSeedClerkUserIds = body.verifiedSeedClerkUserIds as string[];
     }
   }
 
   const { deletedCount, clerkUsersDeleted } = await resetDatabase(db, seedEnv, {
     prefix,
-    clerkUserIds,
+    verifiedSeedClerkUserIds,
   });
   return c.json({
     message: 'Database reset complete',

@@ -108,6 +108,7 @@ function mockOwnedTopicRow(topic: ReturnType<typeof mockTopicRow>) {
     topicId: topic.id,
     topicTitle: topic.title,
     topicDescription: topic.description,
+    topicChapter: null,
     bookId: topic.bookId ?? 'book-1',
     bookTitle: 'Book 1',
     curriculumId: topic.curriculumId,
@@ -205,6 +206,7 @@ function createMockDb({
   }>,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
   topicFindFirst = undefined as ReturnType<typeof mockTopicRow> | undefined,
+  topicSubjectJoinRows = [{ topicId }] as Array<{ topicId: string }>,
   ownedTopicRows,
 }: {
   curriculumFindFirst?: { id: string; subjectId: string } | undefined;
@@ -216,13 +218,16 @@ function createMockDb({
   }>;
   topicsFindMany?: ReturnType<typeof mockTopicRow>[];
   topicFindFirst?: ReturnType<typeof mockTopicRow> | undefined;
+  topicSubjectJoinRows?: Array<{ topicId: string }>;
   ownedTopicRows?: ReturnType<typeof mockOwnedTopicRow>[];
 } = {}): Database {
   const effectiveOwnedTopicRows =
     ownedTopicRows ??
-    (topicFindFirst
-      ? [mockOwnedTopicRow(topicFindFirst)]
-      : topicsFindMany.map(mockOwnedTopicRow));
+    (topicSubjectJoinRows.length === 0
+      ? []
+      : topicFindFirst
+        ? [mockOwnedTopicRow(topicFindFirst)]
+        : topicsFindMany.map(mockOwnedTopicRow));
   const orderBy = jest.fn().mockResolvedValue(curriculumSelectRows);
   const selectWhere = jest.fn().mockReturnValue({ orderBy });
   const ownedTopicLimit = jest.fn().mockResolvedValue(effectiveOwnedTopicRows);
@@ -637,6 +642,45 @@ describe('getTopicProgress', () => {
       subjectId,
       'foreign-topic',
     );
+
+    expect(result).toBeNull();
+  });
+
+  // [BUG-656 / L3.M3.2] BREAK TEST — cross-profile topic read attempt
+  // Pre-fix: topic was fetched by `eq(curriculumTopics.id, topicId)` alone,
+  // so a crafted topicId from another profile returned its title,
+  // description, and downstream progress (xpStatus, struggleStatus,
+  // summaryExcerpt). Subject was verified for the caller but the topic was
+  // NOT joined back to that subject.
+  // Post-fix: parent-chain join (curriculum_topics -> curricula ->
+  // subjects.id = subjectId) returns 0 rows when the topic belongs to a
+  // different subject; function returns null without ever surfacing the
+  // foreign topic's data.
+  it('[BUG-656] returns null when topicId belongs to a different subject (no leak)', async () => {
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      // These would fire ONLY if the function continued past the ownership
+      // check — they must not be reached for a foreign topicId.
+      retentionCardFindFirst: mockRetentionCard(),
+      assessmentsFindMany: [
+        mockAssessmentRow({ status: 'passed', masteryScore: 0.95 }),
+      ],
+      sessionsFindMany: [mockSessionRow({ topicId })],
+      xpLedgerFindMany: [{ topicId, status: 'pending', createdAt: NOW }],
+    });
+    // Parent-chain join returns 0 rows — simulates an attacker passing a
+    // leaked topicId that lives under another profile's subject.
+    // topicFindFirst is still set to the foreign topic so pre-fix the
+    // function would have returned it.
+    const db = createMockDb({
+      topicSubjectJoinRows: [],
+      topicFindFirst: mockTopicRow({
+        title: 'Victim Topic Title',
+        curriculumId: 'other-curriculum',
+      }),
+    });
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
     expect(result).toBeNull();
   });

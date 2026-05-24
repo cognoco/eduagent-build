@@ -43,8 +43,13 @@ const mockUseUser = jest.fn(
     },
   }),
 );
+const mockUseAuth = jest.fn(() => ({
+  isLoaded: true,
+  isSignedIn: true,
+}));
 
 jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => mockUseAuth(),
   useUser: () => mockUseUser(),
 }));
 
@@ -144,6 +149,10 @@ describe('ConsentScreen', () => {
     mockCanGoBack.mockReturnValue(true);
     mockUseNetworkStatus.mockReturnValue({ isOffline: false, isReady: true });
     // Restore default: Clerk hydrated, user present.
+    mockUseAuth.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
     mockUseUser.mockImplementation(() => ({
       isLoaded: true,
       user: {

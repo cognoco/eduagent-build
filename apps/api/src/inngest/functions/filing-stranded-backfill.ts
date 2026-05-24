@@ -93,7 +93,9 @@ export const filingStrandedBackfill = inngest.createFunction(
     });
 
     for (const session of stranded) {
-      const createdAt = new Date(session.createdAt);
+      // [BUG-643] Use dispatch time (now), not session creation time. Stranded
+      // sessions were created days ago — using createdAt would make the
+      // msSinceTimeoutDispatch metric in filing-timed-out-observe meaningless.
       await step.sendEvent(`synthetic-timeout-${session.id}`, {
         name: 'app/session.filing_timed_out',
         data: filingTimedOutEventSchema.parse({
@@ -101,7 +103,7 @@ export const filingStrandedBackfill = inngest.createFunction(
           profileId: session.profileId,
           sessionType: session.sessionType,
           timeoutMs: 60_000,
-          timestamp: createdAt.toISOString(),
+          timestamp: new Date().toISOString(),
         }),
       });
     }

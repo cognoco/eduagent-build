@@ -14,8 +14,9 @@
 
   ## Hard Constraints
 
-  1. **No commits, no pushes, no PRs.** This skill produces a clean working tree of fixes. The user (or `/commit`) decides
-  what to commit.
+  1. **Stage but never commit. No pushes, no PRs.** Sub-agents that fix findings must `git add` their files as they edit
+  so concurrent watchers (Codex, VS Code autosave) and other parallel agents can't silently revert the work; the index
+  is the safety net. The user (or `/commit`) decides what to commit. Pure-review agents (no edits) don't stage.
   2. **Other agents may be active in the same tree.** Before any edit, check whether the file is part of the branch diff
   (`git diff --name-only $(git merge-base HEAD origin/main)..HEAD`). If a file you'd edit isn't in that set, it belongs to
   another agent's WIP — skip it and note it in the report.

@@ -52,7 +52,7 @@ Output a single concise proposal with:
 Do not start implementing. Present the proposal. The user decides whether to greenlight the wave, swap PR ordering, defer something, or kill an item.
 
 When greenlit, follow the existing dispatch / commit conventions from `CLAUDE.md` and the user's memory:
-- Subagents never commit (memory: `feedback_agents_commit_push.md`).
+- Subagents stage (`git add`) but never commit (memory: `feedback_agents_commit_push`, `feedback_stage_after_each_agent_report`).
 - Coordinator commits via `/commit` only.
 - LLM-prompt PRs run `pnpm eval:llm` before commit.
 - Old-screen deletion PRs (5h pattern) require the file-count guardrail to drop after the change.

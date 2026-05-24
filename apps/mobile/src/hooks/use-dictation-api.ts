@@ -3,22 +3,16 @@ import type {
   PrepareHomeworkInput,
   PrepareHomeworkOutput,
   GenerateDictationOutput,
-  DictationMode,
   DictationReviewInput,
   DictationReviewResult,
+  RecordDictationResultInput as SchemaRecordDictationResultInput,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 
 export type { DictationReviewResult };
 
-export interface RecordDictationResultInput {
-  localDate: string;
-  sentenceCount: number;
-  mistakeCount: number | null;
-  mode: DictationMode;
-  reviewed: boolean;
-}
+export type RecordDictationResultInput = SchemaRecordDictationResultInput;
 
 export function usePrepareHomework() {
   const client = useApiClient();

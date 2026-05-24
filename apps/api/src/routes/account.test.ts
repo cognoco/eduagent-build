@@ -148,6 +148,7 @@ import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import {
   cancelDeletion,
+  getProfileIdsForAccount,
   getDeletionStatus,
   scheduleDeletion,
 } from '../services/deletion';
@@ -251,16 +252,7 @@ describe('account routes', () => {
       expect(() => new Date(body.gracePeriodEnds)).not.toThrow();
     });
 
-    // [CR-SILENT-RECOVERY-2] Break test: deletion-event dispatch failure must
-    // be escalated via BOTH a structured log AND a Sentry capture. A
-    // GDPR-relevant action cannot recover silently — on-call needs aggregate
-    // spike alerting (mirrors consent.ts:142,270 [A-23]). Escalation runs
-    // through safeSend (services/safe-non-core.ts), which logs via
-    // logger.error → console.error.
-    it('still returns 200 and escalates via logger.error + captureException when dispatch fails', async () => {
-      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
-      (captureException as jest.Mock).mockClear();
-
+    it('[WI-84 DS-045] returns 503 and does not claim deletion scheduled when Inngest dispatch fails', async () => {
       const dispatchError = new Error('Inngest unavailable');
       (inngest.send as jest.Mock).mockRejectedValueOnce(dispatchError);
 
@@ -275,29 +267,94 @@ describe('account routes', () => {
 
       const body = await res.json();
 
-      expect(res.status).toBe(200);
-      expect(body.message).toBe('Deletion scheduled');
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[safe-send] non-core Inngest dispatch failed'),
+      expect(res.status).toBe(503);
+      expect(body).toMatchObject({
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+      expect(cancelDeletion).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id',
       );
-
-      // Sentry escalation: assert the deliberate call from safeSend happened
-      // with the raw error and a queryable surface tag. (Other middleware in
-      // the request path may also call captureException — e.g. profile-scope
-      // middleware itself escalates if findOwnerProfile fails against the
-      // stubbed DB. We only care that our specific call is one of them.)
       expect(captureException).toHaveBeenCalledWith(dispatchError, {
         extra: {
           surface: 'account.deletion',
-          kind: 'non-core-send',
+          kind: 'core-send',
           accountId: 'test-account-id',
         },
       });
-
-      errorSpy.mockRestore();
     });
 
-    it('does not dispatch a second deletion event when already scheduled', async () => {
+    it('[WI-84 review] reports rollback failure when dispatch compensation fails', async () => {
+      const dispatchError = new Error('Inngest unavailable');
+      const rollbackError = new Error('rollback unavailable');
+      (inngest.send as jest.Mock).mockRejectedValueOnce(dispatchError);
+      (cancelDeletion as jest.Mock).mockRejectedValueOnce(rollbackError);
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+
+      expect(res.status).toBe(503);
+      expect(body).toMatchObject({
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+      expect(captureException).toHaveBeenCalledWith(dispatchError, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send',
+          accountId: 'test-account-id',
+        },
+      });
+      expect(captureException).toHaveBeenCalledWith(rollbackError, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send-rollback',
+          accountId: 'test-account-id',
+        },
+      });
+    });
+
+    it('[WI-84 review] rolls back and returns 503 if profile lookup fails after scheduling', async () => {
+      const lookupError = new Error('profile lookup unavailable');
+      (getProfileIdsForAccount as jest.Mock).mockRejectedValueOnce(lookupError);
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+
+      expect(res.status).toBe(503);
+      expect(body).toMatchObject({
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+      expect(cancelDeletion).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id',
+      );
+      expect(captureException).toHaveBeenCalledWith(lookupError, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send',
+          accountId: 'test-account-id',
+        },
+      });
+      expect(inngest.send).not.toHaveBeenCalled();
+    });
+
+    it('[WI-84 review] dispatches an idempotent deletion event when deletion was already scheduled', async () => {
       (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',
         scheduledNow: false,
@@ -319,7 +376,14 @@ describe('account routes', () => {
         message: 'Deletion scheduled',
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',
       });
-      expect(inngest.send).not.toHaveBeenCalled();
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/account.deletion-scheduled',
+        data: expect.objectContaining({
+          accountId: 'test-account-id',
+          profileIds: ['profile-1'],
+          timestamp: expect.any(String),
+        }),
+      });
     });
 
     it('returns 401 without auth header', async () => {

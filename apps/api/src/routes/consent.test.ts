@@ -238,6 +238,39 @@ describe('consent routes', () => {
       expect(body.emailStatus).toBe('sent');
     });
 
+    it('[WI-84 DS-021] dispatches consent.requested with requestedAt generation', async () => {
+      const { inngest: mockInngest } = jest.requireMock(
+        '../inngest/client',
+      ) as {
+        inngest: { send: jest.Mock };
+      };
+      mockInngest.send.mockClear();
+
+      const res = await app.request(
+        '/v1/consent/request',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            parentEmail: 'parent@example.com',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(201);
+      expect(mockInngest.send).toHaveBeenCalledWith({
+        name: 'app/consent.requested',
+        data: expect.objectContaining({
+          profileId: '550e8400-e29b-41d4-a716-446655440000',
+          consentType: 'GDPR',
+          requestedAt: expect.any(String),
+        }),
+      });
+    });
+
     it('returns 201 with COPPA consent type (backward compat)', async () => {
       const res = await app.request(
         '/v1/consent/request',

@@ -12,6 +12,8 @@ const BAR_COLORS: Record<WarningLevel, string> = {
   none: 'bg-retention-strong',
   soft: 'bg-retention-fading',
   hard: 'bg-warning',
+  // [BUG-640] 'top-up-available': monthly exhausted but credits remain — warning not danger
+  'top-up-available': 'bg-warning',
   exceeded: 'bg-danger',
 };
 

@@ -1,6 +1,6 @@
 # Dispatch — Parallel Agent Protocol
 
-Fan out work to parallel sub-agents safely: planning (avoid file conflicts), the per-agent contract (test discipline + no commits), the coordinator's responsibilities (post-fan-out validation + docs + commit), and the safety limits.
+Fan out work to parallel sub-agents safely: planning (avoid file conflicts), the per-agent contract (test discipline + stage-not-commit), the coordinator's responsibilities (post-fan-out validation + docs + commit), and the safety limits.
 
 **This is the canonical parallel-agent protocol for this repo.** Other test/bug skills (`/my:run-tests`, `/my:sweep-mocks`, `/my:fix-notion-bugs`, `/my:e2e`) call into here whenever they need parallel agents. Don't roll your own fan-out logic in those skills — extend this one.
 
@@ -53,8 +53,12 @@ MANDATORY RULES — read before writing any code:
 5. Run related tests for every file you modified:
    cd <project-dir> && TS_NODE_COMPILER_OPTIONS='{"moduleResolution":"node10","module":"commonjs","customConditions":null}' pnpm exec jest --findRelatedTests <files> --no-coverage
 6. Do NOT delete UI code. Comment it out if removing a feature.
-7. Do NOT run git add, git commit, git push, eas update, or gh pr create.
-   You write code, run tests, and REPORT BACK with: (a) files changed, (b) tests run + results,
+7. **Stage as you go, never commit.** After each Edit/Write, immediately run
+   `git add -- <your-files>` (use `:(literal)` pathspec for Expo Router bracket files) to
+   lock the change in the git index. Staging makes your work survive concurrent watchers
+   (Codex, VS Code autosave, format-on-save) and other parallel agents racing on shared
+   files (e.g., locale JSONs). Do NOT run `git commit`, `git push`, `eas update`, or
+   `gh pr create`. REPORT BACK with: (a) files changed, (b) tests run + results,
    (c) anything you couldn't resolve. The coordinator commits.
 8. Do NOT report done until ALL tests pass. If tests fail after 3 attempts, stop and report:
    - Which test(s) failed
@@ -63,6 +67,26 @@ MANDATORY RULES — read before writing any code:
 9. Follow all CLAUDE.md rules (strict TypeScript, named exports, co-located tests, no eslint-disable,
    no @ts-ignore, etc.)
 ```
+
+## On each agent's completion notification (do this BEFORE the next agent finishes)
+
+**Verify the agent's staged diff matches its report.** Agents are required (rule #7 above) to `git add` their files as they edit. On each completion notification, parse the agent's "files changed" list and run:
+
+```bash
+git diff --cached --stat -- <agent's-files>
+# Use :(literal) pathspec for Expo Router bracket files:
+git diff --cached --stat -- ':(literal)apps/mobile/src/app/(app)/recaps/[recapId].tsx'
+```
+
+If `--cached` shows `0 insertions, 0 deletions` (or absent) when the agent claimed real changes, the agent skipped staging (or its writes never reached disk) — flag it immediately, do NOT mark the work Done, re-dispatch. If the file IS staged but `git diff` (unstaged, working-tree vs. index) shows new changes layered on top, someone else (concurrent Codex, VS Code autosave, another agent) wrote after the agent staged — inspect, restore from index via `git checkout-index --force -- <file>` if the layered changes are unwanted, or merge if they're additive.
+
+If the agent didn't stage (older skills, forgot, or rule wasn't surfaced), do it for them now: `git add -- <files>`. Stage ONLY the reporting agent's files — never `git add -A` or `git add .` (that stages other agents' in-flight WIP that may not survive to commit time).
+
+**Why this matters:** multiple writers race on the same checkout — concurrent Codex, VS Code autosave on stale buffers, format-on-save, even other Claude agents on shared files (locale JSONs). Last writer wins. Without staging, silently-reverted work has no git record. Staging immediately locks the diff in the index — disk reverts become detectable via `git diff --cached` and recoverable via `git checkout-index --force`.
+
+Prevention beats recovery: close other editors/agents on the same checkout (Codex, VS Code tabs of edited files, Cursor) before fan-out. Staging is the safety net.
+
+See: `feedback_stage_after_each_agent_report`, `feedback_parallel_agent_stash_wipe_prevention`, `feedback_commit_preserve_other_agents_work`.
 
 ## Post-dispatch validation (coordinator, before any commit)
 

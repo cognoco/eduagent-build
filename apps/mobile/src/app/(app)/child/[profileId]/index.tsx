@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ErrorFallback } from '../../../../components/common';
 import { RecentSessionsList } from '../../../../components/progress';
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
@@ -767,38 +768,26 @@ export default function ChildDetailScreen(): React.ReactElement {
   if (detailUnavailable) {
     return (
       <View
-        className="flex-1 bg-background items-center justify-center px-6"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="child-profile-unavailable"
       >
-        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          {t('parentView.index.profileNoLongerAvailable')}
-        </Text>
-        <Text className="text-body text-text-secondary text-center mb-6">
-          {t('parentView.index.profileRemovedOrNoAccess')}
-        </Text>
-        <Pressable
-          onPress={() => void refetch()}
-          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.tryAgain')}
-          testID="child-profile-retry"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {t('common.tryAgain')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => router.replace(FAMILY_HOME_PATH as Href)}
-          className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-          accessibilityRole="button"
-          accessibilityLabel={t('parentView.index.backToDashboard')}
-          testID="child-profile-back"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            {t('parentView.index.backToDashboard')}
-          </Text>
-        </Pressable>
+        <ErrorFallback
+          variant="centered"
+          title={t('parentView.index.profileNoLongerAvailable')}
+          message={t('parentView.index.profileRemovedOrNoAccess')}
+          primaryAction={{
+            label: t('common.tryAgain'),
+            onPress: () => void refetch(),
+            testID: 'child-profile-retry',
+          }}
+          secondaryAction={{
+            label: t('parentView.index.backToDashboard'),
+            onPress: () => router.replace(FAMILY_HOME_PATH as Href),
+            testID: 'child-profile-back',
+          }}
+          testID="child-profile-unavailable-fallback"
+        />
       </View>
     );
   }

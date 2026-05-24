@@ -154,6 +154,12 @@ describe('SEED_CLERK_PREFIX', () => {
 // ---------------------------------------------------------------------------
 
 describe('seedScenario', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
   it.each(VALID_SCENARIOS as SeedScenario[])(
     'dispatches "%s" and returns SeedResult',
     async (scenario: SeedScenario) => {
@@ -197,6 +203,50 @@ describe('seedScenario', () => {
     expect(typeof result.accountId).toBe('string');
     expect(result.accountId.length).toBeGreaterThan(0);
   });
+
+  it('[WI-84 DS-091] does not delete an existing non-seed Clerk account with the same email', async () => {
+    const db = createMockDb();
+    (db.query.accounts.findMany as jest.Mock).mockResolvedValueOnce([
+      {
+        id: 'real-account-id',
+        email: 'real@example.com',
+        clerkUserId: 'user_real_production_account',
+      },
+    ]);
+
+    await seedScenario(db, 'onboarding-complete', 'real@example.com');
+
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 review] refuses to reuse an existing non-seed Clerk user', async () => {
+    const db = createMockDb();
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'user_real_production_account',
+          primary_email_address_id: 'email_real',
+          email_addresses: [
+            { id: 'email_real', email_address: 'real@example.com' },
+          ],
+          external_id: null,
+        },
+      ],
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      seedScenario(db, 'onboarding-complete', 'real@example.com', {
+        CLERK_SECRET_KEY: 'sk_test',
+      }),
+    ).rejects.toThrow('Refusing to reuse non-seed Clerk user');
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/users/user_real_production_account'),
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -204,6 +254,12 @@ describe('seedScenario', () => {
 // ---------------------------------------------------------------------------
 
 describe('resetDatabase', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
@@ -238,6 +294,87 @@ describe('resetDatabase', () => {
     const result = await resetDatabase(db);
 
     expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+  });
+
+  it('[WI-84 DS-091] prefix reset does not delete non-seed Clerk accounts', async () => {
+    const deleteReturning = jest.fn().mockResolvedValue([]);
+    const deleteWhere = jest.fn().mockReturnValue({
+      returning: deleteReturning,
+    });
+    const db = {
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+      query: {
+        accounts: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'real-account-id',
+              email: 'e2e-real@example.com',
+              clerkUserId: 'user_real_production_account',
+            },
+          ]),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await resetDatabase(db, {}, { prefix: 'e2e-' });
+
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 review] does not trust caller-supplied Clerk IDs without a seed marker', async () => {
+    const deleteReturning = jest.fn().mockResolvedValue([]);
+    const deleteWhere = jest.fn().mockReturnValue({
+      returning: deleteReturning,
+    });
+    const db = {
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+    } as unknown as Database;
+
+    const result = await resetDatabase(
+      db,
+      {},
+      { clerkUserIds: ['user_real_production_account'] },
+    );
+
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 review] verifies supplied real Clerk IDs are seed-managed before DB deletion', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'user_real_production_account',
+          external_id: null,
+          email_addresses: [{ email_address: 'real-person@example.com' }],
+        },
+      ],
+    });
+    global.fetch = fetchMock;
+    const deleteReturning = jest.fn().mockResolvedValue([]);
+    const deleteWhere = jest.fn().mockReturnValue({
+      returning: deleteReturning,
+    });
+    const db = {
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+    } as unknown as Database;
+
+    const result = await resetDatabase(
+      db,
+      { CLERK_SECRET_KEY: 'sk_test' },
+      { verifiedSeedClerkUserIds: ['user_real_production_account'] },
+    );
+
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(db.delete).not.toHaveBeenCalled();
   });
 });
 

@@ -6,13 +6,9 @@ import {
   getStepEmailFrom,
   getStepAppUrl,
 } from '../helpers';
-import { eq, desc } from 'drizzle-orm';
+import { and, eq, gte, lt } from 'drizzle-orm';
 import { consentStates } from '@eduagent/database';
-import {
-  getConsentStatus,
-  getProfileConsentState,
-  refreshConsentToken,
-} from '../../services/consent';
+import { refreshConsentTokenForRequest } from '../../services/consent';
 import {
   sendEmail,
   formatConsentReminderEmail,
@@ -26,6 +22,29 @@ export const consentReminder = inngest.createFunction(
   { event: 'app/consent.requested' },
   async ({ event, step }) => {
     const { profileId } = event.data;
+    const requestedAt =
+      typeof event.data.requestedAt === 'string'
+        ? event.data.requestedAt
+        : null;
+    const requestedAtDate = requestedAt ? new Date(requestedAt) : null;
+    const requestedAtUpperBound =
+      requestedAtDate != null && !Number.isNaN(requestedAtDate.getTime())
+        ? new Date(requestedAtDate.getTime() + 1)
+        : null;
+
+    function currentConsentRequestWhere() {
+      if (!requestedAtDate || !requestedAtUpperBound) return null;
+      return and(
+        eq(consentStates.profileId, profileId),
+        eq(consentStates.consentType, 'GDPR'),
+        gte(consentStates.requestedAt, requestedAtDate),
+        lt(consentStates.requestedAt, requestedAtUpperBound),
+      );
+    }
+
+    function isTerminalConsentStatus(status: string | null): boolean {
+      return status === 'CONSENTED' || status === 'WITHDRAWN';
+    }
 
     // [BUG-699] Build email options. Each reminder step passes a deterministic
     // idempotency key so Inngest step retries cannot deliver the same reminder
@@ -49,22 +68,43 @@ export const consentReminder = inngest.createFunction(
       parentEmail: string | null;
       consentToken: string | null;
     }> {
+      const where = currentConsentRequestWhere();
+      if (!where) {
+        return { parentEmail: null, consentToken: null };
+      }
       const db = getStepDatabase();
-      const state = await getProfileConsentState(db, profileId);
-      if (!state?.parentEmail) return { parentEmail: null, consentToken: null };
-
-      // Fetch the live token separately — getProfileConsentState intentionally
-      // omits it to keep the return surface minimal. We need it here so every
-      // reminder email contains a direct action link [UX-DE-H9].
       const row = await db.query.consentStates.findFirst({
-        where: eq(consentStates.profileId, profileId),
-        orderBy: desc(consentStates.requestedAt),
-        columns: { consentToken: true },
+        where,
+        columns: { parentEmail: true, consentToken: true },
       });
       return {
-        parentEmail: state.parentEmail,
+        parentEmail: row?.parentEmail ?? null,
         consentToken: row?.consentToken ?? null,
       };
+    }
+
+    async function getCurrentConsentRequestStatus(): Promise<string | null> {
+      const where = currentConsentRequestWhere();
+      if (!where) return null;
+      const db = getStepDatabase();
+      const row = await db.query.consentStates.findFirst({
+        where,
+        columns: { status: true },
+      });
+      return row?.status ?? null;
+    }
+
+    async function refreshCurrentConsentToken(): Promise<{
+      parentEmail: string;
+      freshToken: string;
+    } | null> {
+      if (!requestedAtDate || !requestedAtUpperBound) return null;
+      const db = getStepDatabase();
+      return refreshConsentTokenForRequest(db, {
+        profileId,
+        requestedAt: requestedAtDate,
+        requestedAtUpperBound,
+      });
     }
 
     /** Builds the direct consent page URL from a token. */
@@ -75,19 +115,14 @@ export const consentReminder = inngest.createFunction(
     // Day 7 reminder.
     // [DS-020] Mint the fresh token in its OWN step so Inngest memoizes it: the
     // original requestConsent token expires after 7 days (race-prone link), and
-    // refreshConsentToken is non-idempotent (random token each call). If the mint
+    // token refresh is non-idempotent (random token each call). If the mint
     // shared a step with sendEmail, a retry after a delivered email would mint a
     // new token, dead-linking the email the parent already received.
     await step.sleep('wait-7-days', '7d');
     const day7 = await step.run('refresh-day-7-token', async () => {
-      const db = getStepDatabase();
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
-        return null;
-      const { parentEmail } = await lookupConsentDetails();
-      if (!parentEmail) return null;
-      const freshToken = await refreshConsentToken(db, profileId);
-      return { parentEmail, freshToken };
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return null;
+      return refreshCurrentConsentToken();
     });
     if (day7) {
       await step.run('send-day-7-reminder', async () => {
@@ -108,14 +143,9 @@ export const consentReminder = inngest.createFunction(
     // had a 7-day TTL), and the mint must be its own step to survive retries.
     await step.sleep('wait-7-more-days', '7d');
     const day14 = await step.run('refresh-day-14-token', async () => {
-      const db = getStepDatabase();
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
-        return null;
-      const { parentEmail } = await lookupConsentDetails();
-      if (!parentEmail) return null;
-      const freshToken = await refreshConsentToken(db, profileId);
-      return { parentEmail, freshToken };
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return null;
+      return refreshCurrentConsentToken();
     });
     if (day14) {
       await step.run('send-day-14-reminder', async () => {
@@ -134,9 +164,8 @@ export const consentReminder = inngest.createFunction(
     // Day 25 final warning
     await step.sleep('wait-11-more-days', '11d');
     await step.run('send-day-25-warning', async () => {
-      const db = getStepDatabase();
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return;
       const { parentEmail } = await lookupConsentDetails();
       if (!parentEmail) return;
       await sendEmail(
@@ -160,15 +189,16 @@ export const consentReminder = inngest.createFunction(
     await step.sleep('wait-5-more-days', '5d');
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
-      // Fast guard: bail out if consent was already granted/withdrawn.
-      const status = await getConsentStatus(db, profileId);
-      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      // Fast guard: bail out if this GDPR request was already granted/withdrawn.
+      const status = await getCurrentConsentRequestStatus();
+      if (!status || isTerminalConsentStatus(status)) return;
+      if (!requestedAt) return;
       // CI-11: Use service function instead of raw SQL.
       // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.
       // This eliminates the TOCTOU race where a parent approves consent between
       // the status check above and the delete below.
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
-      await deleteProfileIfNoConsent(db, profileId);
+      await deleteProfileIfNoConsent(db, profileId, new Date(requestedAt));
     });
   },
 );

@@ -1,9 +1,10 @@
 // Deletes all Clerk seed users (external_id prefix `clerk_seed_`) and their DB rows.
 //
-// Architecture: this script deletes users from Clerk DIRECTLY (local Node has no
-// Cloudflare Worker 50-subrequest limit), then calls POST /v1/__test/reset
-// with the list of deleted IDs to let the server clean up DB rows in a single
-// transaction. For ~49 users this would otherwise exceed CF's subrequest cap.
+// Architecture: this script asks the server to clean up DB rows for Clerk users
+// that the server can still verify as seed-managed, then deletes those users
+// from Clerk DIRECTLY (local Node has no Cloudflare Worker 50-subrequest limit).
+// For ~49 users, doing the Clerk deletes inside the Worker would otherwise
+// exceed CF's subrequest cap.
 //
 // Safety: only users whose external_id starts with `clerk_seed_` are touched.
 // Real users (jjoerg@gmail.com, key_to@yahoo.com, zuzana.kopecna@zwizzly.com,
@@ -28,7 +29,7 @@ const CLERK_API_BASE = 'https://api.clerk.com/v1';
 
 const apiUrl = (process.env.API_URL ?? 'https://api-stg.mentomate.com').replace(
   /\/+$/,
-  ''
+  '',
 );
 const testSecret = process.env.TEST_SEED_SECRET ?? '';
 const clerkSecret = process.env.CLERK_SECRET_KEY ?? '';
@@ -36,7 +37,7 @@ const clerkSecret = process.env.CLERK_SECRET_KEY ?? '';
 if (!clerkSecret) {
   console.error(
     '[clean-clerk] CLERK_SECRET_KEY is required.\n' +
-      '  Run with Doppler: doppler.exe run -c stg -- node scripts/clean-clerk-test-users.mjs'
+      '  Run with Doppler: doppler.exe run -c stg -- node scripts/clean-clerk-test-users.mjs',
   );
   process.exit(1);
 }
@@ -53,7 +54,7 @@ async function listAllUsers() {
   while (true) {
     const res = await fetch(
       `${CLERK_API_BASE}/users?limit=${pageSize}&offset=${offset}&order_by=-created_at`,
-      { headers: { Authorization: `Bearer ${clerkSecret}` } }
+      { headers: { Authorization: `Bearer ${clerkSecret}` } },
     );
 
     if (!res.ok) {
@@ -117,12 +118,12 @@ async function cleanupDbRows(clerkUserIds) {
   if (testSecret) headers['X-Test-Secret'] = testSecret;
 
   console.log(
-    `[clean-clerk] POST ${apiUrl}/v1/__test/reset  (DB cleanup for ${clerkUserIds.length} IDs)`
+    `[clean-clerk] POST ${apiUrl}/v1/__test/reset  (DB cleanup for ${clerkUserIds.length} IDs)`,
   );
   const res = await fetch(`${apiUrl}/v1/__test/reset`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ clerkUserIds }),
+    body: JSON.stringify({ verifiedSeedClerkUserIds: clerkUserIds }),
   });
 
   const body = await res.text();
@@ -146,21 +147,23 @@ const { seedUsers, otherUsers } = await listAllUsers();
 if (!EXECUTE) {
   console.log('[clean-clerk] DRY-RUN — no users will be deleted.');
   console.log(
-    '[clean-clerk] Pass --execute to actually delete the seed users below.\n'
+    '[clean-clerk] Pass --execute to actually delete the seed users below.\n',
   );
 
   console.log(
-    `=== WILL DELETE — ${seedUsers.length} seed users (external_id: clerk_seed_*) ===`
+    `=== WILL DELETE — ${seedUsers.length} seed users (external_id: clerk_seed_*) ===`,
   );
   for (const u of seedUsers) {
     console.log(`  - ${u.email}  (external_id: ${u.externalId})`);
   }
 
   console.log(
-    `\n=== WILL PRESERVE — ${otherUsers.length} real/other users (no clerk_seed_ tag) ===`
+    `\n=== WILL PRESERVE — ${otherUsers.length} real/other users (no clerk_seed_ tag) ===`,
   );
   for (const u of otherUsers) {
-    const tag = u.externalId ? `external_id: ${u.externalId}` : 'no external_id';
+    const tag = u.externalId
+      ? `external_id: ${u.externalId}`
+      : 'no external_id';
     console.log(`  - ${u.email}  (${tag})`);
   }
 
@@ -169,24 +172,27 @@ if (!EXECUTE) {
   const keyToWillSurvive = preserved.some((e) => e.startsWith('key_to@yahoo'));
 
   console.log(
-    `\n[clean-clerk] Summary:  would delete=${seedUsers.length}  would preserve=${otherUsers.length}`
+    `\n[clean-clerk] Summary:  would delete=${seedUsers.length}  would preserve=${otherUsers.length}`,
   );
   console.log(
-    `[clean-clerk]   jjoerg@gmail.com preserved:   ${jorgWillSurvive ? 'YES ✓' : 'NOT FOUND — investigate'}`
+    `[clean-clerk]   jjoerg@gmail.com preserved:   ${jorgWillSurvive ? 'YES ✓' : 'NOT FOUND — investigate'}`,
   );
   console.log(
-    `[clean-clerk]   key_to@yahoo.com preserved:   ${keyToWillSurvive ? 'YES ✓' : 'NOT FOUND — investigate'}`
+    `[clean-clerk]   key_to@yahoo.com preserved:   ${keyToWillSurvive ? 'YES ✓' : 'NOT FOUND — investigate'}`,
   );
   console.log(
-    `\n[clean-clerk] If the list looks right, re-run with --execute to actually delete.`
+    `\n[clean-clerk] If the list looks right, re-run with --execute to actually delete.`,
   );
   process.exit(0);
 }
 
 // --execute path
 console.log(
-  `[clean-clerk] EXECUTE — deleting ${seedUsers.length} Clerk seed users (local HTTP, no CF Worker limit)...\n`
+  `[clean-clerk] EXECUTE — cleaning DB rows and deleting ${seedUsers.length} Clerk seed users (local HTTP, no CF Worker limit)...\n`,
 );
+
+const seedIds = seedUsers.map((user) => user.id);
+const result = await cleanupDbRows(seedIds);
 
 const deletedIds = [];
 let failed = 0;
@@ -199,30 +205,28 @@ for (const user of seedUsers) {
     // Progress every 10 users so long runs don't look hung.
     if (processed % 10 === 0 || processed === seedUsers.length) {
       console.log(
-        `[clean-clerk]   progress: ${processed}/${seedUsers.length} (${deletedIds.length} deleted, ${failed} failed)`
+        `[clean-clerk]   progress: ${processed}/${seedUsers.length} (${deletedIds.length} deleted, ${failed} failed)`,
       );
     }
   } else {
     failed++;
-    console.warn(`[clean-clerk]   WARN: failed to delete ${user.email} (${user.id})`);
+    console.warn(
+      `[clean-clerk]   WARN: failed to delete ${user.email} (${user.id})`,
+    );
   }
 }
 
 console.log(
-  `\n[clean-clerk] Clerk deletion: ${deletedIds.length} deleted, ${failed} failed.`
+  `\n[clean-clerk] Clerk deletion: ${deletedIds.length} deleted, ${failed} failed.`,
 );
 
-if (deletedIds.length === 0) {
-  console.log('[clean-clerk] No Clerk users were deleted; skipping DB cleanup.');
-  process.exit(failed > 0 ? 1 : 0);
-}
-
-const result = await cleanupDbRows(deletedIds);
 console.log(`[clean-clerk] Done.`);
 console.log(`[clean-clerk]   Clerk users deleted:    ${deletedIds.length}`);
-console.log(`[clean-clerk]   DB rows deleted:        ${result.deletedCount ?? 0}`);
 console.log(
-  `[clean-clerk] Note: this does not refund the Clerk monthly email-send quota.`
+  `[clean-clerk]   DB rows deleted:        ${result.deletedCount ?? 0}`,
+);
+console.log(
+  `[clean-clerk] Note: this does not refund the Clerk monthly email-send quota.`,
 );
 
 if (failed > 0) process.exit(1);

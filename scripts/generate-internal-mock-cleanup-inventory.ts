@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import * as ts from 'typescript';
 
+import { csvCell } from './_csv-cell.js';
+
 type MockKind =
   | 'jest.mock'
   | 'jest.doMock'
@@ -677,12 +679,10 @@ function renderCsv(rows: MockRow[]): string {
   );
 }
 
-function csvCell(value: string): string {
-  if (!/[",\r\n]/.test(value)) {
-    return value;
-  }
-  return `"${value.replace(/"/g, '""')}"`;
-}
+// [WI-324 / DS-235] csvCell is imported from ./_csv-cell at the top of this
+// file. The helper lives in its own module so the pure escaping logic can be
+// unit-tested under the CommonJS ts-jest pipeline without dragging in this
+// script's ESM `import.meta.url` initialization.
 
 function printSummary(action: 'Generated' | 'Verified', rows: MockRow[]): void {
   const files = new Set(rows.map((row) => row.file));

@@ -65,6 +65,68 @@ export function parseNumericFromDriver(
   return result;
 }
 
+/**
+ * [WI-318 / DS-229] Finiteness guard on the number→driver coercion.
+ *
+ * Exported for unit testing. TypeScript's `data: number` type does not
+ * enforce runtime finiteness, so without this guard a NaN or Infinity
+ * reaching a numericAsNumber column would be emitted as the literal string
+ * "NaN" or "Infinity": PostgreSQL numeric can store NaN, and rejected
+ * special values still fail only at the database boundary with no
+ * column-name context. Throw at the helper boundary instead so Sentry can
+ * identify the offending row and the upstream computation that produced
+ * the bad value.
+ *
+ * The parameter is widened to `number | string | null | undefined`
+ * because historical callers (drizzle round-trips, SRS recomputation
+ * flows that re-write a numeric column whose value transited through a
+ * driver-typed string) legitimately hand strings to `toDriver`. Mirror
+ * `parseNumericFromDriver`'s tolerance: accept numeric strings, coerce,
+ * then run the same finiteness check. The contract is "the emitted
+ * driver value represents a finite number"; non-finite numbers and
+ * non-numeric values still throw with the column name.
+ */
+export function parseNumericToDriver(
+  value: number | string | null | undefined,
+  columnName: string,
+): string {
+  if (value === null || value === undefined) {
+    throw new Error(
+      `numericAsNumber: received ${value === null ? 'null' : 'undefined'} ` +
+        `for column "${columnName}" — expected finite number`,
+    );
+  }
+  if (typeof value === 'string') {
+    if (value.trim() === '') {
+      throw new Error(
+        `numericAsNumber: received empty/whitespace string for column ` +
+          `"${columnName}" — expected finite number`,
+      );
+    }
+    const coerced = Number(value);
+    if (!Number.isFinite(coerced)) {
+      throw new Error(
+        `numericAsNumber: non-finite string value ${JSON.stringify(value)} ` +
+          `for column "${columnName}" — expected finite number`,
+      );
+    }
+    return String(coerced);
+  }
+  if (typeof value !== 'number') {
+    throw new Error(
+      `numericAsNumber: expected finite number for column "${columnName}", ` +
+        `got ${typeof value}`,
+    );
+  }
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      `numericAsNumber: non-finite value ${String(value)} for column ` +
+        `"${columnName}" — Postgres numeric should never receive NaN/Infinity`,
+    );
+  }
+  return String(value);
+}
+
 export const numericAsNumber = (
   name: string,
   config: { precision: number; scale: number },
@@ -77,6 +139,6 @@ export const numericAsNumber = (
       return parseNumericFromDriver(value, name);
     },
     toDriver(value: number): string {
-      return String(value);
+      return parseNumericToDriver(value, name);
     },
   })(name);

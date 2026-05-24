@@ -122,7 +122,17 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
         () =>
           inngest.send({
             name: 'app/feedback.delivery_failed',
-            data: { profileId, category: body.category },
+            data: {
+              profileId,
+              userId,
+              category: body.category,
+              message: body.message,
+              supportTo,
+              metaLines,
+              ...(body.appVersion ? { appVersion: body.appVersion } : {}),
+              ...(body.platform ? { platform: body.platform } : {}),
+              ...(body.osVersion ? { osVersion: body.osVersion } : {}),
+            },
           }),
         'feedback.delivery-failed',
         { profileId },

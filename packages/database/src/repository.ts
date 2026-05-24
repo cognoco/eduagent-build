@@ -813,6 +813,7 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
       async insert(values: {
+        completionKey: string;
         date: string;
         sentenceCount: number;
         mistakeCount: number | null;
@@ -820,10 +821,10 @@ export function createScopedRepository(db: Database, profileId: string) {
         mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
       }) {
-        // [BUG-4] Idempotent on (profile_id, date, mode): a retry of the
-        // same completion event upserts the latest counts/reviewed flag
-        // rather than creating a duplicate row. Backed by
-        // uniq_dictation_results_profile_date_mode in the schema.
+        // [WI-84 rollout] Keep the legacy conflict target for the expand
+        // deploy. Old Workers still need uniq_dictation_results_profile_date_mode
+        // during the migration-to-deploy window; a contract migration can move
+        // this upsert to completionKey after those Workers are gone.
         const [row] = await db
           .insert(dictationResults)
           .values({ profileId, ...values })
@@ -834,6 +835,7 @@ export function createScopedRepository(db: Database, profileId: string) {
               dictationResults.mode,
             ],
             set: {
+              completionKey: values.completionKey,
               sentenceCount: values.sentenceCount,
               mistakeCount: values.mistakeCount,
               reviewed: values.reviewed,

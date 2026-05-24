@@ -430,7 +430,7 @@ export function LearnerScreen({
         {loadingTimedOut && (
           <View className="mt-6 items-center" testID="learner-loading-timeout">
             <Text className="text-body text-text-secondary text-center">
-              Taking longer than usual...
+              {t('learnerHomeTimeout.loading')}
             </Text>
             <Pressable
               onPress={() => refetch()}
@@ -438,7 +438,7 @@ export function LearnerScreen({
               testID="learner-loading-retry"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Retry
+                {t('learnerHomeTimeout.retry')}
               </Text>
             </Pressable>
             {/* [HOME-08] Replace the self-referential "Go home" (which is this
@@ -450,7 +450,7 @@ export function LearnerScreen({
               testID="learner-loading-go-library"
             >
               <Text className="text-body text-primary font-medium">
-                Go to Library
+                {t('learnerHomeTimeout.goToLibrary')}
               </Text>
             </Pressable>
             <Pressable
@@ -459,7 +459,7 @@ export function LearnerScreen({
               testID="learner-loading-go-more"
             >
               <Text className="text-body text-primary font-medium">
-                More options
+                {t('learnerHomeTimeout.moreOptions')}
               </Text>
             </Pressable>
           </View>

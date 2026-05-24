@@ -38,12 +38,6 @@ function findDopplerCliCandidates(): string[] {
     candidates.push(process.env.DOPPLER_CLI);
   }
 
-  for (const candidate of DOPPLER_CLI_CANDIDATES) {
-    if (existsSync(candidate)) {
-      candidates.push(candidate);
-    }
-  }
-
   try {
     const command =
       process.platform === 'win32' ? 'where doppler' : 'command -v doppler';
@@ -58,6 +52,12 @@ function findDopplerCliCandidates(): string[] {
     candidates.push(...found);
   } catch {
     // PATH lookup failed — fixed candidates may still work.
+  }
+
+  for (const candidate of DOPPLER_CLI_CANDIDATES) {
+    if (existsSync(candidate)) {
+      candidates.push(candidate);
+    }
   }
 
   candidates.push('doppler');

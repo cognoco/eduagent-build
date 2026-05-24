@@ -11,6 +11,7 @@ import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 // ---------------------------------------------------------------------------
 
 export interface DictationData {
+  completionKey: string;
   sentences: DictationSentence[];
   language: string;
   title?: string;

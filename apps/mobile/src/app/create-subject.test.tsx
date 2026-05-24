@@ -50,27 +50,35 @@ jest.mock(
     require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-jest.mock('../lib/profile', () => ({
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-    },
-    profiles: [],
-    switchProfile: async () => ({ success: true }),
-    isLoading: false,
-    profileLoadError: null,
-    profileWasRemoved: false,
-    acknowledgeProfileRemoval: () => undefined,
+jest.mock(
+  '../lib/profile',
+  /* gc1-allow: context-boundary — useProfile reads ProfileContext which has no Provider
+   * in this test tree; ProfileProvider requires useProfiles (network) + SecureStore
+   * state machine that cannot be driven without a full integration wrapper. The rest
+   * of the module (isGuardianProfile, PROFILE_SCOPED_KEYS, etc.) runs real via
+   * requireActual. */
+  () => ({
+    ...jest.requireActual('../lib/profile'),
+    useProfile: () => ({
+      activeProfile: {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
+      },
+      profiles: [],
+      switchProfile: async () => ({ success: true }),
+      isLoading: false,
+      profileLoadError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: () => undefined,
+    }),
   }),
-}));
+);
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
