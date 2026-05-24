@@ -265,6 +265,16 @@ const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
     expectedFindings: { 'profile-owner-read': 1 },
   },
   {
+    file: 'apps/mobile/src/app/session-summary/[sessionId].tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'child-target read: useParentProxy() is consumed only for childProfile.consentStatus + childProfile.id, which describe the mentor-memory navigation target. Active-user proxy gating routes through contract.gates.showLearningActions.',
+    expectedFindings: {
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+  {
     file: 'apps/mobile/src/app/(app)/more/celebrations.tsx',
     category: 'non-nav-domain-read',
     reason:
