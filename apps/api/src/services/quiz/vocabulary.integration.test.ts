@@ -14,7 +14,10 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { sm2 } from '@eduagent/retention';
 import { resolve } from 'path';
 import type { QuizQuestion } from '@eduagent/schemas';
-import { completeQuizRound } from './complete-round';
+import {
+  checkQuizAnswerWithCorrect,
+  completeQuizRound,
+} from './complete-round';
 import { generateQuizRound } from './generate-round';
 import { getVocabularyRoundContext } from './queries';
 import { QUIZ_CONFIG } from './config';
@@ -239,11 +242,11 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
           cefrLevel: 'A2',
         },
         {
-          term: 'der Frosch',
-          correctAnswer: 'frog',
-          acceptedAnswers: ['frog'],
+          term: 'Guten Morgen',
+          correctAnswer: 'good morning',
+          acceptedAnswers: ['good morning'],
           distractors: ['duck', 'rabbit', 'mouse'],
-          funFact: 'Frosch shows up in many beginner stories.',
+          funFact: 'Guten Morgen is a common morning greeting.',
           cefrLevel: 'A1',
         },
       ],
@@ -353,12 +356,19 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       },
     );
 
-    const completion = await completeQuizRound(
-      db,
-      profile.id,
-      round.id,
-      results,
-    );
+    for (const result of results) {
+      await checkQuizAnswerWithCorrect(
+        db,
+        profile.id,
+        round.id,
+        result.questionIndex,
+        result.answerGiven,
+        'multiple_choice',
+        true,
+      );
+    }
+
+    const completion = await completeQuizRound(db, profile.id, round.id, []);
     expect(completion.total).toBe(VOCAB_ROUND_SIZE);
 
     const afterCards = await db.query.vocabularyRetentionCards.findMany({
@@ -397,6 +407,53 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
         expected.card.nextReviewAt.slice(0, 10),
       );
     }
+
+    const savedDiscoveryVocabulary = await db.query.vocabulary.findMany({
+      where: and(
+        eq(vocabulary.profileId, profile.id),
+        eq(vocabulary.subjectId, subject.id),
+      ),
+    });
+    const savedByTerm = new Map(
+      savedDiscoveryVocabulary.map(
+        (item: typeof vocabulary.$inferSelect) => [item.term, item] as const,
+      ),
+    );
+    expect(savedByTerm.get('das Schwein')).toEqual(
+      expect.objectContaining({
+        translation: 'pig',
+        type: 'word',
+        cefrLevel: 'A1',
+      }),
+    );
+    expect(savedByTerm.get('der Bär')).toEqual(
+      expect.objectContaining({
+        translation: 'bear',
+        type: 'word',
+        cefrLevel: 'A2',
+      }),
+    );
+    expect(savedByTerm.get('Guten Morgen')).toEqual(
+      expect.objectContaining({
+        translation: 'good morning',
+        type: 'chunk',
+        cefrLevel: 'A1',
+      }),
+    );
+
+    const discoveryIds = ['das Schwein', 'der Bär', 'Guten Morgen'].map(
+      (term) => savedByTerm.get(term)!.id,
+    );
+    const discoveryCards = await db.query.vocabularyRetentionCards.findMany({
+      where: inArray(vocabularyRetentionCards.vocabularyId, discoveryIds),
+    });
+    expect(discoveryCards).toHaveLength(3);
+    expect(
+      discoveryCards.every(
+        (card: typeof vocabularyRetentionCards.$inferSelect) =>
+          card.lastReviewedAt instanceof Date,
+      ),
+    ).toBe(true);
 
     const storedRound = await db.query.quizRounds.findFirst({
       where: and(

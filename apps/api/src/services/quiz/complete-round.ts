@@ -11,13 +11,13 @@ import type {
   QuizQuestion,
   ValidatedQuestionResult,
 } from '@eduagent/schemas';
-import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
+import { cefrLevelSchema, isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { safeWrite, type DeferredActivityEvent } from '../safe-non-core';
-import { reviewVocabulary } from '../vocabulary';
+import { createVocabulary, reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
 import { applyQuizSm2, type MasterySm2Input } from './mastery-provider';
 import { computeCapitalsItemKey, computeGuessWhoItemKey } from './mastery-keys';
@@ -330,6 +330,43 @@ export function getVocabSm2Quality(correct: boolean): number {
   return correct ? 4 : 2;
 }
 
+export function inferVocabularyTypeFromTerm(term: string): 'word' | 'chunk' {
+  const tokens = term.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length <= 1) return 'word';
+
+  const leadingArticle = tokens[0]?.toLowerCase().replace(/[.,!?;:]+$/g, '');
+  const articlePrefixes = new Set([
+    'der',
+    'die',
+    'das',
+    'ein',
+    'eine',
+    'el',
+    'la',
+    'los',
+    'las',
+    'un',
+    'una',
+    'le',
+    'les',
+    'une',
+    'il',
+    'lo',
+    'gli',
+    'i',
+  ]);
+
+  if (
+    tokens.length === 2 &&
+    leadingArticle &&
+    articlePrefixes.has(leadingArticle)
+  ) {
+    return 'word';
+  }
+
+  return 'chunk';
+}
+
 export function getCapitalsSm2Quality(correct: boolean): number {
   return correct ? 4 : 1;
 }
@@ -548,6 +585,42 @@ export async function completeQuizRound(
           undefined,
           deferredEvents,
         );
+      }
+
+      if (!round.subjectId) {
+        logger.warn('quiz.vocabulary.discovery_persist_missing_subject', {
+          profileId,
+          roundId,
+        });
+      } else {
+        for (const result of validatedResults) {
+          const question = questions[result.questionIndex];
+          if (question?.type !== 'vocabulary' || question.isLibraryItem) {
+            continue;
+          }
+
+          const cefrLevel = cefrLevelSchema.safeParse(question.cefrLevel);
+          const vocabItem = await createVocabulary(
+            tx as unknown as Database,
+            profileId,
+            round.subjectId,
+            {
+              term: question.term,
+              translation: question.correctAnswer,
+              type: inferVocabularyTypeFromTerm(question.term),
+              ...(cefrLevel.success ? { cefrLevel: cefrLevel.data } : {}),
+            },
+          );
+
+          await reviewVocabulary(
+            tx as unknown as Database,
+            profileId,
+            vocabItem.id,
+            { quality: getVocabSm2Quality(result.correct) },
+            round.subjectId,
+            deferredEvents,
+          );
+        }
       }
     }
 

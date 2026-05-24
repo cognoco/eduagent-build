@@ -29,6 +29,7 @@ import {
   getCelebrationTier,
   getGuessWhoSm2Quality,
   getVocabSm2Quality,
+  inferVocabularyTypeFromTerm,
   isAnswerCorrect,
   validateResults,
 } from './complete-round';
@@ -140,6 +141,19 @@ describe('getVocabSm2Quality', () => {
 
   it('returns 2 for wrong answers', () => {
     expect(getVocabSm2Quality(false)).toBe(2);
+  });
+});
+
+describe('inferVocabularyTypeFromTerm', () => {
+  it('keeps article+noun entries as words', () => {
+    expect(inferVocabularyTypeFromTerm('das Schwein')).toBe('word');
+    expect(inferVocabularyTypeFromTerm('la casa')).toBe('word');
+    expect(inferVocabularyTypeFromTerm('el perro')).toBe('word');
+  });
+
+  it('stores reusable daily phrases as chunks', () => {
+    expect(inferVocabularyTypeFromTerm('Guten Morgen')).toBe('chunk');
+    expect(inferVocabularyTypeFromTerm('Va bene')).toBe('chunk');
   });
 });
 
