@@ -1,5 +1,5 @@
-ALTER TYPE "public"."notification_type" ADD VALUE 'dictation_review';--> statement-breakpoint
-CREATE TABLE "quiz_mastery_items" (
+ALTER TYPE "public"."notification_type" ADD VALUE IF NOT EXISTS 'dictation_review';--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "quiz_mastery_items" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"profile_id" uuid NOT NULL,
 	"activity_type" "quiz_activity_type" NOT NULL,
@@ -15,5 +15,14 @@ CREATE TABLE "quiz_mastery_items" (
 	CONSTRAINT "uq_quiz_mastery_profile_activity_key" UNIQUE("profile_id","activity_type","item_key")
 );
 --> statement-breakpoint
-ALTER TABLE "quiz_mastery_items" ADD CONSTRAINT "quiz_mastery_items_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_quiz_mastery_due" ON "quiz_mastery_items" USING btree ("profile_id","activity_type","next_review_at");
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'quiz_mastery_items_profile_id_profiles_id_fk'
+      AND conrelid = '"quiz_mastery_items"'::regclass
+  ) THEN
+    ALTER TABLE "quiz_mastery_items" ADD CONSTRAINT "quiz_mastery_items_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;
+  END IF;
+END$$;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_quiz_mastery_due" ON "quiz_mastery_items" USING btree ("profile_id","activity_type","next_review_at");
