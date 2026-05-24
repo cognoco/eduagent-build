@@ -46,6 +46,7 @@ import {
 } from '../services/metering';
 import { getTierConfig } from '../services/subscription';
 import { createStripeClient } from '../services/stripe';
+import { resolvePriceId } from '../services/billing-pricing';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
@@ -129,19 +130,6 @@ function getStartOfTodayInTimeZone(now: Date, timeZone: string): Date {
   );
   start = new Date(localMidnightAsUtc - getTimeZoneOffsetMs(start, timeZone));
   return start;
-}
-
-/**
- * Maps a tier + interval to the corresponding Stripe price ID from env bindings.
- */
-function resolvePriceId(
-  env: BillingRouteEnv['Bindings'],
-  tier: 'plus' | 'family' | 'pro',
-  interval: 'monthly' | 'yearly',
-): string | undefined {
-  const key =
-    `STRIPE_PRICE_${tier.toUpperCase()}_${interval.toUpperCase()}` as keyof typeof env;
-  return env[key] as string | undefined;
 }
 
 export const billingRoutes = new Hono<BillingRouteEnv>()
