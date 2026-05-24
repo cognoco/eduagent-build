@@ -100,6 +100,50 @@ jest.mock('../services/ocr' /* gc1-allow: pattern-a conversion */, () => ({
   }),
 }));
 
+// Billing mock — required by metering middleware now that
+// POST /v1/ocr is metered [WI-155 / WI-77 allowlist sweep].
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/billing',
+  ) as typeof import('../services/billing');
+  return {
+    ...actual,
+    ensureFreeSubscription: jest.fn().mockResolvedValue({
+      id: 'sub-1',
+      accountId: 'test-account-id',
+      tier: 'free',
+      status: 'active',
+      stripeSubscriptionId: null,
+      stripeCustomerId: null,
+      currentPeriodStart: new Date().toISOString(),
+      currentPeriodEnd: new Date().toISOString(),
+      cancelAtPeriodEnd: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    getQuotaPool: jest.fn().mockResolvedValue({
+      id: 'qp-1',
+      subscriptionId: 'sub-1',
+      monthlyLimit: 500,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    decrementQuota: jest.fn().mockResolvedValue({
+      success: true,
+      source: 'monthly',
+      remainingMonthly: 489,
+      remainingTopUp: 0,
+      remainingDaily: null,
+    }),
+    getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
+    safeRefundQuota: jest.fn().mockResolvedValue({ refunded: true }),
+  };
+});
+
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { captureException } from '../services/sentry';
@@ -551,9 +595,12 @@ describe('homework routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns 400 when profile cannot be resolved for OCR [CR-1B.5]', async () => {
+    it('returns 403 when profile cannot be resolved for OCR [CR-1B.5]', async () => {
       // findOwnerProfile returns null (default mock), so without X-Profile-Id
-      // the profileId context variable stays undefined and requireProfileId throws 400.
+      // no profile is resolved. Since /v1/ocr is now a metered LLM route
+      // [WI-155 / WI-77 allowlist sweep], assertNotProxyMode() in the metering
+      // middleware fires first (profileMeta absent → fail closed with 403)
+      // before the route handler's requireProfileId can return 400.
       const formData = new FormData();
       formData.append(
         'image',
@@ -570,7 +617,7 @@ describe('homework routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
     });
   });
 });

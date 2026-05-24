@@ -160,6 +160,51 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// Billing mock — required by metering middleware now that
+// POST /v1/subjects/:subjectId/books/:bookId/generate-topics is metered
+// [WI-141 / WI-77 allowlist sweep].
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/billing',
+  ) as typeof import('../services/billing');
+  return {
+    ...actual,
+    ensureFreeSubscription: jest.fn().mockResolvedValue({
+      id: 'sub-1',
+      accountId: 'test-account-id',
+      tier: 'free',
+      status: 'active',
+      stripeSubscriptionId: null,
+      stripeCustomerId: null,
+      currentPeriodStart: new Date().toISOString(),
+      currentPeriodEnd: new Date().toISOString(),
+      cancelAtPeriodEnd: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    getQuotaPool: jest.fn().mockResolvedValue({
+      id: 'qp-1',
+      subscriptionId: 'sub-1',
+      monthlyLimit: 500,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    decrementQuota: jest.fn().mockResolvedValue({
+      success: true,
+      source: 'monthly',
+      remainingMonthly: 489,
+      remainingTopUp: 0,
+      remainingDaily: null,
+    }),
+    getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
+    safeRefundQuota: jest.fn().mockResolvedValue({ refunded: true }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
