@@ -144,7 +144,9 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { onboardingRoutes } from './onboarding';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { OnboardingNotFoundError } from '../services/onboarding';
 
@@ -924,5 +926,51 @@ describe('onboarding routes', () => {
       );
       expect(res.status).toBe(401);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-160 / DS-071] Proxy-mode write guard on the 2 self-edit onboarding
+// handlers that were not previously gated. (PATCH /onboarding/language already
+// had an equivalent isOwner check via a custom 403; not retested here.)
+// ---------------------------------------------------------------------------
+describe('[WI-160 / DS-071] onboarding self-edit proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, {
+        isOwner: false,
+        birthYear: 1990,
+      });
+      await next();
+    });
+    proxyApp.route('/', onboardingRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('PATCH /onboarding/pronouns returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/onboarding/pronouns', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pronouns: 'they/them' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('PATCH /onboarding/interests/context returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/onboarding/interests/context', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        interests: [{ label: 'cooking', context: 'free_time' }],
+      }),
+    });
+    expect(res.status).toBe(403);
   });
 });

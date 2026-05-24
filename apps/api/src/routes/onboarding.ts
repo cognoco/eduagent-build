@@ -22,6 +22,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { assertOwnerAndParentAccess } from '../services/family-access';
 import { notFound, forbidden } from '../errors';
 import {
@@ -118,6 +119,11 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-160 / DS-071] Self-edit must be from an owner-profile session.
+      // A parent in proxy mode (active profile = child) should use the
+      // /onboarding/:profileId/pronouns route instead, not the self-edit
+      // path. Mirrors the existing isOwner check on /onboarding/language.
+      assertNotProxyMode(c);
       // WI-278: Server-side age gate (mirrors the client's self-skip so a
       // modified client cannot bypass it). The business rule lives in the
       // service guard; the parent-managed /:profileId/pronouns route is exempt
@@ -168,7 +174,12 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
-      // self-edit allowed: interests are personal to the learner, gating would break solo learning
+      // [WI-160 / DS-071] Self-edit must be from an owner-profile session.
+      // A parent in proxy mode (active profile = child) should use the
+      // /onboarding/:profileId/interests/context route instead, not the
+      // self-edit path. (The prior "interests are personal" comment described
+      // child-as-owner self-editing, which assertNotProxyMode preserves.)
+      assertNotProxyMode(c);
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, profileId, account.id, interests);
