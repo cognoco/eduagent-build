@@ -147,7 +147,10 @@ export function usePushTokenRegistration(): PushRegistrationState {
           pendingProfileToken.current = null;
           return;
         }
-        await registerPushToken.mutateAsync(tokenData.data);
+        await registerPushToken.mutateAsync({
+          profileId: activeProfileId,
+          token: tokenData.data,
+        });
       } catch (err) {
         setState({ status: 'failed', reason: 'api_registration_failed' });
         capturePushRegistrationFailure(err, 'api_registration_failed');

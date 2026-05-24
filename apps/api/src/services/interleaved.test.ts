@@ -285,6 +285,17 @@ describe('selectInterleavedTopics', () => {
 
     const db = createMockDb();
     db.query.curricula.findFirst = jest.fn().mockResolvedValue(null);
+    db.select = jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      }),
+    });
 
     const topics = await selectInterleavedTopics(db, PROFILE_ID, {
       subjectId: 'nonexistent-subject',
@@ -405,6 +416,72 @@ describe('selectInterleavedTopics', () => {
         expect.objectContaining({ topicTitle: 'Victim Secret Topic' }),
       ]),
     );
+  });
+
+  it('[WI-80] backfills owned topics when stale foreign cards sort first', async () => {
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+    try {
+      mockFindMany.mockResolvedValue([
+        createMockCard({
+          id: 'foreign-1',
+          topicId: 'topic-foreign-1',
+          nextReviewAt: new Date('2026-02-10'),
+        }),
+        createMockCard({
+          id: 'foreign-2',
+          topicId: 'topic-foreign-2',
+          nextReviewAt: new Date('2026-02-10'),
+        }),
+        createMockCard({
+          id: 'owned-1',
+          topicId: 'topic-owned-1',
+          nextReviewAt: new Date('2026-02-10'),
+        }),
+        createMockCard({
+          id: 'owned-2',
+          topicId: 'topic-owned-2',
+          nextReviewAt: new Date('2026-02-10'),
+        }),
+      ]);
+
+      const db = createMockDb({
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              innerJoin: jest.fn().mockReturnValue({
+                innerJoin: jest.fn().mockReturnValue({
+                  where: jest.fn().mockResolvedValue([
+                    {
+                      topicId: 'topic-owned-1',
+                      topicTitle: 'Owned Topic 1',
+                      curriculumId: 'curriculum-owned',
+                      subjectId: 'subject-owned',
+                    },
+                    {
+                      topicId: 'topic-owned-2',
+                      topicTitle: 'Owned Topic 2',
+                      curriculumId: 'curriculum-owned',
+                      subjectId: 'subject-owned',
+                    },
+                  ]),
+                }),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const topics = await selectInterleavedTopics(db, PROFILE_ID, {
+        topicCount: 2,
+      });
+
+      expect(topics.map((topic) => topic.topicId)).toEqual([
+        'topic-owned-1',
+        'topic-owned-2',
+      ]);
+    } finally {
+      randomSpy.mockRestore();
+    }
   });
 
   it('includes stability information on returned topics', async () => {

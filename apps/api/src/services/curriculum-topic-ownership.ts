@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   curriculumBooks,
   curricula,
@@ -54,6 +54,43 @@ export async function findOwnedCurriculumTopic(
     .limit(1);
 
   return row ?? null;
+}
+
+export async function findOwnedCurriculumTopics(
+  db: Database,
+  params: { profileId: string; topicIds: string[]; subjectId?: string },
+): Promise<OwnedCurriculumTopic[]> {
+  if (params.topicIds.length === 0) return [];
+
+  const conditions = [
+    inArray(curriculumTopics.id, params.topicIds),
+    eq(subjects.profileId, params.profileId),
+  ];
+  if (params.subjectId) {
+    conditions.push(eq(subjects.id, params.subjectId));
+  }
+
+  return db
+    .select({
+      topicId: curriculumTopics.id,
+      topicTitle: curriculumTopics.title,
+      topicDescription: curriculumTopics.description,
+      bookId: curriculumBooks.id,
+      bookTitle: curriculumBooks.title,
+      curriculumId: curriculumTopics.curriculumId,
+      subjectId: subjects.id,
+    })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.id, curricula.subjectId),
+      ),
+    )
+    .where(and(...conditions));
 }
 
 export async function assertOwnedCurriculumTopic(

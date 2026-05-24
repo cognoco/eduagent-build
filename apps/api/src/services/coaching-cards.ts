@@ -24,7 +24,7 @@ import {
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
 import { captureException } from './sentry';
-import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
+import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 
 // ---------------------------------------------------------------------------
 // silentDegrade — structured escalation for optional priority branches
@@ -166,6 +166,21 @@ export async function precomputeCoachingCard(
   // Fetch retention cards (scoped to profile)
   const repo = createScopedRepository(db, profileId);
   const allCards = await repo.retentionCards.findMany();
+  let ownedTopics: Awaited<ReturnType<typeof findOwnedCurriculumTopics>> = [];
+  try {
+    ownedTopics = await findOwnedCurriculumTopics(db, {
+      profileId,
+      topicIds: [...new Set(allCards.map((card) => card.topicId))],
+    });
+  } catch (err) {
+    silentDegrade(err, 'retention_card_topic_ownership', { profileId });
+  }
+  const ownedTopicById = new Map(
+    ownedTopics.map((topic) => [topic.topicId, topic]),
+  );
+  const ownedCards = allCards.filter((card) =>
+    ownedTopicById.has(card.topicId),
+  );
 
   // [BUG-912] Fetch streak through findCurrentForToday so the row is already
   // decayed-for-today before it reaches a display path. The returned object
@@ -193,7 +208,7 @@ export async function precomputeCoachingCard(
   }
 
   // --- Priority 1: review_due ---
-  const overdueCards = allCards.filter(
+  const overdueCards = ownedCards.filter(
     (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime(),
   );
 
@@ -217,12 +232,9 @@ export async function precomputeCoachingCard(
     let topicTitle: string | null = null;
     let bookTitle: string | null = null;
     try {
-      const row = await findOwnedCurriculumTopic(db, {
-        profileId,
-        topicId: mostOverdue.topicId,
-      });
-      topicTitle = row?.topicTitle ?? null;
-      bookTitle = row?.bookTitle ?? null;
+      const topic = ownedTopicById.get(mostOverdue.topicId);
+      topicTitle = topic?.topicTitle ?? null;
+      bookTitle = topic?.bookTitle ?? null;
     } catch (err) {
       silentDegrade(err, 'review_due_book_enrichment', {
         profileId,
@@ -308,8 +320,8 @@ export async function precomputeCoachingCard(
   // If there are multiple retention cards and ALL of them are verified,
   // the learner has completed their curriculum. Require >= 3 to distinguish from
   // "just started and verified one topic" vs "completed entire curriculum."
-  if (allCards.length >= 3) {
-    const allComplete = allCards.every((c) => c.xpStatus === 'verified');
+  if (ownedCards.length >= 3) {
+    const allComplete = ownedCards.every((c) => c.xpStatus === 'verified');
     if (allComplete) {
       return {
         id,
@@ -353,7 +365,7 @@ export async function precomputeCoachingCard(
   }
 
   // --- Priority 4: insight (verified topics) ---
-  const verifiedCards = allCards.filter((c) => c.xpStatus === 'verified');
+  const verifiedCards = ownedCards.filter((c) => c.xpStatus === 'verified');
   if (verifiedCards.length > 0) {
     const firstVerified = verifiedCards[0];
     if (!firstVerified)
@@ -376,7 +388,7 @@ export async function precomputeCoachingCard(
   // [BUG-55] When no retention cards exist, find a topic from the curriculum
   // instead of using profileId as topicId (which is semantically wrong).
   const fallbackTopicId: string | null =
-    allCards.length > 0 ? (allCards[0]?.topicId ?? null) : null;
+    ownedCards.length > 0 ? (ownedCards[0]?.topicId ?? null) : null;
   // No retention cards = new learner, return curriculum_complete start prompt
   if (!fallbackTopicId) {
     return {

@@ -186,10 +186,35 @@ describe('useRegisterPushToken', () => {
     });
 
     await act(async () => {
-      await result.current.mutateAsync('ExponentPushToken[abc123]');
+      await result.current.mutateAsync({
+        profileId: 'test-profile-id',
+        token: 'ExponentPushToken[abc123]',
+      });
     });
 
     expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('[WI-80] sends the captured profile id as an explicit request header', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ registered: true }), { status: 200 }),
+    );
+
+    const { result } = renderHook(() => useRegisterPushToken(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        profileId: 'profile-captured',
+        token: 'ExponentPushToken[abc123]',
+      });
+    });
+
+    const headers = new Headers(
+      (mockFetch.mock.calls[0]?.[1] as RequestInit | undefined)?.headers,
+    );
+    expect(headers.get('X-Profile-Id')).toBe('profile-captured');
   });
 });
 

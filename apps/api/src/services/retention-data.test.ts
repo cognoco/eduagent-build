@@ -348,6 +348,34 @@ describe('getTopicRetention', () => {
 // ---------------------------------------------------------------------------
 
 describe('processRecallTest', () => {
+  it('[WI-80] rejects mixed-parent topics before recall processing', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+    const db = createMockDb();
+    db.select = jest.fn(() => ({
+      from: jest.fn(() => ({
+        innerJoin: jest.fn(() => ({
+          innerJoin: jest.fn(() => ({
+            innerJoin: jest.fn(() => ({
+              where: jest.fn(() => ({
+                limit: jest.fn().mockResolvedValue([]),
+              })),
+            })),
+          })),
+        })),
+      })),
+    })) as never;
+
+    await expect(
+      processRecallTest(db, profileId, {
+        topicId,
+        answer: 'answer that should never be evaluated',
+      }),
+    ).rejects.toThrow('Topic');
+    expect(processRecallResult).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
   it('creates retention card and runs SM-2 when no card exists', async () => {
     setupScopedRepo({ retentionCardFindFirst: undefined });
 
@@ -923,6 +951,29 @@ describe('processRecallTest', () => {
 // ---------------------------------------------------------------------------
 
 describe('startRelearn', () => {
+  it('[WI-80] rejects mixed-parent topics before starting relearn', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+    db.select = jest.fn(() => ({
+      from: jest.fn(() => ({
+        innerJoin: jest.fn(() => ({
+          innerJoin: jest.fn(() => ({
+            innerJoin: jest.fn(() => ({
+              where: jest.fn(() => ({
+                limit: jest.fn().mockResolvedValue([]),
+              })),
+            })),
+          })),
+        })),
+      })),
+    })) as never;
+
+    await expect(
+      startRelearn(db, profileId, { topicId, method: 'same' }),
+    ).rejects.toThrow('Topic');
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it('returns relearn confirmation with recap when a prior summary exists', async () => {
     setupScopedRepo({
       needsDeepeningFindMany: [],

@@ -65,6 +65,7 @@ jest.mock(
 jest.mock(
   '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
   () => ({
+    curriculumBooks: {},
     curriculumTopics: {},
     curricula: {},
     subjects: {},
@@ -94,7 +95,9 @@ describe('reviewDueSend', () => {
       from: jest.fn().mockReturnValue({
         innerJoin: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue(mockSelectResult),
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(mockSelectResult),
+            }),
           }),
         }),
       }),
@@ -170,7 +173,9 @@ describe('reviewDueSend', () => {
         from: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
             innerJoin: jest.fn().mockReturnValue({
-              where: jest.fn().mockResolvedValue([]),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue([]),
+              }),
             }),
           }),
         }),
@@ -202,7 +207,9 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
       from: jest.fn().mockReturnValue({
         innerJoin: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue([]),
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
           }),
         }),
       }),

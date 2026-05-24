@@ -676,29 +676,12 @@ export async function processRecallTest(
 ): Promise<RecallTestResponse> {
   const repo = createScopedRepository(db, profileId);
 
-  // IDOR prevention: verify the topic belongs to one of the profile's subjects
-  // BEFORE creating any retention state or reading evaluation context.
-  // Mirrors the ownership check in startRelearn (lines 886-909).
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, input.topicId),
+  // IDOR prevention: verify the topic belongs to the profile through both topic
+  // parent chains before creating retention state or reading evaluation context.
+  const topic = await assertOwnedCurriculumTopic(db, {
+    profileId,
+    topicId: input.topicId,
   });
-  const curriculum = topic
-    ? await db.query.curricula.findFirst({
-        where: eq(curricula.id, topic.curriculumId),
-      })
-    : null;
-  const subjectId = curriculum?.subjectId ?? null;
-  if (subjectId) {
-    const ownedSubject = await repo.subjects.findFirst(
-      eq(subjects.id, subjectId),
-    );
-    if (!ownedSubject) {
-      throw new NotFoundError('Topic');
-    }
-  } else {
-    // Topic doesn't exist or has no curriculum chain — reject
-    throw new NotFoundError('Topic');
-  }
 
   const card = await repo.retentionCards.findFirst(
     eq(retentionCards.topicId, input.topicId),
@@ -733,9 +716,7 @@ export async function processRecallTest(
     };
   }
 
-  // topic was already fetched for the ownership check above — reuse it here
-  // for the LLM evaluation context (avoids a redundant DB round-trip).
-  const topicTitle = topic?.title ?? input.topicId;
+  const topicTitle = topic.topicTitle;
   const quality =
     attemptMode === 'dont_remember'
       ? 0
@@ -802,13 +783,11 @@ export async function processRecallTest(
   // pattern: post-atomic-write safeWrite so a ledger failure is captured in
   // Sentry but never aborts the recall test response.
   const recallCompletedAt = new Date();
-  // curriculum was already fetched during the ownership check above — reuse it.
-  const topicCurriculum = curriculum;
   await safeWrite(
     () =>
       recordPracticeActivityEvent(db, {
         profileId,
-        subjectId: topicCurriculum?.subjectId ?? null,
+        subjectId: topic.subjectId,
         activityType: 'review',
         activitySubtype: 'topic_recall',
         completedAt: recallCompletedAt,
@@ -867,7 +846,7 @@ export async function processRecallTest(
     attemptMode === 'dont_remember' &&
     result.failureAction !== 'redirect_to_library'
   ) {
-    response.hint = buildRecallHint(topicTitle, topic?.description);
+    response.hint = buildRecallHint(topicTitle, topic.topicDescription);
   }
 
   // Add remediation data when redirect is triggered (3+ failures)
@@ -905,31 +884,12 @@ export async function startRelearn(
   profileId: string,
   input: RelearnTopicInput,
 ): Promise<RelearnResponse> {
-  // Find subjectId through the topic's curriculum chain
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, input.topicId),
+  const topic = await assertOwnedCurriculumTopic(db, {
+    profileId,
+    topicId: input.topicId,
   });
-  const curriculum = topic
-    ? await db.query.curricula.findFirst({
-        where: eq(curricula.id, topic.curriculumId),
-      })
-    : null;
-
-  const subjectId = curriculum?.subjectId ?? null;
-
-  // Verify topic belongs to one of the profile's subjects (IDOR prevention).
+  const subjectId = topic.subjectId;
   const repo = createScopedRepository(db, profileId);
-  if (subjectId) {
-    const ownedSubject = await repo.subjects.findFirst(
-      eq(subjects.id, subjectId),
-    );
-    if (!ownedSubject) {
-      throw new NotFoundError('Topic');
-    }
-  } else {
-    // Topic doesn't exist or has no curriculum chain — reject
-    throw new NotFoundError('Topic');
-  }
 
   // Mark topic as needs deepening if not already
   const existing = await repo.needsDeepeningTopics.findMany(
