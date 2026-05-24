@@ -41,10 +41,25 @@ function createMockDb(options: {
   // 3. curricula ⋈ subjects (scoped)
   const totalOverdueRows =
     options.totalOverdue != null ? [{ count: options.totalOverdue }] : [];
+  const subjectByCurriculum = new Map(
+    (options.curriculaRows ?? []).map((curriculum) => [
+      curriculum.id,
+      curriculum.subjectId,
+    ]),
+  );
+  const ownedTopicRows = (options.topicsRows ?? []).map((topic) => ({
+    topicId: topic.id,
+    topicTitle: topic.title,
+    topicDescription: null,
+    bookId: `book-${topic.id}`,
+    bookTitle: 'Book',
+    curriculumId: topic.curriculumId,
+    subjectId: subjectByCurriculum.get(topic.curriculumId) ?? 'subject-1',
+  }));
   const selectFn = jest.fn();
   selectFn
     .mockReturnValueOnce(createSelectChain(totalOverdueRows))
-    .mockReturnValueOnce(createSelectChain(options.topicsRows ?? []))
+    .mockReturnValueOnce(createSelectChain(ownedTopicRows))
     .mockReturnValueOnce(createSelectChain(options.curriculaRows ?? []));
 
   return { select: selectFn } as unknown as Database;
@@ -255,6 +270,52 @@ describe('getOverdueTopicsGrouped', () => {
     const result = await getOverdueTopicsGrouped(db, profileId);
 
     expect(result.subjects[0]?.topics[0]?.overdueDays).toBe(3);
+  });
+
+  it('[WI-80] filters overdue topic grouping through the dual topic parent chain', async () => {
+    const countChain = createSelectChain([{ count: 1 }]);
+    const ownedTopicsChain = createSelectChain([
+      {
+        topicId: 'owned-topic',
+        topicTitle: 'Owned Topic',
+        topicDescription: null,
+        bookId: 'book-owned',
+        bookTitle: 'Book',
+        curriculumId: 'curriculum-1',
+        subjectId: 'subject-1',
+      },
+    ]);
+    const db = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce(countChain)
+        .mockReturnValueOnce(ownedTopicsChain),
+    } as unknown as Database;
+    setupScopedRepo({
+      retentionCardsFindMany: [
+        {
+          topicId: 'owned-topic',
+          nextReviewAt: new Date('2026-05-01T10:00:00.000Z'),
+          failureCount: 2,
+        },
+        {
+          topicId: 'mixed-parent-topic',
+          nextReviewAt: new Date('2026-05-01T10:00:00.000Z'),
+          failureCount: 4,
+        },
+      ],
+      subjectsFindManyResults: [{ id: 'subject-1', name: 'Math' }],
+    });
+
+    const result = await getOverdueTopicsGrouped(db, profileId);
+
+    expect(countChain.innerJoin).toHaveBeenCalledTimes(4);
+    expect(ownedTopicsChain.innerJoin).toHaveBeenCalledTimes(3);
+    expect(result.totalOverdue).toBe(1);
+    expect(result.subjects).toHaveLength(1);
+    expect(result.subjects[0]?.topics.map((topic) => topic.topicId)).toEqual([
+      'owned-topic',
+    ]);
   });
 
   it('[BUG-470 / P2 BREAK] sets truncated:true and correct displayedCount when card list hits the 500-card cap', async () => {

@@ -22,6 +22,7 @@ import {
   subjects,
   curricula,
   curriculumTopics,
+  curriculumBooks,
   retentionCards,
   needsDeepeningTopics,
   teachingPreferences,
@@ -63,6 +64,7 @@ import { NotFoundError } from '../errors';
 import { createLogger } from './logger';
 import {
   assertOwnedCurriculumTopic,
+  findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from './curriculum-topic-ownership';
 
@@ -260,9 +262,17 @@ export async function getSubjectRetention(
   const topics = await db.query.curriculumTopics.findMany({
     where: eq(curriculumTopics.curriculumId, curriculum.id),
   });
-  const topicIds = topics.map((t) => t.id);
-  const topicTitleMap = new Map(topics.map((t) => [t.id, t.title]));
-  const topicBookIdMap = new Map(topics.map((t) => [t.id, t.bookId]));
+  const candidateTopicIds = topics.map((t) => t.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: candidateTopicIds,
+    subjectId,
+  });
+  const topicIds = ownedTopics.map((t) => t.topicId);
+  const topicTitleMap = new Map(
+    ownedTopics.map((t) => [t.topicId, t.topicTitle]),
+  );
+  const topicBookIdMap = new Map(ownedTopics.map((t) => [t.topicId, t.bookId]));
 
   // Get retention cards for this subject's topics (DB-level filter — issue #22.2)
   const subjectCards =
@@ -271,15 +281,19 @@ export async function getSubjectRetention(
           inArray(retentionCards.topicId, topicIds),
         )
       : [];
+  const ownedTopicIdSet = new Set(topicIds);
+  const ownedSubjectCards = subjectCards.filter((card) =>
+    ownedTopicIdSet.has(card.topicId),
+  );
 
   const now = new Date();
-  const reviewDueCount = subjectCards.filter(
+  const reviewDueCount = ownedSubjectCards.filter(
     (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime(),
   ).length;
 
   // F-023: Include not-started topics (those with no retention card) so the
   // Library Topics tab shows the full curriculum, not just started topics.
-  const cardByTopicId = new Map(subjectCards.map((c) => [c.topicId, c]));
+  const cardByTopicId = new Map(ownedSubjectCards.map((c) => [c.topicId, c]));
   const allTopics = topicIds.map((tid) => {
     const bookId = topicBookIdMap.get(tid) ?? '';
     const card = cardByTopicId.get(tid);
@@ -365,15 +379,18 @@ export async function getAllSubjectsRetention(
           where: inArray(curriculumTopics.curriculumId, curriculumIds),
         })
       : [];
-  const topicIds = allTopics.map((t) => t.id);
-  const topicTitleMap = new Map(allTopics.map((t) => [t.id, t.title]));
-  const topicBookIdMap = new Map(allTopics.map((t) => [t.id, t.bookId]));
-  // curriculumId → subjectId reverse lookup
-  const curriculumToSubject = new Map(
-    Array.from(curriculumBySubject.values()).map((c) => [c.id, c.subjectId]),
+  const candidateTopicIds = allTopics.map((t) => t.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: candidateTopicIds,
+  });
+  const topicIds = ownedTopics.map((t) => t.topicId);
+  const topicTitleMap = new Map(
+    ownedTopics.map((t) => [t.topicId, t.topicTitle]),
   );
+  const topicBookIdMap = new Map(ownedTopics.map((t) => [t.topicId, t.bookId]));
   const topicToSubject = new Map(
-    allTopics.map((t) => [t.id, curriculumToSubject.get(t.curriculumId) ?? '']),
+    ownedTopics.map((t) => [t.topicId, t.subjectId]),
   );
 
   // 4. All retention cards for those topics (one scoped query — RLS-aware).
@@ -384,7 +401,11 @@ export async function getAllSubjectsRetention(
         )
       : [];
 
-  const cardByTopicId = new Map(allCards.map((c) => [c.topicId, c]));
+  const ownedTopicIdSet = new Set(topicIds);
+  const ownedCards = allCards.filter((card) =>
+    ownedTopicIdSet.has(card.topicId),
+  );
+  const cardByTopicId = new Map(ownedCards.map((c) => [c.topicId, c]));
   const now = new Date();
 
   // Group results by subjectId in the same shape the per-subject route returns.
@@ -482,16 +503,67 @@ export async function getProfileOverdueCount(
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(retentionCards)
+      .innerJoin(
+        curriculumTopics,
+        eq(curriculumTopics.id, retentionCards.topicId),
+      )
+      .innerJoin(
+        curriculumBooks,
+        eq(curriculumBooks.id, curriculumTopics.bookId),
+      )
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .innerJoin(
+        subjects,
+        and(
+          eq(subjects.id, curriculumBooks.subjectId),
+          eq(subjects.id, curricula.subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      )
       .where(overdueWhere),
     db
       .select({ topicId: retentionCards.topicId })
       .from(retentionCards)
+      .innerJoin(
+        curriculumTopics,
+        eq(curriculumTopics.id, retentionCards.topicId),
+      )
+      .innerJoin(
+        curriculumBooks,
+        eq(curriculumBooks.id, curriculumTopics.bookId),
+      )
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .innerJoin(
+        subjects,
+        and(
+          eq(subjects.id, curriculumBooks.subjectId),
+          eq(subjects.id, curricula.subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      )
       .where(overdueWhere)
       .orderBy(asc(retentionCards.nextReviewAt))
       .limit(3),
     db
       .select({ nextReviewAt: retentionCards.nextReviewAt })
       .from(retentionCards)
+      .innerJoin(
+        curriculumTopics,
+        eq(curriculumTopics.id, retentionCards.topicId),
+      )
+      .innerJoin(
+        curriculumBooks,
+        eq(curriculumBooks.id, curriculumTopics.bookId),
+      )
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .innerJoin(
+        subjects,
+        and(
+          eq(subjects.id, curriculumBooks.subjectId),
+          eq(subjects.id, curricula.subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      )
       .where(
         and(
           eq(retentionCards.profileId, profileId),
@@ -510,25 +582,21 @@ export async function getProfileOverdueCount(
   let nextReviewTopic: NextReviewTopic | null = null;
   const topTopicId = topTopicIds[0];
   if (topTopicId) {
-    const topic = await db.query.curriculumTopics.findFirst({
-      where: eq(curriculumTopics.id, topTopicId),
+    const topic = await findOwnedCurriculumTopic(db, {
+      profileId,
+      topicId: topTopicId,
     });
     if (topic) {
-      const curriculum = await db.query.curricula.findFirst({
-        where: eq(curricula.id, topic.curriculumId),
-      });
-      if (curriculum) {
-        const subject = await repo.subjects.findFirst(
-          eq(subjects.id, curriculum.subjectId),
-        );
-        if (subject) {
-          nextReviewTopic = {
-            topicId: topTopicId,
-            subjectId: subject.id,
-            subjectName: subject.name,
-            topicTitle: topic.title,
-          };
-        }
+      const subject = await repo.subjects.findFirst(
+        eq(subjects.id, topic.subjectId),
+      );
+      if (subject) {
+        nextReviewTopic = {
+          topicId: topTopicId,
+          subjectId: subject.id,
+          subjectName: subject.name,
+          topicTitle: topic.topicTitle,
+        };
       }
     }
   }
@@ -550,6 +618,11 @@ export async function getTopicRetention(
   const card = await repo.retentionCards.findFirst(
     eq(retentionCards.topicId, topicId),
   );
+  if (!card) return null;
+
+  const topic = await findOwnedCurriculumTopic(db, { profileId, topicId });
+  if (!topic) return null;
+
   return card ? mapRetentionCardRow(card) : null;
 }
 

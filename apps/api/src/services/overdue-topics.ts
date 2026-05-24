@@ -2,12 +2,14 @@ import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import {
   createScopedRepository,
   curricula,
+  curriculumBooks,
   curriculumTopics,
   retentionCards,
   subjects,
   type Database,
 } from '@eduagent/database';
 import type { OverdueSubject, OverdueTopicsResponse } from '@eduagent/schemas';
+import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -42,6 +44,20 @@ export async function getOverdueTopicsGrouped(
   const [countRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(retentionCards)
+    .innerJoin(
+      curriculumTopics,
+      eq(curriculumTopics.id, retentionCards.topicId),
+    )
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.id, curricula.subjectId),
+        eq(subjects.profileId, profileId),
+      ),
+    )
     .where(
       and(
         eq(retentionCards.profileId, profileId),
@@ -51,44 +67,13 @@ export async function getOverdueTopicsGrouped(
   const totalOverdue = countRow?.count ?? overdueCards.length;
 
   const topicIds = [...new Set(overdueCards.map((c) => c.topicId))];
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds,
+  });
+  const topicMap = new Map(ownedTopics.map((t) => [t.topicId, t]));
 
-  // Scoping: join through subjects.profileId so cross-profile topics with the
-  // same id (impossible today, but defends against RLS misconfiguration or
-  // future schema changes) are filtered out at the DB level.
-  const topicsRows = await db
-    .select({
-      id: curriculumTopics.id,
-      title: curriculumTopics.title,
-      curriculumId: curriculumTopics.curriculumId,
-    })
-    .from(curriculumTopics)
-    .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
-    .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
-    .where(
-      and(
-        inArray(curriculumTopics.id, topicIds),
-        eq(subjects.profileId, profileId),
-      ),
-    );
-  const topicMap = new Map(topicsRows.map((t) => [t.id, t]));
-
-  const curriculumIds = [...new Set(topicsRows.map((t) => t.curriculumId))];
-  const curriculaRows =
-    curriculumIds.length > 0
-      ? await db
-          .select({ id: curricula.id, subjectId: curricula.subjectId })
-          .from(curricula)
-          .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
-          .where(
-            and(
-              inArray(curricula.id, curriculumIds),
-              eq(subjects.profileId, profileId),
-            ),
-          )
-      : [];
-  const curriculumMap = new Map(curriculaRows.map((c) => [c.id, c]));
-
-  const subjectIds = [...new Set(curriculaRows.map((c) => c.subjectId))];
+  const subjectIds = [...new Set(ownedTopics.map((t) => t.subjectId))];
   const subjectsRows =
     subjectIds.length > 0
       ? await repo.subjects.findMany(inArray(subjects.id, subjectIds))
@@ -101,10 +86,7 @@ export async function getOverdueTopicsGrouped(
     const topic = topicMap.get(card.topicId);
     if (!topic) continue;
 
-    const curriculum = curriculumMap.get(topic.curriculumId);
-    if (!curriculum) continue;
-
-    const subject = subjectLookup.get(curriculum.subjectId);
+    const subject = subjectLookup.get(topic.subjectId);
     if (!subject) continue;
 
     const entry = subjectMap.get(subject.id) ?? {
@@ -117,7 +99,7 @@ export async function getOverdueTopicsGrouped(
     entry.overdueCount += 1;
     entry.topics.push({
       topicId: card.topicId,
-      topicTitle: topic.title,
+      topicTitle: topic.topicTitle,
       overdueDays: toOverdueDays(now, card.nextReviewAt),
       failureCount: card.failureCount ?? 0,
     });
