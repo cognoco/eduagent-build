@@ -98,6 +98,15 @@ export type MeteringEnv = {
     quotaDecrementSource: 'monthly' | 'top_up';
     /** Set when quotaDecrementSource === 'top_up'. */
     quotaDecrementTopUpCreditId?: string;
+    /**
+     * [WI-133] Belt-and-braces flag flipped after either refund path
+     * (try/catch on handler throw, or post-`next()` status >= 400). Prevents
+     * double-refund if both paths fire in the same request — which should
+     * not happen in practice (throw replaces the response so the
+     * status-based branch will not fire), but the flag protects against
+     * unexpected interactions.
+     */
+    quotaRefunded?: boolean;
   };
 };
 
@@ -119,7 +128,7 @@ const SESSION_MESSAGE_STREAM_PATTERNS = [
   /\/sessions\/[^/]+\/stream\/?$/,
 ];
 
-const LLM_ROUTE_PATTERNS_ANY_METHOD = [
+export const LLM_ROUTE_PATTERNS_ANY_METHOD = [
   ...SESSION_MESSAGE_STREAM_PATTERNS,
   // [BUG-623 / A-6] generateRecallBridge calls the LLM but was missing from
   // this list, so any authenticated user could call recall-bridge in a tight
@@ -135,7 +144,7 @@ const LLM_ROUTE_PATTERNS_ANY_METHOD = [
 // Routes that consume LLM exchanges only on POST. Quiz round generation and
 // dictation are billable on POST; their GET counterparts (history, stats,
 // completion) are DB-only and must NOT decrement quota.
-const LLM_ROUTE_PATTERNS_POST_ONLY = [
+export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/quiz\/rounds\/?$/,
   /\/quiz\/rounds\/prefetch\/?$/,
   // [CRIT-1] Dictation LLM-consuming routes — all POST-only.
@@ -621,8 +630,51 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
-    await next();
+    // [WI-133] Wrap handler invocation in try/catch so a thrown error refunds
+    // quota before propagating. Without this, any uncaught handler exception
+    // (LLM provider 5xx, DB connection drop, validation throw inside a
+    // service) decrements the quota pool but never refunds, silently burning
+    // user quota for failures that never produced LLM output.
+    try {
+      await next();
+    } catch (err) {
+      // The handler's Response may not exist on throw — treat absence as
+      // not-skip. When present, an explicit `Quota-Refund: skip` header
+      // suppresses middleware refund (handlers that already refunded
+      // explicitly use this to avoid double-refund — e.g. streaming routes
+      // that refund inside the SSE reducer).
+      const skipHeader =
+        (c.res as Response | undefined)?.headers?.get('Quota-Refund') ===
+        'skip';
+      if (!skipHeader && !c.get('quotaRefunded')) {
+        // Preserve BUG-503 ordering on the throw path: KV delete BEFORE DB
+        // refund so a concurrent request cannot read the stale pre-refund
+        // KV snapshot and decrement again.
+        if (kv) {
+          await safeDeleteKV(kv, account.id);
+        }
+        await safeRefundQuota(db, subscriptionId, {
+          route: `metering.${c.req.method}.${c.req.path}`,
+          profileId,
+          source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+          topUpCreditId: decrement.topUpCreditId,
+        });
+        c.set('quotaRefunded', true);
+      }
+      // Always re-throw — the middleware does not swallow handler errors.
+      // The global error handler still gets the original exception unchanged.
+      throw err;
+    }
+
     if (shouldRefundAfterHandler(c.res.status)) {
+      // [WI-133] Honor the `Quota-Refund: skip` escape hatch on the
+      // status-based branch too, so a handler that returned 5xx after
+      // refunding explicitly inside its own reducer doesn't get double-
+      // refunded by the middleware.
+      const skipHeader = c.res.headers.get('Quota-Refund') === 'skip';
+      if (skipHeader || c.get('quotaRefunded')) {
+        return;
+      }
       // [BUG-503] Cache-aside invalidate-BEFORE-write: delete KV snapshot
       // FIRST, then refund the DB. Without this ordering, a concurrent request
       // could read the stale post-decrement KV between the DB refund write and
@@ -648,6 +700,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
         topUpCreditId: decrement.topUpCreditId,
       });
+      c.set('quotaRefunded', true);
       return;
     }
 
