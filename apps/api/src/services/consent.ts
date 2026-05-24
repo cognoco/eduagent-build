@@ -682,6 +682,31 @@ export async function getConsentStatus(
   return row?.status ?? null;
 }
 
+export async function isConsentRevocationGenerationCurrent(
+  db: Database,
+  profileId: string,
+  revokedAt?: Date,
+): Promise<boolean> {
+  const row = await db.query.consentStates.findFirst({
+    where: and(
+      eq(consentStates.profileId, profileId),
+      eq(consentStates.consentType, 'GDPR'),
+    ),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  if (row?.status !== 'WITHDRAWN') return false;
+  if (!revokedAt) return true;
+
+  const currentRespondedAt = row.respondedAt?.getTime();
+  const eventRespondedAt = revokedAt.getTime();
+  return (
+    currentRespondedAt !== undefined &&
+    !Number.isNaN(currentRespondedAt) &&
+    !Number.isNaN(eventRespondedAt) &&
+    currentRespondedAt === eventRespondedAt
+  );
+}
+
 /**
  * Whether async/background processing of a profile's learner data is currently
  * permitted by GDPR consent state.

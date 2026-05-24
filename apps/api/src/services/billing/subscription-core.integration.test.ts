@@ -373,7 +373,7 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(row!.lastStripeEventId).toBe('evt_same_second_second');
   });
 
-  it('[WI-78 review] rejects same-second payment_failed after active recovery', async () => {
+  it('[WI-78 review] applies a distinct same-second payment_failed after active recovery', async () => {
     const db = createIntegrationDb();
     const acct = await seedAccount('webhook-same-second-past-due-stale');
 
@@ -399,9 +399,48 @@ describe('updateSubscriptionFromWebhook', () => {
 
     expect(result).toEqual(
       expect.objectContaining({
+        status: 'past_due',
+        lastStripeEventId: 'evt_payment_failed_same_second',
+        webhookApplied: true,
+      }),
+    );
+
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('past_due');
+    expect(row!.lastStripeEventId).toBe('evt_payment_failed_same_second');
+  });
+
+  it('[WI-78 review] applies a distinct same-second active recovery after payment_failed', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('webhook-same-second-active-recovery');
+
+    const ts = new Date('2026-06-10T10:00:00.000Z');
+    await db.insert(subscriptions).values({
+      accountId: acct.id,
+      tier: 'plus',
+      status: 'past_due',
+      stripeSubscriptionId: 'sub_same_second_active_recovery_001',
+      lastStripeEventTimestamp: ts,
+      lastStripeEventId: 'evt_payment_failed_same_second',
+    });
+
+    const result = await updateSubscriptionFromWebhook(
+      db,
+      'sub_same_second_active_recovery_001',
+      {
+        status: 'active',
+        lastStripeEventTimestamp: ts.toISOString(),
+        stripeEventId: 'evt_payment_succeeded_same_second',
+      },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
         status: 'active',
         lastStripeEventId: 'evt_payment_succeeded_same_second',
-        webhookApplied: false,
+        webhookApplied: true,
       }),
     );
 

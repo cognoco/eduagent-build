@@ -9,6 +9,7 @@ import {
   requestConsent,
   processConsentResponse,
   getConsentStatus,
+  isConsentRevocationGenerationCurrent,
   isGdprProcessingAllowed,
   revokeConsent,
   refreshConsentToken,
@@ -55,6 +56,7 @@ function mockConsentRow(
     parentEmail: string | null;
     expiresAt: Date | null;
     consentToken: string | null;
+    respondedAt: Date | null;
   }>,
 ) {
   return {
@@ -64,7 +66,8 @@ function mockConsentRow(
     status: overrides?.status ?? 'PARENTAL_CONSENT_REQUESTED',
     parentEmail: overrides?.parentEmail ?? 'parent@example.com',
     requestedAt: NOW,
-    respondedAt: null,
+    respondedAt:
+      overrides?.respondedAt !== undefined ? overrides.respondedAt : null,
     expiresAt: overrides?.expiresAt !== undefined ? overrides.expiresAt : null,
     consentToken:
       overrides?.consentToken !== undefined ? overrides.consentToken : null,
@@ -528,6 +531,60 @@ describe('getConsentStatus', () => {
     );
 
     expect(result).toBe('CONSENTED');
+  });
+});
+
+describe('isConsentRevocationGenerationCurrent', () => {
+  it('returns true when the current GDPR withdrawal has the same respondedAt as the event generation', async () => {
+    const revokedAt = new Date('2026-01-10T10:00:00.000Z');
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({
+        status: 'WITHDRAWN',
+        respondedAt: revokedAt,
+      }),
+    });
+
+    await expect(
+      isConsentRevocationGenerationCurrent(
+        db,
+        '550e8400-e29b-41d4-a716-446655440000',
+        revokedAt,
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('returns false when consent is withdrawn for a newer generation', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({
+        status: 'WITHDRAWN',
+        respondedAt: new Date('2026-01-12T10:00:00.000Z'),
+      }),
+    });
+
+    await expect(
+      isConsentRevocationGenerationCurrent(
+        db,
+        '550e8400-e29b-41d4-a716-446655440000',
+        new Date('2026-01-10T10:00:00.000Z'),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('returns false when the latest GDPR consent state is no longer withdrawn', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({
+        status: 'CONSENTED',
+        respondedAt: new Date('2026-01-12T10:00:00.000Z'),
+      }),
+    });
+
+    await expect(
+      isConsentRevocationGenerationCurrent(
+        db,
+        '550e8400-e29b-41d4-a716-446655440000',
+        new Date('2026-01-10T10:00:00.000Z'),
+      ),
+    ).resolves.toBe(false);
   });
 });
 

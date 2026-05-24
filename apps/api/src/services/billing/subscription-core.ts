@@ -5,7 +5,7 @@
 // markSubscriptionCancelled, updateQuotaPoolLimit, activateSubscriptionFromCheckout
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, lt, lte, ne, or } from 'drizzle-orm';
+import { and, eq, isNull, lte, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   subscriptions,
@@ -31,23 +31,6 @@ import {
 } from './types';
 
 const logger = createLogger();
-
-function isSameSecondPastDueDowngrade(
-  existing: typeof subscriptions.$inferSelect,
-  updates: WebhookSubscriptionUpdate,
-): boolean {
-  if (existing.status !== 'active' || updates.status !== 'past_due') {
-    return false;
-  }
-  const existingTs = existing.lastStripeEventTimestamp?.getTime();
-  const incomingTs = new Date(updates.lastStripeEventTimestamp).getTime();
-  return (
-    existingTs != null &&
-    !Number.isNaN(existingTs) &&
-    !Number.isNaN(incomingTs) &&
-    existingTs === incomingTs
-  );
-}
 
 // ---------------------------------------------------------------------------
 // [BUG-120] Zod input contract for activateSubscriptionFromCheckout
@@ -195,10 +178,6 @@ export async function updateSubscriptionFromWebhook(
         return { ...mapSubscriptionRow(existing), webhookApplied: false };
       }
     }
-    if (isSameSecondPastDueDowngrade(existing, updates)) {
-      return { ...mapSubscriptionRow(existing), webhookApplied: false };
-    }
-
     const setValues: Record<string, unknown> = {
       lastStripeEventTimestamp: new Date(updates.lastStripeEventTimestamp),
       updatedAt: new Date(),
@@ -272,9 +251,7 @@ export async function updateSubscriptionFromWebhook(
     const incomingEventTimestamp = new Date(updates.lastStripeEventTimestamp);
     const eventTimestampPredicate = or(
       isNull(subscriptions.lastStripeEventTimestamp),
-      isSameSecondPastDueDowngrade(existing, updates)
-        ? lt(subscriptions.lastStripeEventTimestamp, incomingEventTimestamp)
-        : lte(subscriptions.lastStripeEventTimestamp, incomingEventTimestamp),
+      lte(subscriptions.lastStripeEventTimestamp, incomingEventTimestamp),
     );
     if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
 
@@ -307,9 +284,6 @@ export async function updateSubscriptionFromWebhook(
         !Number.isNaN(incomingTs) &&
         incomingTs < recheckTs
       ) {
-        return { ...mapSubscriptionRow(recheck), webhookApplied: false };
-      }
-      if (recheck && isSameSecondPastDueDowngrade(recheck, updates)) {
         return { ...mapSubscriptionRow(recheck), webhookApplied: false };
       }
       throw new Error('Subscription webhook update did not return a row');

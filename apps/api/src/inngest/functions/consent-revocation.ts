@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import {
   calculateAge,
   getFamilyOwnerProfileId,
-  getConsentStatus,
+  isConsentRevocationGenerationCurrent,
   getProfileForConsentRevocation,
   getProfileDisplayName,
 } from '../../services/consent';
@@ -63,8 +63,12 @@ export const consentRevocation = inngest.createFunction(
 
     await step.run('send-warning-push', async () => {
       const db = getStepDatabase();
-      const status = await getConsentStatus(db, childProfileId);
-      if (status !== 'WITHDRAWN') {
+      const isCurrentRevocation = await isConsentRevocationGenerationCurrent(
+        db,
+        childProfileId,
+        revocationRespondedAt,
+      );
+      if (!isCurrentRevocation) {
         return { sent: false, reason: 'restored' };
       }
 
@@ -94,8 +98,11 @@ export const consentRevocation = inngest.createFunction(
     // Check if consent was restored during grace period
     const restored = await step.run('check-restoration', async () => {
       const db = getStepDatabase();
-      const status = await getConsentStatus(db, childProfileId);
-      return status === 'CONSENTED';
+      return !(await isConsentRevocationGenerationCurrent(
+        db,
+        childProfileId,
+        revocationRespondedAt,
+      ));
     });
 
     if (restored) {
@@ -141,8 +148,13 @@ export const consentRevocation = inngest.createFunction(
         'archive-child-profile',
         async () => {
           const db = getStepDatabase();
-          const status = await getConsentStatus(db, childProfileId);
-          if (status !== 'WITHDRAWN') {
+          const isCurrentRevocation =
+            await isConsentRevocationGenerationCurrent(
+              db,
+              childProfileId,
+              revocationRespondedAt,
+            );
+          if (!isCurrentRevocation) {
             return { archived: false, reason: 'consent_restored' };
           }
           const archivedAt = new Date();
@@ -230,6 +242,14 @@ export const consentRevocation = inngest.createFunction(
     // observability story consistent across cron-driven push paths.
     await step.run('notify-child', async () => {
       const db = getStepDatabase();
+      const isCurrentRevocation = await isConsentRevocationGenerationCurrent(
+        db,
+        childProfileId,
+        revocationRespondedAt,
+      );
+      if (!isCurrentRevocation) {
+        return { sent: false, reason: 'consent_restored' };
+      }
       const recentCount = await getRecentNotificationCount(
         db,
         childProfileId,

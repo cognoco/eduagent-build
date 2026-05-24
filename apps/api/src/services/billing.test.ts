@@ -435,14 +435,26 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it('[WI-78 review] skips same-second Stripe past_due downgrade after active recovery', async () => {
+  it('[WI-78 review] applies distinct same-second Stripe past_due events after active recovery', async () => {
     const existing = mockSubscriptionRow({
       stripeSubscriptionId: 'sub_stripe_1',
       status: 'active',
       lastStripeEventId: 'evt_payment_succeeded_same_second',
       lastStripeEventTimestamp: NOW,
     });
+    const updated = mockSubscriptionRow({
+      ...existing,
+      status: 'past_due',
+      lastStripeEventId: 'evt_payment_failed_same_second',
+    });
     const db = createMockDb({ subscriptionFindFirst: existing });
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([updated]),
+        }),
+      }),
+    });
 
     const result = await updateSubscriptionFromWebhook(db, 'sub_stripe_1', {
       status: 'past_due',
@@ -452,12 +464,12 @@ describe('updateSubscriptionFromWebhook', () => {
 
     expect(result).toEqual(
       expect.objectContaining({
-        status: 'active',
-        lastStripeEventId: 'evt_payment_succeeded_same_second',
-        webhookApplied: false,
+        status: 'past_due',
+        lastStripeEventId: 'evt_payment_failed_same_second',
+        webhookApplied: true,
       }),
     );
-    expect(db.update).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalled();
   });
 
   it('skips update when Stripe event id was already processed', async () => {

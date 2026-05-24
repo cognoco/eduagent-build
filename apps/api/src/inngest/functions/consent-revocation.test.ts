@@ -35,6 +35,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockGetConsentStatus = jest.fn();
+const mockIsConsentRevocationGenerationCurrent = jest.fn();
 const mockGetProfileDisplayName = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
 const mockGetFamilyOwnerProfileId = jest.fn();
@@ -51,6 +52,8 @@ jest.mock(
       getFamilyOwnerProfileId: (...args: unknown[]) =>
         mockGetFamilyOwnerProfileId(...args),
       getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+      isConsentRevocationGenerationCurrent: (...args: unknown[]) =>
+        mockIsConsentRevocationGenerationCurrent(...args),
       getProfileForConsentRevocation: (...args: unknown[]) =>
         mockGetProfileForConsentRevocation(...args),
       getProfileDisplayName: (...args: unknown[]) =>
@@ -186,6 +189,7 @@ beforeEach(() => {
     rowCount: 1,
   });
   mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
+  mockIsConsentRevocationGenerationCurrent.mockResolvedValue(true);
   mockGetProfileDisplayName.mockResolvedValue('Liam');
   mockGetProfileForConsentRevocation.mockResolvedValue({
     displayName: 'Liam',
@@ -262,6 +266,7 @@ describe('consentRevocation', () => {
 
   it('does not send a warning if consent was restored before the 6-day mark', async () => {
     mockGetConsentStatus.mockResolvedValue('CONSENTED');
+    mockIsConsentRevocationGenerationCurrent.mockResolvedValue(false);
 
     await executeRevocation({
       childProfileId: 'child-001',
@@ -288,10 +293,26 @@ describe('consentRevocation', () => {
     );
   });
 
+  it('[WI-78 review] does not warn for a stale revocation generation while consent is withdrawn again', async () => {
+    mockIsConsentRevocationGenerationCurrent.mockResolvedValueOnce(false);
+
+    await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-10T10:00:00.000Z',
+    });
+
+    expect(mockSendPushNotification).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'consent_warning' }),
+    );
+  });
+
   it('returns restored without pushing or deleting when consent was restored', async () => {
     mockGetConsentStatus
       .mockResolvedValueOnce('CONSENTED')
       .mockResolvedValueOnce('CONSENTED');
+    mockIsConsentRevocationGenerationCurrent.mockResolvedValue(false);
 
     const { result } = await executeRevocation({
       childProfileId: 'child-001',
@@ -300,6 +321,28 @@ describe('consentRevocation', () => {
 
     expect(result).toEqual({ status: 'restored', childProfileId: 'child-001' });
     expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(mockDeleteProfile).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] stops before child notifications when the grace-end check sees a newer withdrawal generation', async () => {
+    mockIsConsentRevocationGenerationCurrent
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-10T10:00:00.000Z',
+    });
+
+    expect(result).toEqual({ status: 'restored', childProfileId: 'child-001' });
+    expect(mockSendPushNotification).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'child-001',
+        type: 'consent_expired',
+      }),
+    );
     expect(mockDeleteProfile).not.toHaveBeenCalled();
   });
 
