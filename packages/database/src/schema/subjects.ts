@@ -131,6 +131,12 @@ export const curriculumBooks = pgTable(
     emoji: text('emoji'),
     sortOrder: integer('sort_order').notNull(),
     topicsGenerated: boolean('topics_generated').notNull().default(false),
+    // [WI-125] Atomic single-flight claim flag for the
+    // subject-retry-curriculum Inngest function. Set true before the LLM
+    // call via a guarded UPDATE; reset false in a finally block. Prevents
+    // duplicate concurrent retries from burning the LLM call twice when
+    // the dispatch fires multiple events for the same bookId.
+    retryInFlight: boolean('retry_in_flight').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
