@@ -449,9 +449,12 @@ async function handleBillingIssue(
     status: 'past_due',
   });
 
-  const shouldDispatchBillingIssue = updated !== null;
+  const shouldDispatchBillingIssue =
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastRevenuecatEventId === event.id);
 
-  if (updated && shouldDispatchBillingIssue) {
+  if (updated) {
     await safeRefreshKvCache(
       kv,
       db,

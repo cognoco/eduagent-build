@@ -33,11 +33,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const reviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestReviewAttemptRef = useRef(0);
+  const reviewInFlightRef = useRef(false);
 
   useEffect(() => {
     if (isReviewing) {
       setReviewTimedOut(false);
       reviewTimeoutRef.current = setTimeout(() => {
+        reviewCancelledRef.current = true;
         latestReviewAttemptRef.current += 1;
         setReviewTimedOut(true);
       }, 20_000);
@@ -122,133 +124,143 @@ export default function DictationCompleteScreen(): React.ReactElement {
   const handleCheckWriting = async (
     source: 'camera' | 'gallery' = 'camera',
   ) => {
+    if (reviewInFlightRef.current && !reviewCancelledRef.current) return;
+
     const attemptId = latestReviewAttemptRef.current + 1;
     latestReviewAttemptRef.current = attemptId;
     // [BUG-692] Reset the cancelled flag at the start of each new attempt.
     reviewCancelledRef.current = false;
+    reviewInFlightRef.current = true;
 
-    // 1. Launch camera (or gallery in E2E mode)
-    let uri: string | undefined;
-    let assetMimeType: string | undefined;
     try {
-      const result =
-        source === 'gallery'
-          ? await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              quality: 0.8,
-              allowsEditing: false,
-            })
-          : await ImagePicker.launchCameraAsync({
-              mediaTypes: ['images'],
-              quality: 0.8,
-              allowsEditing: false,
-            });
-      if (
-        reviewCancelledRef.current ||
-        latestReviewAttemptRef.current !== attemptId
-      )
+      // 1. Launch camera (or gallery in E2E mode)
+      let uri: string | undefined;
+      let assetMimeType: string | undefined;
+      try {
+        const result =
+          source === 'gallery'
+            ? await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                quality: 0.8,
+                allowsEditing: false,
+              })
+            : await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 0.8,
+                allowsEditing: false,
+              });
+        if (
+          reviewCancelledRef.current ||
+          latestReviewAttemptRef.current !== attemptId
+        )
+          return;
+        if (result.canceled) return;
+        const asset = result.assets?.[0];
+        uri = asset?.uri;
+        // [ASSUMP-F8] Prefer the picker's reported mimeType when present.
+        // Extension sniffing fails for Android content:// URIs (no extension)
+        // and misclassifies unusual camera outputs. The server whitelists
+        // only jpeg/png/webp, so normalize anything else to jpeg.
+        assetMimeType = asset?.mimeType;
+      } catch {
+        platformAlert(
+          t('dictation.complete.cameraErrorTitle'),
+          t('dictation.complete.cameraErrorMessage'),
+          [{ text: t('common.ok') }],
+        );
         return;
-      if (result.canceled) return;
-      const asset = result.assets?.[0];
-      uri = asset?.uri;
-      // [ASSUMP-F8] Prefer the picker's reported mimeType when present.
-      // Extension sniffing fails for Android content:// URIs (no extension)
-      // and misclassifies unusual camera outputs. The server whitelists
-      // only jpeg/png/webp, so normalize anything else to jpeg.
-      assetMimeType = asset?.mimeType;
-    } catch {
-      platformAlert(
-        t('dictation.complete.cameraErrorTitle'),
-        t('dictation.complete.cameraErrorMessage'),
-        [{ text: t('common.ok') }],
-      );
-      return;
-    }
-
-    if (!uri) return;
-
-    // 2. Convert to base64
-    let imageBase64: string;
-    let imageMimeType: 'image/jpeg' | 'image/png' | 'image/webp';
-    try {
-      imageBase64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      if (
-        reviewCancelledRef.current ||
-        latestReviewAttemptRef.current !== attemptId
-      )
-        return;
-      if (
-        assetMimeType === 'image/png' ||
-        assetMimeType === 'image/webp' ||
-        assetMimeType === 'image/jpeg'
-      ) {
-        imageMimeType = assetMimeType;
-      } else if (uri.toLowerCase().endsWith('.png')) {
-        imageMimeType = 'image/png';
-      } else if (uri.toLowerCase().endsWith('.webp')) {
-        imageMimeType = 'image/webp';
-      } else {
-        imageMimeType = 'image/jpeg';
       }
-    } catch {
-      platformAlert(
-        t('dictation.complete.photoErrorTitle'),
-        t('dictation.complete.photoErrorMessage'),
-        [{ text: t('common.ok') }],
-      );
-      return;
-    }
 
-    // 3. Send to LLM for review
-    const sentences = data?.sentences ?? [];
-    const language = data?.language ?? 'en';
-    let request: ReturnType<typeof reviewMutation.mutateAsync> | null = null;
+      if (!uri) return;
 
-    try {
-      request = reviewMutation.mutateAsync({
-        imageBase64,
-        imageMimeType,
-        sentences,
-        language,
-      });
-      const reviewResult = await request;
-
-      // [BUG-692] If the user navigated away (hardware back, Cancel button,
-      // or screen blur) while the review was in flight, skip navigation.
-      if (
-        reviewCancelledRef.current ||
-        latestReviewAttemptRef.current !== attemptId
-      )
+      // 2. Convert to base64
+      let imageBase64: string;
+      let imageMimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+      try {
+        imageBase64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        if (
+          reviewCancelledRef.current ||
+          latestReviewAttemptRef.current !== attemptId
+        )
+          return;
+        if (
+          assetMimeType === 'image/png' ||
+          assetMimeType === 'image/webp' ||
+          assetMimeType === 'image/jpeg'
+        ) {
+          imageMimeType = assetMimeType;
+        } else if (uri.toLowerCase().endsWith('.png')) {
+          imageMimeType = 'image/png';
+        } else if (uri.toLowerCase().endsWith('.webp')) {
+          imageMimeType = 'image/webp';
+        } else {
+          imageMimeType = 'image/jpeg';
+        }
+      } catch {
+        platformAlert(
+          t('dictation.complete.photoErrorTitle'),
+          t('dictation.complete.photoErrorMessage'),
+          [{ text: t('common.ok') }],
+        );
         return;
-
-      // 4. Store review result in context then navigate
-      if (data) {
-        setData({ ...data, reviewResult });
       }
-      router.push('/(app)/dictation/review' as Href);
-    } catch (err) {
-      // [BUG-692] Don't pop an alert if the user already navigated away.
-      if (
-        reviewCancelledRef.current ||
-        latestReviewAttemptRef.current !== attemptId
-      )
-        return;
-      const message = err instanceof Error ? err.message : t('errors.generic');
-      platformAlert(t('dictation.complete.reviewFailedTitle'), message, [
-        {
-          text: t('dictation.complete.tryAgain'),
-          onPress: () => void handleCheckWriting(),
-        },
-        {
-          text: t('dictation.complete.skip'),
-          style: 'cancel',
-          onPress: () => {
-            reviewCancelledRef.current = true;
+
+      // 3. Send to LLM for review
+      const sentences = data?.sentences ?? [];
+      const language = data?.language ?? 'en';
+      let request: ReturnType<typeof reviewMutation.mutateAsync> | null = null;
+
+      try {
+        request = reviewMutation.mutateAsync({
+          imageBase64,
+          imageMimeType,
+          sentences,
+          language,
+        });
+        const reviewResult = await request;
+
+        // [BUG-692] If the user navigated away (hardware back, Cancel button,
+        // or screen blur) while the review was in flight, skip navigation.
+        if (
+          reviewCancelledRef.current ||
+          latestReviewAttemptRef.current !== attemptId
+        )
+          return;
+
+        // 4. Store review result in context then navigate
+        if (data) {
+          setData({ ...data, reviewResult });
+        }
+        router.push('/(app)/dictation/review' as Href);
+      } catch (err) {
+        // [BUG-692] Don't pop an alert if the user already navigated away.
+        if (
+          reviewCancelledRef.current ||
+          latestReviewAttemptRef.current !== attemptId
+        )
+          return;
+        const message =
+          err instanceof Error ? err.message : t('errors.generic');
+        platformAlert(t('dictation.complete.reviewFailedTitle'), message, [
+          {
+            text: t('dictation.complete.tryAgain'),
+            onPress: () => void handleCheckWriting(),
           },
-        },
-      ]);
+          {
+            text: t('dictation.complete.skip'),
+            style: 'cancel',
+            onPress: () => {
+              reviewCancelledRef.current = true;
+            },
+          },
+        ]);
+      }
+    } finally {
+      if (latestReviewAttemptRef.current === attemptId) {
+        reviewInFlightRef.current = false;
+      }
     }
   };
 

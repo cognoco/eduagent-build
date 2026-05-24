@@ -1235,7 +1235,7 @@ describe('BILLING_ISSUE', () => {
     });
   });
 
-  it('[WI-78 review] re-emits payment.failed when retry sees a newer RevenueCat event stamp', async () => {
+  it('[WI-78 review] does not emit payment.failed when stale retry sees a newer RevenueCat event stamp', async () => {
     const payload = makeWebhookPayload('BILLING_ISSUE', {
       id: 'evt_rc_payment_failed_stale_retry',
     });
@@ -1249,15 +1249,7 @@ describe('BILLING_ISSUE', () => {
 
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
-    expect(inngest.send).toHaveBeenCalledWith({
-      id: 'revenuecat-payment-failed:evt_rc_payment_failed_stale_retry',
-      name: 'app/payment.failed',
-      data: expect.objectContaining({
-        subscriptionId: 'sub-internal-1',
-        accountId: 'acc-1',
-        source: 'revenuecat',
-      }),
-    });
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   it('does not emit event when subscription not found', async () => {

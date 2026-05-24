@@ -135,11 +135,24 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           if (!existing) {
             return notFound(c, 'Book not found');
           }
-          if (
-            expandExisting &&
-            existing.topics.filter((topic) => !topic.skipped).length <
-              MIN_GENERATED_BOOK_TOPICS
-          ) {
+          const activeTopicCount = existing.topics.filter(
+            (topic) => !topic.skipped,
+          ).length;
+          if (existing.book.topicsGenerated && existing.topics.length === 0) {
+            await releaseBookGenerationClaimIfEmpty(
+              db,
+              subjectId,
+              bookId,
+              profileId,
+            );
+            return apiError(
+              c,
+              409,
+              ERROR_CODES.CONFLICT,
+              'Book topic generation is still in progress. Please retry shortly.',
+            );
+          }
+          if (expandExisting && activeTopicCount < MIN_GENERATED_BOOK_TOPICS) {
             const learnerAge = await getProfileAge(db, profileId);
             const expanded = await expandExistingBookTopics(
               db,

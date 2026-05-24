@@ -223,24 +223,17 @@ describe('DictationCompleteScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('[WI-78 DS-187] ignores an older review result after a retry starts', async () => {
+  it('[WI-78 DS-187] blocks duplicate review while the first attempt is in flight', async () => {
     mockLaunchCameraResult = {
       canceled: false,
       assets: [{ uri: 'file://review.jpg', mimeType: 'image/jpeg' }],
     };
     let resolveFirst!: (v: unknown) => void;
-    let resolveSecond!: (v: unknown) => void;
-    mockReviewMutateAsync
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveFirst = resolve;
-        }),
-      )
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveSecond = resolve;
-        }),
-      );
+    mockReviewMutateAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
 
     const { getByTestId } = render(<DictationCompleteScreen />);
 
@@ -253,49 +246,36 @@ describe('DictationCompleteScreen', () => {
       await Promise.resolve();
     });
 
-    expect(mockReviewMutateAsync).toHaveBeenCalledTimes(2);
+    expect(mockReviewMutateAsync).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      resolveFirst({ mistakeCount: 2, feedback: 'Old', mistakes: [] });
-      await Promise.resolve();
-    });
-
-    expect(mockSetData).not.toHaveBeenCalled();
-    expect(mockPush).not.toHaveBeenCalled();
-
-    await act(async () => {
-      resolveSecond({ mistakeCount: 0, feedback: 'New', mistakes: [] });
+      resolveFirst({ mistakeCount: 0, feedback: 'Only', mistakes: [] });
       await Promise.resolve();
     });
 
     expect(mockSetData).toHaveBeenCalledTimes(1);
     expect(mockSetData).toHaveBeenCalledWith(
       expect.objectContaining({
-        reviewResult: expect.objectContaining({ feedback: 'New' }),
+        reviewResult: expect.objectContaining({ feedback: 'Only' }),
       }),
     );
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
-  it('[WI-78 review] abandons an older attempt before its review mutation starts', async () => {
+  it('[WI-78 review] blocks duplicate attempts before the first review mutation starts', async () => {
     const imagePicker = require('expo-image-picker') as {
       launchCameraAsync: jest.Mock;
     };
     let resolveFirstCamera!: (value: unknown) => void;
-    imagePicker.launchCameraAsync
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveFirstCamera = resolve;
-          }),
-      )
-      .mockResolvedValueOnce({
-        canceled: false,
-        assets: [{ uri: 'file://second.jpg', mimeType: 'image/jpeg' }],
-      });
+    imagePicker.launchCameraAsync.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstCamera = resolve;
+        }),
+    );
     mockReviewMutateAsync.mockResolvedValueOnce({
       mistakeCount: 0,
-      feedback: 'New',
+      feedback: 'First',
       mistakes: [],
     });
 
@@ -311,8 +291,9 @@ describe('DictationCompleteScreen', () => {
       await Promise.resolve();
     });
 
-    expect(mockReviewMutateAsync).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(imagePicker.launchCameraAsync).toHaveBeenCalledTimes(1);
+    expect(mockReviewMutateAsync).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveFirstCamera({

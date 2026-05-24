@@ -24,6 +24,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
   const [generateTimedOut, setGenerateTimedOut] = useState(false);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestGenerateRequestRef = useRef<Promise<unknown> | null>(null);
+  const generateInFlightRef = useRef(false);
   // [BUG-692] Set when back arrow, Cancel button, or 20s timeout fires while
   // the mutation is in flight. Prevents late-arriving response from pushing to
   // the playback screen after the user has already navigated away.
@@ -49,8 +50,11 @@ export default function DictationChoiceScreen(): React.ReactElement {
   }, [generateMutation.isPending]);
 
   const handleSurpriseMe = async () => {
+    if (generateInFlightRef.current && !generateCancelledRef.current) return;
+
     // [BUG-692] Reset the cancelled flag at the start of each new attempt.
     generateCancelledRef.current = false;
+    generateInFlightRef.current = true;
     setLastError(null);
     setGenerateTimedOut(false);
     let request: ReturnType<typeof generateMutation.mutateAsync> | null = null;
@@ -95,6 +99,10 @@ export default function DictationChoiceScreen(): React.ReactElement {
         },
         { text: t('common.goBack'), style: 'cancel' },
       ]);
+    } finally {
+      if (!request || latestGenerateRequestRef.current === request) {
+        generateInFlightRef.current = false;
+      }
     }
   };
 

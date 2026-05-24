@@ -236,20 +236,13 @@ describe('DictationChoiceScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('[WI-78 DS-178] ignores an older generation result after a retry starts', async () => {
+  it('[WI-78 DS-178] blocks duplicate generation while the first attempt is in flight', async () => {
     let resolveFirst!: (v: unknown) => void;
-    let resolveSecond!: (v: unknown) => void;
-    mockGenerateMutateAsync
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveFirst = resolve;
-        }),
-      )
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveSecond = resolve;
-        }),
-      );
+    mockGenerateMutateAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
 
     const { getByTestId } = render(<DictationChoiceScreen />);
 
@@ -262,30 +255,14 @@ describe('DictationChoiceScreen', () => {
       await Promise.resolve();
     });
 
-    expect(mockGenerateMutateAsync).toHaveBeenCalledTimes(2);
+    expect(mockGenerateMutateAsync).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       resolveFirst({
-        sentences: [{ text: 'Old prompt.' }],
+        sentences: [{ text: 'Only prompt.' }],
         language: 'en',
-        title: 'Old',
-        topic: 'old',
-      });
-      await Promise.resolve();
-    });
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-
-    expect(mockSetData).not.toHaveBeenCalled();
-    expect(mockPush).not.toHaveBeenCalled();
-
-    await act(async () => {
-      resolveSecond({
-        sentences: [{ text: 'New prompt.' }],
-        language: 'en',
-        title: 'New',
-        topic: 'new',
+        title: 'Only',
+        topic: 'only',
       });
       await Promise.resolve();
     });
@@ -295,7 +272,7 @@ describe('DictationChoiceScreen', () => {
 
     expect(mockSetData).toHaveBeenCalledTimes(1);
     expect(mockSetData).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'New', topic: 'new' }),
+      expect.objectContaining({ title: 'Only', topic: 'only' }),
     );
     expect(mockPush).toHaveBeenCalledTimes(1);
   });

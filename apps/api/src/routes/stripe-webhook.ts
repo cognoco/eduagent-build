@@ -469,9 +469,12 @@ async function handlePaymentFailed(
     },
   );
 
-  const shouldDispatchPaymentFailed = updated !== null;
+  const shouldDispatchPaymentFailed =
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastStripeEventId === stripeEventId);
 
-  if (updated && shouldDispatchPaymentFailed) {
+  if (updated) {
     await safeRefreshKvCache(
       kv,
       db,

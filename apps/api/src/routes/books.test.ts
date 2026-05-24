@@ -108,6 +108,7 @@ jest.mock(
       getBookWithTopics: jest.fn().mockResolvedValue(null),
       persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
       claimBookForGeneration: jest.fn().mockResolvedValue(null),
+      releaseBookGenerationClaimIfEmpty: jest.fn().mockResolvedValue(undefined),
       moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
       // expandExistingBookTopics is the extracted orchestration service.
       // We stub it here so the route test isolates the route's dispatch
@@ -170,8 +171,10 @@ import {
   getAllProfileBooks,
   getBookWithTopics,
   claimBookForGeneration,
+  releaseBookGenerationClaimIfEmpty,
 } from '../services/curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const mockGetBooks = getBooks as jest.MockedFunction<typeof getBooks>;
 const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
@@ -182,6 +185,10 @@ const mockGetBookWithTopics = getBookWithTopics as jest.MockedFunction<
 >;
 const mockClaimBookForGeneration =
   claimBookForGeneration as jest.MockedFunction<typeof claimBookForGeneration>;
+const mockReleaseBookGenerationClaimIfEmpty =
+  releaseBookGenerationClaimIfEmpty as jest.MockedFunction<
+    typeof releaseBookGenerationClaimIfEmpty
+  >;
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -402,6 +409,36 @@ describe('book routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.book.topicsGenerated).toBe(true);
+    });
+
+    it('[WI-78 review] rejects and releases an empty generated claim', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: { ...mockBook, topicsGenerated: true },
+        topics: [],
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toMatchObject({
+        code: ERROR_CODES.CONFLICT,
+      });
+      expect(mockReleaseBookGenerationClaimIfEmpty).toHaveBeenCalledWith(
+        undefined,
+        SUBJECT_ID,
+        BOOK_ID,
+        'test-profile-id',
+      );
     });
 
     it('expands an already-generated thin book when requested', async () => {
