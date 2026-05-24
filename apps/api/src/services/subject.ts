@@ -367,26 +367,32 @@ export async function createSubjectWithStructure(
       };
     }
 
-    // Create the focused book
-    const maxOrderResult = await db
-      .select({
-        maxOrder: sql<number>`COALESCE(MAX(${curriculumBooks.sortOrder}), 0)`,
-      })
-      .from(curriculumBooks)
-      .where(eq(curriculumBooks.subjectId, targetSubject.id));
-    const nextOrder = (maxOrderResult[0]?.maxOrder ?? 0) + 1;
+    const bookRow = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${targetSubject.id}))`,
+      );
+      const maxOrderResult = await tx
+        .select({
+          maxOrder: sql<number>`COALESCE(MAX(${curriculumBooks.sortOrder}), 0)`,
+        })
+        .from(curriculumBooks)
+        .where(eq(curriculumBooks.subjectId, targetSubject.id));
+      const nextOrder = (maxOrderResult[0]?.maxOrder ?? 0) + 1;
 
-    const [bookRow] = await db
-      .insert(curriculumBooks)
-      .values({
-        subjectId: targetSubject.id,
-        title: effectiveFocus,
-        description: effectiveFocusDescription ?? null,
-        emoji: null,
-        sortOrder: nextOrder,
-        topicsGenerated: false,
-      })
-      .returning();
+      const [inserted] = await tx
+        .insert(curriculumBooks)
+        .values({
+          subjectId: targetSubject.id,
+          title: effectiveFocus,
+          description: effectiveFocusDescription ?? null,
+          emoji: null,
+          sortOrder: nextOrder,
+          topicsGenerated: false,
+        })
+        .returning();
+
+      return inserted;
+    });
 
     if (!bookRow)
       throw new Error('Insert curriculum book did not return a row');

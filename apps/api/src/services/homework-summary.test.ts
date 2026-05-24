@@ -24,7 +24,9 @@ function createSelectChain(result: unknown[]) {
   };
 }
 
-function createMockDb(): Database {
+function createMockDb(
+  options: { captureUpdateSet?: (value: unknown) => void } = {},
+): Database {
   const selectMock = jest
     .fn()
     .mockReturnValueOnce(
@@ -78,8 +80,11 @@ function createMockDb(): Database {
   return {
     select: selectMock,
     update: jest.fn().mockReturnValue({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+      set: jest.fn((value: unknown) => {
+        options.captureUpdateSet?.(value);
+        return {
+          where: jest.fn().mockResolvedValue(undefined),
+        };
       }),
     }),
     query: {
@@ -385,5 +390,30 @@ describe('extractAndStoreHomeworkSummary', () => {
     await extractAndStoreHomeworkSummary(db, 'profile-1', 'session-1');
 
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it('[WI-78 DS-217] patches only homeworkSummary instead of replacing whole metadata', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValue({
+      response:
+        '{"problemCount":2,"practicedSkills":["linear equations"],"independentProblemCount":1,"guidedProblemCount":1,"summary":"2 problems, practiced linear equations.","displayTitle":"Math Homework"}',
+    });
+
+    let updateSet: unknown;
+    const db = createMockDb({
+      captureUpdateSet: (value) => {
+        updateSet = value;
+      },
+    });
+
+    await extractAndStoreHomeworkSummary(db, 'profile-1', 'session-1');
+
+    expect((updateSet as { metadata?: unknown }).metadata).not.toEqual(
+      expect.objectContaining({
+        homework: expect.anything(),
+      }),
+    );
+    expect((updateSet as { metadata?: unknown }).metadata).toHaveProperty(
+      'queryChunks',
+    );
   });
 });

@@ -60,6 +60,7 @@ jest.mock(
 );
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
+const mockDeleteProfileIfConsentWithdrawn = jest.fn().mockResolvedValue(true);
 jest.mock(
   '../../services/deletion' /* gc1-allow: pattern-a conversion */,
   () => {
@@ -69,6 +70,8 @@ jest.mock(
     return {
       ...actual,
       deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
+      deleteProfileIfConsentWithdrawn: (...args: unknown[]) =>
+        mockDeleteProfileIfConsentWithdrawn(...args),
     };
   },
 );
@@ -156,6 +159,12 @@ beforeEach(() => {
   });
   mockGetFamilyOwnerProfileId.mockResolvedValue('parent-001');
   mockGetWithdrawalArchivePreference.mockResolvedValue('never');
+  mockDeleteProfileIfConsentWithdrawn.mockImplementation(
+    async (...args: unknown[]) => {
+      await mockDeleteProfile(...args);
+      return true;
+    },
+  );
 });
 
 afterEach(() => {

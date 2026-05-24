@@ -620,6 +620,29 @@ describe('activateSubscriptionFromRevenuecat (integration)', () => {
     expect(row!.tier).toBe('family');
   });
 
+  it('[WI-78 DS-188] rejects stale activation events for existing subscriptions', async () => {
+    const account = await seedAccount(4);
+    await seedSubscriptionWithQuota(account.id, 'family', {
+      lastRevenuecatEventId: 'evt-newer-activation',
+      lastRevenuecatEventTimestampMs: String(1_800_000_000_000),
+    });
+    const db = createIntegrationDb();
+
+    const result = await activateSubscriptionFromRevenuecat(
+      db,
+      account.id,
+      'plus',
+      'evt-older-activation',
+      { eventTimestampMs: 1_700_000_000_000 },
+    );
+
+    expect(result.tier).toBe('family');
+
+    const row = await loadSubscription(account.id);
+    expect(row!.tier).toBe('family');
+    expect(row!.lastRevenuecatEventId).toBe('evt-newer-activation');
+  });
+
   it('updates quota pool to new tier limits when subscription already exists', async () => {
     const account = await seedAccount(4);
     const { subscription } = await seedSubscriptionWithQuota(

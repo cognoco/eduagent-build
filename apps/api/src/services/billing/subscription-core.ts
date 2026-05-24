@@ -172,7 +172,7 @@ export async function updateSubscriptionFromWebhook(
       if (
         !Number.isNaN(existingTs) &&
         !Number.isNaN(incomingTs) &&
-        incomingTs <= existingTs
+        incomingTs < existingTs
       ) {
         return mapSubscriptionRow(existing);
       }
@@ -242,12 +242,11 @@ export async function updateSubscriptionFromWebhook(
     // return the existing snapshot instead of double-writing.
     const whereParts = [eq(subscriptions.id, existing.id)];
     if (updates.stripeEventId) {
-      whereParts.push(
-        or(
-          isNull(subscriptions.lastStripeEventId),
-          ne(subscriptions.lastStripeEventId, updates.stripeEventId),
-        )!,
+      const eventIdPredicate = or(
+        isNull(subscriptions.lastStripeEventId),
+        ne(subscriptions.lastStripeEventId, updates.stripeEventId),
       );
+      if (eventIdPredicate) whereParts.push(eventIdPredicate);
     }
 
     const [updated] = await tx

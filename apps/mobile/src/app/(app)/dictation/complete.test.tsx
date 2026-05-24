@@ -74,9 +74,11 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
-// Mock expo-image-picker — not testing camera in unit tests
+let mockLaunchCameraResult: unknown = { canceled: true };
+
+// Mock expo-image-picker — configurable for review request tests
 jest.mock('expo-image-picker', () => ({
-  launchCameraAsync: jest.fn().mockResolvedValue({ canceled: true }),
+  launchCameraAsync: jest.fn(() => Promise.resolve(mockLaunchCameraResult)),
   MediaTypeOptions: { Images: 'Images' },
 }));
 
@@ -117,6 +119,10 @@ describe('DictationCompleteScreen', () => {
     jest.useFakeTimers();
     mockReviewIsPending = false;
     mockRecordIsPending = false;
+    mockReviewMutateAsync.mockReset();
+    mockReviewReset.mockReset();
+    mockRecordMutateAsync.mockReset();
+    mockLaunchCameraResult = { canceled: true };
     delete (global as any).__focusEffectCleanup;
   });
 
@@ -215,5 +221,59 @@ describe('DictationCompleteScreen', () => {
 
     // push must NOT fire because blur set reviewCancelledRef=true
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 DS-187] ignores an older review result after a retry starts', async () => {
+    mockLaunchCameraResult = {
+      canceled: false,
+      assets: [{ uri: 'file://review.jpg', mimeType: 'image/jpeg' }],
+    };
+    let resolveFirst!: (v: unknown) => void;
+    let resolveSecond!: (v: unknown) => void;
+    mockReviewMutateAsync
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        }),
+      );
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+    });
+
+    expect(mockReviewMutateAsync).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveFirst({ mistakeCount: 2, feedback: 'Old', mistakes: [] });
+      await Promise.resolve();
+    });
+
+    expect(mockSetData).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSecond({ mistakeCount: 0, feedback: 'New', mistakes: [] });
+      await Promise.resolve();
+    });
+
+    expect(mockSetData).toHaveBeenCalledTimes(1);
+    expect(mockSetData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewResult: expect.objectContaining({ feedback: 'New' }),
+      }),
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 });

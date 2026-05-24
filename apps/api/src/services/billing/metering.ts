@@ -236,25 +236,33 @@ export async function decrementQuota(
   // 2. Monthly exhausted, daily OK — fall back to top-up credits (FIFO)
   const now = new Date();
   const topUpResult = await db.transaction(async (tx) => {
-    const topUp = await tx.query.topUpCredits.findFirst({
-      where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
-        AND ${topUpCredits.remaining} > 0
-        AND ${topUpCredits.expiresAt} > ${now}`,
-      orderBy: sql`${topUpCredits.purchasedAt} ASC`,
-    });
+    let updatedTopUp: typeof topUpCredits.$inferSelect | undefined;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const topUp = await tx.query.topUpCredits.findFirst({
+        where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
+          AND ${topUpCredits.remaining} > 0
+          AND ${topUpCredits.expiresAt} > ${now}`,
+        orderBy: sql`${topUpCredits.purchasedAt} ASC`,
+      });
 
-    if (!topUp) return null;
+      if (!topUp) return null;
 
-    // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it)
-    const [updatedTopUp] = await tx
-      .update(topUpCredits)
-      .set({
-        remaining: sql`${topUpCredits.remaining} - 1`,
-      })
-      .where(
-        and(eq(topUpCredits.id, topUp.id), sql`${topUpCredits.remaining} > 0`),
-      )
-      .returning();
+      // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it).
+      [updatedTopUp] = await tx
+        .update(topUpCredits)
+        .set({
+          remaining: sql`${topUpCredits.remaining} - 1`,
+        })
+        .where(
+          and(
+            eq(topUpCredits.id, topUp.id),
+            sql`${topUpCredits.remaining} > 0`,
+          ),
+        )
+        .returning();
+
+      if (updatedTopUp) break;
+    }
 
     if (!updatedTopUp) return null;
 

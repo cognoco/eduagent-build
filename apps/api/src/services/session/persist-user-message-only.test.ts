@@ -1,5 +1,9 @@
 import { persistUserMessageOnly } from './persist-user-message-only';
-import { BadRequestError, ForbiddenError } from '@eduagent/schemas';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+} from '@eduagent/schemas';
 
 describe('persistUserMessageOnly', () => {
   let mockDb: any;
@@ -13,9 +17,12 @@ describe('persistUserMessageOnly', () => {
     mockDb = {
       query: {
         learningSessions: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue({ id: 'sess-1', profileId: 'p-1' }),
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'sess-1',
+            profileId: 'p-1',
+            subjectId: 'subj-1',
+            status: 'active',
+          }),
         },
       },
       insert: jest.fn().mockReturnValue(insertChain),
@@ -27,7 +34,7 @@ describe('persistUserMessageOnly', () => {
       persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {
         clientId: undefined as unknown as string,
         orphanReason: 'llm_stream_error',
-      })
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(mockDb.insert).not.toHaveBeenCalled();
   });
@@ -37,7 +44,7 @@ describe('persistUserMessageOnly', () => {
       persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {
         clientId: '',
         orphanReason: 'llm_stream_error',
-      })
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
   });
 
@@ -62,7 +69,7 @@ describe('persistUserMessageOnly', () => {
       persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {
         clientId: 'c-1',
         orphanReason: 'llm_stream_error',
-      })
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
     expect(mockDb.insert).not.toHaveBeenCalled();
   });
@@ -73,9 +80,29 @@ describe('persistUserMessageOnly', () => {
       persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {
         clientId: 'c-1',
         orphanReason: 'llm_stream_error',
-      })
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
+
+  it.each(['completed', 'auto_closed'] as const)(
+    '[WI-78 DS-242] refuses to write orphan user messages to %s sessions',
+    async (status) => {
+      mockDb.query.learningSessions.findFirst.mockResolvedValue({
+        id: 'sess-1',
+        profileId: 'p-1',
+        subjectId: 'subj-1',
+        status,
+      });
+
+      await expect(
+        persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello', {
+          clientId: 'c-1',
+          orphanReason: 'llm_stream_error',
+        }),
+      ).rejects.toBeInstanceOf(ConflictError);
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    },
+  );
 
   it('writes one row with eventType=user_message and orphan_reason', async () => {
     await persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'Hello world', {
@@ -91,7 +118,7 @@ describe('persistUserMessageOnly', () => {
         content: 'Hello world',
         clientId: 'c-1',
         orphanReason: 'llm_stream_error',
-      })
+      }),
     );
     expect(valuesArg.role).toBeUndefined();
   });
@@ -102,7 +129,7 @@ describe('persistUserMessageOnly', () => {
       persistUserMessageOnly(mockDb, 'p-1', 'sess-1', 'm', {
         clientId: 'c',
         orphanReason: 'llm_stream_error',
-      })
+      }),
     ).resolves.toBeUndefined();
     expect(insertChain.onConflictDoNothing).toHaveBeenCalled();
   });

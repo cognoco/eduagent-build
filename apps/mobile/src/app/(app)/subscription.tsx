@@ -696,6 +696,7 @@ function SubscriptionContent(): React.ReactElement | null {
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
   const [pollMessage, setPollMessage] = useState('Confirming your purchase...');
+  const topUpInFlightRef = useRef(false);
 
   // Restore-purchase polling state (BUG-397)
   const [restorePolling, setRestorePolling] = useState(false);
@@ -778,7 +779,10 @@ function SubscriptionContent(): React.ReactElement | null {
     // BUG-397: RevenueCat's CustomerInfo is a local snapshot — the webhook
     // may not have processed yet, so poll the API (same pattern as top-up)
     // waiting for a paid subscription tier.
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) {
+      topUpInFlightRef.current = false;
+      return;
+    }
     setRestorePolling(true);
 
     const maxAttempts = 15; // ~30 s at 2 s intervals
@@ -812,7 +816,10 @@ function SubscriptionContent(): React.ReactElement | null {
       }
     }
 
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) {
+      topUpInFlightRef.current = false;
+      return;
+    }
     setRestorePolling(false);
 
     if (confirmed) {
@@ -991,6 +998,7 @@ function SubscriptionContent(): React.ReactElement | null {
   // ---------------------------------------------------------------------------
 
   const handleTopUp = useCallback(async () => {
+    if (topUpInFlightRef.current) return;
     // If offerings are still loading, do nothing (button should be disabled)
     if (offeringsLoading) return;
 
@@ -1039,10 +1047,12 @@ function SubscriptionContent(): React.ReactElement | null {
     // BC-02: use the usePurchase() hook instead of direct SDK call so that
     // TanStack Query loading/error state is managed and customerInfo cache
     // is automatically invalidated on success.
+    topUpInFlightRef.current = true;
     setTopUpPurchasing(true);
     try {
       await purchase.mutateAsync(topUpPkg);
     } catch (error: unknown) {
+      topUpInFlightRef.current = false;
       setTopUpPurchasing(false);
       if (isPurchaseCancelledError(error)) return;
       if (isNetworkError(error)) {
@@ -1107,6 +1117,7 @@ function SubscriptionContent(): React.ReactElement | null {
     clearTimeout(messageTimer);
 
     if (!mountedRef.current) return;
+    topUpInFlightRef.current = false;
     setTopUpPolling(false);
 
     if (confirmed) {

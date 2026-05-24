@@ -92,6 +92,7 @@ function mockSubscriptionRow(
     currentPeriodStart: Date | null;
     currentPeriodEnd: Date | null;
     cancelledAt: Date | null;
+    lastStripeEventId: string | null;
     lastStripeEventTimestamp: Date | null;
     lastRevenuecatEventId: string | null;
     lastRevenuecatEventTimestampMs: string | null;
@@ -108,6 +109,7 @@ function mockSubscriptionRow(
     currentPeriodStart: overrides?.currentPeriodStart ?? null,
     currentPeriodEnd: overrides?.currentPeriodEnd ?? null,
     cancelledAt: overrides?.cancelledAt ?? null,
+    lastStripeEventId: overrides?.lastStripeEventId ?? null,
     lastRevenuecatEventId: overrides?.lastRevenuecatEventId ?? null,
     lastRevenuecatEventTimestampMs:
       overrides?.lastRevenuecatEventTimestampMs ?? null,
@@ -433,15 +435,17 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it('skips update when timestamps are equal', async () => {
+  it('skips update when Stripe event id was already processed', async () => {
     const existing = mockSubscriptionRow({
       stripeSubscriptionId: 'sub_stripe_1',
+      lastStripeEventId: 'evt_same',
       lastStripeEventTimestamp: NOW,
     });
     const db = createMockDb({ subscriptionFindFirst: existing });
 
     await updateSubscriptionFromWebhook(db, 'sub_stripe_1', {
       status: 'active',
+      stripeEventId: 'evt_same',
       lastStripeEventTimestamp: NOW.toISOString(), // same timestamp
     });
 

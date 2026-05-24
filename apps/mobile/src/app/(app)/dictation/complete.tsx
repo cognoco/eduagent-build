@@ -32,6 +32,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const reviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestReviewRequestRef = useRef<Promise<unknown> | null>(null);
 
   useEffect(() => {
     if (isReviewing) {
@@ -190,18 +191,25 @@ export default function DictationCompleteScreen(): React.ReactElement {
     // 3. Send to LLM for review
     const sentences = data?.sentences ?? [];
     const language = data?.language ?? 'en';
+    let request: ReturnType<typeof reviewMutation.mutateAsync> | null = null;
 
     try {
-      const reviewResult = await reviewMutation.mutateAsync({
+      request = reviewMutation.mutateAsync({
         imageBase64,
         imageMimeType,
         sentences,
         language,
       });
+      latestReviewRequestRef.current = request;
+      const reviewResult = await request;
 
       // [BUG-692] If the user navigated away (hardware back, Cancel button,
       // or screen blur) while the review was in flight, skip navigation.
-      if (reviewCancelledRef.current) return;
+      if (
+        reviewCancelledRef.current ||
+        latestReviewRequestRef.current !== request
+      )
+        return;
 
       // 4. Store review result in context then navigate
       if (data) {
@@ -210,7 +218,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
       router.push('/(app)/dictation/review' as Href);
     } catch (err) {
       // [BUG-692] Don't pop an alert if the user already navigated away.
-      if (reviewCancelledRef.current) return;
+      if (
+        reviewCancelledRef.current ||
+        latestReviewRequestRef.current !== request
+      )
+        return;
       const message = err instanceof Error ? err.message : t('errors.generic');
       platformAlert(t('dictation.complete.reviewFailedTitle'), message, [
         {

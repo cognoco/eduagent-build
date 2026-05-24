@@ -4,7 +4,7 @@
 // activateSubscriptionFromRevenuecat
 // ---------------------------------------------------------------------------
 
-import { eq, and, isNull, ne, or } from 'drizzle-orm';
+import { eq, and, isNull, ne, or, sql } from 'drizzle-orm';
 import {
   subscriptions,
   quotaPools,
@@ -194,12 +194,11 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     if (updates.status !== undefined && updates.status !== existing.status) {
       whereParts.push(eq(subscriptions.status, existing.status));
     }
-    whereParts.push(
-      or(
-        isNull(subscriptions.lastRevenuecatEventId),
-        ne(subscriptions.lastRevenuecatEventId, updates.eventId),
-      )!,
+    const eventIdPredicate = or(
+      isNull(subscriptions.lastRevenuecatEventId),
+      ne(subscriptions.lastRevenuecatEventId, updates.eventId),
     );
+    if (eventIdPredicate) whereParts.push(eventIdPredicate);
 
     const [updated] = await tx
       .update(subscriptions)
@@ -275,48 +274,65 @@ export async function activateSubscriptionFromRevenuecat(
   const status = isTrial ? 'trial' : 'active';
 
   if (!existing) {
-    // Create new subscription + quota pool
-    const [subRow] = await db
-      .insert(subscriptions)
-      .values({
-        accountId,
-        tier,
-        status,
-        lastRevenuecatEventId: eventId,
-        lastRevenuecatEventTimestampMs:
-          options?.eventTimestampMs != null
-            ? String(options.eventTimestampMs)
+    const subRow = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(subscriptions)
+        .values({
+          accountId,
+          tier,
+          status,
+          lastRevenuecatEventId: eventId,
+          lastRevenuecatEventTimestampMs:
+            options?.eventTimestampMs != null
+              ? String(options.eventTimestampMs)
+              : null,
+          revenuecatOriginalAppUserId:
+            options?.revenuecatOriginalAppUserId ?? null,
+          currentPeriodStart: options?.currentPeriodStart
+            ? new Date(options.currentPeriodStart)
             : null,
-        revenuecatOriginalAppUserId:
-          options?.revenuecatOriginalAppUserId ?? null,
-        currentPeriodStart: options?.currentPeriodStart
-          ? new Date(options.currentPeriodStart)
-          : null,
-        currentPeriodEnd: options?.currentPeriodEnd
-          ? new Date(options.currentPeriodEnd)
-          : null,
-        trialEndsAt: options?.trialEndsAt
-          ? new Date(options.trialEndsAt)
-          : null,
-      })
-      .returning();
+          currentPeriodEnd: options?.currentPeriodEnd
+            ? new Date(options.currentPeriodEnd)
+            : null,
+          trialEndsAt: options?.trialEndsAt
+            ? new Date(options.trialEndsAt)
+            : null,
+        })
+        .returning();
 
-    if (!subRow) throw new Error('Subscription insert did not return a row');
+      if (!inserted)
+        throw new Error('Subscription insert did not return a row');
 
-    const now = new Date();
-    const cycleResetAt = new Date(now);
-    cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+      const now = new Date();
+      const cycleResetAt = new Date(now);
+      cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
 
-    await db.insert(quotaPools).values({
-      subscriptionId: subRow.id,
-      monthlyLimit: tierConfig.monthlyQuota,
-      usedThisMonth: 0,
-      dailyLimit: tierConfig.dailyLimit,
-      usedToday: 0,
-      cycleResetAt,
+      await tx.insert(quotaPools).values({
+        subscriptionId: inserted.id,
+        monthlyLimit: tierConfig.monthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: tierConfig.dailyLimit,
+        usedToday: 0,
+        cycleResetAt,
+      });
+
+      return inserted;
     });
 
     return mapSubscriptionRow(subRow);
+  }
+
+  if (existing.lastRevenuecatEventId === eventId) {
+    return existing;
+  }
+  if (
+    options?.eventTimestampMs != null &&
+    existing.lastRevenuecatEventTimestampMs != null
+  ) {
+    const lastTs = Number(existing.lastRevenuecatEventTimestampMs);
+    if (!Number.isNaN(lastTs) && options.eventTimestampMs < lastTs) {
+      return existing;
+    }
   }
 
   // Update existing subscription
@@ -348,14 +364,33 @@ export async function activateSubscriptionFromRevenuecat(
   // subscriptions.tier at the new value while the quota pool still carries the
   // old limit (billing leak). Wrap in a transaction so both commit or neither does.
   const updated = await db.transaction(async (tx) => {
+    const whereParts = [eq(subscriptions.id, existing.id)];
+    const eventIdPredicate = or(
+      isNull(subscriptions.lastRevenuecatEventId),
+      ne(subscriptions.lastRevenuecatEventId, eventId),
+    );
+    if (eventIdPredicate) whereParts.push(eventIdPredicate);
+    if (options?.eventTimestampMs != null) {
+      const eventTimestampPredicate = or(
+        isNull(subscriptions.lastRevenuecatEventTimestampMs),
+        sql`(${subscriptions.lastRevenuecatEventTimestampMs})::bigint <= ${options.eventTimestampMs}`,
+      );
+      if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
+    }
+
     const [row] = await tx
       .update(subscriptions)
       .set(setValues)
-      .where(eq(subscriptions.id, existing.id))
+      .where(and(...whereParts))
       .returning();
 
-    if (!row)
+    if (!row) {
+      const latest = await tx.query.subscriptions.findFirst({
+        where: eq(subscriptions.accountId, accountId),
+      });
+      if (latest) return latest;
       throw new Error('Subscription update (revenuecat) did not return a row');
+    }
 
     // Update quota pool limit to match the new tier (inside same tx)
     const [quotaPool] = await tx

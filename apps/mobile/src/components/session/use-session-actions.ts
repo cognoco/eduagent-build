@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 // Alert import removed — all calls migrated to platformAlert [F-029]
 import { platformAlert } from '../../lib/platform-alert';
 import type {
@@ -151,6 +151,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     router,
     returnTo,
   } = opts;
+  const topicSwitchInFlightRef = useRef(false);
 
   const handleInputModeChange = useCallback(
     (nextInputMode: InputMode) => {
@@ -646,6 +647,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       nextSubjectId: string,
       nextSubjectName: string,
     ) => {
+      if (topicSwitchInFlightRef.current) return;
+      topicSwitchInFlightRef.current = true;
       try {
         setIsClosing(true);
         if (activeSessionId) {
@@ -668,6 +671,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           },
         } as Href);
       } catch (err: unknown) {
+        topicSwitchInFlightRef.current = false;
         setIsClosing(false);
         platformAlert('Could not switch topic', classifyApiError(err).message);
       }

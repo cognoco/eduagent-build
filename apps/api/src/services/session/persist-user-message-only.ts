@@ -5,7 +5,11 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { OrphanReason } from '@eduagent/schemas';
-import { BadRequestError, ForbiddenError } from '@eduagent/schemas';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+} from '@eduagent/schemas';
 
 interface Options {
   clientId: string;
@@ -31,11 +35,19 @@ export async function persistUserMessageOnly(
       eq(learningSessions.id, sessionId),
       eq(learningSessions.profileId, profileId),
     ),
-    columns: { id: true, profileId: true, subjectId: true },
+    columns: { id: true, profileId: true, subjectId: true, status: true },
   });
   if (!owningSession || owningSession.profileId !== profileId) {
     throw new ForbiddenError(
       'persistUserMessageOnly: session does not belong to profile',
+    );
+  }
+  if (
+    owningSession.status === 'completed' ||
+    owningSession.status === 'auto_closed'
+  ) {
+    throw new ConflictError(
+      'persistUserMessageOnly: session is closed and cannot accept messages',
     );
   }
 

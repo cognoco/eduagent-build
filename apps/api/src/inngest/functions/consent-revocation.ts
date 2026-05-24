@@ -1,7 +1,7 @@
 // @inngest-admin: parent-chain (profiles updated with explicit childProfileId + archivedAt guard)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { profiles } from '@eduagent/database';
 import {
   calculateAge,
@@ -10,7 +10,7 @@ import {
   getProfileForConsentRevocation,
   getProfileDisplayName,
 } from '../../services/consent';
-import { deleteProfile } from '../../services/deletion';
+import { deleteProfileIfConsentWithdrawn } from '../../services/deletion';
 import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
 import {
@@ -139,12 +139,25 @@ export const consentRevocation = inngest.createFunction(
           if (status !== 'WITHDRAWN') {
             return { archived: false, reason: 'consent_restored' };
           }
-          await db
+          const archivedRows = await db
             .update(profiles)
             .set({ archivedAt: new Date() })
             .where(
-              and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
-            );
+              and(
+                eq(profiles.id, childProfileId),
+                isNull(profiles.archivedAt),
+                sql`EXISTS (
+                  SELECT 1 FROM consent_states
+                  WHERE consent_states.profile_id = ${childProfileId}
+                  AND consent_states.consent_type = 'GDPR'
+                  AND consent_states.status = 'WITHDRAWN'
+                )`,
+              ),
+            )
+            .returning({ id: profiles.id });
+          if (archivedRows.length === 0) {
+            return { archived: false, reason: 'consent_restored' };
+          }
           return { archived: true };
         },
       );
@@ -230,10 +243,13 @@ export const consentRevocation = inngest.createFunction(
     });
 
     // Delete child profile (FK cascades handle all data)
-    await step.run('delete-child-profile', async () => {
+    const deleteResult = await step.run('delete-child-profile', async () => {
       const db = getStepDatabase();
-      await deleteProfile(db, childProfileId);
+      return deleteProfileIfConsentWithdrawn(db, childProfileId);
     });
+    if (!deleteResult) {
+      return { status: 'restored', childProfileId };
+    }
 
     // Notify parent of completion. [BUG-699-FOLLOWUP] same 24h dedup as the
     // child-side notify above — duplicate revocation events would otherwise

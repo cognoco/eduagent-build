@@ -100,6 +100,8 @@ const DictationChoiceScreen = require('./index').default as React.ComponentType;
 describe('DictationChoiceScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGenerateMutateAsync.mockReset();
+    mockGenerateReset.mockReset();
     jest.useFakeTimers();
     mockGenerateIsPending = false;
   });
@@ -232,5 +234,69 @@ describe('DictationChoiceScreen', () => {
 
     // The timeout set cancelledRef; push must be blocked
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 DS-178] ignores an older generation result after a retry starts', async () => {
+    let resolveFirst!: (v: unknown) => void;
+    let resolveSecond!: (v: unknown) => void;
+    mockGenerateMutateAsync
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        }),
+      );
+
+    const { getByTestId } = render(<DictationChoiceScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('dictation-surprise'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('dictation-surprise'));
+      await Promise.resolve();
+    });
+
+    expect(mockGenerateMutateAsync).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveFirst({
+        sentences: [{ text: 'Old prompt.' }],
+        language: 'en',
+        title: 'Old',
+        topic: 'old',
+      });
+      await Promise.resolve();
+    });
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(mockSetData).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSecond({
+        sentences: [{ text: 'New prompt.' }],
+        language: 'en',
+        title: 'New',
+        topic: 'new',
+      });
+      await Promise.resolve();
+    });
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(mockSetData).toHaveBeenCalledTimes(1);
+    expect(mockSetData).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'New', topic: 'new' }),
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 });

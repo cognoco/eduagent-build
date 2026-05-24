@@ -119,6 +119,11 @@ function buildHwDb(
   const sessionsFindFirst = jest
     .fn()
     .mockResolvedValue(sessionRow ?? undefined);
+  const lockLimit = jest.fn().mockResolvedValue(sessionRow ? [sessionRow] : []);
+  const lockForUpdate = jest.fn().mockReturnValue({ limit: lockLimit });
+  const lockWhere = jest.fn().mockReturnValue({ for: lockForUpdate });
+  const lockFrom = jest.fn().mockReturnValue({ where: lockWhere });
+  const selectForLock = jest.fn().mockReturnValue({ from: lockFrom });
 
   // db.update — capture WHERE predicate if caller wants it
   const updateWhereChain = jest.fn((pred: unknown) => {
@@ -139,11 +144,15 @@ function buildHwDb(
     query: {
       learningSessions: { findFirst: sessionsFindFirst },
     },
+    select: selectForLock,
     update: jest.fn().mockReturnValue(updateStart),
     insert: jest.fn().mockReturnValue(insertChain),
   } as unknown as import('@eduagent/database').Database;
+  (db as unknown as { transaction: jest.Mock }).transaction = jest.fn(
+    async (fn: (tx: typeof db) => unknown) => fn(db),
+  );
 
-  return { db, insertValuesMock, updateWhereChain };
+  return { db, insertValuesMock, updateWhereChain, lockForUpdate };
 }
 
 describe('syncHomeworkState', () => {
@@ -375,6 +384,22 @@ describe('syncHomeworkState', () => {
     // by the service code; the existence of the predicate is the observable invariant.
     expect(updateWhereChain).toHaveBeenCalledTimes(1);
     expect(capturedUpdateWhere).toBeDefined();
+  });
+
+  it('[WI-78 DS-245] locks the session row while deciding homework lifecycle events', async () => {
+    const { db, lockForUpdate } = buildHwDb(buildMinimalHomeworkSession());
+
+    await syncHomeworkState(
+      db,
+      'prof-1',
+      'sess-hw-1',
+      makeSyncInput([{ id: 'p1', text: 'A problem', status: 'active' }]),
+    );
+
+    expect(
+      (db as unknown as { transaction: jest.Mock }).transaction,
+    ).toHaveBeenCalledTimes(1);
+    expect(lockForUpdate).toHaveBeenCalledWith('update');
   });
 
   it('does not write events to a different profile session (cross-profile isolation)', async () => {

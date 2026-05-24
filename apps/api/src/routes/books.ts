@@ -11,6 +11,7 @@ import {
   moveTopicResponseSchema,
   ERROR_CODES,
   MIN_GENERATED_BOOK_TOPICS,
+  type BookWithTopics,
   type BookTopicGenerationResult,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
@@ -22,6 +23,7 @@ import {
   getBookWithTopics,
   persistBookTopics,
   claimBookForGeneration,
+  releaseBookGenerationClaimIfEmpty,
   moveTopicToBook,
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
@@ -153,38 +155,44 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           return c.json(bookWithTopicsSchema.parse(existing));
         }
 
-        const learnerAge = await getProfileAge(db, profileId);
+        let persisted: BookWithTopics;
+        try {
+          const learnerAge = await getProfileAge(db, profileId);
 
-        const generated: BookTopicGenerationResult =
-          await generateBookTopicsWithFallback(
-            claimed.title,
-            claimed.description ?? '',
-            learnerAge,
-            priorKnowledge,
-            {
-              generateBookTopics,
-              captureException,
-              buildFallbackBookTopics,
-              sentryContext: {
-                profileId,
-                extra: {
-                  phase: 'book_topic_generation_fallback',
-                  subjectId,
-                  bookId,
-                  bookTitle: claimed.title,
+          const generated: BookTopicGenerationResult =
+            await generateBookTopicsWithFallback(
+              claimed.title,
+              claimed.description ?? '',
+              learnerAge,
+              priorKnowledge,
+              {
+                generateBookTopics,
+                captureException,
+                buildFallbackBookTopics,
+                sentryContext: {
+                  profileId,
+                  extra: {
+                    phase: 'book_topic_generation_fallback',
+                    subjectId,
+                    bookId,
+                    bookTitle: claimed.title,
+                  },
                 },
               },
-            },
-          );
+            );
 
-        const persisted = await persistBookTopics(
-          db,
-          profileId,
-          subjectId,
-          bookId,
-          generated.topics,
-          generated.connections,
-        );
+          persisted = await persistBookTopics(
+            db,
+            profileId,
+            subjectId,
+            bookId,
+            generated.topics,
+            generated.connections,
+          );
+        } catch (error) {
+          await releaseBookGenerationClaimIfEmpty(db, subjectId, bookId);
+          throw error;
+        }
 
         // Fire-and-forget: pre-generate next books in background.
         // Pre-generation is an optimization, so dispatch failure must not

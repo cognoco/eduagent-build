@@ -371,7 +371,11 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
           onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
         })),
       })),
+      execute: jest.fn().mockResolvedValue(undefined),
     };
+    (db as unknown as { transaction: jest.Mock }).transaction = jest.fn(
+      async (fn: (tx: typeof db) => unknown) => fn(db),
+    );
 
     return db as unknown as Database;
   }

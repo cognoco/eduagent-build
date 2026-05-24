@@ -229,6 +229,19 @@ describe('RecallTestScreen', () => {
     });
   });
 
+  it('[WI-78 DS-202] ignores repeated dont_remember taps while the first attempt is pending', async () => {
+    mockRecallMutate.mockImplementation(() => {
+      /* leave pending */
+    });
+
+    render(<RecallTestScreen />);
+
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+
+    expect(mockRecallMutate).toHaveBeenCalledTimes(1);
+  });
+
   it('shows error message and rolls back count on failure', async () => {
     // UX-DE-L8: errors are surfaced via platformAlert (not as AI chat bubble).
     const alertSpy = jest.spyOn(Alert, 'alert').mockReturnValue(undefined);

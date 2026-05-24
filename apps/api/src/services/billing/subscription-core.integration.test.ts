@@ -338,6 +338,41 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(result!.lastStripeEventTimestamp).toBe(newerTs.toISOString());
   });
 
+  it('[WI-78 DS-176] applies distinct Stripe events created in the same second', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('webhook-same-second-distinct');
+
+    const ts = new Date('2026-06-10T10:00:00.000Z');
+    await db.insert(subscriptions).values({
+      accountId: acct.id,
+      tier: 'plus',
+      status: 'active',
+      stripeSubscriptionId: 'sub_same_second_001',
+      lastStripeEventTimestamp: ts,
+      lastStripeEventId: 'evt_same_second_first',
+    });
+
+    const result = await updateSubscriptionFromWebhook(
+      db,
+      'sub_same_second_001',
+      {
+        status: 'cancelled',
+        lastStripeEventTimestamp: ts.toISOString(),
+        stripeEventId: 'evt_same_second_second',
+      },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('cancelled');
+    expect(result!.lastStripeEventTimestamp).toBe(ts.toISOString());
+
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('cancelled');
+    expect(row!.lastStripeEventId).toBe('evt_same_second_second');
+  });
+
   // [BREAK CR-2026-05-19-M11] Two concurrent deliveries of the same Stripe event
   // ID must result in exactly ONE write. Pre-fix: both calls saw "not yet processed"
   // (timestamp ordering check outside tx) and both wrote — divergent billing state.

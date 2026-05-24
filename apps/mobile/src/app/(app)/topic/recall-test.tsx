@@ -49,12 +49,14 @@ export default function RecallTestScreen() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [inputDisabled, setInputDisabled] = useState(false);
   const [dontRememberCount, setDontRememberCount] = useState(0);
+  const [dontRememberPending, setDontRememberPending] = useState(false);
   const [remediationData, setRemediationData] = useState<{
     cooldownEndsAt?: string;
     retentionStatus: RetentionStatus;
   } | null>(null);
 
   const cleanupRef = useRef<(() => void) | null>(null);
+  const dontRememberPendingRef = useRef(false);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -138,6 +140,9 @@ export default function RecallTestScreen() {
 
   const handleDontRemember = useCallback(() => {
     if (!topicId) return;
+    if (dontRememberPendingRef.current || isStreaming) return;
+    dontRememberPendingRef.current = true;
+    setDontRememberPending(true);
 
     const nextCount = dontRememberCount + 1;
     setDontRememberCount(nextCount);
@@ -153,6 +158,8 @@ export default function RecallTestScreen() {
       { topicId, attemptMode: 'dont_remember' },
       {
         onSuccess: (result) => {
+          dontRememberPendingRef.current = false;
+          setDontRememberPending(false);
           if (
             result.failureAction === 'redirect_to_library' ||
             nextCount >= 2
@@ -181,6 +188,8 @@ export default function RecallTestScreen() {
           );
         },
         onError: (err: Error) => {
+          dontRememberPendingRef.current = false;
+          setDontRememberPending(false);
           setDontRememberCount((prev) => Math.max(prev - 1, 0));
           // UX-DE-L8: error is not an AI reply
           platformAlert(
@@ -190,7 +199,7 @@ export default function RecallTestScreen() {
         },
       },
     );
-  }, [dontRememberCount, submitRecallTest, topicId, t]);
+  }, [dontRememberCount, isStreaming, submitRecallTest, topicId, t]);
 
   if (!topicId) {
     return (
@@ -238,6 +247,7 @@ export default function RecallTestScreen() {
     <View className="px-4 pt-3 bg-surface border-t border-surface-elevated">
       <Pressable
         onPress={handleDontRemember}
+        disabled={dontRememberPending || isStreaming}
         className="self-start rounded-button px-4 py-2 bg-surface-elevated"
         testID="recall-dont-remember-button"
         accessibilityRole="button"
