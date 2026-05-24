@@ -12,6 +12,7 @@
 
 export type {
   SubscriptionRow,
+  AppliedSubscriptionRow,
   QuotaPoolRow,
   WebhookSubscriptionUpdate,
 } from './billing/types';

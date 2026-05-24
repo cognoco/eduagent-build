@@ -26,7 +26,10 @@ import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
-import type { WebhookSubscriptionUpdate } from '../services/billing';
+import type {
+  AppliedSubscriptionRow,
+  WebhookSubscriptionUpdate,
+} from '../services/billing';
 
 const logger = createLogger();
 
@@ -68,6 +71,14 @@ function extractSubscriptionIdFromInvoice(
 // ---------------------------------------------------------------------------
 
 const PAID_TIERS = new Set<string>(['plus', 'family', 'pro']);
+
+function shouldDispatchPaymentFailedEvent(
+  updated: AppliedSubscriptionRow,
+  stripeEventId: string,
+): boolean {
+  if (updated.webhookApplied !== false) return true;
+  return updated.lastStripeEventId === stripeEventId;
+}
 
 /** Validates and extracts a paid tier from metadata. */
 function extractPaidTier(
@@ -480,12 +491,17 @@ async function handlePaymentFailed(
         invoiceId: invoice.id,
       },
     );
+  }
 
+  if (!updated) return;
+
+  if (shouldDispatchPaymentFailedEvent(updated, stripeEventId)) {
     // core-send: payment-failed alert — observed by payment-failed-observe.ts.
     // Kept direct so a dispatch failure throws to the Stripe webhook handler,
     // which then returns non-2xx → Stripe retries the webhook. A swallowed
     // dispatch would lose the payment-failure signal entirely.
     await inngest.send({
+      id: `stripe-payment-failed:${stripeEventId}`,
       name: 'app/payment.failed',
       data: {
         subscriptionId: updated.id,

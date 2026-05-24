@@ -786,15 +786,79 @@ describe('invoice.payment_failed', () => {
       TEST_ENV,
     );
 
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: expect.stringMatching(/^stripe-payment-failed:evt_/),
+        name: 'app/payment.failed',
+        data: expect.objectContaining({
+          subscriptionId: 'sub-internal-1',
+          stripeSubscriptionId: 'sub_stripe_123',
+          accountId: 'acc-1',
+          attempt: 2,
+        }),
+      }),
+    );
+  });
+
+  it('[WI-78 review] re-emits payment.failed when retry sees duplicate Stripe event stamp', async () => {
+    const invoice = makeInvoice({ attempt_count: 3 });
+    const event = makeStripeEvent('invoice.payment_failed', invoice);
+    event.id = 'evt_payment_failed_retry';
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({
+        status: 'past_due',
+        lastStripeEventId: 'evt_payment_failed_retry',
+        webhookApplied: false,
+      }),
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
     expect(inngest.send).toHaveBeenCalledWith({
+      id: 'stripe-payment-failed:evt_payment_failed_retry',
       name: 'app/payment.failed',
       data: expect.objectContaining({
         subscriptionId: 'sub-internal-1',
         stripeSubscriptionId: 'sub_stripe_123',
         accountId: 'acc-1',
-        attempt: 2,
+        attempt: 3,
       }),
     });
+  });
+
+  it('[WI-78 review] does not emit payment.failed for stale non-duplicate events', async () => {
+    const invoice = makeInvoice({ attempt_count: 3 });
+    const event = makeStripeEvent('invoice.payment_failed', invoice);
+    event.id = 'evt_payment_failed_stale';
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({
+        status: 'active',
+        lastStripeEventId: 'evt_newer_event_already_applied',
+        webhookApplied: false,
+      }),
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   it('does not emit event when subscription not found', async () => {
