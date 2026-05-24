@@ -139,12 +139,6 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             (topic) => !topic.skipped,
           ).length;
           if (existing.book.topicsGenerated && existing.topics.length === 0) {
-            await releaseBookGenerationClaimIfEmpty(
-              db,
-              subjectId,
-              bookId,
-              profileId,
-            );
             return apiError(
               c,
               409,

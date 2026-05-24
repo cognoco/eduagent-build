@@ -19,6 +19,14 @@ jest.mock('expo-localization', () => ({
 const mockPush = jest.fn();
 const mockRecallMutate = jest.fn();
 let queuedRecallResults: Array<Record<string, unknown>> = [];
+let mockAnimateResponseImpl: (
+  content: string,
+  setMessages: React.Dispatch<
+    React.SetStateAction<Array<{ id: string; role: string; content: string }>>
+  >,
+  setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
+  onComplete?: () => void,
+) => () => void;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -83,15 +91,13 @@ jest.mock(
         >,
         setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
         onComplete?: () => void,
-      ) => {
-        setIsStreaming(false);
-        setMessages((prev) => [
-          ...prev,
-          { id: `ai-${prev.length}`, role: 'assistant', content },
-        ]);
-        onComplete?.();
-        return () => undefined;
-      },
+      ) =>
+        mockAnimateResponseImpl(
+          content,
+          setMessages,
+          setIsStreaming,
+          onComplete,
+        ),
     };
   },
 );
@@ -105,6 +111,20 @@ describe('RecallTestScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     queuedRecallResults = [];
+    mockAnimateResponseImpl = (
+      content,
+      setMessages,
+      setIsStreaming,
+      onComplete,
+    ) => {
+      setIsStreaming(false);
+      setMessages((prev) => [
+        ...prev,
+        { id: `ai-${prev.length}`, role: 'assistant', content },
+      ]);
+      onComplete?.();
+      return () => undefined;
+    };
     mockRecallMutate.mockImplementation(
       (
         _input: Record<string, unknown>,
@@ -233,6 +253,37 @@ describe('RecallTestScreen', () => {
     mockRecallMutate.mockImplementation(() => {
       /* leave pending */
     });
+
+    render(<RecallTestScreen />);
+
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+
+    expect(mockRecallMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-78 review] ignores repeated dont_remember taps before streaming state commits', () => {
+    mockAnimateResponseImpl = (content, setMessages) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: `ai-${prev.length}`, role: 'assistant', content },
+      ]);
+      return () => undefined;
+    };
+    queuedRecallResults = [
+      {
+        passed: false,
+        failureCount: 1,
+        failureAction: 'feedback_only',
+        hint: 'Try remembering the central definition first.',
+      },
+      {
+        passed: false,
+        failureCount: 2,
+        failureAction: 'feedback_only',
+        hint: 'Second duplicate hint.',
+      },
+    ];
 
     render(<RecallTestScreen />);
 

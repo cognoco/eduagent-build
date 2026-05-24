@@ -411,7 +411,7 @@ describe('book routes', () => {
       expect(body.book.topicsGenerated).toBe(true);
     });
 
-    it('[WI-78 review] rejects and releases an empty generated claim', async () => {
+    it('[WI-78 review] rejects an empty generated claim without releasing an active generator', async () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
       mockGetBookWithTopics.mockResolvedValueOnce({
         ...mockBookWithTopics,
@@ -433,12 +433,7 @@ describe('book routes', () => {
       await expect(res.json()).resolves.toMatchObject({
         code: ERROR_CODES.CONFLICT,
       });
-      expect(mockReleaseBookGenerationClaimIfEmpty).toHaveBeenCalledWith(
-        undefined,
-        SUBJECT_ID,
-        BOOK_ID,
-        'test-profile-id',
-      );
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
     });
 
     it('expands an already-generated thin book when requested', async () => {

@@ -57,6 +57,9 @@ export default function RecallTestScreen() {
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const dontRememberPendingRef = useRef(false);
+  const releaseDontRememberBlock = useCallback(() => {
+    dontRememberPendingRef.current = false;
+  }, []);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -158,7 +161,6 @@ export default function RecallTestScreen() {
       { topicId, attemptMode: 'dont_remember' },
       {
         onSuccess: (result) => {
-          dontRememberPendingRef.current = false;
           setDontRememberPending(false);
           if (
             result.failureAction === 'redirect_to_library' ||
@@ -176,6 +178,7 @@ export default function RecallTestScreen() {
                     result.remediation?.retentionStatus,
                   ),
                 });
+                releaseDontRememberBlock();
               },
             );
             return;
@@ -185,6 +188,7 @@ export default function RecallTestScreen() {
             result.hint ?? DONT_REMEMBER_FALLBACK_HINT,
             setMessages,
             setIsStreaming,
+            releaseDontRememberBlock,
           );
         },
         onError: (err: Error) => {
@@ -199,7 +203,14 @@ export default function RecallTestScreen() {
         },
       },
     );
-  }, [dontRememberCount, isStreaming, submitRecallTest, topicId, t]);
+  }, [
+    dontRememberCount,
+    isStreaming,
+    releaseDontRememberBlock,
+    submitRecallTest,
+    topicId,
+    t,
+  ]);
 
   if (!topicId) {
     return (
