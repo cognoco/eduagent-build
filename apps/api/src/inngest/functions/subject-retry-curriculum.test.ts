@@ -58,15 +58,22 @@ function validPayload(overrides?: Record<string, unknown>) {
   };
 }
 
-function makeMockDb(bookOverrides?: Record<string, unknown>) {
+function makeMockDb(
+  bookOverrides?: Record<string, unknown>,
+  options?: { claimReturns?: Array<{ id: string }> },
+) {
   const book = {
     id: BOOK_ID,
     subjectId: SUBJECT_ID,
     title: 'Algebra',
     description: 'Intro to algebra',
     topicsGenerated: false,
+    retryInFlight: false,
     ...bookOverrides,
   };
+  // [WI-125] By default the claim succeeds (returning a single row).
+  // Pass `claimReturns: []` to simulate a concurrent claim already in flight.
+  const claimReturns = options?.claimReturns ?? [{ id: BOOK_ID }];
   return {
     query: {
       curriculumBooks: {
@@ -82,6 +89,20 @@ function makeMockDb(bookOverrides?: Record<string, unknown>) {
       },
     },
     select: jest.fn(),
+    // [WI-125] update().set().where().returning() chain for the
+    // retry_in_flight atomic claim. The release step also calls
+    // update().set().where() but does not call returning() — the chain
+    // resolves on .where() so it works for both paths.
+    update: jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation(() => {
+          const p: Promise<unknown> & { returning?: jest.Mock } =
+            Promise.resolve(undefined);
+          p.returning = jest.fn().mockResolvedValue(claimReturns);
+          return p;
+        }),
+      }),
+    }),
   };
 }
 
@@ -221,7 +242,12 @@ describe('subjectRetryCurriculum', () => {
     let callCount = 0;
     mockGetStepDatabase.mockImplementation(() => {
       callCount++;
-      return callCount <= 2 ? mockDb : confirmDb;
+      // [WI-125] The function now has 5 step.run calls:
+      //   1=load, 2=claim, 3=retry-generate, 4=release, 5=confirm.
+      // The first four observe the book as not-yet-generated; only the
+      // final confirm step sees topicsGenerated=true (matching production
+      // behavior where persistBookTopics flips the flag).
+      return callCount <= 4 ? mockDb : confirmDb;
     });
     const { step, sendEventCalls } = createInngestStepRunner();
 
@@ -290,7 +316,11 @@ describe('subjectRetryCurriculum', () => {
     let callCount = 0;
     mockGetStepDatabase.mockImplementation(() => {
       callCount++;
-      if (callCount === 2) {
+      // [WI-125] After adding the claim/release steps, the retry-generate
+      // step is the THIRD getStepDatabase call (was second pre-WI-125).
+      // Simulate a concurrent topic generation by returning a db whose
+      // book.topicsGenerated is true on the third call.
+      if (callCount === 3) {
         return makeMockDb({ topicsGenerated: true });
       }
       return mockDb;
@@ -312,7 +342,9 @@ describe('subjectRetryCurriculum', () => {
     let callCount = 0;
     mockGetStepDatabase.mockImplementation(() => {
       callCount++;
-      return callCount <= 2 ? mockDb : confirmDb;
+      // [WI-125] The confirm step is the 5th getStepDatabase call after the
+      // claim/release additions. Return confirmDb only on call 5+.
+      return callCount <= 4 ? mockDb : confirmDb;
     });
     const { step, sendEventCalls } = createInngestStepRunner();
 
@@ -358,7 +390,8 @@ describe('subjectRetryCurriculum', () => {
       let callCount = 0;
       mockGetStepDatabase.mockImplementation(() => {
         callCount++;
-        return callCount <= 2 ? mockDb : confirmDb;
+        // [WI-125] confirm step is now call 5 after claim/release additions.
+        return callCount <= 4 ? mockDb : confirmDb;
       });
       const { step } = createInngestStepRunner();
 
@@ -387,12 +420,45 @@ describe('subjectRetryCurriculum', () => {
       let callCount = 0;
       mockGetStepDatabase.mockImplementation(() => {
         callCount++;
-        return callCount <= 2 ? loadDb : confirmDb;
+        // [WI-125] retry-generate-and-persist is the 3rd getStepDatabase call.
+        return callCount <= 4 ? loadDb : confirmDb;
       });
       const { step } = createInngestStepRunner();
 
       await handler({ event: { data: validPayload() }, step });
 
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+      expect(mockPersistBookTopics).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-125] Inngest-level idempotency + DB-level atomic claim
+  // -------------------------------------------------------------------------
+
+  describe('[WI-125] idempotency and DB claim', () => {
+    it('declares idempotency keyed on event.data.bookId', () => {
+      const opts = (subjectRetryCurriculum as any).opts;
+      // Inngest reads idempotency from opts at runtime — the expression
+      // string format documents the dedup field unambiguously.
+      expect(opts.idempotency).toBe('event.data.bookId');
+    });
+
+    it('exits early with already_in_flight when the DB claim returns 0 rows', async () => {
+      const mockDb = makeMockDb({}, { claimReturns: [] });
+      mockGetStepDatabase.mockReturnValue(mockDb);
+      const { step } = createInngestStepRunner();
+
+      const result = await handler({ event: { data: validPayload() }, step });
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'already_in_flight',
+        subjectId: SUBJECT_ID,
+        bookId: BOOK_ID,
+      });
+      // The LLM was not called — the claim short-circuit fired BEFORE the
+      // generate-and-persist step.
       expect(mockGenerateBookTopics).not.toHaveBeenCalled();
       expect(mockPersistBookTopics).not.toHaveBeenCalled();
     });

@@ -1891,6 +1891,11 @@ describe('metering middleware', () => {
         'WI-136: assessment answer submit',
         `/v1/assessments/${ASSESSMENT_UUID}/answer`,
       ],
+      // WI-258 / DS-169 — book-suggestion top-up split from GET ?topup=1
+      [
+        'WI-258: book-suggestions topup',
+        `/v1/subjects/${SUBJECT_UUID}/book-suggestions/topup`,
+      ],
     ];
 
     it.each(POST_METERED_ROUTES)(

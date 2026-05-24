@@ -24,33 +24,57 @@ function createSelectChain(result: unknown[]) {
   };
 }
 
-function createMockDb(): Database {
-  const selectMock = jest
-    .fn()
+function createMockDb(options?: {
+  // [WI-216] When set, the store function's idempotency pre-check returns
+  // a row containing an existing homeworkSummary, forcing the short-circuit
+  // (no LLM call, no update). Defaults to undefined (no pre-existing
+  // summary; the LLM path proceeds normally).
+  withPreCheck?: { existingHomeworkSummary?: unknown };
+}): Database {
+  const homeworkMetadata = {
+    homework: {
+      problemCount: 2,
+      currentProblemIndex: 1,
+      problems: [
+        {
+          id: 'problem-1',
+          text: 'Solve 2x + 5 = 17',
+          source: 'ocr',
+          selectedMode: 'help_me',
+        },
+        {
+          id: 'problem-2',
+          text: 'Factor x^2 + 3x + 2',
+          source: 'manual',
+          selectedMode: 'check_answer',
+        },
+      ],
+    },
+  };
+  const selectMock = jest.fn();
+  if (options?.withPreCheck) {
+    // [WI-216] Idempotency pre-check chain — first .select() in
+    // extractAndStoreHomeworkSummary. Subsequent chains are the original
+    // extractHomeworkSummary fixtures.
+    selectMock.mockReturnValueOnce(
+      createSelectChain([
+        {
+          metadata: options.withPreCheck.existingHomeworkSummary
+            ? {
+                ...homeworkMetadata,
+                homeworkSummary: options.withPreCheck.existingHomeworkSummary,
+              }
+            : homeworkMetadata,
+        },
+      ]),
+    );
+  }
+  selectMock
     .mockReturnValueOnce(
       createSelectChain([
         {
           subjectId: 'subject-1',
-          metadata: {
-            homework: {
-              problemCount: 2,
-              currentProblemIndex: 1,
-              problems: [
-                {
-                  id: 'problem-1',
-                  text: 'Solve 2x + 5 = 17',
-                  source: 'ocr',
-                  selectedMode: 'help_me',
-                },
-                {
-                  id: 'problem-2',
-                  text: 'Factor x^2 + 3x + 2',
-                  source: 'manual',
-                  selectedMode: 'check_answer',
-                },
-              ],
-            },
-          },
+          metadata: homeworkMetadata,
         },
       ]),
     )
@@ -381,9 +405,43 @@ describe('extractAndStoreHomeworkSummary', () => {
         '{"problemCount":2,"practicedSkills":["linear equations"],"independentProblemCount":1,"guidedProblemCount":1,"summary":"2 problems, practiced linear equations.","displayTitle":"Math Homework"}',
     });
 
-    const db = createMockDb();
+    const db = createMockDb({ withPreCheck: {} });
     await extractAndStoreHomeworkSummary(db, 'profile-1', 'session-1');
 
     expect(db.update).toHaveBeenCalled();
+  });
+
+  // [WI-216] Idempotency short-circuit: when the session already has a
+  // homeworkSummary written into metadata, re-invoking the store function
+  // must NOT call the LLM and must NOT issue a new update — it returns the
+  // existing summary directly.
+  it('[WI-216] short-circuits without calling the LLM when homeworkSummary is already set', async () => {
+    (routeAndCall as jest.Mock).mockClear();
+    (routeAndCall as jest.Mock).mockResolvedValue({
+      response: '{"problemCount":99,"summary":"should not be used"}',
+    });
+
+    const existing = {
+      problemCount: 3,
+      practicedSkills: ['fractions'],
+      independentProblemCount: 2,
+      guidedProblemCount: 1,
+      summary: '3 problems, practiced fractions.',
+      displayTitle: 'Math Homework',
+    };
+
+    const db = createMockDb({
+      withPreCheck: { existingHomeworkSummary: existing },
+    });
+
+    const result = await extractAndStoreHomeworkSummary(
+      db,
+      'profile-1',
+      'session-1',
+    );
+
+    expect(result).toEqual(existing);
+    expect(routeAndCall).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
   });
 });

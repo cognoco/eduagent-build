@@ -211,6 +211,12 @@ export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // evaluateAssessmentAnswer (LLM). The terminal-replay guard at the service
   // layer lands in a separate WP; allowlist coverage is the prerequisite.
   /\/assessments\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/answer\/?$/,
+  // [WI-258 / DS-169] POST /subjects/:subjectId/book-suggestions/topup —
+  // the side-effecting top-up generation path. The previous shape was a
+  // GET ?topup=1 query parameter which the path-based allowlist could not
+  // distinguish from the DB-only GET counterpart. Splitting into an
+  // explicit POST topup route makes metering coverage trivial.
+  /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/book-suggestions\/topup\/?$/,
 ];
 
 const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [

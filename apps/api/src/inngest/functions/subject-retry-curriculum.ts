@@ -42,6 +42,11 @@ export const subjectRetryCurriculum = inngest.createFunction(
     name: 'Retry curriculum generation for stuck books',
     retries: 2,
     concurrency: { limit: 2, key: 'event.data.profileId' },
+    // [WI-125] Inngest-level idempotency on bookId — within Inngest's
+    // configured idempotency window, duplicate dispatch events for the same
+    // bookId are deduped server-side. This is defence-in-depth alongside the
+    // DB-level atomic claim below.
+    idempotency: 'event.data.bookId',
   },
   { event: 'app/subject.curriculum-retry-requested' },
   async ({ event, step }) => {
@@ -83,45 +88,94 @@ export const subjectRetryCurriculum = inngest.createFunction(
       return { status: 'skipped', reason: 'consent_not_granted' };
     }
 
-    await step.run('retry-generate-and-persist', async () => {
+    // [WI-125] DB-level atomic single-flight claim. Inngest's idempotency
+    // window is large but bounded; the DB claim is the hard guarantee that
+    // two concurrent executions for the same bookId cannot both reach the
+    // LLM call. The UPDATE acts as a check-and-set: only the first
+    // execution flips retry_in_flight from false→true and proceeds; any
+    // concurrent execution sees 0 rows and exits early. The flag is reset
+    // to false in a finally block so a subsequent retry (after this attempt
+    // fails or completes) can re-claim.
+    const claimed = await step.run('claim-retry-in-flight', async () => {
       const db = getStepDatabase();
-      const book = await loadBook(db, profileId, subjectId, bookId);
-      if (book.topicsGenerated) return;
+      const rows = await db
+        .update(curriculumBooks)
+        .set({ retryInFlight: true, updatedAt: new Date() })
+        .where(
+          and(
+            eq(curriculumBooks.id, bookId),
+            eq(curriculumBooks.subjectId, subjectId),
+            eq(curriculumBooks.retryInFlight, false),
+          ),
+        )
+        .returning({ id: curriculumBooks.id });
+      return rows.length > 0;
+    });
 
-      // [WI-82] Re-check consent INSIDE this step. The gate in
-      // load-retry-context is memoized by Inngest, so on a retry of this step a
-      // consent withdrawal that occurred after the first run would otherwise be
-      // missed and stale-allowed learner data would still reach the LLM.
-      if (!(await isGdprProcessingAllowed(db, profileId))) return;
-
-      const result = await generateBookTopics(
-        context.bookTitle,
-        context.bookDescription,
-        context.learnerAge,
-      );
-      if (result.topics.length === 0) {
-        const err = new NonRetriableError('retry-empty-topics');
-        captureException(err, {
-          profileId,
-          extra: {
-            phase: 'retry_empty_topics',
-            subjectId,
-            bookId,
-            bookTitle: context.bookTitle,
-          },
-        });
-        throw err;
-      }
-
-      await persistBookTopics(
-        db,
-        profileId,
+    if (!claimed) {
+      return {
+        status: 'skipped',
+        reason: 'already_in_flight',
         subjectId,
         bookId,
-        result.topics,
-        result.connections,
-      );
-    });
+      };
+    }
+
+    try {
+      await step.run('retry-generate-and-persist', async () => {
+        const db = getStepDatabase();
+        const book = await loadBook(db, profileId, subjectId, bookId);
+        if (book.topicsGenerated) return;
+
+        // [WI-82] Re-check consent INSIDE this step. The gate in
+        // load-retry-context is memoized by Inngest, so on a retry of this step a
+        // consent withdrawal that occurred after the first run would otherwise be
+        // missed and stale-allowed learner data would still reach the LLM.
+        if (!(await isGdprProcessingAllowed(db, profileId))) return;
+
+        const result = await generateBookTopics(
+          context.bookTitle,
+          context.bookDescription,
+          context.learnerAge,
+        );
+        if (result.topics.length === 0) {
+          const err = new NonRetriableError('retry-empty-topics');
+          captureException(err, {
+            profileId,
+            extra: {
+              phase: 'retry_empty_topics',
+              subjectId,
+              bookId,
+              bookTitle: context.bookTitle,
+            },
+          });
+          throw err;
+        }
+
+        await persistBookTopics(
+          db,
+          profileId,
+          subjectId,
+          bookId,
+          result.topics,
+          result.connections,
+        );
+      });
+    } finally {
+      // Always release the claim so subsequent retries can re-acquire it.
+      await step.run('release-retry-in-flight', async () => {
+        const db = getStepDatabase();
+        await db
+          .update(curriculumBooks)
+          .set({ retryInFlight: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(curriculumBooks.id, bookId),
+              eq(curriculumBooks.subjectId, subjectId),
+            ),
+          );
+      });
+    }
 
     const shouldEmit = await step.run('confirm-retry-generated', async () => {
       const db = getStepDatabase();

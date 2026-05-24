@@ -24,37 +24,54 @@ type BookSuggestionsEnv = {
   };
 };
 
-const pickerQuerySchema = z.object({
-  topup: z.enum(['1']).optional(),
-});
-
 // [BUG-392] Guard path params against non-UUID input reaching the DB layer.
 const subjectParamSchema = z.object({
   subjectId: z.string().uuid(),
 });
 
+// [WI-258] The legacy GET ?topup=1 query parameter is preserved for one
+// release for backwards compatibility but is treated as DB-only — the
+// metering middleware allowlist (path-based) cannot distinguish a GET with
+// ?topup=1 from a plain GET, so we removed the side-effecting topup branch
+// from the GET handler and surface it only via the dedicated POST
+// /subjects/:subjectId/book-suggestions/topup route below. Mobile clients
+// must call the POST endpoint to trigger top-up generation.
 export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
   .get(
     '/subjects/:subjectId/book-suggestions',
     zValidator('param', subjectParamSchema),
-    zValidator('query', pickerQuerySchema),
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { subjectId } = c.req.valid('param');
-      const { topup } = c.req.valid('query');
 
-      // [WI-138 / DS-049] topup=1 triggers suggestion-generation writes (LLM
-      // calls + DB insert). Reads of existing suggestions remain allowed in
-      // proxy mode; only the write-triggering path is gated.
-      if (topup === '1') {
-        assertNotProxyMode(c);
-      }
-      const result =
-        topup === '1'
-          ? await getUnpickedBookSuggestionsWithTopup(db, profileId, subjectId)
-          : await getUnpickedBookSuggestionsEnvelope(db, profileId, subjectId);
+      const result = await getUnpickedBookSuggestionsEnvelope(
+        db,
+        profileId,
+        subjectId,
+      );
+      return c.json(bookSuggestionsResponseSchema.parse(result), 200);
+    },
+  )
+  // [WI-258] POST topup route — explicit, side-effecting, metered via the
+  // path-based allowlist in middleware/metering.ts. Proxy mode is blocked
+  // because top-up triggers LLM calls that must be billed against the
+  // owner, not a proxied profile.
+  .post(
+    '/subjects/:subjectId/book-suggestions/topup',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      const { subjectId } = c.req.valid('param');
 
+      assertNotProxyMode(c);
+
+      const result = await getUnpickedBookSuggestionsWithTopup(
+        db,
+        profileId,
+        subjectId,
+      );
       return c.json(bookSuggestionsResponseSchema.parse(result), 200);
     },
   )

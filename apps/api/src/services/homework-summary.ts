@@ -246,9 +246,13 @@ export async function extractAndStoreHomeworkSummary(
   profileId: string,
   sessionId: string,
 ): Promise<HomeworkSummary> {
-  const summary = await extractHomeworkSummary(db, profileId, sessionId);
-
-  const [sessionRow] = await db
+  // [WI-216] Idempotency short-circuit: if the homework summary has already
+  // been written for this session, do not call the LLM again. The
+  // session-completed Inngest function declares
+  // `idempotency: 'event.data.sessionId'` so duplicate dispatch is deduped
+  // server-side, but a step retry inside the same execution would re-enter
+  // this code path and burn the LLM call without this guard.
+  const [existingRow] = await db
     .select({ metadata: learningSessions.metadata })
     .from(learningSessions)
     .where(
@@ -259,7 +263,12 @@ export async function extractAndStoreHomeworkSummary(
     )
     .limit(1);
 
-  const existingMetadata = getSessionMetadata(sessionRow?.metadata);
+  const existingMetadata = getSessionMetadata(existingRow?.metadata);
+  if (existingMetadata.homeworkSummary) {
+    return existingMetadata.homeworkSummary;
+  }
+
+  const summary = await extractHomeworkSummary(db, profileId, sessionId);
 
   await db
     .update(learningSessions)

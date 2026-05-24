@@ -851,9 +851,13 @@ describe('processRecallTest', () => {
     expect(result.passed).toBe(true);
     expect(result.failureCount).toBe(0);
 
-    // Verify the DB update includes failureCount: 0
-    const setArg = (db.update as jest.Mock).mock.results[0]!.value.set.mock
-      .calls[0]![0];
+    // [WI-234] db.update is invoked TWICE: first the pre-LLM cooldown
+    // claim (sets lastReviewedAt only) and then the post-LLM SM-2 persist
+    // (which carries failureCount and the other SM-2 fields). The shared
+    // set mock accumulates both calls in .mock.calls — the SM-2 persist
+    // is the second entry.
+    const setMock = (db.update as jest.Mock).mock.results[0]!.value.set;
+    const setArg = setMock.mock.calls[1]![0];
     expect(setArg.failureCount).toBe(0);
   });
 

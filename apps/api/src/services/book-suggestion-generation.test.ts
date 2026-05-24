@@ -95,16 +95,22 @@ function makeTx(opts: {
     insertRejects,
   } = opts;
 
-  // select() calls inside the transaction, in order:
-  //   1. unpicked bookSuggestions check
-  //   2. existingBookTitles (curriculumBooks)
-  //   3. existingSuggestionTitles (bookSuggestions)
-  //   4. studiedTopics (learningSessions join chain)
+  // [WI-194] The service now invokes db.transaction() twice — once before
+  // the LLM call (Phase 1: lock + reserve + read prompt inputs) and once
+  // after (Phase 3: re-lock + re-check + insert). Phase 1 makes 4 select
+  // calls; Phase 3 makes 1 select call (the unpicked re-check). All select
+  // calls go through this single tx mock so we feed the script in order.
+  //   1. Phase 1: unpicked bookSuggestions check
+  //   2. Phase 1: existingBookTitles (curriculumBooks)
+  //   3. Phase 1: existingSuggestionTitles (bookSuggestions)
+  //   4. Phase 1: studiedTopics (learningSessions join chain)
+  //   5. Phase 3: unpicked re-check
   const selectResults = [
     unpicked,
     existingBookTitles.map((title) => ({ title })),
     existingSuggestionTitles.map((title) => ({ title })),
     studiedTopics.map((title) => ({ title, ts: new Date() })),
+    unpicked,
   ];
   let selectCallIndex = 0;
 
@@ -176,6 +182,10 @@ function makeDb(
   subject: Record<string, unknown> | null,
   txCallback?: (cb: (tx: never) => Promise<void>) => Promise<void>,
 ) {
+  // [WI-194] The service now calls db.transaction() twice — Phase 1 (lock +
+  // reserve + read prompt inputs) and Phase 3 (re-lock + re-check + insert).
+  // The same `tx` mock services both calls; its scripted select results
+  // include entries for both phases (see makeTx).
   const transactionMock =
     txCallback != null
       ? jest.fn<typeof txCallback>().mockImplementation(txCallback)
