@@ -1,4 +1,6 @@
 import {
+  act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -34,7 +36,12 @@ const mockNavContract = () => ({
     iconName: 'School',
   },
   chrome: { modeSwitcher: 'hidden', proxyBanner: 'hidden' },
-  gates: { sessionIsOwner: true, showFamilyChildActivity: false },
+  gates: {
+    sessionIsOwner: true,
+    showFamilyChildActivity: false,
+    showFamilyHome: mockContractHomeScreen === 'FamilyHome',
+    showLearningActions: !mockIsExplicitProxyMode,
+  },
   canEnter: () => true,
   isSurfaced: () => true,
   queryScope: { appContext: 'study' as const, profileId: 'test-profile-id' },
@@ -46,6 +53,15 @@ jest.mock(
   '../../hooks/use-navigation-contract' /* gc1-allow: hook wraps profile context, subscription query, and feature flags; not exercisable in isolation */,
   () => ({
     useNavigationContract: () => mockNavContract(),
+    useNavigationHomeContract: () => ({
+      contract: mockNavContract(),
+      proxy: {
+        active: mockIsExplicitProxyMode,
+        childName: mockIsExplicitProxyMode ? 'Alex' : '',
+        childProfileId: mockIsExplicitProxyMode ? 'child-id' : null,
+        parentProfileId: mockIsExplicitProxyMode ? 'owner-id' : null,
+      },
+    }),
     useNavigationDataScopeContract: () => mockNavContract(),
   }),
 );
@@ -213,10 +229,7 @@ jest.mock(
   }),
 );
 
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
+function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -245,6 +258,7 @@ const QUIZ_DISCOVERY_CARD = {
 
 describe('LearnerScreen', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
+  let queryClient: QueryClient | null = null;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -299,7 +313,26 @@ describe('LearnerScreen', () => {
     mockSwitchProfile.mockResolvedValue({ success: true });
     mockIsExplicitProxyMode = false;
     mockContractHomeScreen = 'LearnerHome';
-    Wrapper = createWrapper();
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { retry: false, gcTime: 0 },
+      },
+    });
+    Wrapper = createWrapper(queryClient);
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      cleanup();
+      await Promise.resolve();
+    });
+    if (queryClient) {
+      await queryClient.cancelQueries();
+      queryClient.getMutationCache().clear();
+      queryClient.clear();
+      queryClient = null;
+    }
   });
 
   it('renders greeting with first name', async () => {
@@ -387,6 +420,7 @@ describe('LearnerScreen', () => {
 
   it('shows parent Home for owner with linked children', async () => {
     mockSubscriptionTier = 'family';
+    mockContractHomeScreen = 'FamilyHome';
     mockLinkedChildren = [
       { id: 'child-id', displayName: 'Emma', isOwner: false },
     ];
@@ -436,7 +470,6 @@ describe('LearnerScreen', () => {
           displayName: 'Parent',
           isOwner: true,
         }}
-        mode="family"
       />,
       { wrapper: Wrapper },
     );
@@ -453,6 +486,7 @@ describe('LearnerScreen', () => {
 
   it('shows add-first-child parent Home for family owners with no linked children', async () => {
     mockSubscriptionTier = 'family';
+    mockContractHomeScreen = 'FamilyHome';
 
     render(
       <LearnerScreen
@@ -462,7 +496,6 @@ describe('LearnerScreen', () => {
           displayName: 'Parent',
           isOwner: true,
         }}
-        mode="family"
       />,
       { wrapper: Wrapper },
     );
@@ -475,10 +508,9 @@ describe('LearnerScreen', () => {
     });
   });
 
-  // [NAV-CONTRACT-W3] When V1 flag is on, LearnerScreen derives FamilyHome from
-  // the navigation contract (home.screen === 'FamilyHome') instead of the legacy
-  // mode/hasLinkedChildren heuristic.
-  it('[V1] shows ParentHomeScreen when contract resolves FamilyHome and proxy is off', async () => {
+  // [NAV-CONTRACT-W3] LearnerScreen derives FamilyHome from the navigation
+  // contract gate instead of the legacy mode/hasLinkedChildren heuristic.
+  it('[V1] shows ParentHomeScreen when the contract opens showFamilyHome and proxy is off', async () => {
     mockContractHomeScreen = 'FamilyHome';
     mockIsExplicitProxyMode = false;
     mockLinkedChildren = [{ id: 'c1', displayName: 'Kid', isOwner: false }];
@@ -889,7 +921,10 @@ describe('LearnerScreen', () => {
       screen.getByText('Discover more');
     });
 
-    fireEvent.press(screen.getByTestId('home-coach-band-continue'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('home-coach-band-continue'));
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       const surfacedCalls = fetchCallsMatching(
@@ -905,6 +940,10 @@ describe('LearnerScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz',
       params: { activityType: 'capitals', ...HOME_RETURN_PARAMS },
+    });
+    await waitFor(() => {
+      expect(queryClient?.isMutating()).toBe(0);
+      expect(queryClient?.isFetching()).toBe(0);
     });
   });
 
@@ -1098,9 +1137,13 @@ describe('LearnerScreen', () => {
       jest.useFakeTimers();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       // Resolve the hanging promise to prevent open-handle warnings.
-      hangingFetchResolve?.();
+      await act(async () => {
+        hangingFetchResolve?.();
+        await Promise.resolve();
+      });
+      hangingFetchResolve = null;
       jest.useRealTimers();
     });
 
@@ -1112,7 +1155,9 @@ describe('LearnerScreen', () => {
       expect(screen.queryByTestId('learner-loading-timeout')).toBeNull();
 
       // Advance past the 15-second threshold and flush React state updates.
-      jest.advanceTimersByTime(16_000);
+      act(() => {
+        jest.advanceTimersByTime(16_000);
+      });
 
       await waitFor(() => {
         screen.getByTestId('learner-loading-timeout');
@@ -1123,7 +1168,9 @@ describe('LearnerScreen', () => {
     it('shows the Retry CTA after timeout', async () => {
       render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-      jest.advanceTimersByTime(16_000);
+      act(() => {
+        jest.advanceTimersByTime(16_000);
+      });
 
       await waitFor(() => screen.getByTestId('learner-loading-retry'));
       // Retry button is present and pressable — pressing must not throw.
@@ -1138,7 +1185,9 @@ describe('LearnerScreen', () => {
       // The fix replaces it with Library + More routes that change state.
       render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-      jest.advanceTimersByTime(16_000);
+      act(() => {
+        jest.advanceTimersByTime(16_000);
+      });
 
       await waitFor(() => screen.getByTestId('learner-loading-go-library'));
       fireEvent.press(screen.getByTestId('learner-loading-go-library'));
@@ -1151,7 +1200,9 @@ describe('LearnerScreen', () => {
     it('"More options" CTA navigates to More tab', async () => {
       render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-      jest.advanceTimersByTime(16_000);
+      act(() => {
+        jest.advanceTimersByTime(16_000);
+      });
 
       await waitFor(() => screen.getByTestId('learner-loading-go-more'));
       fireEvent.press(screen.getByTestId('learner-loading-go-more'));

@@ -12,15 +12,12 @@ import { useCelebrationLevel } from '../../hooks/use-settings';
 import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useAckNotice, useDashboard } from '../../hooks/use-dashboard';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useProfile } from '../../lib/profile';
-import { useAppContext } from '../../lib/app-context';
 
 export default function HomeScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { profiles, activeProfile, isLoading } = useProfile();
-  const { mode: legacyMode } = useAppContext();
   const navigationContract = useNavigationContract();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
@@ -28,9 +25,7 @@ export default function HomeScreen(): React.ReactElement {
   const markCelebrationsSeen = useMarkCelebrationsSeen();
   const { data: dashboard } = useDashboard();
   const ackNotice = useAckNotice();
-  const isOwner = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.sessionIsOwner
-    : activeProfile?.isOwner === true;
+  const isOwner = navigationContract.gates.sessionIsOwner;
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations ?? [],
     celebrationLevel,
@@ -92,7 +87,7 @@ export default function HomeScreen(): React.ReactElement {
     // [3B.11] Secondary navigation actions prevent dead-end when home times out.
     // [B-600] Family-mode users must not be routed to the adult Study Library —
     // they get a Progress shortcut instead, keeping them in a mentor-safe context.
-    const isFamilyMode = legacyMode === 'family';
+    const isFamilyMode = navigationContract.effectiveAppContext === 'family';
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-6"
@@ -157,7 +152,6 @@ export default function HomeScreen(): React.ReactElement {
       <LearnerScreen
         profiles={profiles}
         activeProfile={activeProfile}
-        mode={legacyMode}
         showParentHome={true}
       />
       {CelebrationOverlay}

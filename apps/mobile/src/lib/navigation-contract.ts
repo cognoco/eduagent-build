@@ -77,6 +77,8 @@ export interface ProfileContext {
 
 export interface NavigationGates {
   sessionIsOwner: boolean;
+  showFamilyHome: boolean;
+  showLearningActions: boolean;
   showBilling: boolean;
   showAccountSecurity: boolean;
   showExportDelete: boolean;
@@ -238,6 +240,13 @@ export function resolveNavigationContract(
   const familyCapable = isFamilyCapable(context.activeProfile);
   const ownerRole = isOwnerRole(context.role);
   const subscriptionReady = context.subscription.status === 'ready';
+  const familyPlanOwner =
+    isAdultOwner(context.activeProfile) &&
+    ownerRole &&
+    !context.isParentProxy &&
+    subscriptionReady &&
+    (context.subscription.tier === 'family' ||
+      context.subscription.tier === 'pro');
   const legacyV0ModeNavActive =
     context.flags.MODE_NAV_V1_ENABLED === false &&
     context.flags.MODE_NAV_V0_ENABLED === true;
@@ -312,9 +321,26 @@ export function resolveNavigationContract(
     familyShape &&
     !context.isParentProxy &&
     context.activeProfile?.hasFamilyLinks === true;
+  const showLegacyModeFamilyHome =
+    legacyV0ModeNavActive &&
+    legacyV0FamilyCapable &&
+    !context.isParentProxy &&
+    context.appContext === 'family';
+  const showLegacyFlagsOffFamilyHome =
+    context.flags.MODE_NAV_V1_ENABLED === false &&
+    context.flags.MODE_NAV_V0_ENABLED === false &&
+    !context.isParentProxy &&
+    (isLegacyGuardian(context.activeProfile, linkedChildIds) ||
+      familyPlanOwner);
+  const showFamilyHome =
+    context.flags.MODE_NAV_V1_ENABLED === true
+      ? familyShape && !context.isParentProxy
+      : showLegacyModeFamilyHome || showLegacyFlagsOffFamilyHome;
 
   const gates: NavigationGates = {
     sessionIsOwner: ownerRole && !context.isParentProxy,
+    showFamilyHome,
+    showLearningActions: !context.isParentProxy,
     showBilling: ownerRole && !context.isParentProxy,
     showAccountSecurity: ownerRole && !context.isParentProxy,
     showExportDelete: ownerRole && !context.isParentProxy,

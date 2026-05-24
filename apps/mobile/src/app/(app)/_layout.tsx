@@ -16,7 +16,6 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
-import { useAppContext } from '../../lib/app-context';
 import { useProfile } from '../../lib/profile';
 import { computeAgeBracket, type Profile } from '@eduagent/schemas';
 import {
@@ -49,22 +48,16 @@ import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback, GateContent } from '../../components/common';
 import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
 import { goBackOrReplace } from '../../lib/navigation';
-import {
-  resolveHomeTabPresentation,
-  resolveShellVisibleTabs,
-  resolveTabShape,
-} from '../../lib/legacy-navigation-contract';
+import { resolveContractHomeTabPresentation } from '../../lib/legacy-navigation-contract';
 import { track } from '../../lib/analytics';
 import { useSubjects } from '../../hooks/use-subjects';
-import { useParentProxy } from '../../hooks/use-parent-proxy';
 import {
   useActiveProfileRole,
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
-import { useNavigationContract } from '../../hooks/use-navigation-contract';
+import { useNavigationShellContract } from '../../hooks/use-navigation-contract';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
-import type { NavigationContract } from '../../lib/navigation-contract';
 import {
   getPreviewState,
   setPreviewState,
@@ -76,6 +69,8 @@ import {
 // Task 14's Step-3 success path (this file) and sign-out.
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
+
+export { resolveContractHomeTabPresentation };
 
 initNotificationHandler();
 
@@ -109,33 +104,6 @@ const iconMap: Record<
   Users: { focused: 'people', default: 'people-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
-
-type HomeTabPresentation = {
-  titleKey: 'tabs.children' | 'tabs.familyHub' | 'tabs.myLearning';
-  accessibilityLabelKey:
-    | 'tabs.childrenLabel'
-    | 'tabs.familyHubLabel'
-    | 'tabs.myLearningLabel';
-  iconName: 'Home' | 'School' | 'Users';
-};
-
-export function resolveContractHomeTabPresentation(
-  home: NavigationContract['home'],
-): HomeTabPresentation {
-  if (home.screen === 'FamilyHome') {
-    return {
-      titleKey: 'tabs.children',
-      accessibilityLabelKey: 'tabs.childrenLabel',
-      iconName: home.iconName,
-    };
-  }
-
-  return {
-    titleKey: 'tabs.myLearning',
-    accessibilityLabelKey: 'tabs.myLearningLabel',
-    iconName: home.iconName,
-  };
-}
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const colors = useThemeColors();
@@ -1991,31 +1959,12 @@ export default function AppLayout() {
     switchProfile,
   } = useProfile();
   useMentorLanguageSync();
-  const { isParentProxy, childProfile, parentProfile } = useParentProxy();
-  const { mode, familyCapable } = useAppContext();
   const proxyColors = getProxyChromeColors(colors);
   const role = useActiveProfileRole();
-  const navigationContract = useNavigationContract();
-  const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
-  const visibleTabs = React.useMemo(
-    () =>
-      resolveShellVisibleTabs({
-        familyCapable,
-        isParentProxy,
-        mode,
-        navigationContract,
-        tabShape,
-        useContract: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
-      }),
-    [familyCapable, isParentProxy, mode, navigationContract, tabShape],
-  );
-  const homeTabPresentation = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? resolveContractHomeTabPresentation(navigationContract.home)
-    : resolveHomeTabPresentation(
-        tabShape,
-        isParentProxy,
-        familyCapable ? mode : null,
-      );
+  const navigationShell = useNavigationShellContract();
+  const visibleTabs = navigationShell.visibleTabs;
+  const homeTabPresentation = navigationShell.homeTabPresentation;
+  const isProxyChromeActive = navigationShell.proxy.active;
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -2411,13 +2360,21 @@ export default function AppLayout() {
     );
   }
 
+  const proxyBanner =
+    navigationShell.proxy.active && navigationShell.proxy.parentProfileId
+      ? {
+          childName: navigationShell.proxy.childName,
+          parentProfileId: navigationShell.proxy.parentProfileId,
+        }
+      : null;
+
   return (
     <FeedbackProvider>
       <View style={[{ flex: 1 }, tokenVars]}>
-        {isParentProxy && parentProfile && (
+        {proxyBanner && (
           <ProxyBanner
-            childName={childProfile?.displayName ?? ''}
-            onSwitchBack={() => void switchProfile(parentProfile.id)}
+            childName={proxyBanner.childName}
+            onSwitchBack={() => void switchProfile(proxyBanner.parentProfileId)}
           />
         )}
         <ModeSwitcher />
@@ -2440,7 +2397,7 @@ export default function AppLayout() {
               // An opaque sceneStyle prevents the previous tab from bleeding
               // through when switching to a full-screen route (session, quiz, etc.).
               sceneStyle: {
-                backgroundColor: isParentProxy
+                backgroundColor: isProxyChromeActive
                   ? proxyColors.sceneBackground
                   : colors.background,
               },
@@ -2455,13 +2412,13 @@ export default function AppLayout() {
                     overflow: 'hidden' as const,
                   }
                 : {
-                    backgroundColor: isParentProxy
+                    backgroundColor: isProxyChromeActive
                       ? proxyColors.tabBackground
                       : colors.surface,
-                    borderTopColor: isParentProxy
+                    borderTopColor: isProxyChromeActive
                       ? proxyColors.border
                       : colors.border,
-                    borderTopWidth: isParentProxy ? 2 : 1,
+                    borderTopWidth: isProxyChromeActive ? 2 : 1,
                     height: 56 + Math.max(insets.bottom, 24),
                     paddingBottom: Math.max(insets.bottom, 24),
                   },

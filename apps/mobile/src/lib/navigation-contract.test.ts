@@ -347,6 +347,8 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.gates).toEqual(
       expect.objectContaining({
         sessionIsOwner: true,
+        showFamilyHome: true,
+        showLearningActions: true,
         showAccommodationChildEditor: true,
         showAccountSecurity: true,
         showBilling: true,
@@ -378,6 +380,8 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.gates).toEqual(
       expect.objectContaining({
         sessionIsOwner: false,
+        showFamilyHome: false,
+        showLearningActions: true,
         showAccommodationChildEditor: false,
         showAccountSecurity: false,
         showAddChild: false,
@@ -410,6 +414,7 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.shape).toBe('study');
     expect(contract.gates.showAddChild).toBe(false);
     expect(contract.gates.showBilling).toBe(true);
+    expect(contract.gates.showFamilyHome).toBe(false);
   });
 
   it('does not infer V1 family capability from the local child profile list', () => {
@@ -438,13 +443,47 @@ describe('resolveNavigationContract gates', () => {
       makeContext({
         activeProfile: familyAdult,
         appContext: 'family',
-        flags: { MODE_NAV_V1_ENABLED: false },
+        flags: { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: false },
         profiles: [familyAdult, child],
       }),
     );
 
     expect(contract.diagnostic.reason).toBe('v1-disabled');
     expect(contract.gates.showLearnThisToo).toBe(false);
+    expect(contract.gates.showFamilyHome).toBe(true);
+  });
+
+  it('preserves V0-off family/pro owner home setup without linked children', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: adult,
+        appContext: null,
+        flags: {
+          MODE_NAV_V0_ENABLED: false,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [adult],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.diagnostic.reason).toBe('v1-disabled');
+    expect(contract.gates.showFamilyHome).toBe(true);
+    expect(contract.gates.showLearningActions).toBe(true);
+  });
+
+  it('hides learner write actions in proxy mode', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        isParentProxy: true,
+        profiles: [familyAdult, child],
+      }),
+    );
+
+    expect(contract.gates.showFamilyHome).toBe(false);
+    expect(contract.gates.showLearningActions).toBe(false);
   });
 });
 
@@ -758,6 +797,7 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
 
     expectTabs(contract, legacyGuardianTabs);
     expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
+    expect(contract.gates.showFamilyHome).toBe(true);
     expect(contract.gates.showLearnThisToo).toBe(false);
   });
 

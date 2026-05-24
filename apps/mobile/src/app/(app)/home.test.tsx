@@ -48,36 +48,44 @@ jest.mock(
 
 const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
+let mockNavigationEffectiveAppContext: 'study' | 'family' = 'study';
+let mockNavigationSessionIsOwner = true;
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
 }));
+
+jest.mock(
+  '../../hooks/use-navigation-contract' /* gc1-allow: home.test.tsx pins navigation-contract outputs without mounting the full shell adapter */,
+  () => ({
+    useNavigationContract: () => ({
+      effectiveAppContext: mockNavigationEffectiveAppContext,
+      gates: { sessionIsOwner: mockNavigationSessionIsOwner },
+      queryScope: {
+        appContext: mockNavigationEffectiveAppContext,
+        profileId: 'test-profile-id',
+      },
+    }),
+    useNavigationDataScopeContract: () => ({
+      queryScope: {
+        appContext: mockNavigationEffectiveAppContext,
+        profileId: 'test-profile-id',
+      },
+    }),
+  }),
+);
 
 jest.mock(
   '../../components/home' /* gc1-allow: avoids full native component tree render; home.test.tsx tests routing logic not component internals */,
   () => {
     const { Text, View } = require('react-native');
     return {
-      LearnerScreen: ({ mode }: { mode?: string | null }) => (
+      LearnerScreen: () => (
         <View testID="learner-screen">
           <Text>LearnerScreen</Text>
-          <Text>mode:{mode ?? 'none'}</Text>
         </View>
       ),
     };
   },
-);
-
-let mockAppContextMode: string | null = 'study';
-jest.mock(
-  '../../lib/app-context' /* gc1-allow: home.test.tsx pins mode without mounting AppContextProvider which requires ProfileContext + network */,
-  () => ({
-    ...jest.requireActual('../../lib/app-context'),
-    useAppContext: () => ({
-      mode: mockAppContextMode,
-      setMode: jest.fn(),
-      familyCapable: mockAppContextMode === 'family',
-    }),
-  }),
 );
 
 const HomeScreen = require('./home').default;
@@ -135,6 +143,8 @@ describe('HomeScreen intent router', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockOnAllComplete = null;
+    mockNavigationEffectiveAppContext = 'study';
+    mockNavigationSessionIsOwner = true;
   });
 
   it('renders LearnerScreen for owner with no children [BUG-522]', () => {
@@ -216,7 +226,8 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
-    mockAppContextMode = 'study';
+    mockNavigationEffectiveAppContext = 'study';
+    mockNavigationSessionIsOwner = true;
     ({ wrapper: Wrapper } = createScreenWrapper({
       activeProfile: null,
       profiles: [],
@@ -286,7 +297,8 @@ describe('HomeScreen B-600: family mode timeout state routes to Progress not Lib
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
-    mockAppContextMode = 'family';
+    mockNavigationEffectiveAppContext = 'family';
+    mockNavigationSessionIsOwner = true;
     ({ wrapper: Wrapper } = createScreenWrapper({
       activeProfile: null,
       profiles: [],
@@ -296,7 +308,7 @@ describe('HomeScreen B-600: family mode timeout state routes to Progress not Lib
 
   afterEach(() => {
     jest.useRealTimers();
-    mockAppContextMode = 'study';
+    mockNavigationEffectiveAppContext = 'study';
   });
 
   it('shows progress button instead of library button in family mode timeout [B-600]', () => {
@@ -329,7 +341,7 @@ describe('HomeScreen B-600: family mode timeout state routes to Progress not Lib
   });
 
   it('non-family mode still shows library button, not progress button [B-600 guard]', () => {
-    mockAppContextMode = 'study';
+    mockNavigationEffectiveAppContext = 'study';
     const { wrapper } = createScreenWrapper({
       activeProfile: null,
       profiles: [],

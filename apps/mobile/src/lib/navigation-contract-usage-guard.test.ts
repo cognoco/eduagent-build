@@ -27,6 +27,8 @@ const RAW_NAVIGATION_HOOKS = new Set(['useAppContext', 'useParentProxy']);
 const NAVIGATION_CONTRACT_HOOKS = new Set([
   'useNavigationContract',
   'useNavigationDataScopeContract',
+  'useNavigationHomeContract',
+  'useNavigationShellContract',
 ]);
 
 // Terminal navigation contract ratchet.
@@ -39,28 +41,6 @@ const NAVIGATION_CONTRACT_HOOKS = new Set([
 // rationale.
 const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] =
   [
-    // V0-fallback: owns legacy tab computation and raw app/proxy context while V0 flags remain supported.
-    {
-      file: 'apps/mobile/src/app/(app)/_layout.tsx',
-      reason:
-        'V0-fallback: legacy tab shell keeps raw mode/proxy reads for MODE_NAV_V1 off.',
-      expectedFindings: {
-        'proxy-state-read': 7,
-        'raw-hook-call': 2,
-        'raw-hook-import': 2,
-      },
-    },
-    // V0-fallback: home still passes legacy mode and owner audience when V1 is off.
-    {
-      file: 'apps/mobile/src/app/(app)/home.tsx',
-      reason:
-        'V0-fallback: celebration audience and LearnerScreen legacy mode prop remain for MODE_NAV_V1 off.',
-      expectedFindings: {
-        'profile-owner-read': 1,
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-      },
-    },
     // V0-fallback: More child-editor screen keeps owner/child discrimination only for legacy mode.
     {
       file: 'apps/mobile/src/app/(app)/more/accommodation.tsx',
@@ -122,12 +102,15 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
         'raw-hook-import': 1,
       },
     },
-    // V0-fallback: subscription uses contract billing/family gates in V1 and raw owner reads in legacy paths.
+    // V0-fallback + family-member labels: subscription contract-gates UI visibility and consolidates the
+    // remaining non-UI owner reads. One raw activeProfile.isOwner read feeds analytics, child-paywall routing,
+    // and the V0 fallback for billing/remove-member gates; the other two findings are member.isOwner reads on
+    // family-pool member rows (different entity, domain data not navigation gating).
     {
       file: 'apps/mobile/src/app/(app)/subscription.tsx',
       reason:
-        'V0-fallback: subscription billing/member controls are contract-gated in V1 and owner-read legacy paths remain.',
-      expectedFindings: { 'profile-owner-read': 8 },
+        'V0-fallback + family-member labels: subscription gates UI visibility through the contract, keeps one consolidated owner read for analytics/paywall/V0 fallback, and reads member.isOwner on family-pool rows.',
+      expectedFindings: { 'profile-owner-read': 3 },
     },
     // Account/profile ownership: profile creation still validates owner status outside app-tab navigation.
     {
@@ -173,17 +156,6 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
       expectedFindings: {
         'raw-hook-call': 1,
         'raw-hook-import': 1,
-      },
-    },
-    // V0-fallback: learner home keeps raw legacy home-shape decisions when V1 is disabled.
-    {
-      file: 'apps/mobile/src/components/home/LearnerScreen.tsx',
-      reason:
-        'V0-fallback: learner home uses contract home shape in V1 and raw owner/mode checks only for legacy home selection.',
-      expectedFindings: {
-        'profile-owner-read': 2,
-        'proxy-state-read': 13,
-        'study-family-mode-compare': 1,
       },
     },
     // Contract primitive: role resolver feeds resolveNavigationContract().
@@ -239,7 +211,7 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
       reason:
         'contract primitive: useNavigationContract is the only hook adapter that feeds raw app/proxy context into the resolver.',
       expectedFindings: {
-        'proxy-state-read': 1,
+        'proxy-state-read': 7,
         'raw-hook-call': 2,
         'raw-hook-import': 2,
       },
@@ -327,7 +299,7 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
         'contract primitive: resolveNavigationContract is the allowed owner/proxy decision point.',
       expectedFindings: {
         'profile-owner-read': 4,
-        'proxy-state-read': 18,
+        'proxy-state-read': 23,
       },
     },
     // V0-fallback: navigation helper maps legacy mode to return paths when V1 is disabled.

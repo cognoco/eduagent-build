@@ -685,18 +685,24 @@ function SubscriptionContent(): React.ReactElement | null {
     useFamilySubscription(subscription?.tier === 'family');
   const byokWaitlist = useJoinByokWaitlist();
   const removeFamilyProfile = useRemoveFamilyProfile();
+  // Account-identity fact: drives analytics and the child-paywall routing
+  // decision below. Navigation UI visibility (billing card, remove-member
+  // button) consumes the contract gates; this raw owner read covers the
+  // non-UI surfaces the plan keeps explicit, and is also the V0 fallback
+  // for the contract gates when MODE_NAV_V1_ENABLED is off.
+  const isOwnerProfile = activeProfile?.isOwner === true;
   const canUseOwnerBillingGates = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.gates.showBilling
-    : activeProfile?.isOwner === true;
+    : isOwnerProfile;
   const canRemoveFamilyMember = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.gates.showRemoveFamilyMember
-    : activeProfile?.isOwner === true;
+    : isOwnerProfile;
   const linkedChildCount =
     canUseOwnerBillingGates && activeProfile
       ? profiles.filter((profile) => profile.id !== activeProfile.id).length
       : 0;
   const breakdownAnalytics = {
-    is_owner: activeProfile?.isOwner === true,
+    is_owner: isOwnerProfile,
     breakdown_section_visible: Boolean(usage?.byProfile?.length),
     child_count_bucket: childCountBucket(linkedChildCount),
   };
@@ -704,10 +710,10 @@ function SubscriptionContent(): React.ReactElement | null {
   useEffect(() => {
     if (!usage) return;
     track('subscription_breakdown_mounted', {
-      is_owner: activeProfile?.isOwner === true,
+      is_owner: isOwnerProfile,
       child_count_bucket: childCountBucket(linkedChildCount),
     });
-  }, [activeProfile?.isOwner, linkedChildCount, usage]);
+  }, [isOwnerProfile, linkedChildCount, usage]);
 
   // BUG-399: Persistent "already joined" flag for BYOK waitlist
   const [byokJoined, setByokJoined] = useState(false);
@@ -758,7 +764,7 @@ function SubscriptionContent(): React.ReactElement | null {
   // We compute this early so the useEffect runs unconditionally (React hooks
   // rules require all hooks before any conditional early-returns below).
   // The effect is a no-op when data is still loading or the paywall should show.
-  const isChildEarly = activeProfile ? !activeProfile.isOwner : false;
+  const isChildEarly = activeProfile ? !isOwnerProfile : false;
   const subHasLoadErrorEarly =
     (subError && !subscription) || (usageError && !usage);
   const trialOrExpiredEarly =

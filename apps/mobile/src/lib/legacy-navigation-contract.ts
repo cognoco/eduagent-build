@@ -1,5 +1,5 @@
-import type { NavigationContract } from './navigation-contract';
 import type { AppMode } from './app-context';
+import type { NavigationContract } from './navigation-contract';
 
 const GUARDIAN_TABS: ReadonlySet<string> = new Set([
   'home',
@@ -36,6 +36,15 @@ const STUDY_MODE_TABS: ReadonlySet<string> = new Set([
 ]);
 
 export type LegacyTabShape = 'guardian' | 'learner';
+
+export type ShellHomeTabPresentation = {
+  titleKey: 'tabs.children' | 'tabs.familyHub' | 'tabs.myLearning';
+  accessibilityLabelKey:
+    | 'tabs.childrenLabel'
+    | 'tabs.familyHubLabel'
+    | 'tabs.myLearningLabel';
+  iconName: 'Home' | 'School' | 'Users';
+};
 
 function isLegacyGuardianProfile(
   profile: { isOwner: boolean } | null | undefined,
@@ -86,11 +95,7 @@ export function resolveHomeTabPresentation(
   shape: LegacyTabShape,
   isParentProxy = false,
   mode: AppMode | null = null,
-): {
-  titleKey: 'tabs.familyHub' | 'tabs.myLearning';
-  accessibilityLabelKey: 'tabs.familyHubLabel' | 'tabs.myLearningLabel';
-  iconName: 'Home' | 'School';
-} {
+): ShellHomeTabPresentation {
   if (!isParentProxy && mode === 'family') {
     return {
       titleKey: 'tabs.familyHub',
@@ -103,6 +108,24 @@ export function resolveHomeTabPresentation(
     titleKey: 'tabs.myLearning',
     accessibilityLabelKey: 'tabs.myLearningLabel',
     iconName: 'School',
+  };
+}
+
+export function resolveContractHomeTabPresentation(
+  home: NavigationContract['home'],
+): ShellHomeTabPresentation {
+  if (home.screen === 'FamilyHome') {
+    return {
+      titleKey: 'tabs.children',
+      accessibilityLabelKey: 'tabs.childrenLabel',
+      iconName: home.iconName,
+    };
+  }
+
+  return {
+    titleKey: 'tabs.myLearning',
+    accessibilityLabelKey: 'tabs.myLearningLabel',
+    iconName: home.iconName,
   };
 }
 
