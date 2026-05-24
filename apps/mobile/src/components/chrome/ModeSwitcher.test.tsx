@@ -9,36 +9,45 @@ jest.mock(
 );
 
 // useNavigationContract internally composes useAppContext + useProfile +
-// useSubscription + feature flags. Pattern A: spread the real module so other
-// exports remain real, override only the hook with our spy. Real hook is never
-// invoked because the override replaces the named export.
+// useSubscription + feature flags. Wiring all four providers in a
+// chrome-component unit test would duplicate the navigation-contract.test.ts
+// scope without adding contract coverage (which lives in that file and the
+// snapshot test). Risk: this test cannot catch a regression in the contract
+// resolution itself — only that ModeSwitcher reads the contract correctly.
 // TODO(zk): promote ModeSwitcher coverage to an integration test under
 // _layout that mounts the real provider chain (tracked as parallel-review
 // follow-up).
 const mockUseNavigationContract = jest.fn();
-jest.mock('../../hooks/use-navigation-contract', () => ({
-  ...jest.requireActual('../../hooks/use-navigation-contract'),
-  useNavigationContract: (...args: unknown[]) =>
-    mockUseNavigationContract(...args),
-}));
+jest.mock('../../hooks/use-navigation-contract', () => {
+  const actual = jest.requireActual('../../hooks/use-navigation-contract');
+  return {
+    ...actual,
+    useNavigationContract: (...args: unknown[]) =>
+      mockUseNavigationContract(...args),
+  };
+});
 
 // useModeSwitch internally uses useRouter + useQueryClient + useAppContext.setMode
-// (a TanStack mutation). Pattern A: spread the real module, override only the
-// hook. switch-error UI behavior is covered here; mutation logic in use-mode-switch.test.
+// (a TanStack mutation with onError/onSuccess). The switch-error state we surface
+// here is a UI consequence of setMode's onError callback; the mode-switching
+// logic itself is covered in use-mode-switch.test.
 const mockSwitchMode = jest.fn();
 const mockDismissError = jest.fn();
 let mockIsSwitching = false;
 let mockSwitchError: 'study' | 'family' | null = null;
-jest.mock('../../lib/use-mode-switch', () => ({
-  ...jest.requireActual('../../lib/use-mode-switch'),
-  useModeSwitch: () => ({
-    switchMode: mockSwitchMode,
-    isSwitching: mockIsSwitching,
-    isSwitchingRef: { current: mockIsSwitching },
-    switchError: mockSwitchError,
-    dismissError: mockDismissError,
-  }),
-}));
+jest.mock('../../lib/use-mode-switch', () => {
+  const actual = jest.requireActual('../../lib/use-mode-switch');
+  return {
+    ...actual,
+    useModeSwitch: () => ({
+      switchMode: mockSwitchMode,
+      isSwitching: mockIsSwitching,
+      isSwitchingRef: { current: mockIsSwitching },
+      switchError: mockSwitchError,
+      dismissError: mockDismissError,
+    }),
+  };
+});
 
 function buildContract(
   modeSwitcher: 'global-header' | 'hidden',
