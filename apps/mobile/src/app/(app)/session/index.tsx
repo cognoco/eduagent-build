@@ -97,6 +97,7 @@ import { SessionTopicHeader } from '../../../components/session/SessionTopicHead
 import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
 import { useTranslation } from 'react-i18next';
+import { track } from '../../../lib/analytics';
 import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
 import { ConfirmationToast } from './_components/ConfirmationToast';
 import { useImageBase64 } from './_hooks/use-image-base64';
@@ -845,9 +846,39 @@ function SessionScreenInner() {
         return undefined;
       }
 
+      // [HOMEWORK-06] If the learner attached a photo but conversion failed
+      // or timed out (>2.5s), surface a visible system message and emit a
+      // structured analytics event before falling back to text-only auto-send.
+      // Silent fallback is banned by CLAUDE.md "Fix Development Rules".
+      const imageAttachFailed =
+        !!imageUri &&
+        (imageAttachmentStatus === 'failed' ||
+          imageAttachmentStatus === 'timeout');
+
       const timer = setTimeout(() => {
         if (hasAutoSentRef.current) return;
         hasAutoSentRef.current = true;
+
+        if (imageAttachFailed) {
+          track('homework_image_attach_dropped', {
+            reason: imageAttachmentStatus,
+            captureSource: homeworkCaptureSource ?? null,
+            hasOcrText: !!normalizedOcrText,
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: createLocalMessageId('ai'),
+              role: 'assistant',
+              content:
+                imageAttachmentStatus === 'timeout'
+                  ? "Your photo took too long to load, so I'm starting with the text only. If something looks off, tap the camera again to retry."
+                  : "I couldn't open your photo, so I'm starting with the text only. If something looks off, tap the camera again to retry.",
+              isSystemPrompt: true,
+            },
+          ]);
+        }
+
         // BUG-373: Mark homework auto-send as auto-sent
         // [WI-87 review / DS-195 defense-in-depth] Only forward imageUri to
         // the send pipeline (which both attaches the base64 to the LLM call
@@ -877,6 +908,9 @@ function SessionScreenInner() {
     routeSessionId,
     imageUri,
     imageAttachmentStatus,
+    createLocalMessageId,
+    homeworkCaptureSource,
+    normalizedOcrText,
   ]);
 
   const {
