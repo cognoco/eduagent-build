@@ -65,6 +65,43 @@ export function parseNumericFromDriver(
   return result;
 }
 
+/**
+ * [WI-318 / DS-229] Finiteness guard on the number→driver coercion.
+ *
+ * Exported for unit testing. TypeScript's `data: number` type does not
+ * enforce runtime finiteness, so without this guard a NaN or Infinity
+ * reaching a numericAsNumber column would be emitted as the literal string
+ * "NaN" or "Infinity": PostgreSQL numeric can store NaN, and rejected
+ * special values still fail only at the database boundary with no
+ * column-name context. Mirror parseNumericFromDriver and throw at the
+ * helper boundary instead so Sentry can identify the offending row and the
+ * upstream computation that produced the bad value.
+ */
+// Parameter is widened to `number | string | null | undefined` (rather than
+// `number`, which matches drizzle's `toDriver` signature) so a refactor that
+// passes through an LLM-parsed or user-supplied value at runtime — despite
+// the static `data: number` declaration — does not silently bypass the
+// guard. See callsite: customType.toDriver below.
+export function parseNumericToDriver(
+  value: number | string | null | undefined,
+  columnName: string,
+): string {
+  if (typeof value !== 'number') {
+    throw new Error(
+      `numericAsNumber: expected number for column "${columnName}", got ${
+        value === null ? 'null' : typeof value
+      }`,
+    );
+  }
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      `numericAsNumber: non-finite value ${String(value)} for column ` +
+        `"${columnName}" — Postgres numeric should never receive NaN/Infinity`,
+    );
+  }
+  return String(value);
+}
+
 export const numericAsNumber = (
   name: string,
   config: { precision: number; scale: number },
@@ -77,6 +114,6 @@ export const numericAsNumber = (
       return parseNumericFromDriver(value, name);
     },
     toDriver(value: number): string {
-      return String(value);
+      return parseNumericToDriver(value, name);
     },
   })(name);

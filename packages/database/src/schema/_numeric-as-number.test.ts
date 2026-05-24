@@ -1,6 +1,7 @@
 import {
   numericAsNumber,
   parseNumericFromDriver,
+  parseNumericToDriver,
 } from './_numeric-as-number.js';
 
 /**
@@ -146,5 +147,68 @@ describe('parseNumericFromDriver — NaN guard [BUG-980]', () => {
       v: string,
     ) => number;
     expect(() => fromDriver('garbage')).toThrow(/corrupt value/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-318 / DS-229] Finiteness guard on the number→driver coercion.
+//
+// Pre-fix, `toDriver` accepted any runtime number and serialized it with
+// `String(value)`. TypeScript's `data: number` type does not enforce runtime
+// finiteness, so NaN or Infinity reaching a numericAsNumber column was emitted
+// as "NaN" or "Infinity". PostgreSQL numeric can store NaN; rejected special
+// values still fail only at the database boundary, with no column-name
+// context. Throw at the helper boundary with the column name instead, so the
+// origin is identifiable in Sentry.
+// ---------------------------------------------------------------------------
+
+describe('parseNumericToDriver — finiteness guard [WI-318]', () => {
+  it('serializes well-formed finite numbers to string', () => {
+    expect(parseNumericToDriver(0, 'mastery_score')).toBe('0');
+    expect(parseNumericToDriver(0.85, 'mastery_score')).toBe('0.85');
+    expect(parseNumericToDriver(2.5, 'ease_factor')).toBe('2.5');
+    expect(parseNumericToDriver(-1.23, 'col')).toBe('-1.23');
+  });
+
+  it('[BREAK] throws on NaN with the column name in the message', () => {
+    expect(() => parseNumericToDriver(NaN, 'mastery_score')).toThrow(
+      /non-finite value NaN for column "mastery_score"/,
+    );
+  });
+
+  it('[BREAK] throws on Infinity / -Infinity with the column name', () => {
+    expect(() => parseNumericToDriver(Infinity, 'ease_factor')).toThrow(
+      /non-finite value Infinity for column "ease_factor"/,
+    );
+    expect(() => parseNumericToDriver(-Infinity, 'ease_factor')).toThrow(
+      /non-finite value -Infinity for column "ease_factor"/,
+    );
+  });
+
+  it('[BREAK] throws when given a non-number runtime value', () => {
+    // The TS signature widens to defend against the same class of refactor
+    // that could regress the from-side guard: a caller passing through a
+    // user-provided or LLM-parsed value that landed as a string or null at
+    // runtime despite the `data: number` declaration.
+    expect(() =>
+      parseNumericToDriver('1.5' as unknown as number, 'mastery_score'),
+    ).toThrow(/expected number/);
+    expect(() =>
+      parseNumericToDriver(null as unknown as number, 'ease_factor'),
+    ).toThrow(/expected number/);
+    expect(() =>
+      parseNumericToDriver(undefined as unknown as number, 'ease_factor'),
+    ).toThrow(/expected number/);
+  });
+
+  it('[BREAK] customType toDriver hook surfaces the same throw', () => {
+    const col = numericAsNumber('mastery_score', { precision: 3, scale: 2 });
+    const builder: any = col;
+    const toDriver = builder.config.customTypeParams.toDriver as (
+      v: number,
+    ) => string;
+    expect(() => toDriver(NaN)).toThrow(/non-finite value NaN/);
+    expect(() => toDriver(Infinity)).toThrow(/non-finite value Infinity/);
+    expect(toDriver(0.5)).toBe('0.5');
   });
 });
