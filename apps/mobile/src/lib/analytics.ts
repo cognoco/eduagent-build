@@ -85,37 +85,72 @@ export function track(
  */
 const DEV_FALLBACK_SECRET = 'DEV-ONLY-not-for-prod-analytics-hash-key';
 
+// One-shot guard so a misconfigured production build (env var missing)
+// surfaces in Sentry exactly once per session, not on every tap.
+let unkeyedWarningEmitted = false;
+
+function bytesToHex(bytes: Uint8Array, take: number): string {
+  let hex = '';
+  for (let i = 0; i < take; i += 1) {
+    hex += bytes[i]!.toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
 export function hashProfileId(profileId: string): string {
   const envSecret = process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
-  let secret: string;
   if (envSecret) {
-    secret = envSecret;
-  } else {
-    // Bail loudly in production. The historical silent fallback to a
-    // hardcoded constant produced hashes that looked legitimate but
-    // provided zero pseudonymisation — anyone with the (constant) "secret"
-    // and the user-ID list could correlate every analytics event back to a
-    // profile. Make the misconfiguration visible at the first call site.
-    if (!(global as { __DEV__?: boolean }).__DEV__) {
-      throw new Error(
-        'analytics.hashProfileId: EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 is not ' +
-          'set. Provision the key via Doppler/EAS env injection. Refusing ' +
-          'to fall back to a hardcoded secret in production builds.',
-      );
+    // Truncate to 16 bytes / 32 hex chars. 128-bit truncation gives a
+    // ~50% birthday-collision probability at ~2^64 inputs — orders of
+    // magnitude above any plausible profile count. Shorter tags are also
+    // friendlier in Sentry's UI than a full 64-char SHA-256.
+    return `v3_${bytesToHex(hmac(sha256, envSecret, profileId), 16)}`;
+  }
+
+  if ((global as { __DEV__?: boolean }).__DEV__) {
+    // Dev: known-bad fallback, clearly marked so a leaked dev hash can
+    // never be confused with a prod hash.
+    return `v3_${bytesToHex(hmac(sha256, DEV_FALLBACK_SECRET, profileId), 16)}`;
+  }
+
+  // Production with no key provisioned. Earlier this fell back silently to
+  // a hardcoded constant — a privacy regression dressed as a hash.
+  // Throwing would crash user-facing tap handlers (use-clone-from-child,
+  // progress/empty-state CTA, etc.) since `hashProfileId(...)` evaluates
+  // inside the analytics-payload literal before `track(...)` runs. Instead:
+  //   - Emit an `unkeyed_` tag so the missing-key state is visible in
+  //     Sentry's tag values (operators can filter on `profile_id_hash
+  //     starts_with unkeyed_`) without leaking the raw profile ID.
+  //   - Raise one warning breadcrumb per session so the misconfiguration
+  //     can't hide for long.
+  // The keyless SHA-256 still provides per-user funnel correlation; it
+  // does NOT provide a privacy boundary, which is fine because the
+  // pre-fix hardcoded-fallback path also provided none.
+  if (!unkeyedWarningEmitted) {
+    unkeyedWarningEmitted = true;
+    try {
+      Sentry.addBreadcrumb({
+        category: 'analytics.config',
+        level: 'warning',
+        message:
+          'analytics.hashProfileId: EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 missing — ' +
+          'emitting `unkeyed_` tags. Provision the key via Doppler/EAS env injection.',
+      });
+    } catch {
+      // Sentry not initialised yet (early-boot call); the next call attempts again.
+      unkeyedWarningEmitted = false;
     }
-    secret = DEV_FALLBACK_SECRET;
   }
-  const tag = hmac(sha256, secret, profileId);
-  // Truncate to 16 bytes / 32 hex chars. SHA-256 truncation is sound for
-  // collision resistance at the user-base scale we care about (well under
-  // 2^64 distinct profiles), and shorter tag values are friendlier in
-  // Sentry's UI.
-  let hex = '';
-  for (let i = 0; i < 16; i += 1) {
-    hex += tag[i]!.toString(16).padStart(2, '0');
-  }
-  return `v3_${hex}`;
+  return `v3_unkeyed_${bytesToHex(sha256(profileId), 12)}`;
 }
+
+// Test-only escape hatch to reset the one-shot warning latch between
+// production-path assertions. Not used in production code paths.
+export const __TEST_ONLY__ = {
+  resetUnkeyedWarning(): void {
+    unkeyedWarningEmitted = false;
+  },
+};
 
 export function bucketAccountAge(createdAt: string | null | undefined): string {
   if (!createdAt) return '0-7';

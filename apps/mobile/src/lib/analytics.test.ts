@@ -3,6 +3,7 @@ import {
   hashProfileId,
   track,
   trackHomeworkOcrGateAccepted,
+  __TEST_ONLY__,
 } from './analytics';
 
 describe('analytics telemetry', () => {
@@ -82,6 +83,7 @@ describe('hashProfileId — HMAC-SHA256 hardening [WI-315]', () => {
   afterEach(() => {
     process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 = ORIGINAL_KEY;
     (global as { __DEV__?: boolean }).__DEV__ = ORIGINAL_DEV;
+    __TEST_ONLY__.resetUnkeyedWarning();
   });
 
   it('[BREAK] emits a v3_ prefix (FNV→HMAC-SHA256 swap is observable to consumers)', () => {
@@ -109,12 +111,45 @@ describe('hashProfileId — HMAC-SHA256 hardening [WI-315]', () => {
     expect(hashProfileId('user-1')).not.toBe(hashProfileId('user-2'));
   });
 
-  it('[BREAK] throws when the key is missing in production (no silent hardcoded fallback)', () => {
+  it('[BREAK] in production with missing key, emits an `unkeyed_` tag (does NOT throw, does NOT silently use a hardcoded secret)', () => {
+    // Throwing would crash user-facing tap handlers — `hashProfileId(...)`
+    // is evaluated inside analytics-payload literals before `track(...)`
+    // runs, so a throw escapes the handler. Instead emit an `unkeyed_`
+    // tag so operators can filter on the misconfiguration in Sentry's
+    // tag UI, then warn once per session via a breadcrumb.
     delete process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
     (global as { __DEV__?: boolean }).__DEV__ = false;
-    expect(() => hashProfileId('user-1')).toThrow(
-      /EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1/,
-    );
+
+    expect(() => hashProfileId('user-1')).not.toThrow();
+    expect(hashProfileId('user-1')).toMatch(/^v3_unkeyed_[0-9a-f]{24}$/);
+  });
+
+  it('[BREAK] in production with missing key, the unkeyed tag is deterministic per profile (per-user funnel correlation preserved)', () => {
+    delete process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
+    (global as { __DEV__?: boolean }).__DEV__ = false;
+
+    expect(hashProfileId('user-1')).toBe(hashProfileId('user-1'));
+    expect(hashProfileId('user-1')).not.toBe(hashProfileId('user-2'));
+  });
+
+  it('[BREAK] in production with missing key, raises exactly one Sentry warning breadcrumb per session (operator visibility, not log spam)', () => {
+    delete process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
+    (global as { __DEV__?: boolean }).__DEV__ = false;
+    jest.clearAllMocks();
+
+    hashProfileId('user-1');
+    hashProfileId('user-2');
+    hashProfileId('user-3');
+
+    const configBreadcrumbs = (Sentry.addBreadcrumb as jest.Mock).mock.calls
+      .map((args) => args[0])
+      .filter(
+        (call) =>
+          call?.category === 'analytics.config' &&
+          /EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 missing/.test(call?.message ?? ''),
+      );
+    expect(configBreadcrumbs).toHaveLength(1);
+    expect(configBreadcrumbs[0].level).toBe('warning');
   });
 
   it('[BREAK] in dev, falls back to a clearly-marked dev key so local builds keep working', () => {
@@ -125,6 +160,8 @@ describe('hashProfileId — HMAC-SHA256 hardening [WI-315]', () => {
     delete process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
     (global as { __DEV__?: boolean }).__DEV__ = true;
     expect(() => hashProfileId('user-1')).not.toThrow();
+    // Dev path uses the keyed format (with the dev fallback secret), not
+    // the production `unkeyed_` sentinel — distinguishable in Sentry.
     expect(hashProfileId('user-1')).toMatch(/^v3_[0-9a-f]{32}$/);
   });
 });

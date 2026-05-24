@@ -80,5 +80,10 @@ function decodeFileSystemRoot(rootUri: string): string {
     // If a directory itself somehow contains malformed percent-encoding,
     // use the raw form rather than crashing the allowlist check.
   }
-  return value;
+  // [WI-87 review] Defense against a future SDK that drops the documented
+  // trailing slash from `cacheDirectory` / `documentDirectory`. Without
+  // this, a `startsWith` check on `/data/.../cache` would also accept
+  // `/data/.../cache_attacker/x.jpg`. The trailing slash is the directory
+  // boundary; force it.
+  return value.endsWith('/') ? value : `${value}/`;
 }

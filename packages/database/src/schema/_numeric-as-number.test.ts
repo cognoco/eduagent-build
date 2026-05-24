@@ -170,6 +170,15 @@ describe('parseNumericToDriver — finiteness guard [WI-318]', () => {
     expect(parseNumericToDriver(-1.23, 'col')).toBe('-1.23');
   });
 
+  it('serializes negative zero as plain "0" (matches historical String(-0) behaviour)', () => {
+    // Pinned so a future refactor that swaps `String(value)` for
+    // `value.toFixed(...)` or a manual sign handler can't silently flip
+    // emission to "-0" — which Postgres numeric accepts but is visually
+    // confusing in logs and changes equality semantics downstream.
+    expect(parseNumericToDriver(-0, 'col')).toBe('0');
+    expect(Object.is(-0, -0)).toBe(true);
+  });
+
   it('[BREAK] throws on NaN with the column name in the message', () => {
     expect(() => parseNumericToDriver(NaN, 'mastery_score')).toThrow(
       /non-finite value NaN for column "mastery_score"/,

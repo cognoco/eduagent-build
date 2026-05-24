@@ -103,3 +103,43 @@ describe('isAllowedImageUri [WI-284]', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-87 review] Separate suite with a directory constant that lacks the
+// documented trailing slash. Exercises the defensive normalisation in
+// decodeFileSystemRoot — without it, `startsWith` on a slash-less root
+// matches a sibling directory whose name extends the root with a non-`/`
+// suffix (prefix-confusion). The test guarantees we don't slip back into
+// that bypass if a future Expo SDK drops the documented trailing slash.
+// ---------------------------------------------------------------------------
+
+describe('isAllowedImageUri [WI-87 review] — trailing-slash invariant', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.doMock('expo-file-system/legacy', () => ({
+      cacheDirectory:
+        'file:///data/user/0/host.exp.exponent/cache/ExperienceData/test',
+      documentDirectory: undefined,
+    }));
+  });
+
+  it('rejects a sibling directory that extends the slash-less root with a non-/ suffix', () => {
+    const { isAllowedImageUri: scopedIsAllowed } =
+      require('./_image-uri-allowlist') as typeof import('./_image-uri-allowlist');
+    expect(
+      scopedIsAllowed(
+        'file:///data/user/0/host.exp.exponent/cache/ExperienceData/test_attacker/x.jpg',
+      ),
+    ).toBe(false);
+  });
+
+  it('still allows a URI directly under the slash-less root (with the synthesised trailing /)', () => {
+    const { isAllowedImageUri: scopedIsAllowed } =
+      require('./_image-uri-allowlist') as typeof import('./_image-uri-allowlist');
+    expect(
+      scopedIsAllowed(
+        'file:///data/user/0/host.exp.exponent/cache/ExperienceData/test/homework.jpg',
+      ),
+    ).toBe(true);
+  });
+});
