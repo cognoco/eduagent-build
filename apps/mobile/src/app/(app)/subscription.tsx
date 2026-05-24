@@ -681,7 +681,9 @@ function SubscriptionContent(): React.ReactElement | null {
     isRefetching: usageRefetching,
   } = useUsage();
   const { data: familySubscription, refetch: refetchFamilySubscription } =
-    useFamilySubscription(subscription?.tier === 'family');
+    useFamilySubscription(
+      subscription?.tier === 'family' || subscription?.tier === 'pro',
+    );
   const byokWaitlist = useJoinByokWaitlist();
   const removeFamilyProfile = useRemoveFamilyProfile();
   // Account-identity fact: drives analytics and the child-paywall routing

@@ -21,6 +21,15 @@ const mockPush = jest.fn();
 const mockRecallMutate = jest.fn();
 const mockRecallReset = jest.fn();
 const mockRecallState = { isPending: false };
+// [LEARN-14] Controls the useResolveTopicSubject result. Tests that need a
+// resolver-driven subjectId set this before render.
+let mockResolveResult: { subjectId: string } | undefined = undefined;
+// [LEARN-14] Controls the params returned from useLocalSearchParams so a test
+// can simulate a deep link that omits subjectId.
+let mockSearchParams: Record<string, string> = {
+  topicId: 'topic-1',
+  subjectId: 'subject-1',
+};
 let queuedRecallResults: Array<Record<string, unknown> | 'defer' | Error> = [];
 // Holds the callbacks of the most recent mutate() call so a test can
 // fire them deferred — simulating a request that resolves AFTER the
@@ -32,11 +41,15 @@ let deferredCallbacks: {
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
-  useLocalSearchParams: () => ({
-    topicId: 'topic-1',
-    subjectId: 'subject-1',
-  }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
+
+jest.mock(
+  '../../../hooks/use-progress', // gc1-allow: native-boundary — the real hook reaches into the API client + profile scope, neither of which is wired in this test environment
+  () => ({
+    useResolveTopicSubject: () => ({ data: mockResolveResult }),
+  }),
+);
 
 jest.mock(
   '../../../hooks/use-retention', // gc1-allow: native-boundary — ChatShell mock (below) exposes mock-send-button; real useSubmitRecallTest cannot integrate with the real ChatShell in JSDOM without its own native-dep chain (speech-recognition, TTS, reanimated)
@@ -121,6 +134,8 @@ describe('RecallTestScreen', () => {
     queuedRecallResults = [];
     deferredCallbacks = null;
     mockRecallState.isPending = false;
+    mockResolveResult = undefined;
+    mockSearchParams = { topicId: 'topic-1', subjectId: 'subject-1' };
     mockRecallMutate.mockImplementation(
       (
         _input: Record<string, unknown>,
@@ -350,5 +365,74 @@ describe('RecallTestScreen', () => {
     expect(title).toBe('Something went wrong');
     expect(message).toMatch(/offline|can't be reached/i);
     alertSpy.mockRestore();
+  });
+
+  // -----------------------------------------------------------------------
+  // [LEARN-14] Relearn CTA no-ops when deep link lacks subjectId
+  // -----------------------------------------------------------------------
+  // Helper: drive the remediation card to render so the Relearn CTA exists.
+  const renderWithRemediationCard = () => {
+    queuedRecallResults = [
+      {
+        passed: false,
+        failureCount: 3,
+        failureAction: 'redirect_to_library',
+        remediation: {
+          cooldownEndsAt: '2026-03-30T18:30:00.000Z',
+          retentionStatus: 'forgotten',
+        },
+      },
+    ];
+    render(<RecallTestScreen />);
+    fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
+    return waitFor(() => screen.getByTestId('remediation-card'));
+  };
+
+  it('[LEARN-14] Relearn CTA uses paramSubjectId when present', async () => {
+    mockSearchParams = { topicId: 'topic-1', subjectId: 'subject-1' };
+    await renderWithRemediationCard();
+
+    fireEvent.press(screen.getByTestId('relearn-topic-button'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/relearn',
+      params: expect.objectContaining({
+        topicId: 'topic-1',
+        subjectId: 'subject-1',
+      }),
+    });
+  });
+
+  it('[LEARN-14] Relearn CTA uses resolved subjectId when deep link omits it', async () => {
+    mockSearchParams = { topicId: 'topic-1' };
+    mockResolveResult = { subjectId: 'resolved-subject' };
+    await renderWithRemediationCard();
+
+    fireEvent.press(screen.getByTestId('relearn-topic-button'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/relearn',
+      params: expect.objectContaining({
+        topicId: 'topic-1',
+        subjectId: 'resolved-subject',
+      }),
+    });
+  });
+
+  it('[LEARN-14] Relearn CTA still navigates (to picker) when subjectId is fully unresolved — no silent no-op', async () => {
+    mockSearchParams = { topicId: 'topic-1' };
+    mockResolveResult = undefined;
+    await renderWithRemediationCard();
+
+    fireEvent.press(screen.getByTestId('relearn-topic-button'));
+
+    // The push MUST happen (no silent return). When subjectId is unresolved,
+    // relearn falls back to its subject-picker phase — that's the actionable
+    // recovery path required by UX Resilience.
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const [pushArg] = mockPush.mock.calls[0] ?? [];
+    expect(pushArg.pathname).toBe('/(app)/topic/relearn');
+    expect(pushArg.params.topicId).toBe('topic-1');
+    expect(pushArg.params.subjectId).toBeUndefined();
   });
 });

@@ -12,6 +12,7 @@ import {
   type RetentionStatus,
 } from '../../../components/progress';
 import { useSubmitRecallTest } from '../../../hooks/use-retention';
+import { useResolveTopicSubject } from '../../../hooks/use-progress';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 import { ErrorFallback } from '../../../components/common';
@@ -38,11 +39,24 @@ function deriveStatus(retentionStatus?: string): RetentionStatus {
 export default function RecallTestScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { topicId, subjectId, topicName } = useLocalSearchParams<{
+  const {
+    topicId,
+    subjectId: paramSubjectId,
+    topicName,
+  } = useLocalSearchParams<{
     topicId: string;
     subjectId: string;
     topicName?: string;
   }>();
+
+  // [LEARN-14] Recall deep links may omit subjectId. Resolve from topicId so
+  // the Relearn CTA can route correctly; matches the F-009 pattern in
+  // topic/[topicId].tsx.
+  const needsResolve = !paramSubjectId && !!topicId;
+  const { data: resolved } = useResolveTopicSubject(
+    needsResolve ? topicId : undefined,
+  );
+  const subjectId = paramSubjectId || resolved?.subjectId;
 
   const submitRecallTest = useSubmitRecallTest();
   const ensureStudyMode = useEnsureStudyMode();
@@ -158,10 +172,18 @@ export default function RecallTestScreen() {
   }, []);
 
   const handleRelearnTopic = useCallback(() => {
-    if (!topicId || !subjectId) return;
+    if (!topicId) return;
+    // [LEARN-14] If subjectId is still unresolved (deep link without it +
+    // resolver hasn't returned), route to relearn anyway — the relearn screen
+    // falls back to its subject picker phase, giving the user an actionable
+    // recovery instead of a silent no-op tap. UX Resilience: never silent.
     router.push({
       pathname: '/(app)/topic/relearn',
-      params: { topicId, subjectId, ...(topicName ? { topicName } : {}) },
+      params: {
+        topicId,
+        ...(subjectId ? { subjectId } : {}),
+        ...(topicName ? { topicName } : {}),
+      },
     });
   }, [router, topicId, subjectId, topicName]);
 

@@ -27,6 +27,47 @@ const SCREEN_HEIGHT =
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
 
+// [#617 / AUTH-06] Clerk's signIn.create / signIn.attemptFirstFactor can hang
+// indefinitely (network stall, dev email delivery issue, test-mode mismatch).
+// Without a client-side timeout, `loading` never flips back to false and the
+// user is stranded on a disabled spinner with no actionable recovery. The
+// helper below caps every Clerk call at 20s, surfaces a clear message, and
+// re-enables the button.
+const RESET_REQUEST_TIMEOUT_MS = 20_000;
+const RESET_TIMEOUT_USER_MESSAGE =
+  "We couldn't reach the reset service in time. Check your connection and try again.";
+
+class ResetRequestTimeoutError extends Error {
+  constructor(public readonly operation: string) {
+    super(
+      `Reset request timed out after ${RESET_REQUEST_TIMEOUT_MS}ms: ${operation}`,
+    );
+    this.name = 'ResetRequestTimeoutError';
+  }
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  operation: string,
+  timeoutMs: number = RESET_REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new ResetRequestTimeoutError(operation));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 export default function ForgotPasswordScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
@@ -65,13 +106,29 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
 
     try {
-      await signIn.create({
-        strategy: 'reset_password_email_code',
-        identifier: emailAddress,
-      });
+      await withTimeout(
+        signIn.create({
+          strategy: 'reset_password_email_code',
+          identifier: emailAddress,
+        }),
+        'signIn.create',
+      );
       setPendingReset(true);
     } catch (err: unknown) {
-      setError(extractClerkError(err));
+      if (err instanceof ResetRequestTimeoutError) {
+        Sentry.addBreadcrumb({
+          category: 'auth',
+          message: 'forgot-password: signIn.create timed out',
+          level: 'warning',
+          data: {
+            operation: err.operation,
+            timeoutMs: RESET_REQUEST_TIMEOUT_MS,
+          },
+        });
+        setError(RESET_TIMEOUT_USER_MESSAGE);
+      } else {
+        setError(extractClerkError(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -84,11 +141,14 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
 
     try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: 'reset_password_email_code',
-        code,
-        password: newPassword,
-      });
+      const result = await withTimeout(
+        signIn.attemptFirstFactor({
+          strategy: 'reset_password_email_code',
+          code,
+          password: newPassword,
+        }),
+        'signIn.attemptFirstFactor',
+      );
 
       if (result.status === 'complete') {
         const sessionId = result.createdSessionId;
@@ -118,7 +178,20 @@ export default function ForgotPasswordScreen() {
         setError('Password reset could not be completed. Please try again.');
       }
     } catch (err: unknown) {
-      setError(extractClerkError(err));
+      if (err instanceof ResetRequestTimeoutError) {
+        Sentry.addBreadcrumb({
+          category: 'auth',
+          message: 'forgot-password: signIn.attemptFirstFactor timed out',
+          level: 'warning',
+          data: {
+            operation: err.operation,
+            timeoutMs: RESET_REQUEST_TIMEOUT_MS,
+          },
+        });
+        setError(RESET_TIMEOUT_USER_MESSAGE);
+      } else {
+        setError(extractClerkError(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -157,12 +230,28 @@ export default function ForgotPasswordScreen() {
     setResending(true);
 
     try {
-      await signIn.create({
-        strategy: 'reset_password_email_code',
-        identifier: emailAddress,
-      });
+      await withTimeout(
+        signIn.create({
+          strategy: 'reset_password_email_code',
+          identifier: emailAddress,
+        }),
+        'signIn.create(resend)',
+      );
     } catch (err: unknown) {
-      setError(extractClerkError(err));
+      if (err instanceof ResetRequestTimeoutError) {
+        Sentry.addBreadcrumb({
+          category: 'auth',
+          message: 'forgot-password: resend signIn.create timed out',
+          level: 'warning',
+          data: {
+            operation: err.operation,
+            timeoutMs: RESET_REQUEST_TIMEOUT_MS,
+          },
+        });
+        setError(RESET_TIMEOUT_USER_MESSAGE);
+      } else {
+        setError(extractClerkError(err));
+      }
     } finally {
       setResending(false);
     }

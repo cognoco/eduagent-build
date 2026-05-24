@@ -1567,6 +1567,56 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('remove-family-member-p3');
   });
 
+  it('shows live family pool details for pro subscriptions', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'pro',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'pro',
+              monthlyLimit: 1500,
+              usedThisMonth: 300,
+              remainingQuestions: 1200,
+              profileCount: 3,
+              maxProfiles: 4,
+              members: [
+                { profileId: 'p1', displayName: 'Parent', isOwner: true },
+                { profileId: 'p2', displayName: 'Alex', isOwner: false },
+                { profileId: 'p3', displayName: 'Mia', isOwner: false },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('family-pool-section');
+    });
+    screen.getByText('3 of 4 profiles connected');
+    screen.getByText(/1200 shared questions left/i);
+    screen.getByText('Parent (owner)');
+    screen.getByText('Alex');
+    screen.getByText('Mia');
+  });
+
   it('removes a non-owner profile from the family pool after confirmation', async () => {
     mockFetch.setRoute(
       '/subscription',

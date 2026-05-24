@@ -270,7 +270,13 @@ describe('ChildReportsScreen', () => {
       expect(screen.getAllByText('+2 vs last week').length).toBeGreaterThan(0);
     });
 
-    it('opens older weekly reports inline and can return to the latest report', () => {
+    // [BUG-604] Tapping a weekly report card must navigate to the weekly
+    // report detail screen (which marks the report viewed on mount). The
+    // previous implementation swapped the inline header summary and never
+    // called router.push, leaving the detail route + mark-viewed path
+    // unreachable. Break test: assert router.push is invoked with the
+    // weekly-report route + params.
+    it('navigates to weekly report detail when a weekly card is pressed [BUG-604]', () => {
       mockUseChildWeeklyReports.mockReturnValue({
         data: [
           {
@@ -325,15 +331,15 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
+      // Latest weekly summary renders in the header
       screen.getByText('Topics mastered: 4');
+
       fireEvent.press(screen.getByTestId('weekly-report-card-wr-older'));
 
-      screen.getByText('Topics mastered: 1');
-      screen.getByTestId('child-reports-back-to-latest');
-      expect(mockPush).not.toHaveBeenCalled();
-
-      fireEvent.press(screen.getByTestId('child-reports-back-to-latest'));
-      screen.getByText('Topics mastered: 4');
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+        params: { profileId: 'child-001', weeklyReportId: 'wr-older' },
+      });
     });
 
     it('puts the "New" badge on the latest weekly summary instead of older rows', () => {
