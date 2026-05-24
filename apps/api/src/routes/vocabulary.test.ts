@@ -118,7 +118,9 @@ jest.mock(
   },
 );
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { vocabularyRoutes } from './vocabulary';
 import {
   createVocabulary,
   deleteVocabulary,
@@ -415,5 +417,64 @@ describe('vocabulary routes', () => {
 
       expect(res.status).toBe(401);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-181 / DS-092] Proxy-mode write guard
+//
+// Mounts vocabularyRoutes on a mini Hono app with profileMeta.isOwner=false
+// so assertNotProxyMode rejects every write before the service is touched.
+// Mirrors the pattern in proxy-guard.test.ts + assessments.test.ts.
+// ---------------------------------------------------------------------------
+describe('[WI-181 / DS-092] vocabulary proxy-mode guard', () => {
+  function makeProxyApp() {
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    app.route('/', vocabularyRoutes);
+    return app;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /subjects/:subjectId/vocabulary returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/vocabulary`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ term: 'hola', translation: 'hello' }),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(createVocabulary).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/:subjectId/vocabulary/:vocabularyId/review returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/vocabulary/${VOCABULARY_ID}/review`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quality: 4 }),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(reviewVocabulary).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /subjects/:subjectId/vocabulary/:vocabularyId returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/vocabulary/${VOCABULARY_ID}`,
+      { method: 'DELETE' },
+    );
+    expect(res.status).toBe(403);
+    expect(deleteVocabulary).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   createVocabulary,
   deleteVocabulary,
@@ -42,7 +43,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
       const vocabulary = await listVocabulary(
         db,
         profileId,
-        c.req.param('subjectId')
+        c.req.param('subjectId'),
       );
       return c.json(vocabularyListResponseSchema.parse({ vocabulary }));
     } catch (err) {
@@ -57,6 +58,8 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
     '/subjects/:subjectId/vocabulary',
     zValidator('json', vocabularyCreateSchema),
     async (c) => {
+      // [WI-181 / DS-092] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       try {
@@ -64,11 +67,11 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
           db,
           profileId,
           c.req.param('subjectId'),
-          c.req.valid('json')
+          c.req.valid('json'),
         );
         return c.json(
           vocabularyCreateResponseSchema.parse({ vocabulary }),
-          201
+          201,
         );
       } catch (err) {
         // [FIX-API-6] Use typed instanceof check instead of string-matching message
@@ -77,12 +80,14 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
         }
         throw err;
       }
-    }
+    },
   )
   .post(
     '/subjects/:subjectId/vocabulary/:vocabularyId/review',
     zValidator('json', vocabularyReviewSchema),
     async (c) => {
+      // [WI-181 / DS-092] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       try {
@@ -91,7 +96,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
           profileId,
           c.req.param('vocabularyId'),
           c.req.valid('json'),
-          c.req.param('subjectId')
+          c.req.param('subjectId'),
         );
         return c.json(vocabularyReviewResponseSchema.parse(result));
       } catch (err) {
@@ -103,12 +108,14 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
           c,
           422,
           ERROR_CODES.VALIDATION_ERROR,
-          err instanceof Error ? err.message : 'Vocabulary review failed'
+          err instanceof Error ? err.message : 'Vocabulary review failed',
         );
       }
-    }
+    },
   )
   .delete('/subjects/:subjectId/vocabulary/:vocabularyId', async (c) => {
+    // [WI-181 / DS-092] Server-derived proxy-mode write guard.
+    assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const { subjectId, vocabularyId } = c.req.param();
@@ -117,7 +124,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
       db,
       profileId,
       subjectId,
-      vocabularyId
+      vocabularyId,
     );
     if (!deleted) {
       return notFound(c, 'Vocabulary item not found');

@@ -208,8 +208,11 @@ jest.mock('inngest/hono', () => ({
 // Import app AFTER all mocks are in place
 // ---------------------------------------------------------------------------
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { filingRoutes } from './filing';
 import { getSession } from '../services/session';
+import { fileToLibrary } from '../services/filing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -715,5 +718,53 @@ describe('filing routes', () => {
         expect.objectContaining({ name: 'app/filing.completed' }),
       );
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-153 / DS-064] Proxy-mode write guard
+//
+// Mini-Hono mount of filingRoutes with profileMeta.isOwner=false so
+// assertNotProxyMode rejects every write before the service is touched.
+// Mirrors proxy-guard.test.ts + assessments.test.ts.
+// ---------------------------------------------------------------------------
+describe('[WI-153 / DS-064] filing proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'test-profile-id');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', filingRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /filing/request-retry returns 403 when caller is in proxy mode', async () => {
+    const SESSION_ID = '550e8400-e29b-41d4-a716-446655440111';
+    const res = await makeProxyApp().request('/filing/request-retry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, sessionMode: 'freeform' }),
+    });
+    expect(res.status).toBe(403);
+    // Guard must reject BEFORE the IDOR getSession lookup — mirrors the
+    // assertion shape used by the other five files in this WI-76 batch.
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it('POST /filing returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request('/filing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawInput: 'fractions' }),
+    });
+    expect(res.status).toBe(403);
+    // Guard must reject BEFORE the LLM filing call.
+    expect(fileToLibrary).not.toHaveBeenCalled();
   });
 });

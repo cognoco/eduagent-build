@@ -23,6 +23,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getCurriculum,
   skipTopic,
@@ -104,6 +105,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     '/subjects/:subjectId/curriculum/skip',
     zValidator('json', topicSkipSchema),
     async (c) => {
+      // [WI-147 / DS-058] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
@@ -126,6 +129,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     '/subjects/:subjectId/curriculum/unskip',
     zValidator('json', topicUnskipSchema),
     async (c) => {
+      // [WI-147 / DS-058] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
@@ -155,6 +160,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     '/subjects/:subjectId/curriculum/topics',
     zValidator('json', curriculumTopicAddSchema),
     async (c) => {
+      // [WI-147 / DS-058] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
@@ -179,6 +186,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     '/subjects/:subjectId/curriculum/challenge',
     zValidator('json', curriculumChallengeSchema),
     async (c) => {
+      // [WI-147 / DS-058] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
@@ -204,6 +213,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     '/subjects/:subjectId/curriculum/adapt',
     zValidator('json', curriculumAdaptRequestSchema),
     async (c) => {
+      // [WI-147 / DS-058] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
