@@ -3,6 +3,7 @@ import {
   calculateRemainingQuestions,
   calculateRemainingDaily,
   getWarningLevel,
+  resolveWarningLevel,
   calculateMidCycleUpgrade,
   calculateMidCycleDowngrade,
   type MeteringState,
@@ -13,7 +14,7 @@ import {
 // ---------------------------------------------------------------------------
 
 function createTestState(
-  overrides: Partial<MeteringState> = {}
+  overrides: Partial<MeteringState> = {},
 ): MeteringState {
   return {
     monthlyLimit: 500,
@@ -55,6 +56,35 @@ describe('getWarningLevel', () => {
 
   it('returns exceeded when limit is 0', () => {
     expect(getWarningLevel(0, 0)).toBe('exceeded');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveWarningLevel [BUG-640]
+// ---------------------------------------------------------------------------
+
+describe('resolveWarningLevel', () => {
+  it('returns same level as getWarningLevel when no top-up credits', () => {
+    expect(resolveWarningLevel(500, 500, 0)).toBe('exceeded');
+    expect(resolveWarningLevel(475, 500, 0)).toBe('hard');
+    expect(resolveWarningLevel(400, 500, 0)).toBe('soft');
+    expect(resolveWarningLevel(0, 500, 0)).toBe('none');
+  });
+
+  it('returns top-up-available when monthly exhausted but top-up credits remain', () => {
+    expect(resolveWarningLevel(500, 500, 200)).toBe('top-up-available');
+    expect(resolveWarningLevel(600, 500, 1)).toBe('top-up-available');
+  });
+
+  it('returns exceeded when truly blocked (no monthly quota and no top-ups)', () => {
+    expect(resolveWarningLevel(500, 500, 0)).toBe('exceeded');
+  });
+
+  it('does not emit top-up-available for partial levels even if credits exist', () => {
+    // Credits should not affect soft/hard/none — only the exhausted case
+    expect(resolveWarningLevel(400, 500, 100)).toBe('soft');
+    expect(resolveWarningLevel(475, 500, 100)).toBe('hard');
+    expect(resolveWarningLevel(0, 500, 100)).toBe('none');
   });
 });
 
@@ -180,7 +210,8 @@ describe('checkQuota', () => {
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(200);
-    expect(result.warningLevel).toBe('exceeded');
+    // [BUG-640] Monthly exhausted + top-ups available => 'top-up-available', not 'exceeded'
+    expect(result.warningLevel).toBe('top-up-available');
   });
 
   // Daily limit tests

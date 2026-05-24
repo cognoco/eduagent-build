@@ -42,7 +42,7 @@ For every row in a batch, do this loop. It takes 2–10 minutes per flow.
 
 ### 2. Filing bugs in Notion
 
-**Where:** MentoMate Bug Tracker, database ID `b8ce802f-1126-4a2f-a123-be5f888cbb23`.
+**Where:** `Issue Tracker - Open`, database ID `3598bce9-1f7c-8070-86eb-e012bd99f184`. The Issue Tracker was split on 2026-05-18 — the old `b8ce802f-1126-4a2f-a123-be5f888cbb23` is now `Issue Tracker - Resolved` (frozen archive). **NEVER file new bugs into the Resolved DB.** When a bug moves to Done, the same agent moves the row from Open → Resolved (see `/fix-notion-bugs` for the move recipe).
 
 **How:** prefer the `/notion` skill if available. Otherwise hit the REST API:
 
@@ -52,7 +52,7 @@ curl -X POST https://api.notion.com/v1/pages \
   -H "Authorization: Bearer $NOTION_API_KEY" \
   -H "Notion-Version: 2022-06-28" \
   -H "Content-Type: application/json" \
-  -d '{ "parent": {"database_id": "b8ce802f-1126-4a2f-a123-be5f888cbb23"}, "properties": {...} }'
+  -d '{ "parent": {"database_id": "3598bce9-1f7c-8070-86eb-e012bd99f184"}, "properties": {...} }'
 ```
 
 **Required fields per bug:**
@@ -117,8 +117,8 @@ If you find a flow not in the inventory, do BOTH:
 
 | Situation | Status | Result | Action |
 | --- | --- | --- | --- |
-| Need an account/state I don't have, can't create from current persona | 🚫 | `Blocked` | Note what's missing in the row; flag in batch summary; do not skip — return after setup |
-| Flow exists but Apple/Google store gating prevents purchase test | 🚫 | `Blocked` | Document partial coverage in Notes; mark Blocked; revisit after store enrolment |
+| Need an account/state I don't have, can't create from current persona | ⬜ | _(leave blank)_ | Do NOT mark Blocked — the flow has not been attempted. Leave Status ⬜ and Result blank; note the missing prerequisite in the row and flag in the batch summary so setup can be done; return after setup and re-test |
+| Flow attempted but Apple/Google store gating actually prevents purchase from completing | 🚫 | `Blocked` | Blocked only because the flow was exercised and store gating proved to be the stopper. Document the exact point of failure in Notes; revisit after store enrolment |
 | Flow described in inventory has been removed from the app | ➖ | `Removed` | Edit inventory to mark removed; tick Doc Updated; no bug needed |
 | Flow works but inventory description is wrong | ✅ or ⚠️ | `Pass` | Edit inventory; tick Doc Updated; no bug needed (drift, not defect) |
 | Flow partly works, one branch broken | ⚠️ | `Pass w/ issues` | File bug for the broken branch; mark plan row ⚠️ |
@@ -193,7 +193,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | AUTH-02 | Sign up with email and password | 🚫 | Blocked | | | Sign-up fields and Create account CTA are reachable with normal field-to-field taps, but Clerk dev email quota is exhausted (`monthly limit for email messages in development (100)`), so full account creation is blocked by environment. Hosted Playwright web smoke run 25852959340 passed form render, disabled/enabled submit states, Clerk submit request, loading state, and terms/privacy links. |
 | AUTH-03 | Sign-up email verification code | 🚫 | Blocked | | | Blocked by Clerk dev email quota while submitting AUTH-02; verification-code screen did not appear. Web smoke did not reach this stage either. |
 | AUTH-04 | Sign in with email and password | ✅ | Pass | | | Seeded-user sign-in succeeds with literal credentials and normal field-to-field taps, reaching the expected consent-pending gate. |
-| AUTH-05 | Additional sign-in verification (email/phone/TOTP) | 🚫 | Blocked | | | Required MFA seed scenarios do not exist yet (`mfa-email-code`, `mfa-phone`, `mfa-totp`, backup-code). |
+| AUTH-05 | Additional sign-in verification (email/phone/TOTP) | ⬜ |  | | | Not yet attempted — prerequisite missing: MFA seed scenarios do not exist yet (`mfa-email-code`, `mfa-phone`, `mfa-totp`, backup-code). Provision seeds, then test. |
 | AUTH-06 | Forgot password and reset password | 🚫 | Blocked | | | Forgot-password screen renders, email entry works, and Send reset code is tappable, but Clerk dev email quota blocks reset-code delivery with the same monthly-limit error as sign-up. Hosted Playwright web smoke run 25852959340 passed forgot-password reachability and back-to-sign-in navigation; reset-code completion not exercised. |
 | AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | ✅ | Pass | | | Android/dev-client: Google SSO button renders and is tappable; OpenAI absent but optional. Web smoke: Google button renders, happy path blocked in web preview. |
 | AUTH-09 | SSO callback completion + fallback | 🚫 | Blocked | https://www.notion.so/3608bce91f7c81cab6c8d96cea8e5b7b | | Airplane-mode broadcast blocked on this emulator (`Permission Denial`); after the failed SSO attempt, dev-client also hit a WebBrowser cleanup crash. |
@@ -434,7 +434,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 ## Batch 14 — Parent Setup, Adding Children, Family Gating
 
-**State required:** Slot E (parent owner, Family plan, 0 children → added Timmy age 12).
+**State required:** Slot F (parent owner, Family plan, 0 children) → becomes Slot G after Timmy (age 12) is added.
 **Estimated time:** 45 min.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
@@ -452,7 +452,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 ## Batch 15 — Parent Dashboard & Drill-Downs
 
-**State required:** Slot E (parent, 1 child Timmy, no learning history yet).
+**State required:** Slot G (parent owner, Family plan, 1 child Timmy, no learning history yet). Use Slot H for the multi-child rows.
 **Estimated time:** 75 min.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |

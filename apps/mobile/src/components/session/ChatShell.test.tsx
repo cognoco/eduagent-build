@@ -39,11 +39,6 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
-// prettier-ignore
-jest.mock('../../lib/math-format', () => ({ // gc1-allow: render tests only need deterministic math text passthrough
-  formatMathContent: (s: string) => s,
-}));
-
 jest.mock('@expo/vector-icons', () => {
   // gc1-allow: native-boundary — vector icons requires native font assets unavailable in Jest
   const { Text } = require('react-native');

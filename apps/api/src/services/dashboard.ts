@@ -117,7 +117,7 @@ export interface DashboardInput {
   exchangesLastWeek: number;
   subjectRetentionData: Array<{
     name: string;
-    status: 'strong' | 'fading' | 'weak' | 'forgotten';
+    status: 'strong' | 'fading' | 'weak' | 'forgotten' | 'unknown';
   }>;
   guidedCount: number;
   totalProblemCount: number;

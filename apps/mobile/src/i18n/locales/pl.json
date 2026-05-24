@@ -240,7 +240,9 @@
         "reportsAction": "Raporty",
         "nudgeAction": "Nudge"
       }
-    }
+    },
+    "goToProgress": "Go to Progress",
+    "goToProgressLabel": "Go to Progress"
   },
   "nudge": {
     "sheet": {
@@ -1778,7 +1780,8 @@
       "nudgeCta": "Krótka zachęta może pomóc {{name}} wrócić do nauki.",
       "nudgeA11y": "Wyślij {{name}} zachętę",
       "viewAllReports": "Zobacz wszystkie raporty",
-      "subjectsTitle": "Przedmioty"
+      "subjectsTitle": "Przedmioty",
+      "goToChildCurriculum": "Open child curriculum"
     },
     "remediation": {
       "heading": "Spróbuj inaczej",
@@ -2501,6 +2504,63 @@
     "web": {
       "plansOnMobile": "Plany są dostępne w aplikacji mobilnej",
       "storePurchaseUnavailable": "Zakupy w sklepie nie są dostępne na tym urządzeniu."
+    },
+    "childPaywall": {
+      "headline": "Nice work so far!",
+      "greatStart": "You've been exploring and learning — great start!",
+      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
+      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "notifyButton": "Notify My Parent",
+      "notifyButtonNotified": "Parent notified",
+      "notifyButtonAccessibilityNotified": "Parent already notified",
+      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "cooldownReminder": "You can remind them again in {{label}}.",
+      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
+      "waitText": "While you wait, you can still browse your Library and see your progress.",
+      "browseLibrary": "Browse Library",
+      "browseLibraryAccessibilityLabel": "Browse Library",
+      "seeProgress": "See your progress",
+      "seeProgressAccessibilityLabel": "See your progress",
+      "goHome": "Go Home",
+      "goHomeAccessibilityLabel": "Go Home",
+      "back": "Back",
+      "backAccessibilityLabel": "Go back",
+      "alerts": {
+        "sentTitle": "Sent!",
+        "sentBody": "We let your parent know!",
+        "askParentTitle": "Ask your parent",
+        "askParentBody": "Ask your parent to open the app and subscribe.",
+        "notifyErrorTitle": "Could not send notification",
+        "notifyErrorBody": "Please check your connection and try again."
+      }
+    },
+    "restore": {
+      "button": "Restore Purchases",
+      "accessibilityLabel": "Restore purchases",
+      "verifying": "Verifying purchase...",
+      "restoring": "Restoring...",
+      "failedTitle": "Restore failed",
+      "failedBody": "Could not restore purchases. Please try again.",
+      "notFoundTitle": "No subscriptions found",
+      "notFoundBody": "We could not find any previous purchases to restore.",
+      "cancelledTitle": "Restore cancelled",
+      "cancelledBody": "Restore will continue in background.",
+      "cancelAccessibilityLabel": "Cancel restore"
+    },
+    "byokWaitlist": {
+      "heading": "Bring your own key",
+      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
+      "joinButton": "Join Waitlist",
+      "alreadyJoinedButton": "Already joined",
+      "joinAccessibilityLabel": "Join BYOK waitlist",
+      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "alerts": {
+        "successTitle": "Waitlist",
+        "successBody": "You have been added to the BYOK waitlist.",
+        "errorTitle": "Error",
+        "errorBody": "Could not join waitlist. Try again."
+      }
     }
   },
   "sessionSummary": {
@@ -2630,5 +2690,231 @@
     "dismiss": "Dismiss",
     "buttonLabel": "Add to my learning",
     "privacyNote": "Private to your learning"
+  },
+  "learnerHomeTimeout": {
+    "loading": "Już prawie — jeszcze chwilkę...",
+    "retry": "Spróbuj ponownie",
+    "goToLibrary": "Przejdź do biblioteki",
+    "moreOptions": "Więcej opcji"
+  },
+  "subscriptionScreen": {
+    "back": "Powrót",
+    "backAccessibilityLabel": "Powrót",
+    "title": "Subskrypcja",
+    "loading": {
+      "error": "Nie można załadować szczegółów subskrypcji. Spróbuj ponownie.",
+      "retryAccessibilityLabel": "Ponownie załaduj subskrypcję",
+      "retry": "Spróbuj ponownie"
+    },
+    "tierLabels": {
+      "free": "Bezpłatny",
+      "plus": "Plus",
+      "family": "Rodzinny",
+      "pro": "Pro"
+    },
+    "tierLimits": {
+      "free": "10 pytań/dzień, 100/miesiąc",
+      "plus": "700 pytań/miesiąc",
+      "family": "1 500 współdzielonych pytań/miesiąc",
+      "pro": "Nieograniczone pytania"
+    },
+    "tierFeatures": {
+      "free": {
+        "0": "10 pytań dziennie",
+        "1": "100 pytań miesięcznie",
+        "2": "Podstawowe tematy nauki",
+        "3": "śledzenie postępów"
+      },
+      "plus": {
+        "0": "700 pytań miesięcznie",
+        "1": "Brak dziennego limitu",
+        "2": "Wszystkie tematy nauki",
+        "3": "Priorytetowe wsparcie"
+      },
+      "family": {
+        "0": "1 500 współdzielonych pytań/miesiąc",
+        "1": "Do 5 członków rodziny",
+        "2": "Przegląd postępów rodziny",
+        "3": "Wszystkie funkcje Plus"
+      },
+      "pro": {
+        "0": "Nieograniczone pytania",
+        "1": "Wczesny dostęp do nowych funkcji",
+        "2": "Dedykowane wsparcie",
+        "3": "Wszystkie funkcje rodzinne"
+      }
+    },
+    "packagePeriod": {
+      "monthly": "Miesięczny",
+      "annual": "Roczny",
+      "weekly": "Tygodniowy",
+      "lifetime": "Dożywotnio",
+      "threeMonth": "3 miesiące",
+      "sixMonth": "6 miesięcy",
+      "twoMonth": "2 miesiące"
+    },
+    "currentPlan": {
+      "sectionHeader": "Obecny plan",
+      "statusCancelling": "Anulowanie",
+      "statusPastDue": "Zaległość",
+      "statusExpired": "Wygasła",
+      "statusActive": "Aktywna",
+      "accessUntil": "Dostęp do {{date}}",
+      "renews": "Odnawia się {{date}}",
+      "upgradeButton": "Ulepsz",
+      "upgradeAccessibilityLabel": "Ulepszenie planu"
+    },
+    "cancellationNotice": {
+      "title": "Subskrypcja kończy się",
+      "body": "Twoja subskrypcja została anulowana. Możesz nadal korzystać ze wszystkich funkcji do {{date}}. Po tym czasie Twój konto zostanie przełączone na plan Bezpłatny."
+    },
+    "usage": {
+      "sectionHeader": "Użycie w tym miesiącu",
+      "dailyQuestions": "Dziś: {{used}} / {{limit}} dziennych pytań",
+      "topUpCreditsRemaining_one": "+ {{count}} doladowanie kredyt",
+      "topUpCreditsRemaining_other": "+ {{count}} doladowania kredyty",
+      "yourShare": "Twój udział",
+      "yourUsage": "Twoje użycie",
+      "questionsCount_one": "{{count}} pytanie",
+      "questionsCount_other": "{{count}} pytań",
+      "familyAggregate": "Łącznie rodzina",
+      "quotaResets": "Kwota resetuje się {{date}}",
+      "subscriptionRenews": "Subskrypcja odnawia się {{date}}",
+      "dailyLimitResets": "Dzienny limit — resetuje się o północy"
+    },
+    "familyPool": {
+      "sectionHeader": "Pula rodzinna",
+      "profilesConnected": "z {{max}} połączonych profilów",
+      "questionsLeft": "współdzielonych pytań pozostałych w tym cyklu.",
+      "ownerSuffix": " (właściciel)",
+      "removingMember": "Usuwanie…",
+      "removeMember": "Usuń"
+    },
+    "plans": {
+      "sectionHeader": "Plany",
+      "confirmingPurchase": "Potwierdzanie zakupu…",
+      "currentBadge": "Obecny",
+      "retryOfferings": "Spróbuj ponownie",
+      "retryOfferingsAccessibilityLabel": "Ponownie załaduj oferty subskrypcji",
+      "contactSupport": "Skontaktuj się z obsługą",
+      "contactSupportAccessibilityLabel": "Skontaktuj się z obsługą",
+      "offeringsError": "Nie można teraz załadować opcji zakupu. Jesteś na planie {{tier}} z {{limits}}.",
+      "offeringsWebOnly": "Jesteś na planie {{tier}} z {{limits}}. Oto co zawiera każdy plan — zakupy w sklepie nie są jeszcze dostępne na tym urządzeniu."
+    },
+    "packageOption": {
+      "currentPlan": "Obecny plan",
+      "subscribeTo": "Subskrybuj",
+      "subscribe": "Subskrybuj",
+      "processing": "Przetwarzanie…",
+      "currentPlanLabel": "Obecny plan",
+      "subscribeLabel": "Subskrybuj",
+      "processingLabel": "Przetwarzanie…",
+      "currentPlanAccessibilityLabel": "Obecny plan: {{title}}, {{price}}",
+      "subscribePlanAccessibilityLabel": "Subskrybuj {{title}}, {{price}}"
+    },
+    "restore": {
+      "sectionHeader": "Przywróć zakupy",
+      "checkLater": "Sprawdź później"
+    },
+    "topUp": {
+      "sectionHeader": "Potrzebujesz więcej pytań?",
+      "buyAccessibilityLabel": "Kup 500 kredytów",
+      "buyButton": "Kup 500 kredytów",
+      "openingStore": "Otwieranie sklepu…",
+      "credits": "Zakup jednorazowy. Kredyty wygasą po 12 miesiącach.",
+      "checkLater": "Sprawdź później",
+      "checkLaterAccessibilityLabel": "Anuluj potwierdzenie doładowania",
+      "confirmingPollMessage": "Potwierdzanie zakupu…",
+      "confirmingPollMessageLong": "Ciągle potwierdzanie — może to zająć do 30 sekund. Twój zakup jest bezpieczny."
+    },
+    "manageBilling": {
+      "sectionHeader": "Zarządzaj",
+      "button": "Zarządzaj rozliczeniami",
+      "buttonAccessibilityLabel": "Zarządzaj rozliczeniami",
+      "webInfo": "Zarządzaj rozliczeniami",
+      "webInfoSubtitle": "Subskrypcja jest zarządzana na Twoim urządzeniu mobilnym",
+      "opensAppStore": "Otwiera subskrypcje App Store",
+      "opensGooglePlay": "Otwiera subskrypcje Google Play"
+    },
+    "byokWaitlist": {
+      "joinButton": "Dołącz do listy oczekujących",
+      "leaveButton": "Opuść listę oczekujących",
+      "joiningButton": "Dołączanie…",
+      "leavingButton": "Opuszczanie…"
+    },
+    "childPaywall": {
+      "title": "Zapytaj rodzica",
+      "body": "Wykorzystałeś wszystkie swoje pytania na dziś. Twój rodzic musi dokonać aktualizacji, aby kontynuować naukę.",
+      "cooldownZero": "0 sekund",
+      "cooldownHours_one": "{{count}} godzina",
+      "cooldownHours_other": "{{count}} godzin",
+      "cooldownMinutes_one": "{{count}} minuta",
+      "cooldownMinutes_other": "{{count}} minut",
+      "cooldownSeconds_one": "{{count}} sekunda",
+      "cooldownSeconds_other": "{{count}} sekund",
+      "xpThisWeek_one": "{{count}} XP w tym tygodniu",
+      "xpThisWeek_other": "{{count}} XP w tym tygodniu",
+      "topicsThisWeek_one": "{{count}} temat w tym tygodniu",
+      "topicsThisWeek_other": "{{count}} tematów w tym tygodniu"
+    },
+    "alerts": {
+      "topUpNotAvailableTitle": "Niedostępne",
+      "topUpNotAvailableBody": "Kredyty doładowania nie są teraz dostępne. Spróbuj później lub skontaktuj się z obsługą.",
+      "topUpRetry": "Spróbuj ponownie",
+      "networkErrorTitle": "Błąd sieci",
+      "networkErrorBody": "Proszę sprawdzić połączenie z internetem i spróbować ponownie.",
+      "purchaseFailedTitle": "Zakup nie powiódł się",
+      "purchaseFailedBody": "Podczas zakupu wystąpił nieoczekiwany błąd. Spróbuj ponownie.",
+      "alreadyPurchasedTitle": "Już zakupiono",
+      "alreadyPurchasedBody": "Wygląda na to, że już posiadasz tę subskrypcję. Naciśnij 'Przywróć zakupy', aby aktywować ją na tym urządzeniu.",
+      "restorePurchasesButton": "Przywróć zakupy",
+      "manageBillingErrorTitle": "Nie można otworzyć zarządzania subskrypcją",
+      "manageBillingErrorBody": "Możesz zarządzać subskrypcją bezpośrednio pod adresem:\n{{url}}",
+      "tryAgain": "Spróbuj ponownie",
+      "checkAgain": "Sprawdź ponownie",
+      "topUpPurchaseConfirmedTitle": "Zakup potwierdzony",
+      "topUpPurchaseConfirmedBody": "Twoje 500 kredytów jest dodawanych. Zazwyczaj pojawiają się w ciągu minuty — przeciągnij w dół, aby odświeżyć użycie.",
+      "topUpCheckLaterTitle": "Sprawdź później",
+      "topUpCheckLaterBody": "Kredyty pojawią się wkrótce — naciśnij odśwież, aby sprawdzić.",
+      "contactSupportTitle": "Skontaktuj się z obsługą",
+      "contactSupportBody": "Napisz na support@mentomate.app w celu uzyskania pomocy z subskrypcjami.",
+      "removeFamilyTitle": "Usunąć z rodziny?",
+      "removeFamilyBody": "Profil {{name}} zostanie usunięty z tego planu rodzinnego i ukryty z przełączania profilów.",
+      "removeFamilyConfirm": "Usuń",
+      "familyUpdatedTitle": "Rodzina zaktualizowana",
+      "familyUpdatedBody": "{{name}} został usunięty z Twojego planu rodzinnego.",
+      "removeFamilyErrorTitle": "Nie można usunąć profilu",
+      "removeFamilyErrorBody": "Proszę sprawdzić połączenie i spróbować ponownie.",
+      "topUpConnectionErrorTitle": "Błąd sieci",
+      "topUpConnectionErrorBody": "Proszę sprawdzić połączenie z internetem i spróbować ponownie."
+    }
+  },
+  "passwordInput": {
+    "defaultPlaceholder": "Wpisz hasło",
+    "hideLabel": "Ukryj hasło",
+    "showLabel": "Pokaż hasło",
+    "hideText": "Ukryj",
+    "showText": "Pokaż",
+    "requirementsHint": "Co najmniej 8 znaków"
+  },
+  "accountSecurity": {
+    "securedVia": "Zabezpieczono przez {{provider}}",
+    "changePasswordLabel": "Zmień hasło"
+  },
+  "changePassword": {
+    "errorCurrentRequired": "Wprowadź aktualne hasło",
+    "errorTooShort": "Hasło musi mieć co najmniej 8 znaków",
+    "errorMismatch": "Hasła nie są zgodne",
+    "currentPlaceholder": "Aktualne hasło",
+    "signingOut": "Wylogowywanie...",
+    "forgotPassword": "Zapomniałeś hasła?",
+    "newPlaceholder": "Nowe hasło",
+    "confirmPlaceholder": "Potwierdź nowe hasło",
+    "successMessage": "Hasło zaktualizowane",
+    "signOutErrorTitle": "Nie można się wylogować",
+    "signOutErrorMessage": "Spróbuj ponownie.",
+    "updateLabel": "Zaktualizuj hasło",
+    "updating": "Aktualizowanie...",
+    "updateButton": "Zaktualizuj hasło"
   }
 }

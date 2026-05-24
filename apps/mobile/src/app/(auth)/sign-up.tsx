@@ -625,6 +625,12 @@ export default function SignUpScreen() {
             </View>
           </View>
 
+          {/* [BUG-591] Mount point for Clerk Smart CAPTCHA widget.
+           * On web, RN-Web translates nativeID -> DOM id="clerk-captcha";
+           * Clerk's signUp.create() needs this element present in the form
+           * view to attach the widget. On iOS/Android this is a no-op View. */}
+          <View nativeID="clerk-captcha" testID="clerk-captcha" />
+
           <Button
             variant="primary"
             label="Sign up"

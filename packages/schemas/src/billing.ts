@@ -72,7 +72,15 @@ export const usageSchema = z
     usedThisMonth: z.number().int(),
     remainingQuestions: z.number().int(),
     topUpCreditsRemaining: z.number().int(),
-    warningLevel: z.enum(['none', 'soft', 'hard', 'exceeded']),
+    // [BUG-640] 'top-up-available': monthly quota exhausted but top-up credits remain.
+    // UI must distinguish from 'exceeded' (truly blocked) to show correct CTA.
+    warningLevel: z.enum([
+      'none',
+      'soft',
+      'hard',
+      'exceeded',
+      'top-up-available',
+    ]),
     cycleResetAt: isoDateField,
     dailyLimit: z.number().int().nullable(),
     usedToday: z.number().int(),

@@ -1,6 +1,17 @@
 import { z } from 'zod';
 import type { GuessWhoLlmOutput, GuessWhoQuestion } from '@eduagent/schemas';
 import { describeAgeBracket, type AgeBracket, type Interest } from './config';
+import { sanitizeXmlValue } from '../llm/sanitize';
+
+// [L15.MED3 prompt-injection] Sanitize free-text interest labels before
+// prompt interpolation. Interests can originate from LLM extraction
+// (topic-probe / session analysis) or onboarding free text; a crafted label
+// like '<system>ignore previous</system>' would otherwise smuggle directives.
+function safeInterestLabels(values: Interest[]): string[] {
+  return values
+    .map((i) => sanitizeXmlValue(i.label, 60))
+    .filter((label) => label.length > 0);
+}
 
 export interface GuessWhoPromptParams {
   discoveryCount: number;
@@ -60,7 +71,7 @@ function dedupeCaseInsensitive(values: string[]): string[] {
 // when the LLM omits it from acceptedAliases. [BUG-541]
 export function appendSurnameAlias(
   canonicalName: string,
-  aliases: string[]
+  aliases: string[],
 ): string[] {
   const result = [...aliases];
   const nameParts = canonicalName.trim().split(/\s+/);
@@ -83,7 +94,7 @@ function normalizeForNameScan(value: string): string {
 
 export function clueMentionsGuessWhoName(
   clue: string,
-  names: string[]
+  names: string[],
 ): boolean {
   const normalizedClue = normalizeForNameScan(clue);
   if (!normalizedClue) return false;
@@ -97,11 +108,11 @@ export function clueMentionsGuessWhoName(
 
 function ensureCanonicalInFallbackOptions(
   canonicalName: string,
-  mcFallbackOptions: string[]
+  mcFallbackOptions: string[],
 ): string[] {
   const canonicalLower = canonicalName.trim().toLowerCase();
   const distractors = dedupeCaseInsensitive(mcFallbackOptions).filter(
-    (option) => option.toLowerCase() !== canonicalLower
+    (option) => option.toLowerCase() !== canonicalLower,
   );
 
   if (distractors.length < 3) return [];
@@ -143,21 +154,23 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
           .slice(0, 30)
           .join('; ')}. At least ${Math.min(
           2,
-          discoveryCount
+          discoveryCount,
         )} of the ${discoveryCount} people MUST relate clearly to one or more of those topics.`
       : 'No topic hints are available. Choose an age-appropriate mix of widely recognizable people.';
 
   let themeInstruction: string;
   if (themePreference) {
-    themeInstruction = `Theme: "${themePreference}"`;
+    // [L15.MED3] themePreference is user-typed; sanitize before interpolation.
+    themeInstruction = `Theme: "${sanitizeXmlValue(themePreference, 120)}"`;
   } else if (interests.length > 0) {
-    const interestLabels = interests
-      .filter((i) => i.context === 'free_time' || i.context === 'both')
-      .map((i) => i.label);
+    const filtered = interests.filter(
+      (i) => i.context === 'free_time' || i.context === 'both',
+    );
+    const interestLabels = safeInterestLabels(filtered);
     const allLabels =
       interestLabels.length > 0
         ? interestLabels
-        : interests.map((i) => i.label);
+        : safeInterestLabels(interests);
     themeInstruction = `Choose a theme of famous people connected to the learner's interests: ${allLabels
       .slice(0, 5)
       .join(', ')}.`;
@@ -171,7 +184,7 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
       ? `\nRecent weaker areas for this learner: ${recentStruggles
           .slice(0, 10)
           .join(
-            '; '
+            '; ',
           )}. Where a naturally fitting figure exists, prefer people who help revisit these topics — but do not force a weak connection if none exists.`
       : '';
 
@@ -180,7 +193,7 @@ export function buildGuessWhoPrompt(params: GuessWhoPromptParams): string {
       ? `\nRecently missed people (re-surface where the theme fits): ${recentlyMissedItems
           .slice(0, 8)
           .join(
-            ', '
+            ', ',
           )}. Include at least one of these as a question when the chosen theme naturally accommodates them.`
       : '';
 
@@ -221,7 +234,7 @@ Respond with ONLY valid JSON in this shape:
 }
 
 export function validateGuessWhoRound(
-  llmOutput: GuessWhoLlmOutput
+  llmOutput: GuessWhoLlmOutput,
 ): ValidatedGuessWhoRound {
   const questions = llmOutput.questions.flatMap((question) => {
     const canonicalName = question.canonicalName.trim();
@@ -232,7 +245,7 @@ export function validateGuessWhoRound(
       acceptedAliasesRaw.length > 0 ? [...acceptedAliasesRaw] : [canonicalName];
     const acceptedAliases = appendSurnameAlias(
       canonicalName,
-      acceptedAliasesBase
+      acceptedAliasesBase,
     );
     const clues = question.clues.map((clue) => clue.trim());
     const funFact = question.funFact.trim();
@@ -246,7 +259,7 @@ export function validateGuessWhoRound(
 
     const mcFallbackOptions = ensureCanonicalInFallbackOptions(
       canonicalName,
-      question.mcFallbackOptions
+      question.mcFallbackOptions,
     );
     if (mcFallbackOptions.length !== 4) return [];
 
@@ -294,7 +307,7 @@ export const guessWhoMasteryClueSchema = z.object({
 
 export function buildGuessWhoMasteryCluePrompt(
   canonicalName: string,
-  ageBracket: AgeBracket
+  ageBracket: AgeBracket,
 ): string {
   const ageLabel = describeAgeBracket(ageBracket);
   return `Generate 5 progressive clues for a Guess Who quiz about "${canonicalName}" for a ${ageLabel} learner.

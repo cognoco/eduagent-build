@@ -1,0 +1,546 @@
+diff --git a/apps/mobile/src/components/account-security.tsx b/apps/mobile/src/components/account-security.tsx
+index 2cfe0890e..a8c41d2b0 100644
+--- a/apps/mobile/src/components/account-security.tsx
++++ b/apps/mobile/src/components/account-security.tsx
+@@ -1,5 +1,6 @@
+-import { useState } from 'react';
++﻿import { useState } from 'react';
+ import { View, Text, Pressable } from 'react-native';
++import { useTranslation } from 'react-i18next';
+ import { useUser } from '@clerk/clerk-expo';
+ import { ChangePassword } from './change-password';
+ 
+@@ -23,6 +24,7 @@ export function AccountSecurity({
+   visible?: boolean;
+ }): React.JSX.Element | null {
+   const { user } = useUser();
++  const { t } = useTranslation();
+ 
+   const [showPasswordForm, setShowPasswordForm] = useState(false);
+ 
+@@ -36,7 +38,7 @@ export function AccountSecurity({
+     return (
+       <View className="bg-surface rounded-card px-4 py-3.5 mb-2">
+         <Text className="text-body text-text-secondary">
+-          Secured via {providerLabel}
++          {t('accountSecurity.securedVia', { provider: providerLabel })}
+         </Text>
+       </View>
+     );
+@@ -49,11 +51,13 @@ export function AccountSecurity({
+       <Pressable
+         onPress={() => setShowPasswordForm((v) => !v)}
+         className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
+-        accessibilityLabel="Change Password"
++        accessibilityLabel={t('accountSecurity.changePasswordLabel')}
+         accessibilityRole="button"
+         testID="change-password-row"
+       >
+-        <Text className="text-body text-text-primary">Change Password</Text>
++        <Text className="text-body text-text-primary">
++          {t('accountSecurity.changePasswordLabel')}
++        </Text>
+         <Text className="text-body text-text-secondary">
+           {showPasswordForm ? '−' : '>'}
+         </Text>
+@@ -66,4 +70,4 @@ export function AccountSecurity({
+       )}
+     </>
+   );
+-}
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/components/change-password.tsx b/apps/mobile/src/components/change-password.tsx
+index 7018489cc..5a2171333 100644
+--- a/apps/mobile/src/components/change-password.tsx
++++ b/apps/mobile/src/components/change-password.tsx
+@@ -1,5 +1,6 @@
+-import { useState, useCallback } from 'react';
++﻿import { useState, useCallback } from 'react';
+ import { View, Text, Pressable } from 'react-native';
++import { useTranslation } from 'react-i18next';
+ import { platformAlert } from '../lib/platform-alert';
+ import { useUser, useAuth } from '@clerk/clerk-expo';
+ import { useRouter, type Href } from 'expo-router';
+@@ -15,6 +16,7 @@ export function ChangePassword(): React.JSX.Element {
+   const router = useRouter();
+   const queryClient = useQueryClient();
+   const { profiles } = useProfile();
++  const { t } = useTranslation();
+ 
+   const [currentPassword, setCurrentPassword] = useState('');
+   const [newPassword, setNewPassword] = useState('');
+@@ -34,17 +36,17 @@ export function ChangePassword(): React.JSX.Element {
+     // feedback. Match the server's minimum (Clerk enforces ≥8 characters);
+     // we don't accept anything shorter than the server contract.
+     if (currentPassword.length < 8) {
+-      setError('Enter your current password');
++      setError(t('changePassword.errorCurrentRequired'));
+       return;
+     }
+ 
+     if (newPassword.length < 8) {
+-      setError('Password must be at least 8 characters');
++      setError(t('changePassword.errorTooShort'));
+       return;
+     }
+ 
+     if (newPassword !== confirmPassword) {
+-      setError('Passwords do not match');
++      setError(t('changePassword.errorMismatch'));
+       return;
+     }
+ 
+@@ -63,7 +65,7 @@ export function ChangePassword(): React.JSX.Element {
+     } finally {
+       setIsSubmitting(false);
+     }
+-  }, [user, currentPassword, newPassword, confirmPassword]);
++  }, [user, currentPassword, newPassword, confirmPassword, t]);
+ 
+   const handleForgotPassword = useCallback(async () => {
+     setIsSigningOut(true);
+@@ -74,20 +76,23 @@ export function ChangePassword(): React.JSX.Element {
+         profileIds: profiles.map((p) => p.id),
+       });
+     } catch {
+-      platformAlert('Could not sign out', 'Please try again.');
++      platformAlert(
++        t('changePassword.signOutErrorTitle'),
++        t('changePassword.signOutErrorMessage'),
++      );
+       return;
+     } finally {
+       setIsSigningOut(false);
+     }
+     router.replace('/(auth)/sign-in' as Href);
+-  }, [signOut, router, queryClient, profiles]);
++  }, [signOut, router, queryClient, profiles, t]);
+ 
+   return (
+     <View className="mt-3">
+       <PasswordInput
+         value={currentPassword}
+         onChangeText={setCurrentPassword}
+-        placeholder="Current password"
++        placeholder={t('changePassword.currentPlaceholder')}
+         testID="current-password"
+       />
+ 
+@@ -97,14 +102,16 @@ export function ChangePassword(): React.JSX.Element {
+         className="mt-1 mb-3"
+       >
+         <Text className="text-xs text-primary">
+-          {isSigningOut ? 'Signing out...' : 'Forgot your password?'}
++          {isSigningOut
++            ? t('changePassword.signingOut')
++            : t('changePassword.forgotPassword')}
+         </Text>
+       </Pressable>
+ 
+       <PasswordInput
+         value={newPassword}
+         onChangeText={setNewPassword}
+-        placeholder="New password"
++        placeholder={t('changePassword.newPlaceholder')}
+         testID="new-password"
+         showRequirements
+       />
+@@ -113,7 +120,7 @@ export function ChangePassword(): React.JSX.Element {
+         <PasswordInput
+           value={confirmPassword}
+           onChangeText={setConfirmPassword}
+-          placeholder="Confirm new password"
++          placeholder={t('changePassword.confirmPlaceholder')}
+           testID="confirm-password"
+         />
+       </View>
+@@ -125,21 +132,25 @@ export function ChangePassword(): React.JSX.Element {
+       )}
+ 
+       {success && (
+-        <Text className="text-xs text-success mt-2">Password updated</Text>
++        <Text className="text-xs text-success mt-2">
++          {t('changePassword.successMessage')}
++        </Text>
+       )}
+ 
+       <Pressable
+         onPress={handleSubmit}
+         disabled={isSubmitting}
+         className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
+-        accessibilityLabel="Update password"
++        accessibilityLabel={t('changePassword.updateLabel')}
+         accessibilityRole="button"
+         testID="update-password-button"
+       >
+         <Text className="text-body font-semibold text-text-inverse">
+-          {isSubmitting ? 'Updating...' : 'Update Password'}
++          {isSubmitting
++            ? t('changePassword.updating')
++            : t('changePassword.updateButton')}
+         </Text>
+       </Pressable>
+     </View>
+   );
+-}
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/components/common/PasswordInput.tsx b/apps/mobile/src/components/common/PasswordInput.tsx
+index 603523f36..dd85a41ae 100644
+--- a/apps/mobile/src/components/common/PasswordInput.tsx
++++ b/apps/mobile/src/components/common/PasswordInput.tsx
+@@ -1,5 +1,6 @@
+-import { useState } from 'react';
++﻿import { useState } from 'react';
+ import { View, Text, TextInput, Pressable } from 'react-native';
++import { useTranslation } from 'react-i18next';
+ import { useThemeColors } from '../../lib/theme';
+ 
+ interface PasswordInputProps {
+@@ -19,7 +20,7 @@ interface PasswordInputProps {
+ export function PasswordInput({
+   value,
+   onChangeText,
+-  placeholder = 'Enter password',
++  placeholder,
+   editable = true,
+   testID,
+   showRequirements = false,
+@@ -27,7 +28,9 @@ export function PasswordInput({
+   onFocus,
+ }: PasswordInputProps) {
+   const colors = useThemeColors();
++  const { t } = useTranslation();
+   const [visible, setVisible] = useState(false);
++  const resolvedPlaceholder = placeholder ?? t('passwordInput.defaultPlaceholder');
+ 
+   const meetsLength = value.length >= 8;
+ 
+@@ -37,7 +40,7 @@ export function PasswordInput({
+         <TextInput
+           className="flex-1 text-text-primary text-body px-4 py-3"
+           secureTextEntry={!visible}
+-          placeholder={placeholder}
++          placeholder={resolvedPlaceholder}
+           placeholderTextColor={colors.muted}
+           value={value}
+           onChangeText={onChangeText}
+@@ -51,17 +54,21 @@ export function PasswordInput({
+           onSubmitEditing={onSubmitEditing}
+           testID={testID}
+           onFocus={onFocus}
+-          accessibilityLabel={placeholder}
++          accessibilityLabel={resolvedPlaceholder}
+         />
+         <Pressable
+           onPress={() => setVisible((v) => !v)}
+           className="px-3 min-h-[44px] justify-center"
+-          accessibilityLabel={visible ? 'Hide password' : 'Show password'}
++          accessibilityLabel={
++            visible
++              ? t('passwordInput.hideLabel')
++              : t('passwordInput.showLabel')
++          }
+           accessibilityRole="button"
+           testID={testID ? `${testID}-toggle` : 'password-toggle'}
+         >
+           <Text className="text-body-sm font-semibold text-primary">
+-            {visible ? 'Hide' : 'Show'}
++            {visible ? t('passwordInput.hideText') : t('passwordInput.showText')}
+           </Text>
+         </Pressable>
+       </View>
+@@ -72,9 +79,9 @@ export function PasswordInput({
+           }`}
+           testID={testID ? `${testID}-hint` : 'password-hint'}
+         >
+-          At least 8 characters
++          {t('passwordInput.requirementsHint')}
+         </Text>
+       )}
+     </View>
+   );
+-}
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/i18n/locales/de.json b/apps/mobile/src/i18n/locales/de.json
+index 1f1fc8aeb..37b11ac22 100644
+--- a/apps/mobile/src/i18n/locales/de.json
++++ b/apps/mobile/src/i18n/locales/de.json
+@@ -2631,4 +2631,33 @@
+     "buttonLabel": "Add to my learning",
+     "privacyNote": "Private to your learning"
+   }
+-}
++,
++  "passwordInput": {
++    "defaultPlaceholder": "Passwort eingeben",
++    "hideLabel": "Passwort verbergen",
++    "showLabel": "Passwort anzeigen",
++    "hideText": "Verbergen",
++    "showText": "Anzeigen",
++    "requirementsHint": "Mindestens 8 Zeichen"
++  },
++  "accountSecurity": {
++    "securedVia": "Gesichert über {{provider}}",
++    "changePasswordLabel": "Passwort ändern"
++  },
++  "changePassword": {
++    "errorCurrentRequired": "Aktuelles Passwort eingeben",
++    "errorTooShort": "Passwort muss mindestens 8 Zeichen haben",
++    "errorMismatch": "Passwörter stimmen nicht überein",
++    "currentPlaceholder": "Aktuelles Passwort",
++    "signingOut": "Abmelden...",
++    "forgotPassword": "Passwort vergessen?",
++    "newPlaceholder": "Neues Passwort",
++    "confirmPlaceholder": "Neues Passwort bestätigen",
++    "successMessage": "Passwort aktualisiert",
++    "signOutErrorTitle": "Abmelden nicht möglich",
++    "signOutErrorMessage": "Bitte versuche es erneut.",
++    "updateLabel": "Passwort aktualisieren",
++    "updating": "Aktualisieren...",
++    "updateButton": "Passwort aktualisieren"
++  }
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/i18n/locales/en.json b/apps/mobile/src/i18n/locales/en.json
+index 6a640b59b..feaa2668c 100644
+--- a/apps/mobile/src/i18n/locales/en.json
++++ b/apps/mobile/src/i18n/locales/en.json
+@@ -2631,4 +2631,33 @@
+       "modalTitle": "New nudges"
+     }
+   }
+-}
++,
++  "passwordInput": {
++    "defaultPlaceholder": "Enter password",
++    "hideLabel": "Hide password",
++    "showLabel": "Show password",
++    "hideText": "Hide",
++    "showText": "Show",
++    "requirementsHint": "At least 8 characters"
++  },
++  "accountSecurity": {
++    "securedVia": "Secured via {{provider}}",
++    "changePasswordLabel": "Change Password"
++  },
++  "changePassword": {
++    "errorCurrentRequired": "Enter your current password",
++    "errorTooShort": "Password must be at least 8 characters",
++    "errorMismatch": "Passwords do not match",
++    "currentPlaceholder": "Current password",
++    "signingOut": "Signing out...",
++    "forgotPassword": "Forgot your password?",
++    "newPlaceholder": "New password",
++    "confirmPlaceholder": "Confirm new password",
++    "successMessage": "Password updated",
++    "signOutErrorTitle": "Could not sign out",
++    "signOutErrorMessage": "Please try again.",
++    "updateLabel": "Update password",
++    "updating": "Updating...",
++    "updateButton": "Update Password"
++  }
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/i18n/locales/es.json b/apps/mobile/src/i18n/locales/es.json
+index d21d33709..df491002b 100644
+--- a/apps/mobile/src/i18n/locales/es.json
++++ b/apps/mobile/src/i18n/locales/es.json
+@@ -2631,4 +2631,33 @@
+     "buttonLabel": "Add to my learning",
+     "privacyNote": "Private to your learning"
+   }
+-}
++,
++  "passwordInput": {
++    "defaultPlaceholder": "Introducir contraseña",
++    "hideLabel": "Ocultar contraseña",
++    "showLabel": "Mostrar contraseña",
++    "hideText": "Ocultar",
++    "showText": "Mostrar",
++    "requirementsHint": "Al menos 8 caracteres"
++  },
++  "accountSecurity": {
++    "securedVia": "Protegido mediante {{provider}}",
++    "changePasswordLabel": "Cambiar contraseña"
++  },
++  "changePassword": {
++    "errorCurrentRequired": "Introduce tu contraseña actual",
++    "errorTooShort": "La contraseña debe tener al menos 8 caracteres",
++    "errorMismatch": "Las contraseñas no coinciden",
++    "currentPlaceholder": "Contraseña actual",
++    "signingOut": "Cerrando sesión...",
++    "forgotPassword": "¿Olvidaste tu contraseña?",
++    "newPlaceholder": "Nueva contraseña",
++    "confirmPlaceholder": "Confirmar nueva contraseña",
++    "successMessage": "Contraseña actualizada",
++    "signOutErrorTitle": "No se pudo cerrar sesión",
++    "signOutErrorMessage": "Por favor, inténtalo de nuevo.",
++    "updateLabel": "Actualizar contraseña",
++    "updating": "Actualizando...",
++    "updateButton": "Actualizar contraseña"
++  }
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/i18n/locales/ja.json b/apps/mobile/src/i18n/locales/ja.json
+index 45fd1a1fc..71037abec 100644
+--- a/apps/mobile/src/i18n/locales/ja.json
++++ b/apps/mobile/src/i18n/locales/ja.json
+@@ -2631,4 +2631,33 @@
+     "buttonLabel": "Add to my learning",
+     "privacyNote": "Private to your learning"
+   }
+-}
++,
++  "passwordInput": {
++    "defaultPlaceholder": "パスワードを入力",
++    "hideLabel": "パスワードを隠す",
++    "showLabel": "パスワードを表示",
++    "hideText": "隠す",
++    "showText": "表示",
++    "requirementsHint": "8文字以上"
++  },
++  "accountSecurity": {
++    "securedVia": "{{provider}}で保護されています",
++    "changePasswordLabel": "パスワードを変更"
++  },
++  "changePassword": {
++    "errorCurrentRequired": "現在のパスワードを入力してください",
++    "errorTooShort": "パスワードは8文字以上にしてください",
++    "errorMismatch": "パスワードが一致しません",
++    "currentPlaceholder": "現在のパスワード",
++    "signingOut": "サインアウト中...",
++    "forgotPassword": "パスワードをお忘れですか?",
++    "newPlaceholder": "新しいパスワード",
++    "confirmPlaceholder": "新しいパスワードを確認",
++    "successMessage": "パスワードを更新しました",
++    "signOutErrorTitle": "サインアウトできませんでした",
++    "signOutErrorMessage": "もう一度お試しください。",
++    "updateLabel": "パスワードを更新",
++    "updating": "更新中...",
++    "updateButton": "パスワードを更新"
++  }
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/i18n/locales/nb.json b/apps/mobile/src/i18n/locales/nb.json
+index 868c10d81..f5ca0c5de 100644
+--- a/apps/mobile/src/i18n/locales/nb.json
++++ b/apps/mobile/src/i18n/locales/nb.json
+@@ -2631,4 +2631,33 @@
+     "buttonLabel": "Legg til i min læring",
+     "privacyNote": "Privat for din læring"
+   }
+-}
++,
++  "passwordInput": {
++    "defaultPlaceholder": "Skriv inn passord",
++    "hideLabel": "Skjul passord",
++    "showLabel": "Vis passord",
++    "hideText": "Skjul",
++    "showText": "Vis",
++    "requirementsHint": "Minst 8 tegn"
++  },
++  "accountSecurity": {
++    "securedVia": "Sikret via {{provider}}",
++    "changePasswordLabel": "Endre passord"
++  },
++  "changePassword": {
++    "errorCurrentRequired": "Skriv inn ditt nåværende passord",
++    "errorTooShort": "Passordet må ha minst 8 tegn",
++    "errorMismatch": "Passordene stemmer ikke overens",
++    "currentPlaceholder": "Nåværende passord",
++    "signingOut": "Logger av...",
++    "forgotPassword": "Glemt passordet ditt?",
++    "newPlaceholder": "Nytt passord",
++    "confirmPlaceholder": "Bekreft nytt passord",
++    "successMessage": "Passord oppdatert",
++    "signOutErrorTitle": "Kunne ikke logge av",
++    "signOutErrorMessage": "Prøv igjen.",
++    "updateLabel": "Oppdater passord",
++    "updating": "Oppdaterer...",
++    "updateButton": "Oppdater passord"
++  }
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/i18n/locales/pl.json b/apps/mobile/src/i18n/locales/pl.json
+index 6de29a7e0..38522e735 100644
+--- a/apps/mobile/src/i18n/locales/pl.json
++++ b/apps/mobile/src/i18n/locales/pl.json
+@@ -2631,4 +2631,33 @@
+     "buttonLabel": "Add to my learning",
+     "privacyNote": "Private to your learning"
+   }
+-}
++,
++  "passwordInput": {
++    "defaultPlaceholder": "Wpisz hasło",
++    "hideLabel": "Ukryj hasło",
++    "showLabel": "Pokaż hasło",
++    "hideText": "Ukryj",
++    "showText": "Pokaż",
++    "requirementsHint": "Co najmniej 8 znaków"
++  },
++  "accountSecurity": {
++    "securedVia": "Zabezpieczono przez {{provider}}",
++    "changePasswordLabel": "Zmień hasło"
++  },
++  "changePassword": {
++    "errorCurrentRequired": "Wprowadź aktualne hasło",
++    "errorTooShort": "Hasło musi mieć co najmniej 8 znaków",
++    "errorMismatch": "Hasła nie są zgodne",
++    "currentPlaceholder": "Aktualne hasło",
++    "signingOut": "Wylogowywanie...",
++    "forgotPassword": "Zapomniałeś hasła?",
++    "newPlaceholder": "Nowe hasło",
++    "confirmPlaceholder": "Potwierdź nowe hasło",
++    "successMessage": "Hasło zaktualizowane",
++    "signOutErrorTitle": "Nie można się wylogować",
++    "signOutErrorMessage": "Spróbuj ponownie.",
++    "updateLabel": "Zaktualizuj hasło",
++    "updating": "Aktualizowanie...",
++    "updateButton": "Zaktualizuj hasło"
++  }
++}
+\ No newline at end of file
+diff --git a/apps/mobile/src/i18n/locales/pt.json b/apps/mobile/src/i18n/locales/pt.json
+index eb77acde2..860d1fb78 100644
+--- a/apps/mobile/src/i18n/locales/pt.json
++++ b/apps/mobile/src/i18n/locales/pt.json
+@@ -2631,4 +2631,33 @@
+     "buttonLabel": "Add to my learning",
+     "privacyNote": "Private to your learning"
+   }
+-}
++,
++  "passwordInput": {
++    "defaultPlaceholder": "Inserir senha",
++    "hideLabel": "Ocultar senha",
++    "showLabel": "Mostrar senha",
++    "hideText": "Ocultar",
++    "showText": "Mostrar",
++    "requirementsHint": "Pelo menos 8 caracteres"
++  },
++  "accountSecurity": {
++    "securedVia": "Protegido via {{provider}}",
++    "changePasswordLabel": "Alterar senha"
++  },
++  "changePassword": {
++    "errorCurrentRequired": "Insira sua senha atual",
++    "errorTooShort": "A senha deve ter pelo menos 8 caracteres",
++    "errorMismatch": "As senhas não coincidem",
++    "currentPlaceholder": "Senha atual",
++    "signingOut": "Saindo...",
++    "forgotPassword": "Esqueceu sua senha?",
++    "newPlaceholder": "Nova senha",
++    "confirmPlaceholder": "Confirmar nova senha",
++    "successMessage": "Senha atualizada",
++    "signOutErrorTitle": "Não foi possível sair",
++    "signOutErrorMessage": "Por favor, tente novamente.",
++    "updateLabel": "Atualizar senha",
++    "updating": "Atualizando...",
++    "updateButton": "Atualizar senha"
++  }
++}
+\ No newline at end of file

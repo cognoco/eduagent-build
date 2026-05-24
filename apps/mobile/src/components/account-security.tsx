@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useUser } from '@clerk/clerk-expo';
 import { ChangePassword } from './change-password';
 
@@ -23,6 +24,7 @@ export function AccountSecurity({
   visible?: boolean;
 }): React.JSX.Element | null {
   const { user } = useUser();
+  const { t } = useTranslation();
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
@@ -36,7 +38,7 @@ export function AccountSecurity({
     return (
       <View className="bg-surface rounded-card px-4 py-3.5 mb-2">
         <Text className="text-body text-text-secondary">
-          Secured via {providerLabel}
+          {t('accountSecurity.securedVia', { provider: providerLabel })}
         </Text>
       </View>
     );
@@ -49,11 +51,13 @@ export function AccountSecurity({
       <Pressable
         onPress={() => setShowPasswordForm((v) => !v)}
         className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
-        accessibilityLabel="Change Password"
+        accessibilityLabel={t('accountSecurity.changePasswordLabel')}
         accessibilityRole="button"
         testID="change-password-row"
       >
-        <Text className="text-body text-text-primary">Change Password</Text>
+        <Text className="text-body text-text-primary">
+          {t('accountSecurity.changePasswordLabel')}
+        </Text>
         <Text className="text-body text-text-secondary">
           {showPasswordForm ? '−' : '>'}
         </Text>

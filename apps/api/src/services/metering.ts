@@ -14,7 +14,8 @@ export interface MeteringState {
 export interface MeteringResult {
   allowed: boolean;
   remaining: number;
-  warningLevel: 'none' | 'soft' | 'hard' | 'exceeded';
+  // [BUG-640] 'top-up-available': monthly exhausted but top-up credits remain
+  warningLevel: 'none' | 'soft' | 'hard' | 'exceeded' | 'top-up-available';
   dailyRemaining: number | null;
   dailyWarningLevel: 'none' | 'soft' | 'hard' | 'exceeded' | null;
 }
@@ -33,7 +34,7 @@ export interface MeteringResult {
  */
 export function getWarningLevel(
   used: number,
-  limit: number
+  limit: number,
 ): 'none' | 'soft' | 'hard' | 'exceeded' {
   if (limit <= 0) {
     return 'exceeded';
@@ -44,7 +45,25 @@ export function getWarningLevel(
   if (ratio >= 1) return 'exceeded';
   if (ratio >= 0.95) return 'hard';
   if (ratio >= 0.8) return 'soft';
+
   return 'none';
+}
+
+/**
+ * [BUG-640] Resolves effective warningLevel, accounting for top-up credits.
+ * Returns 'top-up-available' when monthly is exhausted but credits remain;
+ * 'exceeded' only when truly blocked (no monthly quota and no top-ups left).
+ */
+export function resolveWarningLevel(
+  used: number,
+  limit: number,
+  topUpCreditsRemaining: number,
+): 'none' | 'soft' | 'hard' | 'exceeded' | 'top-up-available' {
+  const base = getWarningLevel(used, limit);
+  if (base === 'exceeded' && topUpCreditsRemaining > 0) {
+    return 'top-up-available';
+  }
+  return base;
 }
 
 /**
@@ -54,7 +73,7 @@ export function getWarningLevel(
 export function calculateRemainingQuestions(state: MeteringState): number {
   const monthlyRemaining = Math.max(
     0,
-    state.monthlyLimit - state.usedThisMonth
+    state.monthlyLimit - state.usedThisMonth,
   );
   return monthlyRemaining + state.topUpCreditsRemaining;
 }
@@ -83,7 +102,13 @@ export function checkQuota(state: MeteringState): MeteringResult {
   // [1C.1] warningLevel reflects monthly plan consumption, not top-up credits.
   // When monthly quota is exhausted but top-ups remain, warningLevel = 'exceeded'
   // (the user is drawing from top-ups, which the UI should highlight).
-  const warningLevel = getWarningLevel(state.usedThisMonth, state.monthlyLimit);
+  // [BUG-640] Use resolveWarningLevel to emit 'top-up-available' when
+  // monthly is exhausted but top-up credits remain.
+  const warningLevel = resolveWarningLevel(
+    state.usedThisMonth,
+    state.monthlyLimit,
+    state.topUpCreditsRemaining,
+  );
   const dailyRemaining = calculateRemainingDaily(state);
   const dailyWarningLevel =
     state.dailyLimit !== null
@@ -111,7 +136,7 @@ export function checkQuota(state: MeteringState): MeteringResult {
  */
 export function calculateMidCycleUpgrade(
   usedInCurrentCycle: number,
-  newTierQuota: number
+  newTierQuota: number,
 ): number {
   return Math.max(0, newTierQuota - usedInCurrentCycle);
 }
@@ -125,7 +150,7 @@ export function calculateMidCycleUpgrade(
  */
 export function calculateMidCycleDowngrade(
   usedInCurrentCycle: number,
-  newTierQuota: number
+  newTierQuota: number,
 ): number {
   if (usedInCurrentCycle > newTierQuota) {
     return 0;

@@ -2,6 +2,7 @@ import { inngest } from './client';
 import { consentReminder } from './functions/consent-reminders';
 import { consentRevocation } from './functions/consent-revocation';
 import { archiveCleanup } from './functions/archive-cleanup';
+import { webhookIdempotencyPurge } from './functions/webhook-idempotency-purge';
 import { scheduledDeletion } from './functions/account-deletion';
 import { sessionCompleted } from './functions/session-completed';
 import { sessionStaleCleanup } from './functions/session-stale-cleanup';
@@ -111,6 +112,7 @@ export {
   consentReminder,
   consentRevocation,
   archiveCleanup,
+  webhookIdempotencyPurge,
   scheduledDeletion,
   sessionCompleted,
   sessionStaleCleanup,
@@ -188,6 +190,7 @@ export const functions = [
   consentReminder,
   consentRevocation,
   archiveCleanup,
+  webhookIdempotencyPurge,
   scheduledDeletion,
   sessionCompleted,
   sessionStaleCleanup,

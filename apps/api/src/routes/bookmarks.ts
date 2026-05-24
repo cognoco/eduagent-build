@@ -3,8 +3,8 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
-  bookmarkSchema,
   createBookmarkSchema,
+  createBookmarkResponseSchema,
   bookmarkListQuerySchema,
   bookmarkListResponseSchema,
   sessionBookmarkListResponseSchema,
@@ -37,14 +37,6 @@ const bookmarkIdParamSchema = z.object({
 
 const sessionBookmarksQuerySchema = z.object({
   sessionId: z.string().uuid(),
-});
-
-// [L8-F10] Local response wrapper for POST /bookmarks. Mirrors the
-// { bookmarks: [...] } shape used by the GET handlers (which parse via
-// sessionBookmarkListResponseSchema / bookmarkListResponseSchema). Kept
-// local since no shared schema package export exists for the singular case.
-const createBookmarkResponseSchema = z.object({
-  bookmark: bookmarkSchema,
 });
 
 export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()

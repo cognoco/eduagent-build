@@ -204,26 +204,27 @@ export async function storeMilestones(
   profileId: string,
   detected: DetectedMilestone[],
 ): Promise<MilestoneRecord[]> {
-  const inserted: MilestoneRecord[] = [];
+  if (detected.length === 0) {
+    return [];
+  }
 
-  for (const milestone of detected) {
-    const rows = await db
-      .insert(milestones)
-      .values({
+  // [CR-2026-05-21-067] Bulk insert: one round-trip for the full batch instead
+  // of N. onConflictDoNothing() still applies per-row so existing milestones
+  // are silently skipped and only newly-inserted rows come back via RETURNING.
+  const rows = await db
+    .insert(milestones)
+    .values(
+      detected.map((milestone) => ({
         profileId,
         milestoneType: milestone.milestoneType,
         threshold: milestone.threshold,
         subjectId: milestone.subjectId ?? null,
         bookId: milestone.bookId ?? null,
         metadata: milestone.metadata ?? null,
-      })
-      .onConflictDoNothing()
-      .returning();
+      })),
+    )
+    .onConflictDoNothing()
+    .returning();
 
-    if (rows[0]) {
-      inserted.push(mapMilestoneRow(rows[0]));
-    }
-  }
-
-  return inserted;
+  return rows.map(mapMilestoneRow);
 }

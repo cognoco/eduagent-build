@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 interface PasswordInputProps {
@@ -19,7 +20,7 @@ interface PasswordInputProps {
 export function PasswordInput({
   value,
   onChangeText,
-  placeholder = 'Enter password',
+  placeholder,
   editable = true,
   testID,
   showRequirements = false,
@@ -27,7 +28,10 @@ export function PasswordInput({
   onFocus,
 }: PasswordInputProps) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
+  const resolvedPlaceholder =
+    placeholder ?? t('passwordInput.defaultPlaceholder');
 
   const meetsLength = value.length >= 8;
 
@@ -37,7 +41,7 @@ export function PasswordInput({
         <TextInput
           className="flex-1 text-text-primary text-body px-4 py-3"
           secureTextEntry={!visible}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           placeholderTextColor={colors.muted}
           value={value}
           onChangeText={onChangeText}
@@ -51,17 +55,23 @@ export function PasswordInput({
           onSubmitEditing={onSubmitEditing}
           testID={testID}
           onFocus={onFocus}
-          accessibilityLabel={placeholder}
+          accessibilityLabel={resolvedPlaceholder}
         />
         <Pressable
           onPress={() => setVisible((v) => !v)}
           className="px-3 min-h-[44px] justify-center"
-          accessibilityLabel={visible ? 'Hide password' : 'Show password'}
+          accessibilityLabel={
+            visible
+              ? t('passwordInput.hideLabel')
+              : t('passwordInput.showLabel')
+          }
           accessibilityRole="button"
           testID={testID ? `${testID}-toggle` : 'password-toggle'}
         >
           <Text className="text-body-sm font-semibold text-primary">
-            {visible ? 'Hide' : 'Show'}
+            {visible
+              ? t('passwordInput.hideText')
+              : t('passwordInput.showText')}
           </Text>
         </Pressable>
       </View>
@@ -72,7 +82,7 @@ export function PasswordInput({
           }`}
           testID={testID ? `${testID}-hint` : 'password-hint'}
         >
-          At least 8 characters
+          {t('passwordInput.requirementsHint')}
         </Text>
       )}
     </View>

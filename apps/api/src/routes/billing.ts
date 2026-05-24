@@ -41,7 +41,7 @@ import {
   getFamilyPoolStatus,
 } from '../services/billing';
 import {
-  getWarningLevel,
+  resolveWarningLevel,
   calculateRemainingQuestions,
 } from '../services/metering';
 import { getTierConfig } from '../services/subscription';
@@ -485,7 +485,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       dailyLimit,
       usedToday,
     });
-    const warningLevel = getWarningLevel(usedThisMonth, monthlyLimit);
+    // [BUG-640] Emit 'top-up-available' when monthly exhausted but credits remain
+    const warningLevel = resolveWarningLevel(
+      usedThisMonth,
+      monthlyLimit,
+      topUpCreditsRemaining,
+    );
     const activeProfileId = c.get('profileId');
     const activeProfileMeta = c.get('profileMeta');
     const cycleResetAt = quota?.cycleResetAt ?? new Date().toISOString();
@@ -529,7 +534,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const visibleRemaining = remaining;
     const visibleWarningLevel = usageBreakdown?.isOwnerBreakdownViewer
       ? warningLevel
-      : getWarningLevel(visibleUsedThisMonth, monthlyLimit);
+      : // [BUG-640] top-up credits are pool-level, apply to all viewers
+        resolveWarningLevel(
+          visibleUsedThisMonth,
+          monthlyLimit,
+          topUpCreditsRemaining,
+        );
     // Non-owner viewers must see only their own daily usage; the
     // subscription-level `usedToday` is a family aggregate that would let a
     // child infer siblings' activity. Owners and non-family accounts see raw.

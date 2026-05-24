@@ -67,6 +67,19 @@ jest.mock(
   },
 );
 
+let mockAppContextMode: string | null = 'study';
+jest.mock(
+  '../../lib/app-context' /* gc1-allow: home.test.tsx pins mode without mounting AppContextProvider which requires ProfileContext + network */,
+  () => ({
+    ...jest.requireActual('../../lib/app-context'),
+    useAppContext: () => ({
+      mode: mockAppContextMode,
+      setMode: jest.fn(),
+      familyCapable: mockAppContextMode === 'family',
+    }),
+  }),
+);
+
 const HomeScreen = require('./home').default;
 
 const originalFetch = globalThis.fetch;
@@ -203,6 +216,7 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    mockAppContextMode = 'study';
     ({ wrapper: Wrapper } = createScreenWrapper({
       activeProfile: null,
       profiles: [],
@@ -266,6 +280,72 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   });
 });
 
+describe('HomeScreen B-600: family mode timeout state routes to Progress not Library', () => {
+  let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    mockAppContextMode = 'family';
+    ({ wrapper: Wrapper } = createScreenWrapper({
+      activeProfile: null,
+      profiles: [],
+      isLoading: true,
+    }));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    mockAppContextMode = 'study';
+  });
+
+  it('shows progress button instead of library button in family mode timeout [B-600]', () => {
+    render(<HomeScreen />, { wrapper: Wrapper });
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    screen.getByTestId('home-loading-timeout');
+    // [B-600] Family mode must show progress shortcut, not adult library
+    screen.getByTestId('timeout-progress-button');
+    expect(screen.queryByTestId('timeout-library-button')).toBeNull();
+    // More options still present as secondary escape
+    screen.getByTestId('timeout-more-button');
+  });
+
+  it('navigates to progress when progress button is pressed in family mode [B-600]', () => {
+    render(<HomeScreen />, { wrapper: Wrapper });
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    fireEvent.press(screen.getByTestId('timeout-progress-button'));
+
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/progress');
+    // [B-600] Must never route family mode to adult library
+    expect(mockRouterReplace).not.toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('non-family mode still shows library button, not progress button [B-600 guard]', () => {
+    mockAppContextMode = 'study';
+    const { wrapper } = createScreenWrapper({
+      activeProfile: null,
+      profiles: [],
+      isLoading: true,
+    });
+
+    render(<HomeScreen />, { wrapper });
+
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    screen.getByTestId('timeout-library-button');
+    expect(screen.queryByTestId('timeout-progress-button')).toBeNull();
+  });
+});
 describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();

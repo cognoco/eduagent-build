@@ -64,26 +64,14 @@ jest.mock(
 // Profile (IDOR guard — profiles must include child-001)
 // ---------------------------------------------------------------------------
 
+const mockUseProfile = jest.fn();
+
 jest.mock(
   '../../../../lib/profile' /* gc1-allow: profile context requires app provider setup; this test controls the owned child profile only */,
   () => ({
-    useProfile: () => ({
-      activeProfile: {
-        id: 'parent-001',
-        displayName: 'Parent',
-        isOwner: true,
-      },
-      profiles: [
-        {
-          id: 'child-001',
-          displayName: 'Emma',
-          createdAt: '2026-01-01T00:00:00.000Z',
-        },
-      ],
-    }),
+    useProfile: (...args: unknown[]) => mockUseProfile(...args),
   }),
 );
-
 // ---------------------------------------------------------------------------
 // Dashboard hooks
 // ---------------------------------------------------------------------------
@@ -155,6 +143,63 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
+// Common components barrel (includes Reanimated animations — cannot render in JSDOM)
+// ---------------------------------------------------------------------------
+
+jest.mock(
+  '../../../../components/common' /* gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM */,
+  () => ({
+    ErrorFallback: ({
+      title,
+      message,
+      primaryAction,
+      secondaryAction,
+      testID,
+    }: {
+      title?: string;
+      message?: string;
+      primaryAction?: {
+        label: string;
+        onPress: () => void;
+        testID?: string;
+      };
+      secondaryAction?: {
+        label: string;
+        onPress: () => void;
+        testID?: string;
+      };
+      testID?: string;
+    }) => {
+      const { View, Text, Pressable } = require('react-native');
+      return (
+        <View testID={testID ?? 'error-fallback'}>
+          {title ? <Text testID="error-fallback-title">{title}</Text> : null}
+          {message ? (
+            <Text testID="error-fallback-message">{message}</Text>
+          ) : null}
+          {primaryAction ? (
+            <Pressable
+              testID={primaryAction.testID ?? 'error-fallback-primary'}
+              onPress={primaryAction.onPress}
+            >
+              <Text>{primaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+          {secondaryAction ? (
+            <Pressable
+              testID={secondaryAction.testID ?? 'error-fallback-secondary'}
+              onPress={secondaryAction.onPress}
+            >
+              <Text>{secondaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      );
+    },
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Module under test (required AFTER all mocks are set up)
 // ---------------------------------------------------------------------------
 
@@ -166,9 +211,29 @@ const { default: ChildDetailScreen } = require('./index') as {
 // Default mock values
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Default mock values
+// ---------------------------------------------------------------------------
+
 function setupDefaultMocks() {
   mockLocalSearchParams = { profileId: 'child-001' };
   mockIsSurfaced.mockReturnValue(true);
+
+  mockUseProfile.mockReturnValue({
+    activeProfile: {
+      id: 'parent-001',
+      displayName: 'Parent',
+      isOwner: true,
+    },
+    profiles: [
+      {
+        id: 'child-001',
+        displayName: 'Emma',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    isLoading: false,
+  });
 
   mockUseDashboard.mockReturnValue({
     data: undefined,
@@ -826,5 +891,98 @@ describe('ChildDetailScreen — deletionGraceDays plural key routing', () => {
     expect(banner).toHaveTextContent(
       /parentView\.index\.deletionGraceDays.*"count":5/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BUG-681: data-absent state renders ErrorFallback (not blank)
+// Trigger: isLoading=false + childDetail=null + no dashboard entry + profiles=[]
+// Fix: detailUnavailable block now renders <ErrorFallback> with retry + back actions
+// ---------------------------------------------------------------------------
+
+describe('ChildDetailScreen — data-absent state (BUG-681)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupDefaultMocks();
+
+    // Empty profiles bypasses the no-access guard (profiles.length > 0 is false)
+    // and leaves ownedProfile=undefined, so detailUnavailable=true when
+    // childDetail is also null/undefined.
+    mockUseProfile.mockReturnValue({
+      activeProfile: {
+        id: 'parent-001',
+        displayName: 'Parent',
+        isOwner: true,
+      },
+      profiles: [],
+      isLoading: false,
+    });
+
+    mockUseChildDetail.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseDashboard.mockReturnValue({
+      data: { children: [], pendingNotices: [], demoMode: false },
+      isLoading: false,
+    });
+  });
+
+  it('[BUG-681] renders ErrorFallback wrapper when childDetail is null and no known profile', () => {
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('child-profile-unavailable');
+    screen.getByTestId('child-profile-unavailable-fallback');
+    expect(screen.queryByTestId('child-detail-scroll')).toBeNull();
+  });
+
+  it('[BUG-681] ErrorFallback exposes both retry and back-to-dashboard actions', () => {
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('child-profile-retry');
+    screen.getByTestId('child-profile-back');
+  });
+
+  it('[BUG-681] retry action calls refetch on the child detail query', () => {
+    const refetch = jest.fn();
+    mockUseChildDetail.mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+      refetch,
+    });
+
+    render(<ChildDetailScreen />);
+    fireEvent.press(screen.getByTestId('child-profile-retry'));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('[BUG-681] back-to-dashboard action navigates to family home', () => {
+    render(<ChildDetailScreen />);
+    fireEvent.press(screen.getByTestId('child-profile-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('[BUG-681] renders ErrorFallback when the detail query errors with no fallback data', () => {
+    mockUseChildDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: jest.fn(),
+    });
+    mockUseDashboard.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('child-profile-unavailable');
+    screen.getByTestId('child-profile-unavailable-fallback');
+    expect(screen.queryByTestId('child-detail-scroll')).toBeNull();
   });
 });

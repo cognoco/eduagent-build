@@ -8,9 +8,10 @@ import {
   ScrollView,
   Dimensions,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useUser } from '@clerk/clerk-expo';
+import { useRouter, useLocalSearchParams, Redirect } from 'expo-router';
+import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
@@ -48,6 +49,8 @@ export default function ConsentScreen() {
   }>();
   const consentType = 'GDPR' as const;
 
+  // [ACCOUNT-19] Auth gate: bounce signed-out direct access (e.g. /consent?profileId=...) to sign-in.
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user, isLoaded: isClerkLoaded } = useUser();
   const { activeProfile } = useProfile();
   const { mutateAsync, isPending } = useRequestConsent();
@@ -192,6 +195,22 @@ export default function ConsentScreen() {
       setResending(false);
     }
   }, [profileId, consentType, parentEmail, mutateAsync, resending]);
+
+  // [ACCOUNT-19] Auth gate must precede the form UI so signed-out direct
+  // access to /consent?profileId=... cannot render the parent-email form.
+  if (!isAuthLoaded) {
+    return (
+      <View
+        testID="consent-auth-loading"
+        className="flex-1 items-center justify-center bg-background"
+      >
+        <ActivityIndicator />
+      </View>
+    );
+  }
+  if (!isSignedIn) {
+    return <Redirect href="/sign-in" />;
+  }
 
   return (
     <KeyboardAvoidingView

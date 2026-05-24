@@ -90,8 +90,12 @@ function computeRetentionStatus(
 
 function computeAggregateRetentionStatus(
   statuses: Array<'strong' | 'fading' | 'weak' | 'forgotten'>,
-): 'strong' | 'fading' | 'weak' | 'forgotten' {
-  if (statuses.length === 0) return 'strong';
+): 'strong' | 'fading' | 'weak' | 'forgotten' | 'unknown' {
+  // [L1.C1.11] Zero cards = no retention signal. Returning 'strong' here would
+  // falsely advertise that the learner has retained material they never
+  // attempted; 'unknown' makes the absence of data explicit to UI consumers
+  // (they can show a neutral placeholder rather than a green checkmark).
+  if (statuses.length === 0) return 'unknown';
   const forgottenCount = statuses.filter((s) => s === 'forgotten').length;
   const weakCount = statuses.filter((s) => s === 'weak').length;
   const fadingCount = statuses.filter((s) => s === 'fading').length;
@@ -260,7 +264,24 @@ export async function getTopicProgress(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) return null;
 
-  // Find topic
+  // [BUG-656 / L3.M3.2] Verify the topic belongs to the verified subject
+  // via the parent chain: curriculum_topics -> curricula -> subjects.
+  // Without this join a crafted topicId from another profile leaks topic
+  // title, description, and downstream progress (xpStatus, struggleStatus,
+  // summaryExcerpt). createScopedRepository cannot express multi-table
+  // joins, so we use the sanctioned direct-select parent-chain pattern
+  // (same shape as services/session/session-topic.ts).
+  const topicOwnership = await db
+    .select({ topicId: curriculumTopics.id })
+    .from(curriculumTopics)
+    .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+    .where(
+      and(eq(curriculumTopics.id, topicId), eq(curricula.subjectId, subjectId)),
+    )
+    .limit(1);
+  if (topicOwnership.length === 0) return null;
+
+  // Ownership confirmed via parent chain — safe to read full row.
   const topic = await db.query.curriculumTopics.findFirst({
     where: eq(curriculumTopics.id, topicId),
   });

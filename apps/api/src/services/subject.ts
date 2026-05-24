@@ -410,6 +410,7 @@ export async function createSubjectWithStructure(
     const milestones = generateLanguageCurriculum(subject.languageCode, 'A1');
     await regenerateLanguageCurriculum(
       db,
+      profileId,
       subject.id,
       subject.languageCode,
       'A1',
@@ -567,6 +568,7 @@ export async function configureLanguageSubject(
   await setNativeLanguage(db, profileId, subjectId, input.nativeLanguage);
   await regenerateLanguageCurriculum(
     db,
+    profileId,
     subjectId,
     subject.languageCode,
     input.startingLevel,

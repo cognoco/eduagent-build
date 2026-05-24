@@ -208,15 +208,33 @@ describe('ask classification observe handlers (BUG-836 / F-SVC-002)', () => {
       expect(mockCaptureException).toHaveBeenCalled();
     });
 
-    it('all handlers accept empty object gracefully (all fields optional)', async () => {
-      const completed = await invoke(askClassificationCompletedObserve, {});
-      expect(completed).toMatchObject({ status: 'logged' });
+    // [CR-2026-05-21-175 / BUG-580] Empty payloads must now be REJECTED
+    // by completed + skipped (which require sessionId/exchangeCount/etc.)
+    // and by failed (which requires error). Previously every field was
+    // optional so a misconfigured sender could deliver {} and the
+    // observability handler would log 'unknown' for every dimension.
+    it('completed: rejects empty object (sessionId + payload fields required)', async () => {
+      const result = await invoke(askClassificationCompletedObserve, {});
+      expect(result).toMatchObject({
+        status: 'skipped',
+        reason: 'invalid_payload',
+      });
+    });
 
-      const skipped = await invoke(askClassificationSkippedObserve, {});
-      expect(skipped).toMatchObject({ status: 'logged' });
+    it('skipped: rejects empty object (sessionId + reason required)', async () => {
+      const result = await invoke(askClassificationSkippedObserve, {});
+      expect(result).toMatchObject({
+        status: 'skipped',
+        reason: 'invalid_payload',
+      });
+    });
 
-      const failed = await invoke(askClassificationFailedObserve, {});
-      expect(failed).toMatchObject({ status: 'logged' });
+    it('failed: rejects empty object (error required so escalations are queryable)', async () => {
+      const result = await invoke(askClassificationFailedObserve, {});
+      expect(result).toMatchObject({
+        status: 'skipped',
+        reason: 'invalid_payload',
+      });
     });
   });
 });
