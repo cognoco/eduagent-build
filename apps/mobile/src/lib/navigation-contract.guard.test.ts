@@ -34,7 +34,7 @@ function normalizePath(path: string): string {
 
 function allMobileSources(): string[] {
   const out = execSync(
-    'git ls-files "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
+    'git ls-files --cached --others --exclude-standard "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
     { cwd: repoRoot(), encoding: 'utf-8' },
   );
   return out

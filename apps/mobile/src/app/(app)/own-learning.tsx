@@ -3,11 +3,11 @@ import { View } from 'react-native';
 import { Redirect } from 'expo-router';
 
 import { LearnerScreen } from '../../components/home';
+import { resolveTabShape } from '../../lib/legacy-navigation-contract';
 import { OWN_LEARNING_RETURN_TO } from '../../lib/navigation';
 import { useAppContext } from '../../lib/app-context';
 import { isFamilyCapableProfile, useProfile } from '../../lib/profile';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
-import { resolveTabShape } from './_layout';
 
 export default function OwnLearningScreen(): React.ReactElement {
   const { activeProfile, profiles } = useProfile();

@@ -175,14 +175,14 @@ jest.mock(
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
+const { resolveContractHomeTabPresentation } = require('./_layout');
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
-  resolveContractHomeTabPresentation,
   resolveHomeTabPresentation,
   resolveShellVisibleTabs,
   resolveTabShape,
-} = require('./_layout');
+} = require('../../lib/legacy-navigation-contract');
 const { resolveNavigationContract } = require('../../lib/navigation-contract');
 
 describe('mode tab helpers', () => {

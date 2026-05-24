@@ -45,10 +45,9 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
       reason:
         'V0-fallback: legacy tab shell keeps raw mode/proxy reads for MODE_NAV_V1 off.',
       expectedFindings: {
-        'proxy-state-read': 11,
+        'proxy-state-read': 7,
         'raw-hook-call': 2,
         'raw-hook-import': 2,
-        'study-family-mode-compare': 3,
       },
     },
     // V0-fallback: home still passes legacy mode and owner audience when V1 is off.
@@ -311,6 +310,16 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
         'contract primitive: app-context owns V0 mode state and the required MODE_NAV_V0/MODE_NAV_V1 short-circuits.',
       expectedFindings: { 'profile-owner-read': 2 },
     },
+    // V0-fallback: legacy compatibility boundary owns Study/Family tab branching while V0 exists.
+    {
+      file: 'apps/mobile/src/lib/legacy-navigation-contract.ts',
+      reason:
+        'V0-fallback: legacy navigation compatibility boundary owns MODE_NAV_V0 Study/Family tab branching.',
+      expectedFindings: {
+        'profile-owner-read': 2,
+        'study-family-mode-compare': 3,
+      },
+    },
     // Contract primitive: pure resolver owns all final raw owner/proxy interpretation.
     {
       file: 'apps/mobile/src/lib/navigation-contract.ts',
@@ -363,7 +372,7 @@ function normalizePath(path: string): string {
 
 function listMobileProductionSources(): string[] {
   const out = execSync(
-    'git ls-files "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
+    'git ls-files --cached --others --exclude-standard "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
     { cwd: repoRoot(), encoding: 'utf-8' },
   );
   return out
