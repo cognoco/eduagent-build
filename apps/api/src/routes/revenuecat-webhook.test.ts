@@ -30,7 +30,13 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     updateSubscriptionFromRevenuecatWebhook: jest.fn(),
     activateSubscriptionFromRevenuecat: jest.fn(),
     updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
-    transitionToExtendedTrial: jest.fn().mockResolvedValue(undefined),
+    transitionToExtendedTrialFromRevenuecatEvent: jest.fn().mockResolvedValue({
+      id: 'sub-internal-1',
+      accountId: 'acc-1',
+      tier: 'free',
+      status: 'expired',
+      webhookApplied: true,
+    }),
     purchaseTopUpCredits: jest.fn().mockResolvedValue({
       id: 'topup-1',
       subscriptionId: 'sub-internal-1',
@@ -138,7 +144,7 @@ import {
   updateSubscriptionFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
-  transitionToExtendedTrial,
+  transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
@@ -982,18 +988,22 @@ describe('EXPIRATION', () => {
       mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
     );
 
-    const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' }),
-    );
+    const payload = makeWebhookPayload('EXPIRATION', {
+      period_type: 'TRIAL',
+      event_timestamp_ms: 1710000000000,
+    });
+    const res = await makeRequest(payload);
     expect(res.status).toBe(200);
 
-    // Should call transitionToExtendedTrial with 450 monthly quota
-    expect(transitionToExtendedTrial).toHaveBeenCalledWith(
+    // Should atomically apply the trial soft landing and record the RevenueCat event
+    expect(transitionToExtendedTrialFromRevenuecatEvent).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
       450,
+      payload.event.id,
+      1710000000000,
     );
-    // Should NOT call updateQuotaPoolLimit (soft landing uses transitionToExtendedTrial)
+    // Should NOT call updateQuotaPoolLimit (soft landing uses the atomic helper)
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
@@ -1009,7 +1019,7 @@ describe('EXPIRATION', () => {
     expect(res.status).toBe(200);
 
     // Should NOT soft-land — this is a paid-period expiration
-    expect(transitionToExtendedTrial).not.toHaveBeenCalled();
+    expect(transitionToExtendedTrialFromRevenuecatEvent).not.toHaveBeenCalled();
     // Should downgrade to free tier instead
     expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
       mockDb,
@@ -1029,10 +1039,12 @@ describe('EXPIRATION', () => {
     );
     expect(res.status).toBe(200);
 
-    expect(transitionToExtendedTrial).toHaveBeenCalledWith(
+    expect(transitionToExtendedTrialFromRevenuecatEvent).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
       450,
+      expect.any(String),
+      undefined,
     );
   });
 
@@ -1041,19 +1053,22 @@ describe('EXPIRATION', () => {
       mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
     );
 
-    const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' }),
-    );
+    const payload = makeWebhookPayload('EXPIRATION', {
+      period_type: 'TRIAL',
+      event_timestamp_ms: 1710000000000,
+    });
+    const res = await makeRequest(payload);
     expect(res.status).toBe(200);
 
-    // Should call updateSubscriptionFromRevenuecatWebhook to record eventId
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+    // Should pass the event id into the same atomic write that performs the soft landing
+    expect(transitionToExtendedTrialFromRevenuecatEvent).toHaveBeenCalledWith(
       mockDb,
-      'acc-1',
-      expect.objectContaining({
-        eventId: expect.any(String),
-      }),
+      'sub-internal-1',
+      450,
+      payload.event.id,
+      1710000000000,
     );
+    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
   });
 
   it('refreshes KV cache after trial soft landing', async () => {
@@ -1066,6 +1081,30 @@ describe('EXPIRATION', () => {
     );
     expect(res.status).toBe(200);
     expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] does not refresh cache when stale trial expiration is rejected by the billing guard', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
+    );
+    (
+      transitionToExtendedTrialFromRevenuecatEvent as jest.Mock
+    ).mockResolvedValueOnce({
+      ...mockSubscriptionRow({ status: 'active', tier: 'plus' }),
+      webhookApplied: false,
+    });
+
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', {
+        period_type: 'TRIAL',
+        event_timestamp_ms: 1700000000000,
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+    expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
 });
 

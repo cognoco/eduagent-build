@@ -333,6 +333,7 @@ export const topicProbeExtract = inngest.createFunction(
             and(
               eq(learningSessions.id, payload.sessionId),
               eq(learningSessions.profileId, payload.profileId),
+              sql`COALESCE(${learningSessions.metadata} ->> 'topicProbeExtractionStatus', '') <> 'completed'`,
             ),
           );
       } catch (cleanupError) {

@@ -2,7 +2,7 @@
 // Billing — Trial expiry, soft-landing, bulk cron helpers, date-range queries
 // ---------------------------------------------------------------------------
 
-import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import {
   subscriptions,
   quotaPools,
@@ -13,7 +13,11 @@ import {
 // See feedback_drizzle_transaction_cast.md.
 import type { SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
-import { mapSubscriptionRow, type SubscriptionRow } from './types';
+import {
+  mapSubscriptionRow,
+  type AppliedSubscriptionRow,
+  type SubscriptionRow,
+} from './types';
 
 // Re-export shared type so callers of this module can use it
 export type { SubscriptionRow };
@@ -227,6 +231,72 @@ export async function transitionToExtendedTrial(
         updatedAt: new Date(),
       })
       .where(eq(quotaPools.subscriptionId, subscriptionId));
+  });
+}
+
+export async function transitionToExtendedTrialFromRevenuecatEvent(
+  db: Database,
+  subscriptionId: string,
+  extendedMonthlyQuota: number,
+  eventId: string,
+  eventTimestampMs?: number,
+): Promise<AppliedSubscriptionRow | null> {
+  const freeTierConfig = getTierConfig('free');
+  return db.transaction(async (tx) => {
+    const setValues: Partial<typeof subscriptions.$inferInsert> = {
+      status: 'expired',
+      tier: 'free',
+      lastRevenuecatEventId: eventId,
+      updatedAt: new Date(),
+    };
+    if (eventTimestampMs != null) {
+      setValues.lastRevenuecatEventTimestampMs = String(eventTimestampMs);
+    }
+
+    const whereParts = [
+      eq(subscriptions.id, subscriptionId),
+      eq(subscriptions.status, 'trial'),
+    ];
+    const eventIdPredicate = or(
+      isNull(subscriptions.lastRevenuecatEventId),
+      ne(subscriptions.lastRevenuecatEventId, eventId),
+    );
+    if (eventIdPredicate) whereParts.push(eventIdPredicate);
+    if (eventTimestampMs != null) {
+      const eventTimestampPredicate = or(
+        isNull(subscriptions.lastRevenuecatEventTimestampMs),
+        sql`(${subscriptions.lastRevenuecatEventTimestampMs})::bigint <= ${eventTimestampMs}`,
+      );
+      if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
+    }
+
+    const [updated] = await tx
+      .update(subscriptions)
+      .set(setValues)
+      .where(and(...whereParts))
+      .returning();
+
+    if (!updated) {
+      const latest = await tx.query.subscriptions.findFirst({
+        where: eq(subscriptions.id, subscriptionId),
+      });
+      return latest
+        ? { ...mapSubscriptionRow(latest), webhookApplied: false }
+        : null;
+    }
+
+    await tx
+      .update(quotaPools)
+      .set({
+        monthlyLimit: extendedMonthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: freeTierConfig.dailyLimit,
+        usedToday: 0,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.subscriptionId, subscriptionId));
+
+    return { ...mapSubscriptionRow(updated), webhookApplied: true };
   });
 }
 

@@ -17,7 +17,7 @@ import {
   updateSubscriptionFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
-  transitionToExtendedTrial,
+  transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
@@ -375,29 +375,25 @@ async function handleExpiration(
     // Trial expiration triggers the reverse trial soft landing:
     // Days 15-28: extended access at 450 questions/month (15/day)
     // The daily trial-expiry Inngest function handles Day 29+ transition to free.
-    await transitionToExtendedTrial(
+    const updated = await transitionToExtendedTrialFromRevenuecatEvent(
       db,
       existingSub.id,
       EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
+      event.id,
+      event.event_timestamp_ms,
     );
 
-    // Record the event for idempotency
-    await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
-      eventId: event.id,
-      eventTimestampMs: event.event_timestamp_ms,
-      // transitionToExtendedTrial already set status to 'expired' and tier to 'free'
-      // but we need to record the eventId without overwriting those values
-    });
-
-    await safeRefreshKvCache(
-      kv,
-      db,
-      accountId,
-      'revenuecat.webhook.handleExpiration.trial',
-      {
-        eventId: event.id,
-      },
-    );
+    if (updated && updated.webhookApplied !== false) {
+      await safeRefreshKvCache(
+        kv,
+        db,
+        accountId,
+        'revenuecat.webhook.handleExpiration.trial',
+        {
+          eventId: event.id,
+        },
+      );
+    }
     return;
   }
 

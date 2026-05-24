@@ -46,6 +46,7 @@ export {
   findExpiredTrials,
   findSubscriptionsByTrialDateRange,
   transitionToExtendedTrial,
+  transitionToExtendedTrialFromRevenuecatEvent,
   findExpiredTrialsByDaysSinceEnd,
 } from './billing/trial';
 
