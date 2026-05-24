@@ -124,6 +124,11 @@ export default function RecapDetailScreen(): React.ReactElement {
                 onPress: handleBack,
                 testID: 'recap-detail-not-found-back',
               }}
+              secondaryAction={{
+                label: t('common.goHome'),
+                onPress: () => router.replace('/(app)/home'),
+                testID: 'recap-detail-not-found-go-home',
+              }}
               testID="recap-detail-not-found"
             />
           </View>
