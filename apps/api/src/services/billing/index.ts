@@ -81,5 +81,6 @@ export type { RevenuecatWebhookUpdate } from './revenuecat';
 export {
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
 } from './revenuecat';

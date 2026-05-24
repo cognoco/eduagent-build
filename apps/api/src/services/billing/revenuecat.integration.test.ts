@@ -28,6 +28,7 @@ import { resolve } from 'path';
 import {
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
 } from './revenuecat';
 import { getTierConfig } from '../subscription';
@@ -502,6 +503,50 @@ describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => 
 
     const row = await loadSubscription(account.id);
     expect(row!.cancelledAt).toBeNull();
+  });
+});
+
+describe('updateSubscriptionAndQuotaFromRevenuecatWebhook (integration) [WI-78 review]', () => {
+  it('stamps the RevenueCat event and updates quota in one billing helper call', async () => {
+    const account = await seedAccount(1);
+    const { subscription } = await seedSubscriptionWithQuota(
+      account.id,
+      'plus',
+    );
+    const db = createIntegrationDb();
+    const familyConfig = getTierConfig('family');
+
+    const result = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      db,
+      account.id,
+      {
+        eventId: 'evt-atomic-quota',
+        eventTimestampMs: 1_800_000_000_000,
+        tier: 'family',
+        status: 'active',
+      },
+      {
+        monthlyQuota: familyConfig.monthlyQuota,
+        dailyLimit: familyConfig.dailyLimit,
+      },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: subscription.id,
+        tier: 'family',
+        webhookApplied: true,
+      }),
+    );
+
+    const row = await loadSubscription(account.id);
+    expect(row!.tier).toBe('family');
+    expect(row!.lastRevenuecatEventId).toBe('evt-atomic-quota');
+    expect(row!.lastRevenuecatEventTimestampMs).toBe('1800000000000');
+
+    const pool = await loadQuotaPool(subscription.id);
+    expect(pool!.monthlyLimit).toBe(familyConfig.monthlyQuota);
+    expect(pool!.dailyLimit).toBe(familyConfig.dailyLimit);
   });
 });
 

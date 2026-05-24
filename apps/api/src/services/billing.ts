@@ -118,5 +118,6 @@ export type { RevenuecatWebhookUpdate } from './billing/revenuecat';
 export {
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
 } from './billing/revenuecat';

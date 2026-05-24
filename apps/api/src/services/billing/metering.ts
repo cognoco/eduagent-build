@@ -3,7 +3,7 @@
 // decrementQuota, incrementQuota
 // ---------------------------------------------------------------------------
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, notInArray, sql, type SQL } from 'drizzle-orm';
 import {
   quotaPools,
   profiles,
@@ -237,15 +237,23 @@ export async function decrementQuota(
   const now = new Date();
   const topUpResult = await db.transaction(async (tx) => {
     let updatedTopUp: typeof topUpCredits.$inferSelect | undefined;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    const contendedTopUpIds: string[] = [];
+    while (!updatedTopUp) {
+      const topUpConditions: SQL[] = [
+        eq(topUpCredits.subscriptionId, subscriptionId),
+        sql`${topUpCredits.remaining} > 0`,
+        sql`${topUpCredits.expiresAt} > ${now}`,
+      ];
+      if (contendedTopUpIds.length > 0) {
+        topUpConditions.push(notInArray(topUpCredits.id, contendedTopUpIds));
+      }
       const topUp = await tx.query.topUpCredits.findFirst({
-        where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
-          AND ${topUpCredits.remaining} > 0
-          AND ${topUpCredits.expiresAt} > ${now}`,
-        orderBy: sql`${topUpCredits.purchasedAt} ASC`,
+        where: and(...topUpConditions),
+        orderBy: sql`${topUpCredits.purchasedAt} ASC, ${topUpCredits.id} ASC`,
       });
 
       if (!topUp) return null;
+      if (contendedTopUpIds.includes(topUp.id)) return null;
 
       // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it).
       [updatedTopUp] = await tx
@@ -261,10 +269,10 @@ export async function decrementQuota(
         )
         .returning();
 
-      if (updatedTopUp) break;
+      if (!updatedTopUp) {
+        contendedTopUpIds.push(topUp.id);
+      }
     }
-
-    if (!updatedTopUp) return null;
 
     // [S-2 / BUG-627] Atomically increment usedToday WITH a daily-limit
     // guard. The previous unguarded UPDATE allowed two concurrent top-up

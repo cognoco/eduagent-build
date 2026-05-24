@@ -28,6 +28,7 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     }),
     isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
     updateSubscriptionFromRevenuecatWebhook: jest.fn(),
+    updateSubscriptionAndQuotaFromRevenuecatWebhook: jest.fn(),
     activateSubscriptionFromRevenuecat: jest.fn(),
     updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
     transitionToExtendedTrialFromRevenuecatEvent: jest.fn().mockResolvedValue({
@@ -142,6 +143,7 @@ import {
   ensureFreeSubscription,
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
   transitionToExtendedTrialFromRevenuecatEvent,
@@ -251,6 +253,9 @@ beforeEach(() => {
   (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue(
     mockSubscriptionRow(),
   );
+  (
+    updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
+  ).mockResolvedValue(mockSubscriptionRow());
   (isRevenuecatEventProcessed as jest.Mock).mockResolvedValue(false);
   (ensureFreeSubscription as jest.Mock).mockResolvedValue(
     mockSubscriptionRow({ tier: 'free' }),
@@ -751,14 +756,28 @@ describe('RENEWAL', () => {
     );
   });
 
-  it('updates quota pool when tier is present', async () => {
+  it('[WI-78 review] applies tier-changing renewal subscription and quota update atomically', async () => {
     const res = await makeRequest(
       makeWebhookPayload('RENEWAL', {
         product_id: 'com.eduagent.pro.monthly',
       }),
     );
     expect(res.status).toBe(200);
-    expect(updateQuotaPoolLimit).toHaveBeenCalled();
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        eventId: expect.any(String),
+        status: 'active',
+        tier: 'pro',
+      }),
+      expect.objectContaining({
+        monthlyQuota: expect.any(Number),
+      }),
+    );
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
   it('refreshes KV cache after renewal', async () => {
@@ -866,13 +885,18 @@ describe('RENEWAL', () => {
     expect(res.status).toBe(200);
 
     // updateSubscriptionFromRevenuecatWebhook must receive the new tier
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
       mockDb,
       'acc-1',
       expect.objectContaining({ tier: 'pro' }),
+      expect.objectContaining({
+        monthlyQuota: expect.any(Number),
+      }),
     );
-    // Quota pool must be updated for the new tier
-    expect(updateQuotaPoolLimit).toHaveBeenCalled();
+    // Quota pool must be updated in the same transaction as the event stamp.
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
   // [BUG-453] RENEWAL with same tier must NOT call updateQuotaPoolLimit.
@@ -891,6 +915,9 @@ describe('RENEWAL', () => {
     expect(res.status).toBe(200);
 
     // Tier is unchanged → quota pool must NOT be touched
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).not.toHaveBeenCalled();
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
     // tier must NOT be passed to update (no spurious tier write)
     const callArgs = (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mock
@@ -965,22 +992,29 @@ describe('EXPIRATION', () => {
     );
     expect(res.status).toBe(200);
 
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
       mockDb,
       'acc-1',
       expect.objectContaining({
         status: 'expired',
         tier: 'free',
       }),
+      expect.objectContaining({
+        monthlyQuota: expect.any(Number),
+      }),
     );
+    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
   });
 
-  it('updates quota pool to free tier limit on non-trial expiration', async () => {
+  it('updates quota pool to free tier limit atomically with non-trial expiration event stamp', async () => {
     const res = await makeRequest(
       makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' }),
     );
     expect(res.status).toBe(200);
-    expect(updateQuotaPoolLimit).toHaveBeenCalled();
+    expect(updateSubscriptionAndQuotaFromRevenuecatWebhook).toHaveBeenCalled();
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
   it('triggers soft landing on trial expiration (period_type TRIAL)', async () => {
@@ -1021,10 +1055,13 @@ describe('EXPIRATION', () => {
     // Should NOT soft-land — this is a paid-period expiration
     expect(transitionToExtendedTrialFromRevenuecatEvent).not.toHaveBeenCalled();
     // Should downgrade to free tier instead
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
       mockDb,
       'acc-1',
       expect.objectContaining({ status: 'expired', tier: 'free' }),
+      expect.objectContaining({ monthlyQuota: expect.any(Number) }),
     );
   });
 
@@ -1378,24 +1415,31 @@ describe('PRODUCT_CHANGE', () => {
     );
     expect(res.status).toBe(200);
 
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
       mockDb,
       'acc-1',
       expect.objectContaining({
         tier: 'family',
         status: 'active',
       }),
+      expect.objectContaining({
+        monthlyQuota: expect.any(Number),
+      }),
     );
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
-  it('updates quota pool for new tier', async () => {
+  it('updates quota pool for new tier atomically with product change event stamp', async () => {
     const res = await makeRequest(
       makeWebhookPayload('PRODUCT_CHANGE', {
         new_product_id: 'com.eduagent.pro.yearly',
       }),
     );
     expect(res.status).toBe(200);
-    expect(updateQuotaPoolLimit).toHaveBeenCalled();
+    expect(updateSubscriptionAndQuotaFromRevenuecatWebhook).toHaveBeenCalled();
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
   it('handles unknown new_product_id gracefully', async () => {
@@ -1410,15 +1454,15 @@ describe('PRODUCT_CHANGE', () => {
 
   // [BUG-446] BREAK TEST: PRODUCT_CHANGE on an expired subscription must NOT
   // call updateQuotaPoolLimit. With the wave-3 fix in place (BUG-447),
-  // updateSubscriptionFromRevenuecatWebhook throws on the invalid
+  // updateSubscriptionAndQuotaFromRevenuecatWebhook throws on the invalid
   // expired->active transition. The throw propagates from handleProductChange,
   // skipping the `if (updated)` branch that contains updateQuotaPoolLimit.
   // Pre-fix (before the throw was introduced), the function returned the existing
   // row and callers proceeded to call updateQuotaPoolLimit — divergent billing state.
-  // Reverting the throw in updateSubscriptionFromRevenuecatWebhook makes this fail.
+  // Reverting the throw in the atomic update helper makes this fail.
   it('[BUG-446] PRODUCT_CHANGE on expired subscription does NOT call updateQuotaPoolLimit', async () => {
     (
-      updateSubscriptionFromRevenuecatWebhook as jest.Mock
+      updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
     ).mockRejectedValueOnce(
       new Error('Invalid subscription transition: expired -> active'),
     );

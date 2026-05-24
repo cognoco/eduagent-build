@@ -621,6 +621,45 @@ describe('decrementQuota', () => {
     expect(result.remainingTopUp).toBe(99);
   });
 
+  it('[WI-78 review] advances past three contended top-up credits before declaring exhaustion', async () => {
+    const topUps = [
+      mockTopUpRow({ id: 'tu-1', remaining: 1 }),
+      mockTopUpRow({ id: 'tu-2', remaining: 1 }),
+      mockTopUpRow({ id: 'tu-3', remaining: 1 }),
+      mockTopUpRow({ id: 'tu-4', remaining: 1 }),
+    ];
+    const updatedTopUp = mockTopUpRow({ id: 'tu-4', remaining: 0 });
+    const db = createMockDb({
+      quotaPoolFindFirst: mockQuotaPoolRow({
+        monthlyLimit: 100,
+        usedThisMonth: 100,
+        dailyLimit: null,
+        usedToday: 0,
+      }),
+      updateReturningSequence: [
+        [], // monthly atomic UPDATE: WHERE used < limit fails
+        [], // tu-1 lost to a concurrent consumer
+        [], // tu-2 lost to a concurrent consumer
+        [], // tu-3 lost to a concurrent consumer
+        [updatedTopUp], // tu-4 is still available and should be used
+        [{ dailyLimit: null, usedToday: 1 }], // daily counter increment
+      ],
+    });
+    const findTopUp = (db as any).query.topUpCredits.findFirst as jest.Mock;
+    findTopUp
+      .mockResolvedValueOnce(topUps[0])
+      .mockResolvedValueOnce(topUps[1])
+      .mockResolvedValueOnce(topUps[2])
+      .mockResolvedValueOnce(topUps[3]);
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(true);
+    expect(result.source).toBe('top_up');
+    expect(result.topUpCreditId).toBe('tu-4');
+    expect(findTopUp).toHaveBeenCalledTimes(4);
+  });
+
   it('returns failure when both monthly and top-up are exhausted', async () => {
     const db = createMockDb({
       updateReturning: [], // monthly atomic fails

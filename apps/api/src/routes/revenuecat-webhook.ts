@@ -15,8 +15,8 @@ import {
   ensureFreeSubscription,
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
-  updateQuotaPoolLimit,
   transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
 } from '../services/billing';
@@ -274,10 +274,10 @@ async function handleRenewal(
   // (period_type !== 'TRIAL').
   const isTrial = event.period_type === 'TRIAL';
 
-  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
+  const renewalUpdates = {
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
-    status: 'active',
+    status: 'active' as const,
     // Only include tier when the event actually signals a different product tier.
     // Omitting the key entirely prevents any DB write to the tier column.
     ...(tierChanged && eventTier ? { tier: eventTier } : {}),
@@ -291,18 +291,25 @@ async function handleRenewal(
     // Preserve trialEndsAt during trial-period renewals by omitting it;
     // clear it on conversion to active (period_type !== 'TRIAL').
     ...(isTrial ? {} : { trialEndsAt: null }),
-  });
+  };
 
   // Only update quota pool when the tier actually changed.
-  if (updated && updated.webhookApplied !== false && tierChanged && eventTier) {
-    const tierConfig = getTierConfig(eventTier);
-    await updateQuotaPoolLimit(
-      db,
-      updated.id,
-      tierConfig.monthlyQuota,
-      tierConfig.dailyLimit,
-    );
-  }
+  const updated =
+    tierChanged && eventTier
+      ? await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+          db,
+          accountId,
+          renewalUpdates,
+          {
+            monthlyQuota: getTierConfig(eventTier).monthlyQuota,
+            dailyLimit: getTierConfig(eventTier).dailyLimit,
+          },
+        )
+      : await updateSubscriptionFromRevenuecatWebhook(
+          db,
+          accountId,
+          renewalUpdates,
+        );
 
   if (updated && updated.webhookApplied !== false) {
     await safeRefreshKvCache(
@@ -398,22 +405,24 @@ async function handleExpiration(
   }
 
   // Non-trial expiration: downgrade to free tier immediately
-  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
-    eventId: event.id,
-    eventTimestampMs: event.event_timestamp_ms,
-    status: 'expired',
-    tier: 'free',
-    cancelledAt: new Date().toISOString(),
-  });
+  const freeConfig = getTierConfig('free');
+  const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+    db,
+    accountId,
+    {
+      eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
+      status: 'expired',
+      tier: 'free',
+      cancelledAt: new Date().toISOString(),
+    },
+    {
+      monthlyQuota: freeConfig.monthlyQuota,
+      dailyLimit: freeConfig.dailyLimit,
+    },
+  );
 
   if (updated && updated.webhookApplied !== false) {
-    const freeConfig = getTierConfig('free');
-    await updateQuotaPoolLimit(
-      db,
-      updated.id,
-      freeConfig.monthlyQuota,
-      freeConfig.dailyLimit,
-    );
     await safeRefreshKvCache(
       kv,
       db,
@@ -565,21 +574,23 @@ async function handleProductChange(
     return;
   }
 
-  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
-    eventId: event.id,
-    eventTimestampMs: event.event_timestamp_ms,
-    tier: newTier,
-    status: 'active',
-  });
+  const tierConfig = getTierConfig(newTier);
+  const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+    db,
+    accountId,
+    {
+      eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
+      tier: newTier,
+      status: 'active',
+    },
+    {
+      monthlyQuota: tierConfig.monthlyQuota,
+      dailyLimit: tierConfig.dailyLimit,
+    },
+  );
 
   if (updated && updated.webhookApplied !== false) {
-    const tierConfig = getTierConfig(newTier);
-    await updateQuotaPoolLimit(
-      db,
-      updated.id,
-      tierConfig.monthlyQuota,
-      tierConfig.dailyLimit,
-    );
     await safeRefreshKvCache(
       kv,
       db,
