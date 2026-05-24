@@ -12,6 +12,7 @@ import {
   isGdprProcessingAllowed,
   revokeConsent,
   refreshConsentToken,
+  refreshConsentTokenForRequest,
   EmailDeliveryError,
   ConsentTokenExpiredError,
   ConsentRecordNotFoundError,
@@ -133,6 +134,45 @@ function createMockDb({
     update: updateFn,
     delete: deleteFn,
   } as unknown as Database;
+}
+
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['name'] === 'string') values.push(obj['name'].toLowerCase());
+  if (
+    'value' in obj &&
+    (typeof obj['value'] === 'string' ||
+      typeof obj['value'] === 'number' ||
+      obj['value'] instanceof Date)
+  ) {
+    const value = obj['value'];
+    values.push(
+      value instanceof Date
+        ? value.toISOString().toLowerCase()
+        : String(value).toLowerCase(),
+    );
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions', 'values']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
 }
 
 beforeEach(() => {
@@ -736,6 +776,51 @@ describe('refreshConsentToken', () => {
     await expect(refreshConsentToken(db, PROFILE_ID)).rejects.toThrow(
       ConsentRecordNotFoundError,
     );
+  });
+});
+
+describe('refreshConsentTokenForRequest', () => {
+  const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
+  const requestedAt = new Date('2026-05-01T00:00:00.000Z');
+  const requestedAtUpperBound = new Date('2026-05-01T00:00:00.001Z');
+
+  it('[WI-84 review] scopes token refresh to the original requestedAt generation', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({ parentEmail: 'parent@example.com' }),
+    });
+
+    const result = await refreshConsentTokenForRequest(db, {
+      profileId: PROFILE_ID,
+      requestedAt,
+      requestedAtUpperBound,
+    });
+
+    expect(result?.parentEmail).toBe('parent@example.com');
+    expect(result?.freshToken).toEqual(expect.any(String));
+
+    const updateChain = (db.update as jest.Mock).mock.results[0]!.value;
+    const whereArg =
+      updateChain.set.mock.results[0]!.value.where.mock.calls[0]![0];
+    const whereText = extractSqlTextAndValues(whereArg).join(' ');
+    expect(whereText).toContain(PROFILE_ID.toLowerCase());
+    expect(whereText).toContain('gdpr');
+    expect(whereText).toContain('requested_at');
+    expect(whereText).toContain('2026-05-01t00:00:00.000z');
+    expect(whereText).toContain('2026-05-01t00:00:00.001z');
+    expect(whereText).toContain('status');
+    expect(whereText).toContain('parent_email');
+  });
+
+  it('[WI-84 review] returns null when the generation-bound update matches no row', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(
+      refreshConsentTokenForRequest(db, {
+        profileId: PROFILE_ID,
+        requestedAt,
+        requestedAtUpperBound,
+      }),
+    ).resolves.toBeNull();
   });
 });
 

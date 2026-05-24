@@ -3,6 +3,10 @@ const mockGetProfileConsentState = jest.fn();
 const mockRefreshConsentToken = jest
   .fn()
   .mockResolvedValue('refreshed-token-xyz');
+const mockRefreshConsentTokenForRequest = jest.fn().mockResolvedValue({
+  parentEmail: 'parent@example.com',
+  freshToken: 'refreshed-token-xyz',
+});
 const mockDeleteProfileIfNoConsent = jest.fn().mockResolvedValue(true);
 const mockSendEmail = jest.fn();
 const mockConsentFindFirst = jest.fn().mockResolvedValue({
@@ -52,6 +56,8 @@ jest.mock(
         mockGetProfileConsentState(...args),
       refreshConsentToken: (...args: unknown[]) =>
         mockRefreshConsentToken(...args),
+      refreshConsentTokenForRequest: (...args: unknown[]) =>
+        mockRefreshConsentTokenForRequest(...args),
     };
   },
 );
@@ -173,6 +179,16 @@ async function executeHandler(
         }
       : null,
   );
+  mockRefreshConsentTokenForRequest.mockResolvedValue(
+    eventRequestedAt && stateRequestedAt === eventRequestedAt
+      ? profileState?.parentEmail
+        ? {
+            parentEmail: profileState.parentEmail,
+            freshToken: 'refreshed-token-xyz',
+          }
+        : null
+      : null,
+  );
 
   const { step } = createInngestStepRunner();
 
@@ -192,6 +208,10 @@ beforeEach(() => {
   mockConsentFindFirst.mockResolvedValue({
     parentEmail: 'parent@example.com',
     consentToken: 'test-token-abc123',
+  });
+  mockRefreshConsentTokenForRequest.mockResolvedValue({
+    parentEmail: 'parent@example.com',
+    freshToken: 'refreshed-token-xyz',
   });
 });
 
@@ -278,9 +298,22 @@ describe('consentReminder', () => {
   it('[DS-020] refreshes the consent token before building day-7 and day-14 reminder URLs', async () => {
     await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
 
-    // refreshConsentToken must be called once per reminder that embeds a link
+    // refreshConsentTokenForRequest must be called once per reminder that embeds a link
     // (day-7 and day-14) — NOT for day-25 (no link) and NOT for day-30 (delete).
-    expect(mockRefreshConsentToken).toHaveBeenCalledTimes(2);
+    expect(mockRefreshConsentTokenForRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('[WI-84 review] binds fresh-token minting to the requestedAt generation', async () => {
+    await executeHandler(['PENDING', 'CONSENTED', 'CONSENTED', 'CONSENTED']);
+
+    expect(mockRefreshConsentTokenForRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        profileId: 'profile-1',
+        requestedAt: new Date('2026-05-01T00:00:00.000Z'),
+        requestedAtUpperBound: new Date('2026-05-01T00:00:00.001Z'),
+      },
+    );
   });
 
   it('[DS-020] day-14 reminder URL uses the refreshed token, not the stale DB token', async () => {
@@ -373,7 +406,7 @@ describe('consentReminder', () => {
   });
 
   it('[WI-84 review] reads reminder contact details from the same requestedAt generation', async () => {
-    await executeHandler(['PENDING', 'CONSENTED', 'CONSENTED', 'CONSENTED']);
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'WITHDRAWN']);
 
     const firstCall = mockConsentFindFirst.mock.calls[0]?.[0] as
       | { where?: unknown }
@@ -384,7 +417,7 @@ describe('consentReminder', () => {
   });
 
   it('[WI-84 review] matches requestedAt with a half-open millisecond window', async () => {
-    await executeHandler(['PENDING', 'CONSENTED', 'CONSENTED', 'CONSENTED']);
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'WITHDRAWN']);
 
     const firstCall = mockConsentFindFirst.mock.calls[0]?.[0] as
       | { where?: unknown }

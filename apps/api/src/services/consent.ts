@@ -3,7 +3,18 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, desc, and, sql, inArray, isNull } from 'drizzle-orm';
+import {
+  eq,
+  desc,
+  and,
+  sql,
+  inArray,
+  isNull,
+  isNotNull,
+  gte,
+  lt,
+  notInArray,
+} from 'drizzle-orm';
 import {
   consentStates,
   familyLinks,
@@ -602,6 +613,55 @@ export async function refreshConsentToken(
   }
 
   return newToken;
+}
+
+export interface RefreshConsentTokenForRequestInput {
+  profileId: string;
+  requestedAt: Date;
+  requestedAtUpperBound: Date;
+}
+
+export interface RefreshedConsentTokenForRequest {
+  parentEmail: string;
+  freshToken: string;
+}
+
+/**
+ * Refreshes a reminder token only if the original consent-request generation
+ * is still current. Stale Inngest runs must not mint a valid token onto a newer
+ * request, because token possession authorizes the consent response.
+ */
+export async function refreshConsentTokenForRequest(
+  db: Database,
+  input: RefreshConsentTokenForRequestInput,
+): Promise<RefreshedConsentTokenForRequest | null> {
+  const freshToken = crypto.randomUUID();
+  // 16 days: covers day-14 reminder window plus a 2-day click buffer,
+  // and stays well within the day-30 auto-delete cutoff.
+  const newExpiresAt = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
+
+  const updated = await db
+    .update(consentStates)
+    .set({
+      consentToken: freshToken,
+      expiresAt: newExpiresAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(consentStates.profileId, input.profileId),
+        eq(consentStates.consentType, 'GDPR'),
+        gte(consentStates.requestedAt, input.requestedAt),
+        lt(consentStates.requestedAt, input.requestedAtUpperBound),
+        notInArray(consentStates.status, ['CONSENTED', 'WITHDRAWN']),
+        isNotNull(consentStates.parentEmail),
+      ),
+    )
+    .returning({ parentEmail: consentStates.parentEmail });
+
+  const parentEmail = updated[0]?.parentEmail;
+  if (!parentEmail) return null;
+  return { parentEmail, freshToken };
 }
 
 /**

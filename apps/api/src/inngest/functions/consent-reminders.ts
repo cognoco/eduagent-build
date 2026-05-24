@@ -8,7 +8,10 @@ import {
 } from '../helpers';
 import { and, eq, gte, lt } from 'drizzle-orm';
 import { consentStates } from '@eduagent/database';
-import { getConsentStatus, refreshConsentToken } from '../../services/consent';
+import {
+  getConsentStatus,
+  refreshConsentTokenForRequest,
+} from '../../services/consent';
 import {
   sendEmail,
   formatConsentReminderEmail,
@@ -89,6 +92,19 @@ export const consentReminder = inngest.createFunction(
       return Boolean(row);
     }
 
+    async function refreshCurrentConsentToken(): Promise<{
+      parentEmail: string;
+      freshToken: string;
+    } | null> {
+      if (!requestedAtDate || !requestedAtUpperBound) return null;
+      const db = getStepDatabase();
+      return refreshConsentTokenForRequest(db, {
+        profileId,
+        requestedAt: requestedAtDate,
+        requestedAtUpperBound,
+      });
+    }
+
     /** Builds the direct consent page URL from a token. */
     function buildTokenUrl(token: string): string {
       return `${getStepAppUrl()}/v1/consent-page?token=${encodeURIComponent(token)}`;
@@ -97,7 +113,7 @@ export const consentReminder = inngest.createFunction(
     // Day 7 reminder.
     // [DS-020] Mint the fresh token in its OWN step so Inngest memoizes it: the
     // original requestConsent token expires after 7 days (race-prone link), and
-    // refreshConsentToken is non-idempotent (random token each call). If the mint
+    // token refresh is non-idempotent (random token each call). If the mint
     // shared a step with sendEmail, a retry after a delivered email would mint a
     // new token, dead-linking the email the parent already received.
     await step.sleep('wait-7-days', '7d');
@@ -106,10 +122,7 @@ export const consentReminder = inngest.createFunction(
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
         return null;
-      const { parentEmail } = await lookupConsentDetails();
-      if (!parentEmail) return null;
-      const freshToken = await refreshConsentToken(db, profileId);
-      return { parentEmail, freshToken };
+      return refreshCurrentConsentToken();
     });
     if (day7) {
       await step.run('send-day-7-reminder', async () => {
@@ -134,10 +147,7 @@ export const consentReminder = inngest.createFunction(
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN')
         return null;
-      const { parentEmail } = await lookupConsentDetails();
-      if (!parentEmail) return null;
-      const freshToken = await refreshConsentToken(db, profileId);
-      return { parentEmail, freshToken };
+      return refreshCurrentConsentToken();
     });
     if (day14) {
       await step.run('send-day-14-reminder', async () => {
