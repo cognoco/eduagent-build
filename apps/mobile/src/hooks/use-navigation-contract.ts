@@ -56,17 +56,6 @@ function toSubscriptionContext(
   };
 }
 
-function toProxySurface(
-  parentProxy: ReturnType<typeof useParentProxy>,
-): NavigationProxySurface {
-  return {
-    active: parentProxy.isParentProxy,
-    childName: parentProxy.childProfile?.displayName ?? '',
-    childProfileId: parentProxy.childProfile?.id ?? null,
-    parentProfileId: parentProxy.parentProfile?.id ?? null,
-  };
-}
-
 function useResolvedNavigationState(
   subscription: NavigationSubscriptionContext,
 ): ResolvedNavigationState {
@@ -124,6 +113,24 @@ export function useNavigationContract(): NavigationContract {
     .contract;
 }
 
+function useProxySurface(
+  parentProxy: ReturnType<typeof useParentProxy>,
+): NavigationProxySurface {
+  const childId = parentProxy.childProfile?.id ?? null;
+  const childName = parentProxy.childProfile?.displayName ?? '';
+  const parentId = parentProxy.parentProfile?.id ?? null;
+  const active = parentProxy.isParentProxy;
+  return useMemo(
+    () => ({
+      active,
+      childName,
+      childProfileId: childId,
+      parentProfileId: parentId,
+    }),
+    [active, childName, childId, parentId],
+  );
+}
+
 export function useNavigationShellContract(): NavigationShellContract {
   const subscription = useSubscriptionStatus({
     enabled: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
@@ -163,26 +170,32 @@ export function useNavigationShellContract(): NavigationShellContract {
         familyCapable ? mode : null,
       );
 
+  const proxy = useProxySurface(parentProxy);
+
   return {
     contract,
     homeTabPresentation,
-    proxy: toProxySurface(parentProxy),
+    proxy,
     visibleTabs,
   };
 }
 
 export function useNavigationHomeContract(): NavigationHomeContract {
-  const subscription = useSubscriptionStatus({
-    enabled:
-      FEATURE_FLAGS.MODE_NAV_V1_ENABLED || !FEATURE_FLAGS.MODE_NAV_V0_ENABLED,
-  });
+  // Home gates (showFamilyHome in particular) depend on familyPlanOwner,
+  // which is subscription-derived. Enable unconditionally so the gate
+  // resolves correctly under any flag combo — including the transitional
+  // V0-on/V1-off config where `V1 || !V0` would have stayed false and
+  // permanently suppressed familyPlanOwner.
+  const subscription = useSubscriptionStatus({ enabled: true });
   const { contract, parentProxy } = useResolvedNavigationState(
     toSubscriptionContext(subscription.data),
   );
 
+  const proxy = useProxySurface(parentProxy);
+
   return {
     contract,
-    proxy: toProxySurface(parentProxy),
+    proxy,
   };
 }
 

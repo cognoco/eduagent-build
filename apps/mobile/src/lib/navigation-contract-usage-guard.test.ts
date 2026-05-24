@@ -148,11 +148,11 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
         'raw-hook-import': 1,
       },
     },
-    // Contract primitive: compatibility guard owns legacy mode detection for screens that have not deleted V0.
+    // Contract primitive: family route guard owns the mode-switch write boundary.
     {
       file: 'apps/mobile/src/components/guards/RequireFamilyContext.tsx',
       reason:
-        'contract primitive: compatibility guard owns legacy mode detection for family-only children.',
+        'contract primitive: family route guard reads contract.canEnter/effectiveAppContext for gating and retains the useAppContext().setMode write boundary for the explicit opt-in CTA.',
       expectedFindings: {
         'raw-hook-call': 1,
         'raw-hook-import': 1,
@@ -178,6 +178,34 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
       expectedFindings: {
         'raw-hook-call': 1,
         'raw-hook-import': 1,
+      },
+    },
+    // Bridge context switch: recall-test navigates to Library (STUDY_TABS only) and must
+    // write Study mode first for family-mode users. The mode === 'family' guard avoids
+    // firing an unnecessary API mutation for users already in Study. setMode is the only
+    // write boundary; canEnter/effectiveAppContext cannot perform the write.
+    {
+      file: 'apps/mobile/src/app/(app)/topic/recall-test.tsx',
+      reason:
+        'bridge context switch: recall-test routes to Library (STUDY_TABS) and conditionally writes Study mode for family-mode users before navigating.',
+      expectedFindings: {
+        'raw-hook-call': 1,
+        'raw-hook-import': 1,
+        'study-family-mode-compare': 1,
+      },
+    },
+    // Bridge context switch: LearnerScreen timeout-fallback navigates to Library (STUDY_TABS only)
+    // and must write Study mode first for family-mode users. The mode === 'family' guard avoids
+    // firing an unnecessary API mutation for users already in Study. setMode is the only
+    // write boundary; effectiveAppContext on the home contract is read-only.
+    {
+      file: 'apps/mobile/src/components/home/LearnerScreen.tsx',
+      reason:
+        'bridge context switch: LearnerScreen timeout-fallback routes to Library (STUDY_TABS) and conditionally writes Study mode for family-mode users before navigating.',
+      expectedFindings: {
+        'raw-hook-call': 1,
+        'raw-hook-import': 1,
+        'study-family-mode-compare': 1,
       },
     },
     // Account/profile ownership: consent APIs are parent-owned data surfaces, not tab visibility gates.
@@ -300,17 +328,6 @@ const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] 
       expectedFindings: {
         'profile-owner-read': 4,
         'proxy-state-read': 24,
-      },
-    },
-    // V0-fallback: navigation helper maps legacy mode to return paths when V1 is disabled.
-    {
-      file: 'apps/mobile/src/lib/navigation.ts',
-      reason:
-        'V0-fallback: navigation helper maps legacy app context to return destinations while V0 remains supported.',
-      expectedFindings: {
-        'raw-hook-call': 1,
-        'raw-hook-import': 1,
-        'study-family-mode-compare': 1,
       },
     },
     // Profile primitive: profile provider owns raw owner/child profile selection and switching.

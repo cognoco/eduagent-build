@@ -165,7 +165,9 @@ describe('SubjectSessionsScreen', () => {
     render(<SubjectSessionsScreen />);
     const cta = screen.getByTestId('subject-sessions-empty-start');
     fireEvent.press(cta);
-    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+    // Tab-switch intent — replace, not push, so the home tab keeps its
+    // back-stack independent of the progress tab's deep route.
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('renders error state with retry that calls refetch', () => {

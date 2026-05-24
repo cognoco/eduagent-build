@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../../components/common';
 import { useSubjectSessions } from '../../../../hooks/use-subject-sessions';
@@ -138,7 +138,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
               {t('progress.subjectSessions.empty')}
             </Text>
             <Pressable
-              onPress={() => router.push('/(app)/home' as never)}
+              onPress={() => router.replace('/(app)/home' as Href)}
               className="bg-primary rounded-button px-6 py-3 items-center min-h-[44px] justify-center"
               accessibilityRole="button"
               accessibilityLabel={t('recaps.emptyCtaStartSession')}

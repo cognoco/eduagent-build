@@ -48,7 +48,6 @@ import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback, GateContent } from '../../components/common';
 import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
 import { goBackOrReplace } from '../../lib/navigation';
-import { resolveContractHomeTabPresentation } from '../../lib/legacy-navigation-contract';
 import { track } from '../../lib/analytics';
 import { useSubjects } from '../../hooks/use-subjects';
 import {
@@ -69,8 +68,6 @@ import {
 // Task 14's Step-3 success path (this file) and sign-out.
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
-
-export { resolveContractHomeTabPresentation };
 
 initNotificationHandler();
 

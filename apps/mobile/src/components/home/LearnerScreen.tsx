@@ -32,6 +32,7 @@ import {
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import { useAppContext } from '../../lib/app-context';
 import { useNavigationHomeContract } from '../../hooks/use-navigation-contract';
 import { getSubjectTint, getSubjectTintMap } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
@@ -122,6 +123,7 @@ export function LearnerScreen({
   const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { switchProfile } = useProfile();
+  const { mode, setMode } = useAppContext();
   const navigationHome = useNavigationHomeContract();
   const navigationContract = navigationHome.contract;
   const navigationProxy = navigationHome.proxy;
@@ -432,9 +434,20 @@ export function LearnerScreen({
             </Pressable>
             {/* [HOME-08] Replace the self-referential "Go home" (which is this
                 screen) with escape routes that actually change state — matching
-                the recovery pattern already used in home.tsx:119. */}
+                the recovery pattern already used in home.tsx:119. Library is
+                only in STUDY_TABS, so V1 family-mode users get switched to
+                study mode first; setMode is a no-op for non-family modes. */}
             <Pressable
-              onPress={() => router.replace('/(app)/library' as Href)}
+              onPress={() => {
+                if (mode === 'family') {
+                  setMode('study', {
+                    onSuccess: () => router.replace('/(app)/library' as Href),
+                    onError: () => router.replace('/(app)/library' as Href),
+                  });
+                } else {
+                  router.replace('/(app)/library' as Href);
+                }
+              }}
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
               testID="learner-loading-go-library"
             >

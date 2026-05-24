@@ -16,6 +16,7 @@ import { classifyApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 import { ErrorFallback } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useAppContext } from '../../../lib/app-context';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
@@ -44,6 +45,21 @@ export default function RecallTestScreen() {
   }>();
 
   const submitRecallTest = useSubmitRecallTest();
+  const { mode, setMode } = useAppContext();
+
+  // /library belongs to STUDY_TABS. V1 family-mode users would land outside
+  // their tab shape if we routed them there directly; auto-switch them to
+  // study mode first so the destination is in their navigation surface.
+  const goToLibrary = useCallback(() => {
+    if (mode === 'family') {
+      setMode('study', {
+        onSuccess: () => goBackOrReplace(router, '/(app)/library'),
+        onError: () => goBackOrReplace(router, '/(app)/library'),
+      });
+    } else {
+      goBackOrReplace(router, '/(app)/library');
+    }
+  }, [mode, router, setMode]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([OPENING_MESSAGE]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -221,7 +237,7 @@ export default function RecallTestScreen() {
         message={t('topic.recallTest.missingMessage')}
         primaryAction={{
           label: t('topic.recallTest.goToLibrary'),
-          onPress: () => goBackOrReplace(router, '/(app)/library'),
+          onPress: goToLibrary,
           testID: 'recall-test-missing-topic',
         }}
       />
@@ -248,7 +264,7 @@ export default function RecallTestScreen() {
         }}
         secondaryAction={{
           label: t('topic.recallTest.goToLibrary'),
-          onPress: () => goBackOrReplace(router, '/(app)/library'),
+          onPress: goToLibrary,
           testID: 'recall-test-timeout-back',
         }}
         testID="recall-test-timeout"
@@ -270,7 +286,7 @@ export default function RecallTestScreen() {
         {t('topic.recallTest.successPrompt')}
       </Text>
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(app)/library')}
+        onPress={goToLibrary}
         className="bg-primary rounded-button px-6 py-3 items-center"
         accessibilityRole="button"
         accessibilityLabel={t('topic.recallTest.goToLibrary')}
