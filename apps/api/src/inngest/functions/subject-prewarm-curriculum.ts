@@ -124,6 +124,15 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           return false;
         }
 
+        // [WI-82] Re-check consent INSIDE this step. The gate in
+        // load-prewarm-context is memoized by Inngest, so on a retry of this
+        // step a consent withdrawal that occurred after the first run would
+        // otherwise be missed and stale-allowed learner data would still reach
+        // the LLM. Re-evaluating here closes the cross-step memoization gap.
+        if (!(await isGdprProcessingAllowed(db, profileId))) {
+          return false;
+        }
+
         const result = await generateBookTopics(
           context.bookTitle,
           context.bookDescription,

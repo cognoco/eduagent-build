@@ -332,5 +332,27 @@ describe('subjectPrewarmCurriculum', () => {
       expect(generateBookTopicsSpy).toHaveBeenCalled();
       expect(persistBookTopicsSpy).toHaveBeenCalled();
     });
+
+    // [WI-82] Cross-step memoization regression: consent granted when
+    // load-prewarm-context ran, then withdrawn before generate-and-persist-topics.
+    // The re-check INSIDE the generate step must catch the withdrawal.
+    it('skips LLM and persist when consent is withdrawn between the load and generate steps', async () => {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }));
+      // First call (load-prewarm-context): CONSENTED → context becomes 'pending'.
+      // Second call (generate-and-persist-topics): WITHDRAWN → LLM must be skipped.
+      mockDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+
+      const { result } = await execute(createEventData());
+
+      expect(generateBookTopicsSpy).not.toHaveBeenCalled();
+      expect(persistBookTopicsSpy).not.toHaveBeenCalled();
+      // The handler returns status:'pending' (context.status) when generated===false.
+      expect(result).toMatchObject({ status: 'pending', subjectId, bookId });
+    });
   });
 });

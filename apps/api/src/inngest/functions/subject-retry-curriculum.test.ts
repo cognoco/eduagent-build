@@ -372,5 +372,29 @@ describe('subjectRetryCurriculum', () => {
       expect(mockGenerateBookTopics).toHaveBeenCalled();
       expect(mockPersistBookTopics).toHaveBeenCalled();
     });
+
+    // [WI-82] Cross-step memoization regression: consent granted when
+    // load-retry-context ran, then withdrawn before retry-generate-and-persist.
+    // The re-check INSIDE the generate step must catch the withdrawal.
+    it('skips LLM and persist when consent is withdrawn between the load and generate steps', async () => {
+      // load-retry-context sees CONSENTED → context becomes 'pending'.
+      // retry-generate-and-persist sees WITHDRAWN → LLM must be skipped.
+      const loadDb = makeMockDb();
+      loadDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      const confirmDb = makeMockDb({ topicsGenerated: false });
+      let callCount = 0;
+      mockGetStepDatabase.mockImplementation(() => {
+        callCount++;
+        return callCount <= 2 ? loadDb : confirmDb;
+      });
+      const { step } = createInngestStepRunner();
+
+      await handler({ event: { data: validPayload() }, step });
+
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+      expect(mockPersistBookTopics).not.toHaveBeenCalled();
+    });
   });
 });

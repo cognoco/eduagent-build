@@ -581,8 +581,20 @@ export async function sendStruggleNotification(
       event: 'notification.struggle.consent_blocked',
       childProfileId,
       type: notification.type,
+      // Keep the suppression reason queryable in observability tooling even
+      // though the shared helper returns a boolean (not the raw status).
+      reason: 'gdpr_processing_not_allowed',
     });
     return { sent: false, reason: 'consent_not_granted' };
+  }
+
+  // [WI-226] Honor the parent's push opt-out BEFORE reserving the 24h dedup
+  // slot below. If we deferred this to sendPushNotification (post-reservation),
+  // a push-disabled parent would still consume the dedup slot, so re-enabling
+  // push within 24h could suppress their first real struggle alert as
+  // `dedup_24h`. Checking here keeps the slot unconsumed when nothing is sent.
+  if (!(await isPushEnabled(db, link.parentProfileId))) {
+    return { sent: false, reason: 'push_disabled' };
   }
 
   // [CR-119.5]: Per-type dedup (intentionally NOT per-topic). A parent
@@ -635,6 +647,8 @@ export async function sendStruggleNotification(
     // [BUG-856] Slot already reserved by checkAndLogRateLimitInternal above
     // for the same (parentProfileId, type) bucket — skip the push log so we
     // do not record two rows for the same notification.
-    { skipRateLimitLog: true, respectPushPreference: true },
+    // pushEnabled was already enforced above (before slot reservation), so we
+    // intentionally do NOT pass respectPushPreference here.
+    { skipRateLimitLog: true },
   );
 }

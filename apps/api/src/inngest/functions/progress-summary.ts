@@ -45,7 +45,7 @@ export const progressSummaryGeneration = inngest.createFunction(
       // data to the LLM or persist derived data for a profile whose consent is
       // no longer granted.
       if (!(await isGdprProcessingAllowed(db, profileId))) {
-        return { consentDenied: true as const };
+        return { status: 'consent-blocked' as const };
       }
 
       const profile = await db.query.profiles.findFirst({
@@ -80,6 +80,7 @@ export const progressSummaryGeneration = inngest.createFunction(
 
       const inventory = await buildKnowledgeInventory(db, profileId);
       return {
+        status: 'ok' as const,
         childName: profile.displayName,
         latestSessionId: latestSession.id,
         latestSessionAt: latestSession.startedAt,
@@ -90,21 +91,23 @@ export const progressSummaryGeneration = inngest.createFunction(
     if (!context) {
       return { status: 'skipped', reason: 'not a linked child or no session' };
     }
-    if ('consentDenied' in context && context.consentDenied) {
+    if (context.status === 'consent-blocked') {
       return { status: 'skipped', reason: 'consent_not_granted' };
     }
-
-    const ctx = context as {
-      childName: string;
-      latestSessionId: string;
-      latestSessionAt: string;
-      inventory: Awaited<ReturnType<typeof buildKnowledgeInventory>>;
-    };
+    // `context.status === 'ok'` — narrowed cleanly, no cast needed.
+    const ctx = context;
 
     const summary = await step.run('generate-summary', async () => {
+      // [WI-82] Re-check consent here too: gather-context's gate is memoized by
+      // Inngest, so on a retry of this step a withdrawal after the first run
+      // must still block the LLM call (cross-step memoization gap).
+      const db = getStepDatabase();
+      if (!(await isGdprProcessingAllowed(db, profileId))) return null;
       try {
         return await generateProgressSummary({
-          ...ctx,
+          childName: ctx.childName,
+          latestSessionId: ctx.latestSessionId,
+          inventory: ctx.inventory,
           latestSessionAt: new Date(ctx.latestSessionAt),
         });
       } catch (error) {
@@ -123,8 +126,15 @@ export const progressSummaryGeneration = inngest.createFunction(
       }
     });
 
+    if (summary === null) {
+      return { status: 'skipped', reason: 'consent_not_granted' };
+    }
+
     await step.run('persist-summary', async () => {
       const db = getStepDatabase();
+      // [WI-82] Re-check before persisting derived data — defense-in-depth for
+      // a withdrawal between generate and this (separately retried) step.
+      if (!(await isGdprProcessingAllowed(db, profileId))) return;
       await upsertProgressSummary(db, {
         childProfileId: profileId,
         summary,

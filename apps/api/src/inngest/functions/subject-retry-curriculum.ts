@@ -88,6 +88,12 @@ export const subjectRetryCurriculum = inngest.createFunction(
       const book = await loadBook(db, profileId, subjectId, bookId);
       if (book.topicsGenerated) return;
 
+      // [WI-82] Re-check consent INSIDE this step. The gate in
+      // load-retry-context is memoized by Inngest, so on a retry of this step a
+      // consent withdrawal that occurred after the first run would otherwise be
+      // missed and stale-allowed learner data would still reach the LLM.
+      if (!(await isGdprProcessingAllowed(db, profileId))) return;
+
       const result = await generateBookTopics(
         context.bookTitle,
         context.bookDescription,

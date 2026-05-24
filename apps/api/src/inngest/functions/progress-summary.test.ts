@@ -326,5 +326,33 @@ describe('progressSummaryGeneration', () => {
       expect(mockGenerateProgressSummary).toHaveBeenCalled();
       expect(mockUpsertProgressSummary).toHaveBeenCalled();
     });
+
+    // [WI-82] Cross-step memoization regression: consent granted when
+    // gather-context ran, then withdrawn before generate-summary.
+    // The re-check INSIDE generate-summary must catch the withdrawal and
+    // return null, causing the handler to return consent_not_granted.
+    it('skips LLM and persist when consent is withdrawn between the gather and generate steps', async () => {
+      mockFindLatestCompletedLearningSession.mockResolvedValue({
+        id: 'session-1',
+        startedAt: new Date('2026-05-13T10:00:00Z'),
+      });
+      // First call (gather-context): CONSENTED → context becomes 'ok'.
+      // Second call (generate-summary): WITHDRAWN → return null → skipped.
+      sharedDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+
+      const { result } = await invokeProgressSummary({
+        profileId: 'child-1',
+        sessionId: 'session-1',
+      });
+
+      expect(mockGenerateProgressSummary).not.toHaveBeenCalled();
+      expect(mockUpsertProgressSummary).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+    });
   });
 });
