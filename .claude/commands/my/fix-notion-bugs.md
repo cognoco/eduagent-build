@@ -8,7 +8,7 @@ Pick 3 bugs from the **Issue Tracker - Open** database (`3598bce9-1f7c-8070-86eb
 
 1. **Confirm the bug is still open** and **not already obsolete in current code.** Many rows pre-date a fix that was shipped under a different PR/title. Grep for the symptom, read the cited file:line, and try to reproduce.
 2. **Mark the bug `In progress` in Notion** so other agents don't pick the same one.
-3. **Do NOT commit.** Work locally only. Coordinator commits via `/commit` when the user asks.
+3. **Stage as you go, never commit.** After each Edit/Write, run `git add -- <file>` immediately (use `:(literal)` pathspec for Expo Router bracket files) so the change is locked in the git index. Concurrent watchers (Codex, VS Code autosave, format-on-save) and other parallel agents can otherwise silently revert your work, and silently-reverted edits leave no git record. Do NOT run `git commit` or `git push`. Coordinator commits via `/commit` when the user asks.
 4. **If another agent is editing the same file**, layer your changes on top — never revert their work. Pull a fresh diff before saving.
 
 ## Fix discipline — same as the rest of the repo
