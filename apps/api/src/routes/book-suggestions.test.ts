@@ -301,12 +301,16 @@ describe('[WI-138 / DS-049] book-suggestions proxy-mode guard', () => {
 
   it('GET /subjects/:subjectId/book-suggestions (no topup) allows proxy mode — reads are intentional', async () => {
     const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
-    // No assertion on status — just confirm it does NOT 403. The handler
-    // will hit the empty stub db and likely throw a different error, but
-    // crucially not a PROXY_MODE 403.
+    // We only assert the guard does NOT intercept. The handler then runs
+    // against the empty stub db and is expected to throw → 500, OR return
+    // 200/empty for resilient code paths. Either is fine; the test only
+    // proves assertNotProxyMode did not fire on the read path.
+    // (Pre-tightening was `expect(...).not.toBe(403)` which would also pass
+    // on a panic. Narrowing to the realistic stub-db outcomes keeps the test
+    // honest per Fix-dev verification: every fix must be verifiable.)
     const res = await makeProxyApp().request(
       `/subjects/${SUBJECT_ID}/book-suggestions`,
     );
-    expect(res.status).not.toBe(403);
+    expect([200, 500]).toContain(res.status);
   });
 });
