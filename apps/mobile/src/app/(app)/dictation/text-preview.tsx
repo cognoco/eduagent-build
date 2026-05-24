@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { usePrepareHomework } from '../../../hooks/use-dictation-api';
+import { firstParam } from '../../../lib/route-params';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import * as Crypto from 'expo-crypto';
@@ -16,7 +17,15 @@ export default function TextPreviewScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { ocrText } = useLocalSearchParams<{ ocrText?: string }>();
+  // [WI-269 / DS-180] Expo Router returns `string | string[]` when the same
+  // query key appears more than once in the URL (e.g. a crafted deep link).
+  // Without `firstParam`, the render path's `text.trim()` would throw on an
+  // array, crashing the screen — a client-side denial of the dictation
+  // preview via a deep link.
+  const { ocrText: rawOcrText } = useLocalSearchParams<{
+    ocrText?: string | string[];
+  }>();
+  const ocrText = firstParam(rawOcrText);
   const [text, setText] = useState(ocrText ?? '');
   const prepareMutation = usePrepareHomework();
   const { setData } = useDictationData();

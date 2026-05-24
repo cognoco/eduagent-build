@@ -28,6 +28,7 @@
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.23",
     "@eduagent/schemas": "workspace:*",
+    "@noble/hashes": "^1.8.0",
     "@expo-google-fonts/atkinson-hyperlegible": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
