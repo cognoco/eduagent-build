@@ -27,9 +27,15 @@ module.exports = {
   modulePathIgnorePatterns: [
     '<rootDir>/.worktrees/',
     '[/\\\\]\\.worktrees',
+    '<rootDir>/.tmp/',
+    '[/\\\\]\\.tmp',
     '\\.claude/worktrees',
   ],
-  testPathIgnorePatterns: ['<rootDir>/.worktrees/'],
+  testPathIgnorePatterns: [
+    '<rootDir>/.worktrees/',
+    '<rootDir>/.tmp/',
+    '[/\\\\]\\.tmp',
+  ],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: ['<rootDir>/packages/test-utils/src/**/*.test.ts'],
   coverageDirectory: '<rootDir>/coverage/packages/test-utils',
