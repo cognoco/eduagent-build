@@ -88,6 +88,7 @@ describe('TextPreviewScreen', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 

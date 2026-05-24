@@ -87,7 +87,9 @@ jest.mock('expo-file-system/legacy', () => ({
 
 // DictationData context — valid session
 const mockSetData = jest.fn();
-const validSession = {
+const COMPLETION_KEY = '00000000-0000-4000-8000-000000000001';
+const mockValidSession = {
+  completionKey: COMPLETION_KEY,
   sentences: [{ text: 'The quick brown fox.' }],
   language: 'en',
   mode: 'surprise' as const,
@@ -96,7 +98,7 @@ const validSession = {
 jest.mock('./_layout', () => ({
   // gc1-allow: layout depends on expo-router Stack and native theme — cannot render in JSDOM
   useDictationData: () => ({
-    data: validSession,
+    data: mockValidSession,
     setData: mockSetData,
     clear: jest.fn(),
   }),
@@ -119,6 +121,7 @@ describe('DictationCompleteScreen', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
@@ -127,6 +130,23 @@ describe('DictationCompleteScreen', () => {
     getByTestId('dictation-complete-screen');
     getByTestId('complete-check-writing');
     getByTestId('complete-done');
+  });
+
+  it('[WI-84 DS-115] reuses the session completionKey when recording unreviewed results', async () => {
+    mockRecordMutateAsync.mockResolvedValueOnce(undefined);
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-done'));
+      await Promise.resolve();
+    });
+
+    expect(mockRecordMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completionKey: COMPLETION_KEY,
+        reviewed: false,
+      }),
+    );
   });
 
   // -----------------------------------------------------------------------

@@ -25,15 +25,15 @@ if (typeof WebSocket === 'undefined') {
 export interface CreateDatabaseOptions {
   /**
    * Reuse a Neon WebSocket pool across calls for the same connection string.
-   * Disable this for per-request Cloudflare Worker clients; workerd treats
-   * pooled WebSocket I/O as request-context-bound and can reject later requests.
+   * This is opt-in only; workerd treats pooled WebSocket I/O as
+   * request-context-bound and can reject later requests.
    */
   cacheNeonPool?: boolean;
 }
 
 // Module-level pool cache — survives across requests within the same Cloudflare
-// Worker isolate. Non-Worker callers can opt into this default to avoid repeated
-// Neon WebSocket handshakes.
+// Worker isolate. Callers must opt into this explicitly to avoid repeated Neon
+// WebSocket handshakes.
 //
 // SECURITY: The cache is keyed by a sha256 hash of the DSN rather than the raw
 // DSN. The raw DSN contains the database password in plaintext; using it as a
@@ -98,7 +98,7 @@ export function createDatabase(
   options: CreateDatabaseOptions = {},
 ) {
   if (looksLikeNeon(databaseUrl)) {
-    if (options.cacheNeonPool === false) {
+    if (options.cacheNeonPool !== true) {
       const pool = new NeonPool({
         connectionString: databaseUrl,
         connectionTimeoutMillis: 10_000,

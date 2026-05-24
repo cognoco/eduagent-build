@@ -48,11 +48,14 @@ export default function DictationReviewScreen(): React.ReactElement {
   };
 
   const handleDone = async () => {
+    if (!data) return;
+
     const localDate = new Date().toISOString().slice(0, 10);
     const mistakeCount = mistakes.length;
 
     try {
       await recordResult.mutateAsync({
+        completionKey: data.completionKey,
         localDate,
         sentenceCount: sentences.length,
         mistakeCount,

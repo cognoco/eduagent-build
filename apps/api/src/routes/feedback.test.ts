@@ -204,13 +204,26 @@ describe('POST /feedback', () => {
       body: JSON.stringify({
         category: 'bug',
         message: 'Crash on launch',
+        appVersion: '1.2.3',
+        platform: 'ios',
+        osVersion: '17.5',
       }),
     });
 
     expect(inngest.send).toHaveBeenCalledTimes(1);
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'app/feedback.delivery_failed',
-      data: { profileId: 'profile-bug767-fail', category: 'bug' },
+      data: expect.objectContaining({
+        profileId: 'profile-bug767-fail',
+        userId: 'user-bug767-fail',
+        category: 'bug',
+        message: 'Crash on launch',
+        supportTo: 'support@mentomate.com',
+        metaLines: expect.stringContaining('Profile ID: profile-bug767-fail'),
+        appVersion: '1.2.3',
+        platform: 'ios',
+        osVersion: '17.5',
+      }),
     });
   });
 

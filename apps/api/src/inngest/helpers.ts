@@ -1,4 +1,9 @@
-import { createDatabase, type Database } from '@eduagent/database';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+  closeDatabase,
+  createDatabase,
+  type Database,
+} from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Module-level DATABASE_URL — set by Inngest middleware on CF Workers,
@@ -6,8 +11,26 @@ import { createDatabase, type Database } from '@eduagent/database';
 // ---------------------------------------------------------------------------
 
 let _databaseUrl: string | undefined;
-let _cachedDb: ReturnType<typeof createDatabase> | null = null;
-let _cachedDbUrl: string | null = null;
+const stepDatabaseScope = new AsyncLocalStorage<Set<Database>>();
+
+export async function runWithStepDatabaseScope<T>(
+  callback: () => Promise<T>,
+): Promise<T> {
+  return stepDatabaseScope.run(new Set<Database>(), callback);
+}
+
+export function beginStepDatabaseScope(scope: Set<Database>): void {
+  stepDatabaseScope.enterWith(scope);
+}
+
+export async function closeStepDatabases(
+  scope = stepDatabaseScope.getStore(),
+): Promise<void> {
+  if (!scope) return;
+  const databases = [...scope];
+  scope.clear();
+  await Promise.all(databases.map((db) => closeDatabase(db)));
+}
 
 /** Called by Inngest middleware to inject the DATABASE_URL binding. */
 export function setDatabaseUrl(url: string): void {
@@ -17,8 +40,6 @@ export function setDatabaseUrl(url: string): void {
 /** Reset the injected URL — for test cleanup only. */
 export function resetDatabaseUrl(): void {
   _databaseUrl = undefined;
-  _cachedDb = null;
-  _cachedDbUrl = null;
 }
 
 /**
@@ -28,27 +49,22 @@ export function resetDatabaseUrl(): void {
  * CF Workers). Falls back to `process.env['DATABASE_URL']` so tests running
  * in Node.js keep working without middleware.
  *
- * Caches the Drizzle instance per URL so multiple calls within a single
- * Inngest function execution reuse the same connection.
+ * Creates a fresh Drizzle instance with Neon pool caching disabled so Worker
+ * request-bound WebSocket I/O is not reused across Inngest executions.
  */
 export function getStepDatabase(): Database {
   const url = _databaseUrl ?? process.env['DATABASE_URL'];
   if (!url) {
     throw new Error(
-      'DATABASE_URL not available — ensure Inngest middleware provides env bindings'
+      'DATABASE_URL not available — ensure Inngest middleware provides env bindings',
     );
-  }
-
-  // Reuse existing instance if URL hasn't changed
-  if (_cachedDb && _cachedDbUrl === url) {
-    return _cachedDb;
   }
 
   // Phase 0.0 (RLS plan 2026-04-27): neon-serverless WS driver — real ACID
   // transactions; onTransactionFallback is no longer needed.
-  _cachedDb = createDatabase(url);
-  _cachedDbUrl = url;
-  return _cachedDb;
+  const db = createDatabase(url, { cacheNeonPool: false });
+  stepDatabaseScope.getStore()?.add(db);
+  return db;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,17 +114,17 @@ export function getStepMemoryFactsDedupConfig(): {
     threshold: Number(
       _memoryFactsDedupThreshold ??
         process.env['MEMORY_FACTS_DEDUP_THRESHOLD'] ??
-        '0.15'
+        '0.15',
     ),
     maxLlmCalls: Number(
       _maxDedupLlmCallsPerSession ??
         process.env['MAX_DEDUP_LLM_CALLS_PER_SESSION'] ??
-        '10'
+        '10',
     ),
     rolloutPct: Number(
       _memoryFactsDedupRolloutPct ??
         process.env['MEMORY_FACTS_DEDUP_ROLLOUT_PCT'] ??
-        '0'
+        '0',
     ),
   };
 }
@@ -124,7 +140,7 @@ export function getStepVoyageApiKey(): string {
   const key = _voyageApiKey ?? process.env['VOYAGE_API_KEY'];
   if (!key) {
     throw new Error(
-      'VOYAGE_API_KEY not available — ensure Inngest middleware provides env bindings'
+      'VOYAGE_API_KEY not available — ensure Inngest middleware provides env bindings',
     );
   }
   return key;

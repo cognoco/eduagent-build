@@ -98,6 +98,24 @@ async function sendBatchedEvents(
     }
   }
 
+  if (failedBatches > 0) {
+    const error = new Error(
+      `${input.context} failed to queue ${failedBatches} ${
+        failedBatches === 1 ? 'batch' : 'batches'
+      }`,
+    );
+    captureException(error, {
+      extra: {
+        context: input.context,
+        queuedEvents,
+        queuedBatches,
+        failedBatches,
+        totalEvents: input.events.length,
+      },
+    });
+    throw error;
+  }
+
   return { queuedEvents, queuedBatches, failedBatches };
 }
 

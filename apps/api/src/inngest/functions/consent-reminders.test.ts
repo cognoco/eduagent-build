@@ -3,8 +3,16 @@ const mockGetProfileConsentState = jest.fn();
 const mockRefreshConsentToken = jest
   .fn()
   .mockResolvedValue('refreshed-token-xyz');
+const mockRefreshConsentTokenForRequest = jest.fn().mockResolvedValue({
+  parentEmail: 'parent@example.com',
+  freshToken: 'refreshed-token-xyz',
+});
 const mockDeleteProfileIfNoConsent = jest.fn().mockResolvedValue(true);
 const mockSendEmail = jest.fn();
+const mockConsentFindFirst = jest.fn().mockResolvedValue({
+  parentEmail: 'parent@example.com',
+  consentToken: 'test-token-abc123',
+});
 const mockFormatConsentReminderEmail = jest.fn(
   (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
     to: _email,
@@ -25,9 +33,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
     getStepDatabase: jest.fn(() => ({
       query: {
         consentStates: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue({ consentToken: 'test-token-abc123' }),
+          findFirst: mockConsentFindFirst,
         },
       },
     })),
@@ -50,6 +56,8 @@ jest.mock(
         mockGetProfileConsentState(...args),
       refreshConsentToken: (...args: unknown[]) =>
         mockRefreshConsentToken(...args),
+      refreshConsentTokenForRequest: (...args: unknown[]) =>
+        mockRefreshConsentTokenForRequest(...args),
     };
   },
 );
@@ -92,6 +100,46 @@ interface ProfileConsentState {
   status: string;
   parentEmail: string | null;
   consentType: string;
+  requestedAt?: string | Date;
+}
+
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['name'] === 'string') values.push(obj['name'].toLowerCase());
+  if (
+    'value' in obj &&
+    (typeof obj['value'] === 'string' ||
+      typeof obj['value'] === 'number' ||
+      obj['value'] instanceof Date)
+  ) {
+    const value = obj['value'];
+    values.push(
+      value instanceof Date
+        ? value.toISOString().toLowerCase()
+        : String(value).toLowerCase(),
+    );
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
 }
 
 async function executeHandler(
@@ -100,17 +148,62 @@ async function executeHandler(
     status: 'PARENTAL_CONSENT_REQUESTED',
     parentEmail: 'parent@example.com',
     consentType: 'GDPR',
+    requestedAt: '2026-05-01T00:00:00.000Z',
   },
+  eventData: Record<string, unknown> = {
+    profileId: 'profile-1',
+    consentType: 'GDPR',
+    requestedAt: '2026-05-01T00:00:00.000Z',
+  },
+  latestAnyConsentStatusSequence: (string | null)[] = statusSequence,
 ): Promise<void> {
-  let callIndex = 0;
+  let latestStatusCallIndex = 0;
   mockGetConsentStatus.mockImplementation(async () => {
-    const status = statusSequence[callIndex] ?? null;
-    callIndex++;
+    const status =
+      latestAnyConsentStatusSequence[latestStatusCallIndex] ?? null;
+    latestStatusCallIndex++;
     return status;
   });
 
   // parentEmail is looked up from DB via getProfileConsentState
   mockGetProfileConsentState.mockResolvedValue(profileState);
+  const eventRequestedAt =
+    typeof eventData.requestedAt === 'string' ? eventData.requestedAt : null;
+  const stateRequestedAt =
+    profileState?.requestedAt instanceof Date
+      ? profileState.requestedAt.toISOString()
+      : (profileState?.requestedAt ?? null);
+  let currentRequestStatusCallIndex = 0;
+  mockConsentFindFirst.mockImplementation(async (query: unknown) => {
+    const currentRequestMatches =
+      eventRequestedAt && stateRequestedAt === eventRequestedAt;
+    if (!currentRequestMatches) return null;
+
+    const columns = (query as { columns?: Record<string, boolean> }).columns;
+    if (columns?.status) {
+      const status = statusSequence[currentRequestStatusCallIndex] ?? null;
+      currentRequestStatusCallIndex++;
+      if (!status) return null;
+      return { status };
+    }
+
+    return {
+      id: 'consent-state-1',
+      parentEmail: profileState?.parentEmail ?? null,
+      consentToken: 'test-token-abc123',
+      consentType: profileState?.consentType ?? 'GDPR',
+    };
+  });
+  mockRefreshConsentTokenForRequest.mockResolvedValue(
+    eventRequestedAt && stateRequestedAt === eventRequestedAt
+      ? profileState?.parentEmail
+        ? {
+            parentEmail: profileState.parentEmail,
+            freshToken: 'refreshed-token-xyz',
+          }
+        : null
+      : null,
+  );
 
   const { step } = createInngestStepRunner();
 
@@ -119,10 +212,7 @@ async function executeHandler(
     event: {
       id: 'evt-test-1',
       name: 'app/consent.requested',
-      data: {
-        profileId: 'profile-1',
-        consentType: 'GDPR',
-      },
+      data: eventData,
     },
     step,
   });
@@ -130,6 +220,14 @@ async function executeHandler(
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockConsentFindFirst.mockResolvedValue({
+    parentEmail: 'parent@example.com',
+    consentToken: 'test-token-abc123',
+  });
+  mockRefreshConsentTokenForRequest.mockResolvedValue({
+    parentEmail: 'parent@example.com',
+    freshToken: 'refreshed-token-xyz',
+  });
 });
 
 describe('consentReminder', () => {
@@ -171,7 +269,11 @@ describe('consentReminder', () => {
 
     // 3 reminder emails + 1 atomic delete via db.execute
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
-    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
+    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-1',
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
   });
 
   // [IMP-2] Token URL must reach the email body, not just the format call
@@ -211,9 +313,22 @@ describe('consentReminder', () => {
   it('[DS-020] refreshes the consent token before building day-7 and day-14 reminder URLs', async () => {
     await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
 
-    // refreshConsentToken must be called once per reminder that embeds a link
+    // refreshConsentTokenForRequest must be called once per reminder that embeds a link
     // (day-7 and day-14) — NOT for day-25 (no link) and NOT for day-30 (delete).
-    expect(mockRefreshConsentToken).toHaveBeenCalledTimes(2);
+    expect(mockRefreshConsentTokenForRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('[WI-84 review] binds fresh-token minting to the requestedAt generation', async () => {
+    await executeHandler(['PENDING', 'CONSENTED', 'CONSENTED', 'CONSENTED']);
+
+    expect(mockRefreshConsentTokenForRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        profileId: 'profile-1',
+        requestedAt: new Date('2026-05-01T00:00:00.000Z'),
+        requestedAtUpperBound: new Date('2026-05-01T00:00:00.001Z'),
+      },
+    );
   });
 
   it('[DS-020] day-14 reminder URL uses the refreshed token, not the stale DB token', async () => {
@@ -252,14 +367,95 @@ describe('consentReminder', () => {
     expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
   });
 
+  it('[WI-84 review] ignores terminal COPPA status when the GDPR request is still pending', async () => {
+    await executeHandler(
+      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+      undefined,
+      undefined,
+      ['CONSENTED', 'CONSENTED', 'CONSENTED', 'CONSENTED'],
+    );
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(3);
+    expect(mockDeleteProfileIfNoConsent).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-1',
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
+  });
+
   it('does not send email when parentEmail is not found in DB', async () => {
-    // Pass null profile state so parentEmail lookup returns null
-    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING'], null);
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING'], {
+      status: 'PARENTAL_CONSENT_REQUESTED',
+      parentEmail: null,
+      consentType: 'GDPR',
+      requestedAt: '2026-05-01T00:00:00.000Z',
+    });
 
     // No emails sent because parentEmail lookup returns null
     expect(mockSendEmail).not.toHaveBeenCalled();
     // Atomic delete still happens because consent status is PENDING
     expect(mockDeleteProfileIfNoConsent).toHaveBeenCalled();
+  });
+
+  it('[WI-84 DS-021] skips stale reminder runs when latest consent request has a newer requestedAt', async () => {
+    await executeHandler(
+      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+      {
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+        requestedAt: '2026-05-20T00:00:00.000Z',
+      },
+      {
+        profileId: 'profile-1',
+        consentType: 'GDPR',
+        requestedAt: '2026-05-01T00:00:00.000Z',
+      },
+    );
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 DS-021] skips legacy reminder events without requestedAt because they cannot prove freshness', async () => {
+    await executeHandler(
+      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+      {
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+        requestedAt: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        profileId: 'profile-1',
+        consentType: 'GDPR',
+      },
+    );
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
+  });
+
+  it('[WI-84 review] reads reminder contact details from the same requestedAt generation', async () => {
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'WITHDRAWN']);
+
+    const firstCall = mockConsentFindFirst.mock.calls[0]?.[0] as
+      | { where?: unknown }
+      | undefined;
+    const whereText = extractSqlTextAndValues(firstCall?.where).join(' ');
+    expect(whereText).toContain('profile-1');
+    expect(whereText).toContain('2026-05-01t00:00:00.000z');
+  });
+
+  it('[WI-84 review] matches requestedAt with a half-open millisecond window', async () => {
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'WITHDRAWN']);
+
+    const firstCall = mockConsentFindFirst.mock.calls[0]?.[0] as
+      | { where?: unknown }
+      | undefined;
+    const whereText = extractSqlTextAndValues(firstCall?.where).join(' ');
+    expect(whereText).toContain('2026-05-01t00:00:00.000z');
+    expect(whereText).toContain('2026-05-01t00:00:00.001z');
   });
 
   // [BUG-699] Inngest step retries can replay sendEmail. Each reminder step

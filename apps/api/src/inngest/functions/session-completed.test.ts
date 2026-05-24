@@ -546,6 +546,7 @@ function createEventData(
 describe('sessionCompleted', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (createDatabase as jest.Mock).mockReturnValue(mockSessionCompletedDb);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
     process.env['VOYAGE_API_KEY'] = 'pa-test-key-123';
     // Default: pending consent — analyze-learner-profile step short-circuits.
@@ -1021,16 +1022,16 @@ describe('sessionCompleted', () => {
   });
 
   describe('update-vocabulary-retention step', () => {
-    // getStepDatabase() caches the db instance per URL. We need to reset
-    // the cache before each test so the fresh createDatabase() mock is used.
-    // Import the reset helper from the inngest helpers module.
+    // Import the reset helper from the inngest helpers module so this describe
+    // controls the injected URL independently from the other session tests.
     const { resetDatabaseUrl } = require('../helpers');
 
     function setupSubjectMock(subjectData: Record<string, unknown> | null) {
-      // Reset the db cache so getStepDatabase() calls createDatabase() again
       resetDatabaseUrl();
-      // Override the createDatabase mock to return a db with the desired subject
-      (createDatabase as jest.Mock).mockImplementationOnce(() => {
+      // Override the createDatabase mock to return a db with the desired subject.
+      // Multiple session-completed steps call getStepDatabase(); a one-shot mock
+      // can be consumed before update-vocabulary-retention runs.
+      (createDatabase as jest.Mock).mockImplementation(() => {
         const joinable = (): any => ({
           innerJoin: () => joinable(),
           where: () => ({

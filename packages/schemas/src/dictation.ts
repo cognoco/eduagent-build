@@ -70,6 +70,7 @@ export type DictationReviewResult = z.infer<typeof dictationReviewResultSchema>;
 // --- dictation result input (for recording results) ---
 
 export const recordDictationResultInputSchema = z.object({
+  completionKey: z.string().uuid().optional(),
   localDate: z.string().date(),
   sentenceCount: z.number().int().positive(),
   mistakeCount: z.number().int().nonnegative().nullable().optional(),
@@ -96,6 +97,7 @@ export type DictationReviewInput = z.infer<typeof dictationReviewInputSchema>;
 export const dictationResultSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
+  completionKey: z.string().uuid(),
   date: z.string().date(),
   sentenceCount: z.number().int().positive(),
   mistakeCount: z.number().int().nonnegative().nullable(),

@@ -109,6 +109,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       </View>
     );
   }
+  const completionKey = data.completionKey;
 
   // [E2E] When EXPO_PUBLIC_E2E=1 the dev-client build exposes a gallery picker
   // button (complete-pick-gallery testID). The wrapper script plants a test JPEG
@@ -237,6 +238,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
     try {
       await recordResult.mutateAsync({
+        completionKey,
         localDate,
         sentenceCount: sentences.length,
         mistakeCount: null,

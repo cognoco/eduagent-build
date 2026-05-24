@@ -105,6 +105,7 @@ describe('DictationChoiceScreen', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 

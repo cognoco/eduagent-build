@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   uniqueIndex,
   integer,
   pgEnum,
@@ -8,6 +9,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
 import { profiles } from './profiles';
 
@@ -25,6 +27,9 @@ export const dictationResults = pgTable(
     profileId: uuid('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
+    completionKey: uuid('completion_key')
+      .notNull()
+      .default(sql`gen_random_uuid()`),
     date: date('date').notNull(),
     sentenceCount: integer('sentence_count').notNull(),
     mistakeCount: integer('mistake_count'),
@@ -34,12 +39,15 @@ export const dictationResults = pgTable(
       .notNull()
       .defaultNow(),
   },
-  // [BUG-4] Unique on (profile_id, date, mode) so a client retry of the same
-  // dictation completion is idempotent at the DB layer. A learner can still
-  // legitimately do two dictations on the same day in different modes
-  // (homework + surprise) — those land in separate rows. The index also
-  // backs the streak query, which scans by (profile_id, date desc).
+  // [WI-84 rollout] Keep the legacy date/mode uniqueness during the expand
+  // deploy so old Workers still have a backing ON CONFLICT target. A follow-up
+  // contract migration can make completionKey unique once all deployed Workers
+  // write against that conflict target.
   (table) => [
+    index('idx_dictation_results_profile_completion_key').on(
+      table.profileId,
+      table.completionKey,
+    ),
     uniqueIndex('uniq_dictation_results_profile_date_mode').on(
       table.profileId,
       table.date,

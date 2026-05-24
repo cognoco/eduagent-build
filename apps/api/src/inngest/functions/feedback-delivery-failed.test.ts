@@ -72,6 +72,8 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
@@ -85,6 +87,32 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
+
+type FeedbackRetryEventData = {
+  profileId: string;
+  category: 'bug' | 'suggestion' | 'other';
+  message: string;
+  userId: string;
+  metaLines: string;
+  supportTo?: string;
+};
+
+function feedbackRetryEvent(
+  overrides: Partial<FeedbackRetryEventData> = {},
+): FeedbackRetryEventData {
+  const profileId = overrides.profileId ?? 'p-1';
+  const userId = overrides.userId ?? 'user-1';
+  return {
+    profileId,
+    category: overrides.category ?? 'bug',
+    message: overrides.message ?? 'The original feedback message',
+    userId,
+    metaLines:
+      overrides.metaLines ??
+      `Profile ID: ${profileId}\nUser ID: ${userId}\nSubmitted: 2026-05-23T00:00:00.000Z`,
+    ...(overrides.supportTo ? { supportTo: overrides.supportTo } : {}),
+  };
+}
 
 async function executeHandler(eventData: unknown, eventId?: string) {
   const { step } = createInngestStepRunner();
@@ -115,6 +143,17 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       const config = (feedbackDeliveryFailed as any).opts;
       expect(config.id).toBe('feedback-delivery-failed');
       expect(config.retries).toBe(2);
+    });
+
+    it('[WI-84 automated review] composes feedback payload validation from the shared schema contract', () => {
+      const source = readFileSync(
+        join(__dirname, 'feedback-delivery-failed.ts'),
+        'utf8',
+      );
+
+      expect(source).toContain("from '@eduagent/schemas'");
+      expect(source).toContain('feedbackSubmissionSchema');
+      expect(source).not.toContain("z.enum(['bug', 'suggestion', 'other'])");
     });
   });
 
@@ -163,10 +202,12 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     it('calls sendEmail with configured Resend key + emailFrom', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
-      await executeHandler({
-        profileId: 'profile-abc-12345678',
-        category: 'bug',
-      });
+      await executeHandler(
+        feedbackRetryEvent({
+          profileId: 'profile-abc-12345678',
+          category: 'bug',
+        }),
+      );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(1);
       const [emailArg, configArg] = mockSendEmail.mock.calls[0];
@@ -180,21 +221,53 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     it('formats subject differently per category', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
-      await executeHandler({ profileId: 'p-1', category: 'suggestion' });
+      await executeHandler(
+        feedbackRetryEvent({ profileId: 'p-1', category: 'suggestion' }),
+      );
       expect(mockSendEmail.mock.calls[0][0].subject).toContain('Suggestion');
 
       mockSendEmail.mockClear();
-      await executeHandler({ profileId: 'p-1', category: 'other' });
+      await executeHandler(
+        feedbackRetryEvent({ profileId: 'p-1', category: 'other' }),
+      );
       expect(mockSendEmail.mock.calls[0][0].subject).toContain('Feedback');
     });
 
     it('returns ok on successful retry', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
-      const { result } = await executeHandler({
-        profileId: 'p-1',
-        category: 'bug',
-      });
+      const { result } = await executeHandler(
+        feedbackRetryEvent({
+          profileId: 'p-1',
+          category: 'bug',
+        }),
+      );
       expect(result).toEqual({ ok: true, profileId: 'p-1' });
+    });
+
+    it('[WI-84 DS-030] retries the original feedback message and metadata instead of a placeholder', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler(
+        feedbackRetryEvent({
+          profileId: 'profile-original-payload',
+          userId: 'user-original-payload',
+          category: 'bug',
+          message: 'Original crash report from the user',
+          supportTo: 'feedback-ops@test.com',
+          metaLines:
+            'Profile ID: profile-original-payload\nUser ID: user-original-payload\nPlatform: ios',
+        }),
+        'evt-original-payload',
+      );
+
+      const [emailArg] = mockSendEmail.mock.calls[0] as [
+        { to: string; body: string },
+      ];
+      expect(emailArg.to).toBe('feedback-ops@test.com');
+      expect(emailArg.body).toContain('Original crash report from the user');
+      expect(emailArg.body).toContain('Profile ID: profile-original-payload');
+      expect(emailArg.body).toContain('User ID: user-original-payload');
+      expect(emailArg.body).not.toContain('[Delayed delivery]');
     });
 
     // [BUG-699-FOLLOWUP] Inngest step retries (retries: 2) can replay the
@@ -204,7 +277,10 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
       await executeHandler(
-        { profileId: 'profile-xyz-99999999', category: 'bug' },
+        feedbackRetryEvent({
+          profileId: 'profile-xyz-99999999',
+          category: 'bug',
+        }),
         'evt-feedback-123',
       );
 
@@ -232,9 +308,13 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
       // Simulate first attempt (no eventId).
-      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+      await executeHandler(
+        feedbackRetryEvent({ profileId: 'profile-no-id', category: 'bug' }),
+      );
       // Simulate second attempt (Inngest retry, same payload, still no eventId).
-      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+      await executeHandler(
+        feedbackRetryEvent({ profileId: 'profile-no-id', category: 'bug' }),
+      );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(2);
       const keyFirst = (
@@ -259,8 +339,12 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     it('[CR-IDEMP-FALLBACK-08] distinct payloads with no event.id produce distinct hash keys', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
-      await executeHandler({ profileId: 'profile-A', category: 'bug' });
-      await executeHandler({ profileId: 'profile-B', category: 'bug' });
+      await executeHandler(
+        feedbackRetryEvent({ profileId: 'profile-A', category: 'bug' }),
+      );
+      await executeHandler(
+        feedbackRetryEvent({ profileId: 'profile-B', category: 'bug' }),
+      );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(2);
       const keyA = (
@@ -275,6 +359,34 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       expect(keyA).not.toEqual(keyB);
     });
 
+    it('[WI-84 DS-030] distinct retry payloads without event.id produce distinct hash keys', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler(
+        feedbackRetryEvent({
+          profileId: 'profile-same',
+          category: 'bug',
+          message: 'First failed feedback payload',
+        }),
+      );
+      await executeHandler(
+        feedbackRetryEvent({
+          profileId: 'profile-same',
+          category: 'bug',
+          message: 'Second failed feedback payload',
+        }),
+      );
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyA = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keyB = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      expect(keyA).not.toEqual(keyB);
+    });
+
     // [CR-MISSING-EVENT-ID-VISIBILITY] Break test: when event.id is absent the
     // fallback path must emit a structured logger.warn and captureException so
     // ops can count occurrences in log aggregation and Sentry dashboards.
@@ -284,7 +396,10 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       // No eventId — simulates Inngest replay without an event id.
       await executeHandler(
-        { profileId: 'profile-no-id-visibility', category: 'suggestion' },
+        feedbackRetryEvent({
+          profileId: 'profile-no-id-visibility',
+          category: 'suggestion',
+        }),
         undefined,
       );
 
@@ -322,11 +437,11 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
       await executeHandler(
-        { profileId: 'profile-shared', category: 'bug' },
+        feedbackRetryEvent({ profileId: 'profile-shared', category: 'bug' }),
         'evt-A',
       );
       await executeHandler(
-        { profileId: 'profile-shared', category: 'bug' },
+        feedbackRetryEvent({ profileId: 'profile-shared', category: 'bug' }),
         'evt-B',
       );
 
@@ -349,7 +464,10 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       await expect(
         // Pass an eventId so the missing-event-id visibility path doesn't fire.
-        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-1'),
+        executeHandler(
+          feedbackRetryEvent({ profileId: 'p-1', category: 'bug' }),
+          'evt-retry-1',
+        ),
       ).rejects.toThrow(/feedback-delivery-failed retry unsuccessful/);
     });
 
@@ -362,7 +480,10 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       await expect(
         // Pass an eventId so the missing-event-id visibility path doesn't fire,
         // keeping captureException call count at exactly 1 (the retry failure).
-        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-2'),
+        executeHandler(
+          feedbackRetryEvent({ profileId: 'p-1', category: 'bug' }),
+          'evt-retry-2',
+        ),
       ).rejects.toThrow();
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -393,7 +514,9 @@ describe('[FIX-INNGEST-5] uses getStepSupportEmail() not process.env', () => {
     mockSendEmail.mockResolvedValue({ sent: true });
     mockGetStepSupportEmail.mockReturnValue('ops@company.com');
 
-    await executeHandler({ profileId: 'p-1', category: 'bug' });
+    await executeHandler(
+      feedbackRetryEvent({ profileId: 'p-1', category: 'bug' }),
+    );
 
     expect(mockGetStepSupportEmail).toHaveBeenCalled();
     const [emailArg] = mockSendEmail.mock.calls[0] as [{ to: string }];
@@ -409,7 +532,9 @@ describe('[FIX-INNGEST-5] uses getStepSupportEmail() not process.env', () => {
     delete process.env['SUPPORT_EMAIL'];
     mockGetStepSupportEmail.mockReturnValue('support@mentomate.com');
 
-    await executeHandler({ profileId: 'p-1', category: 'bug' });
+    await executeHandler(
+      feedbackRetryEvent({ profileId: 'p-1', category: 'bug' }),
+    );
 
     // Even with no process.env value, email was sent to the injected address
     const [emailArg] = mockSendEmail.mock.calls[0] as [{ to: string }];

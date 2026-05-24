@@ -141,6 +141,8 @@ export interface ResetOptions {
    * for DB cleanup. Used by scripts/clean-clerk-test-users.mjs to keep Clerk
    * HTTP calls out of the Worker invocation (Cloudflare 50-subrequest limit). */
   clerkUserIds?: string[];
+  /** Clerk IDs already verified by the local cleanup script as seed-managed. */
+  verifiedSeedClerkUserIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +154,20 @@ interface ClerkUser {
   primary_email_address_id?: string | null;
   email_addresses: Array<{ id?: string; email_address: string }>;
   external_id: string | null;
+}
+
+function isSeedManagedClerkUserId(
+  clerkUserId: string,
+  seedClerkUserIds: string[] = [],
+): boolean {
+  return (
+    clerkUserId.startsWith(SEED_CLERK_PREFIX) ||
+    seedClerkUserIds.includes(clerkUserId)
+  );
+}
+
+function isSeedManagedClerkUser(user: ClerkUser): boolean {
+  return user.external_id?.startsWith(SEED_CLERK_PREFIX) === true;
 }
 
 /**
@@ -182,6 +198,11 @@ async function createClerkTestUser(
   const seedExternalId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
 
   if (existingUser) {
+    if (!isSeedManagedClerkUser(existingUser)) {
+      throw new Error(
+        `Refusing to reuse non-seed Clerk user for seed email ${email}`,
+      );
+    }
     userId = existingUser.id;
   } else {
     // Step 2: Create user (password set here may silently fail for special chars)
@@ -323,11 +344,57 @@ async function deleteClerkTestUsers(
   env: SeedEnv,
   options: ResetOptions = {},
 ): Promise<{ count: number; clerkUserIds: string[] }> {
-  if (!env.CLERK_SECRET_KEY) return { count: 0, clerkUserIds: [] };
-  const prefix = options.prefix?.trim().toLowerCase();
+  const seedUsers = await listSeedClerkUsers(env, options);
 
-  // Paginate through Clerk users and filter client-side by external_id prefix.
-  // Clerk's list users API supports `limit` and `offset` for pagination.
+  let deleted = 0;
+  const deletedIds: string[] = [];
+
+  for (const user of seedUsers) {
+    // Revert bypass_client_trust before deleting — belt-and-suspenders in case
+    // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
+    await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bypass_client_trust: false }),
+    }).catch((_e: unknown) => {
+      // Best-effort — don't block cleanup if PATCH fails
+    });
+
+    const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    });
+    if (delRes.ok) {
+      deleted++;
+      deletedIds.push(user.id);
+    }
+  }
+
+  return { count: deleted, clerkUserIds: deletedIds };
+}
+
+async function verifySeedClerkUserIds(
+  env: SeedEnv,
+  clerkUserIds: string[],
+  options: ResetOptions = {},
+): Promise<string[]> {
+  if (clerkUserIds.length === 0) return [];
+  const requestedIds = new Set(clerkUserIds);
+  const seedUsers = await listSeedClerkUsers(env, options);
+  return seedUsers
+    .filter((user) => requestedIds.has(user.id))
+    .map((user) => user.id);
+}
+
+async function listSeedClerkUsers(
+  env: SeedEnv,
+  options: ResetOptions = {},
+): Promise<ClerkUser[]> {
+  if (!env.CLERK_SECRET_KEY) return [];
+  const prefix = options.prefix?.trim().toLowerCase();
   const seedUsers: ClerkUser[] = [];
   let offset = 0;
   const pageSize = 100;
@@ -364,34 +431,7 @@ async function deleteClerkTestUsers(
     offset += pageSize;
   }
 
-  let deleted = 0;
-  const deletedIds: string[] = [];
-
-  for (const user of seedUsers) {
-    // Revert bypass_client_trust before deleting — belt-and-suspenders in case
-    // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
-    await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ bypass_client_trust: false }),
-    }).catch((_e: unknown) => {
-      // Best-effort — don't block cleanup if PATCH fails
-    });
-
-    const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-    });
-    if (delRes.ok) {
-      deleted++;
-      deletedIds.push(user.id);
-    }
-  }
-
-  return { count: deleted, clerkUserIds: deletedIds };
+  return seedUsers;
 }
 
 // ---------------------------------------------------------------------------
@@ -3597,21 +3637,25 @@ export async function seedScenario(
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  // Idempotent: delete existing accounts with the same email before seeding.
-  // Defence-in-depth: look up by email first, then delete by PK only if the
-  // account has a recognizable seed marker (clerk_seed_* prefix) or real Clerk
-  // user ID (user_* prefix from seed runs with CLERK_SECRET_KEY).
-  // This avoids a blind `DELETE WHERE email = ?` which would be dangerous if
-  // the environment guard ever failed (COPPA-regulated platform).
+  const seedMarkedClerkUser =
+    env.CLERK_SECRET_KEY != null
+      ? await findClerkUserByEmail(email, env)
+      : null;
+  const seedClerkUserIds =
+    seedMarkedClerkUser?.external_id?.startsWith(SEED_CLERK_PREFIX) === true
+      ? [seedMarkedClerkUser.id]
+      : [];
+
+  // Idempotent: delete existing seed accounts with the same email before
+  // seeding. Defence-in-depth: look up by email first, then delete by PK only
+  // if the account has a recognizable local seed marker (clerk_seed_* prefix)
+  // or a real Clerk user ID that Clerk itself marks with our seed external_id.
   // Child tables cascade via ON DELETE CASCADE.
   const existingAccounts = await db.query.accounts.findMany({
     where: eq(accounts.email, email),
   });
   for (const existing of existingAccounts) {
-    if (
-      existing.clerkUserId.startsWith(SEED_CLERK_PREFIX) ||
-      existing.clerkUserId.startsWith('user_')
-    ) {
+    if (isSeedManagedClerkUserId(existing.clerkUserId, seedClerkUserIds)) {
       await db.delete(accounts).where(eq(accounts.id, existing.id));
     }
   }
@@ -3626,17 +3670,58 @@ export async function resetDatabase(
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
 
-  // If caller supplied clerkUserIds, skip Clerk deletion (caller already did it
-  // — typically the clean-clerk-test-users.mjs script, which runs locally to
-  // avoid Cloudflare's 50-subrequest-per-Worker limit on bulk cleanup).
-  const { count: clerkUsersDeleted, clerkUserIds } = options.clerkUserIds
-    ? { count: 0, clerkUserIds: options.clerkUserIds }
-    : await deleteClerkTestUsers(env, { prefix });
+  const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
+    ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
+        prefix,
+      })
+    : undefined;
+
+  if (
+    options.verifiedSeedClerkUserIds &&
+    verifiedSeedClerkUserIds?.length === 0
+  ) {
+    return { deletedCount: 0, clerkUsersDeleted: 0 };
+  }
+
+  // If caller supplied server-verifiable Clerk IDs, skip Clerk deletion
+  // because the cleanup script handles Clerk locally after DB rows are removed.
+  const { count: clerkUsersDeleted, clerkUserIds } =
+    options.clerkUserIds || verifiedSeedClerkUserIds
+      ? {
+          count: 0,
+          clerkUserIds:
+            verifiedSeedClerkUserIds ??
+            (options.clerkUserIds ?? []).filter((id) =>
+              id.startsWith(SEED_CLERK_PREFIX),
+            ),
+        }
+      : await deleteClerkTestUsers(env, { prefix });
+
+  if (
+    options.clerkUserIds &&
+    !options.verifiedSeedClerkUserIds &&
+    clerkUserIds.length === 0
+  ) {
+    return { deletedCount: 0, clerkUsersDeleted };
+  }
 
   if (prefix) {
+    const existingAccounts = await db.query.accounts.findMany({
+      where: like(accounts.email, `${prefix}%`),
+    });
+    const seedAccountIds = existingAccounts
+      .filter((account) =>
+        isSeedManagedClerkUserId(account.clerkUserId, clerkUserIds),
+      )
+      .map((account) => account.id);
+
+    if (seedAccountIds.length === 0) {
+      return { deletedCount: 0, clerkUsersDeleted };
+    }
+
     const deleted = await db
       .delete(accounts)
-      .where(like(accounts.email, `${prefix}%`))
+      .where(inArray(accounts.id, seedAccountIds))
       .returning({ id: accounts.id });
 
     return { deletedCount: deleted.length, clerkUsersDeleted };

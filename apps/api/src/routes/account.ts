@@ -20,7 +20,7 @@ import {
 } from '../services/deletion';
 import { generateExport } from '../services/export';
 import { inngest } from '../inngest/client';
-import { safeSend } from '../services/safe-non-core';
+import { captureException } from '../services/sentry';
 import { NotFoundError, apiError } from '../errors';
 
 type AccountRouteEnv = {
@@ -70,24 +70,47 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       account.id,
     );
 
-    if (scheduledNow) {
+    try {
       const profileIds = await getProfileIdsForAccount(db, account.id);
 
-      // [CR-SILENT-RECOVERY-2] Account deletion is GDPR-relevant -- safeSend
-      // escalates dispatch failures to Sentry so on-call gets paged on aggregate
-      // dispatch-failure spikes. Mirrors the consent.ts [A-23] pattern.
-      await safeSend(
-        () =>
-          inngest.send({
-            name: 'app/account.deletion-scheduled',
-            data: {
+      // core-send: account deletion must not claim scheduling if Inngest rejects the durable handoff.
+      // Re-dispatch for already scheduled deletions too; the Inngest function
+      // is idempotent by accountId, and retrying recovers a prior orphaned
+      // schedule where the DB write succeeded but the durable handoff did not.
+      await inngest.send({
+        name: 'app/account.deletion-scheduled',
+        data: {
+          accountId: account.id,
+          profileIds,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      captureException(error, {
+        extra: {
+          surface: 'account.deletion',
+          kind: 'core-send',
+          accountId: account.id,
+        },
+      });
+      if (scheduledNow) {
+        try {
+          await cancelDeletion(db, account.id);
+        } catch (rollbackError) {
+          captureException(rollbackError, {
+            extra: {
+              surface: 'account.deletion',
+              kind: 'core-send-rollback',
               accountId: account.id,
-              profileIds,
-              timestamp: new Date().toISOString(),
             },
-          }),
-        'account.deletion',
-        { accountId: account.id },
+          });
+        }
+      }
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Account deletion could not be scheduled. Please try again.',
       );
     }
 

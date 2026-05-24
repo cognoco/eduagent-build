@@ -278,6 +278,7 @@ describe('dictationReviewResultSchema', () => {
 
 describe('recordDictationResultInputSchema', () => {
   const validInput = {
+    completionKey: UUID,
     localDate: '2025-01-15',
     sentenceCount: 5,
     mistakeCount: 1,
@@ -288,8 +289,24 @@ describe('recordDictationResultInputSchema', () => {
 
   it('accepts valid input', () => {
     const parsed = recordDictationResultInputSchema.parse(validInput);
+    expect(parsed.completionKey).toBe(UUID);
     expect(parsed.mode).toBe('homework');
     expect(parsed.reviewed).toBe(true);
+  });
+
+  it('[WI-84 review] accepts missing completionKey for legacy clients', () => {
+    const { completionKey: _, ...rest } = validInput;
+    const parsed = recordDictationResultInputSchema.parse(rest);
+    expect(parsed.completionKey).toBeUndefined();
+  });
+
+  it('[WI-84 review] rejects malformed completionKey when provided', () => {
+    const result = recordDictationResultInputSchema.safeParse({
+      ...validInput,
+      completionKey: 'not-a-uuid',
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('defaults reviewed to false', () => {
@@ -412,6 +429,7 @@ describe('dictationResultSchema', () => {
   const validResult = {
     id: UUID,
     profileId: UUID,
+    completionKey: UUID,
     date: '2025-01-15',
     sentenceCount: 5,
     mistakeCount: 1,
@@ -477,6 +495,7 @@ describe('recordDictationResultResponseSchema', () => {
     const validResult = {
       id: UUID,
       profileId: UUID,
+      completionKey: UUID,
       date: '2025-01-15',
       sentenceCount: 5,
       mistakeCount: 0,
