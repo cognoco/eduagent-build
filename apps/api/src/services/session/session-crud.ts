@@ -68,6 +68,7 @@ import { escapeXml } from '../llm/sanitize';
 import { createLogger } from '../logger';
 import { addBreadcrumb, captureException } from '../sentry';
 import type { TimedEvent } from './session-context-builders';
+import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
 
 const logger = createLogger();
 
@@ -412,7 +413,7 @@ async function findFirstAvailableTopicId(
       )
       .limit(1);
     if (!book) {
-      throw new Error('Book not found in this subject');
+      throw new NotFoundError('Book');
     }
   }
 
@@ -1780,23 +1781,10 @@ async function hydrateChildSessions(
         })
       : Promise.resolve([]),
     uniqueTopicIds.length > 0
-      ? db
-          .select({
-            id: curriculumTopics.id,
-            title: curriculumTopics.title,
-          })
-          .from(curriculumTopics)
-          .innerJoin(
-            curriculumBooks,
-            eq(curriculumTopics.bookId, curriculumBooks.id),
-          )
-          .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
-          .where(
-            and(
-              inArray(curriculumTopics.id, uniqueTopicIds),
-              eq(subjects.profileId, profileId),
-            ),
-          )
+      ? findOwnedCurriculumTopics(db, {
+          profileId,
+          topicIds: uniqueTopicIds,
+        })
       : Promise.resolve([]),
     // Fluency-drill outcomes for each session, oldest first. Sparse: most
     // ai_response rows have null drill columns, so the IS NOT NULL filter
@@ -1824,7 +1812,7 @@ async function hydrateChildSessions(
     summaries.map((summary) => [summary.sessionId, summary]),
   );
   const subjectNameById = new Map(subjectRows.map((s) => [s.id, s.name]));
-  const topicTitleById = new Map(topicRows.map((t) => [t.id, t.title]));
+  const topicById = new Map(topicRows.map((t) => [t.topicId, t]));
   const drillsBySession = new Map<string, ChildSessionDrillScore[]>();
   for (const row of drillRows) {
     if (row.drillCorrect == null || row.drillTotal == null) continue;
@@ -1837,35 +1825,40 @@ async function hydrateChildSessions(
     drillsBySession.set(row.sessionId, list);
   }
 
-  return ownedSessions.map((s) => {
-    const metadata = getSessionMetadata(s.metadata);
-    const homeworkSummary = normalizeHomeworkSummary(
-      metadata.homeworkSummary ?? null,
-    );
+  return ownedSessions
+    .filter((s) => subjectNameById.has(s.subjectId))
+    .map((s) => {
+      const metadata = getSessionMetadata(s.metadata);
+      const homeworkSummary = normalizeHomeworkSummary(
+        metadata.homeworkSummary ?? null,
+      );
 
-    const summary = summaryBySession.get(s.id);
+      const summary = summaryBySession.get(s.id);
+      const topic = s.topicId ? topicById.get(s.topicId) : null;
+      const ownedTopic =
+        topic && topic.subjectId === s.subjectId ? topic : null;
 
-    return {
-      sessionId: s.id,
-      subjectId: s.subjectId,
-      subjectName: subjectNameById.get(s.subjectId) ?? null,
-      topicId: s.topicId,
-      topicTitle: s.topicId ? (topicTitleById.get(s.topicId) ?? null) : null,
-      sessionType: s.sessionType,
-      startedAt: s.startedAt.toISOString(),
-      endedAt: s.endedAt?.toISOString() ?? null,
-      exchangeCount: s.exchangeCount,
-      escalationRung: s.escalationRung,
-      durationSeconds: s.durationSeconds,
-      wallClockSeconds: s.wallClockSeconds,
-      displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
-      displaySummary: homeworkSummary?.summary ?? null,
-      homeworkSummary,
-      highlight: summary?.highlight ?? null,
-      narrative: summary?.narrative ?? null,
-      conversationPrompt: summary?.conversationPrompt ?? null,
-      engagementSignal: parseEngagementSignal(summary?.engagementSignal),
-      drills: drillsBySession.get(s.id) ?? [],
-    };
-  });
+      return {
+        sessionId: s.id,
+        subjectId: s.subjectId,
+        subjectName: subjectNameById.get(s.subjectId) ?? null,
+        topicId: ownedTopic?.topicId ?? null,
+        topicTitle: ownedTopic?.topicTitle ?? null,
+        sessionType: s.sessionType,
+        startedAt: s.startedAt.toISOString(),
+        endedAt: s.endedAt?.toISOString() ?? null,
+        exchangeCount: s.exchangeCount,
+        escalationRung: s.escalationRung,
+        durationSeconds: s.durationSeconds,
+        wallClockSeconds: s.wallClockSeconds,
+        displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
+        displaySummary: homeworkSummary?.summary ?? null,
+        homeworkSummary,
+        highlight: summary?.highlight ?? null,
+        narrative: summary?.narrative ?? null,
+        conversationPrompt: summary?.conversationPrompt ?? null,
+        engagementSignal: parseEngagementSignal(summary?.engagementSignal),
+        drills: drillsBySession.get(s.id) ?? [],
+      };
+    });
 }

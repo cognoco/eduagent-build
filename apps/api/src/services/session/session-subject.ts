@@ -3,14 +3,9 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, desc, gte, inArray } from 'drizzle-orm';
-import {
-  learningSessions,
-  curriculumTopics,
-  curriculumBooks,
-  subjects,
-  type Database,
-} from '@eduagent/database';
+import { learningSessions, subjects, type Database } from '@eduagent/database';
 import type { SubjectSession } from '@eduagent/schemas';
+import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
 
 const SUBJECT_SESSIONS_LIMIT = 50;
 
@@ -24,47 +19,51 @@ const SUBJECT_SESSIONS_LIMIT = 50;
 export async function getSubjectSessions(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<SubjectSession[]> {
   const rows = await db
     .select({
       id: learningSessions.id,
       topicId: learningSessions.topicId,
-      topicTitle: curriculumTopics.title,
-      bookId: curriculumBooks.id,
-      bookTitle: curriculumBooks.title,
-      chapter: curriculumTopics.chapter,
       sessionType: learningSessions.sessionType,
       durationSeconds: learningSessions.durationSeconds,
       createdAt: learningSessions.createdAt,
     })
     .from(learningSessions)
     .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
-    .leftJoin(
-      curriculumTopics,
-      eq(learningSessions.topicId, curriculumTopics.id)
-    )
-    .leftJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
     .where(
       and(
+        eq(learningSessions.profileId, profileId),
         eq(learningSessions.subjectId, subjectId),
         eq(subjects.profileId, profileId),
         inArray(learningSessions.status, ['completed', 'auto_closed']),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     )
     .orderBy(desc(learningSessions.createdAt))
     .limit(SUBJECT_SESSIONS_LIMIT);
+  const topicIds = rows
+    .map((row) => row.topicId)
+    .filter((topicId): topicId is string => Boolean(topicId));
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    subjectId,
+    topicIds,
+  });
+  const ownedById = new Map(ownedTopics.map((topic) => [topic.topicId, topic]));
 
-  return rows.map((r) => ({
-    id: r.id,
-    topicId: r.topicId,
-    topicTitle: r.topicTitle,
-    bookId: r.bookId,
-    bookTitle: r.bookTitle,
-    chapter: r.chapter,
-    sessionType: r.sessionType,
-    durationSeconds: r.durationSeconds,
-    createdAt: r.createdAt.toISOString(),
-  }));
+  return rows.map((r) => {
+    const ownedTopic = r.topicId ? ownedById.get(r.topicId) : undefined;
+    return {
+      id: r.id,
+      topicId: ownedTopic?.topicId ?? null,
+      topicTitle: ownedTopic?.topicTitle ?? null,
+      bookId: ownedTopic?.bookId ?? null,
+      bookTitle: ownedTopic?.bookTitle ?? null,
+      chapter: ownedTopic?.topicChapter ?? null,
+      sessionType: r.sessionType,
+      durationSeconds: r.durationSeconds,
+      createdAt: r.createdAt.toISOString(),
+    };
+  });
 }

@@ -56,6 +56,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 jest.mock(
   'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
   () => ({
+    and: jest.fn(),
     eq: jest.fn(),
     inArray: jest.fn(),
   }),
@@ -64,6 +65,7 @@ jest.mock(
 jest.mock(
   '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
   () => ({
+    curriculumBooks: {},
     curriculumTopics: {},
     curricula: {},
     subjects: {},
@@ -93,7 +95,9 @@ describe('reviewDueSend', () => {
       from: jest.fn().mockReturnValue({
         innerJoin: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue(mockSelectResult),
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(mockSelectResult),
+            }),
           }),
         }),
       }),
@@ -163,6 +167,33 @@ describe('reviewDueSend', () => {
         profileId: 'p-1',
       });
     });
+
+    it('[WI-80-sweep] does not format review reminder with an unowned subject name from event topic IDs', async () => {
+      (mockDb.select as jest.Mock).mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue([]),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      await executeHandler({
+        profileId: 'profile-a',
+        overdueCount: 1,
+        topTopicIds: ['topic-foreign'],
+      });
+
+      expect(mockFormatReviewReminderBody).toHaveBeenCalledWith(1, [
+        'your subjects',
+      ]);
+      expect(mockFormatReviewReminderBody).not.toHaveBeenCalledWith(1, [
+        'Victim Subject',
+      ]);
+    });
   });
 });
 
@@ -176,7 +207,9 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
       from: jest.fn().mockReturnValue({
         innerJoin: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue([]),
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
           }),
         }),
       }),

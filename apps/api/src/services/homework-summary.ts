@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -248,26 +248,15 @@ export async function extractAndStoreHomeworkSummary(
 ): Promise<HomeworkSummary> {
   const summary = await extractHomeworkSummary(db, profileId, sessionId);
 
-  const [sessionRow] = await db
-    .select({ metadata: learningSessions.metadata })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-      ),
-    )
-    .limit(1);
-
-  const existingMetadata = getSessionMetadata(sessionRow?.metadata);
-
   await db
     .update(learningSessions)
     .set({
-      metadata: {
-        ...existingMetadata,
-        homeworkSummary: summary,
-      },
+      metadata: sql`jsonb_set(
+        COALESCE(${learningSessions.metadata}, '{}'::jsonb),
+        '{homeworkSummary}',
+        ${JSON.stringify(summary)}::jsonb,
+        true
+      )`,
       updatedAt: new Date(),
     })
     .where(

@@ -26,7 +26,10 @@ import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
-import type { WebhookSubscriptionUpdate } from '../services/billing';
+import type {
+  AppliedSubscriptionRow,
+  WebhookSubscriptionUpdate,
+} from '../services/billing';
 
 const logger = createLogger();
 
@@ -68,6 +71,17 @@ function extractSubscriptionIdFromInvoice(
 // ---------------------------------------------------------------------------
 
 const PAID_TIERS = new Set<string>(['plus', 'family', 'pro']);
+
+function shouldRefreshStripeKv(
+  updated: AppliedSubscriptionRow | null,
+  stripeEventId: string,
+): updated is AppliedSubscriptionRow {
+  return (
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastStripeEventId === stripeEventId)
+  );
+}
 
 /** Validates and extracts a paid tier from metadata. */
 function extractPaidTier(
@@ -253,7 +267,7 @@ async function handleSubscriptionEvent(
       updates,
     );
 
-    if (result) {
+    if (result && result.webhookApplied !== false) {
       if (isExpired) {
         const freeTier = getTierConfig('free');
         await updateQuotaPoolLimit(
@@ -277,7 +291,7 @@ async function handleSubscriptionEvent(
     return result;
   });
 
-  if (updated) {
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -320,7 +334,7 @@ async function handleSubscriptionDeleted(
       updates,
     );
 
-    if (result) {
+    if (result && result.webhookApplied !== false) {
       const freeTier = getTierConfig('free');
       await updateQuotaPoolLimit(
         txDb,
@@ -333,7 +347,7 @@ async function handleSubscriptionDeleted(
     return result;
   });
 
-  if (updated) {
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -469,7 +483,12 @@ async function handlePaymentFailed(
     },
   );
 
-  if (updated) {
+  const shouldDispatchPaymentFailed =
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastStripeEventId === stripeEventId);
+
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -480,12 +499,17 @@ async function handlePaymentFailed(
         invoiceId: invoice.id,
       },
     );
+  }
 
+  if (!updated) return;
+
+  if (shouldDispatchPaymentFailed) {
     // core-send: payment-failed alert — observed by payment-failed-observe.ts.
     // Kept direct so a dispatch failure throws to the Stripe webhook handler,
     // which then returns non-2xx → Stripe retries the webhook. A swallowed
     // dispatch would lose the payment-failure signal entirely.
     await inngest.send({
+      id: `stripe-payment-failed:${stripeEventId}`,
       name: 'app/payment.failed',
       data: {
         subscriptionId: updated.id,
@@ -552,7 +576,7 @@ async function handlePaymentSucceeded(
     },
   );
 
-  if (updated) {
+  if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
       kv,
       db,

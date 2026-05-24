@@ -23,6 +23,8 @@ export default function DictationChoiceScreen(): React.ReactElement {
   const [lastError, setLastError] = useState<string | null>(null);
   const [generateTimedOut, setGenerateTimedOut] = useState(false);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestGenerateRequestRef = useRef<Promise<unknown> | null>(null);
+  const generateInFlightRef = useRef(false);
   // [BUG-692] Set when back arrow, Cancel button, or 20s timeout fires while
   // the mutation is in flight. Prevents late-arriving response from pushing to
   // the playback screen after the user has already navigated away.
@@ -48,16 +50,26 @@ export default function DictationChoiceScreen(): React.ReactElement {
   }, [generateMutation.isPending]);
 
   const handleSurpriseMe = async () => {
+    if (generateInFlightRef.current && !generateCancelledRef.current) return;
+
     // [BUG-692] Reset the cancelled flag at the start of each new attempt.
     generateCancelledRef.current = false;
+    generateInFlightRef.current = true;
     setLastError(null);
     setGenerateTimedOut(false);
+    let request: ReturnType<typeof generateMutation.mutateAsync> | null = null;
     try {
-      const result = await generateMutation.mutateAsync();
+      request = generateMutation.mutateAsync();
+      latestGenerateRequestRef.current = request;
+      const result = await request;
 
       // [BUG-692] If back arrow, Cancel button, or the 20s timeout fired
       // while the mutation was in flight, skip navigation to playback.
-      if (generateCancelledRef.current) return;
+      if (
+        generateCancelledRef.current ||
+        latestGenerateRequestRef.current !== request
+      )
+        return;
 
       setData({
         completionKey: Crypto.randomUUID(),
@@ -73,7 +85,11 @@ export default function DictationChoiceScreen(): React.ReactElement {
       setTimeout(() => router.push('/(app)/dictation/playback' as Href), 0);
     } catch (err: unknown) {
       // [BUG-692] Don't show an alert if the user already navigated away.
-      if (generateCancelledRef.current) return;
+      if (
+        generateCancelledRef.current ||
+        latestGenerateRequestRef.current !== request
+      )
+        return;
       const message = formatApiError(err);
       setLastError(message);
       platformAlert(t('dictation.index.errorTitle'), message, [
@@ -83,6 +99,10 @@ export default function DictationChoiceScreen(): React.ReactElement {
         },
         { text: t('common.goBack'), style: 'cancel' },
       ]);
+    } finally {
+      if (!request || latestGenerateRequestRef.current === request) {
+        generateInFlightRef.current = false;
+      }
     }
   };
 

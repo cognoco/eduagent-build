@@ -3,10 +3,8 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  curriculumTopics,
-  curricula,
   learningSessions,
   subjects,
   createScopedRepository,
@@ -14,6 +12,7 @@ import {
 } from '@eduagent/database';
 import type { InterleavedSessionStartInput } from '@eduagent/schemas';
 import { isTopicStable } from './retention';
+import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,7 +72,6 @@ export async function selectInterleavedTopics(
   const allCards = await repo.retentionCards.findMany();
 
   // Filter to subject if provided
-  let candidateCards = allCards;
   if (subjectId) {
     // CR-018: verify ownership before reading curricula/topics — prevents
     // attacker-controllable subjectId acting as an existence-check oracle.
@@ -81,18 +79,18 @@ export async function selectInterleavedTopics(
       eq(subjects.id, subjectId),
     );
     if (!ownedSubject) return [];
-
-    const curriculum = await db.query.curricula.findFirst({
-      where: eq(curricula.subjectId, subjectId),
-    });
-    if (!curriculum) return [];
-
-    const topics = await db.query.curriculumTopics.findMany({
-      where: eq(curriculumTopics.curriculumId, curriculum.id),
-    });
-    const topicIds = new Set(topics.map((t) => t.id));
-    candidateCards = allCards.filter((c) => topicIds.has(c.topicId));
   }
+
+  // [BUG-68] A profile-scoped retention card is not proof that the referenced
+  // topic is still owned. Filter through the dual parent-chain ownership query
+  // before slicing so stale foreign cards cannot crowd out eligible owned cards.
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: [...new Set(allCards.map((card) => card.topicId))],
+    subjectId,
+  });
+  const topicMap = new Map(ownedTopics.map((topic) => [topic.topicId, topic]));
+  const candidateCards = allCards.filter((card) => topicMap.has(card.topicId));
 
   if (candidateCards.length === 0) return [];
 
@@ -119,35 +117,13 @@ export async function selectInterleavedTopics(
     selected = [...selected, ...sorted.slice(0, needed)];
   }
 
-  // [BUG-68] Batch topic + curriculum lookups
-  const topicIds = selected.map((c) => c.topicId);
-  const topicRows =
-    topicIds.length > 0
-      ? await db.query.curriculumTopics.findMany({
-          where: inArray(curriculumTopics.id, topicIds),
-        })
-      : [];
-  const topicMap = new Map(topicRows.map((t) => [t.id, t]));
-  const curriculumIds = [...new Set(topicRows.map((t) => t.curriculumId))];
-  const curriculumRows =
-    curriculumIds.length > 0
-      ? await db.query.curricula.findMany({
-          where: inArray(curricula.id, curriculumIds),
-        })
-      : [];
-  const curriculumToSubject = new Map<string, string>();
-  for (const c of curriculumRows) {
-    curriculumToSubject.set(c.id, c.subjectId);
-  }
-
   return selected.map((card) => {
     const topic = topicMap.get(card.topicId);
+    if (!topic) throw new Error('Expected owned topic after candidate filter');
     return {
       topicId: card.topicId,
-      subjectId: topic
-        ? (curriculumToSubject.get(topic.curriculumId) ?? '')
-        : '',
-      topicTitle: topic?.title ?? 'Unknown topic',
+      subjectId: topic.subjectId,
+      topicTitle: topic.topicTitle,
       isStable: isTopicStable(card.consecutiveSuccesses),
       consecutiveSuccesses: card.consecutiveSuccesses,
     };

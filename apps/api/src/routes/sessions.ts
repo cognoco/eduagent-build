@@ -489,6 +489,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionMessageSchema),
     async (c) => {
+      // [WI-171 / DS-082] Server-derived proxy-mode write guard.
+      // The stream endpoint persists messages and triggers LLM exchanges
+      // (DeepSec Found-In lines 868, 924, 943, 956, 972, 991 — all inside
+      // this handler's write paths).
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subscriptionId = c.get('subscriptionId');
@@ -1022,6 +1027,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionCloseSchema),
     async (c) => {
+      // [WI-171 / DS-082] Server-derived proxy-mode write guard.
+      // close persists session state + dispatches the completion event
+      // (DeepSec Found-In lines 1020, 1056).
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');

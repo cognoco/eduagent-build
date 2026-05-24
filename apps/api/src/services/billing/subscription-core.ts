@@ -5,7 +5,7 @@
 // markSubscriptionCancelled, updateQuotaPoolLimit, activateSubscriptionFromCheckout
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, ne, or } from 'drizzle-orm';
+import { and, eq, isNull, lte, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   subscriptions,
@@ -25,6 +25,7 @@ import {
   mapSubscriptionRow,
   mapQuotaPoolRow,
   type SubscriptionRow,
+  type AppliedSubscriptionRow,
   type QuotaPoolRow,
   type WebhookSubscriptionUpdate,
 } from './types';
@@ -141,7 +142,7 @@ export async function updateSubscriptionFromWebhook(
   db: Database,
   stripeSubscriptionId: string,
   updates: WebhookSubscriptionUpdate,
-): Promise<SubscriptionRow | null> {
+): Promise<AppliedSubscriptionRow | null> {
   return db.transaction(async (tx) => {
     // Load current row inside the transaction (BD-10: via standalone helper —
     // keyed by Stripe ID, not accountId).
@@ -162,7 +163,7 @@ export async function updateSubscriptionFromWebhook(
       updates.stripeEventId &&
       existing.lastStripeEventId === updates.stripeEventId
     ) {
-      return mapSubscriptionRow(existing);
+      return { ...mapSubscriptionRow(existing), webhookApplied: false };
     }
 
     // Idempotency check: skip if incoming event is older (NaN-safe) [1C.6]
@@ -172,12 +173,20 @@ export async function updateSubscriptionFromWebhook(
       if (
         !Number.isNaN(existingTs) &&
         !Number.isNaN(incomingTs) &&
-        incomingTs <= existingTs
+        incomingTs < existingTs
       ) {
-        return mapSubscriptionRow(existing);
+        return { ...mapSubscriptionRow(existing), webhookApplied: false };
+      }
+      if (
+        !Number.isNaN(existingTs) &&
+        !Number.isNaN(incomingTs) &&
+        incomingTs === existingTs &&
+        existing.status === 'active' &&
+        updates.status === 'past_due'
+      ) {
+        return { ...mapSubscriptionRow(existing), webhookApplied: false };
       }
     }
-
     const setValues: Record<string, unknown> = {
       lastStripeEventTimestamp: new Date(updates.lastStripeEventTimestamp),
       updatedAt: new Date(),
@@ -242,13 +251,18 @@ export async function updateSubscriptionFromWebhook(
     // return the existing snapshot instead of double-writing.
     const whereParts = [eq(subscriptions.id, existing.id)];
     if (updates.stripeEventId) {
-      whereParts.push(
-        or(
-          isNull(subscriptions.lastStripeEventId),
-          ne(subscriptions.lastStripeEventId, updates.stripeEventId),
-        )!,
+      const eventIdPredicate = or(
+        isNull(subscriptions.lastStripeEventId),
+        ne(subscriptions.lastStripeEventId, updates.stripeEventId),
       );
+      if (eventIdPredicate) whereParts.push(eventIdPredicate);
     }
+    const incomingEventTimestamp = new Date(updates.lastStripeEventTimestamp);
+    const eventTimestampPredicate = or(
+      isNull(subscriptions.lastStripeEventTimestamp),
+      lte(subscriptions.lastStripeEventTimestamp, incomingEventTimestamp),
+    );
+    if (eventTimestampPredicate) whereParts.push(eventTimestampPredicate);
 
     const [updated] = await tx
       .update(subscriptions)
@@ -268,11 +282,22 @@ export async function updateSubscriptionFromWebhook(
         updates.stripeEventId &&
         recheck.lastStripeEventId === updates.stripeEventId
       ) {
-        return mapSubscriptionRow(recheck);
+        return { ...mapSubscriptionRow(recheck), webhookApplied: false };
+      }
+      const recheckTs = recheck?.lastStripeEventTimestamp?.getTime();
+      const incomingTs = incomingEventTimestamp.getTime();
+      if (
+        recheck &&
+        recheckTs != null &&
+        !Number.isNaN(recheckTs) &&
+        !Number.isNaN(incomingTs) &&
+        incomingTs < recheckTs
+      ) {
+        return { ...mapSubscriptionRow(recheck), webhookApplied: false };
       }
       throw new Error('Subscription webhook update did not return a row');
     }
-    return mapSubscriptionRow(updated);
+    return { ...mapSubscriptionRow(updated), webhookApplied: true };
   });
 }
 
@@ -490,14 +515,21 @@ export async function updateQuotaPoolLimit(
   newLimit: number,
   dailyLimit: number | null,
 ): Promise<void> {
-  await db
+  const updatedRows = await db
     .update(quotaPools)
     .set({
       monthlyLimit: newLimit,
       dailyLimit,
       updatedAt: new Date(),
     })
-    .where(eq(quotaPools.subscriptionId, subscriptionId));
+    .where(eq(quotaPools.subscriptionId, subscriptionId))
+    .returning({ id: quotaPools.id });
+
+  if (updatedRows.length === 0) {
+    throw new Error(
+      `Missing quota pool for subscription ${subscriptionId}; rolling back quota limit update`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

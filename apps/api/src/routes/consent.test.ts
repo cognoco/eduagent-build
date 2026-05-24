@@ -792,6 +792,46 @@ describe('consent Inngest dispatch observability [A-23]', () => {
       }),
     );
   });
+
+  it('[WI-78 review] includes the consent revocation generation in the revocation event', async () => {
+    const { inngest: mockInngest } = jest.requireMock('../inngest/client') as {
+      inngest: { send: jest.Mock };
+    };
+    const { revokeConsent: mockRevokeConsent } = jest.requireMock(
+      '../services/consent',
+    ) as { revokeConsent: jest.Mock };
+    mockInngest.send.mockClear();
+    mockRevokeConsent.mockResolvedValueOnce({
+      id: 'consent-1',
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
+      consentType: 'GDPR',
+      status: 'WITHDRAWN',
+      parentEmail: 'parent@example.com',
+      requestedAt: '2026-01-01T00:00:00.000Z',
+      respondedAt: '2026-01-15T10:00:00.000Z',
+    });
+
+    const res = await app.request(
+      '/v1/consent/550e8400-e29b-41d4-a716-446655440000/revoke',
+      {
+        method: 'PUT',
+        headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockInngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/consent.revoked',
+        data: expect.objectContaining({
+          childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          parentProfileId: 'test-profile-id',
+          revokedAt: '2026-01-15T10:00:00.000Z',
+        }),
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

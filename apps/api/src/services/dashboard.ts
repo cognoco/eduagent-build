@@ -74,6 +74,10 @@ import {
   selectCurrentlyWorkingOn,
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
+import {
+  findOwnedCurriculumTopic,
+  findOwnedCurriculumTopics,
+} from './curriculum-topic-ownership';
 import { generateWeeklyReportData } from './weekly-report';
 import {
   isoDate,
@@ -1282,7 +1286,13 @@ export async function getChildSubjectTopics(
     where: eq(curriculumTopics.curriculumId, curriculum.id),
   });
 
-  const topicIds = topics.map((topic) => topic.id);
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId: childProfileId,
+    topicIds: topics.map((topic) => topic.id),
+  });
+  const ownedTopicIds = new Set(ownedTopics.map((topic) => topic.topicId));
+  const scopedTopics = topics.filter((topic) => ownedTopicIds.has(topic.id));
+  const topicIds = scopedTopics.map((topic) => topic.id);
   const topicSessionCounts =
     topicIds.length > 0
       ? await db
@@ -1317,7 +1327,7 @@ export async function getChildSubjectTopics(
   // [F-PV-06] Batch all per-topic queries into ~6 inArray queries (constant
   // subrequest count) instead of 7 queries × N topics which blows past the
   // Cloudflare Workers 50-subrequest limit for subjects with > 6 topics.
-  const results = await getTopicProgressBatch(db, childProfileId, topics);
+  const results = await getTopicProgressBatch(db, childProfileId, scopedTopics);
 
   // Only return topics where the student had at least 1 exchange.
   // Topics with no sessions have no connection to the student.
@@ -1382,7 +1392,10 @@ export async function getChildSessionDetail(
   // count stays bounded.
   const [summary, subjectRow, topicRow, drillRows] = await Promise.all([
     db.query.sessionSummaries.findFirst({
-      where: eq(sessionSummaries.sessionId, sessionId),
+      where: and(
+        eq(sessionSummaries.sessionId, sessionId),
+        eq(sessionSummaries.profileId, childProfileId),
+      ),
       columns: {
         highlight: true,
         narrative: true,
@@ -1391,13 +1404,17 @@ export async function getChildSessionDetail(
       },
     }),
     db.query.subjects.findFirst({
-      where: eq(subjects.id, session.subjectId),
+      where: and(
+        eq(subjects.id, session.subjectId),
+        eq(subjects.profileId, childProfileId),
+      ),
       columns: { name: true },
     }),
     session.topicId
-      ? db.query.curriculumTopics.findFirst({
-          where: eq(curriculumTopics.id, session.topicId),
-          columns: { title: true },
+      ? findOwnedCurriculumTopic(db, {
+          profileId: childProfileId,
+          topicId: session.topicId,
+          subjectId: session.subjectId,
         })
       : Promise.resolve(null),
     db
@@ -1410,6 +1427,7 @@ export async function getChildSessionDetail(
       .where(
         and(
           eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.profileId, childProfileId),
           eq(sessionEvents.eventType, 'ai_response'),
           isNotNull(sessionEvents.drillTotal),
         ),
@@ -1427,12 +1445,14 @@ export async function getChildSessionDetail(
     });
   }
 
+  if (!subjectRow) return null;
+
   return {
     sessionId: session.id,
     subjectId: session.subjectId,
     subjectName: subjectRow?.name ?? null,
-    topicId: session.topicId,
-    topicTitle: topicRow?.title ?? null,
+    topicId: topicRow?.topicId ?? null,
+    topicTitle: topicRow?.topicTitle ?? null,
     sessionType: session.sessionType,
     startedAt: session.startedAt.toISOString(),
     endedAt: session.endedAt?.toISOString() ?? null,

@@ -35,6 +35,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockGetConsentStatus = jest.fn();
+const mockIsConsentRevocationGenerationCurrent = jest.fn();
 const mockGetProfileDisplayName = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
 const mockGetFamilyOwnerProfileId = jest.fn();
@@ -51,6 +52,8 @@ jest.mock(
       getFamilyOwnerProfileId: (...args: unknown[]) =>
         mockGetFamilyOwnerProfileId(...args),
       getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+      isConsentRevocationGenerationCurrent: (...args: unknown[]) =>
+        mockIsConsentRevocationGenerationCurrent(...args),
       getProfileForConsentRevocation: (...args: unknown[]) =>
         mockGetProfileForConsentRevocation(...args),
       getProfileDisplayName: (...args: unknown[]) =>
@@ -60,6 +63,7 @@ jest.mock(
 );
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
+const mockDeleteProfileIfConsentWithdrawn = jest.fn().mockResolvedValue(true);
 jest.mock(
   '../../services/deletion' /* gc1-allow: pattern-a conversion */,
   () => {
@@ -69,6 +73,8 @@ jest.mock(
     return {
       ...actual,
       deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
+      deleteProfileIfConsentWithdrawn: (...args: unknown[]) =>
+        mockDeleteProfileIfConsentWithdrawn(...args),
     };
   },
 );
@@ -123,10 +129,42 @@ jest.mock(
 
 import { consentRevocation } from './consent-revocation';
 
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['value'] === 'string') values.push(obj['value'].toLowerCase());
+  if (Array.isArray(obj['value'])) {
+    for (const item of obj['value']) {
+      values.push(...extractSqlTextAndValues(item, visited));
+    }
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
+}
+
 async function executeRevocation(
   eventData: {
     childProfileId: string;
     parentProfileId: string;
+    revokedAt?: string;
   },
   stepOptions?: InngestStepRunnerOptions,
 ) {
@@ -147,7 +185,11 @@ beforeEach(() => {
   jest.useFakeTimers({ now: new Date('2026-01-15T00:00:00.000Z') });
   jest.clearAllMocks();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValue({
+    rowCount: 1,
+  });
   mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
+  mockIsConsentRevocationGenerationCurrent.mockResolvedValue(true);
   mockGetProfileDisplayName.mockResolvedValue('Liam');
   mockGetProfileForConsentRevocation.mockResolvedValue({
     displayName: 'Liam',
@@ -156,6 +198,12 @@ beforeEach(() => {
   });
   mockGetFamilyOwnerProfileId.mockResolvedValue('parent-001');
   mockGetWithdrawalArchivePreference.mockResolvedValue('never');
+  mockDeleteProfileIfConsentWithdrawn.mockImplementation(
+    async (...args: unknown[]) => {
+      await mockDeleteProfile(...args);
+      return true;
+    },
+  );
 });
 
 afterEach(() => {
@@ -218,6 +266,7 @@ describe('consentRevocation', () => {
 
   it('does not send a warning if consent was restored before the 6-day mark', async () => {
     mockGetConsentStatus.mockResolvedValue('CONSENTED');
+    mockIsConsentRevocationGenerationCurrent.mockResolvedValue(false);
 
     await executeRevocation({
       childProfileId: 'child-001',
@@ -244,10 +293,26 @@ describe('consentRevocation', () => {
     );
   });
 
+  it('[WI-78 review] does not warn for a stale revocation generation while consent is withdrawn again', async () => {
+    mockIsConsentRevocationGenerationCurrent.mockResolvedValueOnce(false);
+
+    await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-10T10:00:00.000Z',
+    });
+
+    expect(mockSendPushNotification).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'consent_warning' }),
+    );
+  });
+
   it('returns restored without pushing or deleting when consent was restored', async () => {
     mockGetConsentStatus
       .mockResolvedValueOnce('CONSENTED')
       .mockResolvedValueOnce('CONSENTED');
+    mockIsConsentRevocationGenerationCurrent.mockResolvedValue(false);
 
     const { result } = await executeRevocation({
       childProfileId: 'child-001',
@@ -256,6 +321,28 @@ describe('consentRevocation', () => {
 
     expect(result).toEqual({ status: 'restored', childProfileId: 'child-001' });
     expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(mockDeleteProfile).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] stops before child notifications when the grace-end check sees a newer withdrawal generation', async () => {
+    mockIsConsentRevocationGenerationCurrent
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-10T10:00:00.000Z',
+    });
+
+    expect(result).toEqual({ status: 'restored', childProfileId: 'child-001' });
+    expect(mockSendPushNotification).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'child-001',
+        type: 'consent_expired',
+      }),
+    );
     expect(mockDeleteProfile).not.toHaveBeenCalled();
   });
 
@@ -500,6 +587,54 @@ describe('archive path — auto preference, age 14', () => {
       }),
     );
   });
+
+  it('[WI-78 review] locks the GDPR consent row before archiving the profile', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: null,
+    });
+
+    await executeRevocation({
+      childProfileId: 'child-014',
+      parentProfileId: 'parent-001',
+    });
+
+    const sqlArg = (mockDatabaseModule.db.execute as jest.Mock).mock
+      .calls[0]?.[0];
+    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
+    expect(sqlText).toContain('with locked_consent');
+    expect(sqlText).toContain('for update');
+    expect(sqlText).toContain('consent_type');
+    expect(sqlText).toContain('gdpr');
+    expect(sqlText).toContain('withdrawn');
+  });
+
+  it('[WI-78 review] requires the archive to match the revocation generation', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: null,
+    });
+    (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValueOnce({
+      rowCount: 0,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-014',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-10T10:00:00.000Z',
+    });
+
+    expect(result).toEqual({ status: 'restored', childProfileId: 'child-014' });
+    const sqlArg = (mockDatabaseModule.db.execute as jest.Mock).mock
+      .calls[0]?.[0];
+    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
+    expect(sqlText).toContain('responded_at');
+    expect(sqlText).toContain('2026-01-10t10:00:00.000z');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -571,9 +706,11 @@ describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolu
 // ---------------------------------------------------------------------------
 
 describe('[FIX-INNGEST-3] idempotency and concurrency config', () => {
-  it('declares idempotency keyed on event.data.childProfileId', () => {
+  it('declares idempotency keyed on event.data.childProfileId and revokedAt', () => {
     const opts = (consentRevocation as any).opts;
-    expect(opts.idempotency).toBe('event.data.childProfileId');
+    expect(opts.idempotency).toBe(
+      'event.data.childProfileId + "-" + event.data.revokedAt',
+    );
   });
 
   it('declares concurrency limit of 1 keyed on event.data.childProfileId', () => {

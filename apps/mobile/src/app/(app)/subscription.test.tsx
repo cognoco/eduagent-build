@@ -2075,6 +2075,27 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).not.toHaveBeenCalled();
     });
 
+    it('[WI-78 DS-197] ignores rapid duplicate top-up presses before disabled state renders', async () => {
+      setupPaidTierWithTopUp();
+      mockMutateAsyncPurchase.mockImplementation(
+        () =>
+          new Promise(() => {
+            /* keep purchase in flight */
+          }),
+      );
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('top-up-button');
+      });
+
+      fireEvent.press(screen.getByTestId('top-up-button'));
+      fireEvent.press(screen.getByTestId('top-up-button'));
+
+      expect(mockMutateAsyncPurchase).toHaveBeenCalledTimes(1);
+    });
+
     it('shows network error alert on top-up network failure', async () => {
       setupPaidTierWithTopUp();
       const networkError = {

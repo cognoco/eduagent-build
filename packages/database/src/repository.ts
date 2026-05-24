@@ -41,6 +41,7 @@ import {
   bookSuggestions,
   topicSuggestions,
   curriculumBooks,
+  curricula,
   curriculumTopics,
   monthlyReports,
   weeklyReports,
@@ -367,9 +368,10 @@ export function createScopedRepository(db: Database, profileId: string) {
           where: scopedWhere(consentStates, extraWhere),
         });
       },
-      async findFirst(extraWhere?: SQL) {
+      async findFirst(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
         return db.query.consentStates.findFirst({
           where: scopedWhere(consentStates, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
         });
       },
     },
@@ -648,7 +650,14 @@ export function createScopedRepository(db: Database, profileId: string) {
             curriculumBooks,
             eq(curriculumBooks.id, curriculumTopics.bookId),
           )
-          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+          .innerJoin(
+            subjects,
+            and(
+              eq(subjects.id, curriculumBooks.subjectId),
+              eq(subjects.id, curricula.subjectId),
+            ),
+          )
           .where(
             and(
               eq(curriculumTopics.id, topicId),
@@ -683,7 +692,14 @@ export function createScopedRepository(db: Database, profileId: string) {
             curriculumBooks,
             eq(curriculumBooks.id, curriculumTopics.bookId),
           )
-          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+          .innerJoin(
+            subjects,
+            and(
+              eq(subjects.id, curriculumBooks.subjectId),
+              eq(subjects.id, curricula.subjectId),
+            ),
+          )
           .where(
             and(
               eq(curriculumTopics.bookId, bookId),
@@ -719,10 +735,17 @@ export function createScopedRepository(db: Database, profileId: string) {
             curriculumBooks,
             eq(curriculumBooks.id, curriculumTopics.bookId),
           )
-          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+          .innerJoin(
+            subjects,
+            and(
+              eq(subjects.id, curriculumBooks.subjectId),
+              eq(subjects.id, curricula.subjectId),
+            ),
+          )
           .where(
             and(
-              eq(curriculumBooks.subjectId, subjectId),
+              eq(subjects.id, subjectId),
               gt(curriculumBooks.sortOrder, currentBookSortOrder),
               eq(curriculumTopics.skipped, false),
               eq(subjects.profileId, profileId),
@@ -759,10 +782,17 @@ export function createScopedRepository(db: Database, profileId: string) {
             curriculumBooks,
             eq(curriculumBooks.id, curriculumTopics.bookId),
           )
-          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+          .innerJoin(
+            subjects,
+            and(
+              eq(subjects.id, curriculumBooks.subjectId),
+              eq(subjects.id, curricula.subjectId),
+            ),
+          )
           .where(
             and(
-              eq(curriculumBooks.subjectId, subjectId),
+              eq(subjects.id, subjectId),
               eq(subjects.profileId, profileId),
               or(
                 ...keywords.map((keyword) =>

@@ -74,6 +74,7 @@ export default function RecallTestScreen() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [inputDisabled, setInputDisabled] = useState(false);
   const [dontRememberCount, setDontRememberCount] = useState(0);
+  const [dontRememberPending, setDontRememberPending] = useState(false);
   const [remediationData, setRemediationData] = useState<{
     cooldownEndsAt?: string;
     retentionStatus: RetentionStatus;
@@ -81,6 +82,14 @@ export default function RecallTestScreen() {
   const [submissionTimedOut, setSubmissionTimedOut] = useState(false);
 
   const cleanupRef = useRef<(() => void) | null>(null);
+  const dontRememberPendingRef = useRef(false);
+  const submissionInFlightRef = useRef(false);
+  const releaseSubmissionBlock = useCallback(() => {
+    submissionInFlightRef.current = false;
+  }, []);
+  const releaseDontRememberBlock = useCallback(() => {
+    dontRememberPendingRef.current = false;
+  }, []);
   // Token bumped whenever the user abandons an in-flight submission (timeout
   // retry). Callbacks captured by an older mutate() check this before applying
   // state so a late-arriving response cannot mutate the UI the user has
@@ -99,6 +108,8 @@ export default function RecallTestScreen() {
   const handleSend = useCallback(
     (text: string) => {
       if (!topicId) return;
+      if (submissionInFlightRef.current || isStreaming) return;
+      submissionInFlightRef.current = true;
 
       // Add user message
       const userMsg: ChatMessage = {
@@ -122,6 +133,7 @@ export default function RecallTestScreen() {
                 setIsStreaming,
                 () => {
                   setInputDisabled(true);
+                  releaseSubmissionBlock();
                 },
               );
             } else if (result.failureAction === 'feedback_only') {
@@ -130,6 +142,7 @@ export default function RecallTestScreen() {
                 "Not quite there yet, but that's okay! Think about the key concepts and try explaining again. What stands out most to you?",
                 setMessages,
                 setIsStreaming,
+                releaseSubmissionBlock,
               );
             } else if (result.failureAction === 'redirect_to_library') {
               // 3+ failures — show remediation card
@@ -145,12 +158,14 @@ export default function RecallTestScreen() {
                       result.remediation?.retentionStatus,
                     ),
                   });
+                  releaseSubmissionBlock();
                 },
               );
             }
           },
           onError: (err: Error) => {
             if (token !== submissionTokenRef.current) return;
+            releaseSubmissionBlock();
             // UX-DE-L8: error is not an AI reply
             platformAlert(
               t('topic.recallTest.errorTitle'),
@@ -160,7 +175,7 @@ export default function RecallTestScreen() {
         },
       );
     },
-    [topicId, submitRecallTest, t],
+    [isStreaming, releaseSubmissionBlock, submitRecallTest, topicId, t],
   );
 
   const handleReviewRetest = useCallback(() => {
@@ -189,6 +204,9 @@ export default function RecallTestScreen() {
 
   const handleDontRemember = useCallback(() => {
     if (!topicId) return;
+    if (dontRememberPendingRef.current || isStreaming) return;
+    dontRememberPendingRef.current = true;
+    setDontRememberPending(true);
 
     const nextCount = dontRememberCount + 1;
     setDontRememberCount(nextCount);
@@ -206,6 +224,7 @@ export default function RecallTestScreen() {
       {
         onSuccess: (result) => {
           if (token !== submissionTokenRef.current) return;
+          setDontRememberPending(false);
           if (
             result.failureAction === 'redirect_to_library' ||
             nextCount >= 2
@@ -222,6 +241,7 @@ export default function RecallTestScreen() {
                     result.remediation?.retentionStatus,
                   ),
                 });
+                releaseDontRememberBlock();
               },
             );
             return;
@@ -231,10 +251,13 @@ export default function RecallTestScreen() {
             result.hint ?? DONT_REMEMBER_FALLBACK_HINT,
             setMessages,
             setIsStreaming,
+            releaseDontRememberBlock,
           );
         },
         onError: (err: Error) => {
           if (token !== submissionTokenRef.current) return;
+          dontRememberPendingRef.current = false;
+          setDontRememberPending(false);
           setDontRememberCount((prev) => Math.max(prev - 1, 0));
           // UX-DE-L8: error is not an AI reply
           platformAlert(
@@ -244,7 +267,14 @@ export default function RecallTestScreen() {
         },
       },
     );
-  }, [dontRememberCount, submitRecallTest, topicId, t]);
+  }, [
+    dontRememberCount,
+    isStreaming,
+    releaseDontRememberBlock,
+    submitRecallTest,
+    topicId,
+    t,
+  ]);
 
   if (!topicId) {
     return (
@@ -274,6 +304,9 @@ export default function RecallTestScreen() {
             // cannot mutate state after the user has dismissed the timeout
             // screen and resumed typing.
             submissionTokenRef.current += 1;
+            releaseSubmissionBlock();
+            releaseDontRememberBlock();
+            setDontRememberPending(false);
             submitRecallTest.reset();
             setSubmissionTimedOut(false);
           },
@@ -320,6 +353,7 @@ export default function RecallTestScreen() {
     <View className="px-4 pt-3 bg-surface border-t border-surface-elevated">
       <Pressable
         onPress={handleDontRemember}
+        disabled={dontRememberPending || isStreaming}
         className="self-start rounded-button px-4 py-2 bg-surface-elevated"
         testID="recall-dont-remember-button"
         accessibilityRole="button"

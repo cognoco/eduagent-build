@@ -108,6 +108,7 @@ jest.mock(
       getBookWithTopics: jest.fn().mockResolvedValue(null),
       persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
       claimBookForGeneration: jest.fn().mockResolvedValue(null),
+      releaseBookGenerationClaimIfEmpty: jest.fn().mockResolvedValue(undefined),
       moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
       // expandExistingBookTopics is the extracted orchestration service.
       // We stub it here so the route test isolates the route's dispatch
@@ -164,14 +165,18 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { bookRoutes } from './books';
 import {
   getBooks,
   getAllProfileBooks,
   getBookWithTopics,
   claimBookForGeneration,
+  releaseBookGenerationClaimIfEmpty,
 } from '../services/curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const mockGetBooks = getBooks as jest.MockedFunction<typeof getBooks>;
 const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
@@ -182,6 +187,10 @@ const mockGetBookWithTopics = getBookWithTopics as jest.MockedFunction<
 >;
 const mockClaimBookForGeneration =
   claimBookForGeneration as jest.MockedFunction<typeof claimBookForGeneration>;
+const mockReleaseBookGenerationClaimIfEmpty =
+  releaseBookGenerationClaimIfEmpty as jest.MockedFunction<
+    typeof releaseBookGenerationClaimIfEmpty
+  >;
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -404,6 +413,59 @@ describe('book routes', () => {
       expect(body.book.topicsGenerated).toBe(true);
     });
 
+    it('[WI-78 review] rejects an empty generated claim without releasing an active generator', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: { ...mockBook, topicsGenerated: true },
+        topics: [],
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toMatchObject({
+        code: ERROR_CODES.CONFLICT,
+      });
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
+    it('[WI-78 review] treats skipped-only generated topics as empty', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: { ...mockBook, topicsGenerated: true },
+        topics: mockBookWithTopics.topics.map((topic) => ({
+          ...topic,
+          skipped: true,
+        })),
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toMatchObject({
+        code: ERROR_CODES.CONFLICT,
+      });
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
     it('expands an already-generated thin book when requested', async () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
       mockGetBookWithTopics.mockResolvedValueOnce(mockBookWithTopics as never);
@@ -501,5 +563,56 @@ describe('book routes', () => {
 
       expect(res.status).toBe(404);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-139 / DS-050] Proxy-mode write guard
+//
+// Mini-Hono mount of bookRoutes with profileMeta.isOwner=false so
+// assertNotProxyMode rejects every write before the service is touched.
+// Mirrors proxy-guard.test.ts + assessments.test.ts.
+// ---------------------------------------------------------------------------
+describe('[WI-139 / DS-050] books proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'test-profile-id');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', bookRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /subjects/:subjectId/books/:bookId/generate-topics returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockClaimBookForGeneration).not.toHaveBeenCalled();
+  });
+
+  it('PATCH /subjects/:subjectId/books/:bookId/topics/:topicId/move returns 403 when caller is in proxy mode', async () => {
+    const TARGET_BOOK_ID = '550e8400-e29b-41d4-a716-446655440099';
+    const TOPIC_ID = '550e8400-e29b-41d4-a716-446655440042';
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/books/${BOOK_ID}/topics/${TOPIC_ID}/move`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetBookId: TARGET_BOOK_ID }),
+      },
+    );
+    expect(res.status).toBe(403);
   });
 });

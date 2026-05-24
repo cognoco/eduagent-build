@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getUnpickedBookSuggestionsWithTopup,
   getUnpickedBookSuggestionsEnvelope,
@@ -43,6 +44,12 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
       const { subjectId } = c.req.valid('param');
       const { topup } = c.req.valid('query');
 
+      // [WI-138 / DS-049] topup=1 triggers suggestion-generation writes (LLM
+      // calls + DB insert). Reads of existing suggestions remain allowed in
+      // proxy mode; only the write-triggering path is gated.
+      if (topup === '1') {
+        assertNotProxyMode(c);
+      }
       const result =
         topup === '1'
           ? await getUnpickedBookSuggestionsWithTopup(db, profileId, subjectId)

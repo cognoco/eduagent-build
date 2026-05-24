@@ -5,10 +5,12 @@
 import { eq, and, desc, gte, inArray } from 'drizzle-orm';
 import {
   learningSessions,
+  curriculumBooks,
   curriculumTopics,
   subjects,
   type Database,
 } from '@eduagent/database';
+import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
 
 export interface BookSession {
   id: string;
@@ -31,40 +33,69 @@ export async function getBookSessions(
   profileId: string,
   bookId: string,
 ): Promise<BookSession[]> {
+  const [ownedBook] = await db
+    .select({ id: curriculumBooks.id })
+    .from(curriculumBooks)
+    .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+    .where(
+      and(eq(curriculumBooks.id, bookId), eq(subjects.profileId, profileId)),
+    )
+    .limit(1);
+  if (!ownedBook) return [];
+
+  const topicRows = await db
+    .select({ id: curriculumTopics.id })
+    .from(curriculumTopics)
+    .where(eq(curriculumTopics.bookId, bookId));
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds: topicRows.map((topic) => topic.id),
+  });
+  const ownedTopicsForBook = ownedTopics.filter(
+    (topic) => topic.bookId === bookId,
+  );
+  if (ownedTopicsForBook.length === 0) return [];
+  const ownedById = new Map(
+    ownedTopicsForBook.map((topic) => [topic.topicId, topic]),
+  );
+
   const rows = await db
     .select({
       id: learningSessions.id,
       topicId: learningSessions.topicId,
-      topicTitle: curriculumTopics.title,
-      chapter: curriculumTopics.chapter,
       createdAt: learningSessions.createdAt,
       exchangeCount: learningSessions.exchangeCount,
       durationSeconds: learningSessions.durationSeconds,
     })
     .from(learningSessions)
-    .innerJoin(
-      curriculumTopics,
-      eq(learningSessions.topicId, curriculumTopics.id),
-    )
-    .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
     .where(
       and(
-        eq(curriculumTopics.bookId, bookId),
-        eq(subjects.profileId, profileId),
+        eq(learningSessions.profileId, profileId),
+        inArray(
+          learningSessions.topicId,
+          ownedTopicsForBook.map((topic) => topic.topicId),
+        ),
         inArray(learningSessions.status, ['completed', 'auto_closed']),
         gte(learningSessions.exchangeCount, 1),
       ),
     )
     .orderBy(desc(learningSessions.createdAt));
 
-  return rows.map((r) => ({
-    id: r.id,
-    topicId: r.topicId,
-    topicTitle: r.topicTitle,
-    chapter: r.chapter,
-    exchangeCount: r.exchangeCount,
-    createdAt: r.createdAt.toISOString(),
-  }));
+  return rows.flatMap((r) => {
+    if (!r.topicId) return [];
+    const ownedTopic = ownedById.get(r.topicId);
+    if (!ownedTopic) return [];
+    return [
+      {
+        id: r.id,
+        topicId: ownedTopic.topicId,
+        topicTitle: ownedTopic.topicTitle,
+        chapter: ownedTopic.topicChapter,
+        exchangeCount: r.exchangeCount,
+        createdAt: r.createdAt.toISOString(),
+      },
+    ];
+  });
 }
 
 /**

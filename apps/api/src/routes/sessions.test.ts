@@ -455,7 +455,9 @@ import {
   startFirstCurriculumSession,
   SessionExchangeLimitError,
 } from '../services/session';
+import { Hono } from 'hono';
 import { app } from '../index';
+import { sessionRoutes } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -2707,5 +2709,46 @@ describe('session routes', () => {
 
       expect(mockInngestSend).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-171 / DS-082] Proxy-mode write guard — stream + close
+// (other write handlers in sessions.ts were already guarded pre-PR)
+// ---------------------------------------------------------------------------
+describe('[WI-171 / DS-082] sessions proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', sessionRoutes);
+    return proxyApp;
+  }
+
+  const SESSION_ID = '550e8400-e29b-41d4-a716-446655440111';
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /sessions/:sessionId/stream returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(`/sessions/${SESSION_ID}/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'hello' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /sessions/:sessionId/close returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(`/sessions/${SESSION_ID}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summaryStatus: 'skipped' }),
+    });
+    expect(res.status).toBe(403);
   });
 });

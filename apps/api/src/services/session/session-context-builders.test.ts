@@ -12,6 +12,13 @@ function makeDbStub(fixtures: {
   session?: Record<string, unknown> | null;
   subject?: { name: string } | null;
   topic?: { title: string } | null;
+  ownedTopicRows?: Array<{
+    topicId: string;
+    topicTitle: string;
+    topicDescription: string | null;
+    bookId: string;
+    subjectId: string;
+  }>;
   summary?: Record<string, unknown> | null;
   events?: Array<{ eventType: string; content: string }>;
 }): Database {
@@ -30,6 +37,19 @@ function makeDbStub(fixtures: {
         findMany: async () => fixtures.events ?? [],
       },
     },
+    select: () => ({
+      from: () => ({
+        innerJoin: () => ({
+          innerJoin: () => ({
+            innerJoin: () => ({
+              where: () => ({
+                limit: async () => fixtures.ownedTopicRows ?? [],
+              }),
+            }),
+          }),
+        }),
+      }),
+    }),
   } as unknown as Database;
 }
 
@@ -123,6 +143,29 @@ describe('buildResumeContext', () => {
     // The raw JSON structure must NOT appear — that would leak to the LLM.
     expect(result).not.toContain('"signals"');
     expect(result).not.toContain('"ui_hints"');
+  });
+
+  it('[WI-80] suppresses resume topic metadata when the prior session topic is not owned by the profile subject', async () => {
+    mockSubjectFixture = { name: 'Science' };
+    const db = makeDbStub({
+      session: { id: 's1', subjectId: 'sub-owned', topicId: 'topic-foreign' },
+      // Pre-fix behavior reads this raw topic row by ID and leaks it into the
+      // resume prompt. The fixed path must ignore this unscoped fixture and
+      // use ownedTopicRows instead.
+      topic: { title: 'Foreign Photosynthesis Topic' },
+      ownedTopicRows: [],
+      summary: {
+        learnerRecap: 'We talked about chlorophyll.',
+      },
+    });
+
+    const result = await buildResumeContext(db, 'profile-1', 'session-prev');
+
+    expect(result).toBeTruthy();
+    expect(result).toContain('Subject: Science');
+    expect(result).toContain('We talked about chlorophyll.');
+    expect(result).not.toContain('Foreign Photosynthesis Topic');
+    expect(result).not.toContain('Topic:');
   });
 });
 

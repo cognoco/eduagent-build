@@ -3,13 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, sql } from 'drizzle-orm';
-import {
-  curriculumBooks,
-  curriculumTopics,
-  sessionSummaries,
-  subjects,
-  type Database,
-} from '@eduagent/database';
+import { sessionSummaries, type Database } from '@eduagent/database';
 import {
   ConflictError,
   type SessionSummary,
@@ -23,6 +17,7 @@ import { captureException } from '../sentry';
 import { createNoteForSession } from '../notes';
 import { getSession } from './session-crud';
 import { findSessionSummaryRow, mapSummaryRow } from './session-events';
+import { findOwnedCurriculumTopic } from '../curriculum-topic-ownership';
 
 const logger = createLogger();
 
@@ -47,25 +42,14 @@ export async function getSessionSummary(
     return enrichedSummary;
   }
 
-  // Scope the next-topic title lookup through subjects.profileId so a
-  // hallucinated or cross-profile UUID can't leak a foreign topic title.
-  const [topic] = await db
-    .select({ title: curriculumTopics.title })
-    .from(curriculumTopics)
-    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
-    .innerJoin(
-      subjects,
-      and(
-        eq(curriculumBooks.subjectId, subjects.id),
-        eq(subjects.profileId, profileId),
-      ),
-    )
-    .where(eq(curriculumTopics.id, row.nextTopicId))
-    .limit(1);
+  const topic = await findOwnedCurriculumTopic(db, {
+    profileId,
+    topicId: row.nextTopicId,
+  });
 
   return {
     ...enrichedSummary,
-    nextTopicTitle: topic?.title ?? null,
+    nextTopicTitle: topic?.topicTitle ?? null,
   };
 }
 

@@ -24,6 +24,7 @@ let mockNotifPrefs: NotifPrefs | undefined = {
   pushEnabled: false,
 };
 let mockNotifLoading = false;
+let mockNotifError = false;
 const mockUpdateMutate = jest.fn();
 let mockUpdateIsPending = false;
 
@@ -33,6 +34,7 @@ jest.mock(
     useNotificationSettings: () => ({
       data: mockNotifPrefs,
       isLoading: mockNotifLoading,
+      isError: mockNotifError,
     }),
     useUpdateNotificationSettings: () => ({
       mutate: mockUpdateMutate,
@@ -118,6 +120,7 @@ describe('NotificationsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockNotifLoading = false;
+    mockNotifError = false;
     mockUpdateIsPending = false;
     mockNotifPrefs = {
       reviewReminders: false,
@@ -231,12 +234,30 @@ describe('NotificationsScreen', () => {
     expect(getByTestId('push-notifications-toggle').props.disabled).toBe(true);
   });
 
-  it('defaults to false values when notifPrefs is undefined', () => {
+  it('[WI-78 DS-202] disables toggles and does not submit defaults when settings are missing', () => {
     mockNotifPrefs = undefined;
     const { getByTestId } = render(<NotificationsScreen />, {
       wrapper: createWrapper(),
     });
-    // Defaults: pushEnabled=false
     expect(getByTestId('push-notifications-toggle').props.value).toBe(false);
+    expect(getByTestId('push-notifications-toggle').props.disabled).toBe(true);
+
+    fireEvent(getByTestId('push-notifications-toggle'), 'valueChange', true);
+
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 DS-202] disables toggles and does not submit defaults after load error', () => {
+    mockNotifPrefs = undefined;
+    mockNotifError = true;
+
+    const { getByTestId } = render(<NotificationsScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    expect(getByTestId('weekly-digest-toggle').props.disabled).toBe(true);
+    fireEvent(getByTestId('weekly-digest-toggle'), 'valueChange', false);
+
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
   });
 });

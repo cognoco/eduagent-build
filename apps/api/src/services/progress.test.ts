@@ -33,8 +33,7 @@ const mockGetPracticeActivitySummaryBatch = jest
   .mockResolvedValue(new Map());
 
 jest.mock(
-  // gc1-allow: unit test boundary
-  './practice-activity-summary',
+  './practice-activity-summary' /* gc1-allow: unit test boundary */,
   () => ({
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
@@ -51,6 +50,7 @@ import { createScopedRepository } from '@eduagent/database';
 import {
   getSubjectProgress,
   getTopicProgress,
+  getTopicProgressBatch,
   getOverallProgress,
   getOverallProgressBatch,
   getContinueSuggestion,
@@ -99,6 +99,20 @@ function mockTopicRow(
     skipped: false,
     createdAt: NOW,
     updatedAt: NOW,
+  };
+}
+
+function mockOwnedTopicRow(topic: ReturnType<typeof mockTopicRow>) {
+  return {
+    profileId,
+    topicId: topic.id,
+    topicTitle: topic.title,
+    topicDescription: topic.description,
+    topicChapter: null,
+    bookId: topic.bookId ?? 'book-1',
+    bookTitle: 'Book 1',
+    curriculumId: topic.curriculumId,
+    subjectId,
   };
 }
 
@@ -191,28 +205,59 @@ function createMockDb({
     version: number;
   }>,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
-  topicFindFirst = undefined as Record<string, unknown> | undefined,
-  // [BUG-656] Result for the topic↔subject parent-chain ownership join used
-  // by getTopicProgress. Default is the positive case (singleton array) so
-  // existing tests pass; empty array simulates the foreign-topic case.
+  topicFindFirst = undefined as ReturnType<typeof mockTopicRow> | undefined,
   topicSubjectJoinRows = [{ topicId }] as Array<{ topicId: string }>,
+  ownedTopicRows,
+}: {
+  curriculumFindFirst?: { id: string; subjectId: string } | undefined;
+  curriculaFindMany?: Array<{ id: string; subjectId: string }>;
+  curriculumSelectRows?: Array<{
+    id: string;
+    subjectId: string;
+    version: number;
+  }>;
+  topicsFindMany?: ReturnType<typeof mockTopicRow>[];
+  topicFindFirst?: ReturnType<typeof mockTopicRow> | undefined;
+  topicSubjectJoinRows?: Array<{ topicId: string }>;
+  ownedTopicRows?: ReturnType<typeof mockOwnedTopicRow>[];
 } = {}): Database {
-  // The select mock covers two chain shapes used by progress.ts:
-  //   (a) .select(...).from(...).where(...).orderBy(...) -> curriculumSelectRows
-  //   (b) .select(...).from(...).innerJoin(...).where(...).limit(...)
-  //       -> topicSubjectJoinRows (BUG-656 ownership join)
+  const effectiveOwnedTopicRows =
+    ownedTopicRows ??
+    (topicSubjectJoinRows.length === 0
+      ? []
+      : topicFindFirst
+        ? [mockOwnedTopicRow(topicFindFirst)]
+        : topicsFindMany.map(mockOwnedTopicRow));
+  const orderBy = jest.fn().mockResolvedValue(curriculumSelectRows);
+  const selectWhere = jest.fn().mockReturnValue({ orderBy });
+  const ownedTopicLimit = jest.fn().mockResolvedValue(effectiveOwnedTopicRows);
+  const ownedTopicWhereResult = Object.assign(
+    { limit: ownedTopicLimit },
+    {
+      then: (
+        resolve: (value: typeof effectiveOwnedTopicRows) => unknown,
+        reject?: (reason: unknown) => unknown,
+      ) => Promise.resolve(effectiveOwnedTopicRows).then(resolve, reject),
+    },
+  );
+  const ownedTopicWhere = jest.fn().mockReturnValue(ownedTopicWhereResult);
+  const ownedTopicThirdJoin = jest.fn().mockReturnValue({
+    where: ownedTopicWhere,
+  });
+  const ownedTopicSecondJoin = jest.fn().mockReturnValue({
+    innerJoin: ownedTopicThirdJoin,
+  });
+  const ownedTopicFirstJoin = jest.fn().mockReturnValue({
+    innerJoin: ownedTopicSecondJoin,
+  });
+  const from = jest.fn().mockReturnValue({
+    where: selectWhere,
+    innerJoin: ownedTopicFirstJoin,
+  });
+
   return {
     select: jest.fn().mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          orderBy: jest.fn().mockResolvedValue(curriculumSelectRows),
-        }),
-        innerJoin: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue(topicSubjectJoinRows),
-          }),
-        }),
-      }),
+      from,
     }),
     query: {
       curricula: {
@@ -245,6 +290,7 @@ function setupScopedRepo({
   sessionSummariesFindFirst = undefined as { content: string } | undefined,
   sessionSummariesFindMany = [] as Array<{
     sessionId: string;
+    profileId?: string;
     status: string;
     content?: string;
   }>,
@@ -331,6 +377,42 @@ describe('getSubjectProgress', () => {
     expect(result!.topicsCompleted).toBe(2); // 1 verified + 1 passed
     expect(result!.topicsVerified).toBe(1);
     expect(result!.name).toBe('Mathematics');
+  });
+
+  it('[WI-80] excludes mixed-parent topics from subject progress totals', async () => {
+    const ownedTopic = mockTopicRow({ id: 'owned-topic', sortOrder: 1 });
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      bookId: 'foreign-book',
+      sortOrder: 2,
+    });
+
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardsFindMany: [
+        mockRetentionCard({ topicId: 'owned-topic', xpStatus: 'verified' }),
+        mockRetentionCard({
+          topicId: 'mixed-parent-topic',
+          xpStatus: 'verified',
+        }),
+      ],
+      assessmentsFindMany: [
+        mockAssessmentRow({ topicId: 'mixed-parent-topic', status: 'passed' }),
+      ],
+    });
+    const db = createMockDb({
+      curriculumFindFirst: { id: curriculumId, subjectId },
+      topicsFindMany: [ownedTopic, mixedParentTopic],
+      ownedTopicRows: [mockOwnedTopicRow(ownedTopic)],
+    });
+
+    const result = await getSubjectProgress(db, profileId, subjectId);
+
+    expect(result).toMatchObject({
+      topicsTotal: 1,
+      topicsCompleted: 1,
+      topicsVerified: 1,
+    });
   });
 
   it('includes lastSessionAt from most recent session', async () => {
@@ -517,12 +599,50 @@ describe('getTopicProgress', () => {
 
   it('returns null when topic not found', async () => {
     setupScopedRepo({ subjectFindFirst: mockSubjectRow() });
-    // [BUG-656] Parent-chain ownership join returns empty -> null short-circuit.
-    const db = createMockDb({
-      topicSubjectJoinRows: [],
-      topicFindFirst: undefined,
-    });
+    const db = createMockDb({ ownedTopicRows: [] });
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
+    expect(result).toBeNull();
+  });
+
+  it('[WI-80] returns null when topicId is not owned by the scoped subject/profile', async () => {
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: undefined,
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [],
+    });
+    const db = {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          innerJoin: jest.fn(() => ({
+            innerJoin: jest.fn(() => ({
+              innerJoin: jest.fn(() => ({
+                where: jest.fn(() => ({
+                  limit: jest.fn().mockResolvedValue([]),
+                })),
+              })),
+            })),
+          })),
+        })),
+      })),
+      query: {
+        curriculumTopics: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue(mockTopicRow({ id: 'foreign-topic' })),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await getTopicProgress(
+      db,
+      profileId,
+      subjectId,
+      'foreign-topic',
+    );
+
     expect(result).toBeNull();
   });
 
@@ -554,11 +674,10 @@ describe('getTopicProgress', () => {
     // function would have returned it.
     const db = createMockDb({
       topicSubjectJoinRows: [],
-      topicFindFirst: {
-        id: topicId,
+      topicFindFirst: mockTopicRow({
         title: 'Victim Topic Title',
         curriculumId: 'other-curriculum',
-      },
+      }),
     });
 
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
@@ -704,6 +823,69 @@ describe('getTopicProgress', () => {
     expect(rendered).toContain('exchange_count');
   });
 });
+
+// ---------------------------------------------------------------------------
+// getTopicProgressBatch
+// ---------------------------------------------------------------------------
+
+describe('getTopicProgressBatch', () => {
+  it('[WI-80] excludes mixed-parent topics from batched topic progress', async () => {
+    const ownedTopic = mockTopicRow({
+      id: 'owned-topic',
+      title: 'Owned Topic',
+    });
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Topic',
+      bookId: 'foreign-book',
+    });
+
+    setupScopedRepo({
+      retentionCardsFindMany: [
+        mockRetentionCard({
+          topicId: 'owned-topic',
+          xpStatus: 'verified',
+        }),
+        mockRetentionCard({
+          topicId: 'mixed-parent-topic',
+          xpStatus: 'verified',
+        }),
+      ],
+      assessmentsFindMany: [
+        mockAssessmentRow({
+          topicId: 'mixed-parent-topic',
+          status: 'passed',
+          masteryScore: 0.95,
+        }),
+      ],
+      sessionsFindMany: [
+        mockSessionRow({ topicId: 'owned-topic' }),
+        mockSessionRow({ topicId: 'mixed-parent-topic' }),
+      ],
+    });
+    const db = createMockDb({
+      topicsFindMany: [ownedTopic, mixedParentTopic],
+      ownedTopicRows: [mockOwnedTopicRow(ownedTopic)],
+    });
+
+    const result = await getTopicProgressBatch(db, profileId, [
+      {
+        id: 'owned-topic',
+        title: 'Owned Topic',
+        description: 'Owned description',
+      },
+      {
+        id: 'mixed-parent-topic',
+        title: 'Foreign Topic',
+        description: 'Foreign description',
+      },
+    ]);
+
+    expect(result.map((topic) => topic.topicId)).toEqual(['owned-topic']);
+    expect(JSON.stringify(result)).not.toContain('Foreign Topic');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // getOverallProgress
 // ---------------------------------------------------------------------------
@@ -859,6 +1041,53 @@ describe('getOverallProgress', () => {
     expect(science!.topicsTotal).toBe(1);
     expect(science!.topicsCompleted).toBe(1);
     expect(science!.topicsVerified).toBe(0);
+  });
+
+  it('[WI-80] excludes mixed-parent topics from overall progress aggregation', async () => {
+    const subject = mockSubjectRow({ id: 'sub-1', name: 'Math' });
+    const curriculumIdLocal = 'curr-1';
+    const ownedTopic = {
+      ...mockTopicRow({ id: 'owned-topic', sortOrder: 1 }),
+      curriculumId: curriculumIdLocal,
+    };
+    const mixedParentTopic = {
+      ...mockTopicRow({
+        id: 'mixed-parent-topic',
+        bookId: 'foreign-book',
+        sortOrder: 2,
+      }),
+      curriculumId: curriculumIdLocal,
+    };
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [
+        mockRetentionCard({ topicId: 'owned-topic', xpStatus: 'verified' }),
+        mockRetentionCard({
+          topicId: 'mixed-parent-topic',
+          xpStatus: 'verified',
+        }),
+      ],
+      assessmentsFindMany: [
+        mockAssessmentRow({ topicId: 'mixed-parent-topic', status: 'passed' }),
+      ],
+    });
+
+    const db = createMockDb({
+      curriculaFindMany: [{ id: curriculumIdLocal, subjectId: 'sub-1' }],
+      topicsFindMany: [ownedTopic, mixedParentTopic],
+      ownedTopicRows: [mockOwnedTopicRow(ownedTopic)],
+    });
+
+    const result = await getOverallProgress(db, profileId);
+
+    expect(result.subjects[0]).toMatchObject({
+      topicsTotal: 1,
+      topicsCompleted: 1,
+      topicsVerified: 1,
+    });
+    expect(result.totalTopicsCompleted).toBe(1);
+    expect(result.totalTopicsVerified).toBe(1);
   });
 
   it('handles subjects without curricula', async () => {
@@ -1163,6 +1392,59 @@ describe('getLearningResumeTarget', () => {
     });
   });
 
+  it('[WI-80] does not resume a session attached to a mixed-parent topic', async () => {
+    const subject = mockSubjectRow();
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Book Topic',
+      bookId: 'foreign-book',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'mixed-parent-session',
+          topicId: 'mixed-parent-topic',
+          status: 'active',
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        }),
+      ],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [mixedParentTopic],
+      ownedTopicRows: [],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toBeNull();
+  });
+
+  it('[WI-80] does not suggest a next topic from a mixed parent chain', async () => {
+    const subject = mockSubjectRow();
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Book Topic',
+      bookId: 'foreign-book',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [mixedParentTopic],
+      ownedTopicRows: [],
+    });
+
+    const result = await getLearningResumeTarget(db, profileId);
+
+    expect(result).toBeNull();
+  });
+
   it('resumes a subject-level session even when no curriculum exists yet', async () => {
     const subject = mockSubjectRow({ name: 'Biography' });
     setupScopedRepo({
@@ -1278,6 +1560,32 @@ describe('getContinueSuggestion', () => {
     expect(result!.subjectId).toBe(subjectId);
     expect(result!.subjectName).toBe('Mathematics');
     expect(result!.lastSessionId).toBeNull();
+  });
+
+  it('[WI-80] does not suggest a mixed-parent topic', async () => {
+    const subject = mockSubjectRow();
+    const mixedParentTopic = mockTopicRow({
+      id: 'mixed-parent-topic',
+      title: 'Foreign Book Topic',
+      bookId: 'foreign-book',
+      sortOrder: 1,
+    });
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [mixedParentTopic],
+      ownedTopicRows: [],
+    });
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).toBeNull();
   });
 
   it('includes lastSessionId when an active session exists', async () => {
@@ -1460,7 +1768,7 @@ describe('getActiveSessionForTopic', () => {
     setupScopedRepo({
       sessionsFindMany: [olderSession, newerSession],
     });
-    const db = createMockDb();
+    const db = createMockDb({ topicFindFirst: mockTopicRow() });
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
 
@@ -1473,6 +1781,26 @@ describe('getActiveSessionForTopic', () => {
       sessionsFindMany: [],
     });
     const db = createMockDb();
+
+    const result = await getActiveSessionForTopic(db, profileId, topicId);
+
+    expect(result).toBeNull();
+  });
+
+  it('[WI-80] returns null when the topic is not owned through the parent chain', async () => {
+    setupScopedRepo({
+      sessionsFindMany: [
+        {
+          ...mockSessionRow({ topicId }),
+          id: 'stale-session',
+          status: 'active' as const,
+        },
+      ],
+    });
+    const db = createMockDb({
+      topicFindFirst: mockTopicRow({ id: topicId, bookId: 'foreign-book' }),
+      ownedTopicRows: [],
+    });
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
 
@@ -1496,11 +1824,11 @@ describe('resolveTopicSubject', () => {
   it('returns null when curriculum does not exist', async () => {
     setupScopedRepo();
     const db = createMockDb({
-      topicFindFirst: {
+      topicFindFirst: mockTopicRow({
         id: topicId,
         title: 'Algebra Basics',
         curriculumId,
-      },
+      }),
       curriculumFindFirst: undefined,
     });
 
@@ -1511,15 +1839,35 @@ describe('resolveTopicSubject', () => {
   it('returns null when subject belongs to a different profile', async () => {
     setupScopedRepo({ subjectFindFirst: undefined });
     const db = createMockDb({
-      topicFindFirst: {
+      topicFindFirst: mockTopicRow({
         id: topicId,
         title: 'Algebra Basics',
         curriculumId,
-      },
+      }),
       curriculumFindFirst: { id: curriculumId, subjectId },
     });
 
     const result = await resolveTopicSubject(db, profileId, topicId);
+    expect(result).toBeNull();
+  });
+
+  it('[WI-80] returns null when the topic has a mixed parent chain', async () => {
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow({ name: 'Mathematics' }),
+    });
+    const db = createMockDb({
+      topicFindFirst: mockTopicRow({
+        id: topicId,
+        title: 'Foreign Book Topic',
+        curriculumId,
+        bookId: 'foreign-book',
+      }),
+      curriculumFindFirst: { id: curriculumId, subjectId },
+      ownedTopicRows: [],
+    });
+
+    const result = await resolveTopicSubject(db, profileId, topicId);
+
     expect(result).toBeNull();
   });
 
@@ -1528,11 +1876,11 @@ describe('resolveTopicSubject', () => {
       subjectFindFirst: mockSubjectRow({ name: 'Mathematics' }),
     });
     const db = createMockDb({
-      topicFindFirst: {
+      topicFindFirst: mockTopicRow({
         id: topicId,
         title: 'Algebra Basics',
         curriculumId,
-      },
+      }),
       curriculumFindFirst: { id: curriculumId, subjectId },
     });
 
@@ -1777,5 +2125,126 @@ describe('getOverallProgressBatch — cross-profile data leak (security)', () =>
     // as A's. Identity check catches any future regression where the
     // fallback again uses .values().next().value.
     expect(resultB!.practiceSummary).not.toBe(resultA!.practiceSummary);
+  });
+
+  it('[WI-80] excludes mixed-parent topics from batch progress aggregation', async () => {
+    const subject = mockSubjectRow({ id: 'sub-1', name: 'Math' });
+    const curriculumIdLocal = 'curr-1';
+    const ownedTopic = {
+      ...mockTopicRow({ id: 'owned-topic', sortOrder: 1 }),
+      curriculumId: curriculumIdLocal,
+    };
+    const mixedParentTopic = {
+      ...mockTopicRow({
+        id: 'mixed-parent-topic',
+        bookId: 'foreign-book',
+        sortOrder: 2,
+      }),
+      curriculumId: curriculumIdLocal,
+    };
+
+    mockGetPracticeActivitySummaryBatch.mockResolvedValueOnce(
+      new Map([[profileId, emptyPracticeActivitySummary]]),
+    );
+    const db = createMockDb({
+      curriculaFindMany: [{ id: curriculumIdLocal, subjectId: 'sub-1' }],
+      topicsFindMany: [ownedTopic, mixedParentTopic],
+      ownedTopicRows: [mockOwnedTopicRow(ownedTopic)],
+    });
+    const query = db.query as unknown as Record<
+      string,
+      { findMany: jest.Mock }
+    >;
+    query.subjects = { findMany: jest.fn().mockResolvedValue([subject]) };
+    query.retentionCards = {
+      findMany: jest.fn().mockResolvedValue([
+        mockRetentionCard({ topicId: 'owned-topic', xpStatus: 'verified' }),
+        mockRetentionCard({
+          topicId: 'mixed-parent-topic',
+          xpStatus: 'verified',
+        }),
+      ]),
+    };
+    query.assessments = {
+      findMany: jest.fn().mockResolvedValue([
+        mockAssessmentRow({
+          topicId: 'mixed-parent-topic',
+          status: 'passed',
+        }),
+      ]),
+    };
+    query.learningSessions = { findMany: jest.fn().mockResolvedValue([]) };
+    query.sessionSummaries = { findMany: jest.fn().mockResolvedValue([]) };
+
+    const result = await getOverallProgressBatch(db, [profileId]);
+    const progress = result.get(profileId);
+
+    expect(progress).toBeDefined();
+    expect(progress!.subjects[0]).toMatchObject({
+      topicsTotal: 1,
+      topicsCompleted: 1,
+      topicsVerified: 1,
+    });
+    expect(progress!.totalTopicsCompleted).toBe(1);
+    expect(progress!.totalTopicsVerified).toBe(1);
+  });
+
+  it('[WI-80] does not count another profile summary as completion for a profile-owned short session', async () => {
+    const profileA = profileId;
+    const profileB = 'other-profile-id';
+    const subject = mockSubjectRow({ id: 'sub-summary-mismatch' });
+    const curriculumIdLocal = 'curr-summary-mismatch';
+    const ownedTopic = {
+      ...mockTopicRow({ id: 'topic-summary-mismatch', sortOrder: 1 }),
+      curriculumId: curriculumIdLocal,
+    };
+
+    mockGetPracticeActivitySummaryBatch.mockResolvedValueOnce(
+      new Map([[profileA, emptyPracticeActivitySummary]]),
+    );
+    const db = createMockDb({
+      curriculaFindMany: [
+        { id: curriculumIdLocal, subjectId: 'sub-summary-mismatch' },
+      ],
+      topicsFindMany: [ownedTopic],
+      ownedTopicRows: [mockOwnedTopicRow(ownedTopic)],
+    });
+    const query = db.query as unknown as Record<
+      string,
+      { findMany: jest.Mock }
+    >;
+    query.subjects = { findMany: jest.fn().mockResolvedValue([subject]) };
+    query.retentionCards = { findMany: jest.fn().mockResolvedValue([]) };
+    query.assessments = { findMany: jest.fn().mockResolvedValue([]) };
+    query.learningSessions = {
+      findMany: jest.fn().mockResolvedValue([
+        mockSessionRow({
+          id: 'session-short-owned-by-a',
+          subjectId: 'sub-summary-mismatch',
+          topicId: 'topic-summary-mismatch',
+          exchangeCount: 1,
+        }),
+      ]),
+    };
+    query.sessionSummaries = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          sessionId: 'session-short-owned-by-a',
+          profileId: profileB,
+          status: 'accepted',
+        },
+      ]),
+    };
+
+    const result = await getOverallProgressBatch(db, [profileA]);
+    const progress = result.get(profileA);
+
+    expect(progress).toBeDefined();
+    expect(progress!.subjects[0]).toMatchObject({
+      topicsTotal: 1,
+      topicsCompleted: 0,
+      topicsVerified: 0,
+    });
+    expect(progress!.totalTopicsCompleted).toBe(0);
   });
 });

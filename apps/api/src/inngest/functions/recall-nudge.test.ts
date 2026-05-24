@@ -364,7 +364,7 @@ describe('recallNudge — find-eligible-profiles step DB path', () => {
       overdueCount: number;
       topTopicIds: string[] | null;
     }>,
-  ): { select: jest.Mock } {
+  ): { select: jest.Mock; builder: Record<string, jest.Mock> } {
     // Builder that returns itself for every method except groupBy
     const builder: Record<string, jest.Mock> = {};
     const methods = [
@@ -384,7 +384,7 @@ describe('recallNudge — find-eligible-profiles step DB path', () => {
     builder['groupBy'] = jest.fn().mockResolvedValue(rows);
 
     const selectMock = jest.fn().mockReturnValue(builder);
-    return { select: selectMock };
+    return { select: selectMock, builder };
   }
 
   it('calls db.select() when executing the find-eligible-profiles step', async () => {
@@ -431,6 +431,17 @@ describe('recallNudge — find-eligible-profiles step DB path', () => {
       eligibleCount: 0,
       sentEvents: 0,
     });
+  });
+
+  it('[WI-80] joins retention cards through owned topic parents before aggregating', async () => {
+    const db = buildChainableDb([]);
+    mockGetStepDatabase.mockReturnValue(db);
+
+    const { step } = createInngestStepRunner();
+    const handler = (recallNudge as any).fn;
+    await handler({ step });
+
+    expect(db.builder.innerJoin).toHaveBeenCalledTimes(7);
   });
 
   it('fans out correctly when DB query returns eligible profiles', async () => {

@@ -13,19 +13,24 @@ import {
 
 export default function NotificationsScreen(): React.ReactElement {
   const { t } = useTranslation();
-  const { data: notifPrefs, isLoading: notifLoading } =
-    useNotificationSettings();
+  const {
+    data: notifPrefs,
+    isLoading: notifLoading,
+    isError: notifError,
+  } = useNotificationSettings();
   const updateNotifications = useUpdateNotificationSettings();
+  const settingsUnavailable = notifError || !notifPrefs;
 
   const handleTogglePush = useCallback(
     (value: boolean) => {
+      if (!notifPrefs) return;
       updateNotifications.mutate(
         {
-          reviewReminders: notifPrefs?.reviewReminders ?? false,
-          dailyReminders: notifPrefs?.dailyReminders ?? false,
-          weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
-          weeklyProgressEmail: notifPrefs?.weeklyProgressEmail ?? true,
-          monthlyProgressEmail: notifPrefs?.monthlyProgressEmail ?? true,
+          reviewReminders: notifPrefs.reviewReminders,
+          dailyReminders: notifPrefs.dailyReminders,
+          weeklyProgressPush: notifPrefs.weeklyProgressPush,
+          weeklyProgressEmail: notifPrefs.weeklyProgressEmail,
+          monthlyProgressEmail: notifPrefs.monthlyProgressEmail,
           pushEnabled: value,
         },
         {
@@ -43,14 +48,15 @@ export default function NotificationsScreen(): React.ReactElement {
 
   const handleToggleDigest = useCallback(
     (value: boolean) => {
+      if (!notifPrefs) return;
       updateNotifications.mutate(
         {
-          reviewReminders: notifPrefs?.reviewReminders ?? false,
-          dailyReminders: notifPrefs?.dailyReminders ?? false,
+          reviewReminders: notifPrefs.reviewReminders,
+          dailyReminders: notifPrefs.dailyReminders,
           weeklyProgressPush: value,
-          weeklyProgressEmail: notifPrefs?.weeklyProgressEmail ?? true,
-          monthlyProgressEmail: notifPrefs?.monthlyProgressEmail ?? true,
-          pushEnabled: notifPrefs?.pushEnabled ?? false,
+          weeklyProgressEmail: notifPrefs.weeklyProgressEmail,
+          monthlyProgressEmail: notifPrefs.monthlyProgressEmail,
+          pushEnabled: notifPrefs.pushEnabled,
         },
         {
           onError: () => {
@@ -67,14 +73,15 @@ export default function NotificationsScreen(): React.ReactElement {
 
   const handleToggleWeeklyEmailDigest = useCallback(
     (value: boolean) => {
+      if (!notifPrefs) return;
       updateNotifications.mutate(
         {
-          reviewReminders: notifPrefs?.reviewReminders ?? false,
-          dailyReminders: notifPrefs?.dailyReminders ?? false,
-          weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
+          reviewReminders: notifPrefs.reviewReminders,
+          dailyReminders: notifPrefs.dailyReminders,
+          weeklyProgressPush: notifPrefs.weeklyProgressPush,
           weeklyProgressEmail: value,
-          monthlyProgressEmail: notifPrefs?.monthlyProgressEmail ?? true,
-          pushEnabled: notifPrefs?.pushEnabled ?? false,
+          monthlyProgressEmail: notifPrefs.monthlyProgressEmail,
+          pushEnabled: notifPrefs.pushEnabled,
         },
         {
           onError: () => {
@@ -91,14 +98,15 @@ export default function NotificationsScreen(): React.ReactElement {
 
   const handleToggleMonthlyEmailDigest = useCallback(
     (value: boolean) => {
+      if (!notifPrefs) return;
       updateNotifications.mutate(
         {
-          reviewReminders: notifPrefs?.reviewReminders ?? false,
-          dailyReminders: notifPrefs?.dailyReminders ?? false,
-          weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
-          weeklyProgressEmail: notifPrefs?.weeklyProgressEmail ?? true,
+          reviewReminders: notifPrefs.reviewReminders,
+          dailyReminders: notifPrefs.dailyReminders,
+          weeklyProgressPush: notifPrefs.weeklyProgressPush,
+          weeklyProgressEmail: notifPrefs.weeklyProgressEmail,
           monthlyProgressEmail: value,
-          pushEnabled: notifPrefs?.pushEnabled ?? false,
+          pushEnabled: notifPrefs.pushEnabled,
         },
         {
           onError: () => {
@@ -127,14 +135,18 @@ export default function NotificationsScreen(): React.ReactElement {
           label={t('more.notifications.pushTitle')}
           value={notifPrefs?.pushEnabled ?? false}
           onToggle={handleTogglePush}
-          disabled={notifLoading || updateNotifications.isPending}
+          disabled={
+            notifLoading || settingsUnavailable || updateNotifications.isPending
+          }
           testID="push-notifications-toggle"
         />
         <ToggleRow
           label={t('more.notifications.weeklyDigestTitle')}
           value={notifPrefs?.weeklyProgressPush ?? false}
           onToggle={handleToggleDigest}
-          disabled={notifLoading || updateNotifications.isPending}
+          disabled={
+            notifLoading || settingsUnavailable || updateNotifications.isPending
+          }
           testID="weekly-digest-toggle"
         />
         <ToggleRow
@@ -142,7 +154,9 @@ export default function NotificationsScreen(): React.ReactElement {
           description={t('more.notifications.emailDigestDescription')}
           value={notifPrefs?.weeklyProgressEmail ?? true}
           onToggle={handleToggleWeeklyEmailDigest}
-          disabled={notifLoading || updateNotifications.isPending}
+          disabled={
+            notifLoading || settingsUnavailable || updateNotifications.isPending
+          }
           testID="weekly-email-digest-toggle"
         />
         <ToggleRow
@@ -150,7 +164,9 @@ export default function NotificationsScreen(): React.ReactElement {
           description={t('more.notifications.emailDigestDescription')}
           value={notifPrefs?.monthlyProgressEmail ?? true}
           onToggle={handleToggleMonthlyEmailDigest}
-          disabled={notifLoading || updateNotifications.isPending}
+          disabled={
+            notifLoading || settingsUnavailable || updateNotifications.isPending
+          }
           testID="monthly-email-digest-toggle"
         />
       </ScrollView>

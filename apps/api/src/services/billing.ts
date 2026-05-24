@@ -12,6 +12,7 @@
 
 export type {
   SubscriptionRow,
+  AppliedSubscriptionRow,
   QuotaPoolRow,
   WebhookSubscriptionUpdate,
 } from './billing/types';
@@ -46,6 +47,7 @@ export {
   findExpiredTrials,
   findSubscriptionsByTrialDateRange,
   transitionToExtendedTrial,
+  transitionToExtendedTrialFromRevenuecatEvent,
   findExpiredTrialsByDaysSinceEnd,
 } from './billing/trial';
 
@@ -117,5 +119,6 @@ export type { RevenuecatWebhookUpdate } from './billing/revenuecat';
 export {
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
 } from './billing/revenuecat';

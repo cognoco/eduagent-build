@@ -26,8 +26,8 @@ import {
   resetDailyQuotas,
   resetExpiredQuotaCycles,
   transitionToExtendedTrial,
+  transitionToExtendedTrialFromRevenuecatEvent,
   expireTrialAndDowngradeQuota,
-  downgradeQuotaPool,
 } from '../billing';
 import { getTierConfig } from '../subscription';
 
@@ -347,6 +347,117 @@ describe('transitionToExtendedTrial atomicity [CR-2026-05-19-M3 SITE 2a]', () =>
     expect(pool!.monthlyLimit).toBe(EXTENDED_MONTHLY);
     expect(pool!.usedThisMonth).toBe(0);
     expect(pool!.usedToday).toBe(0);
+  });
+});
+
+describe('transitionToExtendedTrialFromRevenuecatEvent [WI-78 review]', () => {
+  it('stamps the RevenueCat event in the same transaction as the trial soft landing', async () => {
+    const account = await seedAccount(3);
+    const { subscription } = await seedTrialSubscriptionWithPlusQuota(
+      account.id,
+      'trial',
+    );
+    const db = createIntegrationDb();
+    const eventTimestampMs = 1_800_000_000_000;
+
+    const result = await transitionToExtendedTrialFromRevenuecatEvent(
+      db,
+      subscription.id,
+      450,
+      'evt-trial-expired',
+      eventTimestampMs,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: subscription.id,
+        status: 'expired',
+        tier: 'free',
+        webhookApplied: true,
+      }),
+    );
+
+    const sub = await loadSubscriptionById(subscription.id);
+    expect(sub!.status).toBe('expired');
+    expect(sub!.tier).toBe('free');
+    expect(sub!.lastRevenuecatEventId).toBe('evt-trial-expired');
+    expect(sub!.lastRevenuecatEventTimestampMs).toBe(String(eventTimestampMs));
+
+    const pool = await loadQuotaPool(subscription.id);
+    expect(pool!.monthlyLimit).toBe(450);
+    expect(pool!.usedThisMonth).toBe(0);
+    expect(pool!.usedToday).toBe(0);
+  });
+
+  it('does not downgrade a subscription already converted by a newer RevenueCat event', async () => {
+    const account = await seedAccount(4);
+    const { subscription, quotaPool } =
+      await seedTrialSubscriptionWithPlusQuota(account.id, 'active');
+    const db = createIntegrationDb();
+
+    await db
+      .update(subscriptions)
+      .set({
+        lastRevenuecatEventId: 'evt-renewal-newer',
+        lastRevenuecatEventTimestampMs: String(1_900_000_000_000),
+      })
+      .where(eq(subscriptions.id, subscription.id));
+
+    const result = await transitionToExtendedTrialFromRevenuecatEvent(
+      db,
+      subscription.id,
+      450,
+      'evt-trial-expired-stale',
+      1_800_000_000_000,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: subscription.id,
+        status: 'active',
+        tier: 'plus',
+        webhookApplied: false,
+      }),
+    );
+
+    const sub = await loadSubscriptionById(subscription.id);
+    expect(sub!.status).toBe('active');
+    expect(sub!.tier).toBe('plus');
+    expect(sub!.lastRevenuecatEventId).toBe('evt-renewal-newer');
+    expect(sub!.lastRevenuecatEventTimestampMs).toBe('1900000000000');
+
+    const pool = await loadQuotaPool(subscription.id);
+    expect(pool!.monthlyLimit).toBe(quotaPool.monthlyLimit);
+    expect(pool!.usedThisMonth).toBe(quotaPool.usedThisMonth);
+    expect(pool!.usedToday).toBe(quotaPool.usedToday);
+  });
+
+  it('rolls back the trial transition when the quota row is missing', async () => {
+    const account = await seedAccount(5);
+    const { subscription } = await seedTrialSubscriptionWithPlusQuota(
+      account.id,
+      'trial',
+    );
+    const db = createIntegrationDb();
+
+    await db
+      .delete(quotaPools)
+      .where(eq(quotaPools.subscriptionId, subscription.id));
+
+    await expect(
+      transitionToExtendedTrialFromRevenuecatEvent(
+        db,
+        subscription.id,
+        450,
+        'evt-trial-missing-quota',
+        1_800_000_000_000,
+      ),
+    ).rejects.toThrow('quota pool');
+
+    const sub = await loadSubscriptionById(subscription.id);
+    expect(sub!.status).toBe('trial');
+    expect(sub!.tier).toBe('plus');
+    expect(sub!.lastRevenuecatEventId).not.toBe('evt-trial-missing-quota');
   });
 });
 

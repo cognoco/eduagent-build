@@ -7,7 +7,6 @@ import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
-  curriculumTopics,
   retentionCards,
   vocabulary,
   subjects,
@@ -26,6 +25,7 @@ import type {
   VerificationType,
 } from '@eduagent/schemas';
 import {
+  ConflictError,
   LlmStreamError,
   classifyOrphanError,
   extractedInterviewSignalsSchema,
@@ -103,6 +103,10 @@ import {
   recordPracticeActivityEvent,
   type RecordPracticeActivityEventInput,
 } from '../practice-activity-events';
+import {
+  findOwnedCurriculumTopic,
+  findOwnedCurriculumTopics,
+} from '../curriculum-topic-ownership';
 
 /**
  * [BUG-92 / CR-2026-05-19-C4] Decide whether the interview / onboarding loop
@@ -700,6 +704,9 @@ export async function checkExchangeLimit(
   if (!row) {
     throw new Error('Session not found');
   }
+  if (row.status === 'completed' || row.status === 'auto_closed') {
+    throw new ConflictError('Session is closed and cannot accept exchanges');
+  }
   if (row.exchangeCount >= MAX_EXCHANGES_PER_SESSION) {
     throw new SessionExchangeLimitError(row.exchangeCount);
   }
@@ -879,10 +886,16 @@ export async function prepareExchangeContext(
     isFreeform,
     staticContext,
   );
+  const ownedSessionTopic = session.topicId
+    ? await findOwnedCurriculumTopic(db, {
+        profileId,
+        topicId: session.topicId,
+        subjectId: session.subjectId,
+      })
+    : null;
 
   const [
     subject,
-    topicRows,
     profileRows,
     retentionRows,
     priorTopicSessionRows,
@@ -894,34 +907,27 @@ export async function prepareExchangeContext(
     supp,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
-    session.topicId
-      ? db
-          .select()
-          .from(curriculumTopics)
-          .where(eq(curriculumTopics.id, session.topicId))
-          .limit(1)
-      : Promise.resolve([]),
     Promise.resolve(staticContext.profile ? [staticContext.profile] : []),
-    session.topicId
+    ownedSessionTopic
       ? db
           .select()
           .from(retentionCards)
           .where(
             and(
-              eq(retentionCards.topicId, session.topicId),
+              eq(retentionCards.topicId, ownedSessionTopic.topicId),
               eq(retentionCards.profileId, profileId),
             ),
           )
           .limit(1)
       : Promise.resolve([]),
-    session.topicId
+    ownedSessionTopic
       ? db
           .select({ id: learningSessions.id })
           .from(learningSessions)
           .where(
             and(
               eq(learningSessions.profileId, profileId),
-              eq(learningSessions.topicId, session.topicId),
+              eq(learningSessions.topicId, ownedSessionTopic.topicId),
               ne(learningSessions.id, sessionId),
               gte(learningSessions.exchangeCount, 1),
             ),
@@ -1033,10 +1039,9 @@ export async function prepareExchangeContext(
   const crossSubjectHighlights = supp.crossSubjectHighlights;
   const learningProfile = supp.learningProfile;
 
-  const topic = topicRows[0];
+  const topic = ownedSessionTopic;
   const [profile] = profileRows;
-  const isFirstEncounter =
-    Boolean(session.topicId) && priorTopicSessionRows.length === 0;
+  const isFirstEncounter = Boolean(topic) && priorTopicSessionRows.length === 0;
   if (!profile) {
     // Auth middleware loads the profile before reaching this point, so a missing
     // row here means a referential-integrity break (deleted profile mid-request,
@@ -1087,24 +1092,31 @@ export async function prepareExchangeContext(
     };
     const topicIds = meta.interleavedTopics?.map((t) => t.topicId) ?? [];
     if (topicIds.length > 0) {
-      const topicDetails = await db
-        .select({
-          id: curriculumTopics.id,
-          title: curriculumTopics.title,
-          description: curriculumTopics.description,
-        })
-        .from(curriculumTopics)
-        .where(inArray(curriculumTopics.id, topicIds));
-      const detailMap = new Map(topicDetails.map((t) => [t.id, t]));
-      interleavedTopics = topicIds.map((id) => {
-        const detail = detailMap.get(id);
-        const metaTopic = meta.interleavedTopics?.find((t) => t.topicId === id);
-        return {
-          topicId: id,
-          title: detail?.title ?? metaTopic?.topicTitle ?? 'Unknown',
-          description: detail?.description ?? undefined,
-        };
+      const ownedTopics = await findOwnedCurriculumTopics(db, {
+        profileId,
+        topicIds,
       });
+      const ownedById = new Map(
+        ownedTopics.map((owned) => [owned.topicId, owned]),
+      );
+      const resolvedTopics: NonNullable<ExchangeContext['interleavedTopics']> =
+        [];
+      for (const id of topicIds) {
+        const owned = ownedById.get(id);
+        const metaTopic = meta.interleavedTopics?.find((t) => t.topicId === id);
+        if (
+          !owned ||
+          (metaTopic?.subjectId && metaTopic.subjectId !== owned.subjectId)
+        ) {
+          continue;
+        }
+        resolvedTopics.push({
+          topicId: owned.topicId,
+          title: owned.topicTitle,
+          description: owned.topicDescription ?? undefined,
+        });
+      }
+      interleavedTopics = resolvedTopics;
     }
   }
 
@@ -1338,13 +1350,13 @@ export async function prepareExchangeContext(
   const crossSubjectContext =
     buildCrossSubjectContext(crossSubjectHighlights) || undefined;
   const learningHistoryParts = [
-    topic?.bookId && topic?.id
+    topic?.bookId && topic?.topicId
       ? await getCachedBookLearningHistoryContext(
           db,
           profileId,
           sessionId,
           session,
-          topic.id,
+          topic.topicId,
           topic.bookId,
         )
       : undefined,
@@ -1441,11 +1453,11 @@ export async function prepareExchangeContext(
       );
     const strongTopicIds = strongCards.map((row) => row.topicId);
     if (strongTopicIds.length > 0) {
-      const strongTopicRows = await db
-        .select({ title: curriculumTopics.title })
-        .from(curriculumTopics)
-        .where(inArray(curriculumTopics.id, strongTopicIds));
-      strongTopicTitles = strongTopicRows.map((row) => row.title);
+      const strongTopicRows = await findOwnedCurriculumTopics(db, {
+        profileId,
+        topicIds: strongTopicIds,
+      });
+      strongTopicTitles = strongTopicRows.map((row) => row.topicTitle);
     }
   }
 
@@ -1554,7 +1566,7 @@ export async function prepareExchangeContext(
         isFreeform
           ? (silentClassification?.subjectName ?? null)
           : (subject?.name ?? null),
-        topic?.title ?? null,
+        topic?.topicTitle ?? null,
         {
           status: retentionStatusValue,
           strongTopics: strongTopicTitles,
@@ -1592,8 +1604,10 @@ export async function prepareExchangeContext(
     sessionId,
     profileId,
     subjectName: effectiveSubjectName,
-    topicTitle: interleavedTopics ? undefined : topic?.title,
-    topicDescription: interleavedTopics ? undefined : topic?.description,
+    topicTitle: interleavedTopics ? undefined : topic?.topicTitle,
+    topicDescription: interleavedTopics
+      ? undefined
+      : (topic?.topicDescription ?? undefined),
     sessionType: session.sessionType,
     escalationRung: effectiveRung,
     exchangeHistory,
@@ -1767,143 +1781,79 @@ export async function persistExchangeResult(
       }),
   };
 
-  let insertedUserEventId: string | undefined;
-  if (clientId) {
-    const insertedUserRows = await db
-      .insert(sessionEvents)
-      .values({
-        sessionId,
-        profileId,
-        subjectId: session.subjectId,
-        eventType: 'user_message' as const,
-        content: userMessage,
-        clientId,
-      })
-      .onConflictDoNothing({
-        target: [sessionEvents.sessionId, sessionEvents.clientId],
-        where: sql`${sessionEvents.clientId} IS NOT NULL`,
-      })
-      .returning({ id: sessionEvents.id });
-
-    insertedUserEventId = insertedUserRows[0]?.id;
-    if (!insertedUserEventId) {
-      const freshSession = await getSession(db, profileId, sessionId);
-      return {
-        exchangeCount: freshSession?.exchangeCount ?? session.exchangeCount,
-        persistedUserMessage: false,
-      };
-    }
-  }
-
-  // [S-1 / BUG-626] Run the atomic exchange-count UPDATE FIRST and only
-  // insert events if it succeeded. Pre-fix: events were inserted BEFORE the
-  // UPDATE — two concurrent requests at exchangeCount=MAX-1 both inserted
-  // user_message + ai_response, then raced UPDATE; the loser threw
-  // SessionExchangeLimitError but its events stayed in the DB as orphans
-  // (visible as ghost turns in subsequent exchangeHistory loads).
-  //
-  // Why reorder instead of wrap in a transaction:
-  //
-  // [BUG-981 / CCR-PR126-M-5] The production driver was migrated from
-  // neon-http to neon-serverless (Phase 0.0 of the RLS preparatory plan,
-  // see packages/database/src/client.ts), so interactive transactions over
-  // WebSocket are now supported. The earlier comment on this block claimed
-  // db.transaction "silently degrades to sequential statements" — that
-  // claim is no longer true and was removed.
-  //
-  // The reorder is kept for two reasons that *do* still hold:
-  //   1. The hot path makes only two writes (UPDATE + 1–2 INSERTs); on the
-  //      contention loser branch we want to avoid the cost of opening a tx
-  //      just to roll back. The targeted DELETE rollback below is cheaper.
-  //   2. We are mid-migration on RLS plumbing; until createScopedRepository
-  //      is fully RLS-aware everywhere, mixing tx wrapping with repo writes
-  //      requires extra ceremony we'd rather defer.
-  //
-  // If those constraints lift, this block is a candidate for replacement
-  // with a single db.transaction(async (tx) => { ... }) block — the driver
-  // now supports it correctly.
-  //
-  // Trade-off: if the post-UPDATE INSERTs fail (e.g., connection drop)
-  // we get a counter increment without events. This is rare and recoverable
-  // (user retries, sees fresh state) — strictly less harmful than orphan
-  // events polluting history permanently.
   const now = new Date();
-  const [updated] = await db
-    .update(learningSessions)
-    .set({
-      exchangeCount: sql`${learningSessions.exchangeCount} + 1`,
-      escalationRung: effectiveRung,
-      lastActivityAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-        lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION),
-      ),
-    )
-    .returning({ exchangeCount: learningSessions.exchangeCount });
-
-  if (!updated) {
-    if (insertedUserEventId) {
-      try {
-        await db
-          .delete(sessionEvents)
-          .where(
-            and(
-              eq(sessionEvents.id, insertedUserEventId),
-              eq(sessionEvents.profileId, profileId),
-            ),
-          );
-      } catch (rollbackErr) {
-        captureException(rollbackErr, {
-          profileId,
-          extra: {
-            context: 'session.exchange.user_insert_rollback_failed',
-            sessionId,
-            clientId,
-            userEventId: insertedUserEventId,
-          },
-        });
-      }
-    }
-    throw new SessionExchangeLimitError(session.exchangeCount);
-  }
-
-  // Atomic guard passed — now persist the events.
-  // Drill score is sparse: only set on ai_response when the LLM emitted a
-  // scored fluency drill on this turn. Null on every other exchange.
   const drillCorrect = behavioral?.drillCorrect ?? null;
   const drillTotal = behavioral?.drillTotal ?? null;
-  const insertedEvents = clientId
-    ? await db
+  const persisted = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    if (clientId) {
+      const insertedUserRows = await txDb
         .insert(sessionEvents)
         .values({
           sessionId,
           profileId,
           subjectId: session.subjectId,
-          eventType: 'ai_response' as const,
-          content: aiResponse,
-          metadata: aiMetadata,
-          drillCorrect,
-          drillTotal,
+          eventType: 'user_message' as const,
+          content: userMessage,
+          clientId,
         })
-        .returning({
-          id: sessionEvents.id,
-          eventType: sessionEvents.eventType,
+        .onConflictDoNothing({
+          target: [sessionEvents.sessionId, sessionEvents.clientId],
+          where: sql`${sessionEvents.clientId} IS NOT NULL`,
         })
-    : await db
-        .insert(sessionEvents)
-        .values([
-          {
-            sessionId,
-            profileId,
-            subjectId: session.subjectId,
-            eventType: 'user_message' as const,
-            content: userMessage,
+        .returning({ id: sessionEvents.id });
+
+      if (!insertedUserRows[0]?.id) {
+        const freshSession = await getSession(txDb, profileId, sessionId);
+        return {
+          updated: {
+            exchangeCount: freshSession?.exchangeCount ?? session.exchangeCount,
           },
-          {
+          insertedEvents: [] as Array<{
+            id: string;
+            eventType: string | null;
+          }>,
+          persistedUserMessage: false,
+        };
+      }
+    }
+
+    const [updated] = await txDb
+      .update(learningSessions)
+      .set({
+        exchangeCount: sql`${learningSessions.exchangeCount} + 1`,
+        escalationRung: effectiveRung,
+        lastActivityAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+          inArray(learningSessions.status, ['active', 'paused']),
+          lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION),
+        ),
+      )
+      .returning({ exchangeCount: learningSessions.exchangeCount });
+
+    if (!updated) {
+      const freshSession = await getSession(txDb, profileId, sessionId);
+      if (
+        freshSession?.status === 'completed' ||
+        freshSession?.status === 'auto_closed'
+      ) {
+        throw new ConflictError(
+          'Session is closed and cannot accept exchanges',
+        );
+      }
+      throw new SessionExchangeLimitError(session.exchangeCount);
+    }
+
+    const insertedEvents = clientId
+      ? await txDb
+          .insert(sessionEvents)
+          .values({
             sessionId,
             profileId,
             subjectId: session.subjectId,
@@ -1912,16 +1862,68 @@ export async function persistExchangeResult(
             metadata: aiMetadata,
             drillCorrect,
             drillTotal,
-          },
-        ])
-        .returning({
-          id: sessionEvents.id,
-          eventType: sessionEvents.eventType,
-        });
+          })
+          .returning({
+            id: sessionEvents.id,
+            eventType: sessionEvents.eventType,
+          })
+      : await txDb
+          .insert(sessionEvents)
+          .values([
+            {
+              sessionId,
+              profileId,
+              subjectId: session.subjectId,
+              eventType: 'user_message' as const,
+              content: userMessage,
+            },
+            {
+              sessionId,
+              profileId,
+              subjectId: session.subjectId,
+              eventType: 'ai_response' as const,
+              content: aiResponse,
+              metadata: aiMetadata,
+              drillCorrect,
+              drillTotal,
+            },
+          ])
+          .returning({
+            id: sessionEvents.id,
+            eventType: sessionEvents.eventType,
+          });
+
+    return {
+      updated,
+      insertedEvents,
+      persistedUserMessage: true,
+    };
+  });
+  const { updated, insertedEvents } = persisted;
+
+  if (!persisted.persistedUserMessage) {
+    return {
+      exchangeCount: updated.exchangeCount,
+      persistedUserMessage: false,
+    };
+  }
 
   const aiEventId = insertedEvents.find(
     (event) => event.eventType === 'ai_response',
   )?.id;
+
+  await safeWrite(
+    () =>
+      applyContinuationScore(
+        db,
+        profileId,
+        sessionId,
+        behavioral?.retrievalScore,
+      ),
+    'session-exchange.continuation-score',
+    { profileId, sessionId },
+  );
+
   const sessionMetadata = session.metadata as Record<string, unknown> | null;
   const effectiveMode = sessionMetadata?.['effectiveMode'];
 
@@ -2182,12 +2184,6 @@ export async function processMessage(
     options?.clientId,
   );
 
-  await safeWrite(
-    () =>
-      applyContinuationScore(db, profileId, sessionId, result.retrievalScore),
-    'session-exchange.continuation-score',
-    { profileId, sessionId },
-  );
   if (persisted.persistedUserMessage) {
     await maybeDispatchTopicProbeExtraction(
       db,
@@ -2491,17 +2487,6 @@ export async function streamMessage(
           teachBackAssessment: parsed.teachBackAssessment,
         },
         options?.clientId,
-      );
-      await safeWrite(
-        () =>
-          applyContinuationScore(
-            db,
-            profileId,
-            sessionId,
-            parsed.retrievalScore,
-          ),
-        'session-exchange.continuation-score',
-        { profileId, sessionId },
       );
       if (persisted.persistedUserMessage) {
         await maybeDispatchTopicProbeExtraction(

@@ -214,7 +214,9 @@ jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { billingRoutes } from './billing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const AUTH_HEADERS = makeAuthHeaders();
@@ -1298,5 +1300,95 @@ describe('billing routes', () => {
       expect(body).toContain('mentomate://home');
       expect(body).not.toContain('${BRAND_COLOR_PRIMARY}');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-137 / DS-048] Proxy-mode write guard — 7 billing write handlers
+//
+// Billing is account-level; a parent-proxy session must not initiate billing
+// operations on a child-profile context. Mini-Hono mount with isOwner=false.
+// ---------------------------------------------------------------------------
+describe('[WI-137 / DS-048] billing proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('account' as never, {
+        id: 'test-account-id',
+        email: 'test@example.com',
+      });
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', billingRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('POST /subscription/checkout returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subscription/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /subscription/cancel returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subscription/cancel', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /subscription/top-up returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subscription/top-up', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: 500 }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /subscription/portal returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subscription/portal', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /subscription/family/add returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subscription/family/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: 'a0000000-0000-4000-a000-000000000099',
+      }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /subscription/family/remove returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subscription/family/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: 'a0000000-0000-4000-a000-000000000099',
+      }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /byok-waitlist returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/byok-waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(403);
   });
 });

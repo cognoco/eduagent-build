@@ -22,6 +22,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { assertOwnerAndParentAccess } from '../services/family-access';
 import { notFound, forbidden } from '../errors';
 import {
@@ -123,7 +124,17 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // service guard; the parent-managed /:profileId/pronouns route is exempt
       // because a parent setting pronouns for their child is the allowed path.
       // Throws ForbiddenError → 403 for under-min-age profiles.
+      //
+      // Order note: age gate runs BEFORE assertNotProxyMode so an under-min-age
+      // caller (which is also the typical proxy-mode scenario) gets the more
+      // specific FORBIDDEN/age-related rejection rather than PROXY_MODE. Both
+      // are 403; preserving the more specific error preserves UX and the
+      // pronouns-age-gate integration test contract.
       assertPronounsSelfEditAllowed(c.get('profileMeta')?.birthYear);
+      // [WI-160 / DS-071] Self-edit must be from an owner-profile session.
+      // A parent in proxy mode (active profile = child, but old enough) should
+      // use the /onboarding/:profileId/pronouns route instead.
+      assertNotProxyMode(c);
       const { pronouns } = c.req.valid('json');
       try {
         await updatePronouns(db, profileId, account.id, pronouns);
@@ -168,7 +179,12 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
-      // self-edit allowed: interests are personal to the learner, gating would break solo learning
+      // [WI-160 / DS-071] Self-edit must be from an owner-profile session.
+      // A parent in proxy mode (active profile = child) should use the
+      // /onboarding/:profileId/interests/context route instead, not the
+      // self-edit path. (The prior "interests are personal" comment described
+      // child-as-owner self-editing, which assertNotProxyMode preserves.)
+      assertNotProxyMode(c);
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, profileId, account.id, interests);

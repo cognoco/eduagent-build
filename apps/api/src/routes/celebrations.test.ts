@@ -1,0 +1,48 @@
+// ---------------------------------------------------------------------------
+// celebrations.test.ts — proxy-mode write-guard regression for WI-143 / DS-054
+//
+// Scope: this file was added to scaffold the WI-76 batch-2 proxy-mode guard
+// test. Broader coverage of celebrations routes lives in integration tests.
+// Mirrors the mini-Hono pattern used by parking-lot.test.ts.
+// ---------------------------------------------------------------------------
+
+import { Hono } from 'hono';
+import { celebrationRoutes } from './celebrations';
+
+function makeProxyApp(opts?: { isOwner?: boolean }) {
+  const app = new Hono();
+  app.use('*', async (c, next) => {
+    c.set('db' as never, {});
+    c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+    c.set('user' as never, { id: 'test-user' });
+    c.set('profileMeta' as never, { isOwner: opts?.isOwner ?? false });
+    await next();
+  });
+  app.route('/', celebrationRoutes);
+  return app;
+}
+
+describe('[WI-143 / DS-054] celebrations proxy-mode guard', () => {
+  it('POST /celebrations/seen returns 403 when caller is in proxy mode (isOwner=false)', async () => {
+    const res = await makeProxyApp().request('/celebrations/seen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ viewer: 'parent' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /celebrations/seen does NOT 403 for owner profile (isOwner=true) — guard does not block legitimate writes', async () => {
+    const res = await makeProxyApp({ isOwner: true }).request(
+      '/celebrations/seen',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viewer: 'child' }),
+      },
+    );
+    // The stub db will likely throw a different error (markCelebrationsSeen
+    // hits an empty object) but crucially not a PROXY_MODE 403.
+    expect(res.status).not.toBe(403);
+  });
+});
