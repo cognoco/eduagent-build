@@ -212,6 +212,7 @@ import { Hono } from 'hono';
 import { app } from '../index';
 import { filingRoutes } from './filing';
 import { getSession } from '../services/session';
+import { fileToLibrary } from '../services/filing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -751,6 +752,9 @@ describe('[WI-153 / DS-064] filing proxy-mode guard', () => {
       body: JSON.stringify({ sessionId: SESSION_ID, sessionMode: 'freeform' }),
     });
     expect(res.status).toBe(403);
+    // Guard must reject BEFORE the IDOR getSession lookup — mirrors the
+    // assertion shape used by the other five files in this WI-76 batch.
+    expect(getSession).not.toHaveBeenCalled();
   });
 
   it('POST /filing returns 403 when caller is in proxy mode', async () => {
@@ -760,5 +764,7 @@ describe('[WI-153 / DS-064] filing proxy-mode guard', () => {
       body: JSON.stringify({ rawInput: 'fractions' }),
     });
     expect(res.status).toBe(403);
+    // Guard must reject BEFORE the LLM filing call.
+    expect(fileToLibrary).not.toHaveBeenCalled();
   });
 });

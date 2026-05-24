@@ -1104,4 +1104,30 @@ describe('[WI-147 / DS-058] curriculum proxy-mode guard', () => {
     expect(res.status).toBe(403);
     expect(mockChallengeCurriculum).not.toHaveBeenCalled();
   });
+
+  it('POST /subjects/:subjectId/curriculum/topics returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/curriculum/topics`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'preview', title: 'New topic' }),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockAddCurriculumTopic).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/:subjectId/curriculum/adapt returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/curriculum/adapt`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId: TOPIC_ID, signal: 'struggling' }),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockAdaptCurriculumFromPerformance).not.toHaveBeenCalled();
+  });
 });
