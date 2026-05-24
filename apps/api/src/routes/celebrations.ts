@@ -8,6 +8,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { getCelebrationLevel } from '../services/settings';
 import {
   filterCelebrationsByLevel,
@@ -35,7 +36,7 @@ export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
       return c.json(
         pendingCelebrationsResponseSchema.parse({
           pendingCelebrations: celebrations,
-        })
+        }),
       );
     }
 
@@ -45,20 +46,22 @@ export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
       pendingCelebrationsResponseSchema.parse({
         pendingCelebrations: filterCelebrationsByLevel(
           celebrations,
-          celebrationLevel
+          celebrationLevel,
         ),
-      })
+      }),
     );
   })
   .post(
     '/celebrations/seen',
     zValidator('json', celebrationSeenSchema),
     async (c) => {
+      // [WI-143 / DS-054] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
 
       await markCelebrationsSeen(db, profileId, body.viewer);
       return c.json(celebrationSeenResponseSchema.parse({ ok: true }));
-    }
+    },
   );
