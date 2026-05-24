@@ -99,6 +99,15 @@ function createMockDb(): Database {
     }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue([]),
+              }),
+            }),
+          }),
+        }),
         // [BUG-NOTION-263] review_due enrichment uses a leftJoin; default to
         // an empty result so happy-path tests (no overdue topic in mock DB)
         // produce a null book context without throwing.
@@ -179,6 +188,47 @@ describe('precomputeCoachingCard', () => {
       expect(card.topicId).toBe(topicId);
       expect(card.easeFactor).toBe(2.5);
       expect(typeof card.dueAt).toBe('string');
+    }
+  });
+
+  it('[WI-80] does not enrich review_due copy with an unowned topic title', async () => {
+    const overdueCard = mockRetentionCardRow({
+      topicId: 'foreign-topic',
+      nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardsFindMany: [overdueCard] });
+    const db = createMockDb();
+    db.select = jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue([]),
+              }),
+            }),
+          }),
+        }),
+        leftJoin: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([
+              {
+                topicTitle: 'Victim Secret Topic',
+                bookTitle: 'Victim Book',
+              },
+            ]),
+          }),
+        }),
+      }),
+    });
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    expect(card.type).toBe('review_due');
+    if (card.type === 'review_due') {
+      expect(card.body).toBe('You have 1 topic ready for review.');
+      expect(card.body).not.toContain('Victim Secret Topic');
+      expect(card.body).not.toContain('Victim Book');
     }
   });
 

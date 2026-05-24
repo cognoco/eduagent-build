@@ -6,7 +6,7 @@
 
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { curriculumTopics, curricula, subjects } from '@eduagent/database';
 import {
   formatReviewReminderBody,
@@ -71,7 +71,12 @@ export const reviewDueSend = inngest.createFunction(
           .from(curriculumTopics)
           .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
           .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
-          .where(inArray(curriculumTopics.id, topTopicIds));
+          .where(
+            and(
+              inArray(curriculumTopics.id, topTopicIds),
+              eq(subjects.profileId, profileId),
+            ),
+          );
 
         // Deduplicate subject names (multiple topics may share a subject)
         subjectNames = [...new Set(topicRows.map((r) => r.subjectName))];

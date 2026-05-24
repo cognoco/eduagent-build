@@ -24,6 +24,7 @@ import {
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
 import { captureException } from './sentry';
+import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
 
 // ---------------------------------------------------------------------------
 // silentDegrade — structured escalation for optional priority branches
@@ -216,19 +217,10 @@ export async function precomputeCoachingCard(
     let topicTitle: string | null = null;
     let bookTitle: string | null = null;
     try {
-      const rows = await db
-        .select({
-          topicTitle: curriculumTopics.title,
-          bookTitle: curriculumBooks.title,
-        })
-        .from(curriculumTopics)
-        .leftJoin(
-          curriculumBooks,
-          eq(curriculumBooks.id, curriculumTopics.bookId),
-        )
-        .where(eq(curriculumTopics.id, mostOverdue.topicId))
-        .limit(1);
-      const row = rows[0];
+      const row = await findOwnedCurriculumTopic(db, {
+        profileId,
+        topicId: mostOverdue.topicId,
+      });
       topicTitle = row?.topicTitle ?? null;
       bookTitle = row?.bookTitle ?? null;
     } catch (err) {

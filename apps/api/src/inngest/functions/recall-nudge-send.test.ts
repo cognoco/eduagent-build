@@ -82,6 +82,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 jest.mock(
   'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
   () => ({
+    and: jest.fn(),
     eq: jest.fn(),
     inArray: jest.fn(),
   }),
@@ -90,13 +91,30 @@ jest.mock(
 jest.mock(
   '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
   () => ({
+    curriculumBooks: {},
+    curricula: {},
     curriculumTopics: {},
     familyLinks: {},
     profiles: {},
+    subjects: {},
   }),
 );
 
 import { recallNudgeSend } from './recall-nudge-send';
+
+function createOwnedTopicSelect(rows: Array<{ title: string }> = []) {
+  return jest.fn().mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      innerJoin: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(rows),
+          }),
+        }),
+      }),
+    }),
+  });
+}
 
 async function executeHandler(eventData: {
   profileId: string;
@@ -119,6 +137,7 @@ describe('recallNudgeSend', () => {
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
       profiles: { findFirst: jest.fn().mockResolvedValue(null) },
     },
+    select: createOwnedTopicSelect(),
   };
 
   beforeEach(() => {
@@ -186,6 +205,31 @@ describe('recallNudgeSend', () => {
         profileId: 'p-1',
       });
     });
+
+    it('[WI-80] does not format a nudge with an unowned topic title from event data', async () => {
+      mockDb.query.curriculumTopics.findMany.mockResolvedValueOnce([
+        { id: 'topic-foreign', title: 'Victim Secret Topic' },
+      ]);
+
+      await executeHandler({
+        profileId: 'profile-a',
+        fadingCount: 1,
+        topTopicIds: ['topic-foreign'],
+      });
+
+      expect(mockFormatRecallNudge).toHaveBeenCalledWith(
+        1,
+        'your fading topic',
+        'learner',
+        undefined,
+      );
+      expect(mockFormatRecallNudge).not.toHaveBeenCalledWith(
+        1,
+        'Victim Secret Topic',
+        'learner',
+        undefined,
+      );
+    });
   });
 });
 
@@ -200,6 +244,7 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
       profiles: { findFirst: jest.fn().mockResolvedValue(null) },
     },
+    select: createOwnedTopicSelect(),
   };
 
   beforeEach(() => {
@@ -268,6 +313,7 @@ describe('[CR-RECALL-DEDUP-GUARD] getRecentNotificationCount DB failure — fail
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
       profiles: { findFirst: jest.fn().mockResolvedValue(null) },
     },
+    select: createOwnedTopicSelect(),
   };
 
   beforeEach(() => {

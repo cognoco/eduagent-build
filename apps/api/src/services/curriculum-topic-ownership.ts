@@ -1,0 +1,66 @@
+import { and, eq } from 'drizzle-orm';
+import {
+  curriculumBooks,
+  curricula,
+  curriculumTopics,
+  subjects,
+  type Database,
+} from '@eduagent/database';
+import { NotFoundError } from '../errors';
+
+export interface OwnedCurriculumTopic {
+  topicId: string;
+  topicTitle: string;
+  topicDescription: string | null;
+  bookId: string;
+  bookTitle: string;
+  curriculumId: string;
+  subjectId: string;
+}
+
+export async function findOwnedCurriculumTopic(
+  db: Database,
+  params: { profileId: string; topicId: string; subjectId?: string },
+): Promise<OwnedCurriculumTopic | null> {
+  const conditions = [
+    eq(curriculumTopics.id, params.topicId),
+    eq(subjects.profileId, params.profileId),
+  ];
+  if (params.subjectId) {
+    conditions.push(eq(subjects.id, params.subjectId));
+  }
+
+  const [row] = await db
+    .select({
+      topicId: curriculumTopics.id,
+      topicTitle: curriculumTopics.title,
+      topicDescription: curriculumTopics.description,
+      bookId: curriculumBooks.id,
+      bookTitle: curriculumBooks.title,
+      curriculumId: curriculumTopics.curriculumId,
+      subjectId: subjects.id,
+    })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.id, curricula.subjectId),
+      ),
+    )
+    .where(and(...conditions))
+    .limit(1);
+
+  return row ?? null;
+}
+
+export async function assertOwnedCurriculumTopic(
+  db: Database,
+  params: { profileId: string; topicId: string; subjectId?: string },
+): Promise<OwnedCurriculumTopic> {
+  const row = await findOwnedCurriculumTopic(db, params);
+  if (!row) throw new NotFoundError('Topic');
+  return row;
+}

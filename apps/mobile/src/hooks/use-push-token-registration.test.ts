@@ -203,6 +203,37 @@ describe('usePushTokenRegistration', () => {
     });
   });
 
+  it('[WI-80] skips API registration if active profile changes while token lookup is in flight', async () => {
+    let resolveFirstToken!: (value: { data: string }) => void;
+    (Notifications.getExpoPushTokenAsync as jest.Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstToken = resolve;
+          }),
+      )
+      .mockImplementation(() => new Promise(() => undefined));
+
+    const { rerender } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(Notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1);
+    });
+
+    mockActiveProfile = createTestProfile({ id: 'profile-2' });
+    rerender({});
+
+    await act(async () => {
+      resolveFirstToken({ data: 'ExponentPushToken[stale-profile]' });
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalledWith(
+      'ExponentPushToken[stale-profile]',
+    );
+  });
+
   it('registers again when the Expo push token rotates for the same profile', async () => {
     const getExpoPushTokenAsync =
       Notifications.getExpoPushTokenAsync as jest.Mock;

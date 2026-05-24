@@ -34,6 +34,7 @@ import {
   isAcceptedSummaryStatus,
   isMeaningfulCompletedSession,
 } from './topic-completion';
+import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -260,9 +261,10 @@ export async function getTopicProgress(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) return null;
 
-  // Find topic
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, topicId),
+  const topic = await findOwnedCurriculumTopic(db, {
+    profileId,
+    subjectId,
+    topicId,
   });
   if (!topic) return null;
 
@@ -363,9 +365,9 @@ export async function getTopicProgress(
     : 'normal';
 
   return {
-    topicId: topic.id,
-    title: topic.title,
-    description: topic.description,
+    topicId: topic.topicId,
+    title: topic.topicTitle,
+    description: topic.topicDescription ?? '',
     completionStatus,
     retentionStatus: extendedRetentionStatus,
     daysSinceLastReview: retentionCard

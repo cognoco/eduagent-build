@@ -62,6 +62,10 @@ export function usePushTokenRegistration(): PushRegistrationState {
   const { activeProfile } = useProfile();
   const { isParentProxy } = useParentProxy();
   const registerPushToken = useRegisterPushToken();
+  const activeProfileIdRef = useRef<string | null>(null);
+  const isParentProxyRef = useRef(false);
+  activeProfileIdRef.current = activeProfile?.id ?? null;
+  isParentProxyRef.current = isParentProxy;
 
   const registerIfAllowed = useCallback(async () => {
     // React Query keeps mutation objects stable; this prevents duplicate
@@ -111,6 +115,13 @@ export function usePushTokenRegistration(): PushRegistrationState {
       }
 
       if (
+        activeProfileIdRef.current !== activeProfileId ||
+        isParentProxyRef.current
+      ) {
+        return;
+      }
+
+      if (
         registeredProfileToken.current?.profileId === activeProfileId &&
         registeredProfileToken.current.token === tokenData.data
       ) {
@@ -129,6 +140,13 @@ export function usePushTokenRegistration(): PushRegistrationState {
           profileId: activeProfileId,
           token: tokenData.data,
         };
+        if (
+          activeProfileIdRef.current !== activeProfileId ||
+          isParentProxyRef.current
+        ) {
+          pendingProfileToken.current = null;
+          return;
+        }
         await registerPushToken.mutateAsync(tokenData.data);
       } catch (err) {
         setState({ status: 'failed', reason: 'api_registration_failed' });

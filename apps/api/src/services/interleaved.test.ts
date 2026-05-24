@@ -19,7 +19,13 @@ const mockDatabaseModule = createDatabaseModuleMock({
       subjects: { findFirst: mockSubjectsFindFirst },
     })),
     retentionCards: { topicId: 'topicId', profileId: 'profileId' },
-    curriculumTopics: { id: 'id', curriculumId: 'curriculumId' },
+    curriculumBooks: { id: 'id', subjectId: 'subjectId' },
+    curriculumTopics: {
+      id: 'id',
+      curriculumId: 'curriculumId',
+      bookId: 'bookId',
+      title: 'title',
+    },
     curricula: { id: 'id', subjectId: 'subjectId' },
     subjects: { id: 'id', profileId: 'profileId' },
     learningSessions: {},
@@ -85,6 +91,36 @@ function createMockDb(overrides: Record<string, unknown> = {}): any {
     insert: mockInsert.mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: mockReturning,
+      }),
+    }),
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                {
+                  topicId: 'topic-001',
+                  topicTitle: 'Algebra Basics',
+                  curriculumId: 'curriculum-001',
+                  subjectId: 'subject-001',
+                },
+                {
+                  topicId: 'topic-002',
+                  topicTitle: 'Geometry Basics',
+                  curriculumId: 'curriculum-001',
+                  subjectId: 'subject-001',
+                },
+                {
+                  topicId: 'topic-003',
+                  topicTitle: 'Calculus Basics',
+                  curriculumId: 'curriculum-001',
+                  subjectId: 'subject-001',
+                },
+              ]),
+            }),
+          }),
+        }),
       }),
     }),
     ...overrides,
@@ -289,6 +325,86 @@ describe('selectInterleavedTopics', () => {
     expect(topics).toEqual([]);
     // curricula must NOT have been queried — guard fires before DB reads.
     expect(db.query.curricula.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('[WI-80] drops selected retention cards whose topic is not owned by the profile', async () => {
+    mockFindMany.mockResolvedValue([
+      createMockCard({
+        id: 'owned-card',
+        topicId: 'topic-owned',
+        nextReviewAt: new Date('2026-02-10'),
+      }),
+      createMockCard({
+        id: 'foreign-card',
+        topicId: 'topic-foreign',
+        nextReviewAt: new Date('2026-02-10'),
+      }),
+    ]);
+
+    const db = createMockDb({
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue([
+                  {
+                    topicId: 'topic-owned',
+                    topicTitle: 'Owned Topic',
+                    curriculumId: 'curriculum-owned',
+                    subjectId: 'subject-owned',
+                  },
+                ]),
+              }),
+            }),
+          }),
+        }),
+      }),
+      query: {
+        curricula: {
+          findMany: jest.fn().mockResolvedValue([
+            { id: 'curriculum-owned', subjectId: 'subject-owned' },
+            { id: 'curriculum-foreign', subjectId: 'subject-foreign' },
+          ]),
+        },
+        curriculumTopics: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'topic-owned',
+              curriculumId: 'curriculum-owned',
+              title: 'Owned Topic',
+            },
+            {
+              id: 'topic-foreign',
+              curriculumId: 'curriculum-foreign',
+              title: 'Victim Secret Topic',
+            },
+          ]),
+        },
+      },
+    });
+
+    const topics = await selectInterleavedTopics(db, PROFILE_ID, {
+      topicCount: 2,
+    });
+
+    expect(topics).toEqual([
+      expect.objectContaining({
+        topicId: 'topic-owned',
+        subjectId: 'subject-owned',
+        topicTitle: 'Owned Topic',
+      }),
+    ]);
+    expect(topics).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ topicId: 'topic-foreign' }),
+      ]),
+    );
+    expect(topics).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ topicTitle: 'Victim Secret Topic' }),
+      ]),
+    );
   });
 
   it('includes stability information on returned topics', async () => {

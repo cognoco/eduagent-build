@@ -3,8 +3,9 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
+  curriculumBooks,
   curriculumTopics,
   curricula,
   learningSessions,
@@ -119,39 +120,55 @@ export async function selectInterleavedTopics(
     selected = [...selected, ...sorted.slice(0, needed)];
   }
 
-  // [BUG-68] Batch topic + curriculum lookups
+  // [BUG-68] Batch topic lookup, scoped through both topic parent chains. A
+  // profile-scoped retention card is not enough proof that the topic ID is still
+  // owned by the profile.
   const topicIds = selected.map((c) => c.topicId);
+  const topicOwnershipConditions = [
+    inArray(curriculumTopics.id, topicIds),
+    eq(subjects.profileId, profileId),
+  ];
+  if (subjectId) topicOwnershipConditions.push(eq(subjects.id, subjectId));
+
   const topicRows =
     topicIds.length > 0
-      ? await db.query.curriculumTopics.findMany({
-          where: inArray(curriculumTopics.id, topicIds),
-        })
+      ? await db
+          .select({
+            topicId: curriculumTopics.id,
+            topicTitle: curriculumTopics.title,
+            curriculumId: curriculumTopics.curriculumId,
+            subjectId: subjects.id,
+          })
+          .from(curriculumTopics)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumBooks.id, curriculumTopics.bookId),
+          )
+          .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+          .innerJoin(
+            subjects,
+            and(
+              eq(subjects.id, curriculumBooks.subjectId),
+              eq(subjects.id, curricula.subjectId),
+            ),
+          )
+          .where(and(...topicOwnershipConditions))
       : [];
-  const topicMap = new Map(topicRows.map((t) => [t.id, t]));
-  const curriculumIds = [...new Set(topicRows.map((t) => t.curriculumId))];
-  const curriculumRows =
-    curriculumIds.length > 0
-      ? await db.query.curricula.findMany({
-          where: inArray(curricula.id, curriculumIds),
-        })
-      : [];
-  const curriculumToSubject = new Map<string, string>();
-  for (const c of curriculumRows) {
-    curriculumToSubject.set(c.id, c.subjectId);
-  }
+  const topicMap = new Map(topicRows.map((t) => [t.topicId, t]));
 
-  return selected.map((card) => {
-    const topic = topicMap.get(card.topicId);
-    return {
-      topicId: card.topicId,
-      subjectId: topic
-        ? (curriculumToSubject.get(topic.curriculumId) ?? '')
-        : '',
-      topicTitle: topic?.title ?? 'Unknown topic',
-      isStable: isTopicStable(card.consecutiveSuccesses),
-      consecutiveSuccesses: card.consecutiveSuccesses,
-    };
-  });
+  return selected
+    .filter((card) => topicMap.has(card.topicId))
+    .map((card) => {
+      const topic = topicMap.get(card.topicId);
+      if (!topic) throw new Error('Expected topic after filter');
+      return {
+        topicId: card.topicId,
+        subjectId: topic.subjectId,
+        topicTitle: topic.topicTitle,
+        isStable: isTopicStable(card.consecutiveSuccesses),
+        consecutiveSuccesses: card.consecutiveSuccesses,
+      };
+    });
 }
 
 // ---------------------------------------------------------------------------

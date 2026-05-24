@@ -61,6 +61,7 @@ import { captureException } from './sentry';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
 import { createLogger } from './logger';
+import { assertOwnedCurriculumTopic } from './curriculum-topic-ownership';
 
 const logger = createLogger();
 const DAY_MS = 1000 * 60 * 60 * 24;
@@ -192,6 +193,8 @@ export async function ensureRetentionCard(
     ),
   });
   if (existingCard) return { card: existingCard, isNew: false };
+
+  await assertOwnedCurriculumTopic(db, { profileId, topicId });
 
   await db
     .insert(retentionCards)
@@ -1437,7 +1440,14 @@ export async function getStableTopics(
   profileId: string,
   subjectId?: string,
 ): Promise<TopicStability[]> {
+  const repo = createScopedRepository(db, profileId);
+
   if (subjectId) {
+    const ownedSubject = await repo.subjects.findFirst(
+      eq(subjects.id, subjectId),
+    );
+    if (!ownedSubject) return [];
+
     const curriculum = await db.query.curricula.findFirst({
       where: eq(curricula.subjectId, subjectId),
     });
@@ -1449,8 +1459,6 @@ export async function getStableTopics(
     const topicIds = topics.map((t) => t.id);
     if (topicIds.length === 0) return [];
 
-    // DB-level filter via scoped repo — issue #22.2
-    const repo = createScopedRepository(db, profileId);
     const filteredCards = await repo.retentionCards.findMany(
       inArray(retentionCards.topicId, topicIds),
     );
@@ -1463,7 +1471,6 @@ export async function getStableTopics(
   }
 
   // No subject filter — return all cards for this profile
-  const repo = createScopedRepository(db, profileId);
   const allCards = await repo.retentionCards.findMany();
 
   return allCards.map((card) => ({
