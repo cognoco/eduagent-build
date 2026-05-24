@@ -5,7 +5,11 @@ import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getApiUrl } from '../lib/api';
-import { fetchOrThrowNetworkError, UpstreamError } from '../lib/api-errors';
+import {
+  fetchOrThrowNetworkError,
+  NetworkError,
+  UpstreamError,
+} from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
 import {
   countMeaningfulTokens,
@@ -35,7 +39,12 @@ export type OcrErrorCode =
   | 'LOW_QUALITY'
   | 'NO_TEXT'
   | 'ML_KIT_UNAVAILABLE'
-  | 'CACHE_FAILED';
+  | 'CACHE_FAILED'
+  | 'NETWORK_ERROR'
+  | 'AUTH_EXPIRED'
+  | 'IMAGE_TOO_LARGE'
+  | 'RATE_LIMITED'
+  | 'SERVER_ERROR';
 
 export interface UseHomeworkOcrResult {
   text: string | null;
@@ -52,6 +61,40 @@ type RecognizedTextResult = {
   text: string | null;
   confidence?: number;
 };
+
+type ServerFallbackOutcome =
+  | { kind: 'recognized'; recognized: RecognizedTextResult }
+  | { kind: 'aborted' }
+  | { kind: 'failed'; code: OcrErrorCode; message: string };
+
+function classifyUpstreamStatus(status: number): {
+  code: OcrErrorCode;
+  message: string;
+} {
+  if (status === 401 || status === 403) {
+    return {
+      code: 'AUTH_EXPIRED',
+      message: 'Your session expired. Sign in again to keep going.',
+    };
+  }
+  if (status === 413) {
+    return {
+      code: 'IMAGE_TOO_LARGE',
+      message:
+        "That photo's too big. Try a smaller crop or retake from further back.",
+    };
+  }
+  if (status === 429) {
+    return {
+      code: 'RATE_LIMITED',
+      message: "You've hit the photo limit for now. Try again in a minute.",
+    };
+  }
+  return {
+    code: 'SERVER_ERROR',
+    message: 'Our servers are taking a moment. Try again in a few seconds.',
+  };
+}
 
 export const NON_HOMEWORK_ERROR_MESSAGE =
   "We couldn't find a clear homework problem in this photo. Try again or type it in.";
@@ -405,26 +448,26 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     async (
       uri: string,
       signal?: AbortSignal,
-    ): Promise<RecognizedTextResult | null> => {
+    ): Promise<ServerFallbackOutcome> => {
       try {
         const token = await getToken();
-        return await recognizeTextServerSide(
+        const recognized = await recognizeTextServerSide(
           uri,
           token ?? null,
           activeProfile?.id,
           signal,
         );
+        return { kind: 'recognized', recognized };
       } catch (err) {
         // [BUG-681] Distinguish user-initiated cancel from a real failure so
         // we do not surface a "server failed" error after a deliberate cancel.
         if ((err as { name?: string } | null)?.name === 'AbortError') {
-          return null;
+          return { kind: 'aborted' };
         }
-        // Silent recovery ban (CLAUDE.md fix-development rule): the user sees
-        // a generic "couldn't read" error when the server LLM path fails for
-        // any reason (missing GEMINI_API_KEY → 500, network error, malformed
-        // response → 502, auth → 401). Without Sentry, the LLM appears
-        // "disconnected" but we have no visibility. Capture so we can triage.
+        // Capture for triage. Classifying the error to a typed outcome below
+        // means 401 / 413 / 429 / 5xx each get distinct user-visible copy
+        // instead of being flattened to the same "couldn't read clearly"
+        // message at the screen layer.
         console.error('[OCR] Server fallback failed:', err);
         Sentry.captureException(err, {
           tags: {
@@ -432,7 +475,24 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
             action: 'server-fallback',
           },
         });
-        return null;
+        if (err instanceof UpstreamError) {
+          const { code, message } = classifyUpstreamStatus(err.status);
+          return { kind: 'failed', code, message };
+        }
+        if (err instanceof NetworkError) {
+          return {
+            kind: 'failed',
+            code: 'NETWORK_ERROR',
+            message:
+              "Looks like you're offline. Check your connection and try again.",
+          };
+        }
+        return {
+          kind: 'failed',
+          code: 'SERVER_ERROR',
+          message:
+            'Our servers are taking a moment. Try again in a few seconds.',
+        };
       }
     },
     [activeProfile?.id, getToken],
@@ -461,15 +521,18 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           '[OCR] ML Kit TextRecognition native module is not linked. ' +
             'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.',
         );
-        const serverResult = await tryServerFallback(uri, controller.signal);
+        const outcome = await tryServerFallback(uri, controller.signal);
         // [BUG-681] After every await, drop the result if cancel() fired
         // mid-flight. Without this, server OCR completing after cancel would
         // setState 'done', re-opening a screen the user already dismissed.
-        if (controller.signal.aborted) return;
-        if (serverResult && resolveSuccess(serverResult, 'server')) {
+        if (controller.signal.aborted || outcome.kind === 'aborted') return;
+        if (outcome.kind === 'failed') {
+          finishAsError(outcome.message, outcome.code);
           return;
         }
-        if (serverResult?.text) {
+        const serverResult = outcome.recognized;
+        if (resolveSuccess(serverResult, 'server')) return;
+        if (serverResult.text) {
           finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }
@@ -492,15 +555,15 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
             trackHomeworkOcrGateShortcircuit(
               buildGateMetrics(recognized.text, recognized.confidence),
             );
-            const serverResult = await tryServerFallback(
-              uri,
-              controller.signal,
-            );
-            if (controller.signal.aborted) return;
-            if (serverResult && resolveSuccess(serverResult, 'server')) {
+            const outcome = await tryServerFallback(uri, controller.signal);
+            if (controller.signal.aborted || outcome.kind === 'aborted') return;
+            if (outcome.kind === 'failed') {
+              finishAsError(outcome.message, outcome.code);
               return;
             }
-            if (serverResult?.text) {
+            const serverResult = outcome.recognized;
+            if (resolveSuccess(serverResult, 'server')) return;
+            if (serverResult.text) {
               finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
               return;
             }
@@ -519,24 +582,26 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
             recognized.confidence,
           );
           trackHomeworkOcrGateShortcircuit(rejectedMetrics);
-          const serverResult = await tryServerFallback(uri, controller.signal);
-          if (controller.signal.aborted) return;
-          if (serverResult && resolveSuccess(serverResult, 'server')) {
+          const outcome = await tryServerFallback(uri, controller.signal);
+          if (controller.signal.aborted || outcome.kind === 'aborted') return;
+          if (outcome.kind === 'failed') {
+            finishAsError(outcome.message, outcome.code);
             return;
           }
-          if (serverResult?.text) {
-            finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
-            return;
-          }
+          const serverResult = outcome.recognized;
+          if (resolveSuccess(serverResult, 'server')) return;
           finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }
-        const serverResult = await tryServerFallback(uri, controller.signal);
-        if (controller.signal.aborted) return;
-        if (serverResult && resolveSuccess(serverResult, 'server')) {
+        const outcome = await tryServerFallback(uri, controller.signal);
+        if (controller.signal.aborted || outcome.kind === 'aborted') return;
+        if (outcome.kind === 'failed') {
+          finishAsError(outcome.message, outcome.code);
           return;
         }
-        if (serverResult?.text) {
+        const serverResult = outcome.recognized;
+        if (resolveSuccess(serverResult, 'server')) return;
+        if (serverResult.text) {
           finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }
@@ -547,12 +612,15 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         // and exit without a user-visible error.
         if (controller.signal.aborted) return;
         console.error('[OCR] Text recognition failed:', err);
-        const serverResult = await tryServerFallback(uri, controller.signal);
-        if (controller.signal.aborted) return;
-        if (serverResult && resolveSuccess(serverResult, 'server')) {
+        const outcome = await tryServerFallback(uri, controller.signal);
+        if (controller.signal.aborted || outcome.kind === 'aborted') return;
+        if (outcome.kind === 'failed') {
+          finishAsError(outcome.message, outcome.code);
           return;
         }
-        if (serverResult?.text) {
+        const serverResult = outcome.recognized;
+        if (resolveSuccess(serverResult, 'server')) return;
+        if (serverResult.text) {
           finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }

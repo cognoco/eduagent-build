@@ -1375,7 +1375,12 @@
       "LOW_QUALITY": "この写真をはっきり読み取れませんでした。より明るい場所で、手ぶれなく撮影してみてください。",
       "NO_TEXT": "この写真にテキストが見つかりませんでした。宿題がはっきり写り、十分な明るさがあることを確認してください。",
       "ML_KIT_UNAVAILABLE": "このバージョンでは写真の読み取りが利用できません。アプリを最新版に更新すると使えるようになります。",
-      "CACHE_FAILED": "写真の準備中に問題が発生しました。もう一度試すか、問題を直接入力してください。"
+      "CACHE_FAILED": "写真の準備中に問題が発生しました。もう一度試すか、問題を直接入力してください。",
+      "NETWORK_ERROR": "We couldn't reach the server. Check your connection and try again.",
+      "AUTH_EXPIRED": "Your session expired. Sign in again to keep going.",
+      "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
+      "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
+      "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     }
   },
   "progress": {
@@ -2616,7 +2621,8 @@
     "whatHappened": "What happened",
     "detailPending": "This recap is still being prepared.",
     "tryAsking": "Try asking",
-    "openChildSession": "Open child session"
+    "openChildSession": "Open child session",
+    "emptyCtaStartSession": "Start a session"
   },
   "addToMyLearning": {
     "tip": "Save a copy of this topic into your own Library without changing your child's learning.",

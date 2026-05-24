@@ -98,10 +98,14 @@ jest.mock(
     ) as typeof import('../services/recall-bridge');
     return {
       ...actual,
-      // LLM external boundary (routeAndCall)
-      generateRecallBridge: jest
-        .fn()
-        .mockResolvedValue({ questions: ['Q?'], generated: true }),
+      // LLM external boundary (routeAndCall).
+      // [L8-F9] Shape extended to match recallBridgeResultSchema, which the
+      // route now parses on response.
+      generateRecallBridge: jest.fn().mockResolvedValue({
+        questions: ['Q?'],
+        topicId: '770e8400-e29b-41d4-a716-446655440001',
+        topicTitle: 'Test Topic',
+      }),
     };
   },
 );

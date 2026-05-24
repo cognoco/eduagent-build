@@ -46,6 +46,7 @@ import {
 } from '../services/metering';
 import { getTierConfig } from '../services/subscription';
 import { createStripeClient } from '../services/stripe';
+import { resolvePriceId } from '../services/billing-pricing';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
@@ -129,19 +130,6 @@ function getStartOfTodayInTimeZone(now: Date, timeZone: string): Date {
   );
   start = new Date(localMidnightAsUtc - getTimeZoneOffsetMs(start, timeZone));
   return start;
-}
-
-/**
- * Maps a tier + interval to the corresponding Stripe price ID from env bindings.
- */
-function resolvePriceId(
-  env: BillingRouteEnv['Bindings'],
-  tier: 'plus' | 'family' | 'pro',
-  interval: 'monthly' | 'yearly',
-): string | undefined {
-  const key =
-    `STRIPE_PRICE_${tier.toUpperCase()}_${interval.toUpperCase()}` as keyof typeof env;
-  return env[key] as string | undefined;
 }
 
 export const billingRoutes = new Hono<BillingRouteEnv>()
@@ -479,15 +467,17 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const quota = await getQuotaPool(db, subscription.id);
+    // [L7-F6] Parallelize: getQuotaPool and getTopUpCreditsRemaining are
+    // independent reads. Sequential awaits double the round-trip cost on
+    // the /usage hot path.
+    const [quota, topUpCreditsRemaining] = await Promise.all([
+      getQuotaPool(db, subscription.id),
+      getTopUpCreditsRemaining(db, subscription.id),
+    ]);
     const monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
     const usedThisMonth = quota?.usedThisMonth ?? 0;
     const dailyLimit = quota?.dailyLimit ?? null;
     const usedToday = quota?.usedToday ?? 0;
-    const topUpCreditsRemaining = await getTopUpCreditsRemaining(
-      db,
-      subscription.id,
-    );
     const remaining = calculateRemainingQuestions({
       monthlyLimit,
       usedThisMonth,

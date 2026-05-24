@@ -18,6 +18,8 @@ export function useModeSwitch(): {
   switchMode: (mode: AppMode) => void;
   isSwitching: boolean;
   isSwitchingRef: MutableRefObject<boolean>;
+  switchError: AppMode | null;
+  dismissError: () => void;
 } {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -25,9 +27,14 @@ export function useModeSwitch(): {
   const { activeProfile } = useProfile();
   const isSwitchingRef = useRef(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  // Holds the requested mode when setMode rejected. UI surfaces this so a
+  // failed switch is visible instead of a silent no-op.
+  const [switchError, setSwitchError] = useState<AppMode | null>(null);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const modeRef = useRef(mode);
+
+  const dismissError = useCallback(() => setSwitchError(null), []);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -64,8 +71,16 @@ export function useModeSwitch(): {
         }
       };
 
+      if (mountedRef.current) {
+        setSwitchError(null);
+      }
       setMode(nextMode, {
-        onError: releaseSwitchLock,
+        onError: () => {
+          if (mountedRef.current) {
+            setSwitchError(nextMode);
+          }
+          releaseSwitchLock();
+        },
         onSuccess: () => {
           if (!mountedRef.current) {
             releaseSwitchLock();
@@ -99,5 +114,5 @@ export function useModeSwitch(): {
     [activeProfile, queryClient, router, setMode],
   );
 
-  return { switchMode, isSwitching, isSwitchingRef };
+  return { switchMode, isSwitching, isSwitchingRef, switchError, dismissError };
 }

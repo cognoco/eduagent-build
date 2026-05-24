@@ -225,7 +225,18 @@ export async function extractHomeworkSummary(
   try {
     const result = await routeAndCall(messages, 2);
     return parseHomeworkSummaryResponse(result.response, fallback);
-  } catch {
+  } catch (err) {
+    logger.warn('[homework-summary] LLM call failed, using fallback', {
+      event: 'homework_summary.llm.failed',
+      profileId,
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      profileId,
+      tags: { surface: 'homework_summary', reason: 'llm_call_failed' },
+      extra: { sessionId },
+    });
     return fallback;
   }
 }

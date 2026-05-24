@@ -1,12 +1,32 @@
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { loadDatabaseEnv } from './load-database-env';
 
 const ORIGINAL_DATABASE_URL = process.env.DATABASE_URL;
 const ORIGINAL_DOPPLER_CLI = process.env.DOPPLER_CLI;
 const ORIGINAL_PATH = process.env.PATH;
+const itOnNonWindows = process.platform === 'win32' ? it.skip : it;
+
+function writeFakeDoppler(
+  binDir: string,
+  secrets: Record<string, string>,
+): string {
+  const doppler = join(
+    binDir,
+    process.platform === 'win32' ? 'doppler.cmd' : 'doppler',
+  );
+  const json = JSON.stringify(secrets);
+  const script =
+    process.platform === 'win32'
+      ? ['@echo off', `echo ${json}`, ''].join('\r\n')
+      : ['#!/usr/bin/env sh', `printf '${json}'`, ''].join('\n');
+
+  writeFileSync(doppler, script);
+  chmodSync(doppler, 0o755);
+  return doppler;
+}
 
 describe('loadDatabaseEnv', () => {
   let workspaceRoot: string;
@@ -37,17 +57,19 @@ describe('loadDatabaseEnv', () => {
     rmSync(binDir, { recursive: true, force: true });
   });
 
-  it('honors DOPPLER_CLI on non-Windows hosts', () => {
-    const doppler = join(binDir, 'doppler');
-    writeFileSync(
-      doppler,
-      [
-        '#!/usr/bin/env sh',
-        'printf \'{"DATABASE_URL":"postgres://override-db","CLERK_SECRET_KEY":"sk_test"}\'',
-        '',
-      ].join('\n'),
-    );
-    chmodSync(doppler, 0o755);
+  it('uses existing DATABASE_URL without invoking Doppler', () => {
+    process.env.DATABASE_URL = 'postgres://existing-db';
+
+    loadDatabaseEnv(workspaceRoot);
+
+    expect(process.env.DATABASE_URL).toBe('postgres://existing-db');
+  });
+
+  itOnNonWindows('honors DOPPLER_CLI on non-Windows hosts', () => {
+    const doppler = writeFakeDoppler(binDir, {
+      DATABASE_URL: 'postgres://override-db',
+      CLERK_SECRET_KEY: 'sk_test',
+    });
     process.env.DOPPLER_CLI = doppler;
 
     loadDatabaseEnv(workspaceRoot);
@@ -56,20 +78,13 @@ describe('loadDatabaseEnv', () => {
     expect(process.env.CLERK_SECRET_KEY).toBe('sk_test');
   });
 
-  it('discovers doppler from PATH on non-Windows hosts', () => {
-    const doppler = join(binDir, 'doppler');
-    writeFileSync(
-      doppler,
-      [
-        '#!/usr/bin/env sh',
-        'printf \'{"DATABASE_URL":"postgres://path-db"}\'',
-        '',
-      ].join('\n'),
-    );
-    chmodSync(doppler, 0o755);
+  itOnNonWindows('discovers doppler from PATH on non-Windows hosts', () => {
+    writeFakeDoppler(binDir, {
+      DATABASE_URL: 'postgres://path-db',
+    });
     const repoRoot = resolve(__dirname, '../../../..');
     const output = execFileSync(
-      'pnpm',
+      process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
       [
         'exec',
         'tsx',
@@ -89,7 +104,7 @@ describe('loadDatabaseEnv', () => {
           ...process.env,
           DOPPLER_CLI: '',
           DATABASE_URL: '',
-          PATH: `${binDir}:${process.env.PATH ?? ''}`,
+          PATH: `${binDir}${delimiter}${process.env.PATH ?? ''}`,
         },
       },
     );

@@ -526,7 +526,11 @@ describe('useHomeworkOcr', () => {
     }
   });
 
-  it('handles ML Kit exception as error when server fallback also fails', async () => {
+  it('handles ML Kit exception as error when server fallback also fails (NetworkError surfaces specific copy)', async () => {
+    // mockFetch rejecting becomes a typed NetworkError inside
+    // fetchOrThrowNetworkError. tryServerFallback now classifies that to the
+    // 'NETWORK_ERROR' outcome with offline-specific copy, instead of being
+    // flattened to the generic LOW_QUALITY "couldn't read clearly" message.
     mockRecognize.mockRejectedValue(new Error('ML Kit crash'));
     mockFetch.mockRejectedValueOnce(new Error('server down'));
 
@@ -539,8 +543,9 @@ describe('useHomeworkOcr', () => {
     });
 
     expect(result.current.status).toBe('error');
+    expect(result.current.errorCode).toBe('NETWORK_ERROR');
     expect(result.current.error).toBe(
-      "We couldn't read that clearly. Try taking the photo again with better lighting.",
+      "Looks like you're offline. Check your connection and try again.",
     );
   });
 

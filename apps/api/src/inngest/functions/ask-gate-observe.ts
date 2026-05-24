@@ -29,6 +29,39 @@ import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function summarizeReason(reason: unknown) {
+  return {
+    reasonPresent: typeof reason === 'string' ? reason.length > 0 : false,
+    reasonLength: typeof reason === 'string' ? reason.length : 0,
+  };
+}
+
+function summarizeRawPayload(rawData: unknown) {
+  if (!isRecord(rawData)) {
+    return { payloadType: Array.isArray(rawData) ? 'array' : typeof rawData };
+  }
+
+  return {
+    payloadType: 'object',
+    fieldCount: Object.keys(rawData).length,
+  };
+}
+
+function sanitizeDecisionRawData(rawData: unknown) {
+  if (!isRecord(rawData)) {
+    return summarizeRawPayload(rawData);
+  }
+
+  return {
+    ...summarizeRawPayload(rawData),
+    ...summarizeReason(rawData.reason),
+  };
+}
+
 export const askGateDecisionObserve = inngest.createFunction(
   {
     id: 'ask-gate-decision-observe',
@@ -38,15 +71,16 @@ export const askGateDecisionObserve = inngest.createFunction(
   async ({ event }) => {
     const parseResult = askGateDecisionEventSchema.safeParse(event.data);
     if (!parseResult.success) {
+      const rawData = sanitizeDecisionRawData(event.data);
       logger.error('ask.gate_decision.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data, // non-PII: sessionId is an internal ID; no user-identifying fields in payload
+        rawData,
       });
       captureException(
         new Error(
           '[ask-gate-decision] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+        { extra: { issues: parseResult.error.issues, rawData } },
       );
       return { status: 'schema_error' as const };
     }
@@ -55,7 +89,7 @@ export const askGateDecisionObserve = inngest.createFunction(
     logger.info('ask.gate_decision.received', {
       sessionId: data.sessionId ?? null,
       meaningful: data.meaningful ?? null,
-      reason: data.reason ?? null,
+      ...summarizeReason(data.reason),
       method: data.method ?? null,
       exchangeCount: data.exchangeCount ?? null,
       learnerWordCount: data.learnerWordCount ?? null,
@@ -81,15 +115,16 @@ export const askGateTimeoutObserve = inngest.createFunction(
   async ({ event }) => {
     const parseResult = askGateTimeoutEventSchema.safeParse(event.data);
     if (!parseResult.success) {
+      const rawData = summarizeRawPayload(event.data);
       logger.error('ask.gate_timeout.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data, // non-PII: sessionId is an internal ID; no user-identifying fields in payload
+        rawData,
       });
       captureException(
         new Error(
           '[ask-gate-timeout] invalid event payload — schema drift or bad event',
         ),
-        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+        { extra: { issues: parseResult.error.issues, rawData } },
       );
       return { status: 'schema_error' as const };
     }

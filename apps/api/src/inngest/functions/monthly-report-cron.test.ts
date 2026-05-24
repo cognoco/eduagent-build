@@ -35,6 +35,16 @@ const mockSelectDistinct = jest
   .fn()
   .mockReturnValue({ from: mockSelectDistinctFrom });
 
+// [L7-F3] select({parent, child}).from(familyLinks).where(...) chain — used
+// to filter familyLinks by the active-child IN-list. Resolves from
+// mockMonthlyReportDb.query.familyLinks.findMany so existing tests that
+// only seed findMany continue to work.
+const mockSelectFromFamilyLinksWhere = jest.fn();
+const mockSelectFrom = jest
+  .fn()
+  .mockReturnValue({ where: mockSelectFromFamilyLinksWhere });
+const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
+
 // Insert chain for monthlyReports
 const mockOnConflictDoNothing = jest.fn().mockResolvedValue(undefined);
 const mockInsertValues = jest
@@ -72,6 +82,7 @@ const mockMonthlyReportDb = createTransactionalMockDb({
     },
   },
   selectDistinct: mockSelectDistinct,
+  select: mockSelect,
   insert: mockInsert,
 });
 
@@ -106,6 +117,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
     accounts: {
       id: col('id'),
       email: col('email'),
+    },
+    familyLinks: {
+      parentProfileId: col('parentProfileId'),
+      childProfileId: col('childProfileId'),
     },
   },
 });
@@ -360,6 +375,22 @@ beforeEach(() => {
   (
     mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
   ).mockResolvedValue([]);
+  // [L7-F3] select(...).from(familyLinks).where(...) — derives from
+  // familyLinks.findMany AND intersects with the selectDistinct result
+  // (active children), mirroring the real `inArray(childProfileId,
+  // activeChildIds)` filter. Existing tests seed both findMany and
+  // selectDistinct so the intersection follows naturally.
+  mockSelectFromFamilyLinksWhere.mockImplementation(async () => {
+    const allLinks = (await (
+      mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
+    )()) as Array<{ parentProfileId: string; childProfileId: string }>;
+    const activeChildIds = new Set(
+      (
+        (await mockSelectDistinctWhere()) as Array<{ childProfileId: string }>
+      ).map((r) => r.childProfileId),
+    );
+    return allLinks.filter((l) => activeChildIds.has(l.childProfileId));
+  });
   (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockResolvedValue(
     null,
   );

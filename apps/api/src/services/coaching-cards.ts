@@ -549,10 +549,18 @@ async function findContinueBookCard(
   }
   const bookIds = booksWithSubjects.map((b) => b.bookId);
   const curriculumIds = [...curriculumBySubject.values()].map((c) => c.id);
+  // [L7-F9] Project only the columns the loop actually reads.
   const allTopics =
     curriculumIds.length > 0
       ? await db
-          .select()
+          .select({
+            id: curriculumTopics.id,
+            title: curriculumTopics.title,
+            description: curriculumTopics.description,
+            bookId: curriculumTopics.bookId,
+            curriculumId: curriculumTopics.curriculumId,
+            sortOrder: curriculumTopics.sortOrder,
+          })
           .from(curriculumTopics)
           .where(
             and(
@@ -759,8 +767,15 @@ async function findHomeworkConnectionCard(
   if (allCurricula.length === 0) return null;
 
   const curriculumIds = allCurricula.map((c) => c.id);
+  // [L7-F9] Project only the columns the loop below actually reads.
   const allTopics = await db
-    .select()
+    .select({
+      id: curriculumTopics.id,
+      title: curriculumTopics.title,
+      description: curriculumTopics.description,
+      bookId: curriculumTopics.bookId,
+      curriculumId: curriculumTopics.curriculumId,
+    })
     .from(curriculumTopics)
     .where(
       and(

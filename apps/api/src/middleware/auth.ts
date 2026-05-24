@@ -37,6 +37,11 @@ const PUBLIC_PATHS = [
   '/v1/inngest',
   '/v1/stripe/',
   '/v1/revenuecat/webhook',
+  // [WI-85] Resend (Svix) delivery webhook. Carries no Clerk token; the route
+  // handler verifies the Svix HMAC signature itself (RESEND_WEBHOOK_SECRET).
+  // Without this entry the global Clerk authMiddleware 401s the request before
+  // signature verification can run. Bare entry (no sub-paths), like revenuecat.
+  '/v1/webhooks/resend',
   '/v1/consent/respond',
   '/v1/consent-page',
   '/v1/__test/',

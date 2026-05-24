@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { chatExchangeSchema } from './common.ts';
+import { chatExchangeSchema, isoDateField } from './common.ts';
 import { languageCodeSchema, pedagogyModeSchema } from './language.ts';
 
 // Verification depth
@@ -30,7 +30,7 @@ export const assessmentSchema = z.object({
   verificationDepth: verificationDepthSchema,
   status: assessmentStatusSchema,
   masteryScore: z.number().min(0).max(1).nullable(),
-  createdAt: z.string().datetime(),
+  createdAt: isoDateField,
 });
 export type Assessment = z.infer<typeof assessmentSchema>;
 
@@ -47,8 +47,8 @@ export const assessmentRecordSchema = z.object({
   masteryScore: z.number().min(0).max(1).nullable(),
   qualityRating: z.number().int().min(0).max(5).nullable(),
   exchangeHistory: z.array(chatExchangeSchema),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 export type AssessmentRecord = z.infer<typeof assessmentRecordSchema>;
 
@@ -170,8 +170,8 @@ export const retentionCardSchema = z.object({
   easeFactor: z.number(),
   intervalDays: z.number().int(),
   repetitions: z.number().int(),
-  nextReviewAt: z.string().datetime().nullable(),
-  lastReviewedAt: z.string().datetime().nullable(),
+  nextReviewAt: isoDateField.nullable(),
+  lastReviewedAt: isoDateField.nullable(),
   daysSinceLastReview: z.number().int().min(0).nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']),
   failureCount: z.number().int(),
@@ -356,7 +356,7 @@ const recallRemediationSchema = z.object({
   topicTitle: z.string(),
   retentionStatus: z.string(),
   failureCount: z.number().int(),
-  cooldownEndsAt: z.string().datetime(),
+  cooldownEndsAt: isoDateField,
   options: z.array(z.enum(['review_and_retest', 'relearn_topic'])),
 });
 
@@ -364,13 +364,13 @@ export const recallTestResultSchema = z.object({
   passed: z.boolean(),
   masteryScore: z.number(),
   xpChange: z.string(),
-  nextReviewAt: z.string().datetime(),
+  nextReviewAt: isoDateField,
   failureCount: z.number().int(),
   hint: z.string().optional(),
   failureAction: z.enum(['feedback_only', 'redirect_to_library']).optional(),
   remediation: recallRemediationSchema.optional(),
   cooldownActive: z.boolean().optional(),
-  cooldownEndsAt: z.string().datetime().optional(),
+  cooldownEndsAt: isoDateField.optional(),
 });
 export type RecallTestResult = z.infer<typeof recallTestResultSchema>;
 
@@ -440,7 +440,7 @@ export const assessmentEligibleTopicSchema = z.object({
   pedagogyMode: pedagogyModeSchema,
   languageCode: languageCodeSchema.nullable().optional(),
   activeAssessmentId: z.string().uuid().nullable().optional(),
-  lastStudiedAt: z.string().datetime(),
+  lastStudiedAt: isoDateField,
 });
 export type AssessmentEligibleTopic = z.infer<
   typeof assessmentEligibleTopicSchema

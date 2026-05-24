@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const notificationTypeSchema = z.enum([
   'review_reminder',
@@ -86,8 +87,8 @@ export const nudgeSchema = z.object({
   toProfileId: z.string().uuid(),
   fromDisplayName: z.string(),
   template: nudgeTemplateSchema,
-  createdAt: z.string().datetime(),
-  readAt: z.string().datetime().nullable(),
+  createdAt: isoDateField,
+  readAt: isoDateField.nullable(),
 });
 export type Nudge = z.infer<typeof nudgeSchema>;
 

@@ -1400,7 +1400,12 @@
       "LOW_QUALITY": "Nie udało się wyraźnie odczytać tego zdjęcia. Spróbuj w lepszym oświetleniu lub trzymając telefon pewniej.",
       "NO_TEXT": "Nie znaleźliśmy żadnego tekstu na tym zdjęciu. Upewnij się, że praca domowa jest widoczna i dobrze oświetlona.",
       "ML_KIT_UNAVAILABLE": "Odczytywanie zdjęć nie jest dostępne w tej wersji. Szybka aktualizacja aplikacji to naprawia.",
-      "CACHE_FAILED": "Mieliśmy problem z przygotowaniem zdjęcia. Spróbuj ponownie lub wpisz zadanie ręcznie."
+      "CACHE_FAILED": "Mieliśmy problem z przygotowaniem zdjęcia. Spróbuj ponownie lub wpisz zadanie ręcznie.",
+      "NETWORK_ERROR": "We couldn't reach the server. Check your connection and try again.",
+      "AUTH_EXPIRED": "Your session expired. Sign in again to keep going.",
+      "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
+      "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
+      "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
     }
   },
   "progress": {
@@ -2616,7 +2621,8 @@
     "whatHappened": "What happened",
     "detailPending": "This recap is still being prepared.",
     "tryAsking": "Try asking",
-    "openChildSession": "Open child session"
+    "openChildSession": "Open child session",
+    "emptyCtaStartSession": "Start a session"
   },
   "addToMyLearning": {
     "tip": "Save a copy of this topic into your own Library without changing your child's learning.",

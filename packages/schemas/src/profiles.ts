@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 import { consentStatusSchema } from './consent.ts';
 
 export const locationSchema = z.enum(['EU', 'US', 'OTHER']);
@@ -130,9 +131,9 @@ export const profileSchema = z.object({
   conversationLanguage: conversationLanguageSchema.default('en'),
   pronouns: pronounsSchema.nullable().default(null),
   consentStatus: consentStatusSchema.nullable(),
-  linkCreatedAt: z.string().datetime().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  linkCreatedAt: isoDateField.nullable(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 
 export type Profile = z.infer<typeof profileSchema>;

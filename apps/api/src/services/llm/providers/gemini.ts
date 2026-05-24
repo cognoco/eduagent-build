@@ -207,11 +207,14 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
       config: ModelConfig,
     ): Promise<ChatResult> {
       const body = toGeminiRequest(messages, config);
-      const url = `${GEMINI_BASE_URL}/${config.model}:generateContent?key=${apiKey}`;
+      const url = `${GEMINI_BASE_URL}/${config.model}:generateContent`;
 
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(20_000),
       });
@@ -242,11 +245,14 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
 
         try {
           const body = toGeminiRequest(messages, config);
-          const url = `${GEMINI_BASE_URL}/${config.model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+          const url = `${GEMINI_BASE_URL}/${config.model}:streamGenerateContent?alt=sse`;
 
           const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
             body: JSON.stringify(body),
             signal: AbortSignal.timeout(20_000),
           });

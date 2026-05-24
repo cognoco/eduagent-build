@@ -50,6 +50,25 @@ const mockDb = {
       }),
     }),
   })),
+  // [L7-F3] selectDistinct({parentProfileId}).from(familyLinks) — the
+  // post-N+1 query path. Derives the row set from familyLinks.findMany so
+  // existing tests that seed mockDb.query.familyLinks.findMany.mockResolvedValue
+  // continue to work unchanged. The distinct-by-parentProfileId is applied
+  // here to match what the real query would produce.
+  selectDistinct: jest.fn(() => ({
+    from: async () => {
+      const rows = await mockDb.query.familyLinks.findMany();
+      const seen = new Set<string>();
+      const distinct: Array<{ parentProfileId: string }> = [];
+      for (const row of rows as Array<{ parentProfileId: string }>) {
+        if (!seen.has(row.parentProfileId)) {
+          seen.add(row.parentProfileId);
+          distinct.push({ parentProfileId: row.parentProfileId });
+        }
+      }
+      return distinct;
+    },
+  })),
 };
 jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(

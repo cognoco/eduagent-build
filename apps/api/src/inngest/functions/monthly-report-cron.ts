@@ -20,6 +20,7 @@
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   accounts,
+  familyLinks,
   learningProfiles,
   monthlyReports,
   notificationPreferences,
@@ -118,33 +119,34 @@ export const monthlyReportCron = inngest.createFunction(
       const lastMonthEnd = monthRangeEnd(new Date(), -1);
       const lastMonthEndExclusive = new Date(lastMonthEnd);
       lastMonthEndExclusive.setUTCDate(lastMonthEndExclusive.getUTCDate() + 1);
-      const links = await db.query.familyLinks.findMany({
-        columns: {
-          parentProfileId: true,
-          childProfileId: true,
-        },
-      });
-
-      const childIds = links.map((l) => l.childProfileId);
-      if (childIds.length === 0) return [];
-
-      const rows = await db
+      // [L7-F3] Filter familyLinks via JOIN against progressSnapshots so we
+      // never load every link in the system. Previously this was an
+      // unbounded findMany() that scaled linearly with total family-link
+      // count regardless of how many had active snapshots in the window.
+      const activeRows = await db
         .selectDistinct({ childProfileId: progressSnapshots.profileId })
         .from(progressSnapshots)
         .where(
           and(
-            inArray(progressSnapshots.profileId, childIds),
             gte(progressSnapshots.snapshotDate, isoDate(lastMonthStart)),
             lte(progressSnapshots.snapshotDate, isoDate(lastMonthEnd)),
           ),
         );
-      const activeChildIds = new Set(rows.map((r) => r.childProfileId));
-      const linkedPairs = links
-        .filter((l) => activeChildIds.has(l.childProfileId))
-        .map((l) => ({
-          parentId: l.parentProfileId,
-          childId: l.childProfileId,
-        }));
+      const activeChildIds = activeRows.map((r) => r.childProfileId);
+      const linkedPairs = activeChildIds.length
+        ? (
+            await db
+              .select({
+                parentProfileId: familyLinks.parentProfileId,
+                childProfileId: familyLinks.childProfileId,
+              })
+              .from(familyLinks)
+              .where(inArray(familyLinks.childProfileId, activeChildIds))
+          ).map((l) => ({
+            parentId: l.parentProfileId,
+            childId: l.childProfileId,
+          }))
+        : [];
 
       const selfProfileIds = await listEligibleSelfReportProfileIds(db, {
         start: lastMonthStart,

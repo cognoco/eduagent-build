@@ -98,8 +98,13 @@ describe('Gemini Provider', () => {
 
       const [url, options] = fetchSpy.mock.calls[0];
       expect(url).toContain('gemini-2.5-flash:generateContent');
-      expect(url).toContain(`key=${TEST_API_KEY}`);
+      expect(url).not.toContain(TEST_API_KEY);
+      expect(url).not.toContain('key=');
       expect(options.method).toBe('POST');
+      expect(options.headers).toMatchObject({
+        'Content-Type': 'application/json',
+        'x-goog-api-key': TEST_API_KEY,
+      });
 
       const body = JSON.parse(options.body);
       expect(body.contents).toEqual([
@@ -377,8 +382,15 @@ describe('Gemini Provider', () => {
       }
 
       const url = fetchSpy.mock.calls[0][0];
+      const options = fetchSpy.mock.calls[0][1];
       expect(url).toContain('streamGenerateContent');
       expect(url).toContain('alt=sse');
+      expect(url).not.toContain(TEST_API_KEY);
+      expect(url).not.toContain('key=');
+      expect(options.headers).toMatchObject({
+        'Content-Type': 'application/json',
+        'x-goog-api-key': TEST_API_KEY,
+      });
     });
 
     it('throws on non-200 status', async () => {
