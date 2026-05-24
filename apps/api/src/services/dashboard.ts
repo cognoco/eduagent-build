@@ -74,7 +74,10 @@ import {
   selectCurrentlyWorkingOn,
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
-import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
+import {
+  findOwnedCurriculumTopic,
+  findOwnedCurriculumTopics,
+} from './curriculum-topic-ownership';
 import { generateWeeklyReportData } from './weekly-report';
 import {
   isoDate,
@@ -1395,13 +1398,17 @@ export async function getChildSessionDetail(
       },
     }),
     db.query.subjects.findFirst({
-      where: eq(subjects.id, session.subjectId),
+      where: and(
+        eq(subjects.id, session.subjectId),
+        eq(subjects.profileId, childProfileId),
+      ),
       columns: { name: true },
     }),
     session.topicId
-      ? db.query.curriculumTopics.findFirst({
-          where: eq(curriculumTopics.id, session.topicId),
-          columns: { title: true },
+      ? findOwnedCurriculumTopic(db, {
+          profileId: childProfileId,
+          topicId: session.topicId,
+          subjectId: session.subjectId,
         })
       : Promise.resolve(null),
     db
@@ -1431,12 +1438,14 @@ export async function getChildSessionDetail(
     });
   }
 
+  if (!subjectRow) return null;
+
   return {
     sessionId: session.id,
     subjectId: session.subjectId,
     subjectName: subjectRow?.name ?? null,
-    topicId: session.topicId,
-    topicTitle: topicRow?.title ?? null,
+    topicId: topicRow?.topicId ?? null,
+    topicTitle: topicRow?.topicTitle ?? null,
     sessionType: session.sessionType,
     startedAt: session.startedAt.toISOString(),
     endedAt: session.endedAt?.toISOString() ?? null,

@@ -212,6 +212,42 @@ async function seedCurriculum(
   };
 }
 
+async function seedMixedParentTopic(input: {
+  bookSubjectId: string;
+  curriculumSubjectId: string;
+  title: string;
+}): Promise<string> {
+  const [curriculum] = await db
+    .insert(curricula)
+    .values({ subjectId: input.curriculumSubjectId, version: 1 })
+    .returning({ id: curricula.id });
+
+  const [book] = await db
+    .insert(curriculumBooks)
+    .values({
+      subjectId: input.bookSubjectId,
+      title: `${input.title} Book`,
+      sortOrder: 0,
+      topicsGenerated: true,
+    })
+    .returning({ id: curriculumBooks.id });
+
+  const [topic] = await db
+    .insert(curriculumTopics)
+    .values({
+      curriculumId: curriculum!.id,
+      bookId: book!.id,
+      title: input.title,
+      description: `${input.title} description`,
+      sortOrder: 0,
+      estimatedMinutes: 20,
+      skipped: false,
+    })
+    .returning({ id: curriculumTopics.id });
+
+  return topic!.id;
+}
+
 async function seedSession(input: {
   profileId: string;
   subjectId: string;
@@ -1422,6 +1458,152 @@ describe('dashboard service integration', () => {
     expect(detail!.subjectName).toBe('Null Recap Subject');
     expect(detail!.topicTitle).toBe('Topic NR');
     expect(detail!.exchangeCount).toBe(4);
+  });
+
+  it('[WI-80] parent session detail suppresses mixed-parent topic metadata', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Detail Mixed Topic Parent',
+      birthYear: 1979,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Detail Mixed Topic Child',
+      birthYear: 2013,
+    });
+    const { profileId: foreignProfileId } = await seedProfile({
+      displayName: 'Detail Mixed Topic Foreign',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const childSubjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Owned Detail Subject',
+    });
+    const foreignSubjectId = await seedSubject({
+      profileId: foreignProfileId,
+      name: 'Foreign Detail Subject',
+    });
+    const mixedTopicId = await seedMixedParentTopic({
+      bookSubjectId: childSubjectId,
+      curriculumSubjectId: foreignSubjectId,
+      title: 'Foreign Curriculum Detail Topic',
+    });
+    const sessionId = await seedSession({
+      profileId: childProfileId,
+      subjectId: childSubjectId,
+      topicId: mixedTopicId,
+      sessionType: 'learning',
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
+      endedAt: subtractDays(getStableMidWeekNow(), 1),
+      exchangeCount: 4,
+    });
+
+    const detail = await getChildSessionDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      sessionId,
+    );
+
+    expect(detail).not.toBeNull();
+    expect(detail!.subjectName).toBe('Owned Detail Subject');
+    expect(detail!.topicId).toBeNull();
+    expect(detail!.topicTitle).toBeNull();
+    expect(JSON.stringify(detail)).not.toContain(
+      'Foreign Curriculum Detail Topic',
+    );
+  });
+
+  it('[WI-80] parent session detail rejects stale foreign subject ownership', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Detail Foreign Subject Parent',
+      birthYear: 1979,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Detail Foreign Subject Child',
+      birthYear: 2013,
+    });
+    const { profileId: foreignProfileId } = await seedProfile({
+      displayName: 'Detail Foreign Subject Other',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const foreignSubjectId = await seedSubject({
+      profileId: foreignProfileId,
+      name: 'Foreign Subject Leak',
+    });
+    const sessionId = await seedSession({
+      profileId: childProfileId,
+      subjectId: foreignSubjectId,
+      sessionType: 'learning',
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
+      endedAt: subtractDays(getStableMidWeekNow(), 1),
+      exchangeCount: 4,
+    });
+
+    const detail = await getChildSessionDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      sessionId,
+    );
+
+    expect(detail).toBeNull();
+  });
+
+  it('[WI-80] parent session list suppresses mixed-parent topic IDs and titles', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'List Mixed Topic Parent',
+      birthYear: 1979,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'List Mixed Topic Child',
+      birthYear: 2013,
+    });
+    const { profileId: foreignProfileId } = await seedProfile({
+      displayName: 'List Mixed Topic Foreign',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const childSubjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Owned List Subject',
+    });
+    const foreignSubjectId = await seedSubject({
+      profileId: foreignProfileId,
+      name: 'Foreign List Subject',
+    });
+    const mixedTopicId = await seedMixedParentTopic({
+      bookSubjectId: childSubjectId,
+      curriculumSubjectId: foreignSubjectId,
+      title: 'Foreign Curriculum List Topic',
+    });
+    const sessionId = await seedSession({
+      profileId: childProfileId,
+      subjectId: childSubjectId,
+      topicId: mixedTopicId,
+      sessionType: 'learning',
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
+      endedAt: subtractDays(getStableMidWeekNow(), 1),
+      exchangeCount: 4,
+    });
+
+    const sessions = await getChildSessions(
+      db,
+      parentProfileId,
+      childProfileId,
+    );
+    const session = sessions.find((entry) => entry.sessionId === sessionId);
+
+    expect(session).toBeDefined();
+    expect(session!.subjectName).toBe('Owned List Subject');
+    expect(session!.topicId).toBeNull();
+    expect(session!.topicTitle).toBeNull();
+    expect(JSON.stringify(session)).not.toContain(
+      'Foreign Curriculum List Topic',
+    );
   });
 
   it('profile boundary: getChildrenForParent returns ONLY the linked child, not another child linked to a different parent', async () => {
