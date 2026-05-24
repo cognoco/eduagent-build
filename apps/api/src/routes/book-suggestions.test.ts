@@ -153,7 +153,9 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 // Import app AFTER all mocks are in place
 // ---------------------------------------------------------------------------
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { bookSuggestionRoutes } from './book-suggestions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -264,5 +266,47 @@ describe('book-suggestions routes', () => {
       );
       expect(res.status).toBe(400);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-138 / DS-049] Proxy-mode write guard
+//
+// Only the topup=1 branch triggers writes (LLM call + DB insert). Reads of
+// existing suggestions remain allowed in proxy mode by design.
+// ---------------------------------------------------------------------------
+describe('[WI-138 / DS-049] book-suggestions proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', bookSuggestionRoutes);
+    return proxyApp;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('GET /subjects/:subjectId/book-suggestions?topup=1 returns 403 when caller is in proxy mode', async () => {
+    const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/book-suggestions?topup=1`,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /subjects/:subjectId/book-suggestions (no topup) allows proxy mode — reads are intentional', async () => {
+    const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+    // No assertion on status — just confirm it does NOT 403. The handler
+    // will hit the empty stub db and likely throw a different error, but
+    // crucially not a PROXY_MODE 403.
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/book-suggestions`,
+    );
+    expect(res.status).not.toBe(403);
   });
 });

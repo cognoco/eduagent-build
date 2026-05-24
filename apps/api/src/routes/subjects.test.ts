@@ -575,3 +575,59 @@ function makeSubjectRecord(overrides?: Partial<{ name: string }>) {
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
 }
+
+// ---------------------------------------------------------------------------
+// [WI-177 / DS-088] Proxy-mode write guard — 3 newly-guarded handlers
+// (PUT /subjects/:id/language-setup, POST /subjects/:id/retry-curriculum,
+//  PATCH /subjects/:id; POST /subjects already had a guard pre-PR)
+// ---------------------------------------------------------------------------
+describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', subjectRoutes);
+    return proxyApp;
+  }
+
+  const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('PUT /subjects/:id/language-setup returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/language-setup`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nativeLanguage: 'english',
+          startingLevel: 'A1',
+        }),
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /subjects/:id/retry-curriculum returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/retry-curriculum`,
+      { method: 'POST' },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('PATCH /subjects/:id returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(`/subjects/${SUBJECT_ID}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'updated' }),
+    });
+    expect(res.status).toBe(403);
+  });
+});

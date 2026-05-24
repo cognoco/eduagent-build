@@ -85,7 +85,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
       const result = await getSubjectRetention(db, profileId, subjectId);
       return c.json(subjectRetentionResponseSchema.parse(result));
-    }
+    },
   )
 
   // Get retention card for single topic
@@ -99,7 +99,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
       const card = await getTopicRetention(db, profileId, topicId);
       return c.json(topicRetentionResponseSchema.parse({ card }));
-    }
+    },
   )
 
   // Submit a delayed recall test
@@ -114,7 +114,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
       const result = await processRecallTest(db, profileId, input);
       return c.json(recallTestResponseSchema.parse({ result }));
-    }
+    },
   )
 
   // Start relearning a topic
@@ -129,7 +129,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
       const result = await startRelearn(db, profileId, input);
       return c.json(relearnResponseSchema.parse(result));
-    }
+    },
   )
 
   // Get topics needing extra review
@@ -143,7 +143,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
       const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
       return c.json(needsDeepeningResponseSchema.parse(result));
-    }
+    },
   )
 
   // Get teaching method preference
@@ -157,9 +157,9 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
       const preference = await getTeachingPreference(db, profileId, subjectId);
       return c.json(
-        teachingPreferenceEndpointResponseSchema.parse({ preference })
+        teachingPreferenceEndpointResponseSchema.parse({ preference }),
       );
-    }
+    },
   )
 
   // Set teaching method preference (with optional analogy domain)
@@ -168,6 +168,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     zValidator('param', subjectParamSchema),
     zValidator('json', teachingPreferenceSchema),
     async (c) => {
+      // [WI-165 / DS-076] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');
@@ -179,10 +181,10 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
           profileId,
           subjectId,
           method,
-          analogyDomain
+          analogyDomain,
         );
         return c.json(
-          teachingPreferenceEndpointResponseSchema.parse({ preference })
+          teachingPreferenceEndpointResponseSchema.parse({ preference }),
         );
       } catch (error) {
         if (error instanceof NotFoundError) {
@@ -190,7 +192,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
 
   // Reset teaching preference (FR66)
@@ -198,6 +200,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     '/subjects/:subjectId/teaching-preference',
     zValidator('param', subjectParamSchema),
     async (c) => {
+      // [WI-165 / DS-076] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');
@@ -206,9 +210,9 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       return c.json(
         deleteTeachingPreferenceResponseSchema.parse({
           message: 'Teaching preference reset',
-        })
+        }),
       );
-    }
+    },
   )
 
   // Get topic stability status (FR93)
@@ -225,7 +229,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
       const topics = await getStableTopics(db, profileId, subjectId);
       return c.json(stabilityResponseSchema.parse({ topics }));
-    }
+    },
   )
 
   // Check EVALUATE eligibility for a topic (FR128-129)
@@ -240,8 +244,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const eligibility = await checkEvaluateEligibility(
         db,
         profileId,
-        topicId
+        topicId,
       );
       return c.json(evaluateEligibilitySchema.parse(eligibility));
-    }
+    },
   );

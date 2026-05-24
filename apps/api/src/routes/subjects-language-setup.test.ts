@@ -28,6 +28,9 @@ type TestEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    // [WI-177 / DS-088] assertNotProxyMode reads profileMeta on the guarded
+    // write handlers; declare it on TestEnv so the typed c.set is accepted.
+    profileMeta: { isOwner: boolean } | undefined;
   };
 };
 
@@ -38,6 +41,10 @@ function createApp() {
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
     c.set('profileId', 'profile-1');
+    // [WI-177 / DS-088] assertNotProxyMode now fires on PUT /:id/language-setup
+    // and reads profileMeta — mirror production by setting it here. isOwner=true
+    // so the guard passes and the error-classification path under test is reached.
+    c.set('profileMeta', { isOwner: true });
     await next();
   });
   app.onError((err, c) =>

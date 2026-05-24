@@ -101,6 +101,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     '/subjects/:id/language-setup',
     zValidator('json', languageSetupSchema),
     async (c) => {
+      // [WI-177 / DS-088] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       try {
@@ -125,6 +127,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     },
   )
   .post('/subjects/:id/retry-curriculum', async (c) => {
+    // [WI-177 / DS-088] Server-derived proxy-mode write guard.
+    assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     try {
@@ -152,6 +156,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     '/subjects/:id',
     zValidator('json', subjectUpdateSchema),
     async (c) => {
+      // [WI-177 / DS-088] Server-derived proxy-mode write guard.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const input = c.req.valid('json');
       const profileId = requireProfileId(c.get('profileId'));

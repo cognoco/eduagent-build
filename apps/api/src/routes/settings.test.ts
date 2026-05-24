@@ -73,7 +73,9 @@ jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import { Hono } from 'hono';
 import { app } from '../index';
+import { settingsRoutes } from './settings';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
 import { ForbiddenError } from '@eduagent/schemas';
 
@@ -341,6 +343,113 @@ describe('settings routes', () => {
       TEST_ENV,
     );
 
+    expect(res.status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-173 / DS-084] Proxy-mode write guard — 8 write handlers in settings.ts
+// ---------------------------------------------------------------------------
+describe('[WI-173 / DS-084] settings proxy-mode guard', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', settingsRoutes);
+    return proxyApp;
+  }
+
+  const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('PUT /settings/notifications returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/settings/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewReminders: true,
+        dailyReminders: true,
+        pushEnabled: true,
+      }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('PUT /settings/celebration-level returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/settings/celebration-level', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ celebrationLevel: 'all' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('PUT /settings/withdrawal-archive returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/settings/withdrawal-archive', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: 'auto' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('PUT /settings/family-pool-breakdown-sharing returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      '/settings/family-pool-breakdown-sharing',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: true }),
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /settings/push-token returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request('/settings/push-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'ExponentPushToken[xxxxxxxxxx]' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('POST /settings/notify-parent-subscribe returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      '/settings/notify-parent-subscribe',
+      { method: 'POST' },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('PUT /settings/subjects/:subjectId/analogy-domain returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/settings/subjects/${SUBJECT_ID}/analogy-domain`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analogyDomain: 'sports' }),
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('PUT /settings/subjects/:subjectId/native-language returns 403 in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/settings/subjects/${SUBJECT_ID}/native-language`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nativeLanguage: 'en' }),
+      },
+    );
     expect(res.status).toBe(403);
   });
 });
