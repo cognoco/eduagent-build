@@ -620,6 +620,25 @@ describe('deleteProfileIfConsentWithdrawn', () => {
     expect(sqlText).toContain('gdpr');
     expect(sqlText).toContain('withdrawn');
   });
+
+  it('[WI-78 review] requires the delete to match the revocation generation when provided', async () => {
+    const db = {
+      ...createMockDb(),
+      execute: jest.fn().mockResolvedValue({ rowCount: 0 }),
+    } as unknown as Database;
+
+    const result = await deleteProfileIfConsentWithdrawn(
+      db,
+      'profile-1',
+      '2026-01-10T10:00:00.000Z',
+    );
+
+    expect(result).toBe(false);
+    const sqlArg = (db.execute as jest.Mock).mock.calls[0]?.[0];
+    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
+    expect(sqlText).toContain('responded_at');
+    expect(sqlText).toContain('2026-01-10t10:00:00.000z');
+  });
 });
 
 describe('deleteProfileIfNoConsent (CI-11)', () => {

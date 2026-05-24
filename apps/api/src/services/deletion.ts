@@ -288,13 +288,23 @@ export async function deleteProfile(
 export async function deleteProfileIfConsentWithdrawn(
   db: Database,
   profileId: string,
+  revokedAt?: Date | string,
 ): Promise<boolean> {
+  const revokedAtDate =
+    revokedAt instanceof Date
+      ? revokedAt
+      : revokedAt
+        ? new Date(revokedAt)
+        : undefined;
+  if (revokedAtDate && Number.isNaN(revokedAtDate.getTime())) return false;
+
   const result = await db.execute(sql`
     WITH locked_consent AS (
       SELECT 1 FROM consent_states
       WHERE consent_states.profile_id = ${profileId}
       AND consent_states.consent_type = 'GDPR'
       AND consent_states.status = 'WITHDRAWN'
+      ${revokedAtDate ? sql`AND consent_states.responded_at = ${revokedAtDate}` : sql``}
       FOR UPDATE
     )
     DELETE FROM profiles

@@ -35,14 +35,21 @@ export const consentRevocation = inngest.createFunction(
     name: 'Process consent revocation with grace period',
     retries: 5,
     // [FIX-INNGEST-3] Operator re-fires or replay after a 7-day sleep jump must
-    // not trigger a second cascade delete. idempotency dedupes within 24h;
+    // not trigger a second cascade delete. idempotency dedupes within 24h.
+    // Include revokedAt so a restore + new withdrawal gets a fresh grace run.
     // concurrency(limit:1) serialises any concurrent runs for the same child.
-    idempotency: 'event.data.childProfileId',
+    idempotency: 'event.data.childProfileId + "-" + event.data.revokedAt',
     concurrency: { key: 'event.data.childProfileId', limit: 1 },
   },
   { event: 'app/consent.revoked' },
   async ({ event, step }) => {
-    const { childProfileId, parentProfileId } = event.data;
+    const { childProfileId, parentProfileId, revokedAt } = event.data;
+    const revokedAtDate =
+      typeof revokedAt === 'string' ? new Date(revokedAt) : undefined;
+    const revocationRespondedAt =
+      revokedAtDate && !Number.isNaN(revokedAtDate.getTime())
+        ? revokedAtDate
+        : undefined;
 
     // Immediately soft-clear all unread nudges to the child so they don't
     // see stale encouragements during the 7-day grace period.
@@ -145,6 +152,7 @@ export const consentRevocation = inngest.createFunction(
               WHERE consent_states.profile_id = ${childProfileId}
               AND consent_states.consent_type = 'GDPR'
               AND consent_states.status = 'WITHDRAWN'
+              ${revocationRespondedAt ? sql`AND consent_states.responded_at = ${revocationRespondedAt}` : sql``}
               FOR UPDATE
             )
             UPDATE profiles
@@ -243,7 +251,13 @@ export const consentRevocation = inngest.createFunction(
     // Delete child profile (FK cascades handle all data)
     const deleteResult = await step.run('delete-child-profile', async () => {
       const db = getStepDatabase();
-      return deleteProfileIfConsentWithdrawn(db, childProfileId);
+      return revocationRespondedAt
+        ? deleteProfileIfConsentWithdrawn(
+            db,
+            childProfileId,
+            revocationRespondedAt,
+          )
+        : deleteProfileIfConsentWithdrawn(db, childProfileId);
     });
     if (!deleteResult) {
       return { status: 'restored', childProfileId };

@@ -161,6 +161,7 @@ async function executeRevocation(
   eventData: {
     childProfileId: string;
     parentProfileId: string;
+    revokedAt?: string;
   },
   stepOptions?: InngestStepRunnerOptions,
 ) {
@@ -566,6 +567,31 @@ describe('archive path — auto preference, age 14', () => {
     expect(sqlText).toContain('gdpr');
     expect(sqlText).toContain('withdrawn');
   });
+
+  it('[WI-78 review] requires the archive to match the revocation generation', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: null,
+    });
+    (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValueOnce({
+      rowCount: 0,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-014',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-10T10:00:00.000Z',
+    });
+
+    expect(result).toEqual({ status: 'restored', childProfileId: 'child-014' });
+    const sqlArg = (mockDatabaseModule.db.execute as jest.Mock).mock
+      .calls[0]?.[0];
+    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
+    expect(sqlText).toContain('responded_at');
+    expect(sqlText).toContain('2026-01-10t10:00:00.000z');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -637,9 +663,11 @@ describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolu
 // ---------------------------------------------------------------------------
 
 describe('[FIX-INNGEST-3] idempotency and concurrency config', () => {
-  it('declares idempotency keyed on event.data.childProfileId', () => {
+  it('declares idempotency keyed on event.data.childProfileId and revokedAt', () => {
     const opts = (consentRevocation as any).opts;
-    expect(opts.idempotency).toBe('event.data.childProfileId');
+    expect(opts.idempotency).toBe(
+      'event.data.childProfileId + "-" + event.data.revokedAt',
+    );
   });
 
   it('declares concurrency limit of 1 keyed on event.data.childProfileId', () => {

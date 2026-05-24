@@ -831,7 +831,7 @@ export const revenuecatWebhookRoute = new Hono<{
     event.id,
     event.event_timestamp_ms,
   );
-  if (alreadyProcessed) {
+  if (alreadyProcessed && event.type !== 'BILLING_ISSUE') {
     return c.json({ received: true, skipped: true });
   }
 

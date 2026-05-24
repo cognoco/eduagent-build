@@ -1207,6 +1207,34 @@ describe('BILLING_ISSUE', () => {
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 
+  it('[WI-78 review] re-emits payment.failed when the route sees an already-processed duplicate billing issue', async () => {
+    const payload = makeWebhookPayload('BILLING_ISSUE', {
+      id: 'evt_rc_payment_failed_route_retry',
+    });
+    (isRevenuecatEventProcessed as jest.Mock).mockResolvedValueOnce(true);
+    (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({
+        status: 'past_due',
+        lastRevenuecatEventId: 'evt_rc_payment_failed_route_retry',
+        webhookApplied: false,
+      }),
+    );
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    expect(inngest.send).toHaveBeenCalledWith({
+      id: 'revenuecat-payment-failed:evt_rc_payment_failed_route_retry',
+      name: 'app/payment.failed',
+      data: expect.objectContaining({
+        subscriptionId: 'sub-internal-1',
+        accountId: 'acc-1',
+        source: 'revenuecat',
+      }),
+    });
+  });
+
   it('[WI-78 review] does not emit payment.failed for stale non-duplicate RevenueCat events', async () => {
     const payload = makeWebhookPayload('BILLING_ISSUE', {
       id: 'evt_rc_payment_failed_stale',
