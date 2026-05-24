@@ -127,208 +127,208 @@ These flows must be walkable in Chrome or the mobile web preview unless the row 
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | Shared launch/auth gate; mentor routes require family access. | TODO | | | | |
-| AUTH-02 | Email sign-up works before audience is known. | TODO | | | | |
-| AUTH-03 | Sign-up verification works before audience is known. | TODO | | | | |
-| AUTH-04 | Email sign-in preserves reachable mentor route only when authorized. | TODO | | | | |
-| AUTH-05 | Additional sign-in verification preserves authorized mentor route. | TODO | | | | |
-| AUTH-06 | Forgot/reset password remains audience-neutral. | TODO | | | | |
-| AUTH-07 | Sign-in/sign-up/forgot navigation remains audience-neutral. | TODO | | | | |
-| AUTH-08 | OAuth buttons/callback entry remain shared. | TODO | | | | |
-| AUTH-09 | SSO callback fallback returns safely to sign-in. | TODO | | | | |
-| AUTH-10 | Sign-out is available only from permitted surfaces. | TODO | | | | |
-| AUTH-11 | Session-expired sign-out returns to sign-in with banner. | TODO | | | | |
-| AUTH-12 | First-time vs returning copy remains correct. | TODO | | | | |
-| AUTH-13 | Deep-link redirect restores authorized mentor routes only. | TODO | | | | |
-| AUTH-14 | Sign-in transition/stuck recovery works. | TODO | | | | |
-| ACCOUNT-01 | First profile can capture Study/Family intent but remains Study-safe without child links. | TODO | | | | |
-| ACCOUNT-02 | Additional profile creation supports adult/child profiles where allowed. | TODO | | | | |
-| ACCOUNT-03 | Add-child from More/Profiles works as optional mentor setup. | TODO | | | | |
-| ACCOUNT-04 | Profile switching does not enter proxy for normal child review. | TODO | | | | |
-| ACCOUNT-05 | Family-plan/max-profile gates protect add-child setup. | TODO | | | | |
-| ACCOUNT-06 | More exposes mentor rows only when allowed. | TODO | | | | |
-| ACCOUNT-07 | Mentor-relevant notification settings work. | TODO | | | | |
-| ACCOUNT-08 | Child accommodation/celebration editors are mentor-gated. | TODO | | | | |
-| ACCOUNT-09 | Change password is owner-only. | TODO | | | | |
-| ACCOUNT-10 | Export is owner-only. | TODO | | | | |
-| ACCOUNT-11 | Delete account is owner-only. | TODO | | | | |
-| ACCOUNT-12 | Scheduled deletion recovery works for owner profile. | TODO | | | | |
-| ACCOUNT-13 | Privacy policy is reachable where surfaced. | TODO | | | | |
-| ACCOUNT-14 | Terms are reachable where surfaced. | TODO | | | | |
-| ACCOUNT-15 | Self mentor memory remains adult self surface, not child editor. | TODO | | | | |
-| ACCOUNT-16 | Child mentor memory works through child route and consent checks. | TODO | | | | |
-| ACCOUNT-17 | Child memory consent prompts appear where needed. | TODO | | | | |
-| ACCOUNT-18 | Child subject analogy preference is scoped to child route/curriculum. | TODO | | | | |
-| ACCOUNT-19 | Underage consent request affects child visibility correctly. | TODO | | | | |
-| ACCOUNT-20 | Child handoff to parent consent works. | TODO | | | | |
-| ACCOUNT-21 | Parent email entry/resend/change email works for consent. | TODO | | | | |
-| ACCOUNT-22 | Consent pending protects child learning data. | TODO | | | | |
-| ACCOUNT-23 | Consent withdrawn protects child learning data. | TODO | | | | |
-| ACCOUNT-24 | Post-approval landing restores child visibility. | TODO | | | | |
-| ACCOUNT-25 | Parent consent management works from child detail. | TODO | | | | |
-| ACCOUNT-26 | Regional consent variants protect mentor visibility. | TODO | | | | |
-| ACCOUNT-27 | Parent deny confirmation works. | TODO | | | | |
-| ACCOUNT-28 | App language picker works from permitted account surface. | TODO | | | | |
-| ACCOUNT-29 | Mentor-language/account-language entry does not create separate mentor identity. | TODO | | | | |
-| ACCOUNT-30 | Proxy-only More restrictions do not appear in normal mentor review. | TODO | | | | |
+| AUTH-01 | Shared launch/auth gate; mentor routes require family access. |  | | | | |
+| AUTH-02 | Email sign-up works before audience is known. |  | | | | |
+| AUTH-03 | Sign-up verification works before audience is known. |  | | | | |
+| AUTH-04 | Email sign-in preserves reachable mentor route only when authorized. |  | | | | |
+| AUTH-05 | Additional sign-in verification preserves authorized mentor route. |  | | | | |
+| AUTH-06 | Forgot/reset password remains audience-neutral. |  | | | | |
+| AUTH-07 | Sign-in/sign-up/forgot navigation remains audience-neutral. |  | | | | |
+| AUTH-08 | OAuth buttons/callback entry remain shared. |  | | | | |
+| AUTH-09 | SSO callback fallback returns safely to sign-in. |  | | | | |
+| AUTH-10 | Sign-out is available only from permitted surfaces. |  | | | | |
+| AUTH-11 | Session-expired sign-out returns to sign-in with banner. |  | | | | |
+| AUTH-12 | First-time vs returning copy remains correct. |  | | | | |
+| AUTH-13 | Deep-link redirect restores authorized mentor routes only. |  | | | | |
+| AUTH-14 | Sign-in transition/stuck recovery works. |  | | | | |
+| ACCOUNT-01 | First profile can capture Study/Family intent but remains Study-safe without child links. |  | | | | |
+| ACCOUNT-02 | Additional profile creation supports adult/child profiles where allowed. |  | | | | |
+| ACCOUNT-03 | Add-child from More/Profiles works as optional mentor setup. |  | | | | |
+| ACCOUNT-04 | Profile switching does not enter proxy for normal child review. |  | | | | |
+| ACCOUNT-05 | Family-plan/max-profile gates protect add-child setup. |  | | | | |
+| ACCOUNT-06 | More exposes mentor rows only when allowed. |  | | | | |
+| ACCOUNT-07 | Mentor-relevant notification settings work. |  | | | | |
+| ACCOUNT-08 | Child accommodation/celebration editors are mentor-gated. |  | | | | |
+| ACCOUNT-09 | Change password is owner-only. |  | | | | |
+| ACCOUNT-10 | Export is owner-only. |  | | | | |
+| ACCOUNT-11 | Delete account is owner-only. |  | | | | |
+| ACCOUNT-12 | Scheduled deletion recovery works for owner profile. |  | | | | |
+| ACCOUNT-13 | Privacy policy is reachable where surfaced. |  | | | | |
+| ACCOUNT-14 | Terms are reachable where surfaced. |  | | | | |
+| ACCOUNT-15 | Self mentor memory remains adult self surface, not child editor. |  | | | | |
+| ACCOUNT-16 | Child mentor memory works through child route and consent checks. |  | | | | |
+| ACCOUNT-17 | Child memory consent prompts appear where needed. |  | | | | |
+| ACCOUNT-18 | Child subject analogy preference is scoped to child route/curriculum. |  | | | | |
+| ACCOUNT-19 | Underage consent request affects child visibility correctly. |  | | | | |
+| ACCOUNT-20 | Child handoff to parent consent works. |  | | | | |
+| ACCOUNT-21 | Parent email entry/resend/change email works for consent. |  | | | | |
+| ACCOUNT-22 | Consent pending protects child learning data. |  | | | | |
+| ACCOUNT-23 | Consent withdrawn protects child learning data. |  | | | | |
+| ACCOUNT-24 | Post-approval landing restores child visibility. |  | | | | |
+| ACCOUNT-25 | Parent consent management works from child detail. |  | | | | |
+| ACCOUNT-26 | Regional consent variants protect mentor visibility. |  | | | | |
+| ACCOUNT-27 | Parent deny confirmation works. |  | | | | |
+| ACCOUNT-28 | App language picker works from permitted account surface. |  | | | | |
+| ACCOUNT-29 | Mentor-language/account-language entry does not create separate mentor identity. |  | | | | |
+| ACCOUNT-30 | Proxy-only More restrictions do not appear in normal mentor review. |  | | | | |
 
 ## Batch 2 - Mentor Home, Navigation, Setup, And Child Curriculum
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-01 | Learner home is reachable only by Study bridge, not as Mentor home. | TODO | | | | |
-| HOME-02 | Family/Children home summarizes children and routes to mentor surfaces. | TODO | | | | |
-| HOME-03 | Mentor tab target is home/recaps/progress/more when implemented. | TODO | | | | |
-| HOME-04 | Splash and initial shell remain shared. | TODO | | | | |
-| HOME-05 | Empty first-user state remains Study, not Mentor home. | TODO | | | | |
-| HOME-06 | Resume-session state remains Study, not Mentor home. | TODO | | | | |
-| HOME-07 | Family setup offers add/link child plus continue-studying path. | TODO | | | | |
-| HOME-08 | Mentor home timeout recovers to Mentor-safe root. | TODO | | | | |
-| SUBJECT-01 | Create child subject only from child curriculum path. | TODO | | | | |
-| SUBJECT-02 | Create child subject from child curriculum empty state, not adult Library. | TODO | | | | |
-| SUBJECT-03 | Chat classifier fallback is not a normal Mentor route. | TODO | | | | |
-| SUBJECT-04 | Homework subject creation is not a normal Mentor route. | TODO | | | | |
-| SUBJECT-05 | Child subject resolution is scoped to child when launched from child route. | TODO | | | | |
-| SUBJECT-06 | Child broad subject/book flow is scoped to child when supported. | TODO | | | | |
-| SUBJECT-07 | Child focused subject/book flow is scoped to child when supported. | TODO | | | | |
-| SUBJECT-08 | Child language subject setup is scoped to child. | TODO | | | | |
-| SUBJECT-12 | Child curriculum view is reachable from child surfaces. | TODO | | | | |
-| SUBJECT-14 | Assessment cannot silently run as adult when intended for child. | TODO | | | | |
-| SUBJECT-16 | Child/profile conversation-language setup is scoped correctly. | TODO | | | | |
-| SUBJECT-17 | Child/profile pronouns setup is scoped and age-gated correctly. | TODO | | | | |
+| HOME-01 | Learner home is reachable only by Study bridge, not as Mentor home. |  | | | | |
+| HOME-02 | Family/Children home summarizes children and routes to mentor surfaces. |  | | | | |
+| HOME-03 | Mentor tab target is home/recaps/progress/more when implemented. |  | | | | |
+| HOME-04 | Splash and initial shell remain shared. |  | | | | |
+| HOME-05 | Empty first-user state remains Study, not Mentor home. |  | | | | |
+| HOME-06 | Resume-session state remains Study, not Mentor home. |  | | | | |
+| HOME-07 | Family setup offers add/link child plus continue-studying path. |  | | | | |
+| HOME-08 | Mentor home timeout recovers to Mentor-safe root. |  | | | | |
+| SUBJECT-01 | Create child subject only from child curriculum path. |  | | | | |
+| SUBJECT-02 | Create child subject from child curriculum empty state, not adult Library. |  | | | | |
+| SUBJECT-03 | Chat classifier fallback is not a normal Mentor route. |  | | | | |
+| SUBJECT-04 | Homework subject creation is not a normal Mentor route. |  | | | | |
+| SUBJECT-05 | Child subject resolution is scoped to child when launched from child route. |  | | | | |
+| SUBJECT-06 | Child broad subject/book flow is scoped to child when supported. |  | | | | |
+| SUBJECT-07 | Child focused subject/book flow is scoped to child when supported. |  | | | | |
+| SUBJECT-08 | Child language subject setup is scoped to child. |  | | | | |
+| SUBJECT-12 | Child curriculum view is reachable from child surfaces. |  | | | | |
+| SUBJECT-14 | Assessment cannot silently run as adult when intended for child. |  | | | | |
+| SUBJECT-16 | Child/profile conversation-language setup is scoped correctly. |  | | | | |
+| SUBJECT-17 | Child/profile pronouns setup is scoped and age-gated correctly. |  | | | | |
 
 ## Batch 3 - Child Review, Recaps, Reports, And Mentor Progress
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| PARENT-01 | Family home/dashboard works for linked children. | TODO | | | | |
-| PARENT-02 | Multi-child dashboard works. | TODO | | | | |
-| PARENT-03 | Child detail is parent-native and scoped. | TODO | | | | |
-| PARENT-04 | Child subject/topic drill-down is parent-native and scoped. | TODO | | | | |
-| PARENT-05 | Child session/transcript review is parent-native, not proxy-dependent. | TODO | | | | |
-| PARENT-06 | Child reports list/detail works. | TODO | | | | |
-| PARENT-07 | Child curriculum replaces top-level adult Library in Mentor mode. | TODO | | | | |
-| PARENT-08 | Subject raw-input audit is scoped to child. | TODO | | | | |
-| PARENT-09 | Guided label tooltip works in mentor surfaces. | TODO | | | | |
-| PARENT-10 | Child Understanding/Retention cards render correctly. | TODO | | | | |
-| PARENT-11 | Child session recap content works and can feed Recaps target. | TODO | | | | |
-| PARENT-12 | Child subject retention badges are data-gated. | TODO | | | | |
-| PARENT-13 | Child weekly report detail works and marks viewed. | TODO | | | | |
-| LEARN-07 | Student session summary is source material only; mentor reads through parent-native route. | TODO | | | | |
-| LEARN-17 | Family Progress excludes adult self progress. | TODO | | | | |
-| LEARN-18 | Child subject progress detail is scoped to child. | TODO | | | | |
-| LEARN-19 | Child/family streak display does not imply adult self progress. | TODO | | | | |
-| LEARN-20 | Child/family milestones are scoped correctly where surfaced. | TODO | | | | |
-| LEARN-21 | Child/family vocabulary browser is scoped correctly where surfaced. | TODO | | | | |
-| LEARN-23 | Mentor transcript/recap access uses parent-native route and family checks. | TODO | | | | |
-| LEARN-24 | Saved bookmarks are not exposed as a normal mentor surface. | TODO | | | | |
+| PARENT-01 | Family home/dashboard works for linked children. |  | | | | |
+| PARENT-02 | Multi-child dashboard works. |  | | | | |
+| PARENT-03 | Child detail is parent-native and scoped. |  | | | | |
+| PARENT-04 | Child subject/topic drill-down is parent-native and scoped. |  | | | | |
+| PARENT-05 | Child session/transcript review is parent-native, not proxy-dependent. |  | | | | |
+| PARENT-06 | Child reports list/detail works. |  | | | | |
+| PARENT-07 | Child curriculum replaces top-level adult Library in Mentor mode. |  | | | | |
+| PARENT-08 | Subject raw-input audit is scoped to child. |  | | | | |
+| PARENT-09 | Guided label tooltip works in mentor surfaces. |  | | | | |
+| PARENT-10 | Child Understanding/Retention cards render correctly. |  | | | | |
+| PARENT-11 | Child session recap content works and can feed Recaps target. |  | | | | |
+| PARENT-12 | Child subject retention badges are data-gated. |  | | | | |
+| PARENT-13 | Child weekly report detail works and marks viewed. |  | | | | |
+| LEARN-07 | Student session summary is source material only; mentor reads through parent-native route. |  | | | | |
+| LEARN-17 | Family Progress excludes adult self progress. |  | | | | |
+| LEARN-18 | Child subject progress detail is scoped to child. |  | | | | |
+| LEARN-19 | Child/family streak display does not imply adult self progress. |  | | | | |
+| LEARN-20 | Child/family milestones are scoped correctly where surfaced. |  | | | | |
+| LEARN-21 | Child/family vocabulary browser is scoped correctly where surfaced. |  | | | | |
+| LEARN-23 | Mentor transcript/recap access uses parent-native route and family checks. |  | | | | |
+| LEARN-24 | Saved bookmarks are not exposed as a normal mentor surface. |  | | | | |
 
 ## Batch 4 - Learning, Practice, Homework, Quiz, And Dictation Boundaries
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-01 | Freeform chat is not directly surfaced from Mentor mode. | TODO | | | | |
-| LEARN-02 | Guided session is not directly surfaced from Mentor mode. | TODO | | | | |
-| LEARN-03 | First session is not directly surfaced from Mentor mode. | TODO | | | | |
-| LEARN-04 | Core learning loop is not directly surfaced from Mentor mode. | TODO | | | | |
-| LEARN-05 | Coach bubble variants remain student-session behavior. | TODO | | | | |
-| LEARN-06 | Voice controls remain student-session behavior. | TODO | | | | |
-| LEARN-08 | Library behavior is adult Study or child curriculum, not top-level Mentor Library. | TODO | | | | |
-| LEARN-09 | Shelf/book selection is scoped to child curriculum or adult Study. | TODO | | | | |
-| LEARN-10 | Book detail starts learning only in correct student context. | TODO | | | | |
-| LEARN-11 | Manage subject status is scoped to child curriculum or adult Study. | TODO | | | | |
-| LEARN-12 | Topic detail is scoped to child curriculum or adult Study. | TODO | | | | |
-| LEARN-13 | Recall check is not directly surfaced from Mentor mode. | TODO | | | | |
-| LEARN-14 | Failed recall remediation is not directly surfaced from Mentor mode. | TODO | | | | |
-| LEARN-15 | Relearn flow is not directly surfaced from Mentor mode except explicit Study bridge. | TODO | | | | |
-| LEARN-16 | Retention review is not directly surfaced from Mentor mode except scoped child review. | TODO | | | | |
-| LEARN-22 | Vocabulary list is child curriculum/adult Study, not top-level Mentor activity. | TODO | | | | |
-| LEARN-25 | Library search is child curriculum/adult Study, not top-level Mentor activity. | TODO | | | | |
-| LEARN-26 | First-curriculum session starts only in correct student context. | TODO | | | | |
-| PRACTICE-01 | Practice hub is not directly surfaced from Mentor mode. | TODO | | | | |
-| PRACTICE-02 | Review shortcut is not directly surfaced from Mentor mode. | TODO | | | | |
-| PRACTICE-03 | Recitation session is not directly surfaced from Mentor mode. | TODO | | | | |
-| PRACTICE-04 | All-caught-up state is not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-01 | Quiz picker is not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-02 | Quiz launch is not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-03 | Quiz play is not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-04 | Guess Who play is not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-05 | Quiz quit path is not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-06 | Quiz retry/exit path is not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-07 | Quiz results are not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-08 | Quiz errors are not directly surfaced from Mentor mode. | TODO | | | | |
-| QUIZ-09 | Quiz history is visible only through parent-native review if designed. | TODO | | | | |
-| QUIZ-10 | Quiz detail is visible only through parent-native review if designed. | TODO | | | | |
-| QUIZ-11 | Malformed-round guard remains student activity behavior. | TODO | | | | |
-| QUIZ-12 | Wrong-answer dispute remains student activity behavior. | TODO | | | | |
-| QUIZ-13 | Answer-check warning remains student activity behavior. | TODO | | | | |
-| DICT-01 | Dictation choice is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-02 | Dictation OCR preview is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-03 | Generated dictation is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-04 | Dictation playback is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-05 | Dictation exit confirm is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-06 | Dictation completion is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-07 | Dictation photo review is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-08 | Dictation remediation is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-09 | Dictation perfect-score celebration is not directly surfaced from Mentor mode. | TODO | | | | |
-| DICT-10 | Dictation result recording is not directly surfaced from Mentor mode. | TODO | | | | |
-| HOMEWORK-01 | Homework start is not direct child impersonation from Mentor mode. | TODO | | | | |
-| HOMEWORK-02 | Homework camera/OCR is not direct child impersonation from Mentor mode. | TODO | | | | |
-| HOMEWORK-03 | Homework manual fallback is not direct child impersonation from Mentor mode. | TODO | | | | |
-| HOMEWORK-04 | Homework tutoring is not direct child impersonation from Mentor mode. | TODO | | | | |
-| HOMEWORK-05 | Homework gallery import is not direct child impersonation from Mentor mode. | TODO | | | | |
-| HOMEWORK-06 | Homework vision pass-through is not direct child impersonation from Mentor mode. | TODO | | | | |
-| HOMEWORK-07 | Homework permission flow is not direct child impersonation from Mentor mode. | TODO | | | | |
+| LEARN-01 | Freeform chat is not directly surfaced from Mentor mode. |  | | | | |
+| LEARN-02 | Guided session is not directly surfaced from Mentor mode. |  | | | | |
+| LEARN-03 | First session is not directly surfaced from Mentor mode. |  | | | | |
+| LEARN-04 | Core learning loop is not directly surfaced from Mentor mode. |  | | | | |
+| LEARN-05 | Coach bubble variants remain student-session behavior. |  | | | | |
+| LEARN-06 | Voice controls remain student-session behavior. |  | | | | |
+| LEARN-08 | Library behavior is adult Study or child curriculum, not top-level Mentor Library. |  | | | | |
+| LEARN-09 | Shelf/book selection is scoped to child curriculum or adult Study. |  | | | | |
+| LEARN-10 | Book detail starts learning only in correct student context. |  | | | | |
+| LEARN-11 | Manage subject status is scoped to child curriculum or adult Study. |  | | | | |
+| LEARN-12 | Topic detail is scoped to child curriculum or adult Study. |  | | | | |
+| LEARN-13 | Recall check is not directly surfaced from Mentor mode. |  | | | | |
+| LEARN-14 | Failed recall remediation is not directly surfaced from Mentor mode. |  | | | | |
+| LEARN-15 | Relearn flow is not directly surfaced from Mentor mode except explicit Study bridge. |  | | | | |
+| LEARN-16 | Retention review is not directly surfaced from Mentor mode except scoped child review. |  | | | | |
+| LEARN-22 | Vocabulary list is child curriculum/adult Study, not top-level Mentor activity. |  | | | | |
+| LEARN-25 | Library search is child curriculum/adult Study, not top-level Mentor activity. |  | | | | |
+| LEARN-26 | First-curriculum session starts only in correct student context. |  | | | | |
+| PRACTICE-01 | Practice hub is not directly surfaced from Mentor mode. |  | | | | |
+| PRACTICE-02 | Review shortcut is not directly surfaced from Mentor mode. |  | | | | |
+| PRACTICE-03 | Recitation session is not directly surfaced from Mentor mode. |  | | | | |
+| PRACTICE-04 | All-caught-up state is not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-01 | Quiz picker is not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-02 | Quiz launch is not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-03 | Quiz play is not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-04 | Guess Who play is not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-05 | Quiz quit path is not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-06 | Quiz retry/exit path is not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-07 | Quiz results are not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-08 | Quiz errors are not directly surfaced from Mentor mode. |  | | | | |
+| QUIZ-09 | Quiz history is visible only through parent-native review if designed. |  | | | | |
+| QUIZ-10 | Quiz detail is visible only through parent-native review if designed. |  | | | | |
+| QUIZ-11 | Malformed-round guard remains student activity behavior. |  | | | | |
+| QUIZ-12 | Wrong-answer dispute remains student activity behavior. |  | | | | |
+| QUIZ-13 | Answer-check warning remains student activity behavior. |  | | | | |
+| DICT-01 | Dictation choice is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-02 | Dictation OCR preview is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-03 | Generated dictation is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-04 | Dictation playback is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-05 | Dictation exit confirm is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-06 | Dictation completion is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-07 | Dictation photo review is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-08 | Dictation remediation is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-09 | Dictation perfect-score celebration is not directly surfaced from Mentor mode. |  | | | | |
+| DICT-10 | Dictation result recording is not directly surfaced from Mentor mode. |  | | | | |
+| HOMEWORK-01 | Homework start is not direct child impersonation from Mentor mode. |  | | | | |
+| HOMEWORK-02 | Homework camera/OCR is not direct child impersonation from Mentor mode. |  | | | | |
+| HOMEWORK-03 | Homework manual fallback is not direct child impersonation from Mentor mode. |  | | | | |
+| HOMEWORK-04 | Homework tutoring is not direct child impersonation from Mentor mode. |  | | | | |
+| HOMEWORK-05 | Homework gallery import is not direct child impersonation from Mentor mode. |  | | | | |
+| HOMEWORK-06 | Homework vision pass-through is not direct child impersonation from Mentor mode. |  | | | | |
+| HOMEWORK-07 | Homework permission flow is not direct child impersonation from Mentor mode. |  | | | | |
 
 ## Batch 5 - Recaps Target
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| RECAP-TARGET-01 | Recaps list item/detail reuses child session recap fields from PARENT-11. | TODO | | | | |
-| RECAP-TARGET-02 | Recap detail is parent-native and backs to `/(app)/recaps`. | TODO | | | | |
-| RECAP-TARGET-03 | Reports/weekly reports can coexist with or link to Recaps safely. | TODO | | | | |
-| RECAP-TARGET-04 | Recaps read student session source data without mutating it. | TODO | | | | |
-| RECAP-TARGET-05 | Recaps tab is not surfaced as a dead tab before route/API exists. | TODO | | | | |
+| RECAP-TARGET-01 | Recaps list item/detail reuses child session recap fields from PARENT-11. |  | | | | |
+| RECAP-TARGET-02 | Recap detail is parent-native and backs to `/(app)/recaps`. |  | | | | |
+| RECAP-TARGET-03 | Reports/weekly reports can coexist with or link to Recaps safely. |  | | | | |
+| RECAP-TARGET-04 | Recaps read student session source data without mutating it. |  | | | | |
+| RECAP-TARGET-05 | Recaps tab is not surfaced as a dead tab before route/API exists. |  | | | | |
 
 ## Batch 6 - Mentor Billing
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| BILLING-01 | Owner can open subscription details. | TODO | | | | |
-| BILLING-02 | Owner upgrade flow starts safely. | TODO | | | | |
-| BILLING-03 | Trial/usage/family-pool states render correctly. | TODO | | | | |
-| BILLING-04 | Restore purchases works for owner. | TODO | | | | |
-| BILLING-05 | Manage billing deep-link is safe. | TODO | | | | |
-| BILLING-06 | Child notify-parent path creates mentor-facing response. | TODO | | | | |
-| BILLING-07 | Adult owner quota paywall does not affect child review scope. | TODO | | | | |
-| BILLING-08 | Family pool details are visible to eligible family owner. | TODO | | | | |
-| BILLING-09 | Top-up section works for eligible owner. | TODO | | | | |
-| BILLING-10 | BYOK waitlist state is correct if visible. | TODO | | | | |
-| BILLING-11 | Trial banner/status renders for trial owner. | TODO | | | | |
-| BILLING-12 | Static comparison cards render safely. | TODO | | | | |
+| BILLING-01 | Owner can open subscription details. |  | | | | |
+| BILLING-02 | Owner upgrade flow starts safely. |  | | | | |
+| BILLING-03 | Trial/usage/family-pool states render correctly. |  | | | | |
+| BILLING-04 | Restore purchases works for owner. |  | | | | |
+| BILLING-05 | Manage billing deep-link is safe. |  | | | | |
+| BILLING-06 | Child notify-parent path creates mentor-facing response. |  | | | | |
+| BILLING-07 | Adult owner quota paywall does not affect child review scope. |  | | | | |
+| BILLING-08 | Family pool details are visible to eligible family owner. |  | | | | |
+| BILLING-09 | Top-up section works for eligible owner. |  | | | | |
+| BILLING-10 | BYOK waitlist state is correct if visible. |  | | | | |
+| BILLING-11 | Trial banner/status renders for trial owner. |  | | | | |
+| BILLING-12 | Static comparison cards render safely. |  | | | | |
 
 ## Batch 7 - Mentor Cross-Cutting Pass
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| CC-04 | Mentor child/detail/recap back fallbacks are safe. | TODO | | | | |
-| CC-07 | Child accommodation controls are mentor-gated. | TODO | | | | |
-| CC-08 | Parent-facing metric vocabulary appears on mentor surfaces. | TODO | | | | |
-| CC-09 | Web backgrounds do not bleed between Family/child stacks. | TODO | | | | |
-| CC-11 | Mentor copy uses i18n keys. | TODO | | | | |
-| CC-12 | FeedbackProvider works on mentor gates/More. | TODO | | | | |
-| CC-17 | Profile-as-lens child routes do not leak or guess child scope. | TODO | | | | |
-| CC-18 | Stable list refs hold on child lists, reports, Recaps, and family progress. | TODO | | | | |
+| CC-04 | Mentor child/detail/recap back fallbacks are safe. |  | | | | |
+| CC-07 | Child accommodation controls are mentor-gated. |  | | | | |
+| CC-08 | Parent-facing metric vocabulary appears on mentor surfaces. |  | | | | |
+| CC-09 | Web backgrounds do not bleed between Family/child stacks. |  | | | | |
+| CC-11 | Mentor copy uses i18n keys. |  | | | | |
+| CC-12 | FeedbackProvider works on mentor gates/More. |  | | | | |
+| CC-17 | Profile-as-lens child routes do not leak or guess child scope. |  | | | | |
+| CC-18 | Stable list refs hold on child lists, reports, Recaps, and family progress. |  | | | | |
 
 ## Batch 8 - Study Bridge And Negative Student Surfaces
 
 | ID | Access expectation | Status | Result | Notion bugs | Docs updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| BRIDGE-01 | Adult can switch from Mentor to Study and retain own Study access. | TODO | | | | |
-| BRIDGE-02 | "Learn this too" writes as adult, not as child. | TODO | | | | |
-| BRIDGE-03 | Adult quota/paywall appears before Study bridge if needed. | TODO | | | | |
-| BRIDGE-04 | Back navigation after bridge does not return to stale child/proxy route. | TODO | | | | |
-| BRIDGE-05 | Normal mentor review never enters parent proxy. | TODO | | | | |
+| BRIDGE-01 | Adult can switch from Mentor to Study and retain own Study access. |  | | | | |
+| BRIDGE-02 | "Learn this too" writes as adult, not as child. |  | | | | |
+| BRIDGE-03 | Adult quota/paywall appears before Study bridge if needed. |  | | | | |
+| BRIDGE-04 | Back navigation after bridge does not return to stale child/proxy route. |  | | | | |
+| BRIDGE-05 | Normal mentor review never enters parent proxy. |  | | | | |
 
 ## Discovered Mentor Flows
 
