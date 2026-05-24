@@ -213,6 +213,50 @@ describe('getSessionSummary', () => {
     expect(result).toBeNull(); // no summary row → null
     expect(summaryFindFirst).toHaveBeenCalledTimes(1); // summary lookup was attempted
   });
+
+  it('[WI-80] suppresses next-topic title when nextTopicId has a mixed parent chain', async () => {
+    const summaryRow = buildSummaryRow({
+      status: 'accepted',
+      nextTopicId: 'mixed-parent-topic',
+    });
+    const sessionRow = buildSessionRow();
+
+    const twoJoinLimit = jest
+      .fn()
+      .mockResolvedValue([{ title: 'Foreign Next Topic' }]);
+    const threeJoinLimit = jest.fn().mockResolvedValue([]);
+    const thirdJoin = jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({ limit: threeJoinLimit }),
+    });
+    const secondJoinResult = {
+      where: jest.fn().mockReturnValue({ limit: twoJoinLimit }),
+      innerJoin: thirdJoin,
+    };
+    const secondJoin = jest.fn().mockReturnValue(secondJoinResult);
+    const firstJoin = jest.fn().mockReturnValue({ innerJoin: secondJoin });
+
+    const db = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({ innerJoin: firstJoin }),
+      }),
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(sessionRow),
+        },
+        sessionSummaries: {
+          findFirst: jest.fn().mockResolvedValue(summaryRow),
+        },
+        xpLedger: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as import('@eduagent/database').Database;
+
+    const result = await getSessionSummary(db, 'prof-1', 'sess-1');
+
+    expect(result).not.toBeNull();
+    expect(result!.nextTopicTitle).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

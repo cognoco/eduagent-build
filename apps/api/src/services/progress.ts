@@ -844,16 +844,19 @@ export async function getOverallProgressBatch(
   const allSessionSummaries =
     allSessions.length > 0
       ? await db.query.sessionSummaries.findMany({
-          where: inArray(
-            sessionSummaries.sessionId,
-            allSessions.map((session) => session.id),
+          where: and(
+            inArray(
+              sessionSummaries.sessionId,
+              allSessions.map((session) => session.id),
+            ),
+            inArray(sessionSummaries.profileId, profileIds),
           ),
         })
       : [];
-  const acceptedSummarySessionIds = new Set(
+  const acceptedSummarySessionKeys = new Set(
     allSessionSummaries
       .filter((summary) => isAcceptedSummaryStatus(summary.status))
-      .map((summary) => summary.sessionId),
+      .map((summary) => `${summary.profileId}:${summary.sessionId}`),
   );
 
   // 6. Index everything by profileId for in-memory assembly.
@@ -997,7 +1000,9 @@ export async function getOverallProgressBatch(
             session.topicId,
             curriculumTopicIds,
           );
-        } else if (acceptedSummarySessionIds.has(session.id)) {
+        } else if (
+          acceptedSummarySessionKeys.has(`${session.profileId}:${session.id}`)
+        ) {
           addTopicCompletion(
             completedTopics,
             session.topicId,

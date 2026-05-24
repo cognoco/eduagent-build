@@ -285,6 +285,7 @@ function setupScopedRepo({
   sessionSummariesFindFirst = undefined as { content: string } | undefined,
   sessionSummariesFindMany = [] as Array<{
     sessionId: string;
+    profileId?: string;
     status: string;
     content?: string;
   }>,
@@ -2142,5 +2143,64 @@ describe('getOverallProgressBatch — cross-profile data leak (security)', () =>
     });
     expect(progress!.totalTopicsCompleted).toBe(1);
     expect(progress!.totalTopicsVerified).toBe(1);
+  });
+
+  it('[WI-80] does not count another profile summary as completion for a profile-owned short session', async () => {
+    const profileA = profileId;
+    const profileB = 'other-profile-id';
+    const subject = mockSubjectRow({ id: 'sub-summary-mismatch' });
+    const curriculumIdLocal = 'curr-summary-mismatch';
+    const ownedTopic = {
+      ...mockTopicRow({ id: 'topic-summary-mismatch', sortOrder: 1 }),
+      curriculumId: curriculumIdLocal,
+    };
+
+    mockGetPracticeActivitySummaryBatch.mockResolvedValueOnce(
+      new Map([[profileA, emptyPracticeActivitySummary]]),
+    );
+    const db = createMockDb({
+      curriculaFindMany: [
+        { id: curriculumIdLocal, subjectId: 'sub-summary-mismatch' },
+      ],
+      topicsFindMany: [ownedTopic],
+      ownedTopicRows: [mockOwnedTopicRow(ownedTopic)],
+    });
+    const query = db.query as unknown as Record<
+      string,
+      { findMany: jest.Mock }
+    >;
+    query.subjects = { findMany: jest.fn().mockResolvedValue([subject]) };
+    query.retentionCards = { findMany: jest.fn().mockResolvedValue([]) };
+    query.assessments = { findMany: jest.fn().mockResolvedValue([]) };
+    query.learningSessions = {
+      findMany: jest.fn().mockResolvedValue([
+        mockSessionRow({
+          id: 'session-short-owned-by-a',
+          subjectId: 'sub-summary-mismatch',
+          topicId: 'topic-summary-mismatch',
+          exchangeCount: 1,
+        }),
+      ]),
+    };
+    query.sessionSummaries = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          sessionId: 'session-short-owned-by-a',
+          profileId: profileB,
+          status: 'accepted',
+        },
+      ]),
+    };
+
+    const result = await getOverallProgressBatch(db, [profileA]);
+    const progress = result.get(profileA);
+
+    expect(progress).toBeDefined();
+    expect(progress!.subjects[0]).toMatchObject({
+      topicsTotal: 1,
+      topicsCompleted: 0,
+      topicsVerified: 0,
+    });
+    expect(progress!.totalTopicsCompleted).toBe(0);
   });
 });
