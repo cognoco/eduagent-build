@@ -52,6 +52,37 @@ describe('decideNotificationTapNavigation', () => {
     });
   });
 
+  it('does not treat non-session segments containing "session" as active session', () => {
+    expect(
+      decideNotificationTapNavigation({
+        currentPathname: '/session-history',
+        effectiveAppContext: 'study',
+        notificationData: { type: 'weekly_progress' },
+      }),
+    ).toEqual({
+      context: 'family',
+      kind: 'replace',
+      href: '/(app)/recaps',
+    });
+  });
+
+  it('treats nested session routes as active', () => {
+    expect(
+      decideNotificationTapNavigation({
+        currentPathname: '/(app)/session/abc-123',
+        effectiveAppContext: 'study',
+        notificationData: { type: 'weekly_progress' },
+      }),
+    ).toEqual({
+      context: 'family',
+      kind: 'prompt',
+      href: '/(app)/recaps',
+      title: 'Open learning update?',
+      message:
+        'You are in a session. Finish this first, or open the update and leave the current flow.',
+    });
+  });
+
   it('ignores notification payloads without a route target', () => {
     expect(
       decideNotificationTapNavigation({

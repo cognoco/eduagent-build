@@ -51,7 +51,7 @@ function notificationTargetForData(
 }
 
 function isActiveSessionPath(pathname: string): boolean {
-  return pathname === '/session' || pathname.includes('/session');
+  return /(^|\/)session(\/|$)/.test(pathname);
 }
 
 export function decideNotificationTapNavigation({

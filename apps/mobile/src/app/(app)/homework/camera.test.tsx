@@ -700,6 +700,52 @@ describe('CameraScreen', () => {
     listenerSpy.mockRestore();
   });
 
+  it('hardware back during processing phase is consumed without navigating (preserves in-flight OCR)', async () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'processing',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockLaunchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///gallery/homework.png' }],
+    });
+
+    const { BackHandler } = require('react-native');
+    const listenerSpy = jest.spyOn(BackHandler, 'addEventListener');
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    fireEvent.press(getByTestId('gallery-button'));
+    await waitFor(() => {
+      getByTestId('photo-preview');
+    });
+
+    await act(async () => {
+      fireEvent.press(getByTestId('camera-use-this-button'));
+    });
+
+    mockRouter.replace.mockClear();
+
+    const calls = listenerSpy.mock.calls.filter(
+      ([event]) => event === 'hardwareBackPress',
+    );
+    const lastCall = calls[calls.length - 1];
+    expect(lastCall).toBeDefined();
+    const handler = lastCall![1] as () => boolean;
+
+    const consumed = handler();
+    expect(consumed).toBe(true);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    listenerSpy.mockRestore();
+  });
+
   it('CACHE_FAILED suppresses the retry button (cache write failed → currentUriRef is null → retry is a no-op)', () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
