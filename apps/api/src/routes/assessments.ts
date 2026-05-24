@@ -131,6 +131,11 @@ export const assessmentRoutes = new Hono<RouteEnv>()
               exchangeHistory: assessment.exchangeHistory,
             },
             answer,
+            // [WI-136] Service-level terminal-replay guard. If the
+            // assessment is already in a terminal state, this throws
+            // ConflictError → 409 BEFORE the LLM call. Prevents quota
+            // re-billing and downstream retention/XP corruption.
+            { assessmentStatus: assessment.status },
           );
 
       const updatedHistory = [

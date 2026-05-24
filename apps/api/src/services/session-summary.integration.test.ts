@@ -185,6 +185,40 @@ describe('session summary integration', () => {
     });
   });
 
+  it('[WI-247] short-circuits when summary already accepted; LLM is not called on replay', async () => {
+    const { profileId } = await seedProfile();
+    const subjectId = await seedSubject(profileId);
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+    });
+
+    await closeSession(db, profileId, session.id, {
+      reason: 'user_ended',
+      summaryStatus: 'pending',
+    });
+
+    // First submit: LLM is called once and the row becomes `accepted`.
+    const first = await submitSummary(db, profileId, session.id, {
+      content: 'Photosynthesis turns sunlight into food.',
+    });
+    expect(first.summary.status).toBe('accepted');
+    expect(llmProviderCalls).toHaveLength(1);
+
+    // Second submit: existing accepted row → short-circuit, no LLM call.
+    const second = await submitSummary(db, profileId, session.id, {
+      content: 'A completely different and shorter summary.',
+    });
+    expect(second.summary.status).toBe('accepted');
+    expect(second.summary.id).toBe(first.summary.id);
+    // Original content preserved — short-circuit does not overwrite.
+    expect(second.summary.content).toBe(
+      'Photosynthesis turns sunlight into food.',
+    );
+    expect(llmProviderCalls).toHaveLength(1);
+  });
+
   it('evaluates and stores a submitted summary', async () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);

@@ -187,6 +187,89 @@ describe('evaluateAssessmentAnswer', () => {
     registerProvider(createMockProvider('gemini'));
   });
 
+  // ---------------------------------------------------------------------
+  // [WI-136] Terminal-state replay guard. Submitting an answer against an
+  // already-terminal assessment must throw ConflictError before the LLM
+  // call so the metering middleware refunds the decrement and quota is
+  // never burned on replay.
+  // ---------------------------------------------------------------------
+
+  it.each(['passed', 'failed', 'borderline', 'failed_exhausted'] as const)(
+    '[WI-136] rejects answer submission for terminal status "%s" without calling LLM',
+    async (terminalStatus) => {
+      const llmSpy = jest.fn();
+      registerProvider({
+        id: 'gemini',
+        async chat(...args) {
+          llmSpy(...args);
+          return {
+            content: JSON.stringify({
+              feedback: 'should not be called',
+              passed: true,
+              shouldEscalateDepth: false,
+              rawScore: 0.5,
+              qualityRating: 3,
+            }),
+            stopReason: 'stop' as StopReason,
+          };
+        },
+        chatStream() {
+          const s = (async function* () {
+            yield '';
+          })();
+          return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+        },
+      });
+
+      await expect(
+        evaluateAssessmentAnswer(
+          assessmentContext,
+          'I think variables store data.',
+          { assessmentStatus: terminalStatus },
+        ),
+      ).rejects.toThrow(/terminal state/);
+
+      expect(llmSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it('[WI-136] proceeds normally when assessmentStatus is in_progress', async () => {
+    registerProvider(
+      createAssessmentEvalMockProvider({
+        feedback: 'OK',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.4,
+        qualityRating: 3,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'variables store data',
+      { assessmentStatus: 'in_progress' },
+    );
+    expect(result.feedback).toBe('OK');
+  });
+
+  it('[WI-136] proceeds normally when no assessmentStatus option is provided (back-compat)', async () => {
+    registerProvider(
+      createAssessmentEvalMockProvider({
+        feedback: 'OK',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.4,
+        qualityRating: 3,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'variables store data',
+    );
+    expect(result.feedback).toBe('OK');
+  });
+
   it('caps mastery at 0.5 for recall depth', async () => {
     registerProvider(
       createAssessmentEvalMockProvider({

@@ -8,7 +8,9 @@ import {
   recordDictationResultResponseSchema,
   dictationReviewInputSchema,
   dictationReviewResultSchema,
+  dictationReviewPromptCharCount,
   dictationStreakSchema,
+  DICTATION_REVIEW_MAX_PROMPT_CHARS,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -214,6 +216,24 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
           429,
           ERROR_CODES.RATE_LIMITED,
           'Dictation review is limited to 10 requests per minute.',
+        );
+      }
+
+      // [WI-150 / WI-206] Total-prompt-character budget. The per-field zod
+      // caps bound (count × per-sentence length); this final guard bounds
+      // the AGGREGATE so an attacker can't get 50 sentences * 500 chars
+      // through (= 25_000 chars of prompt material) when the legitimate
+      // workflow needs ~2_000-4_000. Service layer enforces the same
+      // budget as defense-in-depth (WI-206).
+      const promptCharCount = dictationReviewPromptCharCount({
+        sentences: input.sentences,
+      });
+      if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {
+        return apiError(
+          c,
+          413,
+          ERROR_CODES.PAYLOAD_TOO_LARGE,
+          `Dictation review payload too large: ${promptCharCount} prompt chars exceeds limit of ${DICTATION_REVIEW_MAX_PROMPT_CHARS}.`,
         );
       }
 

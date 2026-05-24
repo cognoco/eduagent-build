@@ -1,4 +1,7 @@
 import {
+  DICTATION_REVIEW_MAX_PROMPT_CHARS,
+  DictationPayloadTooLargeError,
+  dictationReviewPromptCharCount,
   dictationReviewResultSchema,
   type DictationSentence,
   type DictationReviewResult,
@@ -167,6 +170,20 @@ export async function reviewDictation(
     preferredExplanations,
     recentStruggles,
   } = input;
+
+  // [WI-206] Defense-in-depth payload-size guard. The route handler enforces
+  // this same budget — this service-level check exists so any future internal
+  // caller (Inngest function, batch job) is also covered. Throwing
+  // `DictationPayloadTooLargeError` keeps a single error contract; the route
+  // never sees this throw because its own check fires first.
+  const promptCharCount = dictationReviewPromptCharCount({ sentences });
+  if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {
+    throw new DictationPayloadTooLargeError(
+      `Dictation review payload too large: ${promptCharCount} prompt chars exceeds limit of ${DICTATION_REVIEW_MAX_PROMPT_CHARS}.`,
+      DICTATION_REVIEW_MAX_PROMPT_CHARS,
+      promptCharCount,
+    );
+  }
 
   // [PROMPT-INJECT-8] sentence text comes from the prepare-homework pipeline
   // (LLM output) and `language` is an ISO code. Sanitize both to guard

@@ -15,7 +15,7 @@ import { captureException } from './sentry';
 import { createLogger } from './logger';
 import { recordPracticeActivityEvent } from './practice-activity-events';
 import { buildAppHelpDirectReply, isAppHelpQuery } from './app-help-map';
-import { NotFoundError } from '../errors';
+import { ConflictError, NotFoundError } from '../errors';
 import type {
   VerificationDepth,
   QuickCheckContext,
@@ -285,6 +285,20 @@ export async function generateQuickCheck(
 }
 
 /**
+ * [WI-136] Terminal assessment statuses. Once an assessment reaches one of
+ * these, further answer submissions must be rejected at the service entry
+ * BEFORE the LLM call — replay would re-bill quota AND mutate retention/XP
+ * downstream. The set is the complement of `in_progress` over
+ * `AssessmentStatus`.
+ */
+export const TERMINAL_ASSESSMENT_STATUSES: ReadonlySet<AssessmentStatus> =
+  new Set(['passed', 'failed', 'borderline', 'failed_exhausted']);
+
+export function isTerminalAssessmentStatus(status: AssessmentStatus): boolean {
+  return TERMINAL_ASSESSMENT_STATUSES.has(status);
+}
+
+/**
  * Evaluates a learner's answer at the current verification depth.
  *
  * Uses routeAndCall with rung 2.
@@ -292,11 +306,26 @@ export async function generateQuickCheck(
  * - recall: max 0.5
  * - explain: max 0.8
  * - transfer: max 1.0
+ *
+ * [WI-136] If `assessmentStatus` is provided and represents a terminal state
+ * (passed / failed / borderline / failed_exhausted), throws `ConflictError`
+ * before calling the LLM. The route's global handler maps this to HTTP 409
+ * so callers can't re-bill quota by replaying answers on a closed assessment.
  */
 export async function evaluateAssessmentAnswer(
   context: AssessmentContext,
   answer: string,
+  options?: { assessmentStatus?: AssessmentStatus },
 ): Promise<AssessmentEvaluation> {
+  if (
+    options?.assessmentStatus &&
+    isTerminalAssessmentStatus(options.assessmentStatus)
+  ) {
+    throw new ConflictError(
+      `Assessment is already in terminal state '${options.assessmentStatus}'; cannot submit further answers.`,
+    );
+  }
+
   const messages = buildAssessmentEvaluationMessages(context, answer);
   const result = await routeAndCall(messages, 2);
   const evaluation = parseAssessmentEvaluation(
