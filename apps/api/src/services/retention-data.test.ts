@@ -1586,6 +1586,31 @@ describe('updateRetentionFromSession', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
+  it('[WI-80] rejects stale existing retention cards before updating', async () => {
+    const staleCard = mockRetentionCardRow({ topicId: 'foreign-topic' });
+    setupScopedRepo({ retentionCardFindFirst: staleCard });
+
+    const db = createMockDb();
+    db.select = jest.fn(() => ({
+      from: jest.fn(() => ({
+        innerJoin: jest.fn(() => ({
+          innerJoin: jest.fn(() => ({
+            innerJoin: jest.fn(() => ({
+              where: jest.fn(() => ({
+                limit: jest.fn().mockResolvedValue([]),
+              })),
+            })),
+          })),
+        })),
+      })),
+    })) as never;
+
+    await expect(
+      updateRetentionFromSession(db, profileId, 'foreign-topic', 4),
+    ).rejects.toThrow('Topic');
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
   it('skips SM-2 when card.updatedAt >= sessionTimestamp', async () => {
     // Card was updated at 11:00, session started at 10:00
     const card = mockRetentionCardRow();
@@ -1767,6 +1792,29 @@ describe('ensureRetentionCard', () => {
     expect(result.card.topicId).toBe(topicId);
     expect(result.card.profileId).toBe(profileId);
     expect(result.isNew).toBe(false);
+  });
+
+  it('[WI-80] rejects stale existing retention cards before returning them', async () => {
+    const existingCard = mockRetentionCardRow({ topicId: 'foreign-topic' });
+    const db = createMockDb({ retentionCardFindFirstQuery: existingCard });
+    db.select = jest.fn(() => ({
+      from: jest.fn(() => ({
+        innerJoin: jest.fn(() => ({
+          innerJoin: jest.fn(() => ({
+            innerJoin: jest.fn(() => ({
+              where: jest.fn(() => ({
+                limit: jest.fn().mockResolvedValue([]),
+              })),
+            })),
+          })),
+        })),
+      })),
+    })) as never;
+
+    await expect(
+      ensureRetentionCard(db, profileId, 'foreign-topic'),
+    ).rejects.toThrow('Topic');
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   it('returns the card after insertion', async () => {
@@ -2151,5 +2199,79 @@ describe('getStableTopics', () => {
     expect(result).toEqual([]);
     expect(db.query.curricula.findFirst).not.toHaveBeenCalled();
     expect(db.query.curriculumTopics.findMany).not.toHaveBeenCalled();
+  });
+
+  it('[WI-80] filters stale retention cards when no subject filter is provided', async () => {
+    const ownedCard = mockRetentionCardRow({ topicId: 'owned-topic' });
+    const staleCard = mockRetentionCardRow({ topicId: 'foreign-topic' });
+    setupScopedRepo({
+      retentionCardsFindMany: [ownedCard, staleCard],
+    });
+    const db = createMockDb();
+    db.select = jest.fn(() => ({
+      from: jest.fn(() => ({
+        innerJoin: jest.fn(() => ({
+          innerJoin: jest.fn(() => ({
+            innerJoin: jest.fn(() => ({
+              where: jest.fn().mockResolvedValue([
+                {
+                  topicId: 'owned-topic',
+                  topicTitle: 'Owned Topic',
+                  topicDescription: null,
+                  bookId: 'book-owned',
+                  bookTitle: 'Book',
+                  curriculumId,
+                  subjectId,
+                },
+              ]),
+            })),
+          })),
+        })),
+      })),
+    })) as never;
+
+    const result = await getStableTopics(db, profileId);
+
+    expect(result.map((topic) => topic.topicId)).toEqual(['owned-topic']);
+  });
+
+  it('[WI-80] filters subject stability through the dual topic parent chain', async () => {
+    const mixedParentCard = mockRetentionCardRow({
+      topicId: 'mixed-parent-topic',
+    });
+    const ownedCard = mockRetentionCardRow({ topicId: 'owned-topic' });
+    setupScopedRepo({
+      retentionCardsFindMany: [mixedParentCard, ownedCard],
+    });
+    const db = createMockDb();
+    (db.query.curriculumTopics.findMany as jest.Mock).mockResolvedValue([
+      { id: 'mixed-parent-topic', curriculumId, title: 'Mixed Parent Topic' },
+      { id: 'owned-topic', curriculumId, title: 'Owned Topic' },
+    ]);
+    db.select = jest.fn(() => ({
+      from: jest.fn(() => ({
+        innerJoin: jest.fn(() => ({
+          innerJoin: jest.fn(() => ({
+            innerJoin: jest.fn(() => ({
+              where: jest.fn().mockResolvedValue([
+                {
+                  topicId: 'owned-topic',
+                  topicTitle: 'Owned Topic',
+                  topicDescription: null,
+                  bookId: 'book-owned',
+                  bookTitle: 'Book',
+                  curriculumId,
+                  subjectId,
+                },
+              ]),
+            })),
+          })),
+        })),
+      })),
+    })) as never;
+
+    const result = await getStableTopics(db, profileId, subjectId);
+
+    expect(result.map((topic) => topic.topicId)).toEqual(['owned-topic']);
   });
 });

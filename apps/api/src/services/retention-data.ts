@@ -61,7 +61,10 @@ import { captureException } from './sentry';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
 import { createLogger } from './logger';
-import { assertOwnedCurriculumTopic } from './curriculum-topic-ownership';
+import {
+  assertOwnedCurriculumTopic,
+  findOwnedCurriculumTopics,
+} from './curriculum-topic-ownership';
 
 const logger = createLogger();
 const DAY_MS = 1000 * 60 * 60 * 24;
@@ -186,6 +189,8 @@ export async function ensureRetentionCard(
   profileId: string,
   topicId: string,
 ): Promise<{ card: typeof retentionCards.$inferSelect; isNew: boolean }> {
+  await assertOwnedCurriculumTopic(db, { profileId, topicId });
+
   const existingCard = await db.query.retentionCards.findFirst({
     where: and(
       eq(retentionCards.profileId, profileId),
@@ -193,8 +198,6 @@ export async function ensureRetentionCard(
     ),
   });
   if (existingCard) return { card: existingCard, isNew: false };
-
-  await assertOwnedCurriculumTopic(db, { profileId, topicId });
 
   await db
     .insert(retentionCards)
@@ -1311,6 +1314,8 @@ export async function updateRetentionFromSession(
     eq(retentionCards.topicId, topicId),
   );
 
+  await assertOwnedCurriculumTopic(db, { profileId, topicId });
+
   // Auto-create retention card on first encounter
   const ensured = existing
     ? { card: existing, isNew: false }
@@ -1407,35 +1412,24 @@ export async function getStableTopics(
       eq(subjects.id, subjectId),
     );
     if (!ownedSubject) return [];
+  }
 
-    const curriculum = await db.query.curricula.findFirst({
-      where: eq(curricula.subjectId, subjectId),
-    });
-    if (!curriculum) return [];
+  const allCards = await repo.retentionCards.findMany();
+  const topicIds = Array.from(new Set(allCards.map((card) => card.topicId)));
+  if (topicIds.length === 0) return [];
 
-    const topics = await db.query.curriculumTopics.findMany({
-      where: eq(curriculumTopics.curriculumId, curriculum.id),
-    });
-    const topicIds = topics.map((t) => t.id);
-    if (topicIds.length === 0) return [];
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    topicIds,
+    ...(subjectId ? { subjectId } : {}),
+  });
+  const ownedTopicIds = new Set(ownedTopics.map((topic) => topic.topicId));
 
-    const filteredCards = await repo.retentionCards.findMany(
-      inArray(retentionCards.topicId, topicIds),
-    );
-
-    return filteredCards.map((card) => ({
+  return allCards
+    .filter((card) => ownedTopicIds.has(card.topicId))
+    .map((card) => ({
       topicId: card.topicId,
       isStable: isTopicStable(card.consecutiveSuccesses),
       consecutiveSuccesses: card.consecutiveSuccesses,
     }));
-  }
-
-  // No subject filter — return all cards for this profile
-  const allCards = await repo.retentionCards.findMany();
-
-  return allCards.map((card) => ({
-    topicId: card.topicId,
-    isStable: isTopicStable(card.consecutiveSuccesses),
-    consecutiveSuccesses: card.consecutiveSuccesses,
-  }));
 }
