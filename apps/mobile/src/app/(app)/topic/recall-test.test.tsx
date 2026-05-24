@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -18,7 +19,16 @@ jest.mock('expo-localization', () => ({
 
 const mockPush = jest.fn();
 const mockRecallMutate = jest.fn();
-let queuedRecallResults: Array<Record<string, unknown>> = [];
+const mockRecallReset = jest.fn();
+const mockRecallState = { isPending: false };
+let queuedRecallResults: Array<Record<string, unknown> | 'defer' | Error> = [];
+// Holds the callbacks of the most recent mutate() call so a test can
+// fire them deferred — simulating a request that resolves AFTER the
+// user has pressed timeout-retry.
+let deferredCallbacks: {
+  onSuccess?: (value: Record<string, unknown>) => void;
+  onError?: (error: Error) => void;
+} | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -33,6 +43,10 @@ jest.mock(
   () => ({
     useSubmitRecallTest: () => ({
       mutate: mockRecallMutate,
+      reset: mockRecallReset,
+      get isPending() {
+        return mockRecallState.isPending;
+      },
     }),
   }),
 );
@@ -105,6 +119,8 @@ describe('RecallTestScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     queuedRecallResults = [];
+    deferredCallbacks = null;
+    mockRecallState.isPending = false;
     mockRecallMutate.mockImplementation(
       (
         _input: Record<string, unknown>,
@@ -114,6 +130,10 @@ describe('RecallTestScreen', () => {
         },
       ) => {
         const next = queuedRecallResults.shift();
+        if (next === 'defer') {
+          deferredCallbacks = options ?? null;
+          return;
+        }
         if (next instanceof Error) {
           options?.onError?.(next);
           return;
@@ -227,6 +247,86 @@ describe('RecallTestScreen', () => {
     await waitFor(() => {
       screen.getByText(/your memory of this is solid/);
     });
+  });
+
+  it('[BUG-680] shows timeout fallback when submission hangs past 30s', () => {
+    jest.useFakeTimers();
+    try {
+      mockRecallState.isPending = true;
+      render(<RecallTestScreen />);
+      act(() => {
+        jest.advanceTimersByTime(31_000);
+      });
+      screen.getByTestId('recall-test-timeout');
+      screen.getByTestId('recall-test-timeout-retry');
+      screen.getByTestId('recall-test-timeout-back');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[BUG-680] timeout retry clears the timeout state', () => {
+    jest.useFakeTimers();
+    try {
+      mockRecallState.isPending = true;
+      render(<RecallTestScreen />);
+      act(() => {
+        jest.advanceTimersByTime(31_000);
+      });
+      const retry = screen.getByTestId('recall-test-timeout-retry');
+      mockRecallState.isPending = false;
+      fireEvent.press(retry);
+      expect(screen.queryByTestId('recall-test-timeout')).toBeNull();
+      // Retry must also reset the mutation observer so a fresh send is
+      // allowed and TanStack state (data/error/status) is cleared.
+      expect(mockRecallReset).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[BUG-680 regression] late callbacks from the abandoned attempt do NOT mutate state after retry', async () => {
+    jest.useFakeTimers();
+    try {
+      // First mutate() is deferred — we capture its callbacks and fire them
+      // AFTER the user has pressed timeout-retry, simulating a late response
+      // from a hung request.
+      queuedRecallResults = ['defer' as unknown as Record<string, unknown>];
+      mockRecallState.isPending = true;
+      render(<RecallTestScreen />);
+
+      // Send a message — callbacks are captured but not invoked.
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+      expect(deferredCallbacks).not.toBeNull();
+      const userMessage = screen.getByText('I remember this topic well');
+      expect(userMessage).toBeTruthy();
+
+      // Surface the timeout, then press retry.
+      act(() => {
+        jest.advanceTimersByTime(31_000);
+      });
+      mockRecallState.isPending = false;
+      fireEvent.press(screen.getByTestId('recall-test-timeout-retry'));
+
+      // Now the abandoned request finally resolves (success).
+      act(() => {
+        deferredCallbacks?.onSuccess?.({
+          passed: true,
+          failureCount: 0,
+          masteryScore: 0.9,
+        });
+      });
+
+      // The success-path animateResponse would append an AI bubble and
+      // lock the input. Neither must happen because the submission is
+      // stale.
+      expect(screen.queryByText(/your memory of this is solid/)).toBeNull();
+      // mock-send-button only renders while input is not disabled — so its
+      // presence is proof input remained enabled.
+      expect(screen.getByTestId('mock-send-button')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shows error message and rolls back count on failure', async () => {

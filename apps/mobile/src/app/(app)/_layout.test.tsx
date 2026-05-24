@@ -182,7 +182,7 @@ const {
   resolveHomeTabPresentation,
   resolveShellVisibleTabs,
   resolveTabShape,
-} = require('./_layout');
+} = require('../../lib/legacy-navigation-contract');
 const { resolveNavigationContract } = require('../../lib/navigation-contract');
 
 describe('mode tab helpers', () => {

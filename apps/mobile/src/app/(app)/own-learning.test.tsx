@@ -23,8 +23,8 @@ jest.mock(
       activeProfile: mockActiveProfile,
       profiles: mockProfiles,
     }),
-    // resolveTabShape() pulls in isGuardianProfile through _layout — mirror
-    // the contract here so the screen's guard sees a stable shape.
+    // Keep the legacy family-capability branch stable without mounting the
+    // profile provider.
     isGuardianProfile: () => mockIsGuardianProfile,
     isFamilyCapableProfile: (
       profile: { isOwner: boolean } | null | undefined,
@@ -43,35 +43,6 @@ jest.mock(
   }),
 );
 
-// [BUG-135] Mock the (app) layout module so importing `resolveTabShape`
-// does not pull in the entire Tabs/Clerk module graph. The real export is a
-// pure function (activeProfile + profiles + isParentProxy → 'guardian' |
-// 'learner'); reproducing the contract here keeps the test focused on the
-// per-screen guard logic.
-jest.mock(
-  './_layout' /* gc1-allow: importing real layout pulls Tabs/Clerk native graph */,
-  () => {
-    const { isGuardianProfile } = require('../../lib/profile');
-    return {
-      resolveTabShape: ({
-        activeProfile,
-        profiles,
-        isParentProxy,
-      }: {
-        activeProfile: { isOwner: boolean } | null;
-        profiles: ReadonlyArray<{ isOwner: boolean }>;
-        isParentProxy: boolean;
-      }) => {
-        // Mirror real contract: unknown profile → 'learner' (CCR PR #215 / Bug 305)
-        if (!activeProfile) return 'learner';
-        if (isParentProxy) return 'learner';
-        if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
-        return 'learner';
-      },
-    };
-  },
-);
-
 // [BUG-135] Stub Redirect so we can assert the guard's redirect output.
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) => {
@@ -80,13 +51,16 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('../../lib/app-context' /* gc1-allow: screen guard test controls mode state without mounting AppContextProvider */, () => ({
-  useAppContext: () => ({
-    mode: 'study',
-    setMode: jest.fn(),
-    familyCapable: mockIsGuardianProfile,
+jest.mock(
+  '../../lib/app-context' /* gc1-allow: screen guard test controls mode state without mounting AppContextProvider */,
+  () => ({
+    useAppContext: () => ({
+      mode: 'study',
+      setMode: jest.fn(),
+      familyCapable: mockIsGuardianProfile,
+    }),
   }),
-}));
+);
 
 let capturedProps: Record<string, unknown> = {};
 

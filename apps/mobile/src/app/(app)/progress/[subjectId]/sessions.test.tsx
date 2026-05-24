@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { act, render, screen, fireEvent } from '@testing-library/react-native';
 
 import SubjectSessionsScreen from './sessions';
 
@@ -12,6 +12,10 @@ jest.mock('react-i18next', () => ({
         'progress.subjectSessions.untitledTopic': 'Untitled topic',
         'progress.subjectSessions.openSessionFrom':
           'Open session from {{date}}',
+        'progress.subjectSessions.loadingTooLong': 'Still loading…',
+        'progress.subjectSessions.loadingMessage':
+          'This is taking longer than usual.',
+        'recaps.emptyCtaStartSession': 'Start a session',
         'common.tryAgain': 'Try Again',
         'common.goBack': 'Go back',
       };
@@ -28,10 +32,18 @@ jest.mock('react-i18next', () => ({
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => false);
+const mockRouter = {
+  push: mockPush,
+  replace: mockReplace,
+  back: mockBack,
+  canGoBack: mockCanGoBack,
+};
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ subjectId: 's1' }),
-  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+  useRouter: () => mockRouter,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -50,10 +62,11 @@ jest.mock('react-native-safe-area-context', () => ({
 // i18next.t() which is initialised with the full en.json catalog in
 // test-setup.ts so it returns real English strings in every test worker.
 
+const mockGoBackOrReplace = jest.fn();
 jest.mock(
   '../../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
   () => ({
-    goBackOrReplace: jest.fn(),
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   }),
 );
 
@@ -106,7 +119,14 @@ describe('SubjectSessionsScreen', () => {
   beforeEach(() => {
     mockPush.mockClear();
     mockReplace.mockClear();
+    mockBack.mockClear();
+    mockGoBackOrReplace.mockClear();
+    mockCanGoBack.mockReturnValue(false);
     mockUseProgressInventory.mockReturnValue(INVENTORY);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('renders the loading skeleton while sessions load', () => {
@@ -132,6 +152,22 @@ describe('SubjectSessionsScreen', () => {
     render(<SubjectSessionsScreen />);
     screen.getByTestId('subject-sessions-empty');
     screen.getByText('No conversations yet');
+  });
+
+  it('[BUG-679] empty state exposes a Start-a-session CTA that routes home', () => {
+    mockUseSubjectSessions.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: [],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubjectSessionsScreen />);
+    const cta = screen.getByTestId('subject-sessions-empty-start');
+    fireEvent.press(cta);
+    // Tab-switch intent — replace, not push, so the home tab keeps its
+    // back-stack independent of the progress tab's deep route.
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('renders error state with retry that calls refetch', () => {
@@ -185,5 +221,98 @@ describe('SubjectSessionsScreen', () => {
     render(<SubjectSessionsScreen />);
     screen.getByText('Math');
     screen.getByText('Past conversations');
+  });
+
+  describe('navigation -- deep-link fallback (BUG-686)', () => {
+    it('[BUG-686] header back routes to subject parent, not tab root', () => {
+      mockUseSubjectSessions.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        data: [],
+        error: null,
+        refetch: jest.fn(),
+      });
+      render(<SubjectSessionsScreen />);
+      fireEvent.press(screen.getByTestId('subject-sessions-back'));
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        mockRouter,
+        '/(app)/progress/s1',
+      );
+    });
+
+    it('[BUG-686] error state Go Back routes to subject parent', () => {
+      mockUseSubjectSessions.mockReturnValue({
+        isLoading: false,
+        isError: true,
+        data: undefined,
+        error: new Error('boom'),
+        refetch: jest.fn(),
+      });
+      render(<SubjectSessionsScreen />);
+      fireEvent.press(screen.getByTestId('subject-sessions-error-back'));
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        mockRouter,
+        '/(app)/progress/s1',
+      );
+    });
+
+    it('[BUG-686] timeout state Go Back routes to subject parent', () => {
+      jest.useFakeTimers();
+      mockUseSubjectSessions.mockReturnValue({
+        isLoading: true,
+        isError: false,
+        data: undefined,
+        error: null,
+        refetch: jest.fn(),
+      });
+      render(<SubjectSessionsScreen />);
+      // Source threshold is 15_000ms; assert just past the boundary so the
+      // test pins the actual cutoff and a regression to a slower threshold
+      // (e.g. 20s) would fail here.
+      act(() => {
+        jest.advanceTimersByTime(15_001);
+      });
+      fireEvent.press(screen.getByTestId('subject-sessions-timeout-back'));
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        mockRouter,
+        '/(app)/progress/s1',
+      );
+    });
+
+    it('[BUG-686] timeout state Retry calls refetch and clears the timeout', () => {
+      jest.useFakeTimers();
+      const refetch = jest.fn();
+      mockUseSubjectSessions.mockReturnValue({
+        isLoading: true,
+        isError: false,
+        data: undefined,
+        error: null,
+        refetch,
+      });
+      render(<SubjectSessionsScreen />);
+      act(() => {
+        jest.advanceTimersByTime(15_001);
+      });
+      screen.getByTestId('subject-sessions-timeout');
+      fireEvent.press(screen.getByTestId('subject-sessions-timeout-retry'));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('[BUG-686] timeout does NOT fire below the 15s threshold', () => {
+      jest.useFakeTimers();
+      mockUseSubjectSessions.mockReturnValue({
+        isLoading: true,
+        isError: false,
+        data: undefined,
+        error: null,
+        refetch: jest.fn(),
+      });
+      render(<SubjectSessionsScreen />);
+      act(() => {
+        jest.advanceTimersByTime(14_999);
+      });
+      expect(screen.queryByTestId('subject-sessions-timeout')).toBeNull();
+      screen.getByTestId('subject-sessions-loading');
+    });
   });
 });

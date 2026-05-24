@@ -61,7 +61,7 @@ describe('TopicHeader', () => {
         lastStudiedText="Last studied 14 days ago"
       />,
     );
-    screen.getByText('Slipping after 14 days');
+    screen.getByText('Ready for a refresh after 14 days');
   });
 
   it('does not render RetentionPill when retentionStatus is null', () => {

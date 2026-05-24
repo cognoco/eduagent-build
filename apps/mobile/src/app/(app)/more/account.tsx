@@ -9,7 +9,6 @@ import {
   SectionHeader,
   SettingsRow,
 } from '../../../components/more/settings-rows';
-import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   i18next,
@@ -29,7 +28,6 @@ export default function AccountScreen(): React.ReactElement {
   const themeColors = useThemeColors();
   const { user } = useUser();
   const { activeProfile } = useProfile();
-  const role = useActiveProfileRole();
   const navigationContract = useNavigationContract();
   const { data: subscription } = useSubscription();
   const { t } = useTranslation();
@@ -76,11 +74,7 @@ export default function AccountScreen(): React.ReactElement {
           testID="more-row-profile"
         />
         <AccountSecurity
-          visible={
-            FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-              ? navigationContract.gates.showAccountSecurity
-              : (activeProfile?.isOwner ?? false)
-          }
+          visible={navigationContract.gates.showAccountSecurity}
         />
         {FEATURE_FLAGS.I18N_ENABLED ? (
           <SettingsRow
@@ -90,11 +84,7 @@ export default function AccountScreen(): React.ReactElement {
             testID="settings-app-language"
           />
         ) : null}
-        {(
-          FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-            ? navigationContract.gates.showBilling
-            : role === 'owner'
-        ) ? (
+        {navigationContract.gates.showBilling ? (
           <SettingsRow
             label={t('more.account.subscription')}
             value={

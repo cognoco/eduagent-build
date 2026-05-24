@@ -1093,7 +1093,9 @@
       "successPrompt": "Wróć do swojej Biblioteki, kiedy będziesz gotowy(-a).",
       "dontRemember": "Nie pamiętam",
       "stillStuck": "Nadal nie wiem",
-      "errorTitle": "Coś poszło nie tak"
+      "errorTitle": "Coś poszło nie tak",
+      "timeoutTitle": "Wciąż czekam…",
+      "timeoutMessage": "Wysłanie odpowiedzi trwa dłużej niż zwykle. Sprawdź połączenie i spróbuj ponownie."
     }
   },
   "subject": {
@@ -1707,8 +1709,8 @@
         "remembered_other": "Remembered after {{count}} days",
         "fading_one": "Getting fuzzy after {{count}} day",
         "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Slipping after {{count}} day",
-        "weak_other": "Slipping after {{count}} days",
+        "weak_one": "Ready for a refresh after {{count}} day",
+        "weak_other": "Ready for a refresh after {{count}} days",
         "forgotten_one": "Last seen {{count}} day ago",
         "forgotten_other": "Last seen {{count}} days ago"
       }

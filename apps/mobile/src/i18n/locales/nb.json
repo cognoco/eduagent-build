@@ -1068,7 +1068,9 @@
       "successPrompt": "Gå tilbake til biblioteket ditt når du er klar.",
       "dontRemember": "Jeg husker ikke",
       "stillStuck": "Sitter fortsatt fast",
-      "errorTitle": "Noe gikk galt"
+      "errorTitle": "Noe gikk galt",
+      "timeoutTitle": "Venter fortsatt…",
+      "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen."
     }
   },
   "subject": {
@@ -1682,8 +1684,8 @@
         "remembered_other": "Husket etter {{count}} dager",
         "fading_one": "Begynner å bli uklart etter {{count}} dag",
         "fading_other": "Begynner å bli uklart etter {{count}} dager",
-        "weak_one": "Glemmes etter {{count}} dag",
-        "weak_other": "Glemmes etter {{count}} dager",
+        "weak_one": "Klar for repetisjon etter {{count}} dag",
+        "weak_other": "Klar for repetisjon etter {{count}} dager",
         "forgotten_one": "Sist sett for {{count}} dag siden",
         "forgotten_other": "Sist sett for {{count}} dager siden"
       }

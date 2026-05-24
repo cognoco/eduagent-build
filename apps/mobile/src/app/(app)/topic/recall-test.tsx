@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -16,6 +16,7 @@ import { classifyApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 import { ErrorFallback } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useAppContext } from '../../../lib/app-context';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
@@ -44,6 +45,21 @@ export default function RecallTestScreen() {
   }>();
 
   const submitRecallTest = useSubmitRecallTest();
+  const { mode, setMode } = useAppContext();
+
+  // /library belongs to STUDY_TABS. V1 family-mode users would land outside
+  // their tab shape if we routed them there directly; auto-switch them to
+  // study mode first so the destination is in their navigation surface.
+  const goToLibrary = useCallback(() => {
+    if (mode === 'family') {
+      setMode('study', {
+        onSuccess: () => goBackOrReplace(router, '/(app)/library'),
+        onError: () => goBackOrReplace(router, '/(app)/library'),
+      });
+    } else {
+      goBackOrReplace(router, '/(app)/library');
+    }
+  }, [mode, router, setMode]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([OPENING_MESSAGE]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -53,8 +69,23 @@ export default function RecallTestScreen() {
     cooldownEndsAt?: string;
     retentionStatus: RetentionStatus;
   } | null>(null);
+  const [submissionTimedOut, setSubmissionTimedOut] = useState(false);
 
   const cleanupRef = useRef<(() => void) | null>(null);
+  // Token bumped whenever the user abandons an in-flight submission (timeout
+  // retry). Callbacks captured by an older mutate() check this before applying
+  // state so a late-arriving response cannot mutate the UI the user has
+  // already left behind.
+  const submissionTokenRef = useRef(0);
+
+  // Hard timeout: if a submission stays pending beyond 30s the network or
+  // backend is hung — surface an actionable timeout state so the user is
+  // never stuck waiting for a reply that never arrives.
+  useEffect(() => {
+    if (!submitRecallTest.isPending) return;
+    const timer = setTimeout(() => setSubmissionTimedOut(true), 30_000);
+    return () => clearTimeout(timer);
+  }, [submitRecallTest.isPending]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -68,10 +99,12 @@ export default function RecallTestScreen() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
+      const token = ++submissionTokenRef.current;
       submitRecallTest.mutate(
         { topicId, answer: text },
         {
           onSuccess: (result) => {
+            if (token !== submissionTokenRef.current) return;
             if (result.passed) {
               // Success — animate a congratulatory response
               cleanupRef.current = animateResponse(
@@ -108,6 +141,7 @@ export default function RecallTestScreen() {
             }
           },
           onError: (err: Error) => {
+            if (token !== submissionTokenRef.current) return;
             // UX-DE-L8: error is not an AI reply
             platformAlert(
               t('topic.recallTest.errorTitle'),
@@ -149,10 +183,12 @@ export default function RecallTestScreen() {
     };
     setMessages((prev) => [...prev, userMsg]);
 
+    const token = ++submissionTokenRef.current;
     submitRecallTest.mutate(
       { topicId, attemptMode: 'dont_remember' },
       {
         onSuccess: (result) => {
+          if (token !== submissionTokenRef.current) return;
           if (
             result.failureAction === 'redirect_to_library' ||
             nextCount >= 2
@@ -181,6 +217,7 @@ export default function RecallTestScreen() {
           );
         },
         onError: (err: Error) => {
+          if (token !== submissionTokenRef.current) return;
           setDontRememberCount((prev) => Math.max(prev - 1, 0));
           // UX-DE-L8: error is not an AI reply
           platformAlert(
@@ -200,9 +237,37 @@ export default function RecallTestScreen() {
         message={t('topic.recallTest.missingMessage')}
         primaryAction={{
           label: t('topic.recallTest.goToLibrary'),
-          onPress: () => goBackOrReplace(router, '/(app)/library'),
+          onPress: goToLibrary,
           testID: 'recall-test-missing-topic',
         }}
+      />
+    );
+  }
+
+  if (submissionTimedOut) {
+    return (
+      <ErrorFallback
+        variant="centered"
+        title={t('topic.recallTest.timeoutTitle')}
+        message={t('topic.recallTest.timeoutMessage')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => {
+            // Invalidate the hung submission so its late-arriving callbacks
+            // cannot mutate state after the user has dismissed the timeout
+            // screen and resumed typing.
+            submissionTokenRef.current += 1;
+            submitRecallTest.reset();
+            setSubmissionTimedOut(false);
+          },
+          testID: 'recall-test-timeout-retry',
+        }}
+        secondaryAction={{
+          label: t('topic.recallTest.goToLibrary'),
+          onPress: goToLibrary,
+          testID: 'recall-test-timeout-back',
+        }}
+        testID="recall-test-timeout"
       />
     );
   }
@@ -221,7 +286,7 @@ export default function RecallTestScreen() {
         {t('topic.recallTest.successPrompt')}
       </Text>
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(app)/library')}
+        onPress={goToLibrary}
         className="bg-primary rounded-button px-6 py-3 items-center"
         accessibilityRole="button"
         accessibilityLabel={t('topic.recallTest.goToLibrary')}

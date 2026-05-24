@@ -15,7 +15,9 @@ import type { Bookmark } from '@eduagent/schemas';
 import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 function formatRelativeDate(dateStr: string, t: Translate): string {
   const date = new Date(dateStr);
@@ -37,11 +39,11 @@ function formatRelativeDate(dateStr: string, t: Translate): string {
 function BookmarkRow({
   bookmark,
   onDelete,
-  isParentProxy,
+  canDelete,
 }: {
   bookmark: Bookmark;
   onDelete: (bookmark: Bookmark) => void;
-  isParentProxy: boolean;
+  canDelete: boolean;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -66,7 +68,7 @@ function BookmarkRow({
             {formatRelativeDate(bookmark.createdAt, t)}
           </Text>
         </View>
-        {!isParentProxy && (
+        {canDelete && (
           <Pressable
             onPress={() => onDelete(bookmark)}
             hitSlop={8}
@@ -109,7 +111,11 @@ export default function SavedBookmarksScreen() {
   const subjectId = Array.isArray(params.subjectId)
     ? params.subjectId[0]
     : params.subjectId;
-  const { isParentProxy } = useParentProxy();
+  const navigationContract = useNavigationContract();
+  const parentProxy = useParentProxy();
+  const canDelete = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showLearningActions
+    : !parentProxy.isParentProxy;
   const bookmarksQuery = useBookmarks({ subjectId });
   const deleteBookmark = useDeleteBookmark();
 
@@ -175,7 +181,7 @@ export default function SavedBookmarksScreen() {
           <BookmarkRow
             bookmark={item}
             onDelete={handleDelete}
-            isParentProxy={isParentProxy}
+            canDelete={canDelete}
           />
         )}
         contentContainerStyle={{

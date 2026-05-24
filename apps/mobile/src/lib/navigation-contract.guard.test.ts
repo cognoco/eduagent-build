@@ -13,7 +13,9 @@ const V0_RESOLVERS = new Set([
 const V0_RESOLVER_ALLOWED_FILES = new Set([
   'apps/mobile/src/app/(app)/_layout.tsx',
   'apps/mobile/src/app/(app)/own-learning.tsx',
+  'apps/mobile/src/hooks/use-navigation-contract.ts',
   'apps/mobile/src/lib/app-context.tsx',
+  'apps/mobile/src/lib/legacy-navigation-contract.ts',
   'apps/mobile/src/lib/navigation-contract.ts',
 ]);
 
@@ -34,7 +36,7 @@ function normalizePath(path: string): string {
 
 function allMobileSources(): string[] {
   const out = execSync(
-    'git ls-files "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
+    'git ls-files --cached --others --exclude-standard "apps/mobile/src/**/*.ts" "apps/mobile/src/**/*.tsx"',
     { cwd: repoRoot(), encoding: 'utf-8' },
   );
   return out

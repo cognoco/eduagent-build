@@ -88,8 +88,18 @@ jest.mock(
       },
       visibleTabs: new Set(['home', 'library', 'progress', 'more']),
       gates: {
-        showAddChild: mockActiveProfile?.isOwner === true,
-        showRemoveFamilyMember: mockActiveProfile?.isOwner === true,
+        // Mirror the real contract: showAddChild requires an adult owner
+        // (isAdultOwner) so minor owners and unknown birth years are gated
+        // out. Previously the screen called isAdultOwner directly; PR 3
+        // routes that decision through the contract gate, so this mock
+        // must encode the same rule.
+        showAddChild:
+          mockActiveProfile?.isOwner === true &&
+          typeof mockActiveProfile?.birthYear === 'number' &&
+          new Date().getFullYear() - mockActiveProfile.birthYear >= 18 &&
+          !mockIsParentProxy,
+        showRemoveFamilyMember:
+          mockActiveProfile?.isOwner === true && !mockIsParentProxy,
       },
       canEnter: jest.fn(() => true),
       isSurfaced: jest.fn(() => true),

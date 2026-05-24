@@ -1,8 +1,6 @@
 import type { Href, Router } from 'expo-router';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 
-import { useAppContext } from './app-context';
-
 export const FAMILY_HOME_PATH = '/(app)/home';
 export const LEARNER_HOME_RETURN_TO = 'learner-home';
 export const LEARNER_HOME_HREF = '/(app)/home';
@@ -127,24 +125,4 @@ export function pushLearningResumeTarget(
       ...(returnTo ? { returnTo } : {}),
     },
   } as Href);
-}
-
-export function useGuardFamilyRoute(): {
-  canRenderFamilyRoute: boolean;
-  mode: ReturnType<typeof useAppContext>['mode'];
-  familyCapable: boolean;
-} {
-  // [PARENT-03] This hook is READ-ONLY. It must NOT call setMode() or
-  // router.replace() as a side effect — doing so silently mutates the user's
-  // mode when they deep-link into a child route from Study context.
-  // The consumer (RequireFamilyContext) is responsible for rendering an
-  // explicit opt-in CTA when mode !== 'family' and familyCapable is true,
-  // or a protected fallback when familyCapable is false.
-  const { mode, familyCapable } = useAppContext();
-
-  return {
-    canRenderFamilyRoute: mode === 'family',
-    mode,
-    familyCapable,
-  };
 }

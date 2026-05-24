@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { RequireFamilyContext } from '../../../../components/guards/RequireFamilyContext';
 import { useThemeColors } from '../../../../lib/theme';
 
@@ -8,8 +8,15 @@ export const unstable_settings = { initialRouteName: 'index' };
 
 export default function ChildDetailLayout() {
   const colors = useThemeColors();
+  const { profileId: rawProfileId } = useLocalSearchParams<{
+    profileId?: string | string[];
+  }>();
+  const profileId = Array.isArray(rawProfileId)
+    ? rawProfileId[0]
+    : rawProfileId;
+
   return (
-    <RequireFamilyContext>
+    <RequireFamilyContext route="child/[profileId]" params={{ profileId }}>
       <Stack
         initialRouteName="index"
         screenOptions={{

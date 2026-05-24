@@ -16,8 +16,7 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
-import { useAppContext, type AppMode } from '../../lib/app-context';
-import { useProfile, isGuardianProfile } from '../../lib/profile';
+import { useProfile } from '../../lib/profile';
 import { computeAgeBracket, type Profile } from '@eduagent/schemas';
 import {
   useThemeColors,
@@ -51,15 +50,13 @@ import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
 import { goBackOrReplace } from '../../lib/navigation';
 import { track } from '../../lib/analytics';
 import { useSubjects } from '../../hooks/use-subjects';
-import { useParentProxy } from '../../hooks/use-parent-proxy';
 import {
   useActiveProfileRole,
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
-import { useNavigationContract } from '../../hooks/use-navigation-contract';
+import { useNavigationShellContract } from '../../hooks/use-navigation-contract';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
-import type { NavigationContract } from '../../lib/navigation-contract';
 import {
   getPreviewState,
   setPreviewState,
@@ -73,117 +70,6 @@ import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 
 initNotificationHandler();
-
-// ─── Tab visibility whitelist ────────────────────────────────────────
-// Only these routes render a visible tab button. Every other route in
-// (app)/ is auto-hidden — no manual Tabs.Screen entry required.
-//
-// Two navigation shapes:
-//   guardian — owner with linked children: all 5 tabs including own-learning
-//   learner — everyone else (solo owner OR child on parent account): 4 tabs
-//
-// Content INSIDE tabs (especially More) varies by isOwner and age — but
-// those are per-screen concerns, not tab-visibility concerns.
-const GUARDIAN_TABS: ReadonlySet<string> = new Set([
-  'home',
-  'own-learning',
-  'library',
-  'progress',
-  'more',
-]);
-
-const LEARNER_TABS: ReadonlySet<string> = new Set([
-  'home',
-  'library',
-  'progress',
-  'more',
-]);
-
-const PARENT_PROXY_TABS: ReadonlySet<string> = new Set([
-  'home',
-  'library',
-  'progress',
-]);
-
-const FAMILY_MODE_TABS: ReadonlySet<string> = new Set([
-  'home',
-  'progress',
-  'more',
-]);
-
-const STUDY_MODE_TABS: ReadonlySet<string> = new Set([
-  'home',
-  'library',
-  'progress',
-  'more',
-]);
-
-export type TabShape = 'guardian' | 'learner';
-
-export function resolveTabShape({
-  activeProfile,
-  profiles,
-  isParentProxy,
-}: {
-  activeProfile: { isOwner: boolean } | null | undefined;
-  profiles: ReadonlyArray<{ isOwner: boolean }>;
-  isParentProxy: boolean;
-}): TabShape {
-  // [CCR PR #215 / Bug 305] Default to 'learner' (4-tab least-privilege)
-  // when the profile is unknown or not yet loaded. The guardian shape
-  // surfaces the full 5-tab mentoring hub (own-learning); briefly showing
-  // that to a non-guardian leaks intent. A legitimate guardian seeing the
-  // learner shape for a render or two while the profile loads is harmless —
-  // the only difference is one extra tab appearing once data arrives.
-  if (!activeProfile) return 'learner';
-  if (isParentProxy) return 'learner';
-  if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
-  return 'learner';
-}
-
-export function computeVisibleTabs(
-  shape: TabShape = 'guardian',
-  isParentProxy = false,
-): Set<string> {
-  if (isParentProxy) return new Set(PARENT_PROXY_TABS);
-
-  switch (shape) {
-    case 'guardian':
-      return new Set(GUARDIAN_TABS);
-    case 'learner':
-      return new Set(LEARNER_TABS);
-  }
-}
-
-export function computeModeVisibleTabs(mode: AppMode | null): Set<string> {
-  if (mode === 'family') return new Set(FAMILY_MODE_TABS);
-  if (mode === 'study') return new Set(STUDY_MODE_TABS);
-  return new Set();
-}
-
-export function resolveHomeTabPresentation(
-  shape: TabShape,
-  isParentProxy = false,
-  mode: AppMode | null = null,
-): {
-  titleKey: 'tabs.familyHub' | 'tabs.myLearning';
-  accessibilityLabelKey: 'tabs.familyHubLabel' | 'tabs.myLearningLabel';
-  iconName: 'Home' | 'School';
-} {
-  if (!isParentProxy && mode === 'family') {
-    return {
-      titleKey: 'tabs.familyHub',
-      accessibilityLabelKey: 'tabs.familyHubLabel',
-      iconName: 'Home',
-    };
-  }
-
-  return {
-    titleKey: 'tabs.myLearning',
-    accessibilityLabelKey: 'tabs.myLearningLabel',
-    iconName: 'School',
-  };
-}
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
 const FULL_SCREEN_ROUTES = new Set([
@@ -215,54 +101,6 @@ const iconMap: Record<
   Users: { focused: 'people', default: 'people-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
-
-type HomeTabPresentation = {
-  titleKey: 'tabs.children' | 'tabs.familyHub' | 'tabs.myLearning';
-  accessibilityLabelKey:
-    | 'tabs.childrenLabel'
-    | 'tabs.familyHubLabel'
-    | 'tabs.myLearningLabel';
-  iconName: 'Home' | 'School' | 'Users';
-};
-
-export function resolveContractHomeTabPresentation(
-  home: NavigationContract['home'],
-): HomeTabPresentation {
-  if (home.screen === 'FamilyHome') {
-    return {
-      titleKey: 'tabs.children',
-      accessibilityLabelKey: 'tabs.childrenLabel',
-      iconName: home.iconName,
-    };
-  }
-
-  return {
-    titleKey: 'tabs.myLearning',
-    accessibilityLabelKey: 'tabs.myLearningLabel',
-    iconName: home.iconName,
-  };
-}
-
-export function resolveShellVisibleTabs({
-  familyCapable,
-  isParentProxy,
-  mode,
-  navigationContract,
-  tabShape,
-  useContract,
-}: {
-  familyCapable: boolean;
-  isParentProxy: boolean;
-  mode: AppMode | null;
-  navigationContract: Pick<NavigationContract, 'visibleTabs'>;
-  tabShape: TabShape;
-  useContract: boolean;
-}): Set<string> {
-  if (useContract) return new Set(navigationContract.visibleTabs);
-  if (isParentProxy) return computeVisibleTabs(tabShape, true);
-  if (familyCapable && mode !== null) return computeModeVisibleTabs(mode);
-  return computeVisibleTabs(tabShape, false);
-}
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const colors = useThemeColors();
@@ -2118,31 +1956,12 @@ export default function AppLayout() {
     switchProfile,
   } = useProfile();
   useMentorLanguageSync();
-  const { isParentProxy, childProfile, parentProfile } = useParentProxy();
-  const { mode, familyCapable } = useAppContext();
   const proxyColors = getProxyChromeColors(colors);
   const role = useActiveProfileRole();
-  const navigationContract = useNavigationContract();
-  const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
-  const visibleTabs = React.useMemo(
-    () =>
-      resolveShellVisibleTabs({
-        familyCapable,
-        isParentProxy,
-        mode,
-        navigationContract,
-        tabShape,
-        useContract: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
-      }),
-    [familyCapable, isParentProxy, mode, navigationContract, tabShape],
-  );
-  const homeTabPresentation = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? resolveContractHomeTabPresentation(navigationContract.home)
-    : resolveHomeTabPresentation(
-        tabShape,
-        isParentProxy,
-        familyCapable ? mode : null,
-      );
+  const navigationShell = useNavigationShellContract();
+  const visibleTabs = navigationShell.visibleTabs;
+  const homeTabPresentation = navigationShell.homeTabPresentation;
+  const isProxyChromeActive = navigationShell.proxy.active;
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -2538,13 +2357,21 @@ export default function AppLayout() {
     );
   }
 
+  const proxyBanner =
+    navigationShell.proxy.active && navigationShell.proxy.parentProfileId
+      ? {
+          childName: navigationShell.proxy.childName,
+          parentProfileId: navigationShell.proxy.parentProfileId,
+        }
+      : null;
+
   return (
     <FeedbackProvider>
       <View style={[{ flex: 1 }, tokenVars]}>
-        {isParentProxy && parentProfile && (
+        {proxyBanner && (
           <ProxyBanner
-            childName={childProfile?.displayName ?? ''}
-            onSwitchBack={() => void switchProfile(parentProfile.id)}
+            childName={proxyBanner.childName}
+            onSwitchBack={() => void switchProfile(proxyBanner.parentProfileId)}
           />
         )}
         <ModeSwitcher />
@@ -2567,7 +2394,7 @@ export default function AppLayout() {
               // An opaque sceneStyle prevents the previous tab from bleeding
               // through when switching to a full-screen route (session, quiz, etc.).
               sceneStyle: {
-                backgroundColor: isParentProxy
+                backgroundColor: isProxyChromeActive
                   ? proxyColors.sceneBackground
                   : colors.background,
               },
@@ -2582,13 +2409,13 @@ export default function AppLayout() {
                     overflow: 'hidden' as const,
                   }
                 : {
-                    backgroundColor: isParentProxy
+                    backgroundColor: isProxyChromeActive
                       ? proxyColors.tabBackground
                       : colors.surface,
-                    borderTopColor: isParentProxy
+                    borderTopColor: isProxyChromeActive
                       ? proxyColors.border
                       : colors.border,
-                    borderTopWidth: isParentProxy ? 2 : 1,
+                    borderTopWidth: isProxyChromeActive ? 2 : 1,
                     height: 56 + Math.max(insets.bottom, 24),
                     paddingBottom: Math.max(insets.bottom, 24),
                   },

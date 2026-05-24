@@ -27,6 +27,7 @@ jest.mock('expo-router', () => {
   return {
     Stack: MockStack,
     useRouter: () => ({ replace: jest.fn() }),
+    useLocalSearchParams: () => ({ profileId: 'test-profile-id' }),
   };
 });
 
