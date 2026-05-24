@@ -195,34 +195,12 @@ const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
     },
   },
   {
-    file: 'apps/mobile/src/app/(app)/progress/saved.tsx',
-    category: 'v0-fallback',
-    reason:
-      'V0-fallback: saved progress gates the delete action through contract.gates.showLearningActions in V1 and reads raw proxy state only in the legacy branch.',
-    expectedFindings: {
-      'proxy-state-read': 1,
-      'raw-hook-call': 1,
-      'raw-hook-import': 1,
-    },
-  },
-  {
     file: 'apps/mobile/src/app/profiles.tsx',
     category: 'v0-fallback',
     reason:
       'V0-fallback: profile switcher resets legacy app context and still needs owner/child profile filtering until V0 is retired.',
     expectedFindings: {
       'profile-owner-read': 4,
-      'raw-hook-call': 1,
-      'raw-hook-import': 1,
-    },
-  },
-  {
-    file: 'apps/mobile/src/app/session-summary/[sessionId].tsx',
-    category: 'v0-fallback',
-    reason:
-      'V0-fallback: session summary still reads raw proxy state for retained legacy proxy summaries outside the V1 review path.',
-    expectedFindings: {
-      'proxy-state-read': 5,
       'raw-hook-call': 1,
       'raw-hook-import': 1,
     },

@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react-native';
 import { useProgressInventory } from '../../../hooks/use-progress';
 import VocabularyBrowserScreen from './vocabulary';
 
+const mockReplace = jest.fn();
+const mockUseNavigationContract = jest.fn(() => ({
+  canEnter: jest.fn<boolean, [string]>(() => true),
+}));
+
 jest.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: jest.fn() },
   useTranslation: () => ({
@@ -52,8 +57,14 @@ jest.mock('../../../hooks/use-progress', () => ({
   useProgressInventory: jest.fn(),
 }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: mockReplace }),
 }));
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: hook depends on full app provider tree; stub pins canEnter for deterministic tests */,
+  () => ({
+    useNavigationContract: () => mockUseNavigationContract(),
+  }),
+);
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
@@ -101,11 +112,26 @@ const mockInventory = {
 
 describe('VocabularyBrowserScreen', () => {
   beforeEach(() => {
+    mockReplace.mockClear();
+    mockUseNavigationContract.mockReturnValue({
+      canEnter: jest.fn<boolean, [string]>(() => true),
+    });
     (useProgressInventory as jest.Mock).mockReturnValue({
       data: mockInventory,
       isLoading: false,
       isError: false,
     });
+  });
+
+  it('redirects to /(app)/progress when contract.canEnter("progress/vocabulary") is false', () => {
+    const canEnterFalse = jest.fn<boolean, [string]>(
+      (route) => route !== 'progress/vocabulary',
+    );
+    mockUseNavigationContract.mockReturnValue({
+      canEnter: canEnterFalse,
+    });
+    render(<VocabularyBrowserScreen />);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
   });
 
   it('renders subject section and CEFR breakdown', () => {

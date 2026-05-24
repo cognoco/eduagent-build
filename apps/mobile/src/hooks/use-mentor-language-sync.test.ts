@@ -103,4 +103,20 @@ describe('useMentorLanguageSync', () => {
     // Give any async effects a chance to settle.
     await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
   });
+
+  it('[B-599] syncs newly active profile even when app language has not changed (profile-switch regression)', async () => {
+    // Profile A: conversationLanguage='en', app language nb -> sync fires.
+    await i18next.changeLanguage('nb');
+    mockActiveProfile = { id: 'p1', conversationLanguage: 'en' };
+    const { rerender } = renderHook(() => useMentorLanguageSync());
+    await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+
+    // Switch to profile B with the same gap (still en convo lang, app lang
+    // still nb). Pre-fix code keyed lastSyncedRef by language only, so the
+    // 'nb === nb' guard would suppress the second mutate. Post-fix, the key
+    // is (profileId, language), so the switch must re-trigger sync for B.
+    mockActiveProfile = { id: 'p2', conversationLanguage: 'en' };
+    rerender(undefined);
+    await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(2));
+  });
 });

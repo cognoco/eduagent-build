@@ -16,8 +16,6 @@ import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
-import { useParentProxy } from '../../../hooks/use-parent-proxy';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 function formatRelativeDate(dateStr: string, t: Translate): string {
   const date = new Date(dateStr);
@@ -112,10 +110,7 @@ export default function SavedBookmarksScreen() {
     ? params.subjectId[0]
     : params.subjectId;
   const navigationContract = useNavigationContract();
-  const parentProxy = useParentProxy();
-  const canDelete = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? navigationContract.gates.showLearningActions
-    : !parentProxy.isParentProxy;
+  const canDelete = navigationContract.gates.showLearningActions;
   const bookmarksQuery = useBookmarks({ subjectId });
   const deleteBookmark = useDeleteBookmark();
 

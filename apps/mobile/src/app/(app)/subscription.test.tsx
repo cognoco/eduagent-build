@@ -1836,6 +1836,31 @@ describe('SubscriptionScreen', () => {
         screen.getByText('You learned 1 topic and earned 50 XP — great work!'),
       ).toBeTruthy();
     });
+
+    it('[B-607] paywall strings flow through i18n (childPaywall + restore + byokWaitlist namespaces)', () => {
+      // Locale-key presence regression guard for B-607. If any of these key
+      // paths get deleted or renamed, this test fails immediately rather than
+      // letting non-EN locales silently fall back to key strings or English.
+      // The rendered-string assertions above (e.g. "You've been exploring..."
+      // at line ~1776) already validate runtime i18n; this guard makes the
+      // locale dependency explicit so a future contributor sees the contract.
+      const enJson = jest.requireActual('../../i18n/locales/en.json');
+      expect(enJson.subscription.childPaywall.greatStart).toBe(
+        "You've been exploring and learning — great start!",
+      );
+      expect(enJson.subscription.childPaywall.notifyButton).toBe(
+        'Notify My Parent',
+      );
+      expect(enJson.subscription.restore.button).toBe('Restore Purchases');
+      expect(enJson.subscription.byokWaitlist).toBeDefined();
+      // All 7 locales must define the namespaces.
+      for (const loc of ['de', 'es', 'ja', 'nb', 'pl', 'pt']) {
+        const j = jest.requireActual(`../../i18n/locales/${loc}.json`);
+        expect(j.subscription.childPaywall).toBeDefined();
+        expect(j.subscription.restore).toBeDefined();
+        expect(j.subscription.byokWaitlist).toBeDefined();
+      }
+    });
   });
 
   // ---------------------------------------------------------------------------
