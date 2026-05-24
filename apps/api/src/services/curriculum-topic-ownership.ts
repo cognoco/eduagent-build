@@ -12,6 +12,7 @@ export interface OwnedCurriculumTopic {
   topicId: string;
   topicTitle: string;
   topicDescription: string | null;
+  topicChapter: string | null;
   bookId: string;
   bookTitle: string;
   curriculumId: string;
@@ -35,6 +36,7 @@ export async function findOwnedCurriculumTopic(
       topicId: curriculumTopics.id,
       topicTitle: curriculumTopics.title,
       topicDescription: curriculumTopics.description,
+      topicChapter: curriculumTopics.chapter,
       bookId: curriculumBooks.id,
       bookTitle: curriculumBooks.title,
       curriculumId: curriculumTopics.curriculumId,
@@ -75,6 +77,7 @@ export async function findOwnedCurriculumTopics(
       topicId: curriculumTopics.id,
       topicTitle: curriculumTopics.title,
       topicDescription: curriculumTopics.description,
+      topicChapter: curriculumTopics.chapter,
       bookId: curriculumBooks.id,
       bookTitle: curriculumBooks.title,
       curriculumId: curriculumTopics.curriculumId,

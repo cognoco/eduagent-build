@@ -102,7 +102,7 @@ async function seedSession(
     profileId: string;
     subjectId: string;
     topicId?: string | null;
-    sessionType?: 'learning' | 'interleaved';
+    sessionType?: 'learning' | 'homework' | 'interleaved';
     metadata?: Record<string, unknown>;
   },
 ): Promise<string> {
@@ -243,5 +243,26 @@ describeIfDb('prepareExchangeContext WI-80 ownership hardening', () => {
     expect(prep.context.learnerMemoryContext).toContain(
       'Foreign Strong Memory Topic',
     );
+  });
+
+  it('[WI-80] suppresses homework library context when the session subject is stale and foreign', async () => {
+    const own = await seedProfileWithSubject(db, 'Own Homework');
+    const foreign = await seedProfileWithSubject(db, 'Private Homework');
+    await seedTopic(db, {
+      subjectId: foreign.subjectId,
+      title: 'Foreign Homework Library Topic',
+    });
+    const sessionId = await seedSession(db, {
+      profileId: own.profileId,
+      subjectId: foreign.subjectId,
+      sessionType: 'homework',
+    });
+
+    const prep = await prepare(db, own.profileId, sessionId);
+
+    expect(JSON.stringify(prep.context)).not.toContain(
+      'Foreign Homework Library Topic',
+    );
+    expect(prep.context.learningHistoryContext).toBeUndefined();
   });
 });

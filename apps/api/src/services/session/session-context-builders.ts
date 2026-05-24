@@ -17,7 +17,10 @@ import {
 } from '@eduagent/database';
 import { escapeXml, sanitizeXmlValue } from '../llm/sanitize';
 import { projectAiResponseContent } from '../llm/project-response';
-import { findOwnedCurriculumTopic } from '../curriculum-topic-ownership';
+import {
+  findOwnedCurriculumTopic,
+  findOwnedCurriculumTopics,
+} from '../curriculum-topic-ownership';
 
 // ---------------------------------------------------------------------------
 // FR210: Active time computation (internal analytics)
@@ -353,8 +356,14 @@ export async function buildBookLearningHistoryContext(
 
 export async function buildHomeworkLibraryContext(
   db: Database,
+  profileId: string,
   subjectId: string,
 ): Promise<string | undefined> {
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+  });
+  if (!subject) return undefined;
+
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
     orderBy: desc(curricula.version),
@@ -366,10 +375,20 @@ export async function buildHomeworkLibraryContext(
     orderBy: asc(curriculumTopics.sortOrder),
   });
   if (topics.length === 0) return undefined;
+  const ownedTopics = await findOwnedCurriculumTopics(db, {
+    profileId,
+    subjectId,
+    topicIds: topics.map((topic) => topic.id),
+  });
+  const ownedById = new Map(ownedTopics.map((topic) => [topic.topicId, topic]));
+  const orderedOwnedTopics = topics
+    .map((topic) => ownedById.get(topic.id))
+    .filter((topic): topic is NonNullable<typeof topic> => Boolean(topic));
+  if (orderedOwnedTopics.length === 0) return undefined;
 
   return [
     "Topics already in the learner's Library for this subject:",
-    ...topics.slice(0, 12).map((topic) => `- ${topic.title}`),
+    ...orderedOwnedTopics.slice(0, 12).map((topic) => `- ${topic.topicTitle}`),
     'When useful, connect the homework to these topics naturally.',
   ].join('\n');
 }
