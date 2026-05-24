@@ -4,7 +4,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, PRACTICE_HREF } from '../../../lib/navigation';
 import { useGenerateDictation } from '../../../hooks/use-dictation-api';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
@@ -100,7 +100,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
         <Pressable
           onPress={() => {
             generateCancelledRef.current = true; // [BUG-692]
-            goBackOrReplace(router, '/(app)/practice');
+            goBackOrReplace(router, PRACTICE_HREF as Href);
           }}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
