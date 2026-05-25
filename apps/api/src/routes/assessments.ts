@@ -27,6 +27,7 @@ import {
   buildNeedsReviewEvaluation,
   resolveAssessmentStatus,
   shouldEndAssessmentForReview,
+  lockAssessmentForAnswerSubmission,
 } from '../services/assessments';
 import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
@@ -96,6 +97,10 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
 
+      // Non-transactional pre-fetch — used only for the app-help branch and
+      // the topic context fetch (both read-only). The authoritative read +
+      // terminal-state check + LLM + UPDATE is serialized below under
+      // db.transaction with SELECT ... FOR UPDATE.
       const assessment = await getAssessment(db, profileId, assessmentId);
       if (!assessment) return notFound(c, 'Assessment not found');
 
@@ -118,52 +123,83 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         profileId,
       );
 
-      const forceReview = shouldEndAssessmentForReview(
-        answer,
-        assessment.exchangeHistory,
-      );
-      const evaluation = forceReview
-        ? buildNeedsReviewEvaluation()
-        : await evaluateAssessmentAnswer(
-            {
-              ...topicContext,
-              currentDepth: assessment.verificationDepth,
-              exchangeHistory: assessment.exchangeHistory,
-            },
-            answer,
-            // [WI-136] Service-level terminal-replay guard. If the
-            // assessment is already in a terminal state, this throws
-            // ConflictError → 409 BEFORE the LLM call. Prevents quota
-            // re-billing and downstream retention/XP corruption.
-            { assessmentStatus: assessment.status },
-          );
-
-      const updatedHistory = [
-        ...assessment.exchangeHistory,
-        { role: 'user' as const, content: answer },
-        { role: 'assistant' as const, content: evaluation.feedback },
-      ];
-
-      const answerCount = countLearnerAnswers(updatedHistory);
-      const newStatus = resolveAssessmentStatus({
+      // [WI-136 H4] Concurrent-submission lock. Two near-simultaneous
+      // POSTs would otherwise both pass the non-transactional terminal
+      // check, both call the LLM, and both UPDATE. Wrapping the
+      // critical section in a tx + SELECT ... FOR UPDATE serializes
+      // them: the loser blocks at the SELECT, observes the winner's
+      // terminal-state UPDATE, and exits with 409. Holding the lock
+      // during the LLM call is the explicit trade-off (see
+      // lockAssessmentForAnswerSubmission jsdoc for rationale).
+      const {
+        snapshot: lockedAssessment,
         evaluation,
-        answerCount,
+        updated: updatedAssessment,
+        newStatus,
+        updatedHistory,
         forceReview,
-      });
+      } = await db.transaction(async (tx) => {
+        const txDb = tx as unknown as Database;
+        const snapshot = await lockAssessmentForAnswerSubmission(
+          txDb,
+          profileId,
+          assessmentId,
+        );
 
-      const updatedAssessment = await updateAssessment(
-        db,
-        profileId,
-        assessmentId,
-        {
-          verificationDepth:
-            evaluation.nextDepth ?? assessment.verificationDepth,
+        const forceReview = shouldEndAssessmentForReview(
+          answer,
+          snapshot.exchangeHistory,
+        );
+        const evaluation = forceReview
+          ? buildNeedsReviewEvaluation()
+          : await evaluateAssessmentAnswer(
+              {
+                ...topicContext,
+                currentDepth: snapshot.verificationDepth,
+                exchangeHistory: snapshot.exchangeHistory,
+              },
+              answer,
+              // Terminal-replay guard is now enforced upstream by
+              // lockAssessmentForAnswerSubmission under FOR UPDATE — pass
+              // the snapshot's status for defense-in-depth in case the
+              // service signature drifts.
+              { assessmentStatus: snapshot.status },
+            );
+
+        const updatedHistory = [
+          ...snapshot.exchangeHistory,
+          { role: 'user' as const, content: answer },
+          { role: 'assistant' as const, content: evaluation.feedback },
+        ];
+
+        const answerCount = countLearnerAnswers(updatedHistory);
+        const newStatus = resolveAssessmentStatus({
+          evaluation,
+          answerCount,
+          forceReview,
+        });
+
+        const updated = await updateAssessment(txDb, profileId, assessmentId, {
+          verificationDepth: evaluation.nextDepth ?? snapshot.verificationDepth,
           status: newStatus,
           masteryScore: evaluation.masteryScore,
           qualityRating: evaluation.qualityRating,
           exchangeHistory: updatedHistory,
-        },
-      );
+        });
+
+        return {
+          snapshot,
+          evaluation,
+          updated,
+          newStatus,
+          updatedHistory,
+          forceReview,
+        };
+      });
+      // Alias for downstream code that read `assessment.*` after the update.
+      // The post-tx code uses snapshot for assessment.topicId / subjectId etc.
+      void lockedAssessment;
+      void updatedHistory;
 
       // Wire terminal standalone assessments into the retention lifecycle.
       // Retention uses the same aggregate mastery signal as the pass gate.

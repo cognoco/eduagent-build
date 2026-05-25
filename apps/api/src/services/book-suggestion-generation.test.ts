@@ -147,13 +147,32 @@ function makeTx(opts: {
   };
   const updateMock = jest.fn().mockReturnValue(updateChain);
 
-  const insertChain = insertRejects
-    ? {
-        values: jest
-          .fn<() => Promise<never>>()
-          .mockRejectedValue(insertRejects),
-      }
-    : { values: jest.fn<() => Promise<void>>().mockResolvedValue(undefined) };
+  // [WI-77 M3] Insert chain now supports per-row
+  //   tx.insert(table).values(row).onConflictDoNothing().returning({ id })
+  // shape. The legacy bulk insert returning a Promise from `.values(rows)`
+  // is no longer used. `values()` synchronously returns the builder, which
+  // exposes `onConflictDoNothing()` -> the same builder, which exposes
+  // `returning()` -> a Promise of inserted rows (default: one stub id).
+  const returningMock = insertRejects
+    ? jest
+        .fn<() => Promise<Array<{ id: string }>>>()
+        .mockRejectedValue(insertRejects)
+    : jest
+        .fn<() => Promise<Array<{ id: string }>>>()
+        .mockResolvedValue([{ id: 'stub-suggestion-id' }]);
+  const onConflictDoNothingMock = jest.fn().mockReturnValue({
+    returning: returningMock,
+  });
+  const valuesMock = jest.fn().mockReturnValue({
+    onConflictDoNothing: onConflictDoNothingMock,
+    // Legacy callers awaiting `values(...)` directly are gone; this Promise
+    // shape stays around as a soft fallback for any edge case.
+    then: ((onFulfilled?: ((value: void) => unknown) | null) =>
+      Promise.resolve(undefined).then(
+        onFulfilled,
+      )) as PromiseLike<void>['then'],
+  });
+  const insertChain = { values: valuesMock };
   const insertMock = jest.fn().mockReturnValue(insertChain);
 
   const executeMock = jest
@@ -311,10 +330,11 @@ describe('generateCategorizedBookSuggestions', () => {
           }),
         ]),
       );
-      expect(mocks.insertValues).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ title: 'Travel Conversations' }),
-        ]),
+      const insertedRows = mocks.insertValues.mock.calls.map(
+        (call) => call[0] as { title: string },
+      );
+      expect(insertedRows.map((r) => r.title)).toContain(
+        'Travel Conversations',
       );
     });
 
@@ -503,20 +523,15 @@ describe('generateCategorizedBookSuggestions', () => {
       // Cool-down stamp must come before LLM call
       expect(callOrder.indexOf('stamp')).toBeLessThan(callOrder.indexOf('llm'));
 
-      // All 4 suggestions inserted
-      expect(mocks.insertValues).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ title: 'Book A', category: 'related' }),
-          expect.objectContaining({ title: 'Book B', category: 'related' }),
-          expect.objectContaining({ title: 'Book C', category: 'explore' }),
-          expect.objectContaining({ title: 'Book D', category: 'explore' }),
-        ]),
+      // All 4 suggestions inserted — [WI-77 M3] per-row inserts, one call each.
+      const insertedRows = mocks.insertValues.mock.calls.map(
+        (call) =>
+          call[0] as { title: string; category: string; subjectId: string },
       );
-      expect(mocks.insertValues).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ subjectId: SUBJECT_ID }),
-        ]),
+      expect(insertedRows.map((r) => r.title)).toEqual(
+        expect.arrayContaining(['Book A', 'Book B', 'Book C', 'Book D']),
       );
+      expect(insertedRows.every((r) => r.subjectId === SUBJECT_ID)).toBe(true);
     });
 
     it('calls routeAndCall with the expected message shape', async () => {
@@ -571,7 +586,10 @@ describe('generateCategorizedBookSuggestions', () => {
       expect(retryMessages[retryMessages.length - 1]?.content).toContain(
         'previous response failed validation',
       );
-      expect(mocks.insertValues).toHaveBeenCalledWith(
+      const insertedRows = mocks.insertValues.mock.calls.map(
+        (call) => call[0] as { title: string; description: string },
+      );
+      expect(insertedRows).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             title: 'Evidence and Causes',
@@ -742,17 +760,15 @@ describe('generateCategorizedBookSuggestions', () => {
 
       await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
 
-      // Only the 2 non-duplicate suggestions should be inserted
-      expect(mocks.insertValues).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ title: 'Greek Mythology' }),
-          expect.objectContaining({ title: 'Medieval Knights' }),
-        ]),
+      // Only the 2 non-duplicate suggestions should be inserted — [WI-77 M3]
+      // per-row insertion means one insertValues call per row.
+      const insertedTitles = mocks.insertValues.mock.calls.map(
+        (call) => (call[0] as { title: string }).title,
       );
-      const insertedTitles = (
-        mocks.insertValues.mock.calls[0]! as Array<Array<{ title: string }>>
-      )[0]!.map((s) => s.title);
       expect(insertedTitles).toHaveLength(2);
+      expect(insertedTitles).toEqual(
+        expect.arrayContaining(['Greek Mythology', 'Medieval Knights']),
+      );
       expect(insertedTitles).not.toContain('Ancient History Guide');
       expect(insertedTitles).not.toContain('Roman Empire Overview');
     });
@@ -791,11 +807,66 @@ describe('generateCategorizedBookSuggestions', () => {
 
       await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
 
-      const insertedTitles = (
-        mocks.insertValues.mock.calls[0]! as Array<Array<{ title: string }>>
-      )[0]!.map((s) => s.title);
+      const insertedTitles = mocks.insertValues.mock.calls.map(
+        (call) => (call[0] as { title: string }).title,
+      );
       expect(insertedTitles).not.toContain('Ancient Rome History');
       expect(insertedTitles).toContain('Brand New Topic Here');
+    });
+
+    // [WI-77 M3] Per-row insert with onConflictDoNothing: when a colliding
+    // row appears alongside non-colliding rows, the previous bulk-insert
+    // would drop the entire batch. The per-row pattern inserts the
+    // non-colliders and silently skips the collider.
+    it('[WI-77 M3] continues inserting non-colliding rows when one row hits a unique constraint', async () => {
+      const subject = makeSubject();
+      routeAndCallMock.mockResolvedValue(
+        makeLlmResult([
+          makeSuggestion('Already In DB'),
+          makeSuggestion('Brand New One'),
+          makeSuggestion('Brand New Two'),
+          makeSuggestion('Brand New Three'),
+        ]),
+      );
+
+      const { tx, mocks } = makeTx({});
+      // Simulate the first insert hitting onConflictDoNothing (returns []),
+      // the rest succeed (returns [{id}]).
+      const returningMockA = jest
+        .fn<() => Promise<Array<{ id: string }>>>()
+        .mockResolvedValueOnce([]) // collided -> no rows returned
+        .mockResolvedValueOnce([{ id: 'b' }])
+        .mockResolvedValueOnce([{ id: 'c' }])
+        .mockResolvedValueOnce([{ id: 'd' }]);
+      const onConflictMock = jest
+        .fn()
+        .mockReturnValue({ returning: returningMockA });
+      // Re-wire the values mock to use the per-call returning mock.
+      (mocks.insertValues as jest.Mock).mockReturnValue({
+        onConflictDoNothing: onConflictMock,
+        then: ((onFulfilled?: (v: void) => unknown) =>
+          Promise.resolve(undefined).then(
+            onFulfilled,
+          )) as PromiseLike<void>['then'],
+      });
+
+      const { db } = makeDb(subject, async (cb) => cb(tx));
+
+      const result = await generateCategorizedBookSuggestions(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+      );
+
+      // Result is still 'success' — the LLM call legitimately ran, dedup
+      // contract was met (the collider already exists), and 3 new rows
+      // landed.
+      expect(result).toBe('success');
+      // All 4 values() calls fired (one per candidate row); each was followed
+      // by onConflictDoNothing(). The legacy bulk-insert would have made
+      // exactly one .values() call with an array.
+      expect((mocks.insertValues as jest.Mock).mock.calls).toHaveLength(4);
+      expect(onConflictMock).toHaveBeenCalledTimes(4);
     });
   });
 });

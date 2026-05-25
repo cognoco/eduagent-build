@@ -191,6 +191,12 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       );
     }),
     async (c) => {
+      // [WI-150/WI-206 precedence] zod's schema cap (max 50 sentences, max
+      // 500 chars per sentence/withPunctuation) fires first → 400
+      // VALIDATION_ERROR. The aggregate prompt-character budget below
+      // (DICTATION_REVIEW_MAX_PROMPT_CHARS, currently 12_000 total) fires
+      // only on requests that pass schema validation → 413 PAYLOAD_TOO_LARGE.
+      // Clients switching UX on status code should handle both.
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const input = c.req.valid('json');

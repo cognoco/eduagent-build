@@ -270,21 +270,57 @@ export async function extractAndStoreHomeworkSummary(
 
   const summary = await extractHomeworkSummary(db, profileId, sessionId);
 
-  await db
-    .update(learningSessions)
-    .set({
-      metadata: {
-        ...existingMetadata,
-        homeworkSummary: summary,
-      },
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-      ),
-    );
+  // [WI-216 H2] TOCTOU fix — the pre-LLM check above can race with a
+  // concurrent invocation for the same session. Two callers may both see
+  // `homeworkSummary == null`, both call the LLM, then both UPDATE. The
+  // tx + row-lock here ensures only one write commits; the loser observes
+  // the winner's value and returns it unchanged.
+  //
+  // Trade-off: we accept that the LOSING caller's LLM call was already paid
+  // for (metering decremented at HTTP layer). The security property the fix
+  // enforces is "metadata is not corrupted / overwritten" and "concurrent
+  // callers converge on the same summary value." Holding the row lock during
+  // the LLM call would prevent the duplicate spend but at the cost of
+  // serializing 2-5s LLM round-trips behind a Postgres lock; the concurrency
+  // here is low enough (a session-completed Inngest step retry, plus
+  // possibly a manual replay) that the optimistic post-LLM re-check is the
+  // right trade.
+  return db.transaction(async (tx) => {
+    const [lockedRow] = await tx
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
 
-  return summary;
+    const lockedMetadata = getSessionMetadata(lockedRow?.metadata);
+    if (lockedMetadata.homeworkSummary) {
+      // A concurrent caller raced ahead and wrote a summary while our LLM
+      // call was in flight. Return their value unchanged; do NOT overwrite.
+      return lockedMetadata.homeworkSummary;
+    }
+
+    await tx
+      .update(learningSessions)
+      .set({
+        metadata: {
+          ...lockedMetadata,
+          homeworkSummary: summary,
+        },
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      );
+
+    return summary;
+  });
 }

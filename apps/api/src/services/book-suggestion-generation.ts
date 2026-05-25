@@ -366,21 +366,52 @@ export async function generateCategorizedBookSuggestions(
       );
     if (unpickedNow.length >= 4) return 'success';
 
+    // [WI-77 M3] Per-row insert with onConflictDoNothing.
+    //
+    // The previous shape was a single bulk `insert.values([...])` wrapped in
+    // a try/catch that caught the unique-violation and returned 'success'.
+    // Problem: PostgreSQL aborts the ENTIRE multi-row INSERT on first
+    // constraint violation, so a single colliding title would drop all
+    // non-colliding suggestions on the floor. The LLM call still ran (and
+    // was billed) but the learner saw zero new suggestions.
+    //
+    // Using per-row INSERT ... ON CONFLICT DO NOTHING lets non-colliding
+    // rows commit while colliding rows are silently skipped — the same
+    // success-on-collision semantics, applied row-by-row instead of all-or-
+    // nothing. .returning({ id }) lets us count what actually landed.
+    //
+    // The legacy catch-block fallback is kept around the loop as
+    // belt-and-braces: a non-unique-violation error (e.g. FK or other) still
+    // propagates; a race that surfaces a unique violation despite the ON
+    // CONFLICT clause (e.g. the expression-based partial index path) is
+    // still treated as success.
+    const inserted: Array<{ id: string }> = [];
     try {
-      await tx.insert(bookSuggestions).values(
-        filtered.map((s) => ({
-          subjectId,
-          title: s.title,
-          emoji: s.emoji,
-          description: s.description,
-          category: s.category,
-        })),
-      );
-      return 'success';
+      for (const s of filtered) {
+        const rows = await tx
+          .insert(bookSuggestions)
+          .values({
+            subjectId,
+            title: s.title,
+            emoji: s.emoji,
+            description: s.description,
+            category: s.category,
+          })
+          .onConflictDoNothing()
+          .returning({ id: bookSuggestions.id });
+        const first = rows[0];
+        if (first) inserted.push(first);
+      }
     } catch (error) {
-      if (isUniqueViolation(error)) return 'success';
-      throw error;
+      if (!isUniqueViolation(error)) throw error;
+      // Race surfaced a unique violation; treat as success — the row the
+      // racer wrote satisfies the dedup contract.
     }
+    // Zero inserts is still 'success' because the dedup contract was met
+    // (every candidate already exists or was just written by a concurrent
+    // racer). The LLM call legitimately produced output; we should NOT
+    // refund quota.
+    return 'success';
   });
 }
 

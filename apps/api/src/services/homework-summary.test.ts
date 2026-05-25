@@ -15,10 +15,15 @@ import {
 } from './homework-summary';
 
 function createSelectChain(result: unknown[]) {
+  // The tx.select chain inside the WI-216 H2 transaction adds .for('update')
+  // before .limit; the plain select chains used elsewhere do not. Expose both
+  // shapes off the same `.where` so either consumer works.
+  const limit = jest.fn().mockResolvedValue(result);
   return {
     from: jest.fn().mockReturnValue({
       where: jest.fn().mockReturnValue({
-        limit: jest.fn().mockResolvedValue(result),
+        limit,
+        for: jest.fn().mockReturnValue({ limit }),
       }),
     }),
   };
@@ -30,6 +35,10 @@ function createMockDb(options?: {
   // (no LLM call, no update). Defaults to undefined (no pre-existing
   // summary; the LLM path proceeds normally).
   withPreCheck?: { existingHomeworkSummary?: unknown };
+  // [WI-216 H2] When set, the in-transaction re-check sees a homeworkSummary
+  // that a concurrent caller wrote while our LLM call was in flight. The
+  // function must return that value and NOT overwrite it.
+  withTxRaceWinner?: unknown;
 }): Database {
   const homeworkMetadata = {
     homework: {
@@ -99,12 +108,32 @@ function createMockDb(options?: {
       ]),
     );
 
+  // [WI-216 H2] tx.select chain used inside the post-LLM transaction. The
+  // metadata returned here represents what a concurrent caller may have
+  // written between our pre-check and our LLM call returning.
+  const txMetadata = options?.withTxRaceWinner
+    ? { ...homeworkMetadata, homeworkSummary: options.withTxRaceWinner }
+    : homeworkMetadata;
+
+  const txUpdate = jest.fn().mockReturnValue({
+    set: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    }),
+  });
+  const txSelect = jest
+    .fn()
+    .mockReturnValue(createSelectChain([{ metadata: txMetadata }]));
+
   return {
     select: selectMock,
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
       }),
+    }),
+    transaction: jest.fn().mockImplementation(async (callback) => {
+      const tx = { select: txSelect, update: txUpdate };
+      return callback(tx);
     }),
     query: {
       sessionEvents: {
@@ -121,6 +150,9 @@ function createMockDb(options?: {
           },
         ]),
       },
+      // [WI-216 H2] Expose the tx update mock so the new race test can
+      // assert it was NOT called when a concurrent winner already wrote.
+      __txUpdateMock: txUpdate,
     },
   } as unknown as Database;
 }
@@ -408,7 +440,11 @@ describe('extractAndStoreHomeworkSummary', () => {
     const db = createMockDb({ withPreCheck: {} });
     await extractAndStoreHomeworkSummary(db, 'profile-1', 'session-1');
 
-    expect(db.update).toHaveBeenCalled();
+    // [WI-216 H2] The update now lands inside db.transaction → tx.update,
+    // not on the outer db.update binding.
+    const txUpdate = (db as unknown as { query: { __txUpdateMock: jest.Mock } })
+      .query.__txUpdateMock;
+    expect(txUpdate).toHaveBeenCalled();
   });
 
   // [WI-216] Idempotency short-circuit: when the session already has a
@@ -443,5 +479,55 @@ describe('extractAndStoreHomeworkSummary', () => {
     expect(result).toEqual(existing);
     expect(routeAndCall).not.toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
+  });
+
+  // [WI-216 H2] TOCTOU fix: two concurrent callers can both pass the
+  // pre-LLM idempotency check, both call the LLM, and then both attempt
+  // to UPDATE. The post-LLM transaction now re-reads the row under
+  // SELECT ... FOR UPDATE; if a concurrent winner already wrote a
+  // homeworkSummary while our LLM call was in flight, we must return THEIR
+  // value and skip the UPDATE. The redundant LLM spend is accepted as the
+  // trade-off (see source comment); the correctness property is
+  // last-writer-wins ≠ overwrite, plus convergence.
+  it("[WI-216 H2] returns the concurrent winner's summary and does not overwrite when the row was claimed during the LLM call", async () => {
+    (routeAndCall as jest.Mock).mockClear();
+    (routeAndCall as jest.Mock).mockResolvedValue({
+      response:
+        '{"problemCount":2,"practicedSkills":["our-version"],"independentProblemCount":1,"guidedProblemCount":1,"summary":"our LLM output","displayTitle":"Math Homework"}',
+    });
+
+    const winnerSummary = {
+      problemCount: 7,
+      practicedSkills: ['concurrent-winner'],
+      independentProblemCount: 5,
+      guidedProblemCount: 2,
+      summary: 'winner already wrote this',
+      displayTitle: 'Math Homework',
+    };
+
+    // Pre-check sees no summary (this caller passes the gate), but the tx
+    // re-check sees winnerSummary (a concurrent caller wrote it during our
+    // LLM call).
+    const db = createMockDb({
+      withPreCheck: {},
+      withTxRaceWinner: winnerSummary,
+    });
+
+    const result = await extractAndStoreHomeworkSummary(
+      db,
+      'profile-1',
+      'session-1',
+    );
+
+    // Our LLM call DID fire (the pre-check passed). That spend is accepted.
+    expect(routeAndCall).toHaveBeenCalled();
+
+    // But we return the winner's value, NOT our LLM output.
+    expect(result).toEqual(winnerSummary);
+
+    // And we do NOT issue an UPDATE that would overwrite the winner.
+    const txUpdate = (db as unknown as { query: { __txUpdateMock: jest.Mock } })
+      .query.__txUpdateMock;
+    expect(txUpdate).not.toHaveBeenCalled();
   });
 });
