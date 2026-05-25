@@ -66,6 +66,7 @@ import {
   restoreSessionForAutoFiling,
   resetFilingForRetry,
   getSubjectSessions,
+  dispatchClosePathAutoFileIfEligible,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
@@ -1451,51 +1452,6 @@ async function dispatchSessionAutoFileRequested(
     name: 'app/session.auto_file_requested',
     data: payload,
   });
-}
-
-async function dispatchClosePathAutoFileIfEligible(
-  db: Database,
-  profileId: string,
-  sessionId: string,
-): Promise<void> {
-  const session = await getSession(db, profileId, sessionId);
-  if (!session || !isClosePathAutoFileEligible(session)) return;
-
-  const dispatchId = 'initial';
-  const payload = sessionAutoFileRequestedEventSchema.parse({
-    profileId,
-    sessionId,
-    requestedAt: new Date().toISOString(),
-    reason: 'freeform_session_closed',
-    dispatchId,
-  });
-
-  await safeSend(
-    () =>
-      inngest.send({
-        id: `auto-file-${sessionId}-${dispatchId}`,
-        name: 'app/session.auto_file_requested',
-        data: payload,
-      }),
-    'sessions.close.auto_file_requested',
-    { profileId, sessionId },
-  );
-}
-
-function isClosePathAutoFileEligible(session: {
-  metadata?: unknown;
-  topicId?: string | null;
-  filedAt?: string | Date | null;
-  filingStatus?: string | null;
-  exchangeCount?: number;
-}): boolean {
-  return (
-    getSessionEffectiveMode(session) === 'freeform' &&
-    session.topicId == null &&
-    session.filedAt == null &&
-    session.filingStatus == null &&
-    (session.exchangeCount ?? 0) >= FILING_CONFIG.minFreeformExchanges
-  );
 }
 
 /**

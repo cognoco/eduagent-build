@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+
 import {
   useMutation,
   useQuery,
@@ -215,6 +216,11 @@ export function useSessionLibraryFiling(
   const manualPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pollCount, setPollCount] = useState(0);
   const [pollBudgetExhausted, setPollBudgetExhausted] = useState(false);
+  // TanStack Query v5's internal refetchInterval scheduler does not reliably
+  // tick under jest fake timers (verified 2026-05-25 on @tanstack/react-query
+  // ^5.100.10). In tests, fall back to a deterministic setTimeout we own so
+  // jest.advanceTimersByTimeAsync drives polling. Production uses the
+  // native refetchInterval below.
   const useManualPollingFallback = process.env.NODE_ENV === 'test';
 
   const reserveNextPoll = useCallback((): boolean => {

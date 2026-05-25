@@ -1,5 +1,7 @@
 # Telemetry sweep + route-shrinking — Plan
 
+> **Status (2026-05-25):** **Phase A DONE** (commit `635bb8176`, 2026-05-14): all 14 non-core sites migrated to `safeSend()`; `safe-non-core.guard.test.ts` ratchet live (381 LOC, AST-based); 5 core-send sites correctly annotated; CLAUDE.md rule codified. **Phase B PARTIAL:** `session/index.tsx` shrunk from 2923 → 1825 → 1309 LOC via STAB-1.1..1.8 extractions (SessionFooter, SessionModals, SessionAccessories, MessageActionsRenderer, use-session-actions, use-subject-classification, use-session-streaming under `_components/` + `_hooks/`). Target was <600 LOC — still 118% over. `_view-models/` directory never created; derived selectors not extracted. **Resume here:** decide whether Phase B is still a priority. If yes, create `_view-models/` and extract derived selectors next; if no, mark Phase B deferred in this plan and consider this work closed.
+
 **Date:** 2026-05-14
 **Branch:** `next-phase-2026-05-14` (worktree, branched off `origin/main` at `2143bb56e`)
 **Closes audit #4 (telemetry isolation: partial → full) and opens campaign #1 (route shrinking)**

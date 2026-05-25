@@ -1,5 +1,7 @@
 # Challenge Round — Target Decisions (Task 0.0 + 0.0a)
 
+> **Status (2026-05-25):** Schema decisions shipped (CRIT-1 `mastery_challenge_verified_at` ✅, CRIT-2 `needs_deepening_topics` extensions ✅, CRIT-4 `struggleStatusSchema` extracted ✅). **Two gaps still block Phase 1 (Tasks 8, 9, 11):** (a) **CRIT-3** — `persistSessionMetadata` is not exported from `session-crud.ts`; only file-local `updateSessionMetadata` exists at `apps/api/src/services/session/session-exchange.ts:374`, so callers in `challenge-round/state.ts:14` are broken; (b) **ROUTING-1..5** — `ExchangeContext` (`exchanges.ts:302`) has no `llmRoutingRung?: EscalationRung` field, no rung-4 floor logic in `prepareExchangeContext()`, no behavioral-metric persistence (`session-exchange.ts:306-366`). **Resume here:** (1) extract `persistSessionMetadata` to `session-crud.ts` with merge semantics (read-modify-write, not replace) and add an IDOR break test (`session-crud.persistSessionMetadata.scoped.integration.test.ts`); (2) add `llmRoutingRung` field + `Math.max(rung, 4)` floor in `prepareExchangeContext` and thread it through `processExchange()`/`streamExchange()`; (3) validate with `pnpm test:llm:premium-routing`.
+
 > Decision doc that resolves CRIT-1..4 and ROUTING-1..5 from
 > `docs/plans/2026-05-18-challenge-round-into-note.md`. Phase 1 (Tasks 8, 9, 11)
 > may not start until this doc is signed off and the named plan tasks have been

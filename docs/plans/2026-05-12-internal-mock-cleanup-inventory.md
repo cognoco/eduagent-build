@@ -1,5 +1,7 @@
 # Internal Mock Cleanup Inventory
 
+> **Status (2026-05-25):** This plan's hard deliverables are DONE. Bare-mock backlog drained (6 residuals are classifier false positives, see table below), P0 integration ratchet live (`apps/api/src/test-utils/integration-mock-guard.test.ts`), CSV regenerator wired (`scripts/generate-internal-mock-cleanup-inventory.ts`). **What this plan does NOT cover:** the ~400-file long-tail of internal-ish mocks that are already `gc1-allow`-labeled or `requireActual`-factored (305 pattern-a + 371 gc1-allow + 49 pattern-a-no-label rows in the CSV). Those are inventoried here for visibility but burn down via the **GC6 boy-scout rule in CLAUDE.md** ("remove internal mocks any time you edit a test file"), not via plan-driven sweeps. **Recommendation:** archive this plan as done; keep the CSV + generator script as a living tracking artifact that GC6 consumes opportunistically.
+
 **Date:** 2026-05-12 (last refreshed 2026-05-25)
 **Status:** Framework complete (Phases 0-4); P0 drained; bare-mock backlog collapsed from 131 → 23 → **6** between 2026-05-19 and 2026-05-25 via successive sweeps. Wave 4 (2026-05-25) hit the top-5 bare-mock files including the dominant `_layout.test.tsx` cluster (15 bare).
 

@@ -132,3 +132,9 @@ export type { TopicSession } from './session-topic';
 // Subject sessions (Past conversations)
 export { getSubjectSessions } from './session-subject';
 export type { SubjectSession } from '@eduagent/schemas';
+
+// Filing dispatch (close-path auto-file orchestration)
+export {
+  dispatchClosePathAutoFileIfEligible,
+  isClosePathAutoFileEligible,
+} from './session-filing-dispatch';
