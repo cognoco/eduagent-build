@@ -1,12 +1,54 @@
 # Freeform Chat Library Filing Implementation Plan
 
-> **Status:** Draft
+> **Status:** Partially implemented / not fully delivered
 > **Date:** 2026-05-23
+> **Current status audit:** 2026-05-25 static repo check on branch `freeform`
 > **Source spec:** [`docs/specs/2026-05-23-freeform-library-filing.md`](../specs/2026-05-23-freeform-library-filing.md)
 
 **Goal:** Replace the post-session "do you want to file this?" interruption with quiet auto-filing for meaningful freeform sessions, while preserving an explicit "Keep out of Library" choice. Sessions stay saved either way. Library topics always belong to subjects.
 
 **Tech stack:** Expo / React Native, TanStack Query, Hono, Drizzle, Zod schemas, Inngest, Jest.
+
+---
+
+## Current Implementation Status — 2026-05-25
+
+This plan is **not fully delivered** in the current checkout. Some backend scaffolding has landed, but the core auto-filing lifecycle, race-safe resolver split, mobile Library filing UX, and flow-doc reconciliation remain open.
+
+Static audit evidence:
+
+- **Delivered / present**
+  - `filing_kept_out` exists in shared schema, database schema, and migration:
+    - `packages/schemas/src/sessions.ts`
+    - `packages/database/src/schema/sessions.ts`
+    - `apps/api/drizzle/0098_filing_kept_out.sql`
+  - `app/session.auto_file_requested` schema exists in `packages/schemas/src/inngest-events.ts`.
+  - User-action API scaffolding exists in `apps/api/src/routes/sessions.ts`:
+    - `POST /sessions/:sessionId/library-filing/keep-out`
+    - `POST /sessions/:sessionId/library-filing/add`
+    - `POST /sessions/:sessionId/library-filing/restore`
+    - freeform-aware `POST /sessions/:sessionId/retry-filing`
+  - Session service helpers exist for kept-out/add/restore/retry reset in `apps/api/src/services/session/session-crud.ts`.
+  - `markSessionFiled()` exists and writes `topicId`, `filedAt`, and `updatedAt` in `apps/api/src/services/session/session-book.ts`.
+
+- **Partially delivered / needs correction**
+  - `apps/api/src/inngest/functions/freeform-filing.ts` listens for `app/session.auto_file_requested`, but it reuses `runFreeformFiling()` rather than the planned race-safe `auto-file-session` lifecycle. It does not claim `filing_pending`, enforce the new max-retry lifecycle, or perform the guarded final session update described below.
+  - User-initiated Add/Restore/Retry dispatches use awaited `inngest.send(...)`, which matches the CORE dispatch requirement, but close-path automatic dispatch was not found in the static audit.
+  - `FILING_CONFIG` exists in `apps/api/src/config/filing.ts`, but the static audit found only limited usage. The auto-file eligibility and backfill threshold still need a focused verification pass.
+  - Mobile has `filing_kept_out` in existing status types, but the only visible Summary status found was the old `FilingFailedBanner`, not the planned compact Library filing control.
+
+- **Not delivered / open**
+  - Close-time enqueue for eligible meaningful freeform sessions was not found. The plan still needs implementation of the opportunistic close-path `app/session.auto_file_requested` dispatch with the `auto-file-${sessionId}-initial` dedupe key.
+  - `resolveFilingResult()` still mutates `learning_sessions` directly in `apps/api/src/services/filing.ts`. The planned split is not complete.
+  - `claimSessionForAutoFiling()` was not found.
+  - `deleteTopicIfSafe()` was not found. `markSessionKeptOutOfLibrary()` currently detaches the session but does not perform the shared safe topic cleanup described below.
+  - The auto-file opt-out race guard is not implemented as planned because the resolver still updates the session row directly and the auto-file handler does not perform the guarded final update.
+  - `useSessionLibraryFiling(sessionId)` was not found. Existing session polling still uses `computeFilingRefetchInterval()` with `15_000` ms for `filing_pending`, not the planned 3s cadence / 10-poll timeout behavior.
+  - Session Summary does not yet show the planned Library status/action surface: pending `Don't add to Library`, filed destination/tap-through, filed-topic rename, below-threshold `Add to Library`, or `Remove from Library`.
+  - The Library tab failed-filing attention surface was not found.
+  - Flow docs are not reconciled: `docs/flows/flow-master-directory.md` still lists `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` as `Not created`.
+
+Do not treat PR 1-4 below as complete until these open items are implemented and verified with the validation commands at the end of this plan.
 
 ---
 
@@ -68,6 +110,8 @@ Out of scope — track in follow-up plans:
 
 ### PR 1 - Backend Filing State And Keep-Out Contract
 
+**Current status (2026-05-25): Partial.** Schema/migration/API scaffolding exists, but shared safe topic cleanup and full kept-out exclusion verification remain open.
+
 Create the durable state model and API operations:
 
 - Add terminal `filing_kept_out` state.
@@ -77,6 +121,8 @@ Create the durable state model and API operations:
 
 ### PR 2 - Auto-File Freeform Sessions
 
+**Current status (2026-05-25): Not delivered.** The new event schema and listener exist, but close-path enqueue, CAS claim, guarded final update, resolver split, and terminal failure lifecycle are not implemented as planned.
+
 Move meaningful freeform sessions to background filing by default:
 
 - Enqueue auto-file on close for eligible freeform sessions.
@@ -85,6 +131,8 @@ Move meaningful freeform sessions to background filing by default:
 - Add integration coverage for auto-file success, failure, and opt-out race.
 
 ### PR 3 - Mobile UX
+
+**Current status (2026-05-25): Not delivered.** The existing failed-filing banner remains, but the planned Session Summary Library status/actions, 3s polling hook, filed destination/tap-through, rename affordance, and Library attention surface were not found.
 
 Remove the blocking filing prompt:
 
@@ -96,6 +144,8 @@ Remove the blocking filing prompt:
 - Preserve existing failed-filing retry affordance.
 
 ### PR 4 - Flow Docs Reconciliation
+
+**Current status (2026-05-25): Not delivered.** `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` are still marked `Not created` in the flow master directory.
 
 Collect the scattered documentation:
 
