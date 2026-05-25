@@ -1060,5 +1060,29 @@ describe('learner-profile routes', () => {
       // Guard must fire before the parse service is reached.
       expect(parseLearnerInputMock).not.toHaveBeenCalled();
     });
+
+    it('[BREAK] DELETE /learner-profile/item returns 403 PROXY_MODE for a non-owner (proxy) profile', async () => {
+      const res = await makeProxyApp().request('/learner-profile/item', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: 'interests', value: 'dinosaurs' }),
+      });
+
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe('PROXY_MODE');
+      expect(mockDeleteMemoryItem).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] POST /learner-profile/unsuppress returns 403 PROXY_MODE for a non-owner (proxy) profile', async () => {
+      const res = await makeProxyApp().request('/learner-profile/unsuppress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 'dinosaurs' }),
+      });
+
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe('PROXY_MODE');
+      expect(mockUnsuppressInference).not.toHaveBeenCalled();
+    });
   });
 });
