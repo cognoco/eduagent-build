@@ -44,32 +44,19 @@ export const LLM_CALL_SITE_FILES: readonly string[] = [
   'apps/api/src/services/dictation/review.ts',
   'apps/api/src/services/exchanges.ts',
   'apps/api/src/services/filing.ts',
-  'apps/api/src/services/homework-summary.ts',
   'apps/api/src/services/language-detect.ts',
   'apps/api/src/services/learner-input.ts',
   'apps/api/src/services/learner-profile.ts',
-  'apps/api/src/services/memory/dedup-llm.ts',
-  'apps/api/src/services/monthly-report.ts',
   'apps/api/src/services/ocr.ts',
   'apps/api/src/services/parking-lot.ts',
   'apps/api/src/services/progress-summary.ts',
   'apps/api/src/services/quiz/generate-round.ts',
   'apps/api/src/services/recall-bridge.ts',
   'apps/api/src/services/retention-data.ts',
-  'apps/api/src/services/session-highlights.ts',
-  'apps/api/src/services/session-llm-summary.ts',
-  'apps/api/src/services/session-recap.ts',
   'apps/api/src/services/session/session-crud.ts',
-  'apps/api/src/services/session/session-depth.ts',
-  'apps/api/src/services/session/topic-probe-extraction.ts',
   'apps/api/src/services/subject-classify.ts',
   'apps/api/src/services/subject-resolve.ts',
   'apps/api/src/services/summaries.ts',
-  'apps/api/src/services/vocabulary-extract.ts',
-  // metering.ts itself imports routeAndCall? No — it imports the billing
-  // services. The grep above does not include middleware/metering.ts because
-  // it doesn't call the LLM directly. If a future PR moves an LLM call into
-  // metering.ts (e.g. a pre-flight intent classifier), add it here.
 ];
 
 /**
@@ -88,6 +75,22 @@ export const LLM_CALL_SITE_EXEMPT: readonly string[] = [
   // Covered by separate WPs (WI-125 etc.).
   'apps/api/src/inngest/functions/freeform-filing.ts',
   'apps/api/src/inngest/functions/post-session-suggestions.ts',
+  // Service modules whose LLM-calling functions are only invoked from Inngest
+  // (background jobs). Routes may import other (DB-only) functions from these
+  // files, but the LLM call path is not HTTP-reachable. Listed here so a
+  // future PR adding a routeAndCall to one of these files doesn't silently
+  // expose an unmetered LLM endpoint — the guard test will fail until either
+  // the file moves to LLM_CALL_SITE_FILES (and a route pattern is added) or
+  // a new Inngest-only LLM call site is justified in this comment.
+  'apps/api/src/services/homework-summary.ts',
+  'apps/api/src/services/memory/dedup-llm.ts',
+  'apps/api/src/services/monthly-report.ts',
+  'apps/api/src/services/session-highlights.ts',
+  'apps/api/src/services/session-llm-summary.ts',
+  'apps/api/src/services/session-recap.ts',
+  'apps/api/src/services/session/session-depth.ts',
+  'apps/api/src/services/session/topic-probe-extraction.ts',
+  'apps/api/src/services/vocabulary-extract.ts',
   // The test-only seed route bypasses auth (gated by TEST_SEED_SECRET) and is
   // not deployed in production builds. It calls routeAndCall to seed
   // synthetic LLM exchanges for E2E setup. Out of scope for paying-customer

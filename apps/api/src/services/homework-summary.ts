@@ -276,15 +276,21 @@ export async function extractAndStoreHomeworkSummary(
   // tx + row-lock here ensures only one write commits; the loser observes
   // the winner's value and returns it unchanged.
   //
-  // Trade-off: we accept that the LOSING caller's LLM call was already paid
-  // for (metering decremented at HTTP layer). The security property the fix
-  // enforces is "metadata is not corrupted / overwritten" and "concurrent
-  // callers converge on the same summary value." Holding the row lock during
-  // the LLM call would prevent the duplicate spend but at the cost of
-  // serializing 2-5s LLM round-trips behind a Postgres lock; the concurrency
-  // here is low enough (a session-completed Inngest step retry, plus
-  // possibly a manual replay) that the optimistic post-LLM re-check is the
-  // right trade.
+  // Trade-off: we accept that the LOSING caller's LLM call already consumed
+  // provider tokens directly (this function is invoked from the
+  // session-completed Inngest job, NOT through the HTTP metering middleware,
+  // so there is no quota refund path — the cost is real provider spend, not
+  // user-visible quota). The security property the fix enforces is
+  // "metadata is not corrupted / overwritten" and "concurrent callers
+  // converge on the same summary value." Holding the row lock during the
+  // LLM call would prevent the duplicate spend but at the cost of
+  // serializing 2-5s LLM round-trips behind a Postgres lock; the
+  // concurrency here is low (a session-completed Inngest step retry, plus
+  // possibly a manual replay) so the optimistic post-LLM re-check is the
+  // right trade. The pre-LLM short-circuit at the top of this function
+  // catches the common case (one caller finishes and writes before another
+  // even starts); this in-tx re-check is the defence for the narrow
+  // overlapping window only.
   return db.transaction(async (tx) => {
     const [lockedRow] = await tx
       .select({ metadata: learningSessions.metadata })
