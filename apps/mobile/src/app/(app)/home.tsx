@@ -71,10 +71,12 @@ export default function HomeScreen(): React.ReactElement {
     if (!firstNotice || visibleNoticeId !== firstNotice.id) return;
     const timer = setTimeout(() => {
       setVisibleNoticeId(null);
-      ackNotice.mutate({ id: firstNotice.id });
+      // [WI-270] Do not acknowledge the notice on the child's behalf in proxy
+      // mode — the dismissal is a write that belongs to the child.
+      if (!isExplicitProxyMode) ackNotice.mutate({ id: firstNotice.id });
     }, 5000);
     return () => clearTimeout(timer);
-  }, [ackNotice, firstNotice, visibleNoticeId]);
+  }, [ackNotice, firstNotice, visibleNoticeId, isExplicitProxyMode]);
 
   // Neutral placeholder while profiles load — prevents flash of wrong content.
   if (isLoading && !loadingTimedOut) {

@@ -16,6 +16,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
@@ -73,6 +74,7 @@ function parseWebBirthDate(value: string): Date | null {
 }
 
 export default function CreateProfileScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ for?: 'child' }>();
@@ -319,15 +321,14 @@ export default function CreateProfileScreen() {
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
         <Text className="text-h2 font-bold text-text-primary text-center mb-3">
-          Switch to your own profile to make changes
+          {t('proxy.readOnly.title')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-8">
-          You&apos;re viewing your child&apos;s account. Switch to your own
-          profile to make changes.
+          {t('proxy.readOnly.hint')}
         </Text>
         <Button
           variant="primary"
-          label="Switch profile"
+          label={t('proxy.readOnly.switchProfileCta')}
           onPress={handleClose}
           testID="create-profile-blocked-close"
         />

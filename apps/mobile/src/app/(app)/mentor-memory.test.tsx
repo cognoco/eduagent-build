@@ -531,4 +531,29 @@ describe('MentorMemoryScreen — proxy mode write guard (WI-274)', () => {
     );
     expect(clearBtn.props.accessibilityState?.disabled).toBe(true);
   });
+
+  it('[WI-274] proxy mode: per-item Remove controls are not rendered and an interest-context change dispatches no write', async () => {
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [{ label: 'Football', context: 'free_time' }],
+      memoryConsentStatus: 'granted',
+    };
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    // The per-row Remove action is hidden in proxy mode (onRemove undefined →
+    // MemoryRow renders no remove button). Default actionLabel is "Remove".
+    await screen.findByTestId('mentor-memory-interests-section');
+    expect(screen.queryByLabelText('Remove Football')).toBeNull();
+
+    // Even if the context option is pressed, the guarded handler dispatches
+    // no write while in proxy mode.
+    const bothOption = screen.getByTestId('interest-context-Football-both');
+    await act(async () => {
+      fireEvent.press(bothOption);
+    });
+    expect(
+      fetchCallsMatching(mockFetch, 'onboarding/interests/context'),
+    ).toHaveLength(0);
+  });
 });

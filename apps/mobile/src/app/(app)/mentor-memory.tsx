@@ -199,6 +199,7 @@ export default function MentorMemoryScreen() {
 
   const handleInterestContextChange = useCallback(
     async (label: string, context: InterestContext) => {
+      if (isExplicitProxyMode) return;
       const interests = profile?.interests ?? [];
       try {
         await updateInterestsContext.mutateAsync({
@@ -217,7 +218,7 @@ export default function MentorMemoryScreen() {
         throw err;
       }
     },
-    [profile?.interests, t, updateInterestsContext],
+    [isExplicitProxyMode, profile?.interests, t, updateInterestsContext],
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
@@ -534,26 +535,30 @@ export default function MentorMemoryScreen() {
                 key={row.key}
                 label={row.label}
                 source={row.source}
-                onRemove={async () => {
-                  try {
-                    await deleteItem.mutateAsync({
-                      category: 'learningStyle',
-                      value: row.key,
-                      suppress: true,
-                    });
-                  } catch (err) {
-                    platformAlert(
-                      t('session.mentorMemory.errors.deleteFailed'),
-                      formatApiError(err),
-                    );
-                    Sentry.captureException(err, {
-                      tags: {
-                        surface: 'mentor-memory',
-                        action: 'delete_learning_style',
-                      },
-                    });
-                  }
-                }}
+                onRemove={
+                  isExplicitProxyMode
+                    ? undefined
+                    : async () => {
+                        try {
+                          await deleteItem.mutateAsync({
+                            category: 'learningStyle',
+                            value: row.key,
+                            suppress: true,
+                          });
+                        } catch (err) {
+                          platformAlert(
+                            t('session.mentorMemory.errors.deleteFailed'),
+                            formatApiError(err),
+                          );
+                          Sentry.captureException(err, {
+                            tags: {
+                              surface: 'mentor-memory',
+                              action: 'delete_learning_style',
+                            },
+                          });
+                        }
+                      }
+                }
               />
             ))
           ) : (
@@ -582,28 +587,34 @@ export default function MentorMemoryScreen() {
                   key={label}
                   interest={interest}
                   detail={detail}
-                  disabled={updateInterestsContext.isPending}
+                  disabled={
+                    updateInterestsContext.isPending || isExplicitProxyMode
+                  }
                   onContextChange={handleInterestContextChange}
-                  onRemove={async () => {
-                    try {
-                      await deleteItem.mutateAsync({
-                        category: 'interests',
-                        value: label,
-                        suppress: true,
-                      });
-                    } catch (err) {
-                      platformAlert(
-                        t('session.mentorMemory.errors.deleteFailed'),
-                        formatApiError(err),
-                      );
-                      Sentry.captureException(err, {
-                        tags: {
-                          surface: 'mentor-memory',
-                          action: 'delete_interest',
-                        },
-                      });
-                    }
-                  }}
+                  onRemove={
+                    isExplicitProxyMode
+                      ? undefined
+                      : async () => {
+                          try {
+                            await deleteItem.mutateAsync({
+                              category: 'interests',
+                              value: label,
+                              suppress: true,
+                            });
+                          } catch (err) {
+                            platformAlert(
+                              t('session.mentorMemory.errors.deleteFailed'),
+                              formatApiError(err),
+                            );
+                            Sentry.captureException(err, {
+                              tags: {
+                                surface: 'mentor-memory',
+                                action: 'delete_interest',
+                              },
+                            });
+                          }
+                        }
+                  }
                 />
               );
             })}
@@ -617,26 +628,30 @@ export default function MentorMemoryScreen() {
                 key={entry.subject}
                 label={`${entry.subject}: ${entry.topics.join(', ')}`}
                 source={entry.source}
-                onRemove={async () => {
-                  try {
-                    await deleteItem.mutateAsync({
-                      category: 'strengths',
-                      value: entry.subject,
-                      suppress: true,
-                    });
-                  } catch (err) {
-                    platformAlert(
-                      t('session.mentorMemory.errors.deleteFailed'),
-                      formatApiError(err),
-                    );
-                    Sentry.captureException(err, {
-                      tags: {
-                        surface: 'mentor-memory',
-                        action: 'delete_strength',
-                      },
-                    });
-                  }
-                }}
+                onRemove={
+                  isExplicitProxyMode
+                    ? undefined
+                    : async () => {
+                        try {
+                          await deleteItem.mutateAsync({
+                            category: 'strengths',
+                            value: entry.subject,
+                            suppress: true,
+                          });
+                        } catch (err) {
+                          platformAlert(
+                            t('session.mentorMemory.errors.deleteFailed'),
+                            formatApiError(err),
+                          );
+                          Sentry.captureException(err, {
+                            tags: {
+                              surface: 'mentor-memory',
+                              action: 'delete_strength',
+                            },
+                          });
+                        }
+                      }
+                }
               />
             ))
           ) : (
@@ -667,27 +682,31 @@ export default function MentorMemoryScreen() {
                   source={entry.source}
                   progressLabel={progress.progressLabel}
                   progressValue={progress.progressValue}
-                  onRemove={async () => {
-                    try {
-                      await deleteItem.mutateAsync({
-                        category: 'struggles',
-                        value: entry.topic,
-                        subject: entry.subject ?? undefined,
-                        suppress: true,
-                      });
-                    } catch (err) {
-                      platformAlert(
-                        t('session.mentorMemory.errors.deleteFailed'),
-                        formatApiError(err),
-                      );
-                      Sentry.captureException(err, {
-                        tags: {
-                          surface: 'mentor-memory',
-                          action: 'delete_struggle',
-                        },
-                      });
-                    }
-                  }}
+                  onRemove={
+                    isExplicitProxyMode
+                      ? undefined
+                      : async () => {
+                          try {
+                            await deleteItem.mutateAsync({
+                              category: 'struggles',
+                              value: entry.topic,
+                              subject: entry.subject ?? undefined,
+                              suppress: true,
+                            });
+                          } catch (err) {
+                            platformAlert(
+                              t('session.mentorMemory.errors.deleteFailed'),
+                              formatApiError(err),
+                            );
+                            Sentry.captureException(err, {
+                              tags: {
+                                surface: 'mentor-memory',
+                                action: 'delete_struggle',
+                              },
+                            });
+                          }
+                        }
+                  }
                 />
               );
             })
@@ -704,26 +723,30 @@ export default function MentorMemoryScreen() {
               <MemoryRow
                 key={note}
                 label={note}
-                onRemove={async () => {
-                  try {
-                    await deleteItem.mutateAsync({
-                      category: 'communicationNotes',
-                      value: note,
-                      suppress: true,
-                    });
-                  } catch (err) {
-                    platformAlert(
-                      t('session.mentorMemory.errors.deleteFailed'),
-                      formatApiError(err),
-                    );
-                    Sentry.captureException(err, {
-                      tags: {
-                        surface: 'mentor-memory',
-                        action: 'delete_communication_note',
-                      },
-                    });
-                  }
-                }}
+                onRemove={
+                  isExplicitProxyMode
+                    ? undefined
+                    : async () => {
+                        try {
+                          await deleteItem.mutateAsync({
+                            category: 'communicationNotes',
+                            value: note,
+                            suppress: true,
+                          });
+                        } catch (err) {
+                          platformAlert(
+                            t('session.mentorMemory.errors.deleteFailed'),
+                            formatApiError(err),
+                          );
+                          Sentry.captureException(err, {
+                            tags: {
+                              surface: 'mentor-memory',
+                              action: 'delete_communication_note',
+                            },
+                          });
+                        }
+                      }
+                }
               />
             ))
           ) : (
@@ -741,22 +764,26 @@ export default function MentorMemoryScreen() {
                 key={value}
                 label={value}
                 actionLabel={t('session.mentorMemory.bringBack')}
-                onRemove={async () => {
-                  try {
-                    await unsuppress.mutateAsync({ value });
-                  } catch (err) {
-                    platformAlert(
-                      t('session.mentorMemory.errors.restoreFailed'),
-                      formatApiError(err),
-                    );
-                    Sentry.captureException(err, {
-                      tags: {
-                        surface: 'mentor-memory',
-                        action: 'unsuppress_inference',
-                      },
-                    });
-                  }
-                }}
+                onRemove={
+                  isExplicitProxyMode
+                    ? undefined
+                    : async () => {
+                        try {
+                          await unsuppress.mutateAsync({ value });
+                        } catch (err) {
+                          platformAlert(
+                            t('session.mentorMemory.errors.restoreFailed'),
+                            formatApiError(err),
+                          );
+                          Sentry.captureException(err, {
+                            tags: {
+                              surface: 'mentor-memory',
+                              action: 'unsuppress_inference',
+                            },
+                          });
+                        }
+                      }
+                }
               />
             ))}
           </CollapsibleMemorySection>
