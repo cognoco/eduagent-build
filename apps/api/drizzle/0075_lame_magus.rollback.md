@@ -1,3 +1,7 @@
+# Rollback: 0075 — Create `progress_summaries` table
+
+Migration creates the `progress_summaries` table with a unique index on `profile_id`.
+
 ## Rollback
 
 Rollback is safe — dropping the table loses only cached LLM-generated progress summaries, which are regenerated on next dashboard visit.
