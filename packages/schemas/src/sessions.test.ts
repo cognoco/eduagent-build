@@ -692,6 +692,16 @@ describe('systemPromptIntentSchema', () => {
     ).toBe(false);
   });
 
+  it('rejects message_feedback with an unknown action', () => {
+    expect(
+      systemPromptIntentSchema.safeParse({
+        kind: 'message_feedback',
+        action: 'unknown_action',
+        eventId: 'evt_123',
+      }).success,
+    ).toBe(false);
+  });
+
   it('rejects extra properties (strict) — no smuggled content field', () => {
     expect(
       systemPromptIntentSchema.safeParse({
