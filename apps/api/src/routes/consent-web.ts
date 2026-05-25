@@ -179,7 +179,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       );
     }
 
-    const basePath = c.req.path.replace('/consent-page', '');
+    const basePath = c.req.path.replaceAll('/consent-page', '');
     const confirmUrl = `${basePath}/consent-page/confirm`;
 
     return c.html(
@@ -243,7 +243,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       );
     }
 
-    const basePath = c.req.path.replace('/consent-page/deny-confirm', '');
+    const basePath = c.req.path.replaceAll('/consent-page/deny-confirm', '');
     const confirmDenyUrl = `${basePath}/consent-page/confirm`;
     const backUrl = `${basePath}/consent-page?token=${encodeURIComponent(
       token,

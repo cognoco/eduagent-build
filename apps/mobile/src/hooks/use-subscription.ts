@@ -12,6 +12,7 @@ import type {
   Usage,
   FamilySubscription,
 } from '@eduagent/schemas';
+import { subscriptionResponseSchema } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { NotFoundError } from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
@@ -76,8 +77,8 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.subscription.$get({}, { init: { signal } });
-        await assertOk(res);
-        const data = await res.json();
+        const okRes = await assertOk(res);
+        const data = subscriptionResponseSchema.parse(await okRes.json());
         return data.subscription;
       } finally {
         cleanup();

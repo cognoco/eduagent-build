@@ -12,22 +12,20 @@ Session dispatched 11 parallel subagents on 41 Notion bugs. A concurrent Claude 
 
 ## Status as of 2026-05-25
 
-Bulk recovery commit `881961ed0` (Sun 2026-05-24 11:51) plus `3968fa0c3` (BUG-673 migration) landed 18 of 32. Remaining 14 still need re-do.
+All 32 bugs done. Bulk recovery commit `881961ed0` (Sun 2026-05-24 11:51) plus `3968fa0c3` (BUG-673 migration) landed 18; remaining 14 re-applied 2026-05-25 on branch `freeform` (staged in the index, uncommitted at time of writing).
 
-**DONE (18) — do NOT re-pick:**
+**DONE (32) — do NOT re-pick:**
+- Bundle A: 644, 645 (re-applied 2026-05-25)
 - Bundle B: 655, 656
+- Bundle C: 650, 651, 654 (re-applied 2026-05-25); 652 CANT-REPRO — Notion marked Done verified-clean
+- Bundle D: 688, 689, 695 (re-applied 2026-05-25 — `.bugs-688-689-695.patch` was prose, not a real diff; obsolete, safe to delete)
 - Bundle E: 731
 - Bundle F: 472, 500, 634
 - Bundle G: 640, 641, 643
 - Bundle H: 665, 747
 - Bundle I: 571 (design doc), 580, 672, 673
+- Bundle J: 624, 631, 639, 642 (re-applied 2026-05-25)
 - Bundle K: 696, 697, 698, 708
-
-**NOT DONE (14) — still pending:**
-- Bundle A: 644, 645 (GET `/subscription` + `/subscription/family` still missing `isOwner` gate)
-- Bundle C: 650, 651, 654 (also 652 was CANT-REPRO — mark Done)
-- Bundle D: 688, 689, 695 (`.bugs-688-689-695.patch` survives unapplied at repo root)
-- Bundle J: 624, 631, 639, 642
 
 Bundle-by-bundle status is annotated inline below.
 
@@ -55,17 +53,17 @@ These were verified obsolete; the code is already correct upstream.
 
 Each bundle below is one subagent's planned scope. Files and fix descriptions are from the original (now-wiped) work — re-pick as-is.
 
-### Bundle A — API auth/owner gating [Opus] — **STATUS: NOT DONE**
+### Bundle A — API auth/owner gating [Opus] — **STATUS: DONE (2026-05-25, branch `freeform` staged)**
 
-Both fixes verified real but `apps/api/src/routes/billing.ts` was under concurrent edit; subagent's edits were wiped. Re-apply with a break test for each. Verified 2026-05-25: still missing on both routes.
+Both gates added; red-green confirmed on the two break tests.
 
-#### BUG 644 — GET /subscription leaks billing to non-owner child profiles — **NOT DONE**
+#### BUG 644 — GET /subscription leaks billing to non-owner child profiles — **DONE**
 - **File:** `apps/api/src/routes/billing.ts:137-197`
 - **Bug:** GET `/subscription` has zero `isOwner` gate. Non-owner child active on the parent's account (via `X-Profile-Id`) reads the account's full tier/status/trialEndsAt/currentPeriodEnd/cancelAtPeriodEnd/monthly+dailyLimit.
 - **Fix:** Add early `apiError(c, 403, ERROR_CODES.FORBIDDEN, ...)` when `c.get('profileMeta')?.isOwner !== true`. Same pattern as `billing.ts:299-307` (cancel), `:373-382` (top-up), `:582-591` (portal).
 - **Break test:** `apps/api/src/routes/billing.test.ts` — `[BREAK FCR-2026-05-23-L2.M2.1]` adjacent to the `returns 401 without auth header` block.
 
-#### BUG 645 — GET /subscription/family enumerates members to non-owner — **NOT DONE**
+#### BUG 645 — GET /subscription/family enumerates members to non-owner — **DONE**
 - **File:** `apps/api/src/routes/billing.ts:697-722`
 - **Bug:** GET `/subscription/family` has zero `isOwner` gate while sibling `family/add` (:739) and `family/remove` (:789) both gate on `profileMeta.isOwner !== true`. Non-owner can read sibling displayNames + isOwner flags + pool envelope (tier, monthlyLimit, usedThisMonth, profileCount, maxProfiles).
 - **Fix:** Same early-403 pattern as `family/add`.
@@ -87,38 +85,38 @@ Both fixes verified real but `apps/api/src/routes/billing.ts` was under concurre
 
 ---
 
-### Bundle C — API consent/log small [Sonnet] — **STATUS: NOT DONE (3 pending) + 652 CANT-REPRO**
+### Bundle C — API consent/log small [Sonnet] — **STATUS: DONE (2026-05-25, branch `freeform` staged)**
 
-#### BUG 650 — clerkUserId in log entries — **NOT DONE**
+#### BUG 650 — clerkUserId in log entries — **DONE**
 - **Files:** `apps/api/src/services/account.ts:102,133,173,263`, `apps/api/src/middleware/account.ts:43,71`, `apps/api/src/inngest/functions/billing-trial-subscription-failed.ts` + tests for both.
 - **Fix:** At sites where `accountId` is already present (account.ts:102/133/263), drop `clerkUserId` as redundant. Security-audit site (account.ts:173 — reclaim attempt) and both middleware sites (43/71) where no `accountId` exists yet retain `clerkUserId` with an inline comment documenting it as the only available Clerk audit join key. Drop `clerkUserId` from `app/billing.trial_subscription_failed` Inngest event payload end-to-end (emitter + handler type + both tests).
 
-#### BUG 651 — /consent/my-status empty response with no comment — **NOT DONE**
+#### BUG 651 — /consent/my-status empty response with no comment — **DONE**
 - **File:** `apps/api/src/routes/consent.ts:260`
 - **Fix:** Add inline comment at the `if (!profileId)` guard documenting the contract: caller without active profile (mid-onboarding) has no consent record; null fields mean "no consent required"; intentionally NOT an error — callers should not interpret as failure.
 
 #### BUG 652 — process.env in Inngest helpers (G4 ban)
 - **Status:** CANT-REPRO. Grep of `apps/api/src/inngest/**/*.ts` found 3 hits all benign: comment in test file, comment in `trial-expiry.ts` prose, `process.env.DATABASE_URL` in integration test `beforeAll`. No production Inngest code violates G4. **Action: mark Notion Done with "verified clean".**
 
-#### BUG 654 — consent-web path replace removes only first occurrence — **NOT DONE**
+#### BUG 654 — consent-web path replace removes only first occurrence — **DONE**
 - **File:** `apps/api/src/routes/consent-web.ts:182,246`
 - **Fix:** Two `.replace()` calls — `c.req.path.replace('/consent-page', '')` (line 182) and `c.req.path.replace('/consent-page/deny-confirm', '')` (line 246) — replace both with `.replaceAll()` so a path prefix containing the consent segment doesn't leave a stray segment in `basePath`, corrupting `confirmUrl`/`backUrl`.
 
 ---
 
-### Bundle D — API error classification [Opus] — **STATUS: NOT DONE**
+### Bundle D — API error classification [Opus] — **STATUS: DONE (2026-05-25, branch `freeform` staged)**
 
-**Patch file survives at `.bugs-688-689-695.patch`** (8292 bytes, repo root) — apply directly via `git apply`. Verified 2026-05-25: all three sites still have empty `catch {}` blocks; patch was never applied.
+`.bugs-688-689-695.patch` turned out to be prose-only (zero git-diff hunks), not an applicable patch. All three fixes re-implemented by hand. Patch file is obsolete and safe to delete.
 
-#### BUG 688 — sendPushNotification: DB error misclassified as network_error — **NOT DONE**
+#### BUG 688 — sendPushNotification: DB error misclassified as network_error — **DONE**
 - **File:** `apps/api/src/services/notifications.ts:95-142`
 - **Fix:** Split single `try {}` covering both Expo fetch (network) AND `logNotification` (DB write) into TWO try blocks. Network errors keep `network_error` classification; DB errors get new `db_error` classification with event `notification.push.db_error` and Sentry tag `reason: db_error`. Push still returns `sent: true, ticketId, reason: 'log_write_failed'` when only the log write fails.
 
-#### BUG 689 — Invalid timezone silently falls back to UTC in billing — **NOT DONE**
+#### BUG 689 — Invalid timezone silently falls back to UTC in billing — **DONE**
 - **File:** `apps/api/src/services/billing/family.ts:162-176` (+ logger import at :25)
 - **Fix:** Replace `catch {}` at line 169 with `catch (err)` that emits structured `logger.warn` with event `billing.format_date.timezone_fallback`, fields `{ requestedTimezone, locale, error }`.
 
-#### BUG 695 — openai.ts SSE chunk catch is empty (no log) — **NOT DONE**
+#### BUG 695 — openai.ts SSE chunk catch is empty (no log) — **DONE**
 - **File:** `apps/api/src/services/llm/providers/openai.ts:228-251`
 - **Fix:** Replace both empty `catch {}` blocks (stream_loop ~232, flush_buffer ~248) with `catch (err)` emitting structured `logger.warn` with event `openai.sse.malformed`, fields `{ site, chunk: jsonStr.slice(0, 200), error }`. Discard behavior preserved.
 
@@ -197,23 +195,21 @@ Both fixes verified real but `apps/api/src/routes/billing.ts` was under concurre
 
 ---
 
-### Bundle J — Mobile small fixes [Sonnet] — **STATUS: NOT DONE (all 4 pending)**
+### Bundle J — Mobile small fixes [Sonnet] — **STATUS: DONE (2026-05-25, branch `freeform` staged)**
 
-Subagent's report cut off mid-stream after "all four edits landed" — all edits were wiped before verification ran. Verified 2026-05-25: none of the 4 fixes are present in code.
-
-#### BUG 624 — use-mentor-language-sync test mocks lib/profile without gc1-allow — **NOT DONE**
+#### BUG 624 — use-mentor-language-sync test mocks lib/profile without gc1-allow — **DONE**
 - **File:** `apps/mobile/src/hooks/use-mentor-language-sync.test.ts`
 - **Current state:** The mock already uses `jest.requireActual('../lib/profile')` pattern at lines 21-22 — that's the proper escape and arguably doesn't need a `gc1-allow` comment. Verify whether the bug is still real by reading the file in context; if the override is comprehensive, mark obsolete. Otherwise add `// gc1-allow: <real reason>` or remove the mock.
 
-#### BUG 631 — CollapsibleChapter local Topic interface — **NOT DONE**
+#### BUG 631 — CollapsibleChapter local Topic interface — **DONE**
 - **File:** `apps/mobile/src/components/library/CollapsibleChapter.tsx:6`
 - **Fix:** Replace local `interface Topic { ... }` with import from `@eduagent/schemas` (likely `CurriculumTopic`). If only a subset is needed, use `Pick<CurriculumTopic, 'id' | 'title' | …>`.
 
-#### BUG 639 — Inconsistent hour-to-period mapping in greeting helpers — **NOT DONE**
+#### BUG 639 — Inconsistent hour-to-period mapping in greeting helpers — **DONE**
 - **File:** `apps/mobile/src/lib/greeting.ts` (`getTimeOfDay`, `getGreeting`)
 - **Fix:** Grep for any other `getGreeting`/`morning|afternoon|evening` mappers in mobile. Consolidate to one — `apps/mobile/src/lib/greeting.ts` is dominant.
 
-#### BUG 642 — color-opacity helper has no hex validation — **NOT DONE**
+#### BUG 642 — color-opacity helper has no hex validation — **DONE**
 - **File:** `apps/mobile/src/lib/color-opacity.ts` (`withOpacity`)
 - **Fix:** Current code checks `hex.length === 3/6/8` but doesn't validate hex digits — `#xyz` produces `#xyzxyz<alpha>` (invalid CSS). Add regex `^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$` validation. On invalid input, log a warning and return the input unchanged (UI safety — match existing graceful fallbacks like the `oklch/hsl/named` path).
 

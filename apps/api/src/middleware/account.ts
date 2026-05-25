@@ -41,6 +41,7 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
 
     if (!verifiedEmail.ok) {
       logger.info('account.middleware.email_not_verified', {
+        // Retained: only available Clerk audit join key — no accountId at this point
         clerkUserId: user.userId,
         emailVerified: user.emailVerified,
         reason: verifiedEmail.reason,
@@ -69,6 +70,7 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
     const db = c.get('db');
     if (verifiedEmail.source !== 'jwt') {
       logger.info('account.middleware.email_verified_via_clerk_backend', {
+        // Retained: only available Clerk audit join key — no accountId at this point
         clerkUserId: user.userId,
         source: verifiedEmail.source,
       });

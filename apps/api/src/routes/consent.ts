@@ -261,6 +261,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
   .get('/consent/my-status', async (c) => {
     const profileId = c.get('profileId');
     if (!profileId) {
+      // Caller without active profile (mid-onboarding) has no consent record;
+      // null fields mean "no consent required"; intentionally NOT an error —
+      // callers should not interpret as failure.
       return c.json(
         myConsentStatusSchema.parse({
           consentStatus: null,

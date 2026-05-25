@@ -109,6 +109,12 @@ export async function sendPushNotification(
   }
 
   // 4. Send via Expo Push API
+  // [BUG-688] Separate the network boundary (fetch + json) from the DB write
+  // (logNotification). The previous shape wrapped both in one catch and tagged
+  // any thrown error as `network_error`, so a Postgres failure from
+  // logNotification was misreported as a push-network error in Sentry and
+  // metrics. Classification now branches on which boundary threw.
+  let ticketId: string | undefined;
   try {
     const response = await fetch(EXPO_PUSH_API_URL, {
       method: 'POST',
@@ -132,16 +138,7 @@ export async function sendPushNotification(
     const result = (await response.json()) as {
       data?: { id?: string; status?: string };
     };
-    const ticketId = result.data?.id;
-
-    // 5. Log the notification (skipped when caller already reserved the slot
-    // via checkAndLogRateLimitInternal — avoids double-counting toward the
-    // daily cap on per-type rate-limited paths).
-    if (!options?.skipRateLimitLog) {
-      await logNotification(db, payload.profileId, payload.type, ticketId);
-    }
-
-    return { sent: true, ticketId };
+    ticketId = result.data?.id;
   } catch (err) {
     logger.error('[push] send failed', {
       event: 'notification.push.network_error',
@@ -155,6 +152,37 @@ export async function sendPushNotification(
     });
     return { sent: false, reason: 'network_error' };
   }
+
+  // 5. Log the notification (skipped when caller already reserved the slot
+  // via checkAndLogRateLimitInternal — avoids double-counting toward the
+  // daily cap on per-type rate-limited paths).
+  // [BUG-688] DB errors classified as `db_error` (not network_error). The push
+  // itself succeeded — we still report `sent: true` because the user got it —
+  // but escalate the log-write failure so on-call can see the divergence
+  // between Expo tickets and our notification_log rows.
+  if (!options?.skipRateLimitLog) {
+    try {
+      await logNotification(db, payload.profileId, payload.type, ticketId);
+    } catch (err) {
+      logger.error('[push] log write failed after successful send', {
+        event: 'notification.push.db_error',
+        profileId: payload.profileId,
+        type: payload.type,
+        ticketId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      captureException(err, {
+        profileId: payload.profileId,
+        tags: { surface: 'push_notification', reason: 'db_error' },
+        extra: { ticketId, type: payload.type },
+      });
+      // Push was delivered; surface success to the caller but with a reason
+      // tag so tests/observability can detect the divergence.
+      return { sent: true, ticketId, reason: 'log_write_failed' };
+    }
+  }
+
+  return { sent: true, ticketId };
 }
 
 /**

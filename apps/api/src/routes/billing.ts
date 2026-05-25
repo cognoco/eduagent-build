@@ -139,6 +139,22 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
+
+    // [BUG-644] Only the account owner can read subscription tier/status/limits.
+    // Without this gate, a non-owner child profile on the parent's account
+    // could read parent's tier, status, trialEndsAt, currentPeriodEnd,
+    // cancelAtPeriodEnd, monthlyLimit, dailyLimit — account-level billing
+    // information that must not be exposed to children.
+    const activeProfileMetaSubscription = c.get('profileMeta');
+    if (activeProfileMetaSubscription?.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the account owner can view subscription details.',
+      );
+    }
+
     const freeTier = getTierConfig('free');
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
@@ -721,6 +737,21 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
+
+    // [BUG-645] isOwner gate parity with /family/add and /family/remove.
+    // Without this, a non-owner child active on the parent's account could
+    // read family pool status (tier/monthlyLimit/usedThisMonth/profileCount)
+    // and the full members list — sibling identities and account-level
+    // billing data. Sibling write routes already gate; the read route did not.
+    const activeProfileMetaFamily = c.get('profileMeta');
+    if (activeProfileMetaFamily?.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the family owner can view family subscription details.',
+      );
+    }
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription) {

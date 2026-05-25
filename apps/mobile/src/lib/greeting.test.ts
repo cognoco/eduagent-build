@@ -11,10 +11,15 @@ describe('getTimeOfDay', () => {
     expect(getTimeOfDay(new Date('2026-04-08T16:59:00'))).toBe('afternoon');
   });
 
-  it('returns evening from 17:00 onward and through the night', () => {
+  it('returns evening between 17:00 and 20:59', () => {
     expect(getTimeOfDay(new Date('2026-04-08T17:00:00'))).toBe('evening');
-    expect(getTimeOfDay(new Date('2026-04-08T23:59:00'))).toBe('evening');
-    expect(getTimeOfDay(new Date('2026-04-09T04:59:00'))).toBe('evening');
+    expect(getTimeOfDay(new Date('2026-04-08T20:59:00'))).toBe('evening');
+  });
+
+  it('returns night from 21:00 onward and before 5:00', () => {
+    expect(getTimeOfDay(new Date('2026-04-08T21:00:00'))).toBe('night');
+    expect(getTimeOfDay(new Date('2026-04-08T23:59:00'))).toBe('night');
+    expect(getTimeOfDay(new Date('2026-04-09T04:59:00'))).toBe('night');
   });
 });
 
