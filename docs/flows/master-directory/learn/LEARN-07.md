@@ -35,7 +35,7 @@ The learning session belongs to exactly one learner profile. Study users see the
 | Submit reflection | `useSubmitSummary(sessionId)` on summary screen | Yes | No | Requires at least 10 trimmed characters before enabling `submit-summary-button`; local draft is autosaved by profile/session until submitted. |
 | Skip reflection | `useSkipSummary(sessionId)` on summary screen | Yes | No | Skip is recorded as a persisted state; later re-entry renders skipped-state or draft recovery if a draft exists. |
 | View full transcript | `/session-transcript/[sessionId]` | Yes | Compatibility only | LEARN-23 filters system-prompt rows and strips LLM envelope JSON; parent-proxy link is gated per inventory. |
-| Continue learning | `/(app)/session` with `nextTopicId` when available | Yes | Bridge only | `session-next-topic-card` should start the learner's next session, with reason fed to prompt context. Mentor "learn this too" should write to the adult's Study context, not the child. |
+| Continue learning | `/(app)/session` with `nextTopicId` when available | Yes | Bridge only | `session-next-topic-card` should start the learner's next session, with reason fed to prompt context. Mentor "Add to my learning" should write to the adult's Study context, not the child. |
 | Mentor child recap | `/(app)/child/[profileId]/session/[sessionId]` | No | Yes | Uses `useChildSessionDetail`; parent sees narrative/highlight/prompt/engagement and optional homework summary. |
 | Family Recaps | `/(app)/recaps` with detail handoff to `/(app)/child/[profileId]/session/[sessionId]` | No | Yes in V1 | Minimal navigation-contract branch surface lists child session recap fields and opens parent-native child session detail for full context. |
 

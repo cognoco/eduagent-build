@@ -84,7 +84,7 @@ Parent review should be parent-native. The normal parent path for child session 
 - Recaps as a first-class Family tab from v1.
 - Child curriculum management remains reachable from Family mode through child cards/details, not through proxy mode.
 - Family Progress keeps today's child/family progress behavior, but removes the parent's own progress from Family mode.
-- Parent-to-study bridge from Recaps or child session surfaces, such as "Learn this too", switching the same adult account into Study mode as themselves.
+- Parent-to-study bridge from Recaps or child session surfaces, currently named "Add to my learning", switching the same adult account into Study mode as themselves.
 - The same person/account remains linked across modes; switching modes must not create a separate identity.
 - Hide proxy/view-as-child from normal end-user paths once Recaps covers parent review.
 
@@ -143,7 +143,7 @@ Parent review should be parent-native. The normal parent path for child session 
 | `apps/mobile/src/components/home/ParentHomeScreen.tsx` | Current Family Hub / parent dashboard surface and child actions |
 | `apps/mobile/src/components/home/LearnerScreen.tsx` | Current Study mode learner home |
 | `apps/mobile/src/app/(app)/progress/index.tsx` | Existing Progress behavior, including parent/child/self profile selection |
-| `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx` | Existing parent-facing session recap detail and possible "Learn this too" source |
+| `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx` | Existing parent-facing session recap detail and possible "Add to my learning" source |
 | `apps/mobile/src/app/profiles.tsx` | Existing profile switching and child account/profile entry points |
 | `apps/mobile/src/hooks/use-notification-response-handler.ts` | Push tap routing; must account for Family/Study context boundaries |
 | `apps/mobile/src/lib/api-client.ts` | Existing `X-Profile-Id` and `X-Proxy-Mode` header state; do not add app-context header in v1 |
@@ -269,8 +269,8 @@ Client rules:
 - **Study Progress is self only.** In Study mode, Progress shows the active user's own learning only.
 - **Child curriculum management lives under Family.** Removing top-level Library from Family mode must not remove the parent's ability to add/manage a child's subjects/books. Add an explicit child-card/details path from Children to child curriculum management.
 - **Recaps is parent-native.** Recaps lists child learning summaries the adult is allowed to see. It is not a child-account preview.
-- **"Learn this too" is same-account study.** Tapping it switches the adult into Study mode as themselves and opens a seeded learning entry point based on the child recap context.
-- **Learn this too pre-checks adult quota.** The bridge should check the adult's learning quota/entitlement before opening the Study entry. If quota is exhausted, show the existing quota-exceeded/upgrade UI instead of dropping the user into a dead-end session start.
+- **"Add to my learning" is same-account study.** Tapping it switches the adult into Study mode as themselves and opens a seeded learning entry point based on the child recap context.
+- **Add to my learning pre-checks adult quota.** The bridge should check the adult's learning quota/entitlement before opening the Study entry. If quota is exhausted, show the existing quota-exceeded/upgrade UI instead of dropping the user into a dead-end session start.
 - **Family mode uses adult copy register.** Family UI chrome is for an adult viewing child data, so surrounding UI uses adult register. Existing recap `narrative` / `conversation_prompt` fields are already parent-facing and must not be transformed through child copy logic.
 - **Notification taps are explicit context switches.** Parent/family notifications such as child session recap/progress pushes switch to Family mode and replace into Recaps detail/list. If a full-screen Study session is active, queue or prompt instead of silently interrupting the session.
 - **Analytics required.** Track `mode_intent_chosen`, `mode_switched`, `learn_this_too_tapped`, `learn_this_too_quota_blocked`, and `learn_this_too_completed` using existing `track()` patterns with hashed/profile-safe properties only.
@@ -351,7 +351,7 @@ Rules:
 
 ### Learn This Too Navigation
 
-`Learn this too` is a cross-context action and must be deterministic:
+`Add to my learning` is a cross-context action and must be deterministic:
 
 1. Parent taps from Recaps or child session recap.
 2. App pre-checks the adult's quota/entitlement.
@@ -366,7 +366,7 @@ Rules:
 - Unit test: mode switch failure does not navigate and rolls back UI.
 - Unit test: Family -> Recap detail back uses fallback `/(app)/recaps`.
 - Unit test: Recap detail opened as a deep link still returns to `/(app)/recaps`.
-- Unit test: Learn this too uses replace into Study, not push.
+- Unit test: Add to my learning uses replace into Study, not push.
 - Unit test: notification tap while in Study prompts/queues if an active Study session is full-screen.
 - Playwright: repeat Study/Family switches and device/browser Back never lands in stale child/proxy/detail routes.
 
@@ -417,7 +417,7 @@ Intent is not an account type. It is a first-run preference used to route setup:
   - completion time
   - parent-facing narrative
   - translation-keyed engagement signal, if available
-  - CTA: Learn this too
+  - CTA: Add to my learning
   - secondary action: Open recap/session detail
 
 ### Data Contract
@@ -471,7 +471,7 @@ Endpoint requirements:
 
 The v1 bridge should be explicit and testable:
 
-1. Parent taps `Learn this too` on a Recaps card or child session recap.
+1. Parent taps `Add to my learning` on a Recaps card or child session recap.
 2. App pre-checks adult quota/entitlement.
 3. If quota is exhausted, app shows the existing quota-exceeded/upgrade UI and tracks `learn_this_too_quota_blocked`.
 4. App switches the same adult profile into Study mode.
@@ -601,7 +601,7 @@ If implementation proves it is dead, deletion is allowed only after grepping rou
    - Study mode: self only.
    - Add explicit headers/copy: Family Progress vs My Progress, or equivalent.
 
-12. **Learn this too**
+12. **Add to my learning**
    - Add CTA to Recaps cards.
    - Implement same-account Study mode switch with `StudySourceContext`.
    - Pre-check adult quota/entitlement before switching into the Study entry route.
@@ -662,9 +662,9 @@ If implementation proves it is dead, deletion is allowed only after grepping rou
 14. Given Recaps feed data is selected, then it reuses `session_summaries.narrative`, `conversation_prompt`, and `engagement_signal`; no new synonym columns are added.
 15. Given a parent opens Recaps for a child with no sessions, then the empty state names the child and explains what will make recaps appear.
 16. Given a recap item includes engagement data, when the response is parsed, then only the shared `engagementSignalSchema` values are accepted and UI copy is translation-keyed.
-17. Given a parent taps Learn this too, when Study mode opens, then the adult remains the active learner and the child session context is passed as `StudySourceContext`.
-18. Given a parent taps Learn this too while adult study quota is exhausted, then the existing quota-exhausted/upgrade UI appears before entering Study.
-19. Given a parent taps Learn this too without an existing matching subject, then the app offers a lightweight study entry instead of silently creating a subject/book.
+17. Given a parent taps Add to my learning, when Study mode opens, then the adult remains the active learner and the child session context is passed as `StudySourceContext`.
+18. Given a parent taps Add to my learning while adult study quota is exhausted, then the existing quota-exhausted/upgrade UI appears before entering Study.
+19. Given a parent taps Add to my learning without an existing matching subject, then the app offers a lightweight study entry instead of silently creating a subject/book.
 20. Given a parent has access to a child profile without a linked child account, when Recaps and Progress load, then both surfaces still work.
 21. Given a parent has a linked child learner account, when Recaps and Progress load, then both surfaces respect family-link/consent visibility and do not require proxy mode.
 22. Given the normal profile picker is used by an end user, when a child profile is selected/reviewed, then the app does not route through proxy mode.
@@ -673,12 +673,12 @@ If implementation proves it is dead, deletion is allowed only after grepping rou
 25. Given Family mode is active, when any Study-only route/query attempts to load child data, then the request is rejected or the UI redirects to a Family-safe surface.
 26. Given Study mode is active, when any Family-only route/query attempts to render child recaps/progress, then the UI does not show child data and routes to Study home or shows a no-access fallback.
 27. Given a Recaps API request includes a child id outside the active parent's family, when the endpoint is called, then it returns the existing protected/not-found error shape and no recap data.
-28. Given Learn this too starts an adult study flow from a child recap, when a session or subject is created, then the owner/profile on the write is the adult profile, not the child profile.
+28. Given Add to my learning starts an adult study flow from a child recap, when a session or subject is created, then the owner/profile on the write is the adult profile, not the child profile.
 29. Given a parent/family push notification is tapped while the user is in Study mode, then the app prompts/queues if an active session is running, otherwise switches to Family and replaces into Recaps or a Family-safe root.
 30. Given a mode switch succeeds, when navigation completes, then the route is replaced to the new context canonical root and the previous context detail screen is not in the back stack.
 31. Given a mode switch fails, when navigation is evaluated, then no route change happens and the previous context stays visible.
 32. Given Recap detail is opened from Recaps or by deep link, when Back is pressed, then the app lands on Recaps, not Children, Study, proxy, or a stale child detail screen.
-33. Given Learn this too opens Study from Recaps, when device/browser Back is pressed, then the app follows Study-mode fallback behavior and never jumps to a stale Family detail route.
+33. Given Add to my learning opens Study from Recaps, when device/browser Back is pressed, then the app follows Study-mode fallback behavior and never jumps to a stale Family detail route.
 34. Given email verification or app reload loses the first-run route state, when onboarding resumes, then `/(app)/onboarding/intent` is shown again without reading any SecureStore intent value.
 35. Given mode intent, mode switch, or Learn-this-too events happen, then analytics emit the named events with hashed/profile-safe properties only.
 
@@ -696,7 +696,7 @@ If implementation proves it is dead, deletion is allowed only after grepping rou
 | Parent is proxy-viewing a child through retained internal/test path | `isParentProxy` is true | Proxy banner and child learner preview; no Study/Family switch | Switch back exits proxy and restores adult's last/default context |
 | Normal profile picker previously entered proxy | Parent selects/reviews child profile | Parent-native child detail/Recaps/Progress routes, not proxy | Use Recaps/Progress/Children surfaces; no "view as child" modal |
 | Only active profile is a child on a shared parent account | Child profile is active | Study tabs only; Family/Recaps hidden | Switch back to adult profile through allowed profile switch path |
-| Parent taps Learn this too before starting own learning | Recap has subject/topic context, adult has no matching subject | Lightweight "learn the basics" entry with confirmation, not silent subject creation | Confirm to start studying as adult or cancel back to Recaps |
+| Parent taps Add to my learning before starting own learning | Recap has subject/topic context, adult has no matching subject | Lightweight "learn the basics" entry with confirmation, not silent subject creation | Confirm to start studying as adult or cancel back to Recaps |
 | Recaps endpoint returns no rows | No completed child sessions or no visible child data | Named empty state for all children or selected child | Child studies, consent is resolved, or parent changes filter |
 | Recaps endpoint fails | Network/server error | Reusable error fallback with retry and secondary back/home action | Retry fetch; Family tab remains available |
 | Mode state update fails | Server update for default app context returns 4xx/5xx | Optimistic tab switch rolls back; retryable toast/banner appears | Retry mode switch; current context remains unchanged |
@@ -704,12 +704,12 @@ If implementation proves it is dead, deletion is allowed only after grepping rou
 | Profile list loads slowly | Server-backed `defaultAppContext` is not yet available | Existing profile-loading state; no tab-bar flicker | Wait for profile query containing mode field |
 | Stale query cache after mode switch | Family data remains cached when switching to Study, or self-progress remains cached when switching to Family | Active-context screens either show loading or refetch; stale data is not rendered | Context-scoped query keys and switch invalidation force fresh data |
 | Recaps child filter is tampered | URL/query param uses a child id from another family | Protected/not-found fallback, no data | Server-side family-link check rejects the request |
-| Learn this too carries child source context into a write path | Study flow mistakenly scopes subject/session creation to child id | Write is blocked by tests/server ownership guard; UI remains adult-scoped | Fix mapping so source context is read-only metadata |
-| Adult quota exhausted on Learn this too | Adult taps bridge from Recaps but has no available study quota | Existing quota-exhausted/upgrade UI before entering Study | Pre-check entitlement/quota at bridge tap; track `learn_this_too_quota_blocked` |
+| Add to my learning carries child source context into a write path | Study flow mistakenly scopes subject/session creation to child id | Write is blocked by tests/server ownership guard; UI remains adult-scoped | Fix mapping so source context is read-only metadata |
+| Adult quota exhausted on Add to my learning | Adult taps bridge from Recaps but has no available study quota | Existing quota-exhausted/upgrade UI before entering Study | Pre-check entitlement/quota at bridge tap; track `add_to_my_learning_quota_blocked` |
 | Push tap while in opposite mode | Parent/family notification is tapped while adult is in Study mode | If no active full-screen session, Family Recaps/root opens; if a session is active, prompt/queue appears | Notification handler performs an explicit context transition with replace, never silent stack push |
 | Mode switch leaves stale detail screen in back stack | User switches Family -> Study from a child detail route and presses Back | User remains in Study fallback/root, not old child detail | Mode switch uses replace to canonical root and clears context-specific stack |
 | Recap detail opened by deep link has no history | User presses Back | Recaps list opens as fallback | `goBackOrReplace(router, '/(app)/recaps')` with explicit fallback |
-| Browser/device back after Learn this too | Parent enters Study from child recap, then presses Back | Study fallback/root, not proxy or child detail | Cross-context bridge uses replace; "Back to recap" is an explicit action if needed |
+| Browser/device back after Add to my learning | Parent enters Study from child recap, then presses Back | Study fallback/root, not proxy or child detail | Cross-context bridge uses replace; "Back to recap" is an explicit action if needed |
 | User signs out on shared device | Sign-out cleanup runs | No client-persisted mode state remains | Next sign-in loads mode from server profile data |
 
 ## Additional Context
@@ -768,14 +768,14 @@ If implementation proves it is dead, deletion is allowed only after grepping rou
   - Study Progress excludes child profiles.
   - Children tab exposes child curriculum entry point.
   - Recaps renders all-child feed, child-filtered feed, and empty state.
-  - Learn this too passes `StudySourceContext`.
-  - Learn this too shows existing quota-exhausted/upgrade UI before Study entry when adult quota is exhausted.
+  - Add to my learning passes `StudySourceContext`.
+  - Add to my learning shows existing quota-exhausted/upgrade UI before Study entry when adult quota is exhausted.
   - parent/family push taps switch/prompt according to active Study/Family state.
   - `mode_intent_chosen`, `mode_switched`, `learn_this_too_tapped`, `learn_this_too_quota_blocked`, and `learn_this_too_completed` fire with safe properties.
   - mode switch uses replace to canonical root and rolls back on failure.
   - profile switch replaces to the new profile root and does not preserve stale detail routes.
   - deep-linked Recap detail backs to Recaps.
-  - Learn this too does not leave Family/proxy detail routes in the back stack.
+  - Add to my learning does not leave Family/proxy detail routes in the back stack.
   - context-scoped query keys include profile/context/child filter as appropriate.
 - API tests:
   - `defaultAppContext` parses and serializes on profile list/get responses.
@@ -797,9 +797,9 @@ If implementation proves it is dead, deletion is allowed only after grepping rou
   - Family Recaps opens and filters by child.
   - Children tab can reach child curriculum management.
   - Normal profile picker no longer opens proxy mode.
-  - Learn this too switches into Study as the adult.
+  - Add to my learning switches into Study as the adult.
   - Recaps detail Back returns to Recaps.
-  - Learn this too followed by browser/device Back does not jump to stale Family/proxy/child routes.
+  - Add to my learning followed by browser/device Back does not jump to stale Family/proxy/child routes.
   - repeated Study/Family switches keep Back behavior inside the active context.
 
 ### Notes
