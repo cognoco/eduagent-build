@@ -411,12 +411,8 @@ describe('metering middleware', () => {
         '/v1/subjects/00000000-0000-4000-8000-000000000101/book-suggestions',
         undefined,
       ],
-      [
-        'manual book topic generation',
-        'POST',
-        '/v1/subjects/00000000-0000-4000-8000-000000000101/books/00000000-0000-4000-8000-000000000102/generate-topics',
-        { priorKnowledge: 'some' },
-      ],
+      // [WI-141] manual book topic generation moved to metered routes —
+      // see "[WI-77] newly metered LLM routes" describe block below.
       [
         'learner monthly reports list',
         'GET',
@@ -1822,6 +1818,210 @@ describe('metering middleware', () => {
 
       // Should be caught by metering (402) not pass through unmetered
       expect(res.status).toBe(402);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // [WI-77 Wave B] Newly metered LLM routes (allowlist sweep)
+  //
+  // Each row asserts the metering boundary contract for one route:
+  //   1. With quota available, mockDecrementQuota is invoked when the
+  //      request hits a metered path (route may still reject downstream
+  //      for missing fixtures — the boundary fires regardless).
+  //   2. With quota exhausted at the cap, the middleware fast-paths a 402
+  //      QUOTA_EXCEEDED response before any LLM call can run.
+  //
+  // The boundary test does not require route handlers to succeed end-to-end;
+  // the metering middleware decrements BEFORE the handler. A 4xx from the
+  // route's own validator still proves the boundary fired (and triggers the
+  // post-handler refund — that path is covered separately in
+  // metering.refund-on-throw.test.ts and the existing refund-on-4xx test).
+  // -----------------------------------------------------------------------
+
+  describe('[WI-77] newly metered LLM routes', () => {
+    const SUBJECT_UUID = '00000000-0000-4000-8000-000000000101';
+    const BOOK_UUID = '00000000-0000-4000-8000-000000000102';
+    const TOPIC_UUID = '00000000-0000-4000-8000-000000000103';
+    const SESSION_UUID = 'a0000000-0000-4000-a000-000000000001';
+    const ASSESSMENT_UUID = 'a0000000-0000-4000-a000-000000000201';
+    const CHILD_PROFILE_UUID = '00000000-0000-4000-8000-000000000104';
+
+    // [WI-141, WI-149, WI-154, WI-155, WI-157, WI-168, WI-178, WI-247, WI-136]
+    // POST routes whose handlers transitively reach the LLM. Each row drives
+    // a POST with an intentionally empty body so the route's own zValidator
+    // rejects with 400 — the middleware still ran first, so the decrement
+    // assertion is the metering boundary check.
+    const POST_METERED_ROUTES: ReadonlyArray<readonly [string, string]> = [
+      // WI-141 / DS-052
+      [
+        'WI-141: book topic generation',
+        `/v1/subjects/${SUBJECT_UUID}/books/${BOOK_UUID}/generate-topics`,
+      ],
+      // WI-149 / DS-060
+      [
+        'WI-149: curriculum topic preview/create',
+        `/v1/subjects/${SUBJECT_UUID}/curriculum/topics`,
+      ],
+      [
+        'WI-149: curriculum challenge',
+        `/v1/subjects/${SUBJECT_UUID}/curriculum/challenge`,
+      ],
+      // WI-154 / DS-065
+      ['WI-154: filing', '/v1/filing'],
+      // WI-155 / DS-066
+      ['WI-155: OCR', '/v1/ocr'],
+      // WI-157 / DS-068
+      ['WI-157: learner-profile/tell', '/v1/learner-profile/tell'],
+      [
+        'WI-157: learner-profile/:id/tell',
+        `/v1/learner-profile/${CHILD_PROFILE_UUID}/tell`,
+      ],
+      // WI-168 / DS-079
+      ['WI-168: retention recall-test', '/v1/retention/recall-test'],
+      // WI-178 / DS-089
+      ['WI-178: subjects create', '/v1/subjects'],
+      ['WI-178: subjects classify', '/v1/subjects/classify'],
+      // WI-247 / DS-148
+      [
+        'WI-247: session summary submit',
+        `/v1/sessions/${SESSION_UUID}/summary`,
+      ],
+      // WI-136 / DS-038
+      [
+        'WI-136: assessment answer submit',
+        `/v1/assessments/${ASSESSMENT_UUID}/answer`,
+      ],
+      // WI-258 / DS-169 — book-suggestion top-up split from GET ?topup=1
+      [
+        'WI-258: book-suggestions topup',
+        `/v1/subjects/${SUBJECT_UUID}/book-suggestions/topup`,
+      ],
+    ];
+
+    it.each(POST_METERED_ROUTES)(
+      '%s — decrement fires at the metering boundary',
+      async (_label, path) => {
+        mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+        mockGetQuotaPool.mockResolvedValue(mockQuota());
+        mockDecrementQuota.mockResolvedValue({
+          success: true,
+          source: 'monthly',
+          remainingMonthly: 399,
+          remainingTopUp: 0,
+          remainingDaily: null,
+        });
+
+        await app.request(
+          path,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            // Empty body — route validator will reject, but only AFTER
+            // metering has decremented. Refund-on-4xx fires post-handler;
+            // the boundary assertion is independent.
+            body: JSON.stringify({}),
+          },
+          TEST_ENV,
+        );
+
+        expect(mockDecrementQuota).toHaveBeenCalledWith(
+          expect.anything(),
+          'sub-1',
+          'test-profile-id',
+        );
+      },
+    );
+
+    it.each(POST_METERED_ROUTES)(
+      '%s — returns 402 QUOTA_EXCEEDED before LLM call when quota exhausted',
+      async (_label, path) => {
+        mockEnsureFreeSubscription.mockResolvedValue(
+          mockSubscription({ tier: 'free' }),
+        );
+        mockGetQuotaPool.mockResolvedValue(
+          mockQuota({ usedThisMonth: 100, monthlyLimit: 100 }),
+        );
+        mockDecrementQuota.mockResolvedValue({
+          success: false,
+          source: 'none',
+          remainingMonthly: 0,
+          remainingTopUp: 0,
+          remainingDaily: null,
+        });
+
+        const res = await app.request(
+          path,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({}),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(402);
+        const body = (await res.json()) as { code: string };
+        expect(body.code).toBe('QUOTA_EXCEEDED');
+        // Quota was exhausted before any handler ran — refund must not fire.
+        expect(mockSafeRefundQuota).not.toHaveBeenCalled();
+      },
+    );
+
+    // [WI-149 / DS-060] explainTopicOrdering is the only GET endpoint in this
+    // sweep — it lives in LLM_ROUTE_PATTERNS_ANY_METHOD because the GET
+    // counterpart is not DB-only (it calls routeAndCall). Pair the same two
+    // assertions as the POST table.
+    const EXPLAIN_PATH = `/v1/subjects/${SUBJECT_UUID}/curriculum/topics/${TOPIC_UUID}/explain`;
+
+    it('WI-149: GET curriculum/topics/:id/explain — decrement fires at the metering boundary', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota());
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      await app.request(
+        EXPLAIN_PATH,
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+      );
+    });
+
+    it('WI-149: GET curriculum/topics/:id/explain — returns 402 when quota exhausted', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'free' }),
+      );
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 100, monthlyLimit: 100 }),
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        source: 'none',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        EXPLAIN_PATH,
+        { method: 'GET', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(402);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('QUOTA_EXCEEDED');
+      expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
   });
 });

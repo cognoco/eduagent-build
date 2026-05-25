@@ -144,6 +144,11 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   // 'interview_ready': retained in DB enum (removal needs destructive migration); removed from typed payload union — no sender exists.
   'interview_ready',
   'nudge',
+  // [WI-179] Rate-limit marker for /v1/support/outbox-spillover. Never
+  // dispatched as a user notification — recorded only so the existing
+  // notification_log-backed rate limiter can enforce per-profile budgets
+  // on outbox spillover writes.
+  'support_outbox_spillover',
 ]);
 
 export const notificationLog = pgTable(

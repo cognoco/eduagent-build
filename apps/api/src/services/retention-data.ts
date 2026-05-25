@@ -804,6 +804,58 @@ export async function processRecallTest(
   }
 
   const topicTitle = topic.topicTitle;
+
+  // [WI-234] Atomic cooldown claim BEFORE calling the LLM. Two concurrent
+  // recall submissions for the same fresh topic would both pass the
+  // `canRetestTopic` JS check above (which reads the un-mutated card) and
+  // both reach `evaluateRecallQuality` → `routeAndCall`. To make exactly one
+  // request reach the LLM, claim the cooldown window with an atomic UPDATE
+  // of `lastReviewedAt` here, BEFORE the LLM call. The post-LLM write below
+  // remains as a defence-in-depth optimistic guard but the LLM-call gate is
+  // this pre-claim. dont_remember skips both the LLM and the claim (it never
+  // bumps `lastReviewedAt`).
+  const cooldownThreshold = new Date(Date.now() - RETEST_COOLDOWN_MS);
+  const claimNow = new Date();
+  if (attemptMode !== 'dont_remember') {
+    const [claimed] = await db
+      .update(retentionCards)
+      .set({
+        // Use claimNow for both lastReviewedAt and updatedAt so the
+        // optimistic-lock check below (eq(updatedAt, claimNow)) lines up.
+        lastReviewedAt: claimNow,
+        updatedAt: claimNow,
+      })
+      .where(
+        and(
+          eq(retentionCards.id, effectiveCard.id),
+          eq(retentionCards.profileId, profileId),
+          // Atomic cooldown guard: only claim if lastReviewedAt is null or
+          // older than the cooldown threshold.
+          or(
+            isNull(retentionCards.lastReviewedAt),
+            lt(retentionCards.lastReviewedAt, cooldownThreshold),
+          ),
+        ),
+      )
+      .returning({ id: retentionCards.id });
+
+    if (!claimed) {
+      // Another concurrent request already claimed this cooldown window —
+      // return the cooldown response WITHOUT calling the LLM.
+      return {
+        passed: false,
+        masteryScore: 0,
+        xpChange: 'none',
+        nextReviewAt:
+          effectiveCard.nextReviewAt?.toISOString() ?? new Date().toISOString(),
+        failureCount: effectiveCard.failureCount,
+        failureAction: 'feedback_only',
+        cooldownActive: true,
+        cooldownEndsAt: new Date(Date.now() + RETEST_COOLDOWN_MS).toISOString(),
+      };
+    }
+  }
+
   const quality =
     attemptMode === 'dont_remember'
       ? 0
@@ -812,10 +864,10 @@ export async function processRecallTest(
   // state was already computed above for cooldown check — reuse it
   const result = processRecallResult(state, quality);
 
-  // D-02: atomic cooldown enforcement — the WHERE clause includes the cooldown
-  // threshold so two concurrent requests cannot both pass the cooldown check
-  // and both write lastReviewedAt within the same 24-hour window.
-  const cooldownThreshold = new Date(Date.now() - RETEST_COOLDOWN_MS);
+  // Post-LLM write: persist SM-2 result. For non-dont_remember, the cooldown
+  // claim above already bumped lastReviewedAt + updatedAt; we now write the
+  // computed result. Use the claimNow value as the optimistic lock so a
+  // late-arriving losing request cannot overwrite our just-claimed row.
   const [persisted] = await db
     .update(retentionCards)
     .set({
@@ -829,29 +881,26 @@ export async function processRecallTest(
         ? new Date(result.newState.nextReviewAt)
         : null,
       updatedAt: new Date(),
-      ...(attemptMode !== 'dont_remember'
-        ? { lastReviewedAt: new Date() }
-        : {}),
     })
     .where(
       and(
         eq(retentionCards.id, effectiveCard.id),
         eq(retentionCards.profileId, profileId),
-        // Atomic cooldown guard: only update if lastReviewedAt is null or older
-        // than the cooldown threshold (or dont_remember which skips cooldown write)
+        // For non-dont_remember: ensure the row is still the one we claimed
+        // (defence-in-depth — the pre-claim already serialized the LLM call).
+        // For dont_remember: no pre-claim, so we don't enforce updatedAt match.
         attemptMode === 'dont_remember'
           ? sql`true`
-          : or(
-              isNull(retentionCards.lastReviewedAt),
-              lt(retentionCards.lastReviewedAt, cooldownThreshold),
-            ),
+          : eq(retentionCards.updatedAt, claimNow),
       ),
     )
     .returning({ id: retentionCards.id });
 
-  // If the atomic guard rejected the update, another request already
-  // claimed this cooldown window — return the cooldown response.
   if (!persisted && attemptMode !== 'dont_remember') {
+    // The post-LLM write lost an optimistic-lock race against another writer
+    // (e.g. session-completed updating the same card concurrently). The
+    // pre-claim already burned the LLM call; surface as the cooldown branch
+    // to avoid silently dropping the SM-2 update with no client signal.
     return {
       passed: false,
       masteryScore: 0,

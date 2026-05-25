@@ -779,6 +779,116 @@ describe('POST /v1/dictation/review', () => {
     expect(body.code).toBe('RATE_LIMITED');
     expect(reviewDictation).not.toHaveBeenCalled();
   });
+
+  // -------------------------------------------------------------------------
+  // [WI-150 / WI-206] Payload caps — schema cap (400) and total-prompt-char
+  // budget (413). Verifies the cheap reject paths fire BEFORE the LLM call.
+  // -------------------------------------------------------------------------
+
+  it('returns 400 when sentences array exceeds the schema cap [WI-150]', async () => {
+    // Schema caps the array at 50. 51 entries trips the zod validator.
+    const overCount = Array.from({ length: 51 }, (_, i) => ({
+      text: `Sentence ${i}.`,
+      withPunctuation: `Sentence ${i} period`,
+      wordCount: 2,
+    }));
+
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ ...REVIEW_BODY, sentences: overCount }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('VALIDATION_ERROR');
+    expect(reviewDictation).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when a sentence text exceeds the per-sentence cap [WI-150]', async () => {
+    const oversizedSentence = {
+      text: 'a'.repeat(501), // schema cap is 500
+      withPunctuation: 'short',
+      wordCount: 1,
+    };
+
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          ...REVIEW_BODY,
+          sentences: [oversizedSentence],
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+    expect(reviewDictation).not.toHaveBeenCalled();
+  });
+
+  it('returns 413 when total prompt-char count exceeds the budget [WI-150]', async () => {
+    // 50 sentences × 250 chars (text + withPunctuation) = 12_500 chars > 12_000 cap.
+    // Each sentence's text 125 chars + withPunctuation 125 chars = 250 chars.
+    // All within per-field caps; only the aggregate budget rejects.
+    const aggregateOversized = Array.from({ length: 50 }, () => ({
+      text: 'a'.repeat(125),
+      withPunctuation: 'b'.repeat(125),
+      wordCount: 25,
+    }));
+
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          ...REVIEW_BODY,
+          sentences: aggregateOversized,
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.code).toBe('PAYLOAD_TOO_LARGE');
+    expect(reviewDictation).not.toHaveBeenCalled();
+  });
+
+  it('accepts a request just under the total prompt-char budget [WI-150]', async () => {
+    (reviewDictation as jest.Mock).mockResolvedValueOnce({
+      totalSentences: 30,
+      correctCount: 30,
+      mistakes: [],
+    });
+
+    // 30 sentences × 200 chars = 6_000 prompt chars; well under 12_000.
+    const inBudget = Array.from({ length: 30 }, () => ({
+      text: 'a'.repeat(100),
+      withPunctuation: 'b'.repeat(100),
+      wordCount: 20,
+    }));
+
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({ ...REVIEW_BODY, sentences: inBudget }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(reviewDictation).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

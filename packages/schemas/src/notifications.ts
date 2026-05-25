@@ -22,6 +22,12 @@ export const notificationTypeSchema = z.enum([
   'dictation_review',
   'session_filing_failed',
   'nudge',
+  // [WI-179] Re-uses the rate-limit / notification-log table to track outbox
+  // spillover requests per profile. NOT a user-visible notification — never
+  // dispatched via push/email. The shared `notification_log` table provides
+  // an atomic check-and-log primitive (`checkAndLogRateLimit` in services/settings)
+  // that this route piggybacks on so we don't need a parallel rate-limit store.
+  'support_outbox_spillover',
 ]);
 
 export const nudgeTemplateSchema = z.enum([

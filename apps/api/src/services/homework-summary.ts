@@ -306,25 +306,93 @@ export async function extractAndStoreHomeworkSummary(
   profileId: string,
   sessionId: string,
 ): Promise<HomeworkSummary> {
-  const summary = await extractHomeworkSummary(db, profileId, sessionId);
-
-  await db
-    .update(learningSessions)
-    .set({
-      metadata: sql`jsonb_set(
-        COALESCE(${learningSessions.metadata}, '{}'::jsonb),
-        '{homeworkSummary}',
-        ${JSON.stringify(summary)}::jsonb,
-        true
-      )`,
-      updatedAt: new Date(),
-    })
+  // [WI-216] Idempotency short-circuit: if the homework summary has already
+  // been written for this session, do not call the LLM again. The
+  // session-completed Inngest function declares
+  // `idempotency: 'event.data.sessionId'` so duplicate dispatch is deduped
+  // server-side, but a step retry inside the same execution would re-enter
+  // this code path and burn the LLM call without this guard.
+  const [existingRow] = await db
+    .select({ metadata: learningSessions.metadata })
+    .from(learningSessions)
     .where(
       and(
         eq(learningSessions.id, sessionId),
         eq(learningSessions.profileId, profileId),
       ),
-    );
+    )
+    .limit(1);
 
-  return summary;
+  const existingMetadata = getSessionMetadata(existingRow?.metadata);
+  if (existingMetadata.homeworkSummary) {
+    return existingMetadata.homeworkSummary;
+  }
+
+  const summary = await extractHomeworkSummary(db, profileId, sessionId);
+
+  // [WI-216 H2] TOCTOU fix — the pre-LLM check above can race with a
+  // concurrent invocation for the same session. Two callers may both see
+  // `homeworkSummary == null`, both call the LLM, then both UPDATE. The
+  // tx + row-lock here ensures only one write commits; the loser observes
+  // the winner's value and returns it unchanged.
+  //
+  // Trade-off: we accept that the LOSING caller's LLM call already consumed
+  // provider tokens directly (this function is invoked from the
+  // session-completed Inngest job, NOT through the HTTP metering middleware,
+  // so there is no quota refund path — the cost is real provider spend, not
+  // user-visible quota). The security property the fix enforces is
+  // "metadata is not corrupted / overwritten" and "concurrent callers
+  // converge on the same summary value." Holding the row lock during the
+  // LLM call would prevent the duplicate spend but at the cost of
+  // serializing 2-5s LLM round-trips behind a Postgres lock; the
+  // concurrency here is low (a session-completed Inngest step retry, plus
+  // possibly a manual replay) so the optimistic post-LLM re-check is the
+  // right trade. The pre-LLM short-circuit at the top of this function
+  // catches the common case (one caller finishes and writes before another
+  // even starts); this in-tx re-check is the defence for the narrow
+  // overlapping window only.
+  //
+  // The UPDATE uses jsonb_set (merged from origin/main) so it only writes
+  // the homeworkSummary key without overwriting other metadata that a
+  // concurrent unrelated path may have set during our LLM call.
+  return db.transaction(async (tx) => {
+    const [lockedRow] = await tx
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+
+    const lockedMetadata = getSessionMetadata(lockedRow?.metadata);
+    if (lockedMetadata.homeworkSummary) {
+      // A concurrent caller raced ahead and wrote a summary while our LLM
+      // call was in flight. Return their value unchanged; do NOT overwrite.
+      return lockedMetadata.homeworkSummary;
+    }
+
+    await tx
+      .update(learningSessions)
+      .set({
+        metadata: sql`jsonb_set(
+          COALESCE(${learningSessions.metadata}, '{}'::jsonb),
+          '{homeworkSummary}',
+          ${JSON.stringify(summary)}::jsonb,
+          true
+        )`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      );
+
+    return summary;
+  });
 }

@@ -135,6 +135,36 @@ export async function submitSummary(
   if (!session) {
     throw new Error('Session not found');
   }
+
+  // [WI-247] Idempotent short-circuit: if a summary already exists in
+  // `accepted` (terminal) state, re-submitting MUST NOT call the LLM again
+  // — return the existing row as-is. Without this guard, every retry of an
+  // already-accepted summary would re-bill quota AND risk re-applying the
+  // reflection multiplier (the in-tx existence check below caps the worst
+  // case but only AFTER the LLM call has already burned quota).
+  //
+  // Note: only `accepted` short-circuits here. `submitted` rows still pass
+  // through the in-tx idempotency path below — that path already correctly
+  // returns the existing row without re-multiplying XP, BUT it does so
+  // after the LLM call has executed. Future tightening could short-circuit
+  // `submitted` too; out of scope for WI-247 which targets accepted-replay
+  // specifically.
+  const preExisting = await findSessionSummaryRow(db, profileId, sessionId);
+  if (preExisting && preExisting.status === 'accepted') {
+    const xpInfo = await getSessionXpEntry(db, profileId, sessionId);
+    return {
+      summary: {
+        id: preExisting.id,
+        sessionId: preExisting.sessionId,
+        content: preExisting.content ?? '',
+        aiFeedback: preExisting.aiFeedback ?? '',
+        status: 'accepted',
+        baseXp: xpInfo?.baseXp ?? null,
+        reflectionBonusXp: xpInfo?.reflectionBonusXp ?? null,
+      },
+    };
+  }
+
   const subject = await getSubject(db, profileId, session.subjectId);
 
   // Evaluate summary via LLM
