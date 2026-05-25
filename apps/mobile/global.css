@@ -64,6 +64,8 @@ body {
   --color-homework-lane: #f59e0b;
   --color-reward: #fbbf24;
   --color-reward-soft: rgba(251, 191, 36, 0.15);
+  --color-highlight-bg: #fde047;
+  --color-highlight-fg: #1f2937;
   --spacing-card-padding: 24px;
   --radius-card: 16px;
   --radius-button: 12px;

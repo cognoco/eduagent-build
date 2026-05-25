@@ -500,7 +500,7 @@ export function LearnerScreen({
                   params: { returnTo: returnToTab },
                 } as Href)
               }
-              className="min-h-[56px] min-w-[64px] rounded-card border border-border bg-surface items-center justify-center px-2"
+              className="min-h-[56px] min-w-[64px] rounded-card bg-highlight-bg items-center justify-center px-2"
               accessibilityRole="button"
               accessibilityLabel="Open My Notes"
               testID="home-my-notes"
@@ -508,10 +508,10 @@ export function LearnerScreen({
               <Ionicons
                 name="document-text-outline"
                 size={21}
-                color={colors.primary}
+                color={colors.highlightFg}
               />
               <Text
-                className="text-caption font-semibold text-text-primary mt-0.5"
+                className="text-caption font-semibold text-highlight-fg mt-0.5"
                 numberOfLines={1}
               >
                 My Notes

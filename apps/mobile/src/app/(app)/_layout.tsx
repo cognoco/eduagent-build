@@ -566,6 +566,7 @@ function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useClerk();
+  const { user } = useUser();
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
   const { t } = useTranslation();
@@ -577,6 +578,7 @@ function CreateProfileGate(): React.ReactElement {
         clerkSignOut: signOut,
         queryClient,
         profileIds: profiles.map((p) => p.id),
+        clerkUserId: user?.id,
       });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
@@ -1273,6 +1275,7 @@ function SaveWizardGate({
 function ConsentWithdrawnGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { signOut } = useClerk();
+  const { user } = useUser();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { profiles, activeProfile, switchProfile } = useProfile();
@@ -1284,6 +1287,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
         clerkSignOut: signOut,
         queryClient,
         profileIds: profiles.map((p) => p.id),
+        clerkUserId: user?.id,
       });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
@@ -1409,6 +1413,7 @@ function ConsentPendingGate(): React.ReactElement {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
+  const { user } = useUser();
   const { t } = useTranslation();
   const { profiles, activeProfile, switchProfile } = useProfile();
 
@@ -1418,6 +1423,7 @@ function ConsentPendingGate(): React.ReactElement {
         clerkSignOut: signOut,
         queryClient,
         profileIds: profiles.map((p) => p.id),
+        clerkUserId: user?.id,
       });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
@@ -1429,7 +1435,6 @@ function ConsentPendingGate(): React.ReactElement {
   };
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
-  const { user } = useUser();
   const ageBracket = activeProfile?.birthYear
     ? computeAgeBracket(activeProfile.birthYear)
     : 'adult';
@@ -1936,7 +1941,7 @@ function ConsentPendingGate(): React.ReactElement {
 }
 
 export default function AppLayout() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
   const { signOut: clerkSignOut } = useClerk();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
@@ -2207,6 +2212,7 @@ export default function AppLayout() {
                   clerkSignOut,
                   queryClient,
                   profileIds: profiles.map((p) => p.id),
+                  clerkUserId: userId ?? undefined,
                 });
               },
               testID: 'profile-loading-timeout-signout',
@@ -2252,6 +2258,7 @@ export default function AppLayout() {
                 clerkSignOut,
                 queryClient,
                 profileIds: profiles.map((p) => p.id),
+                clerkUserId: userId ?? undefined,
               });
             },
             testID: 'profile-load-error-signout',
