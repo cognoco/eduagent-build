@@ -162,7 +162,7 @@ If the user chooses keep-out after filing already completed:
 
 **Safe-to-delete rule (all must be true):**
 
-- `curriculum_topics.filedFrom = 'freeform_filing'` (the topic was created by this auto-filing path, not pre-generated or pre-existing);
+- `curriculum_topics.filedFrom IN ('freeform_filing', 'session_filing')` (the topic was created by a filing path, not pre-generated or pre-existing; quiet close-path auto-filing writes `'session_filing'`);
 - `curriculum_topics.sessionId = thisSessionId` (this session is the topic's original creator);
 - no other `learning_sessions.topicId` row references this topic;
 - no `curriculum_topic_progress` row references this topic;

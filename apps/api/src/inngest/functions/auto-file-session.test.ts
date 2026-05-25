@@ -12,6 +12,9 @@ const mockFileToLibrary = jest.fn();
 const mockResolveFilingResult = jest.fn();
 const mockDeleteTopicIfSafe = jest.fn();
 const mockRouteAndCall = jest.fn();
+const mockLoggerError = jest.fn();
+const mockLoggerWarn = jest.fn();
+const mockCaptureException = jest.fn();
 
 jest.mock('../helpers' /* gc1-allow: Inngest step DB boundary */, () => {
   const actual = jest.requireActual(
@@ -50,6 +53,25 @@ jest.mock(
 jest.mock('../../services/llm' /* gc1-allow: LLM router boundary */, () => ({
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
+
+jest.mock(
+  '../../services/logger' /* gc1-allow: logger observability boundary */,
+  () => ({
+    createLogger: () => ({
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: (...args: unknown[]) => mockLoggerError(...args),
+    }),
+  }),
+);
+
+jest.mock(
+  '../../services/sentry' /* gc1-allow: Sentry observability boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import type { InngestStepSendEventCall } from '../../test-utils/inngest-step-runner';
@@ -247,6 +269,26 @@ describe('autoFileSession', () => {
       db,
       profileId,
       sessionId,
+    );
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      'auto_file_session.terminal_failure',
+      expect.objectContaining({
+        profileId,
+        sessionId,
+        dispatchId: 'auto-file-session-test',
+        reason: 'handler_retries_exhausted',
+      }),
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        profileId,
+        extra: expect.objectContaining({
+          site: 'autoFileSession.onFailure',
+          sessionId,
+          dispatchId: 'auto-file-session-test',
+        }),
+      }),
     );
     expect(result).toMatchObject({ status: 'failed' });
   });

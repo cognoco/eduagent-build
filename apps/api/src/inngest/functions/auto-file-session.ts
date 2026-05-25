@@ -173,6 +173,13 @@ export const autoFileSession = inngest.createFunction(
         parsed.data.profileId,
         parsed.data.sessionId,
       );
+      logger.error('auto_file_session.terminal_failure', {
+        profileId: parsed.data.profileId,
+        sessionId: parsed.data.sessionId,
+        dispatchId: parsed.data.dispatchId,
+        reason: 'handler_retries_exhausted',
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
       captureException(error, {
         profileId: parsed.data.profileId,
         extra: {
