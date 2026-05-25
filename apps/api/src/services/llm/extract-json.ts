@@ -10,14 +10,15 @@
 /**
  * Extract the first balanced JSON object substring from free text.
  *
- * 1. Strips markdown ```json ... ``` fences if present.
+ * 1. Strips markdown ```json ... ``` fences when they wrap the whole response.
  * 2. Walks brace depth (handling string escapes) to find `{ … }`.
  * 3. Returns the matched substring, or `null` if no object is found.
  */
 export function extractFirstJsonObject(text: string): string | null {
-  // Strip markdown code-fence wrappers if present.
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const body = (fenceMatch?.[1] ?? text).trim();
+  const trimmed = text.trim();
+  // Strip markdown code-fence wrappers only when they wrap the whole response.
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/);
+  const body = (fenceMatch?.[1] ?? trimmed).trim();
 
   const start = body.indexOf('{');
   if (start === -1) return null;

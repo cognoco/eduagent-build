@@ -38,6 +38,16 @@ describe('extractFirstJsonObject', () => {
     expect(extractFirstJsonObject(input)).toBe(input);
   });
 
+  it('extracts the outer envelope when reply text contains an inner fenced json block', () => {
+    const envelope = {
+      reply: 'Here is a snippet:\n```json\n{"inner": true}\n```\nDone.',
+      signals: { understanding_check: true },
+    };
+    const input = JSON.stringify(envelope);
+
+    expect(extractFirstJsonObject(input)).toBe(input);
+  });
+
   it('handles escaped quotes inside strings', () => {
     const input = '{"reply": "she said \\"hi\\""}';
     expect(extractFirstJsonObject(input)).toBe(input);
