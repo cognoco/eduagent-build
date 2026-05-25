@@ -167,6 +167,12 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
     reason:
       'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API).',
   },
+  {
+    file: 'apps/mobile/src/lib/intro-state.ts',
+    line: 43,
+    reason:
+      'Welcome-intro "seen" flag is per-Clerk-userId, not per-profileId — falls outside PER_PROFILE_KEYS. Per GLOBAL_KEYS comment, onboarding flags that legitimately survive sign-out cycles are intentionally excluded from global wipe: a user who signs out to switch accounts on the same device must not re-see the intro on next sign-in. Cross-user leakage is impossible because the key embeds the Clerk userId. Sign-out clears only the in-memory bit (clearIntroSeen).',
+  },
 ];
 
 /**
