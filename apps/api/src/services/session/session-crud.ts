@@ -25,6 +25,7 @@ import {
   curriculumBooks,
   bookSuggestions,
   createScopedRepository,
+  generateUUIDv7,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -1458,6 +1459,163 @@ export interface ResumeNudgeCandidate {
   topicHint: string;
   exchangeCount: number;
   createdAt: string;
+}
+
+export interface LibraryFilingRequest {
+  session: LearningSession;
+  dispatchId: string;
+}
+
+function createLibraryFilingDispatchId(prefix: string): string {
+  const randomId = globalThis.crypto?.randomUUID?.() ?? generateUUIDv7();
+  return `${prefix}-${randomId}`;
+}
+
+export async function markSessionKeptOutOfLibrary(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LearningSession | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      topicId: null,
+      filedAt: null,
+      filingStatus: 'filing_kept_out',
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+      ),
+    )
+    .returning();
+
+  return updated ? mapSessionRow(updated) : null;
+}
+
+export async function requestSessionLibraryFiling(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LibraryFilingRequest | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: null,
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+        inArray(learningSessions.filingStatus, [
+          'filing_failed',
+          'filing_kept_out',
+        ]),
+      ),
+    )
+    .returning();
+
+  if (updated) {
+    return {
+      session: mapSessionRow(updated),
+      dispatchId: createLibraryFilingDispatchId('add'),
+    };
+  }
+
+  const [nullStatusUpdated] = await db
+    .update(learningSessions)
+    .set({
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+        isNull(learningSessions.filingStatus),
+      ),
+    )
+    .returning();
+
+  return nullStatusUpdated
+    ? {
+        session: mapSessionRow(nullStatusUpdated),
+        dispatchId: createLibraryFilingDispatchId('add'),
+      }
+    : null;
+}
+
+export async function restoreSessionForAutoFiling(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LibraryFilingRequest | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: null,
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.filingStatus, 'filing_kept_out'),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+      ),
+    )
+    .returning();
+
+  return updated
+    ? {
+        session: mapSessionRow(updated),
+        dispatchId: createLibraryFilingDispatchId('restore'),
+      }
+    : null;
+}
+
+export async function resetFilingForRetry(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LibraryFilingRequest | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: null,
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        inArray(learningSessions.filingStatus, [
+          'filing_failed',
+          'filing_kept_out',
+        ]),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+      ),
+    )
+    .returning();
+
+  return updated
+    ? {
+        session: mapSessionRow(updated),
+        dispatchId: createLibraryFilingDispatchId('retry'),
+      }
+    : null;
 }
 
 export async function claimSessionForFilingRetry(

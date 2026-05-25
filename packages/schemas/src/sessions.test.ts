@@ -22,6 +22,7 @@ import {
   sessionStartSchema,
   sessionStatusSchema,
   filingStatusSchema,
+  getSessionEffectiveMode,
   summaryStatusSchema,
   escalationRungSchema,
   learningSessionSchema,
@@ -514,11 +515,12 @@ describe('status schemas', () => {
     }
   });
 
-  it('filingStatusSchema accepts all 3 values', () => {
+  it('filingStatusSchema accepts all 4 values', () => {
     for (const val of [
       'filing_pending',
       'filing_failed',
       'filing_recovered',
+      'filing_kept_out',
     ] as const) {
       expect(filingStatusSchema.safeParse(val).success).toBe(true);
     }
@@ -534,6 +536,25 @@ describe('status schemas', () => {
     ] as const) {
       expect(summaryStatusSchema.safeParse(val).success).toBe(true);
     }
+  });
+});
+
+describe('getSessionEffectiveMode', () => {
+  it('returns freeform and learning from typed session metadata', () => {
+    expect(
+      getSessionEffectiveMode({ metadata: { effectiveMode: 'freeform' } }),
+    ).toBe('freeform');
+    expect(
+      getSessionEffectiveMode({ metadata: { effectiveMode: 'learning' } }),
+    ).toBe('learning');
+  });
+
+  it('returns undefined for missing or invalid metadata', () => {
+    expect(getSessionEffectiveMode({})).toBeUndefined();
+    expect(getSessionEffectiveMode({ metadata: null })).toBeUndefined();
+    expect(
+      getSessionEffectiveMode({ metadata: { effectiveMode: 123 } }),
+    ).toBeUndefined();
   });
 });
 

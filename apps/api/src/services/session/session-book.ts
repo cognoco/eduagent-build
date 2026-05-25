@@ -99,19 +99,20 @@ export async function getBookSessions(
 }
 
 /**
- * Backfill topicId on a learning session after post-session filing.
- * Without this, freeform-filed sessions won't appear in getBookSessions
- * because that query joins on learningSessions.topicId.
+ * Mark a learning session as filed after Library resolution completes.
+ * Callers must use this instead of writing topicId alone; `filedAt` is part
+ * of the "already filed" guard used by async recovery paths.
  */
-export async function backfillSessionTopicId(
+export async function markSessionFiled(
   db: Database,
   profileId: string,
   sessionId: string,
   topicId: string,
 ): Promise<void> {
+  const now = new Date();
   await db
     .update(learningSessions)
-    .set({ topicId })
+    .set({ topicId, filedAt: now, updatedAt: now })
     .where(
       and(
         eq(learningSessions.id, sessionId),

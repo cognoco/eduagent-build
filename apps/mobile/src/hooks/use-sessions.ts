@@ -86,6 +86,7 @@ type FilingStatus =
   | 'filing_pending'
   | 'filing_failed'
   | 'filing_recovered'
+  | 'filing_kept_out'
   | null
   | undefined;
 

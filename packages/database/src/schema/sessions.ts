@@ -75,6 +75,7 @@ export const filingStatusEnum = pgEnum('filing_status', [
   'filing_pending',
   'filing_failed',
   'filing_recovered',
+  'filing_kept_out',
 ]);
 
 // [BUG-225 / P3] onboarding_drafts jsonb columns must be validated on read.

@@ -18,6 +18,22 @@ export const filingRetryEventSchema = z.object({
 });
 export type FilingRetryEvent = z.infer<typeof filingRetryEventSchema>;
 
+export const sessionAutoFileRequestedEventSchema = z.object({
+  sessionId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  requestedAt: isoDateField,
+  reason: z.enum([
+    'freeform_session_closed',
+    'user_requested',
+    'retry',
+    'restore',
+  ]),
+  dispatchId: z.string().min(1).max(128),
+});
+export type SessionAutoFileRequestedEvent = z.infer<
+  typeof sessionAutoFileRequestedEventSchema
+>;
+
 export const filingRetryCompletedEventSchema = z.object({
   sessionId: z.string().uuid(),
   profileId: z.string().uuid(),
