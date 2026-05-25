@@ -43,5 +43,11 @@ zdx:
       project: mentomate
       config: dev
 
+  planning:
+    # Directory where implementation plan documents are written (consumed by
+    # the writing-plans skill). Naming: YYYY-MM-DD-<short-kebab-slug>.md.
+    # The skill defaults to docs/plans/ when this key is absent.
+    plan_dir: docs/plans
+
   conformance:
     deviations: []
