@@ -2752,3 +2752,107 @@ describe('[WI-171 / DS-082] sessions proxy-mode guard', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-371 / DS-194 / WI-283] Proxy-mode write guard — remaining session write
+// routes. WI-76 guarded the high-traffic write routes; these 11 write handlers
+// were still reachable by a proxy (non-owner) caller relying on a bypassable
+// client-side redirect. Each must return 403 PROXY_MODE before doing any work.
+// Bodies are schema-valid so the request reaches the in-handler guard rather
+// than tripping zValidator first.
+// ---------------------------------------------------------------------------
+describe('[WI-371 / DS-194] sessions proxy-mode guard — remaining write routes', () => {
+  function makeProxyApp() {
+    const proxyApp = new Hono();
+    proxyApp.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('user' as never, { id: 'test-user' });
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    proxyApp.route('/', sessionRoutes);
+    return proxyApp;
+  }
+
+  const SID = '550e8400-e29b-41d4-a716-446655440111';
+  const FLAG_EVENT_ID = '550e8400-e29b-41d4-a716-446655440222';
+  const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  const cases: Array<{ name: string; path: string; body?: unknown }> = [
+    {
+      name: 'messages',
+      path: `/sessions/${SID}/messages`,
+      body: { message: 'Explain photosynthesis' },
+    },
+    { name: 'retry-filing', path: `/sessions/${SID}/retry-filing` },
+    { name: 'evaluate-depth', path: `/sessions/${SID}/evaluate-depth` },
+    {
+      name: 'system-prompt',
+      path: `/sessions/${SID}/system-prompt`,
+      body: { content: "Take your time — I'm here when you're ready." },
+    },
+    {
+      name: 'events',
+      path: `/sessions/${SID}/events`,
+      body: {
+        eventType: 'quick_action',
+        content: 'too_easy',
+        metadata: { chip: 'too_easy' },
+      },
+    },
+    {
+      name: 'input-mode',
+      path: `/sessions/${SID}/input-mode`,
+      body: { inputMode: 'voice' },
+    },
+    {
+      name: 'homework-state',
+      path: `/sessions/${SID}/homework-state`,
+      body: {
+        metadata: {
+          problemCount: 1,
+          currentProblemIndex: 0,
+          problems: [
+            {
+              id: 'problem-1',
+              text: 'Solve 2x + 5 = 17',
+              source: 'manual',
+              status: 'active',
+            },
+          ],
+        },
+      },
+    },
+    {
+      name: 'flag',
+      path: `/sessions/${SID}/flag`,
+      body: { eventId: FLAG_EVENT_ID },
+    },
+    { name: 'summary/skip', path: `/sessions/${SID}/summary/skip` },
+    {
+      name: 'summary',
+      path: `/sessions/${SID}/summary`,
+      body: {
+        content:
+          'Photosynthesis converts light energy into chemical energy in plants.',
+      },
+    },
+    { name: 'recall-bridge', path: `/sessions/${SID}/recall-bridge` },
+  ];
+
+  it.each(cases)(
+    'POST $name returns 403 PROXY_MODE in proxy mode',
+    async ({ path, body }) => {
+      const res = await makeProxyApp().request(path, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe('PROXY_MODE');
+    },
+  );
+});

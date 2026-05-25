@@ -269,6 +269,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/retry-filing',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId } = c.req.valid('param');
@@ -320,6 +321,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionMessageSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subscriptionId = c.get('subscriptionId');
@@ -420,6 +422,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/evaluate-depth',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const sessionId = c.req.param('sessionId');
@@ -1089,6 +1092,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', systemPromptBodySchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
@@ -1109,6 +1113,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionAnalyticsEventSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
@@ -1123,6 +1128,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionInputModeSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const session = await setSessionInputMode(
@@ -1141,6 +1147,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', homeworkStateSyncSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
 
@@ -1161,6 +1168,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', contentFlagSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const result = await flagContent(
@@ -1190,6 +1198,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/summary/skip',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId } = c.req.valid('param');
@@ -1227,6 +1236,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', summarySubmitSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId } = c.req.valid('param');
@@ -1289,6 +1299,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/recall-bridge',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId } = c.req.valid('param');
