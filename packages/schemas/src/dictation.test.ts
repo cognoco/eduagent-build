@@ -1,7 +1,11 @@
 import {
+  DICTATION_REVIEW_MAX_PROMPT_CHARS,
+  DICTATION_REVIEW_MAX_SENTENCES,
+  DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS,
   dictationSentenceSchema,
   dictationPaceSchema,
   dictationModeSchema,
+  dictationReviewPromptCharCount,
   prepareHomeworkInputSchema,
   prepareHomeworkOutputSchema,
   generateDictationOutputSchema,
@@ -13,6 +17,7 @@ import {
   recordDictationResultResponseSchema,
   dictationStreakSchema,
 } from './dictation.js';
+import { DictationPayloadTooLargeError } from './errors.js';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -538,5 +543,115 @@ describe('dictationStreakSchema', () => {
       const paths = result.error.issues.map((i) => i.path[0]);
       expect(paths).toContain('streak');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-150 / WI-206] Payload caps — schema, prompt-char helper, typed error
+// ---------------------------------------------------------------------------
+
+describe('dictation payload caps [WI-150 / WI-206]', () => {
+  const VALID_BASE_INPUT = {
+    imageBase64: 'dGVzdA==',
+    imageMimeType: 'image/jpeg' as const,
+    language: 'en',
+  };
+
+  function sentenceOfLen(textLen: number, withPunctLen = textLen) {
+    return {
+      text: 'a'.repeat(textLen),
+      withPunctuation: 'a'.repeat(withPunctLen),
+      wordCount: Math.max(1, Math.floor(textLen / 4)),
+    };
+  }
+
+  describe('per-sentence text/withPunctuation caps', () => {
+    it('accepts text at the per-sentence cap', () => {
+      const result = dictationSentenceSchema.safeParse(
+        sentenceOfLen(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS),
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects text one over the per-sentence cap', () => {
+      const result = dictationSentenceSchema.safeParse(
+        sentenceOfLen(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS + 1, 10),
+      );
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects withPunctuation one over the per-sentence cap', () => {
+      const result = dictationSentenceSchema.safeParse(
+        sentenceOfLen(10, DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS + 1),
+      );
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('sentence-array cap on dictationReviewInputSchema', () => {
+    it('accepts exactly DICTATION_REVIEW_MAX_SENTENCES sentences', () => {
+      const result = dictationReviewInputSchema.safeParse({
+        ...VALID_BASE_INPUT,
+        sentences: Array.from({ length: DICTATION_REVIEW_MAX_SENTENCES }, () =>
+          sentenceOfLen(20),
+        ),
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects one over the sentence-array cap', () => {
+      const result = dictationReviewInputSchema.safeParse({
+        ...VALID_BASE_INPUT,
+        sentences: Array.from(
+          { length: DICTATION_REVIEW_MAX_SENTENCES + 1 },
+          () => sentenceOfLen(20),
+        ),
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('dictationReviewPromptCharCount helper', () => {
+    it('sums text + withPunctuation across all sentences', () => {
+      expect(
+        dictationReviewPromptCharCount({
+          sentences: [
+            { text: 'aaa', withPunctuation: 'bb' }, // 5
+            { text: 'cccc', withPunctuation: 'd' }, // 5
+          ],
+        }),
+      ).toBe(10);
+    });
+
+    it('returns 0 for an empty sentences array', () => {
+      expect(dictationReviewPromptCharCount({ sentences: [] })).toBe(0);
+    });
+  });
+
+  describe('DictationPayloadTooLargeError', () => {
+    it('carries errorCode, limit, and actual for caller diagnostics', () => {
+      const err = new DictationPayloadTooLargeError(
+        'Total prompt size 13000 exceeds 12000',
+        DICTATION_REVIEW_MAX_PROMPT_CHARS,
+        13000,
+      );
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(DictationPayloadTooLargeError);
+      expect(err.errorCode).toBe('PAYLOAD_TOO_LARGE');
+      expect(err.limit).toBe(DICTATION_REVIEW_MAX_PROMPT_CHARS);
+      expect(err.actual).toBe(13000);
+    });
+
+    it('preserves instanceof across Promise.reject round-trip', async () => {
+      await expect(
+        Promise.reject(
+          new DictationPayloadTooLargeError(
+            'too big',
+            DICTATION_REVIEW_MAX_PROMPT_CHARS,
+            13000,
+          ),
+        ),
+      ).rejects.toBeInstanceOf(DictationPayloadTooLargeError);
+    });
   });
 });

@@ -15,7 +15,7 @@ import { captureException } from './sentry';
 import { createLogger } from './logger';
 import { recordPracticeActivityEvent } from './practice-activity-events';
 import { buildAppHelpDirectReply, isAppHelpQuery } from './app-help-map';
-import { NotFoundError } from '../errors';
+import { ConflictError, NotFoundError } from '../errors';
 import type {
   VerificationDepth,
   QuickCheckContext,
@@ -285,6 +285,20 @@ export async function generateQuickCheck(
 }
 
 /**
+ * [WI-136] Terminal assessment statuses. Once an assessment reaches one of
+ * these, further answer submissions must be rejected at the service entry
+ * BEFORE the LLM call — replay would re-bill quota AND mutate retention/XP
+ * downstream. The set is the complement of `in_progress` over
+ * `AssessmentStatus`.
+ */
+export const TERMINAL_ASSESSMENT_STATUSES: ReadonlySet<AssessmentStatus> =
+  new Set(['passed', 'failed', 'borderline', 'failed_exhausted']);
+
+export function isTerminalAssessmentStatus(status: AssessmentStatus): boolean {
+  return TERMINAL_ASSESSMENT_STATUSES.has(status);
+}
+
+/**
  * Evaluates a learner's answer at the current verification depth.
  *
  * Uses routeAndCall with rung 2.
@@ -292,11 +306,26 @@ export async function generateQuickCheck(
  * - recall: max 0.5
  * - explain: max 0.8
  * - transfer: max 1.0
+ *
+ * [WI-136] If `assessmentStatus` is provided and represents a terminal state
+ * (passed / failed / borderline / failed_exhausted), throws `ConflictError`
+ * before calling the LLM. The route's global handler maps this to HTTP 409
+ * so callers can't re-bill quota by replaying answers on a closed assessment.
  */
 export async function evaluateAssessmentAnswer(
   context: AssessmentContext,
   answer: string,
+  options?: { assessmentStatus?: AssessmentStatus },
 ): Promise<AssessmentEvaluation> {
+  if (
+    options?.assessmentStatus &&
+    isTerminalAssessmentStatus(options.assessmentStatus)
+  ) {
+    throw new ConflictError(
+      `Assessment is already in terminal state '${options.assessmentStatus}'; cannot submit further answers.`,
+    );
+  }
+
   const messages = buildAssessmentEvaluationMessages(context, answer);
   const result = await routeAndCall(messages, 2);
   const evaluation = parseAssessmentEvaluation(
@@ -307,6 +336,60 @@ export async function evaluateAssessmentAnswer(
     },
   );
   return ensureAssessmentFeedbackHasNextPrompt(evaluation, context);
+}
+
+/**
+ * [WI-136 H4] Lock+re-read assessment row for the answer-submission critical
+ * section. Run INSIDE a `db.transaction(async (tx) => ...)` and pass `tx` as
+ * the first argument. Returns the locked snapshot. Throws `NotFoundError`
+ * when the row is gone, or `ConflictError` when the snapshot is already in
+ * a terminal state.
+ *
+ * Two near-simultaneous POST /assessments/:id/answer requests would otherwise
+ * both pass the non-transactional terminal-state check, both invoke the LLM,
+ * and both call updateAssessment — re-billing quota and corrupting state.
+ * Re-reading the row under `FOR UPDATE` and re-checking terminal status
+ * inside the same tx as the eventual UPDATE serializes concurrent callers:
+ * the loser blocks at the SELECT, the winner commits a terminal UPDATE,
+ * then the loser unblocks, observes the terminal status, and throws 409.
+ *
+ * Holding the row lock during the 2-5s LLM call is acceptable here:
+ *   (a) Per-assessment write rate is low — one learner at a time, with
+ *       request retries the only concurrency source.
+ *   (b) The security property "no double-bill, no double-write" requires
+ *       the lock to span the LLM call. An optimistic post-LLM re-check
+ *       would still double-bill in the race window.
+ */
+export async function lockAssessmentForAnswerSubmission(
+  tx: Database,
+  profileId: string,
+  assessmentId: string,
+): Promise<AssessmentRecord> {
+  const [row] = await tx
+    .select()
+    .from(assessments)
+    .where(
+      and(
+        eq(assessments.id, assessmentId),
+        eq(assessments.profileId, profileId),
+      ),
+    )
+    .for('update')
+    .limit(1);
+
+  if (!row) {
+    throw new NotFoundError(`Assessment ${assessmentId} not found`);
+  }
+
+  const snapshot = mapAssessmentRow(row);
+
+  if (isTerminalAssessmentStatus(snapshot.status)) {
+    throw new ConflictError(
+      `Assessment is already in terminal state '${snapshot.status}'; cannot submit further answers.`,
+    );
+  }
+
+  return snapshot;
 }
 
 export function buildAssessmentAppHelpEvaluation(

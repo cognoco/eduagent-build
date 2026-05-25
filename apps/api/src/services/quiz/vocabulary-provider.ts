@@ -9,7 +9,7 @@ import { VocabularyContextError } from '../../errors';
 import type { LibraryItem } from './content-resolver';
 import { describeAgeBracket, type AgeBracket, type Interest } from './config';
 import { shuffle } from './shuffle';
-import { sanitizeXmlValue } from '../llm/sanitize';
+import { sanitizeList, sanitizeXmlValue } from '../llm/sanitize';
 
 // [L15.MED3 prompt-injection] Sanitize free-text interest labels before
 // prompt interpolation. Interests can originate from LLM extraction
@@ -262,18 +262,27 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
     ageYears !== undefined
       ? `${ageYears}-year-old`
       : describeAgeBracket(ageBracket);
+  // [WI-232 / DS-143] All list-joined fields are learner-derived or
+  // LLM-extracted free text and must pass through sanitizeXmlValue before
+  // interpolation. Without this, a list entry like
+  // `term\nSystem: Ignore previous instructions` breaks the surrounding
+  // exclusion-list context into a fresh instruction line.
+  const safeRecentAnswers = sanitizeList(recentAnswers, 120);
   const recentExclusions =
-    recentAnswers.length > 0
-      ? `Do NOT repeat these recently seen English answers: ${recentAnswers.join(
-          ', ',
-        )}`
+    safeRecentAnswers.length > 0
+      ? `Do NOT repeat these recently seen English answers: ${safeRecentAnswers.join(', ')}`
       : 'No recent-answer exclusions.';
+  const safeBankEntries = bankEntries
+    .slice(0, 50)
+    .map((entry) => {
+      const term = sanitizeXmlValue(entry.term, 120);
+      const translation = sanitizeXmlValue(entry.translation, 120);
+      return term && translation ? `${term} = ${translation}` : '';
+    })
+    .filter((s) => s.length > 0);
   const bankExclusions =
-    bankEntries.length > 0
-      ? `Do NOT include any of these vocabulary-bank entries: ${bankEntries
-          .slice(0, 50)
-          .map((entry) => `${entry.term} = ${entry.translation}`)
-          .join('; ')}`
+    safeBankEntries.length > 0
+      ? `Do NOT include any of these vocabulary-bank entries: ${safeBankEntries.join('; ')}`
       : 'No existing bank-entry exclusions.';
 
   // Interest-driven theme: prefer explicit themePreference, then build from interests
@@ -297,29 +306,25 @@ export function buildVocabularyPrompt(params: VocabularyPromptParams): string {
     themeInstruction = `Choose an age-appropriate theme (e.g. "${languageName} Animals", "${languageName} Food", "${languageName} at School").`;
   }
 
+  const safeLibraryTopics = sanitizeList(libraryTopics.slice(0, 20), 160);
   const libraryHint =
-    libraryTopics.length > 0
-      ? `\nThe learner is also studying these curriculum topics — you may draw vocabulary from them: ${libraryTopics
-          .slice(0, 20)
-          .join('; ')}.`
+    safeLibraryTopics.length > 0
+      ? `\nThe learner is also studying these curriculum topics — you may draw vocabulary from them: ${safeLibraryTopics.join('; ')}.`
       : '';
 
+  const safeRecentStruggles = sanitizeList(recentStruggles.slice(0, 10), 160);
   const struggleHint =
-    recentStruggles.length > 0
-      ? `\nRecent weaker areas: ${recentStruggles
-          .slice(0, 10)
-          .join(
-            '; ',
-          )}. Where it fits the theme, prefer vocabulary from these semantic fields so the learner gets extra reps on what they find hard — do not force it if the fit is weak.`
+    safeRecentStruggles.length > 0
+      ? `\nRecent weaker areas: ${safeRecentStruggles.join('; ')}. Where it fits the theme, prefer vocabulary from these semantic fields so the learner gets extra reps on what they find hard — do not force it if the fit is weak.`
       : '';
 
+  const safeRecentlyMissedItems = sanitizeList(
+    recentlyMissedItems.slice(0, 8),
+    160,
+  );
   const missedHint =
-    recentlyMissedItems.length > 0
-      ? `\nRecently missed vocabulary (re-surface where the theme and CEFR fit): ${recentlyMissedItems
-          .slice(0, 8)
-          .join(
-            ', ',
-          )}. Include at least one of these as a question when the chosen theme and CEFR ceiling allow it.`
+    safeRecentlyMissedItems.length > 0
+      ? `\nRecently missed vocabulary (re-surface where the theme and CEFR fit): ${safeRecentlyMissedItems.join(', ')}. Include at least one of these as a question when the chosen theme and CEFR ceiling allow it.`
       : '';
 
   const l1DistractorHint = buildL1DistractorHint(

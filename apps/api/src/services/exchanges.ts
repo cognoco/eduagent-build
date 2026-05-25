@@ -65,8 +65,34 @@ export const MAX_INTERVIEW_EXCHANGES = 4;
 
 const SERVER_NOTE_RE = /<\/?server_note[^>]*>/gi;
 
+/**
+ * Strip `<server_note>` tags from learner-supplied content before it is
+ * persisted as conversation history. The LLM treats `<server_note>` as a
+ * trusted system annotation, so any reconstruction of that tag from
+ * attacker-controlled fragments would let the learner fabricate "system"
+ * messages within their own session history.
+ *
+ * [WI-212 / DS-123] Single-pass `String.replace` is not convergent: a
+ * payload like `<server_no<server_note>te ...>PAYLOAD</server_no</server_note>te>`
+ * strips the inner tag, leaving outer fragments that concatenate into a
+ * fresh `<server_note ...>PAYLOAD</server_note>`. We loop until the regex
+ * no longer matches so no reconstruction survives. The bounded loop count
+ * prevents pathological inputs from running unbounded.
+ */
+const SANITIZE_USER_CONTENT_MAX_PASSES = 8;
+
 export function sanitizeUserContent(content: string): string {
-  return content.replace(SERVER_NOTE_RE, '');
+  let current = content;
+  for (let i = 0; i < SANITIZE_USER_CONTENT_MAX_PASSES; i += 1) {
+    const next = current.replace(SERVER_NOTE_RE, '');
+    if (next === current) return next;
+    current = next;
+  }
+  // Fall back to entity-encoding surviving angle brackets — after MAX_PASSES
+  // iterations the input is adversarial. Entity-encoding (rather than
+  // stripping) preserves benign content like `5 < 7` while making any
+  // reconstructed `<server_note>` impossible to interpret as a real tag.
+  return current.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ---------------------------------------------------------------------------

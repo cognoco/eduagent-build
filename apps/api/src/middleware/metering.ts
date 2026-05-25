@@ -98,6 +98,15 @@ export type MeteringEnv = {
     quotaDecrementSource: 'monthly' | 'top_up';
     /** Set when quotaDecrementSource === 'top_up'. */
     quotaDecrementTopUpCreditId?: string;
+    /**
+     * [WI-133] Belt-and-braces flag flipped after either refund path
+     * (try/catch on handler throw, or post-`next()` status >= 400). Prevents
+     * double-refund if both paths fire in the same request — which should
+     * not happen in practice (throw replaces the response so the
+     * status-based branch will not fire), but the flag protects against
+     * unexpected interactions.
+     */
+    quotaRefunded?: boolean;
   };
 };
 
@@ -119,7 +128,7 @@ const SESSION_MESSAGE_STREAM_PATTERNS = [
   /\/sessions\/[^/]+\/stream\/?$/,
 ];
 
-const LLM_ROUTE_PATTERNS_ANY_METHOD = [
+export const LLM_ROUTE_PATTERNS_ANY_METHOD = [
   ...SESSION_MESSAGE_STREAM_PATTERNS,
   // [BUG-623 / A-6] generateRecallBridge calls the LLM but was missing from
   // this list, so any authenticated user could call recall-bridge in a tight
@@ -130,12 +139,17 @@ const LLM_ROUTE_PATTERNS_ANY_METHOD = [
   // topic detection). Without metering, an authenticated client could
   // spam this endpoint and burn unbounded LLM capacity at zero cost.
   /\/sessions\/[^/]+\/evaluate-depth\/?$/,
+  // [WI-149 / DS-060] explainTopicOrdering is GET but invokes routeAndCall
+  // to produce a natural-language explanation for a topic's curriculum
+  // position. Authenticated abuse possible without metering (same class as
+  // recall-bridge / evaluate-depth). Path uses UUIDs for subject and topic.
+  /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/curriculum\/topics\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/explain\/?$/,
 ];
 
 // Routes that consume LLM exchanges only on POST. Quiz round generation and
 // dictation are billable on POST; their GET counterparts (history, stats,
 // completion) are DB-only and must NOT decrement quota.
-const LLM_ROUTE_PATTERNS_POST_ONLY = [
+export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/quiz\/rounds\/?$/,
   /\/quiz\/rounds\/prefetch\/?$/,
   // [CRIT-1] Dictation LLM-consuming routes — all POST-only.
@@ -153,6 +167,56 @@ const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // Retry filing re-runs the LLM-backed filing flow. Match only UUIDs so a
   // malformed path falls through to the route validator without burning quota.
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/retry-filing\/?$/,
+  // [WI-141 / DS-052] Manual book topic generation invokes the LLM via
+  // generateBookTopics. Authenticated abuse possible without metering — same
+  // class as BUG-93 (subjects/resolve). Path uses UUIDs for subject and book.
+  /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/books\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/generate-topics\/?$/,
+  // [WI-149 / DS-060] Curriculum LLM-consuming POST endpoints.
+  // - /topics with mode=preview calls previewCurriculumTopic (LLM); mode=create
+  //   is DB-only. Pattern matches all POSTs to /topics — create-mode requests
+  //   over-bill by 1, accepted as a small false-positive vs. the security
+  //   risk of unmetered preview calls. The route is the trust boundary.
+  // - /challenge regenerates the curriculum via generateCurriculum (LLM).
+  /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/curriculum\/topics\/?$/,
+  /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/curriculum\/challenge\/?$/,
+  // [WI-154 / DS-065] POST /filing invokes fileToLibrary which calls the LLM
+  // to determine library placement. /filing/request-retry only dispatches an
+  // Inngest event (no direct LLM call) and is intentionally not metered here.
+  /\/filing\/?$/,
+  // [WI-155 / DS-066] POST /ocr runs vision OCR through an LLM provider
+  // (Gemini Vision via OcrProvider.extractText). Authenticated abuse possible
+  // without metering.
+  /\/ocr\/?$/,
+  // [WI-157 / DS-068] /learner-profile/tell endpoints call parseLearnerInput
+  // which invokes routeAndCall to classify free-text learner input.
+  // Both the self-mode (/tell) and parent-proxy (/:profileId/tell) variants
+  // reach the same LLM service.
+  /\/learner-profile\/tell\/?$/,
+  /\/learner-profile\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/tell\/?$/,
+  // [WI-168 / DS-079] /retention/recall-test invokes evaluateRecallQuality
+  // (LLM). Race + cooldown serialization (WI-234) lands in a separate WP;
+  // allowlist coverage is the prerequisite.
+  /\/retention\/recall-test\/?$/,
+  // [WI-178 / DS-089] POST /subjects (create) calls detectLanguageSubject
+  // which invokes routeAndCall. POST /subjects/classify calls classifySubject
+  // (LLM). /subjects/resolve is already in the allowlist above (BUG-93).
+  /\/subjects\/?$/,
+  /\/subjects\/classify\/?$/,
+  // [WI-247 / DS-148] POST /sessions/:sessionId/summary calls submitSummary
+  // which evaluates the learner's "Your Words" via the LLM. The service-level
+  // idempotency short-circuit for re-submitted accepted summaries lands in a
+  // separate WP; allowlist coverage is the prerequisite.
+  /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/summary\/?$/,
+  // [WI-136 / DS-038] POST /assessments/:assessmentId/answer invokes
+  // evaluateAssessmentAnswer (LLM). The terminal-replay guard at the service
+  // layer lands in a separate WP; allowlist coverage is the prerequisite.
+  /\/assessments\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/answer\/?$/,
+  // [WI-258 / DS-169] POST /subjects/:subjectId/book-suggestions/topup —
+  // the side-effecting top-up generation path. The previous shape was a
+  // GET ?topup=1 query parameter which the path-based allowlist could not
+  // distinguish from the DB-only GET counterpart. Splitting into an
+  // explicit POST topup route makes metering coverage trivial.
+  /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/book-suggestions\/topup\/?$/,
 ];
 
 const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
@@ -621,8 +685,51 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
-    await next();
+    // [WI-133] Wrap handler invocation in try/catch so a thrown error refunds
+    // quota before propagating. Without this, any uncaught handler exception
+    // (LLM provider 5xx, DB connection drop, validation throw inside a
+    // service) decrements the quota pool but never refunds, silently burning
+    // user quota for failures that never produced LLM output.
+    try {
+      await next();
+    } catch (err) {
+      // The handler's Response may not exist on throw — treat absence as
+      // not-skip. When present, an explicit `Quota-Refund: skip` header
+      // suppresses middleware refund (handlers that already refunded
+      // explicitly use this to avoid double-refund — e.g. streaming routes
+      // that refund inside the SSE reducer).
+      const skipHeader =
+        (c.res as Response | undefined)?.headers?.get('Quota-Refund') ===
+        'skip';
+      if (!skipHeader && !c.get('quotaRefunded')) {
+        // Preserve BUG-503 ordering on the throw path: KV delete BEFORE DB
+        // refund so a concurrent request cannot read the stale pre-refund
+        // KV snapshot and decrement again.
+        if (kv) {
+          await safeDeleteKV(kv, account.id);
+        }
+        await safeRefundQuota(db, subscriptionId, {
+          route: `metering.${c.req.method}.${c.req.path}`,
+          profileId,
+          source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+          topUpCreditId: decrement.topUpCreditId,
+        });
+        c.set('quotaRefunded', true);
+      }
+      // Always re-throw — the middleware does not swallow handler errors.
+      // The global error handler still gets the original exception unchanged.
+      throw err;
+    }
+
     if (shouldRefundAfterHandler(c.res.status)) {
+      // [WI-133] Honor the `Quota-Refund: skip` escape hatch on the
+      // status-based branch too, so a handler that returned 5xx after
+      // refunding explicitly inside its own reducer doesn't get double-
+      // refunded by the middleware.
+      const skipHeader = c.res.headers.get('Quota-Refund') === 'skip';
+      if (skipHeader || c.get('quotaRefunded')) {
+        return;
+      }
       // [BUG-503] Cache-aside invalidate-BEFORE-write: delete KV snapshot
       // FIRST, then refund the DB. Without this ordering, a concurrent request
       // could read the stale post-decrement KV between the DB refund write and
@@ -648,6 +755,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
         topUpCreditId: decrement.topUpCreditId,
       });
+      c.set('quotaRefunded', true);
       return;
     }
 

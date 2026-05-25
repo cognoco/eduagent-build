@@ -24,6 +24,30 @@ import type {
 import { ForbiddenError, PRONOUNS_PROMPT_MIN_AGE } from '@eduagent/schemas';
 import { calculateAge } from '../consent';
 import { getOrCreateLearningProfile } from '../learner-profile';
+import { sanitizeXmlValue } from '../llm/sanitize';
+
+/**
+ * [WI-227 / DS-138] Stored-injection defense — sanitize interest labels at
+ * storage time so a hostile label persisted by one client cannot smuggle
+ * prompt directives into a later LLM call through a consumer that forgot
+ * to re-sanitize. Render-time consumers (`safeInterestLabels` in the quiz
+ * providers) DO sanitize, but the structural guarantee should not depend
+ * on every consumer remembering. Matches the 60-char cap enforced by
+ * `interestEntrySchema` at the route boundary.
+ *
+ * If sanitization yields an empty string (input was pure attack characters
+ * with no surviving letters), return empty so `updateInterestsContext` can
+ * filter the entry out of the persisted list. Returning empty rather than a
+ * defensive fallback to the unsanitized original is intentional — we never
+ * want to persist hostile content under the guise of "preserving the user's
+ * selection."
+ */
+export function sanitizeInterestLabel(label: string): string {
+  // Trim AFTER sanitizeXmlValue so an all-attack input like `<>"<>"` —
+  // which sanitizeXmlValue collapses to a single space — does not survive
+  // as a blank-but-non-empty token and bypass the empty-filter below.
+  return sanitizeXmlValue(label, 60).trim();
+}
 
 export class OnboardingNotFoundError extends Error {
   constructor(profileId: string) {
@@ -142,10 +166,22 @@ export async function updateInterestsContext(
   // precedent at learner-profile.ts:updateAccommodationMode. Idempotent.
   await getOrCreateLearningProfile(db, profileId);
 
+  // [WI-227 / DS-138] Sanitize at storage so a hostile label cannot smuggle
+  // a `\nSystem:` directive through a consumer that skips re-sanitization.
+  // Drop entries whose label sanitizes to empty — those are all-attack
+  // labels that the Zod-boundary non-empty rule does not catch (e.g. `<>`
+  // is non-empty as raw, empty after sanitize).
+  const safeInterests: InterestEntry[] = interests
+    .map((entry) => ({
+      ...entry,
+      label: sanitizeInterestLabel(entry.label),
+    }))
+    .filter((entry) => entry.label.length > 0);
+
   await db
     .update(learningProfiles)
     .set({
-      interests,
+      interests: safeInterests,
       // Bump optimistic-concurrency version so other writers retry (mirrors
       // the pattern used by applyAnalysis/mergeInterests).
       version: sql`${learningProfiles.version} + 1`,

@@ -8,7 +8,9 @@ import {
   recordDictationResultResponseSchema,
   dictationReviewInputSchema,
   dictationReviewResultSchema,
+  dictationReviewPromptCharCount,
   dictationStreakSchema,
+  DICTATION_REVIEW_MAX_PROMPT_CHARS,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -189,6 +191,12 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       );
     }),
     async (c) => {
+      // [WI-150/WI-206 precedence] zod's schema cap (max 50 sentences, max
+      // 500 chars per sentence/withPunctuation) fires first → 400
+      // VALIDATION_ERROR. The aggregate prompt-character budget below
+      // (DICTATION_REVIEW_MAX_PROMPT_CHARS, currently 12_000 total) fires
+      // only on requests that pass schema validation → 413 PAYLOAD_TOO_LARGE.
+      // Clients switching UX on status code should handle both.
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const input = c.req.valid('json');
@@ -214,6 +222,24 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
           429,
           ERROR_CODES.RATE_LIMITED,
           'Dictation review is limited to 10 requests per minute.',
+        );
+      }
+
+      // [WI-150 / WI-206] Total-prompt-character budget. The per-field zod
+      // caps bound (count × per-sentence length); this final guard bounds
+      // the AGGREGATE so an attacker can't get 50 sentences * 500 chars
+      // through (= 25_000 chars of prompt material) when the legitimate
+      // workflow needs ~2_000-4_000. Service layer enforces the same
+      // budget as defense-in-depth (WI-206).
+      const promptCharCount = dictationReviewPromptCharCount({
+        sentences: input.sentences,
+      });
+      if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {
+        return apiError(
+          c,
+          413,
+          ERROR_CODES.PAYLOAD_TOO_LARGE,
+          `Dictation review payload too large: ${promptCharCount} prompt chars exceeds limit of ${DICTATION_REVIEW_MAX_PROMPT_CHARS}.`,
         );
       }
 

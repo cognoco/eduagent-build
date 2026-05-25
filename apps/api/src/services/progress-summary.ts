@@ -23,8 +23,24 @@ function daysBetween(later: Date, earlier: Date): number {
   return (later.getTime() - earlier.getTime()) / (1000 * 60 * 60 * 24);
 }
 
-function trimSummary(text: string): string {
-  const normalized = text.replace(/\s+/g, ' ').trim();
+/**
+ * [WI-118 / DS-029] Entity-encode angle brackets in LLM-produced
+ * progress summaries before storage. The output is a short one-paragraph
+ * prose summary shown to parents. Encoding (rather than stripping)
+ * defends against `<script>` payloads if a future surface (web preview,
+ * markdown, email) renders the same value, while preserving legitimate
+ * content like `5 < 7` or `x > 0` as readable text.
+ *
+ * Input sanitization (`childName`, subject names) is handled separately
+ * inside `buildProgressSummaryPrompt`; this is the matching output guard.
+ */
+function neutralizeHtmlMarkers(text: string): string {
+  return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+export function trimSummary(text: string): string {
+  const cleaned = neutralizeHtmlMarkers(text);
+  const normalized = cleaned.replace(/\s+/g, ' ').trim();
   if (normalized.length <= MAX_PROGRESS_SUMMARY_CHARS) return normalized;
   const clipped = normalized.slice(0, MAX_PROGRESS_SUMMARY_CHARS);
   const sentenceEnd = Math.max(

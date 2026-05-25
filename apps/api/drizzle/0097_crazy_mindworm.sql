@@ -1,0 +1,1 @@
+ALTER TABLE "curriculum_books" ADD COLUMN "retry_claimed_at" timestamp with time zone;

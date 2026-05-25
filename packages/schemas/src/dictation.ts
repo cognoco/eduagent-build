@@ -4,10 +4,25 @@ import { IMAGE_BASE64_MAX } from './common.ts';
 
 // --- Shared types ---
 
+// [WI-150 / WI-206] Payload caps for dictation review.
+// Caps bound the prompt the vision LLM ultimately receives so an attacker
+// who controls /dictation/review input cannot inflate token cost beyond a
+// single metered request's worth. Enforced at three layers:
+//   1. zod schema (per-field caps below)
+//   2. route handler (total-prompt-char budget — `DICTATION_REVIEW_MAX_PROMPT_CHARS`)
+//   3. service entry (defense-in-depth — same budget check before the LLM call)
+export const DICTATION_REVIEW_MAX_SENTENCES = 50;
+export const DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS = 500;
+export const DICTATION_REVIEW_MAX_PROMPT_CHARS = 12_000;
+
 export const dictationSentenceSchema = z.object({
-  text: z.string().describe('Original sentence text with punctuation'),
+  text: z
+    .string()
+    .max(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS)
+    .describe('Original sentence text with punctuation'),
   withPunctuation: z
     .string()
+    .max(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS)
     .describe('Sentence with punctuation spoken as words'),
   wordCount: z.number().int().positive(),
   /** Natural phrase-boundary chunks for TTS playback (original text). */
@@ -92,10 +107,28 @@ export const dictationReviewInputSchema = z
   .object({
     imageBase64: z.string().min(1).max(IMAGE_BASE64_MAX),
     imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-    sentences: z.array(dictationSentenceSchema).min(1),
+    sentences: z
+      .array(dictationSentenceSchema)
+      .min(1)
+      .max(DICTATION_REVIEW_MAX_SENTENCES),
     language: z.string().min(2).max(10),
   })
   .strict();
+
+/**
+ * Returns the total number of prompt-bearing characters in the input —
+ * the union of `text` and `withPunctuation` across all sentences. This is
+ * the budget the route/service guard compares against
+ * `DICTATION_REVIEW_MAX_PROMPT_CHARS`.
+ */
+export function dictationReviewPromptCharCount(input: {
+  sentences: Array<{ text: string; withPunctuation: string }>;
+}): number {
+  return input.sentences.reduce(
+    (sum, s) => sum + s.text.length + s.withPunctuation.length,
+    0,
+  );
+}
 export type DictationReviewInput = z.infer<typeof dictationReviewInputSchema>;
 
 // --- dictation result (for streak tracking) ---

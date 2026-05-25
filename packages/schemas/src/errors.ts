@@ -147,6 +147,28 @@ export class BadRequestError extends Error {
 }
 
 /**
+ * [WI-150 / WI-206] Dictation review request exceeded a payload-size cap
+ * (sentence count, per-sentence length, or total prompt char budget).
+ * Maps to HTTP 413 Payload Too Large at the route boundary.
+ *
+ * Lives in `@eduagent/schemas` so the service layer can throw it without
+ * importing apps/api (defense-in-depth check after the route guard).
+ */
+export class DictationPayloadTooLargeError extends Error {
+  readonly errorCode = 'PAYLOAD_TOO_LARGE' as const;
+  readonly limit: number;
+  readonly actual: number;
+
+  constructor(message: string, limit: number, actual: number) {
+    super(message);
+    this.name = 'DictationPayloadTooLargeError';
+    this.limit = limit;
+    this.actual = actual;
+    Object.setPrototypeOf(this, DictationPayloadTooLargeError.prototype);
+  }
+}
+
+/**
  * [CCR PR #215] Schema-drift fault: a DB row exists but does not validate
  * against its expected zod schema. This is a server-side fault (data shape
  * has drifted from code) — NOT a missing row. The global error handler maps
@@ -301,6 +323,9 @@ export const ERROR_CODES = {
   INVALID_IDEMPOTENCY_KEY: 'INVALID_IDEMPOTENCY_KEY',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  // [WI-150 / WI-206] Returned when a dictation review payload (or other
+  // size-capped request body) exceeds its server-side budget. HTTP 413.
+  PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

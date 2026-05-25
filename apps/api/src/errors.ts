@@ -24,6 +24,7 @@ export {
   TopicNotSkippedError,
   BadRequestError,
   SchemaDriftError,
+  DictationPayloadTooLargeError,
 } from '@eduagent/schemas';
 
 export function apiError(

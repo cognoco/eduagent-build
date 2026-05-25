@@ -29,6 +29,10 @@ jest.mock(
       evaluateQuickCheckAnswer: jest.fn(),
       shouldEndAssessmentForReview: jest.fn().mockReturnValue(false),
       resolveAssessmentStatus: jest.fn().mockReturnValue('in_progress'),
+      // [WI-136 H4] Lock function — default returns the row that
+      // getAssessment would return (in-progress snapshot). Tests that need
+      // a terminal-status race override this with mockRejectedValueOnce.
+      lockAssessmentForAnswerSubmission: jest.fn(),
     };
   },
 );
@@ -113,6 +117,7 @@ import {
   evaluateQuickCheckAnswer,
   shouldEndAssessmentForReview,
   resolveAssessmentStatus,
+  lockAssessmentForAnswerSubmission,
 } from '../services/assessments';
 import { getSession } from '../services/session';
 import { assessmentRoutes } from './assessments';
@@ -164,7 +169,22 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
     if (err instanceof HTTPException) {
       return err.getResponse();
     }
-    return c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500);
+    // [WI-136 H4] Mirror the production handler in apps/api/src/index.ts:
+    // ConflictError -> 409, NotFoundError -> 404. Without this mapping the
+    // route's transactional terminal-state guard collapses to 500 in tests.
+    // Use constructor-name matching to avoid TS narrowing 'err' to 'never'
+    // after the HTTPException branch (dynamic instanceof checks on cast
+    // constructors confuse the narrowing flow — each branch refines the
+    // type until nothing is left).
+    const errName = (err as Error).constructor?.name;
+    const errMessage = (err as Error).message ?? 'Unknown error';
+    if (errName === 'ConflictError') {
+      return c.json({ code: 'CONFLICT', message: errMessage }, 409);
+    }
+    if (errName === 'NotFoundError') {
+      return c.json({ code: 'NOT_FOUND', message: errMessage }, 404);
+    }
+    return c.json({ code: 'INTERNAL_ERROR', message: errMessage }, 500);
   });
   app.route('/v1', assessmentRoutes);
   return app;
@@ -192,9 +212,31 @@ const shouldEndAssessmentForReviewMock = jest.mocked(
 );
 const resolveAssessmentStatusMock = jest.mocked(resolveAssessmentStatus);
 const getSessionMock = jest.mocked(getSession);
+const lockAssessmentForAnswerSubmissionMock = jest.mocked(
+  lockAssessmentForAnswerSubmission,
+);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // [WI-136 H4] Default: the lock returns whatever the test set up
+  // getAssessmentMock to resolve to (the pre-fetch snapshot). Tests that
+  // need to simulate a terminal-state race override via
+  // lockAssessmentForAnswerSubmissionMock.mockRejectedValueOnce.
+  lockAssessmentForAnswerSubmissionMock.mockImplementation(
+    async (_db: Database, _profileId: string, _assessmentId: string) => {
+      const snapshot = await getAssessmentMock(
+        _db as never,
+        _profileId,
+        _assessmentId,
+      );
+      if (!snapshot) {
+        throw new Error(
+          'lockAssessmentForAnswerSubmission mock: getAssessmentMock returned null',
+        );
+      }
+      return snapshot;
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -407,6 +449,58 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
 
     expect(res.status).toBe(403);
     expect(getAssessmentMock).not.toHaveBeenCalled();
+  });
+
+  // [WI-136 H4] Concurrent-submission race: two near-simultaneous POSTs.
+  // Caller A locks first, calls the LLM, commits terminal status. Caller B
+  // blocks at SELECT ... FOR UPDATE, unblocks after A commits, observes
+  // terminal status, throws ConflictError -> 409. The LLM is called exactly
+  // once across the two requests.
+  it('[WI-136 H4] concurrent answer submissions: exactly one LLM call, loser gets 409', async () => {
+    // Both requests see the in-progress snapshot from the non-transactional
+    // pre-fetch (getAssessment). The lock then serializes them.
+    getAssessmentMock.mockResolvedValue(
+      makeAssessmentRecord({ status: 'in_progress' }),
+    );
+    loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
+    shouldEndAssessmentForReviewMock.mockReturnValue(false);
+    evaluateAssessmentAnswerMock.mockResolvedValue(
+      makeEvaluation({ passed: true }),
+    );
+    resolveAssessmentStatusMock.mockReturnValue('passed');
+    updateAssessmentMock.mockResolvedValue(
+      makeAssessmentRecord({ status: 'passed' }),
+    );
+
+    const { ConflictError } = jest.requireActual('@eduagent/schemas') as {
+      ConflictError: new (message: string) => Error;
+    };
+
+    // Override the lock to simulate the race: first call locks the row in
+    // an in-progress state (race winner); second call sees terminal status
+    // post-commit and throws.
+    lockAssessmentForAnswerSubmissionMock
+      .mockResolvedValueOnce(makeAssessmentRecord({ status: 'in_progress' }))
+      .mockRejectedValueOnce(
+        new ConflictError(
+          "Assessment is already in terminal state 'passed'; cannot submit further answers.",
+        ),
+      );
+
+    // Fire both in sequence to make the assertion deterministic. The lock
+    // mock returning in-order is the same serialization the real
+    // SELECT ... FOR UPDATE provides at the DB level.
+    const winner = await makeApp().request(path, validAnswerBody());
+    const loser = await makeApp().request(path, validAnswerBody());
+
+    expect(winner.status).toBe(200);
+    expect(loser.status).toBe(409);
+
+    // The LLM (evaluateAssessmentAnswer) is invoked exactly once across both
+    // requests — the loser short-circuits before its LLM call inside the tx.
+    expect(evaluateAssessmentAnswerMock).toHaveBeenCalledTimes(1);
+    // Likewise only one UPDATE commits.
+    expect(updateAssessmentMock).toHaveBeenCalledTimes(1);
   });
 });
 

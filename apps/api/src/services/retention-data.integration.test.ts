@@ -26,6 +26,8 @@ import {
 import { NotFoundError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { getProfileOverdueCount, processRecallTest } from './retention-data';
+import { registerLlmProviderFixture } from '../test-utils/llm-provider-fixtures';
+import { _resetCircuits } from './llm';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -378,5 +380,131 @@ describe('processRecallTest IDOR ownership guard [LEARN-13]', () => {
       ),
     });
     expect(leakedCard).toBeUndefined();
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// WI-234 — processRecallTest concurrent recall race
+//
+// Property: two concurrent recall submissions for the same fresh topic must
+// produce EXACTLY ONE LLM call. The loser must short-circuit to the cooldown
+// branch BEFORE reaching evaluateRecallQuality / routeAndCall.
+// ---------------------------------------------------------------------------
+
+const WI234_PREFIX = `integ-wi234-${RUN_ID}`;
+
+async function seedWi234ProfileTopic(
+  database: Database,
+  label: string,
+): Promise<{ profileId: string; topicId: string }> {
+  const [account] = await database
+    .insert(accounts)
+    .values({
+      clerkUserId: `${WI234_PREFIX}-${label}`,
+      email: `${WI234_PREFIX}-${label}@test.invalid`,
+    })
+    .returning({ id: accounts.id });
+
+  const [profile] = await database
+    .insert(profiles)
+    .values({
+      accountId: account!.id,
+      displayName: `WI-234 ${label}`,
+      birthYear: 2010,
+      isOwner: true,
+    })
+    .returning({ id: profiles.id });
+
+  const [subject] = await database
+    .insert(subjects)
+    .values({
+      profileId: profile!.id,
+      name: `Subject ${label}`,
+      status: 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning({ id: subjects.id });
+
+  const [curriculum] = await database
+    .insert(curricula)
+    .values({ subjectId: subject!.id, version: 1 })
+    .returning({ id: curricula.id });
+
+  const [book] = await database
+    .insert(curriculumBooks)
+    .values({
+      subjectId: subject!.id,
+      title: `Book ${label}`,
+      sortOrder: 0,
+    })
+    .returning({ id: curriculumBooks.id });
+
+  const [topic] = await database
+    .insert(curriculumTopics)
+    .values({
+      curriculumId: curriculum!.id,
+      bookId: book!.id,
+      title: `Topic ${label}`,
+      description: `Description for ${label}`,
+      sortOrder: 0,
+      estimatedMinutes: 30,
+    })
+    .returning({ id: curriculumTopics.id });
+
+  return { profileId: profile!.id, topicId: topic!.id };
+}
+
+async function cleanupWi234(database: Database): Promise<void> {
+  await database
+    .delete(accounts)
+    .where(like(accounts.clerkUserId, `${WI234_PREFIX}%`));
+}
+
+describe('processRecallTest concurrent LLM serialization [WI-234]', () => {
+  const llmFixture = registerLlmProviderFixture();
+
+  beforeAll(async () => {
+    await cleanupWi234(db);
+  });
+
+  afterAll(async () => {
+    await cleanupWi234(db);
+    llmFixture.dispose();
+    _resetCircuits();
+  });
+
+  beforeEach(() => {
+    llmFixture.clearCalls();
+    llmFixture.clearChatError();
+    // Recall quality grader expects a single digit 0-5.
+    llmFixture.setChatResponse('4');
+    _resetCircuits();
+  });
+
+  it('two concurrent recall submissions for the same fresh topic produce exactly one LLM call', async () => {
+    const seed = await seedWi234ProfileTopic(db, 'concurrent');
+
+    const [resA, resB] = await Promise.all([
+      processRecallTest(db, seed.profileId, {
+        topicId: seed.topicId,
+        answer: 'mitochondria are the powerhouse of the cell',
+        attemptMode: 'standard',
+      }),
+      processRecallTest(db, seed.profileId, {
+        topicId: seed.topicId,
+        answer: 'mitochondria produce ATP',
+        attemptMode: 'standard',
+      }),
+    ]);
+
+    // Exactly one LLM call — the loser must short-circuit before evaluating.
+    expect(llmFixture.chatCalls).toHaveLength(1);
+
+    // Exactly one of the two results is the cooldown branch; the other is normal.
+    const cooldownResponses = [resA, resB].filter((r) => r.cooldownActive);
+    const normalResponses = [resA, resB].filter((r) => !r.cooldownActive);
+    expect(cooldownResponses).toHaveLength(1);
+    expect(normalResponses).toHaveLength(1);
+    expect(cooldownResponses[0]!.cooldownEndsAt).toBeTruthy();
   }, 30_000);
 });

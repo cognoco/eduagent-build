@@ -130,6 +130,25 @@ async function callBookSuggestionGenerationJson(
   return null;
 }
 
+/**
+ * [WI-194] Restructured to keep the LLM call OUTSIDE any open transaction
+ * and OUTSIDE the advisory lock. The previous shape held a single tx open
+ * across the routeAndCall (multi-second remote call), pinning a DB
+ * connection and an advisory lock for the duration of the LLM call.
+ *
+ * New shape:
+ *   1. Short tx #1 — try advisory lock, re-check existing suggestions,
+ *      reserve cooldown (write `bookSuggestionsLastGenerationAttemptedAt`),
+ *      read prompt inputs (existing titles, studied topics). COMMIT.
+ *      Advisory lock is released at COMMIT (xact-scoped).
+ *   2. LLM call OUTSIDE any tx / lock.
+ *   3. Short tx #2 — re-acquire advisory lock, re-check existing
+ *      suggestions (idempotency under retry), insert results. COMMIT.
+ *
+ * If the LLM call throws, the cooldown reservation from step 1 has already
+ * been committed, so subsequent attempts are gated by COOLDOWN_MS (existing
+ * behavior — the cooldown is the rate-limit, not a retry signal).
+ */
 export async function generateCategorizedBookSuggestions(
   db: Database,
   profileId: string,
@@ -148,18 +167,178 @@ export async function generateCategorizedBookSuggestions(
     return 'cooldown';
   }
 
+  const lockKey = `book_suggestions:${profileId}:${subjectId}`;
+
+  // ---------------------------------------------------------------------
+  // Phase 1 — short tx: claim lock + reserve cooldown + read prompt inputs.
+  // ---------------------------------------------------------------------
+  type Phase1Reserved = {
+    kind: 'reserved';
+    existingBookTitles: string[];
+    existingSuggestionTitles: string[];
+    studiedTopics: string[];
+  };
+  type Phase1Outcome =
+    | Phase1Reserved
+    | { kind: 'short_circuit'; outcome: GenerationOutcome };
+
+  const phase1: Phase1Outcome = await db.transaction(
+    async (tx): Promise<Phase1Outcome> => {
+      const lockResult = await tx.execute(
+        sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS got`,
+      );
+      // Drizzle's tx.execute() return shape is driver-dependent and not part
+      // of its stable surface: neon-serverless returns { rows: [...] }, while
+      // some other adapters return the rows array directly. Verified against
+      // drizzle-orm@neon-serverless as of 2026-05-11.
+      const rows =
+        (lockResult as unknown as { rows?: Array<{ got: boolean }> }).rows ??
+        (lockResult as unknown as Array<{ got: boolean }>);
+      if (!Array.isArray(rows) || typeof rows[0]?.got !== 'boolean') {
+        throw new Error(
+          'pg_try_advisory_xact_lock returned an unexpected Drizzle result shape — ' +
+            'driver may have been upgraded. Inspect the shape and update the cast in ' +
+            'book-suggestion-generation.ts.',
+        );
+      }
+      if (!rows[0].got) {
+        return { kind: 'short_circuit', outcome: 'lock_loser' };
+      }
+
+      const unpickedNow = await tx
+        .select({ id: bookSuggestions.id })
+        .from(bookSuggestions)
+        .where(
+          and(
+            eq(bookSuggestions.subjectId, subjectId),
+            isNull(bookSuggestions.pickedAt),
+          ),
+        );
+      if (unpickedNow.length >= 4) {
+        return { kind: 'short_circuit', outcome: 'success' };
+      }
+
+      // Reserve cooldown atomically inside the lock. Any losing caller that
+      // arrives after this commit sees the updated timestamp and falls into
+      // the COOLDOWN_MS branch above.
+      await tx
+        .update(subjects)
+        .set({ bookSuggestionsLastGenerationAttemptedAt: new Date() })
+        .where(
+          and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+        );
+
+      const existingBookTitles = (
+        await tx
+          .select({ title: curriculumBooks.title })
+          .from(curriculumBooks)
+          .where(eq(curriculumBooks.subjectId, subjectId))
+      ).map((r) => r.title);
+
+      const existingSuggestionTitles = (
+        await tx
+          .select({ title: bookSuggestions.title })
+          .from(bookSuggestions)
+          .where(eq(bookSuggestions.subjectId, subjectId))
+      ).map((r) => r.title);
+
+      const studiedTopics = (
+        await tx
+          .select({
+            title: curriculumTopics.title,
+            ts: learningSessions.startedAt,
+          })
+          .from(learningSessions)
+          .innerJoin(
+            curriculumTopics,
+            eq(learningSessions.topicId, curriculumTopics.id),
+          )
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumTopics.bookId, curriculumBooks.id),
+          )
+          .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
+          .where(
+            and(
+              eq(curriculumBooks.subjectId, subjectId),
+              eq(subjects.profileId, profileId),
+            ),
+          )
+          .orderBy(desc(learningSessions.startedAt))
+          .limit(RECENT_TOPIC_LIMIT)
+      ).map((r) => r.title);
+
+      return {
+        kind: 'reserved',
+        existingBookTitles,
+        existingSuggestionTitles,
+        studiedTopics,
+      };
+    },
+  );
+
+  if (phase1.kind === 'short_circuit') {
+    if (phase1.outcome === 'lock_loser') {
+      emitFailureMetric(profileId, subjectId, 'lock_loser');
+    }
+    return phase1.outcome;
+  }
+
+  const { existingBookTitles, existingSuggestionTitles, studiedTopics } =
+    phase1;
+
+  // ---------------------------------------------------------------------
+  // Phase 2 — LLM call OUTSIDE any open transaction or advisory lock.
+  // ---------------------------------------------------------------------
+  let parsed: BookSuggestionGenerationResult;
+  try {
+    const messages = buildPrompt({
+      subjectName: subject.name,
+      languageName:
+        subject.pedagogyMode === 'four_strands' && subject.languageCode
+          ? (getLanguageDisplayName(subject.languageCode) ?? subject.name)
+          : null,
+      existingBookTitles,
+      existingSuggestionTitles,
+      studiedTopics,
+    });
+    const validated = await callBookSuggestionGenerationJson(messages);
+    if (!validated) {
+      emitFailureMetric(profileId, subjectId, 'parse');
+      return 'parse';
+    }
+    parsed = validated;
+  } catch (error) {
+    const reason = classifyError(error);
+    emitFailureMetric(profileId, subjectId, reason);
+    return reason;
+  }
+
+  const blockedTitles = [...existingBookTitles, ...existingSuggestionTitles];
+  const seen = new Set<string>();
+  const filtered = parsed.suggestions.filter((s) => {
+    if (blockedTitles.some((b) => areEquivalentBookTitles(b, s.title)))
+      return false;
+    const lower = s.title.toLowerCase();
+    if (seen.has(lower)) return false;
+    seen.add(lower);
+    return true;
+  });
+  if (filtered.length === 0) {
+    emitFailureMetric(profileId, subjectId, 'all_filtered');
+    return 'all_filtered';
+  }
+
+  // ---------------------------------------------------------------------
+  // Phase 3 — short tx: re-acquire lock + re-check + insert.
+  // The re-check defends against a late-arriving concurrent writer that
+  // committed between Phase 1 and Phase 3 (e.g. a parallel call that
+  // claimed the cooldown after we released the lock).
+  // ---------------------------------------------------------------------
   return db.transaction(async (tx): Promise<GenerationOutcome> => {
-    const lockKey = `book_suggestions:${profileId}:${subjectId}`;
     const lockResult = await tx.execute(
       sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS got`,
     );
-    // Drizzle's tx.execute() return shape is driver-dependent and not part of
-    // its stable surface: neon-serverless (current prod via WebSocket Pool)
-    // returns { rows: [...] }, while some other adapters return the rows
-    // array directly. If a future Drizzle upgrade changes the shape to neither,
-    // an undetected mismatch would silently default `got` to false and the
-    // generator would route every call to 'lock_loser' with no error. Verified
-    // against drizzle-orm@neon-serverless as of 2026-05-11.
     const rows =
       (lockResult as unknown as { rows?: Array<{ got: boolean }> }).rows ??
       (lockResult as unknown as Array<{ got: boolean }>);
@@ -170,10 +349,10 @@ export async function generateCategorizedBookSuggestions(
           'book-suggestion-generation.ts.',
       );
     }
-    const got = rows[0].got;
-    if (!got) {
-      emitFailureMetric(profileId, subjectId, 'lock_loser');
-      return 'lock_loser';
+    if (!rows[0].got) {
+      // Another writer is mid-insert with the same lock. The unique index on
+      // (subject_id, lower(title)) will dedupe; treat as success.
+      return 'success';
     }
 
     const unpickedNow = await tx
@@ -187,107 +366,52 @@ export async function generateCategorizedBookSuggestions(
       );
     if (unpickedNow.length >= 4) return 'success';
 
-    await tx
-      .update(subjects)
-      .set({ bookSuggestionsLastGenerationAttemptedAt: new Date() })
-      .where(
-        and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-      );
-
-    const existingBookTitles = (
-      await tx
-        .select({ title: curriculumBooks.title })
-        .from(curriculumBooks)
-        .where(eq(curriculumBooks.subjectId, subjectId))
-    ).map((r) => r.title);
-
-    const existingSuggestionTitles = (
-      await tx
-        .select({ title: bookSuggestions.title })
-        .from(bookSuggestions)
-        .where(eq(bookSuggestions.subjectId, subjectId))
-    ).map((r) => r.title);
-
-    const studiedTopics = (
-      await tx
-        .select({
-          title: curriculumTopics.title,
-          ts: learningSessions.startedAt,
-        })
-        .from(learningSessions)
-        .innerJoin(
-          curriculumTopics,
-          eq(learningSessions.topicId, curriculumTopics.id),
-        )
-        .innerJoin(
-          curriculumBooks,
-          eq(curriculumTopics.bookId, curriculumBooks.id),
-        )
-        .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
-        .where(
-          and(
-            eq(curriculumBooks.subjectId, subjectId),
-            eq(subjects.profileId, profileId),
-          ),
-        )
-        .orderBy(desc(learningSessions.startedAt))
-        .limit(RECENT_TOPIC_LIMIT)
-    ).map((r) => r.title);
-
-    let parsed;
+    // [WI-77 M3] Per-row insert with onConflictDoNothing.
+    //
+    // The previous shape was a single bulk `insert.values([...])` wrapped in
+    // a try/catch that caught the unique-violation and returned 'success'.
+    // Problem: PostgreSQL aborts the ENTIRE multi-row INSERT on first
+    // constraint violation, so a single colliding title would drop all
+    // non-colliding suggestions on the floor. The LLM call still ran (and
+    // was billed) but the learner saw zero new suggestions.
+    //
+    // Using per-row INSERT ... ON CONFLICT DO NOTHING lets non-colliding
+    // rows commit while colliding rows are silently skipped — the same
+    // success-on-collision semantics, applied row-by-row instead of all-or-
+    // nothing. .returning({ id }) lets us count what actually landed.
+    //
+    // The legacy catch-block fallback is kept around the loop as
+    // belt-and-braces: a non-unique-violation error (e.g. FK or other) still
+    // propagates; a race that surfaces a unique violation despite the ON
+    // CONFLICT clause (e.g. the expression-based partial index path) is
+    // still treated as success.
+    const inserted: Array<{ id: string }> = [];
     try {
-      const messages = buildPrompt({
-        subjectName: subject.name,
-        languageName:
-          subject.pedagogyMode === 'four_strands' && subject.languageCode
-            ? (getLanguageDisplayName(subject.languageCode) ?? subject.name)
-            : null,
-        existingBookTitles,
-        existingSuggestionTitles,
-        studiedTopics,
-      });
-      const validated = await callBookSuggestionGenerationJson(messages);
-      if (!validated) {
-        emitFailureMetric(profileId, subjectId, 'parse');
-        return 'parse';
+      for (const s of filtered) {
+        const rows = await tx
+          .insert(bookSuggestions)
+          .values({
+            subjectId,
+            title: s.title,
+            emoji: s.emoji,
+            description: s.description,
+            category: s.category,
+          })
+          .onConflictDoNothing()
+          .returning({ id: bookSuggestions.id });
+        const first = rows[0];
+        if (first) inserted.push(first);
       }
-      parsed = validated;
     } catch (error) {
-      const reason = classifyError(error);
-      emitFailureMetric(profileId, subjectId, reason);
-      return reason;
+      if (!isUniqueViolation(error)) throw error;
+      // Race surfaced a unique violation; treat as success — the row the
+      // racer wrote satisfies the dedup contract.
     }
-
-    const blockedTitles = [...existingBookTitles, ...existingSuggestionTitles];
-    const seen = new Set<string>();
-    const filtered = parsed.suggestions.filter((s) => {
-      if (blockedTitles.some((b) => areEquivalentBookTitles(b, s.title)))
-        return false;
-      const lower = s.title.toLowerCase();
-      if (seen.has(lower)) return false;
-      seen.add(lower);
-      return true;
-    });
-    if (filtered.length === 0) {
-      emitFailureMetric(profileId, subjectId, 'all_filtered');
-      return 'all_filtered';
-    }
-
-    try {
-      await tx.insert(bookSuggestions).values(
-        filtered.map((s) => ({
-          subjectId,
-          title: s.title,
-          emoji: s.emoji,
-          description: s.description,
-          category: s.category,
-        })),
-      );
-      return 'success';
-    } catch (error) {
-      if (isUniqueViolation(error)) return 'success';
-      throw error;
-    }
+    // Zero inserts is still 'success' because the dedup contract was met
+    // (every candidate already exists or was just written by a concurrent
+    // racer). The LLM call legitimately produced output; we should NOT
+    // refund quota.
+    return 'success';
   });
 }
 
