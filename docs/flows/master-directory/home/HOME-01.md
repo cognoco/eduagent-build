@@ -1,13 +1,15 @@
 # HOME-01 - Learner Home
 
-> **Status:** Draft  
-> **Access label:** Study-only  
-> **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `apps/mobile/src/app/(app)/home.tsx`, `apps/mobile/src/components/home/LearnerScreen.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/lib/app-context.tsx`
+> **Status:** Draft
+> **Access label:** Study-only
+> **Last mapped:** 2026-05-25
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `audience-matrix.md`, `docs/specs/2026-05-23-freeform-library-filing.md`, `docs/plans/2026-05-23-freeform-library-filing-plan.md`, `apps/mobile/src/app/(app)/home.tsx`, `apps/mobile/src/components/home/LearnerScreen.tsx`, `apps/mobile/src/components/home/ParentHomeScreen.tsx`, `apps/mobile/src/lib/app-context.tsx`
 
 ## Purpose
 
 Give the active learner a single starting point for their own study work: resume what is in progress, start homework, ask a freeform question, practice, create a subject, open a subject shelf, view notes, and recover from loading or setup gaps. For adults who are also mentors, this page must remain their own Study home; Family support belongs to the Family shell and parent-native child routes.
+
+The Study New and Ask Anything entries intentionally mean different things. Study New creates or resolves a subject up front for structured learning. Ask Anything opens a freeform session; the session is saved as history, and meaningful freeform chats may later be filed into Library under a subject. Library filing is not the same as creating the session, and keeping a freeform session out of Library does not delete the session history.
 
 ## Audience Access
 
@@ -30,9 +32,9 @@ The end-user product meaning is Study-only: this is the learner's own home. It i
 | --- | --- | --- | --- | --- |
 | Home tab | `/(app)/home` -> `HomeScreen` -> `LearnerScreen` | Yes | Current V0: yes, same route can render Family content. Target: Family tab home should be Family Home, not this learner surface. | `home-screen`, `learner-screen`; `ModeChip` appears when family-capable and mode is loaded. |
 | Subject carousel card | `home-subject-card-{id}` -> `/(app)/shelf/[subjectId]` | Yes | No direct Family surfacing in target. | Uses active learner subject/progress data. |
-| Study new | `home-action-study-new` -> `/create-subject` | Yes | Bridge only if adult switches to Study. | Creates a subject for the active learner, not for a child. |
+| Study new | `home-action-study-new` -> `/create-subject` | Yes | Bridge only if adult switches to Study. | Creates/resolves a subject up front for the active learner, not for a child. See SUBJECT-05. |
 | Homework | `home-action-homework` -> `/(app)/homework/camera` | Yes | Not surfaced in Family target. | Starts active-student homework capture. |
-| Ask Anything | `home-ask-anything` -> `/(app)/session?mode=freeform` | Yes | Not surfaced in Family target. | Opens freeform session as active learner. |
+| Ask Anything | `home-ask-anything` -> `/(app)/session?mode=freeform` | Yes | Not surfaced in Family target. | Opens a freeform session as active learner. The session is saved as history; if meaningful, it may later auto-file into Library after close. See LEARN-01. |
 | Practice | `home-action-practice` -> `/(app)/practice` | Yes | Not surfaced in Family target. | Active-student practice/review route. |
 | My Notes | `home-my-notes` -> `/(app)/my-notes?returnTo=home` | Yes | No | Hidden in parent-proxy branch. |
 | Continue/recommended band | `CoachBand` -> session, resume target, relearn, or quiz | Yes | No | Hidden for parent proxy; gated by `FEATURE_FLAGS.COACH_BAND_ENABLED`. |
@@ -42,6 +44,8 @@ The end-user product meaning is Study-only: this is the learner's own home. It i
 ## Data Ownership And Privacy
 
 - Subject, progress, resume, review, quiz-discovery, notes, homework, practice, and session actions are scoped to the active profile via the mobile profile context and API client active profile.
+- Study New subject creation and Ask Anything freeform chat are separate ownership surfaces. Study New creates a subject before structured learning; Ask Anything creates a saved session first, then may file a Library topic later if the freeform chat is meaningful.
+- Library filing never changes the active learner owner. Filed freeform topics belong under the learner's subjects. Kept-out freeform sessions remain saved session history but are not Library topics and should not drive topic progress or retention.
 - Adult owners can be both mentors and students. Their own Study home must use the adult owner profile, not a linked child, even when family-capable.
 - Parent proxy is compatibility behavior only. When active profile is a child on a parent account, `LearnerScreen` treats that as `isParentProxy` and hides some self-owned affordances such as My Notes and CoachBand; this should not become the normal Family review path.
 - The current `useHasLinkedChildren()`/family-plan fallback in `LearnerScreen` can render `ParentHomeScreen` when `MODE_NAV_V0_ENABLED` is off and the adult has linked children or a family/pro subscription. The target contract says capability should be server-sourced (`hasFamilyLinks`) and Study should remain Study unless the effective context is Family.
@@ -70,6 +74,7 @@ The end-user product meaning is Study-only: this is the learner's own home. It i
 | Type | Link or ID | Note |
 | --- | --- | --- |
 | Product drift | Navigation contract V0 vs FULL | Current `/(app)/home` is a shared content switch. Target wants Study `LearnerHome` and Family `FamilyHome` under a single contract with Family tabs `home, recaps, progress, more`. |
+| Product drift | Freeform filing plan | This page documents the Study Home distinction between Study New and Ask Anything. It does not claim upstream Ask First / Unsorted auto-subject is delivered. |
 | Implementation drift | `apps/mobile/src/lib/app-context.tsx` | Mode is local state derived from client-side profile list; target requires server-backed `profiles.default_app_context` and `hasFamilyLinks`. |
 | Scope drift | `apps/mobile/src/components/home/LearnerScreen.tsx` | With V0 flag off, linked children or family/pro subscription can cause `ParentHomeScreen` to render from the learner component. Study should remain adult self-learning unless Family context is selected. |
 | UX drift | Loading timeout fallback | Home timeout always offers Library, which is correct for Study but not the target Family shell where top-level Library should not be surfaced. |

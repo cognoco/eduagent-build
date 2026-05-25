@@ -1,8 +1,8 @@
 # Freeform Chat Library Filing Implementation Plan
 
-> **Status:** Partially implemented / not fully delivered
+> **Status:** Implemented with follow-up gaps
 > **Date:** 2026-05-23
-> **Current status audit:** 2026-05-25 static repo check on branch `freeform`
+> **Current status audit:** 2026-05-25 coordination pass on branch `freeform`
 > **Source spec:** [`docs/specs/2026-05-23-freeform-library-filing.md`](../specs/2026-05-23-freeform-library-filing.md)
 
 **Goal:** Replace the post-session "do you want to file this?" interruption with quiet auto-filing for meaningful freeform sessions, while preserving an explicit "Keep out of Library" choice. Sessions stay saved either way. Library topics always belong to subjects.
@@ -13,9 +13,9 @@
 
 ## Current Implementation Status — 2026-05-25
 
-This plan is **not fully delivered** in the current checkout. Some backend scaffolding has landed, but the core auto-filing lifecycle, race-safe resolver split, mobile Library filing UX, and flow-doc reconciliation remain open.
+This plan is now **mostly delivered** in the current checkout. The backend auto-file lifecycle, resolver split, keep-out cleanup, mobile Summary controls, Library attention surface, and flow-doc reconciliation were implemented during the 2026-05-25 coordination pass.
 
-Static audit evidence:
+Implementation evidence:
 
 - **Delivered / present**
   - `filing_kept_out` exists in shared schema, database schema, and migration:
@@ -23,32 +23,29 @@ Static audit evidence:
     - `packages/database/src/schema/sessions.ts`
     - `apps/api/drizzle/0098_filing_kept_out.sql`
   - `app/session.auto_file_requested` schema exists in `packages/schemas/src/inngest-events.ts`.
-  - User-action API scaffolding exists in `apps/api/src/routes/sessions.ts`:
+  - User-action API endpoints exist in `apps/api/src/routes/sessions.ts`:
     - `POST /sessions/:sessionId/library-filing/keep-out`
     - `POST /sessions/:sessionId/library-filing/add`
     - `POST /sessions/:sessionId/library-filing/restore`
     - freeform-aware `POST /sessions/:sessionId/retry-filing`
-  - Session service helpers exist for kept-out/add/restore/retry reset in `apps/api/src/services/session/session-crud.ts`.
-  - `markSessionFiled()` exists and writes `topicId`, `filedAt`, and `updatedAt` in `apps/api/src/services/session/session-book.ts`.
+  - `resolveFilingResult()` no longer mutates `learning_sessions`; `/filing` explicitly marks the session filed after topic resolution.
+  - `deleteTopicIfSafe(db, profileId, sessionId, topicId)` exists in `apps/api/src/services/curriculum.ts` and is used by keep-out and the auto-file race branch.
+  - `apps/api/src/inngest/functions/auto-file-session.ts` implements the dedicated `app/session.auto_file_requested` lifecycle with CAS claim, guarded final update, race cleanup, terminal failure handling, and `filedFrom = 'session_filing'`.
+  - Session close opportunistically dispatches eligible meaningful freeform sessions with `auto-file-${sessionId}-initial`; user Add/Restore/Retry use awaited CORE sends with fresh dispatch ids.
+  - Backfill and timeout observer paths were updated for the freeform threshold, kept-out exclusions, and the new auto-file event boundary.
+  - Mobile freeform close now navigates directly to Summary while homework keeps the existing filing prompt.
+  - `useSessionLibraryFiling(sessionId)` polls every 3s, stops after terminal state or 10 polls, and exposes the non-terminal timeout state.
+  - `SessionSummaryLibraryFilingControls` renders pending, still-pending, unfiled, kept-out, failed, and filed states with add/keep-out/remove/restore/retry actions and filed destination/tap-through.
+  - Library has a scan-path attention row for failed freeform Library additions.
+  - Flow docs now include `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` and reconcile session history vs Library filing.
 
-- **Partially delivered / needs correction**
-  - `apps/api/src/inngest/functions/freeform-filing.ts` listens for `app/session.auto_file_requested`, but it reuses `runFreeformFiling()` rather than the planned race-safe `auto-file-session` lifecycle. It does not claim `filing_pending`, enforce the new max-retry lifecycle, or perform the guarded final session update described below.
-  - User-initiated Add/Restore/Retry dispatches use awaited `inngest.send(...)`, which matches the CORE dispatch requirement, but close-path automatic dispatch was not found in the static audit.
-  - `FILING_CONFIG` exists in `apps/api/src/config/filing.ts`, but the static audit found only limited usage. The auto-file eligibility and backfill threshold still need a focused verification pass.
-  - Mobile has `filing_kept_out` in existing status types, but the only visible Summary status found was the old `FilingFailedBanner`, not the planned compact Library filing control.
+- **Remaining follow-up gaps**
+  - Topic rename is not implemented. No backend topic-rename route was found, so the Summary filed state intentionally does not render the planned rename affordance.
+  - The Library failed-filing attention implementation uses recent sessions plus per-session detail fetches. It is acceptable for this slice, but a dedicated backend endpoint is needed before GA-scale use.
+  - Local integration verification is blocked by database schema drift: the local DB is missing `curriculum_books.retry_in_flight`, and some kept-out enum integration paths need the migration applied locally.
+  - Full mobile Jest was not run in this pass; targeted mobile tests and mobile typecheck were run instead.
 
-- **Not delivered / open**
-  - Close-time enqueue for eligible meaningful freeform sessions was not found. The plan still needs implementation of the opportunistic close-path `app/session.auto_file_requested` dispatch with the `auto-file-${sessionId}-initial` dedupe key.
-  - `resolveFilingResult()` still mutates `learning_sessions` directly in `apps/api/src/services/filing.ts`. The planned split is not complete.
-  - `claimSessionForAutoFiling()` was not found.
-  - `deleteTopicIfSafe()` was not found. `markSessionKeptOutOfLibrary()` currently detaches the session but does not perform the shared safe topic cleanup described below.
-  - The auto-file opt-out race guard is not implemented as planned because the resolver still updates the session row directly and the auto-file handler does not perform the guarded final update.
-  - `useSessionLibraryFiling(sessionId)` was not found. Existing session polling still uses `computeFilingRefetchInterval()` with `15_000` ms for `filing_pending`, not the planned 3s cadence / 10-poll timeout behavior.
-  - Session Summary does not yet show the planned Library status/action surface: pending `Don't add to Library`, filed destination/tap-through, filed-topic rename, below-threshold `Add to Library`, or `Remove from Library`.
-  - The Library tab failed-filing attention surface was not found.
-  - Flow docs are not reconciled: `docs/flows/flow-master-directory.md` still lists `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` as `Not created`.
-
-Do not treat PR 1-4 below as complete until these open items are implemented and verified with the validation commands at the end of this plan.
+Treat PR 1, PR 2, and PR 4 as delivered for this branch after the validation commands below pass. Treat PR 3 as delivered except for the explicit topic-rename follow-up and the Library attention endpoint hardening.
 
 ---
 
@@ -110,7 +107,7 @@ Out of scope — track in follow-up plans:
 
 ### PR 1 - Backend Filing State And Keep-Out Contract
 
-**Current status (2026-05-25): Partial.** Schema/migration/API scaffolding exists, but shared safe topic cleanup and full kept-out exclusion verification remain open.
+**Current status (2026-05-25): Delivered, with local integration verification blocked by DB schema drift.** Schema/migration/API scaffolding, service helpers, resolver split, safe topic cleanup, and route coverage are implemented.
 
 Create the durable state model and API operations:
 
@@ -121,7 +118,7 @@ Create the durable state model and API operations:
 
 ### PR 2 - Auto-File Freeform Sessions
 
-**Current status (2026-05-25): Not delivered.** The new event schema and listener exist, but close-path enqueue, CAS claim, guarded final update, resolver split, and terminal failure lifecycle are not implemented as planned.
+**Current status (2026-05-25): Delivered, with local integration verification blocked by DB schema drift.** Close-path enqueue, dedicated auto-file handler, CAS claim, guarded final update, terminal failure handling, backfill thresholding, timeout observer retargeting, and opt-out race cleanup are implemented.
 
 Move meaningful freeform sessions to background filing by default:
 
@@ -132,7 +129,7 @@ Move meaningful freeform sessions to background filing by default:
 
 ### PR 3 - Mobile UX
 
-**Current status (2026-05-25): Not delivered.** The existing failed-filing banner remains, but the planned Session Summary Library status/actions, 3s polling hook, filed destination/tap-through, rename affordance, and Library attention surface were not found.
+**Current status (2026-05-25): Mostly delivered.** Freeform close skips the blocking filing prompt, Summary has the compact Library filing status/actions and 3s/10-poll hook, filed destination/tap-through is shown when available, and Library has a failed-filing attention row. Topic rename remains a follow-up because there is no backend rename route yet; the attention row needs a dedicated backend endpoint before GA-scale use.
 
 Remove the blocking filing prompt:
 
@@ -145,7 +142,7 @@ Remove the blocking filing prompt:
 
 ### PR 4 - Flow Docs Reconciliation
 
-**Current status (2026-05-25): Not delivered.** `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` are still marked `Not created` in the flow master directory.
+**Current status (2026-05-25): Delivered.** `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` exist, and the master directory plus related Home/Learn docs distinguish session history from Library filing.
 
 Collect the scattered documentation:
 
@@ -238,8 +235,8 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 ### Flow Docs
 
 - `docs/flows/master-directory/learn/LEARN-01.md` - create.
-- `docs/flows/master-directory/learn/SUBJECT-03.md` - create. [LOW-1] Subject-creation-from-chat is a chat-session sub-flow, so it lives under `learn/`.
-- `docs/flows/master-directory/learn/SUBJECT-05.md` - create. [LOW-1] Same reasoning — subject resolution from chat is a learn-flow concern.
+- `docs/flows/master-directory/subject/SUBJECT-03.md` - create.
+- `docs/flows/master-directory/subject/SUBJECT-05.md` - create.
 - `docs/flows/master-directory/home/HOME-01.md` - update Ask Anything and Study New rows.
 - `docs/flows/master-directory/learn/LEARN-07.md` - replace filing/dismissal ambiguity.
 - `docs/flows/master-directory/learn/LEARN-08.md` - add session-history vs Library-filing rule.
@@ -249,10 +246,10 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 
 ## PR 1 Tasks - Backend Filing State And Keep-Out
 
-**Static status (2026-05-25): Partial.**
+**Static status (2026-05-25): Delivered, except local DB-backed integration verification.**
 
-- Present: `filing_kept_out` schema/database/migration, `getSessionEffectiveMode()`, `FILING_CONFIG`, `markSessionFiled()`, kept-out/add/restore/retry-reset service scaffolding, and session route endpoints.
-- Needs follow-up: `requestSessionLibraryFiling()` still needs verification against the planned freeform/transcript eligibility contract; `deleteTopicIfSafe()` is missing; `resolveFilingResult()` still writes `learning_sessions`; kept-out retry exclusion/backfill/observer coverage needs a focused test pass.
+- Present: `filing_kept_out` schema/database/migration, `getSessionEffectiveMode()`, `FILING_CONFIG`, `markSessionFiled()`, kept-out/add/restore/retry-reset services, `requestSessionLibraryFiling()`, `deleteTopicIfSafe()`, resolver split, and session route endpoints.
+- Follow-up: rerun DB-backed integration tests after applying the local schema/migration drift fix.
 
 - [ ] Add `filing_kept_out` to shared `filingStatusSchema`.
 - [ ] Add typed `getSessionEffectiveMode(session)` accessor to `@eduagent/schemas`. [HIGH-3] All effective-mode reads in PR 2 must route through this.
@@ -299,10 +296,10 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 
 ## PR 2 Tasks - Auto-File Freeform Sessions
 
-**Static status (2026-05-25): Not delivered.**
+**Static status (2026-05-25): Delivered, except local DB-backed integration verification.**
 
-- Present: `app/session.auto_file_requested` schema and an Inngest listener attached to `freeform-filing.ts`.
-- Needs implementation: eligible close-path dispatch, dedicated `auto-file-session` handler, `claimSessionForAutoFiling()`, guarded final update, terminal failure lifecycle, safe cleanup on opt-out race, repeated-topic dedupe acceptance coverage, and backfill threshold updates.
+- Present: `app/session.auto_file_requested` schema, eligible close-path dispatch, dedicated `auto-file-session` handler, claim/finalize helpers, guarded final update, terminal failure lifecycle, safe cleanup on opt-out race, timeout observer retargeting, and backfill threshold updates.
+- Follow-up: rerun DB-backed integration tests after applying the local schema/migration drift fix; add broader repeated-topic dedupe coverage if resolver behavior needs GA hardening.
 
 - [ ] Audit every `learning_sessions` insert path and confirm the freeform entry actually writes `metadata.effectiveMode = 'freeform'`. **[HIGH-3 / MEDIUM-L]** Today `session-crud.ts:906` defaults to `effectiveMode: 'learning'`; if any freeform creation path forgets to override, auto-file silently never fires for that path. Target files to audit:
   - `apps/api/src/services/session/session-crud.ts` — `startSession`, onboarding fast-path, curriculum-first session creation (the `'learning'` default lives here).
@@ -351,10 +348,10 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 
 ## PR 3 Tasks - Mobile UX
 
-**Static status (2026-05-25): Not delivered.**
+**Static status (2026-05-25): Mostly delivered.**
 
-- Present: legacy `FilingFailedBanner` supports `filing_kept_out` as a hidden/no-op state and existing session polling still handles `filing_pending`.
-- Needs implementation: compact Library status component/hook, state-specific actions, add/keep-out/remove mutations, filed destination/tap-through, rename affordance, 3s/10-poll timeout behavior, Library-tab failed-filing attention surface, and query invalidation coverage for the new mutations.
+- Present: freeform close no longer shows the blocking filing prompt; `useSessionLibraryFiling(sessionId)` implements the 3s/10-poll status hook; Summary renders compact Library status/actions for pending, still-pending, filed, failed, unfiled, and kept-out states; mobile mutations invalidate relevant session/query state; Library has a failed-filing attention row.
+- Follow-up: topic rename is not implemented because the backend route is absent; Library attention should move from recent-session fan-out to a dedicated backend endpoint before GA-scale use.
 
 - [ ] Remove the normal post-close blocking filing prompt **for freeform sessions only**. [MEDIUM-4 / MEDIUM-X] Homework filing prompt is out of scope and unchanged in this PR series; document the temporary inconsistency in flow docs and do not present it as the final cross-mode close pattern.
 - [ ] **[HIGH-S]** Release gate: PR 3 must either ship together with the upstream Ask First / Unsorted auto-subject work, or be released/communicated only as "freeform close no longer asks a second Library question." Do not market it as "Ask Anything has no upfront friction" while the subject picker still appears.
@@ -398,10 +395,10 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 
 ## PR 4 Tasks - Documentation Reconciliation
 
-**Static status (2026-05-25): Not delivered.**
+**Static status (2026-05-25): Delivered.**
 
-- `docs/flows/flow-master-directory.md` still lists `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` as `Not created`.
-- Existing edits to `LEARN-07` / `LEARN-08` do not yet satisfy this plan's freeform Library filing reconciliation.
+- `docs/flows/flow-master-directory.md` maps `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05`.
+- `HOME-01`, `LEARN-07`, and `LEARN-08` distinguish freeform no-prompt close, homework's transitional prompt behavior, saved session history, kept-out sessions, and subject-owned Library topics.
 
 - [ ] Create `LEARN-01` for Freeform chat / Ask Anything.
 - [ ] Create `SUBJECT-03` for subject creation/resolution from chat.

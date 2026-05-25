@@ -1,13 +1,15 @@
 # LEARN-08 - Library V3
 
-> **Status:** Draft  
-> **Access label:** Study-only  
-> **Last mapped:** 2026-05-22  
-> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `apps/mobile/src/app/(app)/library.tsx`, `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx`, `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx`, `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/subjects/[subjectId].tsx`
+> **Status:** Draft
+> **Access label:** Study-only
+> **Last mapped:** 2026-05-25
+> **Sources:** `mobile-app-flow-inventory.md`, `student-flow-access-inventory.md`, `mentor-flow-access-inventory.md`, `2026-05-21-navigation-contract.md`, `docs/specs/2026-05-23-freeform-library-filing.md`, `docs/plans/2026-05-23-freeform-library-filing-plan.md`, `apps/mobile/src/app/(app)/library.tsx`, `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx`, `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx`, `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/subjects/[subjectId].tsx`
 
 ## Purpose
 
 Let a learner browse and continue their own learning structure: subjects, subject shelves, books, generated topic paths, notes, past conversations, retention state, and next study actions. Library is the Study tab for the active learner, not a Family-mode child oversight tab.
+
+Library contains filed learning structure: subjects, books, topics, notes, progress, retention, and conversations attached to those topics. Session history is broader than Library. A freeform Ask Anything chat can remain saved as a summary/transcript without becoming a Library topic, either because it was too short, filing failed, or the learner chose to keep it out of Library. When a freeform chat is filed, the resulting topic must belong to one of the learner's subjects.
 
 For mentors, the equivalent product outcome is child curriculum/review from parent-native child routes. A parent should be able to see or manage a child's subjects/books from a child card/detail surface, but the target Family shell must not expose the adult's top-level Library because that makes "whose library is this?" ambiguous.
 
@@ -35,6 +37,8 @@ The top-level Library is part of the Study tab shape: `home`, `library`, `progre
 | Subject shelf tap | `/(app)/shelf/[subjectId]` | Yes | Child curriculum equivalent only | Shows books, progress, suggestions, and add-book actions for the active learner's subject. |
 | Book tap | `/(app)/shelf/[subjectId]/book/[bookId]` | Yes | Child curriculum equivalent only | Shows generated topics, notes, past conversations, retention banners, bookmarks link, and start/continue CTA. |
 | Topic row | `/(app)/topic/[topicId]` or learning session start from book screen | Yes | No direct Family surface | Mentor review should use child subject/topic detail, not start a child learning session by proxy. |
+| Filed freeform topic | Subject shelf / book/topic destination | Yes | No target Family surface | Meaningful freeform chats may auto-file or link to a Library topic under a subject after close. |
+| Failed filing attention | Library scan/search entry surface | Yes | No target Family surface | Target PR 3 behavior: failed freeform Library additions can surface as a small attention item so recovery is not hidden on Summary only. |
 | Manage subjects | Library manage modal / `/(app)/subject/[subjectId]` | Yes | Child settings equivalent only | Pause/archive/restore and subject settings mutate the active learner's subjects. |
 | Saved for subject | Book screen -> `/(app)/progress/saved?subjectId={id}` | Yes | No target Family surface | Saved bookmarks are LEARN-24 and remain student-owned. |
 | Parent child subject card | `/(app)/child/[profileId]/subjects/[subjectId]` | No | Yes | Current parent-native child subject review exists, but it is progress/review oriented rather than a full child curriculum management replacement. |
@@ -43,6 +47,9 @@ The top-level Library is part of the Study tab shape: `home`, `library`, `progre
 ## Data Ownership And Privacy
 
 - Library reads and writes are scoped to the active learner profile: subjects, books, curriculum topics, notes, sessions, retention, and learning-resume targets.
+- Library topics are subject-owned. No topic should appear in Library without an active-learner subject parent.
+- A saved session can exist outside Library. Kept-out freeform chats remain in session history/summary/transcript where available, but should not appear as Library topics or drive topic progress/retention.
+- Freeform auto-filing should reuse or create an appropriate topic under a subject when confident. If the user removes a filed freeform chat from Library, detach the session from the topic; only delete auto-created topics when the safe cleanup rules allow it.
 - Subject management is a mutation surface. Pause/archive/restore must only affect the active learner's own subject unless a separately designed child-curriculum editor scopes writes to a linked child with explicit parent authority.
 - Book/topic generation and first-curriculum-session start are learner writes. A mentor in Family should not accidentally create or start a child learning path through adult Library chrome.
 - Existing parent proxy compatibility can make Library operate as a child preview. This is not the target Family UX and should be treated as retained/internal behavior until parent-native curriculum exists.
@@ -54,7 +61,10 @@ The top-level Library is part of the Study tab shape: `home`, `library`, `progre
 | --- | --- |
 | Loading | Library shows shimmer rows; if subject loading exceeds 15 seconds, the timeout fallback offers retry and Home. Shelf/book screens show loading animation and working back actions. |
 | Empty | Study Library invites the learner to add a subject. Empty shelf/book states offer pick-book, retry, set-up-book, or start-first-lesson actions depending on available suggestions/topics. |
-| Success | Subject-first shelf list with search, retention pills, grouped active/paused/archived subjects, next-action card, subject shelves, books, notes, topics, past conversations, and study CTAs. |
+| Success | Subject-first shelf list with search, retention pills, grouped active/paused/archived subjects, next-action card, subject shelves, books, notes, filed topics, past conversations attached to topics, and study CTAs. |
+| Freeform filed | Filed Ask Anything sessions appear through their resolved Library topic and destination under a subject. |
+| Freeform kept out | Kept-out sessions remain saved history outside Library; Library should not show them as topics. |
+| Filing failed | Target behavior surfaces a small attention item/count in the Library scan path so the learner can find and retry failed freeform Library additions. |
 | Error/recovery | Query errors show retry and a stable back/home fallback. Book generation failures use visible alert/fallback states and avoid trapping the user. |
 | No access | Study should show only active learner data. Family child curriculum should show protected/not-found and return to Family home or child detail for unauthorized/stale child IDs. |
 
@@ -71,6 +81,7 @@ The top-level Library is part of the Study tab shape: `home`, `library`, `progre
 | Type | Link or ID | Note |
 | --- | --- | --- |
 | Product drift | Navigation contract | Target Family tabs are `home`, `recaps`, `progress`, `more`; current V0 has no Recaps and may still expose Library through guardian/proxy paths. |
+| Product drift | Freeform filing plan | Library filing is separate from saved session history. Existing docs/tests that treat dismissing filing as losing the session should be corrected. |
 | Missing target route | `child/[profileId]/curriculum` | The contract names child curriculum as the Family replacement, but a dedicated route is not present yet. |
 | Access drift | Parent proxy | Proxy can still preview child learner surfaces, including Library. Normal mentor review should be parent-native. |
 | UX ambiguity | PARENT-07 | Existing "parent library view" should split into adult self Library in Study and child curriculum under Family. |
@@ -82,3 +93,4 @@ The top-level Library is part of the Study tab shape: `home`, `library`, `progre
 - Which child curriculum mutations are allowed for mentors: view only, add subject/book, pause/archive, generate topics, or start a child session?
 - Should Family child curriculum include learner notes/bookmarks, or only structured curriculum and progress summaries?
 - How should "Add to my learning" from a child curriculum item bridge to the adult's own Study Library without writing to the child profile?
+- Where should the product expose complete session history for chats that are intentionally kept out of Library?
