@@ -121,16 +121,15 @@ export async function getDictationStreak(
   // [IMP-3] Only fetch the most recent 60 dates — the streak algorithm
   // breaks at the first gap, so 60 days is more than sufficient. Without a
   // limit, a child practising daily for years would load every row into
-  // memory. The (profile_id, date) index covers this query efficiently.
-  const rows = await repo.dictationResults.findMany(undefined, undefined, 60);
-  if (rows.length === 0) {
+  // memory. Ordering and distinctness happen before the limit so the in-memory
+  // streak walk never runs over an arbitrary unordered subset.
+  const recentDateRows =
+    await repo.dictationResults.listRecentDistinctDates(60);
+  if (recentDateRows.length === 0) {
     return { streak: 0, lastDate: null };
   }
 
-  // Sort desc by date, deduplicate
-  const uniqueDates = [
-    ...new Set(rows.map((r) => r.date).sort((a, b) => (a > b ? -1 : 1))),
-  ];
+  const uniqueDates = recentDateRows.map((row) => row.date);
 
   const today = getServerDate();
   const mostRecentDate = uniqueDates[0];
