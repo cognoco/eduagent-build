@@ -12,6 +12,8 @@ const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
+const mockDismiss = jest.fn();
+const mockCanDismiss = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -19,6 +21,8 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     replace: mockReplace,
     canGoBack: mockCanGoBack,
+    dismiss: mockDismiss,
+    canDismiss: mockCanDismiss,
   }),
   // [BUG-375] Redirect stub so auth-gate tests can assert the redirect path.
   Redirect: ({ href }: { href: string }) => {
@@ -184,7 +188,13 @@ describe('ProfilesScreen', () => {
     screen.getByTestId('profile-active-check');
   });
 
-  it('opens a child row in the parent-native child settings view', () => {
+  it('opens a child row in the parent-native child settings view [BUG-774]', () => {
+    // [BUG-774] /profiles is a fullScreenModal; replacing in place left the
+    // child-settings screen un-mounted. We now dismiss the modal (via
+    // router.dismiss — the documented Expo Router modal-dismiss API
+    // required by screen-navigation.test.ts ratchet) then push the
+    // child-settings target.
+    mockCanDismiss.mockReturnValue(true);
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: ownerProfile,
@@ -199,11 +209,40 @@ describe('ProfilesScreen', () => {
     expect(mockSwitchProfile).not.toHaveBeenCalled();
     expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
     expect(mockSetMode).toHaveBeenCalledWith('family');
-    expect(mockReplace).toHaveBeenCalledWith({
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-id', mode: 'settings' },
     });
+    // replace must NOT be the navigation path — it never dismissed the modal
+    // in production (this was the actual symptom of BUG-774).
+    expect(mockReplace).not.toHaveBeenCalled();
+    // back must NOT be used directly — it's blocked by the BUG-BACK-RATCHET
+    // guard. Dismiss is the documented API.
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('pushes child settings even when canDismiss is false [BUG-774]', () => {
+    // Edge case: profiles modal opened as the root entry (no modal stack).
+    // The push must still fire so the user is not trapped on /profiles.
+    mockCanDismiss.mockReturnValue(false);
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-id', mode: 'settings' },
+    });
   });
 
   it('does not expose a normal UI path into child proxy mode', () => {
@@ -336,7 +375,10 @@ describe('ProfilesScreen', () => {
     screen.getByTestId('profiles-loading');
   });
 
-  it('replaces the profiles modal when opening a child row', () => {
+  it('pushes child settings when canGoBack is false (no back-stack to dismiss)', () => {
+    // [BUG-774] When the profiles modal is the only screen in the stack we
+    // skip the back() and push directly to /(app)/child/[profileId] so the
+    // user is not stranded on /profiles.
     mockCanGoBack.mockReturnValue(false);
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
@@ -351,7 +393,8 @@ describe('ProfilesScreen', () => {
 
     expect(mockSetMode).toHaveBeenCalledWith('family');
     expect(mockSwitchProfile).not.toHaveBeenCalled();
-    expect(mockReplace).toHaveBeenCalledWith({
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-id', mode: 'settings' },
     });

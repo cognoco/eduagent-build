@@ -17,7 +17,11 @@
 
 import * as Sentry from '@sentry/react-native'; // gc1-allow: external boundary — Sentry SDK
 import type { QueryClient } from '@tanstack/react-query';
-import { signOutWithCleanup } from './sign-out';
+import {
+  CLERK_SIGNOUT_TIMEOUT_MS,
+  ClerkSignOutTimeoutError,
+  signOutWithCleanup,
+} from './sign-out';
 
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { setActiveProfileId, resetAuthExpiredGuard } from './api-client';
@@ -52,6 +56,8 @@ jest.mock(
   /* gc1-allow: external-boundary — Sentry SDK (also globally stubbed in test-setup.ts; per-file override installs controllable getCurrentScope/setUser) */ () => ({
     getCurrentScope: jest.fn(),
     setUser: jest.fn(),
+    addBreadcrumb: jest.fn(),
+    captureMessage: jest.fn(),
   }),
 );
 
@@ -419,5 +425,125 @@ describe('signOutWithCleanup — welcome-intro flag cleanup', () => {
     // No userId supplied → can't clear; flag survives. SecureStore key remains
     // scoped to user_a, so re-sign-in as user_a still skips the intro.
     expect(hasSeenIntro('user_a', null)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Clerk signOut timeout [BUG-771]
+// ---------------------------------------------------------------------------
+
+describe('signOutWithCleanup — clerkSignOut hard timeout [BUG-771]', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('[break-test] rejects with ClerkSignOutTimeoutError when clerkSignOut never resolves', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    // Hanging Clerk call — simulates the production symptom (sign-out button
+    // hangs >45s and never returns to the sign-in screen).
+    const hangingClerkSignOut = jest.fn(
+      () => new Promise<void>(() => undefined),
+    );
+
+    const promise = signOutWithCleanup({
+      clerkSignOut: hangingClerkSignOut,
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    });
+    // Attach the rejection handler synchronously so Jest doesn't see an
+    // unhandled promise rejection between advancing fake timers and the
+    // awaited expect below.
+    const settled = promise.catch((e) => e);
+    // Cleanup runs in microtasks first; flush microtasks before tripping the
+    // timer race so clerkSignOut has actually been invoked.
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.advanceTimersByTime(CLERK_SIGNOUT_TIMEOUT_MS + 50);
+    const err = await settled;
+    expect(err).toBeInstanceOf(ClerkSignOutTimeoutError);
+    // Break test: removing the timeout race in sign-out.ts would make this
+    // promise never settle — Jest would hit the per-test timeout instead.
+  });
+
+  it('emits a Sentry breadcrumb + captureMessage when the timeout fires', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    const hangingClerkSignOut = jest.fn(
+      () => new Promise<void>(() => undefined),
+    );
+
+    const settled = signOutWithCleanup({
+      clerkSignOut: hangingClerkSignOut,
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    }).catch(() => undefined);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.advanceTimersByTime(CLERK_SIGNOUT_TIMEOUT_MS + 50);
+    await settled;
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'auth',
+        level: 'warning',
+        message: expect.stringContaining('clerkSignOut timed out'),
+      }),
+    );
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('clerkSignOut timed out'),
+      expect.objectContaining({
+        level: 'warning',
+        tags: expect.objectContaining({ feature: 'auth' }),
+      }),
+    );
+  });
+
+  it('still calls resetAuthExpiredGuard after the timeout fires', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    const hangingClerkSignOut = jest.fn(
+      () => new Promise<void>(() => undefined),
+    );
+
+    const settled = signOutWithCleanup({
+      clerkSignOut: hangingClerkSignOut,
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    }).catch(() => undefined);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.advanceTimersByTime(CLERK_SIGNOUT_TIMEOUT_MS + 50);
+    await settled;
+
+    // The finally block must still run so the next user's 401s are not
+    // silently swallowed by a stuck _authExpiredFiring flag.
+    expect(resetAuthExpiredGuard).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not time out when clerkSignOut resolves quickly', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    // Resolves on the next microtask — well below the timeout.
+    const quickClerkSignOut = jest.fn(() => Promise.resolve());
+
+    const settled = signOutWithCleanup({
+      clerkSignOut: quickClerkSignOut,
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    });
+
+    // Flush microtasks; do NOT advance fake timers — clerkSignOut should
+    // resolve before the timeout would have fired.
+    await settled;
+
+    expect(quickClerkSignOut).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 });

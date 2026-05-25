@@ -497,6 +497,43 @@ describe('AppLayout', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
+  it('preserves the query string when replaying a child deep-link [BUG-766]', () => {
+    // [BUG-766] Direct hard-load of /child/{id}?mode=progress used to lose
+    // the mode query during the sign-in → replay round-trip, landing the
+    // user on the unfiltered child detail (which then redirected to home).
+    rememberPendingAuthRedirect('/(app)/child/emma-id?mode=progress');
+    mockUsePathname.mockReturnValue('/home');
+
+    renderLayout();
+
+    screen.getByTestId('auth-redirect-replay');
+    expect(mockReplace).toHaveBeenCalledWith(
+      '/(app)/child/emma-id?mode=progress',
+    );
+  });
+
+  it('preserves the query string when redirecting unauthenticated users [BUG-766]', () => {
+    mockUsePathname.mockReturnValue('/child/emma-id?mode=progress');
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    renderLayout();
+
+    const redirect = screen.getByTestId('redirect');
+    // The redirectTo query param must encode the FULL original deep link
+    // including ?mode=progress so post-sign-in replay lands on the correct
+    // child detail mode.
+    expect(redirect.props.href).toContain('redirectTo=');
+    const href = redirect.props.href as string;
+    const decoded = decodeURIComponent(href.split('redirectTo=')[1] ?? '');
+    expect(decoded).toBe('/(app)/child/emma-id?mode=progress');
+    expect(peekPendingAuthRedirect()).toBe(
+      '/(app)/child/emma-id?mode=progress',
+    );
+  });
+
   it('keeps a matching auth redirect long enough to recover from a late home fallback', () => {
     jest.useFakeTimers();
     rememberPendingAuthRedirect('/(app)/quiz');
