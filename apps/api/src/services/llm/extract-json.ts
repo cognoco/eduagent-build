@@ -20,6 +20,23 @@ export function extractFirstJsonObject(text: string): string | null {
   const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/);
   const body = (fenceMatch?.[1] ?? trimmed).trim();
 
+  const firstCandidate = extractFirstBalancedObject(body);
+  if (!firstCandidate) return null;
+
+  if (isJsonObject(firstCandidate.value)) {
+    return firstCandidate.value;
+  }
+
+  const fencedCandidate = extractFencedJsonObjectAfter(
+    body,
+    firstCandidate.end,
+  );
+  return fencedCandidate ?? firstCandidate.value;
+}
+
+function extractFirstBalancedObject(
+  body: string,
+): { value: string; end: number } | null {
   const start = body.indexOf('{');
   if (start === -1) return null;
 
@@ -47,11 +64,38 @@ export function extractFirstJsonObject(text: string): string | null {
     if (ch === '{') depth++;
     else if (ch === '}') {
       depth--;
-      if (depth === 0) return body.slice(start, i + 1);
+      if (depth === 0) return { value: body.slice(start, i + 1), end: i + 1 };
     }
   }
 
   return null;
+}
+
+function extractFencedJsonObjectAfter(
+  body: string,
+  afterIndex: number,
+): string | null {
+  const fencePattern = /```(?:json)?\s*([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fencePattern.exec(body)) !== null) {
+    if (match.index < afterIndex) continue;
+    const candidate = extractFirstBalancedObject(match[1] ?? '');
+    if (candidate && isJsonObject(candidate.value)) return candidate.value;
+  }
+
+  return null;
+}
+
+function isJsonObject(candidate: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(candidate);
+    return (
+      typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

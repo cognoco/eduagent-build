@@ -28,6 +28,12 @@ describe('extractFirstJsonObject', () => {
     expect(extractFirstJsonObject(input)).toBe(json);
   });
 
+  it('extracts fenced JSON after prose that contains brace placeholders', () => {
+    const json = '{"a": 1}';
+    const input = `Template {topic}:\n\`\`\`json\n${json}\n\`\`\``;
+    expect(extractFirstJsonObject(input)).toBe(json);
+  });
+
   it('handles nested braces correctly', () => {
     const input = '{"a": {"b": 1}}';
     expect(extractFirstJsonObject(input)).toBe(input);
