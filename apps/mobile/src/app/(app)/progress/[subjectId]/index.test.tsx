@@ -133,6 +133,14 @@ jest.mock(
   }),
 );
 
+const mockUseProfile = jest.fn(() => ({ isExplicitProxyMode: false }));
+jest.mock(
+  '../../../../lib/profile' /* gc1-allow: unit test boundary — drives isExplicitProxyMode for proxy write-guard tests (WI-279) */,
+  () => ({
+    useProfile: () => mockUseProfile(),
+  }),
+);
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
@@ -333,6 +341,7 @@ function mockHooks({
 describe('ProgressSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
     mockLocalSearchParams.mockReturnValue({ subjectId: 's1' });
     mockMutateSubjectAsync.mockResolvedValue({ subject: {} });
   });
@@ -926,6 +935,31 @@ describe('ProgressSubjectScreen', () => {
         expect.anything(),
         target,
       );
+    });
+  });
+
+  // ── Proxy mode write guard [WI-279] ──────────────────────────────────────
+  describe('proxy mode write guard [WI-279]', () => {
+    beforeEach(() => {
+      mockUseProfile.mockReturnValue({ isExplicitProxyMode: true });
+      mockHooks();
+    });
+
+    it('renders the hide button disabled in proxy mode [WI-279]', () => {
+      render(<ProgressSubjectScreen />);
+      expect(screen.getByTestId('progress-subject-hide')).toBeDisabled();
+    });
+
+    it('shows the proxy read-only hint in proxy mode [WI-279]', () => {
+      render(<ProgressSubjectScreen />);
+      screen.getByTestId('progress-subject-proxy-hint');
+    });
+
+    it('does NOT dispatch updateSubject when hide button is pressed in proxy mode [WI-279]', () => {
+      render(<ProgressSubjectScreen />);
+      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+      expect(mockPlatformAlert).not.toHaveBeenCalled();
+      expect(mockMutateSubjectAsync).not.toHaveBeenCalled();
     });
   });
 });

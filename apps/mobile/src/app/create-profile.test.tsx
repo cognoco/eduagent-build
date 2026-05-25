@@ -83,6 +83,16 @@ jest.mock('../lib/profile', () => ({
   useProfile: () => mockUseProfile(),
 }));
 
+// WI-296: Controllable role so proxy/non-owner gate tests can set role independently.
+let mockActiveProfileRole: 'owner' | 'child' | 'impersonated-child' | null =
+  'owner';
+jest.mock(
+  '../hooks/use-active-profile-role', // gc1-allow: hooks depend on ProfileProvider + useParentProxy which require SecureStore; mocking the final hook is cleaner than reconstructing the full context chain
+  () => ({
+    useActiveProfileRole: () => mockActiveProfileRole,
+  }),
+);
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
@@ -107,7 +117,10 @@ describe('CreateProfileScreen', () => {
       switchProfile: mockSwitchProfile,
       activeProfile: null,
       profiles: [],
+      isExplicitProxyMode: false,
     });
+    // Default: active profile is account owner
+    mockActiveProfileRole = 'owner';
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     // [BUG-375] Default to signed-in so existing tests are unaffected by the
     // new auth guard; auth-gate break tests override below.
@@ -145,6 +158,7 @@ describe('CreateProfileScreen', () => {
         switchProfile: mockSwitchProfile,
         activeProfile: { id: 'parent-1', isOwner: true },
         profiles: [{ id: 'parent-1', isOwner: true }],
+        isExplicitProxyMode: false,
       });
     });
 
@@ -858,6 +872,63 @@ describe('CreateProfileScreen', () => {
       // WI-297: month is 1-based (June = 6)
       expect(body.birthMonth).toBe(6);
       expect(body.birthDay).toBe(15);
+    });
+  });
+
+  // ---- WI-296: Entry gates — non-owner role and proxy mode ----
+
+  describe('access gate: non-owner role', () => {
+    beforeEach(() => {
+      mockActiveProfileRole = 'child';
+      mockUseProfile.mockReturnValue({
+        switchProfile: mockSwitchProfile,
+        activeProfile: { id: 'child-1', isOwner: false },
+        profiles: [{ id: 'child-1', isOwner: false }],
+        isExplicitProxyMode: false,
+      });
+    });
+
+    it('renders the blocked state, not the form', () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('create-profile-access-blocked');
+      expect(screen.queryByTestId('create-profile-submit')).toBeNull();
+    });
+
+    it('does not fire the create mutation when blocked by non-owner role', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      // The form is not rendered, so no submit can happen
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('access gate: proxy mode', () => {
+    beforeEach(() => {
+      // Owner role but in proxy mode (parent viewing child's context)
+      mockActiveProfileRole = 'owner';
+      mockUseProfile.mockReturnValue({
+        switchProfile: mockSwitchProfile,
+        activeProfile: { id: 'parent-1', isOwner: true },
+        profiles: [
+          { id: 'parent-1', isOwner: true },
+          { id: 'child-1', isOwner: false },
+        ],
+        isExplicitProxyMode: true,
+      });
+    });
+
+    it('renders the blocked state, not the form', () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('create-profile-access-blocked');
+      expect(screen.queryByTestId('create-profile-submit')).toBeNull();
+    });
+
+    it('does not fire the create mutation when blocked by proxy mode', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 });

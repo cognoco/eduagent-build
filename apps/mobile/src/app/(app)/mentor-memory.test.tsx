@@ -31,6 +31,7 @@ let mockProfileData: Record<string, unknown> = {
 };
 
 let mockActiveProfileBirthYear: number | undefined;
+let mockIsExplicitProxyMode = false;
 
 const mockPlatformAlert = jest.fn();
 
@@ -67,6 +68,9 @@ jest.mock('../../lib/profile', () => ({
       get birthYear() {
         return mockActiveProfileBirthYear;
       },
+    },
+    get isExplicitProxyMode() {
+      return mockIsExplicitProxyMode;
     },
   }),
   ProfileContext: {
@@ -471,5 +475,60 @@ describe('MentorMemoryScreen — canEnter=false redirects to home', () => {
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
     expect(screen.queryByTestId('memory-status-text')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-274: proxy mode disables write controls and shows read-only hint
+// ---------------------------------------------------------------------------
+
+describe('MentorMemoryScreen — proxy mode write guard (WI-274)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Keep canEnter=true so Redirect is NOT fired — we test the screen body
+    // rendering with disabled controls when isExplicitProxyMode=true.
+    mockCanEnterResult = true;
+    mockIsExplicitProxyMode = true;
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'granted',
+      memoryInjectionEnabled: true,
+    };
+  });
+
+  afterEach(() => {
+    mockIsExplicitProxyMode = false;
+  });
+
+  it('[WI-274] shows the proxy read-only hint when isExplicitProxyMode=true', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    await screen.findByTestId('proxy-read-only-hint');
+  });
+
+  it('[WI-274] the injection Switch is disabled when isExplicitProxyMode=true', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    // Wait for profile data to land.
+    await screen.findByTestId('memory-status-text');
+
+    // Accessibility label comes from the real en.json:
+    // session.mentorMemory.status.useMemoryLabel = "Use saved notes in lessons"
+    const switchEl = screen.getByLabelText('Use saved notes in lessons');
+    expect(switchEl.props.disabled).toBe(true);
+  });
+
+  it('[WI-274] the clear-all Pressable is disabled when isExplicitProxyMode=true', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    await screen.findByTestId('memory-status-text');
+
+    // Accessibility label: session.mentorMemory.clearAll.accessibilityLabel
+    // = "Clear mentor memory for {{name}}" with name="Test Learner"
+    const clearBtn = screen.getByLabelText(
+      'Clear mentor memory for Test Learner',
+    );
+    expect(clearBtn.props.accessibilityState?.disabled).toBe(true);
   });
 });

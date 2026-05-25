@@ -141,6 +141,7 @@ jest.mock(
   }),
 );
 
+let mockIsExplicitProxyMode = false;
 jest.mock(
   '../../../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
   () => ({
@@ -155,6 +156,7 @@ jest.mock(
         pronouns: null,
         consentStatus: null,
       },
+      isExplicitProxyMode: mockIsExplicitProxyMode,
     }),
   }),
 );
@@ -270,6 +272,7 @@ jest
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockIsExplicitProxyMode = false;
   appStateListeners = [];
   mockLaunchImageLibraryAsync.mockResolvedValue({
     canceled: true,
@@ -1477,6 +1480,40 @@ describe('CameraScreen', () => {
         jest.advanceTimersByTime(60_000);
       });
       expect(mockCancel).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---- WI-271: Proxy-mode write guard ----
+
+  describe('proxy mode gate', () => {
+    beforeEach(() => {
+      mockIsExplicitProxyMode = true;
+    });
+
+    it('renders the proxy read-only empty state instead of the camera pipeline', () => {
+      const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      getByTestId('proxy-read-only');
+      // Camera pipeline must NOT be initialized
+      expect(queryByTestId('camera-view')).toBeNull();
+      expect(queryByTestId('grant-permission-button')).toBeNull();
+    });
+
+    it('does not initialize classify or create-subject mutations', () => {
+      render(<CameraScreen />, { wrapper: createWrapper() });
+
+      // Neither mutation should have been called — we never reach the pipeline
+      expect(mockProcess).not.toHaveBeenCalled();
+    });
+
+    it('shows the switch-profile CTA button', () => {
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      getByTestId('proxy-switch-profile-button');
     });
   });
 });

@@ -412,6 +412,39 @@ describe('HomeScreen B-600: family mode timeout state routes to Progress not Lib
     expect(screen.queryByTestId('timeout-progress-button')).toBeNull();
   });
 });
+describe('HomeScreen WI-270: proxy mode — markCelebrationsSeen is suppressed', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockOnAllComplete = null;
+    mockNavigationHomeScreen = 'LearnerHome';
+  });
+
+  it('does NOT call markCelebrationsSeen.mutateAsync when isExplicitProxyMode is true [WI-270]', async () => {
+    const owner = createTestProfile({
+      id: 'p1',
+      displayName: 'Alex',
+      isOwner: true,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: owner,
+      profiles: [owner],
+      isExplicitProxyMode: true,
+    });
+
+    render(<HomeScreen />, { wrapper });
+
+    expect(mockOnAllComplete).not.toBeNull();
+    await act(async () => {
+      mockOnAllComplete?.();
+    });
+
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/celebrations/seen'),
+      expect.anything(),
+    );
+  });
+});
+
 describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();

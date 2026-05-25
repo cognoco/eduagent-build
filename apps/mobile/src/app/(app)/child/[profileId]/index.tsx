@@ -642,7 +642,12 @@ export default function ChildDetailScreen(): React.ReactElement {
   );
   const child = childDetail ?? dashboardChild;
   const sessionsQuery = useProfileSessions(profileId);
-  const { data: learnerProfile } = useChildLearnerProfile(profileId);
+  const { data: childConsentData } = useChildConsentStatus(profileId);
+  const consentWithdrawn = childConsentData?.consentStatus === 'WITHDRAWN';
+  const restoreConsentForScreen = useRestoreConsent(profileId);
+  const { data: learnerProfile } = useChildLearnerProfile(
+    consentWithdrawn ? undefined : profileId,
+  );
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt);
   const joinedLabel = formatJoinedDate(ownedProfile?.createdAt);
@@ -788,6 +793,34 @@ export default function ChildDetailScreen(): React.ReactElement {
           }}
           testID="child-profile-unavailable-fallback"
         />
+      </View>
+    );
+  }
+
+  if (consentWithdrawn) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="consent-withdrawn-empty-state"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          {t('consent.withdrawn.title')}
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          {t('consent.withdrawn.hint', { name: childName })}
+        </Text>
+        <Pressable
+          onPress={() => restoreConsentForScreen.mutate(undefined)}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={t('consent.withdrawn.requestCta')}
+          testID="consent-withdrawn-request-cta"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {t('consent.withdrawn.requestCta')}
+          </Text>
+        </Pressable>
       </View>
     );
   }

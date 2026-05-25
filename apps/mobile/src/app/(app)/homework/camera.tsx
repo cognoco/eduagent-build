@@ -43,6 +43,7 @@ import {
   serializeHomeworkProblems,
   splitHomeworkProblems,
 } from '../../../components/homework/problem-cards';
+import { useProfile } from '../../../lib/profile';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -56,6 +57,7 @@ export default function CameraScreen(): React.ReactNode {
   }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { isExplicitProxyMode } = useProfile();
 
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
@@ -807,6 +809,34 @@ export default function CameraScreen(): React.ReactNode {
     },
     [speech, voiceProblemId],
   );
+
+  // ---- Proxy-mode gate ----
+  if (isExplicitProxyMode) {
+    return (
+      <View
+        testID="proxy-read-only"
+        className="flex-1 bg-background items-center justify-center px-8"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      >
+        <Text className="text-h2 font-bold text-text-primary text-center mb-3">
+          {t('proxy.readOnly.title')}
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-8">
+          {t('proxy.readOnly.hint')}
+        </Text>
+        <Pressable
+          testID="proxy-switch-profile-button"
+          onPress={handleClose}
+          className="bg-primary rounded-button py-4 px-8 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+        >
+          <Text className="text-text-inverse text-body font-semibold">
+            {t('proxy.readOnly.switchProfileCta')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   // ---- Permission phase ----
   if (state.phase === 'permission') {

@@ -18,6 +18,7 @@ import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { useProfile } from '../../../lib/profile';
 
 const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -100,12 +101,15 @@ export default function LanguageSetup() {
       languageName?: string;
       returnTo?: string;
     }>();
+  const { isExplicitProxyMode } = useProfile();
   const configureLanguageSubject = useConfigureLanguageSubject();
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
     subjectId ?? '',
   );
   const isContinuing =
-    configureLanguageSubject.isPending || startFirstCurriculumSession.isPending;
+    (configureLanguageSubject.isPending ||
+      startFirstCurriculumSession.isPending) &&
+    !isExplicitProxyMode;
   const colors = useThemeColors(); // [BUG-118]
   const [nativeLanguage, setNativeLanguage] = useState<string>(() =>
     getDeviceNativeLanguage(),
@@ -137,6 +141,7 @@ export default function LanguageSetup() {
   }, [returnTo, router]);
 
   const handleContinue = async () => {
+    if (isExplicitProxyMode) return;
     if (!subjectId) return;
     if (nativeLanguage === 'other' && customLanguage.trim().length < 2) {
       setError(t('onboarding.languageSetup.nativeLanguageRequired'));
@@ -280,13 +285,17 @@ export default function LanguageSetup() {
               <View key={option.code} className="gap-2">
                 <Pressable
                   onPress={() => setNativeLanguage(option.code)}
+                  disabled={isExplicitProxyMode}
                   className={
                     selected
                       ? 'rounded-card border border-primary bg-primary/10 px-4 py-3'
                       : 'rounded-card border border-border bg-surface px-4 py-3'
                   }
                   accessibilityRole="button"
-                  accessibilityState={{ selected }}
+                  accessibilityState={{
+                    selected,
+                    disabled: isExplicitProxyMode,
+                  }}
                   testID={`native-language-${option.code}`}
                 >
                   <Text
@@ -355,9 +364,19 @@ export default function LanguageSetup() {
           })}
         </View>
 
+        {isExplicitProxyMode && (
+          <View
+            testID="proxy-read-only-banner"
+            className="bg-surface rounded-card px-4 py-3 mt-6 mb-2"
+          >
+            <Text className="text-body-sm text-text-secondary text-center">
+              {t('proxy.readOnly.hint')}
+            </Text>
+          </View>
+        )}
         <Pressable
           onPress={() => void handleContinue()}
-          disabled={isContinuing}
+          disabled={isContinuing || isExplicitProxyMode}
           className="bg-primary rounded-button py-3.5 items-center mt-8"
           testID="language-setup-continue"
         >

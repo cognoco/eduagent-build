@@ -21,6 +21,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile, type Profile } from '../lib/profile';
+import { useActiveProfileRole } from '../hooks/use-active-profile-role';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { Button } from '../components/common/Button';
@@ -79,7 +80,9 @@ export default function CreateProfileScreen() {
   const queryClient = useQueryClient();
   const client = useApiClient();
   const { isLoaded, isSignedIn } = useAuth();
-  const { activeProfile, profiles, switchProfile } = useProfile();
+  const { activeProfile, profiles, switchProfile, isExplicitProxyMode } =
+    useProfile();
+  const activeProfileRole = useActiveProfileRole();
 
   // BUG-239: Detect whether the current user is a parent adding a child.
   // When an account owner (parent) who already has a profile creates another
@@ -146,6 +149,7 @@ export default function CreateProfileScreen() {
     !loading;
 
   const onSubmit = useCallback(async () => {
+    if (activeProfileRole !== 'owner' || isExplicitProxyMode) return;
     if (!canSubmit || !birthDate) return;
 
     const trimmedName = displayName.trim();
@@ -274,6 +278,8 @@ export default function CreateProfileScreen() {
       setLoading(false);
     }
   }, [
+    activeProfileRole,
+    isExplicitProxyMode,
     canSubmit,
     displayName,
     birthDate,
@@ -299,6 +305,34 @@ export default function CreateProfileScreen() {
   }
   if (!isSignedIn) {
     return <Redirect href="/sign-in" />;
+  }
+
+  // WI-296: Block create-profile when the active profile is not the account
+  // owner, or when a parent is acting as a proxy for a child profile. In both
+  // cases the API would reject the request; gate early to avoid a misleading
+  // form that silently fails.
+  if (activeProfileRole !== 'owner' || isExplicitProxyMode) {
+    return (
+      <View
+        testID="create-profile-access-blocked"
+        className="flex-1 bg-background items-center justify-center px-8"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      >
+        <Text className="text-h2 font-bold text-text-primary text-center mb-3">
+          Switch to your own profile to make changes
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-8">
+          You&apos;re viewing your child&apos;s account. Switch to your own
+          profile to make changes.
+        </Text>
+        <Button
+          variant="primary"
+          label="Switch profile"
+          onPress={handleClose}
+          testID="create-profile-blocked-close"
+        />
+      </View>
+    );
   }
 
   return (

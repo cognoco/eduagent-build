@@ -49,7 +49,7 @@ export default function MentorMemoryScreen() {
   const { returnTo } = useLocalSearchParams<{
     returnTo?: string | string[];
   }>();
-  const { activeProfile } = useProfile();
+  const { activeProfile, isExplicitProxyMode } = useProfile();
   const { data: profile, isLoading, isError, refetch } = useLearnerProfile();
   const deleteItem = useDeleteMemoryItem();
   const deleteAll = useDeleteAllMemory();
@@ -364,6 +364,16 @@ export default function MentorMemoryScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
+        {isExplicitProxyMode ? (
+          <View
+            className="bg-primary-soft rounded-card px-4 py-3 mt-4"
+            testID="proxy-read-only-hint"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              {t('proxy.readOnly.hint')}
+            </Text>
+          </View>
+        ) : null}
         <View className="bg-surface rounded-card p-4 mt-4">
           <Text className="text-body font-semibold text-text-primary">
             {t('session.mentorMemory.status.heading')}
@@ -402,7 +412,10 @@ export default function MentorMemoryScreen() {
               }
               onValueChange={handleToggleInjection}
               disabled={
-                !memoryEnabled || isLoading || toggleInjection.isPending
+                isExplicitProxyMode ||
+                !memoryEnabled ||
+                isLoading ||
+                toggleInjection.isPending
               }
               accessibilityLabel={t(
                 'session.mentorMemory.status.useMemoryLabel',
@@ -494,7 +507,7 @@ export default function MentorMemoryScreen() {
           <TellMentorInput
             birthYear={activeProfile?.birthYear}
             value={draft}
-            isPending={tellMentor.isPending}
+            isPending={isExplicitProxyMode || tellMentor.isPending}
             onChangeText={setDraft}
             onSubmit={() => void handleTellMentor()}
           />
@@ -752,7 +765,8 @@ export default function MentorMemoryScreen() {
         <MemorySection title={t('session.mentorMemory.sections.privacy')}>
           <Pressable
             onPress={handleDeleteAll}
-            className="bg-surface rounded-card px-4 py-3"
+            disabled={isExplicitProxyMode}
+            className="bg-surface rounded-card px-4 py-3 disabled:opacity-50"
             accessibilityRole="button"
             accessibilityLabel={t(
               'session.mentorMemory.clearAll.accessibilityLabel',

@@ -1199,6 +1199,13 @@
       "message": "Complete a language session to start building your word list."
     }
   },
+  "proxy": {
+    "readOnly": {
+      "hint": "You're viewing your child's account. Switch to your own profile to make changes.",
+      "title": "Switch to your own profile to make changes",
+      "switchProfileCta": "Switch profile"
+    }
+  },
   "consent": {
     "sameEmailWarning": "This is your own email. Please enter a parent or guardian's email address.",
     "backToChild": "Back to child",
@@ -1206,7 +1213,13 @@
     "deliverySentBody": "Your parent will get an email at {{email}}. We'll let you know as soon as they approve.",
     "deliveryFailedBody": "We could not confirm that the consent email reached {{email}}. Please double-check the address and try again.",
     "deliveryFailedHint": "You can resend the request now or go back and enter a different email address.",
-    "resendEmail": "Resend email"
+    "resendEmail": "Resend email",
+    "profileNotFound": "This profile does not belong to your account.",
+    "withdrawn": {
+      "hint": "{{name}} has paused sharing this data.",
+      "title": "Sharing paused",
+      "requestCta": "Request consent again"
+    }
   },
   "account": {
     "title": "Delete account",

@@ -17,7 +17,8 @@ import { useProfile } from '../../lib/profile';
 export default function HomeScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { profiles, activeProfile, isLoading } = useProfile();
+  const { profiles, activeProfile, isLoading, isExplicitProxyMode } =
+    useProfile();
   const navigationContract = useNavigationContract();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
@@ -32,6 +33,7 @@ export default function HomeScreen(): React.ReactElement {
     accommodationMode: learnerProfile?.accommodationMode,
     audience: isOwner ? 'adult' : 'child',
     onAllComplete: () => {
+      if (isExplicitProxyMode) return;
       markCelebrationsSeen
         .mutateAsync({
           viewer: isOwner ? 'parent' : 'child',

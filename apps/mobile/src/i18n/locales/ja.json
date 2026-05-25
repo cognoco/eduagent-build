@@ -1136,7 +1136,13 @@
     "deliverySentBody": "保護者に{{email}}宛にメールが届きます。承認され次第、お知らせします。",
     "deliveryFailedBody": "{{email}}への同意メールの到達を確認できませんでした。アドレスを再確認して、もう一度お試しください。",
     "deliveryFailedHint": "今すぐリクエストを再送信するか、戻って別のアドレスを入力できます。",
-    "resendEmail": "メールを再送信"
+    "resendEmail": "メールを再送信",
+    "profileNotFound": "このプロフィールはあなたのアカウントのものではありません。",
+    "withdrawn": {
+      "hint": "{{name}}さんはこのデータの共有を一時停止しています。",
+      "title": "共有を一時停止中",
+      "requestCta": "再度同意をリクエスト"
+    }
   },
   "account": {
     "title": "アカウントを削除",
@@ -2898,5 +2904,12 @@
     "updateLabel": "パスワードを更新",
     "updating": "更新中...",
     "updateButton": "パスワードを更新"
+  },
+  "proxy": {
+    "readOnly": {
+      "hint": "お子様のアカウントを閲覧中です。変更を加えるには、ご自身のプロフィールに切り替えてください。",
+      "title": "変更を加えるには、ご自身のプロフィールに切り替えてください",
+      "switchProfileCta": "プロフィールを切り替える"
+    }
   }
 }

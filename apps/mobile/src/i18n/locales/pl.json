@@ -1161,7 +1161,13 @@
     "deliverySentBody": "Twój rodzic otrzyma e-mail na adres {{email}}. Poinformujemy Cię, gdy tylko wyrazi zgodę.",
     "deliveryFailedBody": "Nie mogliśmy potwierdzić, że e-mail z prośbą o zgodę dotarł na adres {{email}}. Sprawdź dokładnie adres i spróbuj ponownie.",
     "deliveryFailedHint": "Możesz wysłać prośbę ponownie teraz lub wrócić i wprowadzić inny adres e-mail.",
-    "resendEmail": "Wyślij e-mail ponownie"
+    "resendEmail": "Wyślij e-mail ponownie",
+    "profileNotFound": "Ten profil nie należy do Twojego konta.",
+    "withdrawn": {
+      "hint": "{{name}} wstrzymał(a) udostępnianie tych danych.",
+      "title": "Udostępnianie wstrzymane",
+      "requestCta": "Poproś o zgodę ponownie"
+    }
   },
   "account": {
     "title": "Usuń konto",
@@ -2898,5 +2904,12 @@
     "updateLabel": "Zaktualizuj hasło",
     "updating": "Aktualizowanie...",
     "updateButton": "Zaktualizuj hasło"
+  },
+  "proxy": {
+    "readOnly": {
+      "hint": "Przeglądasz konto swojego dziecka. Przełącz się na własny profil, aby wprowadzić zmiany.",
+      "title": "Przełącz się na własny profil, aby wprowadzić zmiany",
+      "switchProfileCta": "Zmień profil"
+    }
   }
 }

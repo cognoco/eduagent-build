@@ -798,7 +798,10 @@ describe('ChildDetailScreen — profile overview', () => {
     );
   });
 
-  it('renders the grace-period restore action for a withdrawn child', () => {
+  it('renders the consent-withdrawn empty state (not grace-period banner) for a withdrawn child', () => {
+    // WI-263: consent WITHDRAWN now shows the screen-level empty state instead
+    // of the ConsentManagementSection grace-period banner. The empty state CTA
+    // calls restoreConsent directly.
     mockUseChildConsentStatus.mockReturnValue({
       data: {
         consentStatus: 'WITHDRAWN',
@@ -811,13 +814,11 @@ describe('ChildDetailScreen — profile overview', () => {
 
     render(<ChildDetailScreen />);
 
-    screen.getByTestId('grace-period-banner');
-    fireEvent.press(screen.getByTestId('cancel-deletion-button'));
+    screen.getByTestId('consent-withdrawn-empty-state');
+    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
 
-    expect(mockRestoreMutate).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
+    fireEvent.press(screen.getByTestId('consent-withdrawn-request-cta'));
+    expect(mockRestoreMutate).toHaveBeenCalledWith(undefined);
   });
 
   it('keeps consent management visible and retryable when consent status fails to load', () => {
@@ -842,6 +843,12 @@ describe('ChildDetailScreen — profile overview', () => {
 
 // ---------------------------------------------------------------------------
 // deletionGraceDays plural wiring — count=1 (singular) vs count=5 (plural)
+//
+// WI-263: WITHDRAWN consent now renders the screen-level empty state instead
+// of the ConsentManagementSection with the grace-period banner. The
+// deletionGraceDays plural key routing is tested at the ConsentManagementSection
+// level. These tests now verify the screen correctly shows the empty state for
+// withdrawn consent (the banner is not reachable from the screen level).
 // ---------------------------------------------------------------------------
 
 describe('ChildDetailScreen — deletionGraceDays plural key routing', () => {
@@ -868,29 +875,25 @@ describe('ChildDetailScreen — deletionGraceDays plural key routing', () => {
     });
   }
 
-  it('passes count=1 to the translation key when 1 day remains in the grace period', () => {
-    // 6 days ago → 1 day remaining (7 - 6 = 1)
+  it('shows the consent-withdrawn empty state (not grace-period banner) when 1 day remains', () => {
+    // WI-263: withdrawn consent now shows screen-level empty state;
+    // grace-period-banner is no longer reachable from this screen when WITHDRAWN.
     setupWithdrawnConsent(6);
 
     render(<ChildDetailScreen />);
 
-    // The mock t() serialises opts: key + JSON, so count=1 must appear in the output
-    const banner = screen.getByTestId('grace-period-banner');
-    expect(banner).toHaveTextContent(
-      /parentView\.index\.deletionGraceDays.*"count":1/,
-    );
+    screen.getByTestId('consent-withdrawn-empty-state');
+    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
   });
 
-  it('passes count=5 to the translation key when 5 days remain in the grace period', () => {
-    // 2 days ago → 5 days remaining (7 - 2 = 5)
+  it('shows the consent-withdrawn empty state (not grace-period banner) when 5 days remain', () => {
+    // WI-263: same — empty state replaces the full screen for withdrawn consent.
     setupWithdrawnConsent(2);
 
     render(<ChildDetailScreen />);
 
-    const banner = screen.getByTestId('grace-period-banner');
-    expect(banner).toHaveTextContent(
-      /parentView\.index\.deletionGraceDays.*"count":5/,
-    );
+    screen.getByTestId('consent-withdrawn-empty-state');
+    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
   });
 });
 
@@ -984,5 +987,53 @@ describe('ChildDetailScreen — data-absent state (BUG-681)', () => {
     screen.getByTestId('child-profile-unavailable');
     screen.getByTestId('child-profile-unavailable-fallback');
     expect(screen.queryByTestId('child-detail-scroll')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-263: consent-withdrawn gates the learning-profile fetch
+// ---------------------------------------------------------------------------
+
+describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupDefaultMocks();
+
+    mockUseChildConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'WITHDRAWN',
+        respondedAt: new Date().toISOString(),
+        consentType: 'GDPR',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+  });
+
+  it('[WI-263] renders the consent-withdrawn empty state when consent is WITHDRAWN', () => {
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('consent-withdrawn-empty-state');
+    screen.getByTestId('consent-withdrawn-request-cta');
+    expect(screen.queryByTestId('child-detail-scroll')).toBeNull();
+  });
+
+  it('[WI-263] does NOT call useChildLearnerProfile with the real profileId when consent is WITHDRAWN', () => {
+    render(<ChildDetailScreen />);
+
+    // The hook must be called with undefined so the enabled guard blocks the fetch.
+    const calls = mockUseChildLearnerProfile.mock.calls;
+    expect(calls.every((args: unknown[]) => args[0] !== 'child-001')).toBe(
+      true,
+    );
+  });
+
+  it('[WI-263] request-cta triggers the restore-consent mutation', () => {
+    render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('consent-withdrawn-request-cta'));
+
+    expect(mockRestoreMutate).toHaveBeenCalledWith(undefined);
   });
 });

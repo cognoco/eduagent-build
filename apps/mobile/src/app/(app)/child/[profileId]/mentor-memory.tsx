@@ -28,6 +28,7 @@ import {
   useChildDetail,
   useChildMemory,
 } from '../../../../hooks/use-dashboard';
+import { useChildConsentStatus } from '../../../../hooks/use-consent';
 import {
   useChildLearnerProfile,
   useDeleteAllMemory,
@@ -60,9 +61,15 @@ export default function ChildMentorMemoryScreen() {
   const { profiles } = useProfile();
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const childProfileId = profileId as string | undefined;
+  const { data: childConsentData } = useChildConsentStatus(childProfileId);
+  const consentWithdrawn = childConsentData?.consentStatus === 'WITHDRAWN';
   const { data: child } = useChildDetail(childProfileId);
-  const { data: profile, isLoading } = useChildLearnerProfile(childProfileId);
-  const { data: memory } = useChildMemory(childProfileId);
+  const { data: profile, isLoading } = useChildLearnerProfile(
+    consentWithdrawn ? undefined : childProfileId,
+  );
+  const { data: memory } = useChildMemory(
+    consentWithdrawn ? undefined : childProfileId,
+  );
   const deleteItem = useDeleteMemoryItem();
   const deleteAll = useDeleteAllMemory();
   const tellMentor = useTellMentor();
@@ -309,6 +316,35 @@ export default function ChildMentorMemoryScreen() {
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
+            {t('common.back')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (consentWithdrawn) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top }}
+        testID="child-mentor-memory-consent-withdrawn"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          {t('consent.withdrawn.title')}
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          {t('consent.withdrawn.hint', {
+            name: child?.displayName ?? t('parentView.index.yourChild'),
+          })}
+        </Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          testID="child-mentor-memory-consent-withdrawn-back"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
             {t('common.back')}
           </Text>
         </Pressable>

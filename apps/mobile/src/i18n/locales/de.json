@@ -1136,7 +1136,13 @@
     "deliverySentBody": "Deine Eltern erhalten eine E-Mail an {{email}}. Wir geben dir Bescheid, sobald sie zugestimmt haben.",
     "deliveryFailedBody": "Wir konnten nicht bestätigen, dass die Zustimmungs-E-Mail {{email}} erreicht hat. Bitte überprüfe die Adresse und versuche es erneut.",
     "deliveryFailedHint": "Du kannst die Anfrage jetzt erneut senden oder zurückgehen und eine andere E-Mail-Adresse eingeben.",
-    "resendEmail": "E-Mail erneut senden"
+    "resendEmail": "E-Mail erneut senden",
+    "profileNotFound": "Dieses Profil gehört nicht zu deinem Konto.",
+    "withdrawn": {
+      "hint": "{{name}} hat das Teilen dieser Daten pausiert.",
+      "title": "Teilen pausiert",
+      "requestCta": "Einwilligung erneut anfordern"
+    }
   },
   "account": {
     "title": "Konto löschen",
@@ -2898,5 +2904,12 @@
     "updateLabel": "Passwort aktualisieren",
     "updating": "Aktualisieren...",
     "updateButton": "Passwort aktualisieren"
+  },
+  "proxy": {
+    "readOnly": {
+      "hint": "Du siehst gerade das Konto deines Kindes. Wechsle zu deinem eigenen Profil, um Änderungen vorzunehmen.",
+      "title": "Für Änderungen zum eigenen Profil wechseln",
+      "switchProfileCta": "Profil wechseln"
+    }
   }
 }

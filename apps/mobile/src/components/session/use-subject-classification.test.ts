@@ -1,6 +1,14 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useSubjectClassification } from './use-subject-classification';
 
+const mockUseProfile = jest.fn(() => ({ isExplicitProxyMode: false }));
+jest.mock(
+  '../../lib/profile' /* gc1-allow: unit test boundary — drives isExplicitProxyMode for proxy write-guard tests (WI-307) */,
+  () => ({
+    useProfile: () => mockUseProfile(),
+  }),
+);
+
 const mockAnimateResponse = jest.fn(() => jest.fn());
 
 function createMockOpts(overrides: Record<string, unknown> = {}) {
@@ -40,6 +48,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
 describe('useSubjectClassification — greeting guard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
   });
 
   it('intercepts a pure greeting in freeform mode — calls animateResponse, not classifySubject or continueWithMessage', async () => {
@@ -222,6 +231,7 @@ describe('useSubjectClassification — greeting guard', () => {
 describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
   });
 
   it('Site A: does NOT auto-pick availableSubjects[0] when classifier returns 0 candidates — proceeds without subject', async () => {
@@ -345,6 +355,7 @@ describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
 describe('useSubjectClassification — typed subject override', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
   });
 
   it('resolves a misspelled typed subject to an existing enrolled subject', async () => {
@@ -481,6 +492,7 @@ describe('useSubjectClassification — typed subject override', () => {
 describe('useSubjectClassification — homework image subject resolution', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
   });
 
   it('preserves the image send request while waiting for a subject pick', async () => {
@@ -545,6 +557,7 @@ describe('useSubjectClassification — homework image subject resolution', () =>
 describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
   });
 
   it('renders "Looks like {subject}." without the confident "Got it" prefix', async () => {
@@ -587,5 +600,68 @@ describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', (
     // Tentative phrasing — no confident "Got it" prefix, no declarative "is about"
     expect(ackMessage?.content).not.toMatch(/^Got it/);
     expect(ackMessage?.content).not.toMatch(/this is about/i);
+  });
+});
+
+describe('useSubjectClassification — proxy mode write guard [WI-307]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseProfile.mockReturnValue({ isExplicitProxyMode: true });
+  });
+
+  it('handleSend dispatches no mutations in proxy mode [WI-307]', async () => {
+    const opts = createMockOpts();
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    let returnValue: unknown;
+    await act(async () => {
+      returnValue = await result.current.handleSend(
+        'help me with quadratic equations',
+      );
+    });
+
+    expect(returnValue).toBeUndefined();
+    expect(opts.classifySubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.resolveSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('handleTypeSubject dispatches no mutations in proxy mode [WI-307]', async () => {
+    const pendingSubjectResolution = {
+      originalText: 'tell me about math',
+      prompt: 'Pick a subject:',
+      candidates: [{ subjectId: 's1', subjectName: 'Math' }],
+    };
+    const opts = createMockOpts({ pendingSubjectResolution });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    let returnValue: unknown;
+    await act(async () => {
+      returnValue = await result.current.handleTypeSubject('math');
+    });
+
+    expect(returnValue).toBeUndefined();
+    expect(opts.resolveSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('handleCreateSuggestedSubject dispatches no mutations in proxy mode [WI-307]', async () => {
+    const pendingSubjectResolution = {
+      originalText: 'tell me about math',
+      prompt: 'Did you mean Math?',
+      candidates: [],
+      suggestedSubjectName: 'Math',
+    };
+    const opts = createMockOpts({ pendingSubjectResolution });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    let returnValue: unknown;
+    await act(async () => {
+      returnValue = await result.current.handleCreateSuggestedSubject();
+    });
+
+    expect(returnValue).toBeUndefined();
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
   });
 });

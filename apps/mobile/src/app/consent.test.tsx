@@ -63,6 +63,23 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+// WI-295: Controllable profile list so the profileId ownership check can be tested.
+// Default includes the profileId used by useLocalSearchParams mock above so existing
+// tests are unaffected.
+const TEST_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
+const mockUseProfile = jest.fn(() => ({
+  activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
+  profiles: [{ id: TEST_PROFILE_ID, isOwner: false }],
+  isExplicitProxyMode: false,
+  isLoading: false,
+}));
+jest.mock(
+  '../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
+  () => ({
+    useProfile: () => mockUseProfile(),
+  }),
+);
+
 const mockMutateAsync = jest.fn();
 
 jest.mock('../hooks/use-consent', () => ({
@@ -153,6 +170,12 @@ describe('ConsentScreen', () => {
     jest.useFakeTimers();
     mockChildEmail = undefined;
     mockCanGoBack.mockReturnValue(true);
+    mockUseProfile.mockReturnValue({
+      activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
+      profiles: [{ id: TEST_PROFILE_ID, isOwner: false }],
+      isExplicitProxyMode: false,
+      isLoading: false,
+    });
     mockUseNetworkStatus.mockReturnValue({ isOffline: false, isReady: true });
     // Restore default: Clerk hydrated, user present.
     mockUseAuth.mockReturnValue({
@@ -772,6 +795,49 @@ describe('ConsentScreen', () => {
       render(<ConsentScreen />);
       expect(screen.getByTestId('consent-auth-loading')).toBeTruthy();
       expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
+  });
+
+  // ---- WI-295: profileId ownership validation ----
+
+  describe('profileId ownership gate', () => {
+    it('shows an error and blocks submit when profileId is not in profiles', () => {
+      // Remove the test profile from the account profiles list.
+      // isLoading: false means profiles have loaded — the check is authoritative.
+      mockUseProfile.mockReturnValue({
+        activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
+        profiles: [],
+        isLoading: false,
+        isExplicitProxyMode: false,
+      });
+
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('consent-profile-not-found');
+      screen.getByTestId('consent-profile-not-found-error');
+      // The consent form must not be rendered
+      expect(screen.queryByTestId('consent-child-view')).toBeNull();
+    });
+
+    it('does not call mutateAsync when profileId is not in profiles', async () => {
+      mockUseProfile.mockReturnValue({
+        activeProfile: { id: TEST_PROFILE_ID, birthYear: 2010, isOwner: false },
+        profiles: [],
+        isLoading: false,
+        isExplicitProxyMode: false,
+      });
+
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('renders the consent form normally when profileId is in profiles', () => {
+      // Default: mockUseProfile includes TEST_PROFILE_ID — form should render
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('consent-child-view');
+      expect(screen.queryByTestId('consent-profile-not-found')).toBeNull();
     });
   });
 });

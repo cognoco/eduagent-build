@@ -75,6 +75,22 @@ const mockGoBackOrReplace = jest.fn();
 let mockIsPending = false;
 let mockSubjectId: string | undefined = 'test-id';
 let mockReturnTo: string | undefined = undefined;
+let mockIsExplicitProxyMode = false;
+
+jest.mock(
+  '../../../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
+  () => ({
+    useProfile: () => ({
+      activeProfile: {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+      },
+      isExplicitProxyMode: mockIsExplicitProxyMode,
+    }),
+  }),
+);
 
 jest.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'nb-NO', languageCode: 'nb' }],
@@ -150,6 +166,7 @@ describe('LanguageSetup', () => {
     mockSubjectId = 'test-id';
     mockIsPending = false;
     mockReturnTo = undefined;
+    mockIsExplicitProxyMode = false;
     mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
     mockStartFirstCurriculumMutateAsync.mockResolvedValue({
       session: {
@@ -339,5 +356,43 @@ describe('LanguageSetup', () => {
 
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockGoBackOrReplace).toHaveBeenCalledTimes(1);
+  });
+
+  // ---- WI-277: Proxy-mode write guard ----
+
+  describe('proxy mode gate', () => {
+    beforeEach(() => {
+      mockIsExplicitProxyMode = true;
+    });
+
+    it('disables the language select options when in proxy mode', () => {
+      render(<LanguageSetup />);
+
+      const enButton = screen.getByTestId('native-language-en');
+      expect(
+        enButton.props.accessibilityState?.disabled ?? enButton.props.disabled,
+      ).toBeTruthy();
+    });
+
+    it('disables the submit button when in proxy mode', () => {
+      render(<LanguageSetup />);
+
+      const continueButton = screen.getByTestId('language-setup-continue');
+      expect(
+        continueButton.props.accessibilityState?.disabled ??
+          continueButton.props.disabled,
+      ).toBeTruthy();
+    });
+
+    it('does not call configure or session mutations when submit is pressed in proxy mode', async () => {
+      render(<LanguageSetup />);
+
+      fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+      expect(mockStartFirstCurriculumMutateAsync).not.toHaveBeenCalled();
+    });
   });
 });

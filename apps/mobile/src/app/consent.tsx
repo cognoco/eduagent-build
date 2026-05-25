@@ -52,7 +52,7 @@ export default function ConsentScreen() {
   // [ACCOUNT-19] Auth gate: bounce signed-out direct access (e.g. /consent?profileId=...) to sign-in.
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user, isLoaded: isClerkLoaded } = useUser();
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles, isLoading: isProfileLoading } = useProfile();
   const { mutateAsync, isPending } = useRequestConsent();
   const ageBracket =
     activeProfile?.birthYear != null
@@ -149,11 +149,25 @@ export default function ConsentScreen() {
     (phase === 'child' || phase === 'parent') &&
     !isOffline;
 
+  // WI-295: Validate the target profileId belongs to this account before
+  // submitting. Prevents a client-side request the server would reject (403),
+  // which today surfaces no UX feedback. Only validate when profiles have
+  // finished loading — block early during the loading window would be
+  // a false negative on first render.
+  const profileBelongsToAccount =
+    isProfileLoading ||
+    profileId == null ||
+    profiles.some((p) => p.id === profileId);
+
   const onSubmit = useCallback(async () => {
     // CR-108: backstop — Clerk hydration window; canSubmit already blocks the
     // button, but guard here too so the same-email check is never skipped.
     if (!user) return;
     if (!canSubmit || !profileId) return;
+    if (!profileBelongsToAccount) {
+      setError('This profile does not belong to your account.');
+      return;
+    }
 
     setError('');
     try {
@@ -171,6 +185,7 @@ export default function ConsentScreen() {
     user,
     canSubmit,
     profileId,
+    profileBelongsToAccount,
     consentType,
     parentEmail,
     mutateAsync,
@@ -210,6 +225,30 @@ export default function ConsentScreen() {
   }
   if (!isSignedIn) {
     return <Redirect href="/sign-in" />;
+  }
+
+  // WI-295: If profileId was provided and profiles have loaded but the
+  // profile is NOT in the account, refuse to render the consent form.
+  if (!profileBelongsToAccount) {
+    return (
+      <View
+        testID="consent-profile-not-found"
+        className="flex-1 bg-background items-center justify-center px-8"
+      >
+        <Text
+          testID="consent-profile-not-found-error"
+          className="text-danger text-body text-center mb-6"
+        >
+          {t('consent.profileNotFound')}
+        </Text>
+        <Button
+          variant="primary"
+          label={t('common.goBack')}
+          onPress={handleClose}
+          testID="consent-profile-not-found-back"
+        />
+      </View>
+    );
   }
 
   return (

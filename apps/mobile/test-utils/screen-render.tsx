@@ -172,6 +172,12 @@ export interface RenderScreenOptions {
    * Default: `async () => ({ success: true })`.
    */
   switchProfile?: ProfileContextValue['switchProfile'];
+  /**
+   * Render as a parent acting on a child profile (proxy mode). Drives
+   * `useProfile().isExplicitProxyMode`. Default false. Used by proxy-mode
+   * write-guard tests (WI-371).
+   */
+  isExplicitProxyMode?: boolean;
 }
 
 export interface RenderScreenResult {
@@ -224,7 +230,7 @@ export function renderScreen(
     profiles,
     activeProfile,
     switchProfile: opts.switchProfile ?? (async () => ({ success: true })),
-    isExplicitProxyMode: false,
+    isExplicitProxyMode: opts.isExplicitProxyMode ?? false,
     isLoading: false,
     profileLoadError: null,
     profileWasRemoved: false,

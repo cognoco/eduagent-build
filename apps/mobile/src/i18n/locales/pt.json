@@ -1161,7 +1161,13 @@
     "deliverySentBody": "Seu pai/mãe receberá um e-mail em {{email}}. Avisaremos assim que ele(a) aprovar.",
     "deliveryFailedBody": "Não conseguimos confirmar que o e-mail de consentimento chegou a {{email}}. Por favor, verifique o endereço e tente novamente.",
     "deliveryFailedHint": "Você pode reenviar a solicitação agora ou voltar e inserir um endereço de e-mail diferente.",
-    "resendEmail": "Reenviar e-mail"
+    "resendEmail": "Reenviar e-mail",
+    "profileNotFound": "Este perfil não pertence à sua conta.",
+    "withdrawn": {
+      "hint": "{{name}} pausou a partilha destes dados.",
+      "title": "Partilha em pausa",
+      "requestCta": "Pedir consentimento novamente"
+    }
   },
   "account": {
     "title": "Excluir conta",
@@ -2898,5 +2904,12 @@
     "updateLabel": "Atualizar senha",
     "updating": "Atualizando...",
     "updateButton": "Atualizar senha"
+  },
+  "proxy": {
+    "readOnly": {
+      "hint": "Você está a ver a conta do seu filho(a). Mude para o seu perfil para fazer alterações.",
+      "title": "Mude para o seu perfil para fazer alterações",
+      "switchProfileCta": "Mudar de perfil"
+    }
   }
 }
