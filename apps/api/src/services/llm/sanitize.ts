@@ -70,6 +70,31 @@ export function escapeXml(text: string): string {
 }
 
 /**
+ * [WI-79 / DS-142,143] Apply `sanitizeXmlValue` to every element of a
+ * string array, drop empties, and return the cleaned list. Used by the
+ * many prompt builders that join lists like `recentAnswers`, `topicTitles`,
+ * `recentStruggles` into the system prompt — each list item is treated as
+ * an attribute-like value and stripped of newlines / angle brackets /
+ * quotes before joining, so a learner-controlled list entry cannot escape
+ * its list context with a `\nSystem: ...` directive.
+ *
+ * Callers join the result themselves; this helper does not impose a
+ * separator so the same helper works for `', '`, `'; '`, and bullet-list
+ * formats.
+ */
+export function sanitizeList(
+  items: readonly string[],
+  maxLen: number,
+): string[] {
+  const out: string[] = [];
+  for (const item of items) {
+    const cleaned = sanitizeXmlValue(item, maxLen);
+    if (cleaned.length > 0) out.push(cleaned);
+  }
+  return out;
+}
+
+/**
  * [BUG-865] Strip TTS pronunciation hints that occasionally leak from the
  * LLM into chat-visible text. The model sometimes splits long terms into
  * hyphenated syllables — "de-nom-i-nay-tor", "num-er-ay-tor", "Least Common
@@ -88,7 +113,7 @@ export function escapeXml(text: string): string {
  */
 export function stripPhoneticHints(text: string): string {
   return text.replace(/\b[A-Za-z][a-z]{0,2}(?:-[a-z]{1,3}){3,}\b/g, (match) =>
-    match.replace(/-/g, '')
+    match.replace(/-/g, ''),
   );
 }
 
@@ -108,7 +133,7 @@ export function stripPhoneticHints(text: string): string {
  */
 export function renderPromptTemplate(
   template: string,
-  values: Record<string, string>
+  values: Record<string, string>,
 ): string {
   return template.replace(
     /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g,
@@ -118,6 +143,6 @@ export function renderPromptTemplate(
       // `hasOwnProperty` does not narrow the indexer type.
       const value = values[key];
       return typeof value === 'string' ? value : match;
-    }
+    },
   );
 }

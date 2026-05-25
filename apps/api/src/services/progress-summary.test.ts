@@ -7,6 +7,7 @@ import {
   classifyActivityState,
   computeNudgeRecommended,
   deterministicProgressSummaryFallback,
+  trimSummary,
 } from './progress-summary';
 
 describe('classifyActivityState', () => {
@@ -290,5 +291,49 @@ describe('buildProgressSummaryPrompt', () => {
     });
 
     expect(result.user).toContain('2026-05-13T10:00:00.000Z');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-118 / DS-029] Output-side defense — LLM-generated parent-facing prose
+// must not pass `<script>` or other angle-bracketed payloads through to
+// storage, even if the renderer happens to be safe today. The renderer is
+// React Native <Text>, which auto-escapes, but if a future surface (web
+// preview, markdown, email) renders the same value, the stored content must
+// not carry HTML tags.
+// ---------------------------------------------------------------------------
+
+describe('trimSummary [WI-118 / DS-029]', () => {
+  it('entity-encodes angle brackets in a hostile <script> payload', () => {
+    const result = trimSummary(
+      'Hi parents <script>alert(1)</script>, great week.',
+    );
+    expect(result).not.toMatch(/<\s*script\b/i);
+    expect(result).toContain('&lt;script&gt;');
+    expect(result).toContain('alert(1)');
+  });
+
+  it('entity-encodes angle brackets even when interleaved across the message', () => {
+    const result = trimSummary('A <b>bold</b> claim about <em>fractions</em>.');
+    expect(result).not.toMatch(/<[a-zA-Z]/);
+    expect(result).toContain('&lt;b&gt;');
+  });
+
+  it('preserves benign math comparisons like 5 < 7 (entity-encoded, still readable)', () => {
+    const result = trimSummary(
+      'Anna solved problems where 5 < 7 was the easy case.',
+    );
+    // The math content survives — `<` becomes `&lt;`, so the meaning is
+    // preserved rather than silently dropped.
+    expect(result).toContain('5 &lt; 7');
+  });
+
+  it('preserves benign prose verbatim', () => {
+    const result = trimSummary('Anna had a productive week with fractions.');
+    expect(result).toBe('Anna had a productive week with fractions.');
+  });
+
+  it('normalizes whitespace and trims', () => {
+    expect(trimSummary('  hello\n\n  world  ')).toBe('hello world');
   });
 });

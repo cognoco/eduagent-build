@@ -132,6 +132,37 @@ export const FAMILIAR_SESSIONS: Record<string, string> & { freeform: string } =
  * @param topicName - Optional topic title when launched from the library
  * @param subjectName - Optional subject name when launched from a home card
  */
+/**
+ * [WI-304 / DS-215] Escape Markdown metacharacters before interpolating
+ * learner-controlled values into the assistant's opening message.
+ *
+ * The opening message is rendered by `MessageBubble` via
+ * `react-native-markdown-display`, which by default treats `[label](url)`
+ * as a tappable link and `Linking.openURL`s the href on tap. A topic name
+ * or rawInput like `[tap me](https://attacker.example)` (or a deep link
+ * like `[tap](myapp://admin)`) would otherwise appear as a tappable
+ * "trusted assistant" link.
+ *
+ * Strategy: backslash-escape the Markdown delimiters that turn plain text
+ * into a link, image, fenced code block, heading, or list — so the value
+ * renders literally as prose. Other inline markdown (bold, italic) is
+ * also neutralized for the same reason.
+ */
+export function escapeMarkdown(text: string): string {
+  // Includes `<` so `<https://evil.example>` autolinks cannot be smuggled
+  // through any field rendered by react-native-markdown-display.
+  //
+  // Intentionally NOT escaped:
+  //   - `=` — setext headings require `=` alone on a line following the
+  //     heading text, which our single-line interpolation never produces.
+  //   - `-` — same reasoning for setext headings; more importantly,
+  //     hyphenated names like "Self-Directed Learning" are common in
+  //     topic and subject names, and react-native-markdown-display does
+  //     not guarantee CommonMark-spec behavior for `\-` (which should
+  //     render as `-` but may render with a visible backslash).
+  return text.replace(/([\\`*_{}\[\]()#+!|<>~])/g, '\\$1');
+}
+
 export function getOpeningMessage(
   mode: string,
   sessionExperience: number,
@@ -149,15 +180,32 @@ export function getOpeningMessage(
   // Any future mode rename must add normalization to BOTH zones.
   const normalizedMode = normalizeModeForConfig(mode);
 
-  if (mode === 'relearn' && recap) {
+  // [WI-304 / DS-215] Every learner-controlled value that lands in this
+  // string is rendered by react-native-markdown-display in MessageBubble.
+  // Escape Markdown metacharacters so values like `[tap](evil://x)` render
+  // as inert text rather than a tappable link.
+  const safeTopicName = topicName ? escapeMarkdown(topicName) : undefined;
+  const safeSubjectName = subjectName ? escapeMarkdown(subjectName) : undefined;
+  const safeRawInput = rawInput ? escapeMarkdown(rawInput) : undefined;
+  // `recap` is a server-produced session summary string. CONTRACT: it is
+  // plain prose only — no intentional Markdown formatting (bold, lists,
+  // code, links). Apply escapeMarkdown for defense-in-depth so that if a
+  // learner-controlled name was ever interpolated into the recap upstream
+  // and missed sanitization, it still cannot turn into a tappable link
+  // here. If the recap surface ever evolves to carry intentional
+  // Markdown, scope this escape down to just link/autolink characters
+  // (`[`, `]`, `(`, `)`, `<`, `>`).
+  const safeRecap = recap ? escapeMarkdown(recap) : undefined;
+
+  if (mode === 'relearn' && safeRecap) {
     return `Last time you learned about ${
-      topicName ?? 'this topic'
-    }, we covered:\n\n${recap}\n\nLet's see what you remember! Want to do a quick quiz on these before we dive in?`;
+      safeTopicName ?? 'this topic'
+    }, we covered:\n\n${safeRecap}\n\nLet's see what you remember! Want to do a quick quiz on these before we dive in?`;
   }
 
   if (mode === 'relearn') {
     return `Let's approach ${
-      topicName ?? 'this topic'
+      safeTopicName ?? 'this topic'
     } from a fresh angle. What do you remember about it?`;
   }
 
@@ -165,35 +213,35 @@ export function getOpeningMessage(
     return "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?";
   }
 
-  if (rawInput && topicName) {
-    return `Let's explore ${rawInput}! I'll start with something interesting.`;
+  if (safeRawInput && safeTopicName) {
+    return `Let's explore ${safeRawInput}! I'll start with something interesting.`;
   }
-  if (rawInput && !topicName) {
-    return `I see you're curious about "${rawInput}" — let's dive in!`;
+  if (safeRawInput && !safeTopicName) {
+    return `I see you're curious about "${safeRawInput}" — let's dive in!`;
   }
 
-  if (topicName) {
+  if (safeTopicName) {
     if (normalizedMode === 'review') {
-      return `Let's review "${topicName}". What do you remember about it in your own words?`;
+      return `Let's review "${safeTopicName}". What do you remember about it in your own words?`;
     }
 
     if (sessionExperience <= 0) {
-      return `Today we're starting with "${topicName}". I'll explain the key ideas and check they make sense — jump in anytime if something's unclear.`;
+      return `Today we're starting with "${safeTopicName}". I'll explain the key ideas and check they make sense — jump in anytime if something's unclear.`;
     }
     if (sessionExperience <= 2) {
-      return `Let's dive into "${topicName}". Ready to start, or is there something specific you'd like to focus on?`;
+      return `Let's dive into "${safeTopicName}". Ready to start, or is there something specific you'd like to focus on?`;
     }
-    return `"${topicName}" — ready when you are. Want me to start, or do you have a preference?`;
+    return `"${safeTopicName}" — ready when you are. Want me to start, or do you have a preference?`;
   }
 
-  if (subjectName) {
+  if (safeSubjectName) {
     if (sessionExperience <= 0) {
-      return `Let's work on ${subjectName} together. Where would you like to start?`;
+      return `Let's work on ${safeSubjectName} together. Where would you like to start?`;
     }
     if (sessionExperience <= 2) {
-      return `Back to ${subjectName} — want to pick up where we left off, or try something new?`;
+      return `Back to ${safeSubjectName} — want to pick up where we left off, or try something new?`;
     }
-    return `${subjectName} — ready when you are. What shall we work on?`;
+    return `${safeSubjectName} — ready when you are. What shall we work on?`;
   }
 
   if (sessionExperience <= 0) {
