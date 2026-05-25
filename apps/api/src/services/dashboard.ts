@@ -765,11 +765,15 @@ export async function getChildrenForParent(
   const startOfLastWeek = new Date(startOfThisWeek);
   startOfLastWeek.setUTCDate(startOfLastWeek.getUTCDate() - 7);
 
+  // [BUG-394] Exclude in-flight sessions: counting status='active' inflates
+  // sessionsThisWeek and the trend computation. The dashboard reports completed
+  // learning activity, not work in progress.
   const allRecentSessions = await db.query.learningSessions.findMany({
     where: and(
       inArray(learningSessions.profileId, childProfileIds),
       gte(learningSessions.startedAt, startOfLastWeek),
       gte(learningSessions.exchangeCount, 1),
+      ne(learningSessions.status, 'active'),
     ),
   });
   const sessionsByProfile = new Map<string, typeof allRecentSessions>();
@@ -838,7 +842,9 @@ export async function getChildrenForParent(
       inArray(consentStates.profileId, childProfileIds),
       eq(consentStates.consentType, 'GDPR'),
     ),
-    orderBy: desc(consentStates.requestedAt),
+    // [BUG-394] Stable tiebreak on id to make consent dedup deterministic when
+    // two rows share the same requestedAt timestamp.
+    orderBy: [desc(consentStates.requestedAt), desc(consentStates.id)],
   });
   const consentByProfile = new Map<
     string,
@@ -1091,11 +1097,13 @@ export async function getChildDetail(
   const startOfLastWeek = new Date(startOfThisWeek);
   startOfLastWeek.setUTCDate(startOfLastWeek.getUTCDate() - 7);
 
+  // [BUG-394] Exclude in-flight sessions: see batch-path comment.
   const recentSessions = await db.query.learningSessions.findMany({
     where: and(
       eq(learningSessions.profileId, childProfileId),
       gte(learningSessions.startedAt, startOfLastWeek),
       gte(learningSessions.exchangeCount, 1),
+      ne(learningSessions.status, 'active'),
     ),
   });
 
