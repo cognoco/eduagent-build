@@ -1022,11 +1022,33 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
   it('[WI-263] does NOT call useChildLearnerProfile with the real profileId when consent is WITHDRAWN', () => {
     render(<ChildDetailScreen />);
 
-    // The hook must be called with undefined so the enabled guard blocks the fetch.
+    // The hook must have been called (it always mounts) but the first arg
+    // must be undefined — never the real profile id — so the enabled guard
+    // blocks the fetch. An empty call list would pass vacuously.
     const calls = mockUseChildLearnerProfile.mock.calls;
-    expect(calls.every((args: unknown[]) => args[0] !== 'child-001')).toBe(
-      true,
-    );
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((args: unknown[]) => args[0] === undefined)).toBe(true);
+  });
+
+  it('[WI-263] positive control — calls useChildLearnerProfile with the real profileId when consent is CONSENTED', () => {
+    // Override the consent mock to CONSENTED for this test only.
+    mockUseChildConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'CONSENTED',
+        respondedAt: '2026-01-01T00:00:00.000Z',
+        consentType: 'GDPR',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    const calls = mockUseChildLearnerProfile.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // When consented the hook must eventually be called with the real id.
+    expect(calls.some((args: unknown[]) => args[0] === 'child-001')).toBe(true);
   });
 
   it('[WI-263] request-cta triggers the restore-consent mutation', () => {

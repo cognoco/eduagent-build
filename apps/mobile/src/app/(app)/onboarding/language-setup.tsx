@@ -319,6 +319,7 @@ export default function LanguageSetup() {
                     placeholderTextColor={colors.textSecondary}
                     className="rounded-card border border-primary bg-surface px-4 py-3 text-body text-text-primary"
                     autoFocus
+                    editable={!navigationContract.isParentProxy}
                     testID="native-language-other-input"
                   />
                 )}
@@ -337,13 +338,17 @@ export default function LanguageSetup() {
               <Pressable
                 key={option.label}
                 onPress={() => setStartingLevel(option.level)}
+                disabled={navigationContract.isParentProxy}
                 className={
                   selected
                     ? 'rounded-card border border-primary bg-primary/10 px-4 py-4'
                     : 'rounded-card border border-border bg-surface px-4 py-4'
                 }
                 accessibilityRole="button"
-                accessibilityState={{ selected }}
+                accessibilityState={{
+                  selected,
+                  disabled: navigationContract.isParentProxy,
+                }}
                 testID={option.testId}
               >
                 <Text className="text-body font-semibold text-text-primary">

@@ -667,4 +667,31 @@ describe('useSubjectClassification — proxy mode write guard [WI-307]', () => {
     expect(returnValue).toBeUndefined();
     expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
   });
+
+  it('handleResolveSubject dispatches nothing in proxy mode [WI-307]', async () => {
+    // Regression guard for the WI-371 fix: handleResolveSubject now early-
+    // returns when isParentProxy is true, the same as the other handlers.
+    // Without the guard, calling handleResolveSubject with a resolved subject
+    // would invoke continueWithMessage — a write on behalf of the child.
+    const pendingSubjectResolution = {
+      originalText: 'tell me about math',
+      prompt: 'Pick a subject:',
+      candidates: [{ subjectId: 's1', subjectName: 'Math' }],
+    };
+    const opts = createMockOpts({ pendingSubjectResolution });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    let returnValue: unknown;
+    await act(async () => {
+      returnValue = await result.current.handleResolveSubject({
+        subjectId: 's1',
+        subjectName: 'Math',
+      });
+    });
+
+    expect(returnValue).toBeUndefined();
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+    expect(opts.resolveSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+  });
 });

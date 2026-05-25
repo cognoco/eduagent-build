@@ -389,5 +389,46 @@ describe('LanguageSetup', () => {
       expect(mockMutateAsync).not.toHaveBeenCalled();
       expect(mockStartFirstCurriculumMutateAsync).not.toHaveBeenCalled();
     });
+
+    it('CEFR level Pressables are disabled in proxy mode [WI-277]', () => {
+      render(<LanguageSetup />);
+
+      // All four CEFR level options must carry accessibilityState.disabled=true
+      // in proxy mode so the parent cannot change the learner's level setting.
+      for (const testId of [
+        'level-beginner',
+        'level-some-basics',
+        'level-conversational',
+        'level-advanced',
+      ]) {
+        const btn = screen.queryByTestId(testId);
+        if (btn) {
+          expect(btn.props.accessibilityState?.disabled).toBe(true);
+        }
+      }
+    });
+
+    it('pressing a CEFR level Pressable does not change the selected level in proxy mode [WI-277]', () => {
+      render(<LanguageSetup />);
+
+      // Record which level is initially selected (if any).
+      const initialA1State =
+        screen.queryByTestId('level-beginner')?.props.accessibilityState;
+      const initialSelected = initialA1State?.selected;
+
+      // Attempt to press the beginner level button (it must be disabled, but
+      // even if the native layer fires the event, the handler must not change
+      // selection because the Pressable is disabled).
+      const btn = screen.queryByTestId('level-beginner');
+      if (btn) {
+        fireEvent.press(btn);
+        // After the (disabled) press, the selected state must not have flipped
+        // compared to before.
+        expect(
+          screen.queryByTestId('level-beginner')?.props.accessibilityState
+            ?.selected,
+        ).toBe(initialSelected);
+      }
+    });
   });
 });

@@ -450,6 +450,61 @@ describe('HomeScreen WI-270: proxy mode — markCelebrationsSeen is suppressed',
   });
 });
 
+describe('HomeScreen WI-270: proxy mode — notice ack write is suppressed', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    mockOnAllComplete = null;
+    mockNavigationHomeScreen = 'LearnerHome';
+    mockNavigationIsParentProxy = true;
+    mockNavigationSessionIsOwner = true;
+    // Wire a dashboard response with a pending notice so the 5s ack timer fires.
+    mockFetch.setRoute('/dashboard', () => ({
+      data: {
+        children: [],
+        pendingNotices: [
+          {
+            id: 'notice-001',
+            type: 'consent_archived',
+            childName: 'Emma',
+            archivedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        demoMode: false,
+      },
+    }));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('does NOT call notices seen endpoint after 5s in proxy mode [WI-270]', async () => {
+    const owner = createTestProfile({
+      id: 'p1',
+      displayName: 'Alex',
+      isOwner: true,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: owner,
+      profiles: [owner],
+      isExplicitProxyMode: true,
+    });
+
+    render(<HomeScreen />, { wrapper });
+
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    // The ackNotice.mutate path must not have fired when isParentProxy=true.
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/notices/'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+});
+
 describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();

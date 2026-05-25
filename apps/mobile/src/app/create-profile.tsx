@@ -311,6 +311,20 @@ export default function CreateProfileScreen() {
     return <Redirect href="/sign-in" />;
   }
 
+  // WI-296: useActiveProfileRole returns null while the role is still
+  // resolving. Show a spinner rather than the access-blocked screen so a
+  // legitimate owner does not briefly see the blocked UI before the role lands.
+  if (activeProfileRole === null) {
+    return (
+      <View
+        testID="create-profile-role-loading"
+        className="flex-1 bg-background items-center justify-center"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   // WI-296: Block create-profile when the active profile is not the account
   // owner, or when a parent is acting as a proxy for a child profile. In both
   // cases the API would reject the request; gate early to avoid a misleading

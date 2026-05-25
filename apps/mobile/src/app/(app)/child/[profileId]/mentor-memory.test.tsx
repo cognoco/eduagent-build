@@ -338,4 +338,39 @@ describe('ChildMentorMemoryScreen — consent-withdrawn empty state (WI-264)', (
 
     cleanup();
   });
+
+  it('[WI-264] does NOT fetch the learner-profile or memory endpoints with the real childProfileId when consent is WITHDRAWN', async () => {
+    // Negative-path: the learner-profile and memory hooks must never be
+    // called with the real childProfileId when consent is WITHDRAWN.
+    // They are gated as `consentResolved && !consentWithdrawn ? id : undefined`
+    // in the screen, so the only calls that may appear must carry undefined.
+    setWithdrawnRoutes();
+
+    const { result, cleanup } = renderScreen(<ChildMentorMemoryScreen />, {
+      profile: guardianProfile,
+      profiles: [guardianProfile, linkedChildProfile],
+      installGlobalFetch: false,
+      routedFetch: mockFetch,
+    });
+
+    await waitFor(() => {
+      result.getByTestId('child-mentor-memory-consent-withdrawn');
+    });
+
+    // Assert that no fetch was made to the learner-profile or memory endpoints
+    // with the real child profile id. The routed mock would record any call.
+    const profileCalls = fetchCallsMatching(
+      mockFetch,
+      '/learner-profile/child-001',
+    );
+    const memoryCalls = fetchCallsMatching(
+      mockFetch,
+      '/dashboard/children/child-001',
+    ).filter(({ url }) => url.includes('/memory'));
+
+    expect(profileCalls).toHaveLength(0);
+    expect(memoryCalls).toHaveLength(0);
+
+    cleanup();
+  });
 });

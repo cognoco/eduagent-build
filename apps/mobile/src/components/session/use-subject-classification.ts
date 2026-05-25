@@ -153,6 +153,7 @@ export function useSubjectClassification(
 
   const handleResolveSubject = useCallback(
     async (candidate: { subjectId: string; subjectName: string }) => {
+      if (navigationContract.isParentProxy) return;
       if (!pendingSubjectResolution || isStreaming || pendingClassification) {
         return;
       }
@@ -178,6 +179,7 @@ export function useSubjectClassification(
     [
       continueWithMessage,
       createLocalMessageId,
+      navigationContract.isParentProxy,
       isStreaming,
       pendingClassification,
       pendingSubjectResolution,

@@ -1311,14 +1311,42 @@ describe('LibraryScreen', () => {
       expect(screen.queryByTestId('manage-subjects-button')).toBeNull();
     });
 
-    it('does not dispatch updateSubject when handleSubjectStatusChange is called in proxy mode [WI-273]', async () => {
-      // Open modal via direct state — since manage button is hidden in proxy mode,
-      // we verify the handler returns early by calling it indirectly.
-      // Instead, verify the mutation is never called even if JS-accessible.
-      // The manage button is hidden, so tapping is not possible — assert mutation count.
+    it('does not dispatch updateSubject in proxy mode — manage-subjects button absent so modal interaction impossible [WI-273]', async () => {
+      // The manage-subjects button is hidden in proxy mode (canWrite=false).
+      // Without it, the modal cannot be opened and the status-change handler
+      // cannot be invoked from the UI. This confirms the write path is blocked.
       render(<LibraryScreen />, { wrapper: TestWrapper });
-      // No manage button to tap in proxy mode. Mutation must never be called.
+
+      // Guard is active: proxy hint shown, manage button absent.
+      screen.getByTestId('library-proxy-hint');
+      expect(screen.queryByTestId('manage-subjects-button')).toBeNull();
       expect(mockUpdateSubjectMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('positive control — updateSubject IS reachable when not in proxy mode [WI-273]', async () => {
+      // Flip to non-proxy so the manage button appears and the mutation is
+      // callable. This proves the negative proxy test is non-vacuous: the
+      // mutation CAN be triggered when the guard is absent.
+      mockIsParentProxy = false;
+      mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // Manage button must be present in non-proxy mode.
+      screen.getByTestId('manage-subjects-button');
+
+      // Open the modal and press the archive action for the subject.
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+      });
+
+      await waitFor(() => {
+        expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
+          subjectId: 'sub-1',
+          status: 'archived',
+        });
+      });
     });
   });
 });

@@ -62,14 +62,17 @@ export default function ChildMentorMemoryScreen() {
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const childProfileId = profileId as string | undefined;
   const { data: childConsentData } = useChildConsentStatus(childProfileId);
+  const consentResolved = childConsentData !== undefined;
   const consentWithdrawn = childConsentData?.consentStatus === 'WITHDRAWN';
   const { data: child } = useChildDetail(childProfileId);
-  const { data: profile, isLoading } = useChildLearnerProfile(
-    consentWithdrawn ? undefined : childProfileId,
-  );
-  const { data: memory } = useChildMemory(
-    consentWithdrawn ? undefined : childProfileId,
-  );
+  // [WI-264] Hard-deny until consent is known: only read the child's learner
+  // profile + memory once the consent query has resolved AND is not withdrawn.
+  // Gating solely on `consentWithdrawn` still fires these reads on the first
+  // render (before consent loads) — a leak in the withdrawn state.
+  const readProfileId =
+    consentResolved && !consentWithdrawn ? childProfileId : undefined;
+  const { data: profile, isLoading } = useChildLearnerProfile(readProfileId);
+  const { data: memory } = useChildMemory(readProfileId);
   const deleteItem = useDeleteMemoryItem();
   const deleteAll = useDeleteAllMemory();
   const tellMentor = useTellMentor();

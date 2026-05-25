@@ -643,10 +643,16 @@ export default function ChildDetailScreen(): React.ReactElement {
   const child = childDetail ?? dashboardChild;
   const sessionsQuery = useProfileSessions(profileId);
   const { data: childConsentData } = useChildConsentStatus(profileId);
+  const consentResolved = childConsentData !== undefined;
   const consentWithdrawn = childConsentData?.consentStatus === 'WITHDRAWN';
   const restoreConsentForScreen = useRestoreConsent(profileId);
+  // [WI-263] Hard-deny until consent is known: do not read the child's learner
+  // profile until the consent query has resolved AND is not withdrawn. Gating
+  // only on `consentWithdrawn` would still fire the fetch on the first render
+  // (before consent loads, when `consentWithdrawn` is false) and leak a read in
+  // the withdrawn state this guard exists to block.
   const { data: learnerProfile } = useChildLearnerProfile(
-    consentWithdrawn ? undefined : profileId,
+    consentResolved && !consentWithdrawn ? profileId : undefined,
   );
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt);

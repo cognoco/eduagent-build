@@ -1527,5 +1527,26 @@ describe('CameraScreen', () => {
 
       getByTestId('proxy-switch-profile-button');
     });
+
+    it('does NOT auto-request camera permission in proxy mode when status is undetermined [WI-271]', () => {
+      // Regression guard: the permission request effect must early-return when
+      // isParentProxy is true, even if the camera status is 'undetermined'.
+      // Without the guard the effect would call requestPermission() and trigger
+      // the OS camera dialog on behalf of the child's account.
+      const requestPermission = jest.fn();
+      useCameraPermissions.mockReturnValue([
+        { granted: false, canAskAgain: true, status: 'undetermined' },
+        requestPermission,
+        jest.fn().mockResolvedValue({
+          granted: false,
+          canAskAgain: true,
+          status: 'undetermined',
+        }),
+      ]);
+
+      render(<CameraScreen />, { wrapper: createWrapper() });
+
+      expect(requestPermission).not.toHaveBeenCalled();
+    });
   });
 });

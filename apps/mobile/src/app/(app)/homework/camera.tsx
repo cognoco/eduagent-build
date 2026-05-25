@@ -130,12 +130,17 @@ export default function CameraScreen(): React.ReactNode {
   // offers either the system-permitted re-ask (canAskAgain) or Open Settings.
   const autoRequestedRef = useRef(false);
   useEffect(() => {
+    // [WI-271] In proxy mode the screen renders a read-only empty state, but
+    // this effect still runs (hooks fire before the early return). Skip the
+    // OS permission prompt so a parent viewing a child profile never triggers
+    // camera initialization.
+    if (navigationContract.isParentProxy) return;
     if (autoRequestedRef.current) return;
     if (permission?.status === 'undetermined') {
       autoRequestedRef.current = true;
       void requestPermission();
     }
-  }, [permission?.status, requestPermission]);
+  }, [permission?.status, requestPermission, navigationContract.isParentProxy]);
 
   // Re-check permission when returning from system Settings.
   // useCameraPermissions does not auto-refresh on app resume, so the screen
