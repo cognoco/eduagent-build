@@ -137,6 +137,12 @@ export const curriculumBooks = pgTable(
     // duplicate concurrent retries from burning the LLM call twice when
     // the dispatch fires multiple events for the same bookId.
     retryInFlight: boolean('retry_in_flight').notNull().default(false),
+    // [WI-125] Timestamp when retry_in_flight was set true. Used by the
+    // claim UPDATE to reclaim stale locks (>15 min) so a worker that crashed
+    // before releasing the flag does not permanently lock the book out of
+    // future retries. Set to NOW() alongside retry_in_flight=true; reset to
+    // NULL alongside retry_in_flight=false in the release step.
+    retryClaimedAt: timestamp('retry_claimed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
