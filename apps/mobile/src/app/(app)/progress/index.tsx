@@ -958,7 +958,7 @@ export default function ProgressScreen(): React.ReactElement {
           <ProgressPillRow
             childrenProfiles={linkedChildren}
             selectedProfileId={selectedProfileId}
-            ownProfileId={activeProfile?.id}
+            ownProfileId={isFamilyProgress ? undefined : activeProfile?.id}
             onSelect={setSelectedProfileId}
           />
         ) : null}

@@ -63,11 +63,14 @@ describe('ProgressPillRow', () => {
     ).toEqual({ selected: false });
   });
 
-  it('returns null when ownProfileId is undefined', () => {
-    const { toJSON } = render(
+  it('renders child pills WITHOUT the own-profile pill when ownProfileId is undefined (Family Progress)', () => {
+    const { getByText, queryByText, queryByTestId } = render(
       <ProgressPillRow {...baseProps} ownProfileId={undefined} />,
     );
-    expect(toJSON()).toBeNull();
+    expect(getByText('Alice'));
+    expect(getByText('Bob'));
+    expect(queryByText('Mine')).toBeNull();
+    expect(queryByTestId('progress-pill-parent-1')).toBeNull();
   });
 
   it('returns null when childrenProfiles is empty', () => {
