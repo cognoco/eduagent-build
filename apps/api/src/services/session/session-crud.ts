@@ -25,6 +25,7 @@ import {
   curriculumBooks,
   bookSuggestions,
   createScopedRepository,
+  generateUUIDv7,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -41,6 +42,7 @@ import type {
   EngagementSignal,
   SessionMetadata,
   BookTopicGenerationResult,
+  SystemPromptIntent,
 } from '@eduagent/schemas';
 import {
   celebrationReasonSchema,
@@ -52,6 +54,7 @@ import {
 } from '@eduagent/schemas';
 import { NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
+import { resolveSystemPromptIntent } from './system-prompt-intents';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
 import { persistBookTopics } from '../curriculum';
@@ -219,35 +222,42 @@ export async function startSession(
     }
   }
 
-  const [row] = await db
-    .insert(learningSessions)
-    .values({
+  // [L10-001] Session row + session_start audit event must be atomic — if the
+  // audit insert fails after the session is created, the session would exist
+  // with no session_start event in its audit trail.
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId: input.topicId ?? null,
+        sessionType: input.sessionType ?? 'learning',
+        verificationType: input.verificationType ?? null,
+        inputMode: input.inputMode ?? 'text',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 0,
+        metadata: {
+          ...(input.metadata ?? {}),
+          inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
+        },
+        rawInput: input.rawInput ?? null,
+      })
+      .returning();
+
+    if (!inserted)
+      throw new Error('Insert learning session did not return a row');
+
+    await tx.insert(sessionEvents).values({
+      sessionId: inserted.id,
       profileId,
       subjectId,
-      topicId: input.topicId ?? null,
-      sessionType: input.sessionType ?? 'learning',
-      verificationType: input.verificationType ?? null,
-      inputMode: input.inputMode ?? 'text',
-      status: 'active',
-      escalationRung: 1,
-      exchangeCount: 0,
-      metadata: {
-        ...(input.metadata ?? {}),
-        inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
-      },
-      rawInput: input.rawInput ?? null,
-    })
-    .returning();
+      eventType: 'session_start' as const,
+      content: '',
+    });
 
-  if (!row) throw new Error('Insert learning session did not return a row');
-
-  // Record session_start event for the audit log
-  await db.insert(sessionEvents).values({
-    sessionId: row.id,
-    profileId,
-    subjectId,
-    eventType: 'session_start' as const,
-    content: '',
+    return inserted;
   });
 
   return mapSessionRow(row);
@@ -1383,12 +1393,19 @@ export async function getSessionTranscript(
 // Thin wrappers for event recording (require getSession)
 // ---------------------------------------------------------------------------
 
+/**
+ * Record a system-prompt event. WI-373: the caller supplies only the validated
+ * intent token; the canonical prompt text is resolved *here* from the
+ * server-owned map, so the persisted `content` can never diverge from the
+ * server's text regardless of caller. Provenance is owned here too — every
+ * write stamps `metadata.source = 'server'` so the replay layer can distinguish
+ * trusted server-authored events from any (now-impossible) client-authored row.
+ */
 export async function recordSystemPrompt(
   db: Database,
   profileId: string,
   sessionId: string,
-  content: string,
-  metadata?: Record<string, unknown>,
+  intent: SystemPromptIntent,
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -1398,8 +1415,8 @@ export async function recordSystemPrompt(
   await insertSessionEvent(db, session, profileId, {
     sessionId,
     eventType: 'system_prompt',
-    content,
-    metadata,
+    content: resolveSystemPromptIntent(intent),
+    metadata: { source: 'server', intent },
     touchSession: true,
   });
 }
@@ -1458,6 +1475,163 @@ export interface ResumeNudgeCandidate {
   topicHint: string;
   exchangeCount: number;
   createdAt: string;
+}
+
+export interface LibraryFilingRequest {
+  session: LearningSession;
+  dispatchId: string;
+}
+
+function createLibraryFilingDispatchId(prefix: string): string {
+  const randomId = globalThis.crypto?.randomUUID?.() ?? generateUUIDv7();
+  return `${prefix}-${randomId}`;
+}
+
+export async function markSessionKeptOutOfLibrary(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LearningSession | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      topicId: null,
+      filedAt: null,
+      filingStatus: 'filing_kept_out',
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+      ),
+    )
+    .returning();
+
+  return updated ? mapSessionRow(updated) : null;
+}
+
+export async function requestSessionLibraryFiling(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LibraryFilingRequest | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: null,
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+        inArray(learningSessions.filingStatus, [
+          'filing_failed',
+          'filing_kept_out',
+        ]),
+      ),
+    )
+    .returning();
+
+  if (updated) {
+    return {
+      session: mapSessionRow(updated),
+      dispatchId: createLibraryFilingDispatchId('add'),
+    };
+  }
+
+  const [nullStatusUpdated] = await db
+    .update(learningSessions)
+    .set({
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+        isNull(learningSessions.filingStatus),
+      ),
+    )
+    .returning();
+
+  return nullStatusUpdated
+    ? {
+        session: mapSessionRow(nullStatusUpdated),
+        dispatchId: createLibraryFilingDispatchId('add'),
+      }
+    : null;
+}
+
+export async function restoreSessionForAutoFiling(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LibraryFilingRequest | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: null,
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.filingStatus, 'filing_kept_out'),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+      ),
+    )
+    .returning();
+
+  return updated
+    ? {
+        session: mapSessionRow(updated),
+        dispatchId: createLibraryFilingDispatchId('restore'),
+      }
+    : null;
+}
+
+export async function resetFilingForRetry(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<LibraryFilingRequest | null> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: null,
+      filingRetryCount: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        inArray(learningSessions.filingStatus, [
+          'filing_failed',
+          'filing_kept_out',
+        ]),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+      ),
+    )
+    .returning();
+
+  return updated
+    ? {
+        session: mapSessionRow(updated),
+        dispatchId: createLibraryFilingDispatchId('retry'),
+      }
+    : null;
 }
 
 export async function claimSessionForFilingRetry(

@@ -13,7 +13,12 @@ const SUCCESS_DISMISS_MS = 3_000;
 
 interface SessionLike {
   id: string;
-  filingStatus: 'filing_pending' | 'filing_failed' | 'filing_recovered' | null;
+  filingStatus:
+    | 'filing_pending'
+    | 'filing_failed'
+    | 'filing_recovered'
+    | 'filing_kept_out'
+    | null;
   filingRetryCount: number;
 }
 
@@ -41,7 +46,11 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
     return () => clearTimeout(timer);
   }, [session.filingStatus, hidden]);
 
-  if (session.filingStatus == null || hidden) {
+  if (
+    session.filingStatus == null ||
+    session.filingStatus === 'filing_kept_out' ||
+    hidden
+  ) {
     return null;
   }
 

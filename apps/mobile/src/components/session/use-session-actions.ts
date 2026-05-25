@@ -497,10 +497,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         }
 
         try {
-          await recordSystemPrompt.mutateAsync({
-            content: config.systemPrompt,
-            metadata: { type: 'quick_chip', chip },
-          });
+          // WI-373: send the intent token; the server owns the prompt text.
+          await recordSystemPrompt.mutateAsync({ kind: 'quick_chip', chip });
         } catch (err) {
           console.warn(
             '[Session] Quick-chip system prompt failed to persist:',
@@ -538,14 +536,6 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     async (message: ChatMessage, action: MessageFeedbackState) => {
       if (!message.eventId || !activeSessionId || isStreaming) return;
 
-      const systemPromptByAction: Record<MessageFeedbackState, string> = {
-        helpful:
-          'The learner marked the previous answer as helpful. Keep the same pace and level of guidance.',
-        not_helpful:
-          'The learner marked the previous answer as not helpful. Re-explain more clearly with one new example.',
-        incorrect:
-          'The learner believes the previous answer was incorrect. Correct it clearly, explain what changed, and continue from there.',
-      };
       const followUpPromptByAction: Partial<
         Record<MessageFeedbackState, string>
       > = {
@@ -575,13 +565,11 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           });
         }
 
+        // WI-373: send the intent token; the server owns the prompt text.
         await recordSystemPrompt.mutateAsync({
-          content: systemPromptByAction[action],
-          metadata: {
-            type: 'message_feedback',
-            value: action,
-            eventId: message.eventId,
-          },
+          kind: 'message_feedback',
+          action,
+          eventId: message.eventId,
         });
         setMessageFeedback((prev) => ({ ...prev, [message.id]: action }));
         showConfirmation(

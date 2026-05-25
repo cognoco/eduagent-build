@@ -24,9 +24,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockSignOutWithCleanup = jest.fn().mockResolvedValue(undefined);
 
+// [BUG-771] more/index.tsx now also imports ClerkSignOutTimeoutError from
+// sign-out to branch on the timeout case (force-redirect to /sign-in). The
+// real class must pass through so `instanceof` checks in production code
+// resolve correctly; only the wrapper function is stubbed.
 jest.mock(
   '../../../lib/sign-out' /* gc1-allow: external-boundary sign-out coordinates SecureStore + cache — needs stub in unit tests */,
   () => ({
+    ...jest.requireActual('../../../lib/sign-out'),
     signOutWithCleanup: (...args: unknown[]) => mockSignOutWithCleanup(...args),
   }),
 );
@@ -70,6 +75,7 @@ const childProfile = {
 };
 
 jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../../lib/profile'),
   useProfile: () => ({
     activeProfile: ownerProfile,
     profiles: [ownerProfile, childProfile],

@@ -8,6 +8,7 @@ const NOW = new Date('2026-05-23T12:00:00.000Z').getTime();
 jest.mock(
   '../../lib/profile' /* gc1-allow: visual component test only needs linked child names */,
   () => ({
+    ...jest.requireActual('../../lib/profile'),
     useLinkedChildren: () => mockChildren,
   }),
 );

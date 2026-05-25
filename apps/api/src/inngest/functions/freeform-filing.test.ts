@@ -137,7 +137,10 @@ jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
 // Import function under test
 // ---------------------------------------------------------------------------
 
-import { freeformFilingRetry } from './freeform-filing';
+import {
+  freeformAutoFileRequested,
+  freeformFilingRetry,
+} from './freeform-filing';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import type { InngestStepSendEventCall } from '../../test-utils/inngest-step-runner';
 
@@ -150,10 +153,11 @@ const testSessionId = '00000000-0000-4000-8000-000000000002';
 
 async function executeSteps(
   eventData: Record<string, unknown>,
+  fn: unknown = freeformFilingRetry,
 ): Promise<{ result: unknown; sendEventCalls: InngestStepSendEventCall[] }> {
   const { step, sendEventCalls } = createInngestStepRunner();
 
-  const handler = (freeformFilingRetry as any).fn;
+  const handler = (fn as any).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/filing.retry' },
     step,
@@ -207,6 +211,37 @@ describe('freeformFilingRetry', () => {
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/filing.retry' }),
       ]),
+    );
+  });
+
+  it('registers an auto-file requested handler for user-initiated Add/Retry/Restore', () => {
+    const triggers = (freeformAutoFileRequested as any).opts?.triggers;
+    expect((freeformAutoFileRequested as any).opts.id).toBe(
+      'freeform-auto-file-requested',
+    );
+    expect(triggers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ event: 'app/session.auto_file_requested' }),
+      ]),
+    );
+  });
+
+  it('auto-file requested events default to freeform filing mode', async () => {
+    const transcript = 'Learner: what is gravity?\nTutor: Gravity pulls.';
+
+    await executeSteps(
+      createEventData({
+        sessionTranscript: transcript,
+        dispatchId: 'add-00000000-0000-4000-8000-000000000001',
+        reason: 'user_requested',
+      }),
+      freeformAutoFileRequested,
+    );
+
+    expect(mockFileToLibrary).toHaveBeenCalledWith(
+      { sessionTranscript: transcript, sessionMode: 'freeform' },
+      expect.anything(),
+      expect.any(Function),
     );
   });
 

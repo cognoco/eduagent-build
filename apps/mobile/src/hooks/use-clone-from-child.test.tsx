@@ -465,6 +465,29 @@ describe('useCloneFromChild', () => {
       }),
     );
   });
+
+  // BUG-775: AddToMyLearningButton's press handler hangs forever on web when
+  // the clone POST never resolves (Playwright observes a 45s timeout, the
+  // spinner stays spinning, no toast appears). The fix attaches the default
+  // 12s abort signal from query-timeout.ts to the mutation fetch so a stalled
+  // request aborts and the mutation routes to onError with a retry toast.
+  it('passes an AbortSignal to the clone fetch so a stalled request does not hang forever', async () => {
+    mockRandomUUID.mockReturnValueOnce(REQUEST_ID);
+    mockFetch.mockResolvedValueOnce(jsonResponse(cloneResponse()));
+
+    const { result } = renderHook(() => useCloneFromChild(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => result.current.cloneFromChild(cloneArgs()));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
 });
 
 // ---------------------------------------------------------------------------

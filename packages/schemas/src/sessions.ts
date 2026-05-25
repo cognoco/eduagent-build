@@ -262,8 +262,25 @@ export const filingStatusSchema = z.enum([
   'filing_pending',
   'filing_failed',
   'filing_recovered',
+  'filing_kept_out',
 ]);
 export type FilingStatus = z.infer<typeof filingStatusSchema>;
+
+export type SessionEffectiveMode = 'freeform' | 'learning';
+
+export function getSessionEffectiveMode(session: {
+  metadata?: unknown;
+}): SessionEffectiveMode | undefined {
+  const parsed = sessionMetadataSchema.safeParse(session.metadata ?? {});
+  if (!parsed.success) {
+    return undefined;
+  }
+
+  return parsed.data.effectiveMode === 'freeform' ||
+    parsed.data.effectiveMode === 'learning'
+    ? parsed.data.effectiveMode
+    : undefined;
+}
 
 export const summaryStatusSchema = z.enum([
   'pending',
@@ -347,14 +364,51 @@ export const sessionCloseSchema = z
   .strict();
 export type SessionCloseInput = z.infer<typeof sessionCloseSchema>;
 
-// System prompt injection (quick chips: hint, example, simpler)
-export const systemPromptBodySchema = z
-  .object({
-    content: z.string().min(1),
-    metadata: z.record(z.string(), z.unknown()).optional(),
-  })
-  .strict();
-export type SystemPromptBody = z.infer<typeof systemPromptBodySchema>;
+// System-prompt intent (WI-373 — server-owned prompt resolution).
+//
+// The client no longer supplies system-role text. It sends a typed intent
+// token; the server resolves the canonical prompt string from a server-owned
+// map (apps/api/src/services/session/system-prompt-intents.ts). This inverts
+// the trust so a crafted client cannot inject arbitrary role:'system' content.
+//
+// The quick-chip ids mirror the contextual chips in the mobile client
+// (apps/mobile/src/components/session/session-types.ts → ContextualQuickChipId).
+// The non-contextual chips (switch_topic, park, wrong_subject) carry no system
+// prompt and are intentionally excluded here.
+export const systemPromptQuickChipSchema = z.enum([
+  'hint',
+  'example',
+  'know_this',
+  'explain_differently',
+  'too_easy',
+  'too_hard',
+]);
+export type SystemPromptQuickChip = z.infer<typeof systemPromptQuickChipSchema>;
+
+export const messageFeedbackActionSchema = z.enum([
+  'helpful',
+  'not_helpful',
+  'incorrect',
+]);
+export type MessageFeedbackAction = z.infer<typeof messageFeedbackActionSchema>;
+
+export const systemPromptIntentSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('silence_nudge') }).strict(),
+  z
+    .object({
+      kind: z.literal('quick_chip'),
+      chip: systemPromptQuickChipSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('message_feedback'),
+      action: messageFeedbackActionSchema,
+      eventId: z.string().min(1),
+    })
+    .strict(),
+]);
+export type SystemPromptIntent = z.infer<typeof systemPromptIntentSchema>;
 
 export const sessionAnalyticsEventTypeSchema = z.enum([
   'quick_action',

@@ -19,6 +19,7 @@ let mockIsParentProxy = false;
 jest.mock(
   '../../lib/profile' /* gc1-allow: screen unit test isolates routing from profile provider */,
   () => ({
+    ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
       activeProfile: mockActiveProfile,
       profiles: mockProfiles,

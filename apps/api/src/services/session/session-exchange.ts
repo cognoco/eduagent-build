@@ -764,6 +764,26 @@ export interface ExchangeHistoryEvent {
   eventType: string | null;
   content: string;
   orphanReason?: string | null;
+  // Persisted session_event metadata (jsonb). Typed `unknown` to match the DB
+  // row shape; narrowed safely in isReplayableSystemPrompt.
+  metadata?: unknown;
+}
+
+/**
+ * WI-240 (DS-151): a `system_prompt` event is replayed as a trusted
+ * `role:'system'` LLM message ONLY when it is server-authored
+ * (`metadata.source === 'server'`) or a legacy untagged row (no `source` —
+ * historically benign static strings, kept per the keep-legacy decision). A row
+ * whose `source` is present but not `'server'` (a client-authored row that
+ * should never exist post-fix) is dropped, never replayed as system.
+ */
+function isReplayableSystemPrompt(event: ExchangeHistoryEvent): boolean {
+  const meta = event.metadata;
+  const source =
+    meta && typeof meta === 'object' && 'source' in meta
+      ? (meta as { source?: unknown }).source
+      : undefined;
+  return source === undefined || source === 'server';
 }
 
 export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
@@ -776,7 +796,7 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
       (e) =>
         e.eventType === 'user_message' ||
         e.eventType === 'ai_response' ||
-        e.eventType === 'system_prompt',
+        (e.eventType === 'system_prompt' && isReplayableSystemPrompt(e)),
     )
     .map((e) => ({
       role:

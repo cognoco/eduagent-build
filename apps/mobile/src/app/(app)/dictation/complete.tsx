@@ -118,11 +118,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
   }
   const completionKey = data.completionKey;
 
-  // [E2E] When EXPO_PUBLIC_E2E=1 the dev-client build exposes a gallery picker
+  // [E2E] When EXPO_PUBLIC_E2E=true the dev-client build exposes a gallery picker
   // button (complete-pick-gallery testID). The wrapper script plants a test JPEG
   // in the emulator gallery via ADB before running the flow so that the review
   // LLM call receives a predictable image without requiring a real camera session.
-  const isE2E = process.env.EXPO_PUBLIC_E2E === '1';
+  const isE2E = process.env.EXPO_PUBLIC_E2E === 'true';
 
   const handleCheckWriting = async (
     source: 'camera' | 'gallery' = 'camera',
@@ -410,7 +410,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
               </View>
             </Pressable>
 
-            {/* [E2E] Gallery picker — only visible in E2E dev-client builds (EXPO_PUBLIC_E2E=1).
+            {/* [E2E] Gallery picker — only visible in E2E dev-client builds (EXPO_PUBLIC_E2E=true).
                 The wrapper script plants a test JPEG in the emulator gallery via ADB before
                 running the flow so the LLM receives a predictable image. */}
             {isE2E ? (

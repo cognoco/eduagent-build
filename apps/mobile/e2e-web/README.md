@@ -30,6 +30,33 @@ Local API mode starts `wrangler dev` unless `PLAYWRIGHT_SKIP_LOCAL_API=1` is set
 
 Before `expo export`, the web server rewrites `apps/mobile/.env.local` and `apps/mobile/.env.development.local` so the built web bundle uses the same API URL as the Playwright seed helpers. Set `PLAYWRIGHT_API_URL` to override it; `EXPO_PUBLIC_API_URL` is accepted as a fallback for compatibility. If neither is set, local mode uses `http://127.0.0.1:8787` and staging mode uses the default shared test API.
 
+### Mentor Chrome audit registry smoke
+
+Opt-in project that iterates over every `mentor-audit-*` seed scenario in
+`fixtures/scenarios.ts`, seeds, signs in (or applies a storage-state mutator
+for pre-shell entries), and asserts the documented `landingTestId` is
+visible. Converts landing-route drift into a CI failure rather than letting
+the audit silently go stale.
+
+```bash
+# Run on staging Cloudflare API (the canonical audit-re-run target)
+CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging-cf \
+  PLAYWRIGHT_API_URL="https://api-stg.mentomate.com" \
+  EXPO_PUBLIC_API_URL="https://api-stg.mentomate.com" \
+  doppler run --project mentomate --config stg -- \
+  pnpm exec playwright test -c apps/mobile/playwright.config.ts \
+  --project=mentor-audit-registry-smoke --workers=1 --reporter=list
+```
+
+Flag-matrix coverage (plan §"Navigation Contract Flag Matrix") requires
+re-running with both `MODE_NAV_V1_ENABLED=false` (V0, current production)
+and `MODE_NAV_V1_ENABLED=true` (V1). Set the matching `MENTOR_AUDIT_NAV_V1`
+env var per run and record both results.
+
+The smoke project is independent of `solo-learner` / `owner-with-children`
+storage states; a single mentor-audit failure cannot poison the rest of the
+suite.
+
 ## Safety
 
 - Shared staging seed calls fail closed when `PLAYWRIGHT_TEST_SEED_SECRET` or `TEST_SEED_SECRET` is missing. Use Doppler config `stg`.

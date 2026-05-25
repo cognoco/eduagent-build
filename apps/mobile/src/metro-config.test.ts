@@ -42,11 +42,13 @@ describe('apps/mobile/metro.config.js — Sentry source-context middleware [WI-2
         transformer: {},
       }),
     );
-    jest.doMock('@sentry/react-native/metro', () => ({ getSentryExpoConfig }));
+    jest.doMock('@sentry/react-native/metro', () => ({ getSentryExpoConfig })); // gc1-allow: external-boundary: @sentry/react-native native metro plugin
     jest.doMock('metro-config', () => ({
+      // gc1-allow: external-boundary: metro-config is a native bundler module not available in JSDOM
       mergeConfig: (a: object, b: object) => ({ ...a, ...b }),
     }));
     jest.doMock('nativewind/metro', () => ({
+      // gc1-allow: external-boundary: nativewind/metro is a native bundler plugin not available in JSDOM
       withNativeWind: (config: unknown) => config,
     }));
 

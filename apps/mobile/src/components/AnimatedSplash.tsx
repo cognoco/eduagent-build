@@ -209,7 +209,21 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
       fade.value = withTiming(0, { duration: 200 }, (finished) => {
         if (finished) runOnJS(done)();
       });
-      return;
+      // Bug 769: the withTiming callback above only fires when `finished` is
+      // true. On web (and on certain native builds) the animation can be
+      // interrupted — e.g. by tab visibility changes or a navigation that
+      // briefly suspends the JS thread — which leaves `finished === false`,
+      // `done()` never runs, the splash never unmounts, and the absolutely-
+      // positioned overlay keeps intercepting taps on /more/notifications,
+      // /more/account, /mentor-memory, /more/privacy. Watchdog mirrors the
+      // main-animation watchdog (3.2s) but scaled to the reduced 200ms fade.
+      const reducedMotionWatchdog = setTimeout(() => {
+        setAcceptsTouches(false);
+        done();
+      }, 800);
+      return () => {
+        clearTimeout(reducedMotionWatchdog);
+      };
     }
 
     const spring = { damping: 8, stiffness: 180 };
@@ -425,12 +439,24 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     <Animated.View
       style={[styles.container, { backgroundColor: C.bg }, containerStyle]}
       testID="animated-splash"
+      // Bug 769: pointerEvents must propagate to inner Pressable + SVG on web.
+      // React Native Web compiles `pointerEvents` on the parent to CSS
+      // `pointer-events: none`, which children inherit — but only if no
+      // descendant resets it. Belt-and-braces: also apply it on the inner
+      // Pressable so a stale-but-visible splash never intercepts taps on
+      // /more/notifications, /more/account, /mentor-memory, /more/privacy.
       pointerEvents={acceptsTouches ? 'auto' : 'none'}
     >
       <Pressable
         onPress={skip}
         style={styles.pressable}
         testID="animated-splash-skip"
+        // Bug 769: `disabled` makes the Pressable a no-op when the splash is
+        // mid/post-exit, even if pointerEvents='none' on the parent View
+        // fails to cascade on a particular web/native build. Together with
+        // `hasExited` (which unmounts) and the parent's pointerEvents this
+        // ensures the splash never intercepts taps after `done()` runs.
+        disabled={!acceptsTouches}
       >
         <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="-5 -15 130 130">
           <Defs>

@@ -80,6 +80,7 @@ jest.mock(
 jest.mock(
   '../../../lib/profile' /* gc1-allow: profile context requires full provider tree */,
   () => ({
+    ...jest.requireActual('../../../lib/profile'),
     useProfile: () => ({
       activeProfile: { id: 'profile-1', birthYear: 2005 },
     }),
@@ -117,9 +118,12 @@ jest.mock(
 );
 
 // BackHandler — stub
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => ({
-  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
-}));
+jest.mock(
+  'react-native/Libraries/Utilities/BackHandler',
+  /* gc1-allow: native-boundary: BackHandler is a platform-specific native module not available in JSDOM */ () => ({
+    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  }),
+);
 
 const PlaybackScreen = require('./playback').default as React.ComponentType;
 

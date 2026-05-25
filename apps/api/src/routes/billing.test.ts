@@ -372,6 +372,46 @@ describe('billing routes', () => {
       const res = await app.request('/v1/subscription', {}, TEST_ENV);
       expect(res.status).toBe(401);
     });
+
+    // [BREAK FCR-2026-05-23-L2.M2.1] [BUG-644] Non-owner profile must NOT
+    // read account-level subscription tier/status/limits. Without the
+    // isOwner gate added in billing.ts /subscription handler, a child on
+    // the parent's account could read parent's billing data.
+    it('[BREAK FCR-2026-05-23-L2.M2.1] returns 403 when caller is a non-owner profile', async () => {
+      const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
+      mockProfileFindFirst.mockResolvedValue({
+        id: childProfileId,
+        accountId: 'test-account-id',
+        displayName: 'Child',
+        avatarUrl: null,
+        birthYear: 2012,
+        location: 'EU',
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'nb',
+        pronouns: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      });
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' }),
+      );
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+
+      const res = await app.request(
+        '/v1/subscription',
+        { headers: { ...AUTH_HEADERS, 'X-Profile-Id': childProfileId } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // Body must not leak any account-level subscription detail.
+      const body = await res.json();
+      expect(body).not.toHaveProperty('subscription');
+      // Subscription service should never be consulted once gate trips.
+      expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -999,6 +1039,45 @@ describe('billing routes', () => {
       const res = await app.request('/v1/subscription/family', {}, TEST_ENV);
 
       expect(res.status).toBe(401);
+    });
+
+    // [BREAK FCR-2026-05-23-L2.M2.1] [BUG-645] Non-owner profile must NOT
+    // read family pool status or member list. Sibling write routes
+    // /family/add and /family/remove gate on isOwner; the read route did
+    // not, leaking sibling identities and pool-level billing data.
+    it('[BREAK FCR-2026-05-23-L2.M2.1] returns 403 when caller is a non-owner profile', async () => {
+      const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
+      mockProfileFindFirst.mockResolvedValue({
+        id: childProfileId,
+        accountId: 'test-account-id',
+        displayName: 'Child',
+        avatarUrl: null,
+        birthYear: 2012,
+        location: 'EU',
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'nb',
+        pronouns: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      });
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' }),
+      );
+
+      const res = await app.request(
+        '/v1/subscription/family',
+        { headers: { ...AUTH_HEADERS, 'X-Profile-Id': childProfileId } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // Family services must never be consulted once the gate trips —
+      // no pool status, no member list reaches the caller.
+      expect(mockListFamilyMembers).not.toHaveBeenCalled();
+      expect(mockGetFamilyPoolStatus).not.toHaveBeenCalled();
+      const body = await res.json();
+      expect(body).not.toHaveProperty('family');
     });
   });
 

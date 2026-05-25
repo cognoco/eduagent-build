@@ -10,12 +10,20 @@ let mockActiveProfile = {
   isOwner: true,
   birthYear: 1990,
 };
+let mockProfiles: Array<{
+  id: string;
+  displayName: string;
+  isOwner: boolean;
+  birthYear: number;
+}> = [];
 let mockLearnerProfile: { accommodationMode?: string } | null = {
   accommodationMode: 'none',
 };
+let mockSearchParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('@expo/vector-icons/Ionicons', () => {
@@ -34,9 +42,10 @@ jest.mock('../../../lib/theme' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../../lib/profile'),
   useProfile: () => ({
     activeProfile: mockActiveProfile,
-    profiles: [mockActiveProfile],
+    profiles: mockProfiles,
   }),
 }));
 
@@ -79,7 +88,9 @@ describe('LearningPreferencesScreen', () => {
       isOwner: true,
       birthYear: 1990,
     };
+    mockProfiles = [mockActiveProfile];
     mockLearnerProfile = { accommodationMode: 'none' };
+    mockSearchParams = {};
   });
 
   it('renders accommodation as the preferences nav row', () => {
@@ -104,5 +115,35 @@ describe('LearningPreferencesScreen', () => {
     render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByText('Short-Burst'));
+  });
+
+  describe('child mode (childProfileId query param)', () => {
+    const childProfile = {
+      id: 'child-1',
+      displayName: 'Emma',
+      isOwner: false,
+      birthYear: 2015,
+    };
+
+    beforeEach(() => {
+      mockSearchParams = { childProfileId: 'child-1' };
+      mockProfiles = [mockActiveProfile, childProfile];
+    });
+
+    it("shows the child's name in the screen title", () => {
+      render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByText("Emma's learning preferences")).toBeTruthy();
+    });
+
+    it('navigates to accommodation screen with childProfileId when row is pressed', () => {
+      render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('accommodation-link'));
+
+      expect(mockPush).toHaveBeenCalledWith(
+        '/(app)/more/accommodation?childProfileId=child-1',
+      );
+    });
   });
 });

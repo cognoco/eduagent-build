@@ -473,6 +473,7 @@ jest.mock(
 );
 
 jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../../lib/profile'),
   useProfile: () => ({
     activeProfile: {
       id: 'profile-1',
@@ -902,9 +903,8 @@ describe('SessionScreen homework flow', () => {
         }),
       );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
-        content:
-          'The learner says this is too easy. Raise the challenge a little and ask for more independent thinking.',
-        metadata: { type: 'quick_chip', chip: 'too_easy' },
+        kind: 'quick_chip',
+        chip: 'too_easy',
       });
       expect(mockStream).toHaveBeenCalledWith(
         'That feels too easy. Can you make it more challenging?',
@@ -933,13 +933,9 @@ describe('SessionScreen homework flow', () => {
         }),
       );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
-        content:
-          'The learner marked the previous answer as not helpful. Re-explain more clearly with one new example.',
-        metadata: {
-          type: 'message_feedback',
-          value: 'not_helpful',
-          eventId: 'event-2',
-        },
+        kind: 'message_feedback',
+        action: 'not_helpful',
+        eventId: 'event-2',
       });
       expect(mockStream).toHaveBeenCalledWith(
         'Can you explain that differently?',
@@ -971,13 +967,9 @@ describe('SessionScreen homework flow', () => {
         reason: 'Learner marked response as incorrect',
       });
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
-        content:
-          'The learner believes the previous answer was incorrect. Correct it clearly, explain what changed, and continue from there.',
-        metadata: {
-          type: 'message_feedback',
-          value: 'incorrect',
-          eventId: 'event-3',
-        },
+        kind: 'message_feedback',
+        action: 'incorrect',
+        eventId: 'event-3',
       });
       expect(mockStream).toHaveBeenCalledWith(
         'I think that answer is incorrect. Can you correct it and explain what changed?',

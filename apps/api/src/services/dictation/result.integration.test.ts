@@ -54,6 +54,12 @@ function getPreviousDate(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+function getDateDaysAgo(dateStr: string, daysAgo: number): string {
+  const d = new Date(dateStr);
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d.toISOString().slice(0, 10);
+}
+
 function completionKey(n: number): string {
   return `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 }
@@ -404,6 +410,54 @@ describe('getDictationStreak (integration)', () => {
 
     const result = await getDictationStreak(db, profileId);
     expect(result.streak).toBe(3);
+    expect(result.lastDate).toBe(today);
+  });
+
+  it('[WI-205] counts the current 60-day streak when older rows were inserted before recent rows', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+    const oldDates = Array.from({ length: 20 }, (_, index) =>
+      getDateDaysAgo(today, 80 + index),
+    );
+    const recentDates = Array.from({ length: 60 }, (_, index) =>
+      getDateDaysAgo(today, index),
+    );
+
+    for (const [index, date] of [...oldDates, ...recentDates].entries()) {
+      await recordDictationResult(db, profileId, {
+        completionKey: completionKey(1000 + index),
+        localDate: date,
+        sentenceCount: 5,
+        mistakeCount: 0,
+        mode: 'homework',
+        reviewed: true,
+      });
+    }
+
+    const result = await getDictationStreak(db, profileId);
+    expect(result.streak).toBe(60);
+    expect(result.lastDate).toBe(today);
+  });
+
+  it('stops counting at the first missing dictation day', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+    const yesterday = getDateDaysAgo(today, 1);
+    const threeDaysAgo = getDateDaysAgo(today, 3);
+
+    for (const [index, date] of [today, yesterday, threeDaysAgo].entries()) {
+      await recordDictationResult(db, profileId, {
+        completionKey: completionKey(1100 + index),
+        localDate: date,
+        sentenceCount: 5,
+        mistakeCount: 0,
+        mode: 'homework',
+        reviewed: true,
+      });
+    }
+
+    const result = await getDictationStreak(db, profileId);
+    expect(result.streak).toBe(2);
     expect(result.lastDate).toBe(today);
   });
 

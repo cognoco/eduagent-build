@@ -10,20 +10,26 @@ let mockActiveProfile: { id: string; conversationLanguage: string } | null = {
   conversationLanguage: 'en',
 };
 
-jest.mock('./use-onboarding-dimensions', () => ({
-  ...jest.requireActual('./use-onboarding-dimensions'),
-  useUpdateConversationLanguage: () => ({
-    mutate: mockMutate,
-    isPending: mockIsPending,
+jest.mock(
+  './use-onboarding-dimensions' /* gc1-allow: useUpdateConversationLanguage requires a real API client + QueryClient context that cannot be wired in this unit-test environment */,
+  () => ({
+    ...jest.requireActual('./use-onboarding-dimensions'),
+    useUpdateConversationLanguage: () => ({
+      mutate: mockMutate,
+      isPending: mockIsPending,
+    }),
   }),
-}));
+);
 
-jest.mock('../lib/profile', () => ({
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({
-    activeProfile: mockActiveProfile,
+jest.mock(
+  '../lib/profile' /* gc1-allow: useProfile reads ProfileContext which is only populated by ProfileProvider — that requires SecureStore, useProfiles (network), and QueryClient; cannot run real implementation here */,
+  () => ({
+    ...jest.requireActual('../lib/profile'),
+    useProfile: () => ({
+      activeProfile: mockActiveProfile,
+    }),
   }),
-}));
+);
 
 describe('useMentorLanguageSync', () => {
   beforeEach(async () => {

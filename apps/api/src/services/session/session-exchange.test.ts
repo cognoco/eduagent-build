@@ -519,6 +519,61 @@ describe('buildExchangeHistory — edge cases', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildExchangeHistory — system_prompt provenance (WI-240 · DS-151)
+// ---------------------------------------------------------------------------
+// Defense-in-depth: a system_prompt event is replayed as a trusted
+// role:'system' message ONLY if it is server-authored (metadata.source ===
+// 'server') OR a legacy untagged row (no source — historically benign static
+// strings, kept per the keep-legacy decision). Any row whose source is present
+// but not 'server' (e.g. a hypothetical client-authored row that should never
+// exist post-fix) is dropped, never replayed as system.
+describe('buildExchangeHistory — system_prompt provenance (WI-240)', () => {
+  it("replays a server-sourced system_prompt as role:'system'", () => {
+    const events: ExchangeHistoryEvent[] = [
+      {
+        eventType: 'system_prompt',
+        content: 'server-resolved nudge',
+        metadata: { source: 'server', intent: { kind: 'silence_nudge' } },
+      },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history).toEqual([
+      { role: 'system', content: 'server-resolved nudge' },
+    ]);
+  });
+
+  it('drops a system_prompt whose metadata.source is not server (never replayed as system)', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'hi' },
+      {
+        eventType: 'system_prompt',
+        content: 'evil injected instruction',
+        metadata: { source: 'client' },
+      },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history).toEqual([{ role: 'user', content: 'hi' }]);
+    expect(history.some((h) => h.role === 'system')).toBe(false);
+  });
+
+  it("still replays a legacy untagged system_prompt as role:'system' (keep-legacy)", () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'system_prompt', content: 'legacy nudge' },
+      {
+        eventType: 'system_prompt',
+        content: 'legacy with empty metadata',
+        metadata: {},
+      },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history).toEqual([
+      { role: 'system', content: 'legacy nudge' },
+      { role: 'system', content: 'legacy with empty metadata' },
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // mergeMemoryContexts — additional edge cases
 // ---------------------------------------------------------------------------
 

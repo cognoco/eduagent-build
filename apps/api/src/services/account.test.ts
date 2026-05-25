@@ -405,7 +405,6 @@ describe('findOrCreateAccount', () => {
           name: 'app/billing.trial_subscription_failed',
           data: expect.objectContaining({
             accountId: 'new-acc',
-            clerkUserId: 'clerk_user_789',
             reason: 'DB constraint violation',
             timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
           }),
@@ -435,7 +434,6 @@ describe('findOrCreateAccount', () => {
           extra: expect.objectContaining({
             flow: 'findOrCreateAccount.trialSubscription',
             accountId: 'new-acc',
-            clerkUserId: 'clerk_user_789',
           }),
         }),
       );
@@ -685,14 +683,13 @@ describe('findOrCreateAccount', () => {
 
       await findOrCreateAccount(db, 'clerk_user_123', 'user@example.com');
 
-      // The safeSend dispatch must include the accountId and clerkUserId
+      // The safeSend dispatch must include the accountId
       // so on-call can query how often this race fires in the last 24h.
       expect(mockInngestSend).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'app/account.trial_missing_repair_attempted',
           data: expect.objectContaining({
             accountId: 'acc-1',
-            clerkUserId: 'clerk_user_123',
             timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
           }),
         }),

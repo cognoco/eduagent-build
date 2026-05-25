@@ -23,6 +23,7 @@ import { Sentry } from '../lib/sentry';
 // internals unrelated to the three outbox bugs under test.
 // prettier-ignore
 jest.mock('../lib/profile', () => ({ // gc1-allow: auth tree
+  ...jest.requireActual('../lib/profile'),
   useProfile: jest.fn(),
 }));
 

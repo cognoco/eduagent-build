@@ -27,7 +27,7 @@ import {
 import {
   getSession,
   getSessionTranscript,
-  backfillSessionTopicId,
+  markSessionFiled,
   claimSessionForFilingRetry,
 } from '../services/session';
 import { routeAndCall } from '../services/llm';
@@ -269,14 +269,9 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       );
     }
 
-    // Backfill topicId on the session so it appears in getBookSessions
+    // Mark session filed so retry/recovery paths do not file it again.
     if (body.sessionId && result.topicId) {
-      await backfillSessionTopicId(
-        db,
-        profileId,
-        body.sessionId,
-        result.topicId,
-      );
+      await markSessionFiled(db, profileId, body.sessionId, result.topicId);
     }
 
     // Mark suggestion as picked/used (prevents reappearing in picker)

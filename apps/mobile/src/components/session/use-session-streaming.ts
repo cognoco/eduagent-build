@@ -13,6 +13,7 @@ import type {
   useRecordSystemPrompt,
 } from '../../hooks/use-sessions';
 import { useApiClient, type QuotaExceededDetails } from '../../lib/api-client';
+import { assertOk } from '../../lib/assert-ok';
 import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
 import { writeSessionRecoveryMarker } from '../../lib/session-recovery';
@@ -297,9 +298,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         },
       });
 
-      if (!res.ok) {
-        throw new Error(`Homework state sync failed: ${res.status}`);
-      }
+      // [L6-001] Route through assertOk so HTTP status maps to the typed
+      // error hierarchy (QuotaExceededError, ForbiddenError, etc.) — callers
+      // depend on classifyApiError reading the raw error type, not a raw
+      // status code embedded in a plain Error's message.
+      await assertOk(res);
     },
     [apiClient, effectiveMode, normalizedOcrText, homeworkCaptureSource],
   );
@@ -355,11 +358,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             },
           },
         });
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          throw new Error(`API error ${res.status}: ${body || res.statusText}`);
-        }
-        const data = (await res.json()) as { session: { id: string } };
+        // [L6-001] See above — typed error classification.
+        const okRes = await assertOk(res);
+        const data = (await okRes.json()) as { session: { id: string } };
         newId = data.session.id;
       } else {
         // [IMP-3] Errors propagate to sendMessage's catch block, which
@@ -483,7 +484,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           });
 
           try {
-            await recordSystemPrompt.mutateAsync({ content: prompt });
+            // WI-373: send the intent token; the server owns the prompt text.
+            // The visible `prompt` bubble above is display-only UI copy.
+            await recordSystemPrompt.mutateAsync({ kind: 'silence_nudge' });
           } catch (err) {
             console.warn('[Session] Silence prompt failed to persist:', err);
             // Best effort only.

@@ -23,7 +23,10 @@ import {
   useUpdateFamilyPoolBreakdownSharing,
 } from '../../../hooks/use-settings';
 import { platformAlert } from '../../../lib/platform-alert';
-import { signOutWithCleanup } from '../../../lib/sign-out';
+import {
+  ClerkSignOutTimeoutError,
+  signOutWithCleanup,
+} from '../../../lib/sign-out';
 import {
   SectionHeader,
   SettingsRow,
@@ -272,7 +275,20 @@ export default function MoreScreen() {
                   profileIds: profiles.map((p) => p.id),
                   clerkUserId: userId ?? undefined,
                 });
-              } catch {
+              } catch (err) {
+                // [BUG-771] If clerkSignOut hung past CLERK_SIGNOUT_TIMEOUT_MS
+                // the local state is already wiped (cache/SecureStore/Sentry
+                // scope all run BEFORE the timed-out Clerk call). Force the
+                // user to /sign-in instead of leaving them on the More
+                // screen — staying here would let them keep tapping buttons
+                // against a half-signed-out app. The breadcrumb +
+                // captureMessage emitted by sign-out.ts already make this
+                // observable; no console.warn-only fallback per CLAUDE.md
+                // "Silent recovery without escalation is banned".
+                if (err instanceof ClerkSignOutTimeoutError) {
+                  router.replace('/sign-in');
+                  return;
+                }
                 platformAlert(
                   t('more.account.couldNotSignOut'),
                   t('more.errors.tryAgainMoment'),

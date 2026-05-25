@@ -1379,11 +1379,19 @@ export const sessionCompleted = inngest.createFunction(
               },
             });
 
+            // [L3-001] Scope subject lookup by profileId so a crafted/replayed
+            // event with a foreign subjectId cannot leak another profile's
+            // subject name into this profile's LLM context.
             const [subjectRow] = subjectId
               ? await db
                   .select({ name: subjects.name })
                   .from(subjects)
-                  .where(eq(subjects.id, subjectId))
+                  .where(
+                    and(
+                      eq(subjects.id, subjectId),
+                      eq(subjects.profileId, profileId),
+                    ),
+                  )
                   .limit(1)
               : [null];
 
@@ -1454,6 +1462,13 @@ export const sessionCompleted = inngest.createFunction(
     );
     outcomes.push(analyzeOutcome);
 
+    // [L1-002] Soft step — best-effort embedding. The downstream dedup step
+    // reads embeddedIds; on Voyage outage or transient embed failure we must
+    // NOT let the exception propagate (Inngest would retry the whole step and
+    // ultimately surface a failed function), since the rest of the pipeline
+    // (dashboard, XP, retention) already succeeded. Mirror the no_voyage_key
+    // sentinel on any failure so dedup sees an empty embeddedIds set and the
+    // function continues.
     const embedNewFactsResult = await step.run(
       'embed-new-memory-facts',
       async () => {
@@ -1472,19 +1487,49 @@ export const sessionCompleted = inngest.createFunction(
             scanned: 0,
             embeddedIds: [],
             failedIds: [],
+            softFailure: false as const,
           };
         }
 
         const db = getStepDatabase();
-        return embedNewFactsForProfile(
-          db,
-          profileId,
-          makeEmbedderFromEnv(apiKey),
-          { limit: 50 },
-        );
+        try {
+          return {
+            ...(await embedNewFactsForProfile(
+              db,
+              profileId,
+              makeEmbedderFromEnv(apiKey),
+              { limit: 50 },
+            )),
+            softFailure: false as const,
+          };
+        } catch (err) {
+          sentry.captureException(err, {
+            profileId,
+            extra: {
+              step: 'embed-new-memory-facts',
+              surface: 'session-completed',
+            },
+          });
+          logger.error('[session-completed] soft step failed', {
+            step: 'embed-new-memory-facts',
+            profileId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return {
+            embedded: 0,
+            failed: 0,
+            scanned: 0,
+            embeddedIds: [],
+            failedIds: [],
+            softFailure: true as const,
+          };
+        }
       },
     );
-    outcomes.push({ step: 'embed-new-memory-facts', status: 'ok' });
+    outcomes.push({
+      step: 'embed-new-memory-facts',
+      status: embedNewFactsResult.softFailure ? 'failed' : 'ok',
+    });
 
     const dedupResult = await step.run('dedup-new-facts', async () => {
       const dedupConfig = getStepMemoryFactsDedupConfig();
@@ -1500,7 +1545,9 @@ export const sessionCompleted = inngest.createFunction(
         db,
         scoped: createScopedRepository(db, profileId),
         profileId,
-        candidateIds: embedNewFactsResult.embeddedIds,
+        candidateIds: (embedNewFactsResult.embeddedIds as string[]).filter(
+          Boolean,
+        ),
         threshold: dedupConfig.threshold,
         cap: dedupConfig.maxLlmCalls,
       });

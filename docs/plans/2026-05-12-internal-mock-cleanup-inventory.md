@@ -1,7 +1,7 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12 (last refreshed 2026-05-24)
-**Status:** Framework complete (Phases 0-4); P0 drained; bare-mock backlog collapsed from 131 → 23 between 2026-05-19 and 2026-05-24 via successive sweeps. Wave 3 (2026-05-24) hit the top-20 most-edited test files — they were already mostly clean.
+**Date:** 2026-05-12 (last refreshed 2026-05-25, post-Wave-6)
+**Status:** Framework complete (Phases 0-4); P0 drained; bare-mock backlog collapsed from 131 → 23 → 6 → **0** between 2026-05-19 and 2026-05-25 via successive sweeps. Wave 5 (2026-05-25) landed the three classifier patches Wave 4 deferred (multi-line factory window, `^@expo-google-fonts/`, `^nativewind(?:\/|$)/` + `^metro-` boundaries). Wave 6 (2026-05-25) converted the `lib/profile` cluster from `gc1-allow`-only to `pattern-a; gc1-allow` — 32 of 35 files converted (3 reverted as legitimate native boundaries: i18n loads eagerly through `lib/profile` transitively in JSDOM). The forward-only GC1 ratchet has nothing left to clean — every remaining relative-path `jest.mock(...)` row is either `pattern-a` (requireActual + override) or `gc1-allow` annotated.
 
 > **Note (2026-05-23):** Inventory counts in this file are point-in-time snapshots. Regenerate with `pnpm exec tsx scripts/generate-internal-mock-cleanup-inventory.ts` for current state.
 **Goal:** Reduce internal mocks that hide route/service/background-job contract drift while preserving true external boundary shims.
@@ -24,35 +24,26 @@ The W1-W17 Notion bug-fix swarm (commit `1391d7490`) and Wave 2 coverage hardeni
 - Internal-ish mocks: **618 → 718** (+100). P1 grew by 31, P2 by 69.
 - The integration mock guard (`apps/api/src/test-utils/integration-mock-guard.test.ts`) is still green — `P0 = 0`. Forward-only ratchet held.
 
-### Annotation Status Audit (2026-05-24, post-Wave-3)
+### Annotation Status Audit (2026-05-25, post-Wave-6)
 
-The inventory generator was extended to record an `annotation` column distinguishing already-converted mocks from true forward-only risks. Of the **705 internal-ish mock rows**:
+The inventory generator was extended to record an `annotation` column distinguishing already-converted mocks from true forward-only risks. Of the latest internal-ish mock rows:
 
 | Annotation status | Count | Meaning |
 | --- | ---: | --- |
-| `gc1-allow` | 343 | Annotated with a boundary label (`external-boundary`, `transport-boundary`, etc.) but not factored via `requireActual`. Mostly route/middleware tests where the target is a DB-shaped or service-shaped boundary the test legitimately replaces. |
-| `pattern-a; gc1-allow` | 293 | `jest.requireActual('<target>')` + `gc1-allow:` label — fully converted. |
-| `pattern-a` | 46 | `requireActual` used but no explicit `gc1-allow:` label. Cosmetic gap; should be annotated. |
-| **`bare`** | **23** | **True forward-only risk — no annotation, no `requireActual`. Down from 131 (2026-05-19) → 23 (2026-05-24).** |
+| `pattern-a; gc1-allow` | 343 | `jest.requireActual('<target>')` + `gc1-allow:` label — fully converted. |
+| `gc1-allow` | 337 | Annotated with a boundary label (`external-boundary`, `transport-boundary`, etc.) but not factored via `requireActual`. Mostly route/middleware tests where the target is a DB-shaped or service-shaped boundary the test legitimately replaces. |
+| `pattern-a` | 43 | `requireActual` used but no explicit `gc1-allow:` label. Acceptable: pattern-A *is* the running-the-real-code path, so the `gc1-allow:` boundary label does not strictly apply. Track but do not enforce. |
+| **`bare`** | **0** | **No remaining forward-only risk. Down from 131 (2026-05-19) → 23 (2026-05-24) → 6 (2026-05-25, Wave 4) → 0 (2026-05-25, Waves 5+6).** |
 
-Implication: of the 23 remaining bare mocks, **15 live in a single file** (`apps/mobile/src/app/_layout.test.tsx`). The other 8 are spread across 7 files with 1-2 each. **The real cleanup queue is now one file, then long-tail singletons.**
+Implication: **the GC1/bare backlog is fully drained.** The GC6 boy-scout rule remains in effect for new test-file edits. However, "no bare rows" does not mean "no internal mocks left to convert" — 369 internal-path rows still stub their target wholesale (with a `gc1-allow:` reason), and ~80-100 of those target modules where a real-code path is now feasible. See **Wave 6 backlog** below.
 
 > Pre-fix snapshot (2026-05-19, before generator regex fix): the first pass reported 180 bare mocks because the `gc1-allow` detection regex used `$` without the `m` flag, so trailing-line-comment annotations on `jest.mock(...)` calls were not matched. After fixing the regex (commit pending), 49 false-bare entries reclassified to `gc1-allow`. Always trust the regenerated post-fix snapshot.
 
-### Top Files with BARE Mocks (refreshed 2026-05-24, post-Wave-3)
+### Top Files with BARE Mocks (refreshed 2026-05-25, post-Wave-5)
 
-| File | Bare count | Notes |
-| --- | ---: | --- |
-| `apps/mobile/src/app/_layout.test.tsx` | 15 | **Single-file concentration — 65% of remaining bare backlog.** Root layout test mocks the app-shell modules directly. Next sweep target. |
-| `apps/mobile/src/app/session-summary/[sessionId].test.tsx` | 2 | Session summary screen. |
-| `apps/mobile/src/app/(app)/dictation/playback.test.tsx` | 1 | Dictation playback. |
-| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 1 | One residual bare mock; rest already converted. |
-| `apps/mobile/src/app/create-profile.test.tsx` | 1 | Profile creation flow. |
-| `apps/mobile/src/app/session-transcript/[sessionId].test.tsx` | 1 | Session transcript. |
-| `apps/mobile/src/components/family/AddToMyLearningButton.test.tsx` | 1 | Family add-to-learning button. |
-| `apps/mobile/src/hooks/use-network-status.test.ts` | 1 | Network status hook. |
+**None.** The CSV reports `BARE internal-ish mocks: 0`. All six rows that survived Wave 4 were classifier-gap artifacts (already-correct test code reported as bare because the inventory regex/boundary-list missed a case). Wave 5 patched the classifier (`scripts/generate-internal-mock-cleanup-inventory.ts`), so the same test files now report cleanly without any test-file edits.
 
-The bare backlog is **entirely mobile** and dominated by one file. Cleaning `apps/mobile/src/app/_layout.test.tsx` would drop the backlog from 23 → 8. The new `apps/mobile/src/test-utils/screen-render.tsx` harness (built in Wave 2) is the canonical replacement pattern for these conversions.
+The `apps/mobile/src/test-utils/screen-render.tsx` harness (built in Wave 2) remains the canonical replacement pattern for any future internal-mock conversions.
 
 ### Wave 1 (2026-05-19) — Outcomes
 
@@ -101,6 +92,107 @@ Ten parallel sonnet agents swept the top 20 most-edited test files (`git log --n
 **Takeaway for next sweep:** Stop targeting "most-edited" — those files are already clean because everyone touches them. Target the BARE-mock list instead. `apps/mobile/src/app/_layout.test.tsx` is the obvious next target (15 bare mocks = 65% of remaining backlog).
 
 Commits: `0589a70eb` (API retention-data annotations) + `380c75055` (mobile annotations + ChatShell math-format removal + progress.tsx requireActual spreads).
+
+### Wave 4 (2026-05-25) — Top-5 Bare-Mock Files
+
+Following the Wave 3 takeaway ("target the BARE-mock list, not most-edited"), Wave 4 targeted the top 5 files from the BARE-mock list: `_layout.test.tsx` (15), `session-summary/[sessionId].test.tsx` (2), `metro-config.test.ts` (2), `inngest/helpers.test.ts` (1), `dictation/playback.test.tsx` (1) — 21 bare rows total.
+
+Fan-out: 1 Opus agent on `_layout.test.tsx` (concentrated work needs context, not parallelism per the `/my:sweep-mocks` skill), 1 Sonnet agent on the other 4 files. Both ran in the `mocks-2026-05-25` worktree.
+
+| File | Bare removed | Method | Tests pass |
+| --- | ---: | --- | :---: |
+| `apps/mobile/src/app/_layout.test.tsx` | 14 of 15 | All entries already had `gc1-allow` intent expressed as `/* gc1-allow: ... */` comments inside the multi-line `jest.mock(...)` factory body — the inventory regex's 3-line window (`detectAnnotation` in `scripts/generate-internal-mock-cleanup-inventory.ts:198-244`) missed them. Reformatted to put the annotation between the spec and the factory arrow (matching the existing pattern at line 64 for `../lib/theme`). | 8/8 |
+| `apps/mobile/src/app/session-summary/[sessionId].test.tsx` | 2 of 2 | Same regex-window artifact as `_layout.test.tsx`: pre-existing `gc1-allow` comments relocated to the visible line. | 64/64 |
+| `apps/mobile/src/metro-config.test.ts` | 2 of 2 | Third-party bundler plugins (`metro-config`, `nativewind/metro`) inside a `jest.resetModules()` + `require()` test; cannot be removed. Added inline `// gc1-allow:` annotations. | 2/2 |
+| `apps/api/src/inngest/helpers.test.ts` | 1 of 1 | `@eduagent/database` opens a real Neon WebSocket connection (unavailable in unit-test environment). Added inline `// gc1-allow: db-boundary` annotation. Real DB is covered by integration tests. | Diff-verified (`/* gc1-allow: ... */` comment addition only — cannot change runtime; worktree's `apps/api/jest.config.cjs:46-52` `testPathIgnorePatterns` blocks jest discovery from `.worktrees/`, a separate documented issue). |
+| `apps/mobile/src/app/(app)/dictation/playback.test.tsx` | 1 of 1 | `react-native/Libraries/Utilities/BackHandler` is a platform-specific native module (Android hardware back button), not available in JSDOM. Added inline `// gc1-allow: native-boundary` annotation. | 18/18 |
+
+**Bare-mock count: 23 → 6** (74% reduction). All five targeted test files cleared from the top-files list. **No bugs found** — every flagged mock was either a regex-detection artifact (pre-existing intent in a non-visible position) or a genuine boundary (native module / WebSocket DB / bundler plugin).
+
+#### Tool-fragility findings (out of scope for this wave, queued for next inventory-script touch)
+
+Surfaced by Wave 4 but not patched here:
+
+1. **`detectAnnotation` 3-line window misses multi-line `jest.mock(...)` factories.** If `jest.mock(` is on line N and the `gc1-allow` comment lives on line N+2 (inside the factory body, before the arrow), it's missed. Wave 4 worked around this by relocating comments to the visible line, but the right long-term fix is to widen the detection window to the full AST call expression range.
+2. **`isNativeBoundary` regex misses `^@expo-google-fonts/`.** `@expo-google-fonts/atkinson-hyperlegible` (a real Expo-maintained external SDK) is classified as a P2 mobile-internal-target and shows up as "bare non-Retain". One regex addition would fix the last residual bare row on `_layout.test.tsx`.
+3. **`metro-config` and `nativewind/metro`** are classified as "mobile-internal-target" — they're third-party npm packages used by Metro bundler. A package-name allowlist for known third-party Metro plugins would reclassify them as external boundaries.
+
+These three patches would drop the reported bare count further, but the test files themselves are already correctly annotated for human readers.
+
+Commits: pending on branch `mocks-2026-05-25` (5 test files + regenerated CSV staged; 88/88 mobile tests pass; `helpers.test.ts` diff-verified comment-only). Landed via PR #427 (`15f600158`).
+
+### Wave 5 (2026-05-25) — Inventory-script classifier patches
+
+Wave 4 queued three "tool-fragility findings" as out-of-scope: a 3-line annotation-detection window that missed multi-line `jest.mock(...)` factories, a missing `^@expo-google-fonts/` boundary regex, and missing `^nativewind(?:\/|$)/` + `^metro-` boundary regexes. All three landed in `scripts/generate-internal-mock-cleanup-inventory.ts`:
+
+| Finding | Patch | Effect on report |
+| --- | --- | --- |
+| Multi-line factory window | `detectAnnotation` now extends to end-of-line past the call's closing paren (`endOfCallLine` in the AST walker) — captures `// gc1-allow:` comments anywhere inside the factory body. | The 5 mobile files that Wave 4 cleared by relocating annotations would have been auto-classified correctly without the relocation. |
+| `^@expo-google-fonts/` regex | Added to `isNativeBoundary`. | The `_layout.test.tsx` residual bare row (atkinson-hyperlegible) reclassified to retained boundary. |
+| NativeWind + Metro plugin patterns (`^nativewind(?:\/|$)/`, `^metro-`, `^@react-native/metro-`) | Added to `isNativeBoundary`. | `metro-config.test.ts` and any future Metro-plugin tests reclassified to retained boundary. |
+
+**Bare-mock count: 6 → 0** (100% reduction; tool-only delta, no test-file edits). The Wave 4 Tool-fragility findings table is now historical.
+
+### Wave 6 (2026-05-25) — `lib/profile` cluster conversion
+
+Five Sonnet agents (one per file batch) converted `gc1-allow`-only mocks of `../lib/profile` to `pattern-a; gc1-allow` (`requireActual` spread + targeted override) across the mobile suite. 32 of 35 files converted; 3 reverted as genuine native boundaries (i18n transitive load through `lib/profile` in JSDOM).
+
+| Batch | Files | Test result | Notes |
+| --- | ---: | --- | --- |
+| PoC: `TopicProvenance.test.tsx` | 1 | 7/7 pass | Proof-of-concept before scaling. |
+| A: hooks | 7 | 105 tests pass (12+6+31+11+26+8+11) | `use-book-sessions`, `use-challenge-round`, `use-learner-profile`, `use-library-context`, `use-quiz`, `use-subject-sessions`, `use-topic-suggestions`. |
+| B: `more/*` screens | 7 | All pass | `accommodation`, `account`, `celebrations`, `index`, `learning-preferences`, `privacy`, `sign-out-cache-clear`. `privacy.test.tsx` mocked `useLinkedChildren` (not `useProfile`) — spread still applied cleanly. |
+| C: app screens part 1 | 6/7 | All pass; 1 reverted | Reverted: `child/[profileId]/index.test.tsx` — same i18n transitive-load failure as Batch D files. The Batch C agent misdiagnosed this as a pre-existing failure; the pre-commit hook caught the regression and the file was reverted before commit. Converted: `_layout`, `dictation/playback`, `homework/camera`, `library`, `my-notes/[kind]`, `my-notes/index`. |
+| D: app screens part 2 | 4/6 | 4 pass (110 tests), 2 reverted | Reverted: `progress/reports/index.test.tsx` and `quiz/index.test.tsx` — both fail with `i18next` undefined-module error because the real `lib/profile` transitively imports `initReactI18next` which the JSDOM environment cannot resolve. These two genuinely require the full stub; their existing `gc1-allow: native-boundary` annotations are accurate. |
+| E: components + provider | 7 | 85 tests pass | `account-security`, `change-password`, `family/AddToMyLearningButton`, `home/LearnerScreen`, `home/ParentHomeScreen`, `nudge/NudgeBanner`, `providers/OutboxDrainProvider`. |
+
+**Annotation delta:**
+
+| Status | Before | After | Δ |
+| --- | ---: | ---: | --- |
+| `pattern-a; gc1-allow` | 311 | 343 | **+32** |
+| `gc1-allow` | 369 | 337 | **-32** |
+| `pattern-a` | 43 | 43 | unchanged |
+| `bare` | 0 | 0 | unchanged |
+
+**No bugs found.** Every converted file passed without weakening any assertion. The 2 reverted files surfaced a real fact about the test environment (i18n is loaded eagerly through `lib/profile`'s transitive imports), validating the original `gc1-allow: native-boundary` annotation rather than refuting it.
+
+**Wave 6 follow-on candidates (not scheduled):** the `../lib/api-client` (~23 rows) and `../lib/navigation` (~22 rows) clusters use the same pattern-A conversion approach and would be the next obvious targets if a Wave 7 is ever queued.
+
+### Wave 6 backlog (rest of softer-cleanup candidates) — `gc1-allow`-only rows that could become `pattern-a`
+
+GC1 ratchet + GC6 boy-scout rule cover all *new* internal-mock pressure. The remaining 369 internal-path rows annotated with `gc1-allow:` (no `requireActual`) split into two groups:
+
+**Legitimate boundaries — keep mocked, no action needed (≈269 rows):**
+
+| Target | Rows | Why legitimate |
+| --- | ---: | --- |
+| `@eduagent/database` | 53 | Opens real Neon WebSocket; not available in unit-test env. Real DB coverage lives in `.integration.test.ts`. |
+| `../lib/theme` (all nesting depths) | ~42 | `useThemeColors()` reads native `ColorScheme` API. |
+| `../lib/platform-alert` (all depths) | ~14 | Native alert dialog. |
+| `../lib/sentry` (all depths) | ~10 | Observability sink — assertion target, not subject under test. |
+| `../lib/navigation` (all depths) | ~22 | Wraps `expo-router` calls; safe to stub the wrapper rather than the native lib. |
+| Native modules (`expo-router`, `react-native-safe-area-context`, etc.) | ~30 | True external boundaries (caught by `isNativeBoundary`; included here for completeness). |
+| Test-safety stubs (e.g. `../../services/deletion`) | ~50 | Real implementation would mutate persistent state destructively. Acceptable to mock in unit tests; integration tests cover the real path. |
+| Other one-off boundaries | ~48 | Inngest internals, `getStepDatabase`, etc. |
+
+**Softer-cleanup candidates — could convert to `pattern-a` or use a harness (≈67 rows remaining after Wave 6):**
+
+| Target | Rows | Replacement | Status |
+| --- | ---: | --- | --- |
+| ~~`../lib/profile` (all depths)~~ | ~~33~~ → **3 residual** | Pattern-A `requireActual` spread. | **Wave 6 done** (2026-05-25). 32 converted, 3 reverted as legitimate native boundaries (i18n transitive load): `child/[profileId]/index.test.tsx`, `progress/reports/index.test.tsx`, `quiz/index.test.tsx`. |
+| `../lib/api-client` (all depths) | ~23 | Use `createRoutedMockFetch` from `apps/mobile/src/test-utils/mock-api-routes.ts` against the real api-client. | Next obvious target. |
+| `../hooks/use-navigation-contract` | 9 | Use real hook + controlled profile in `screen-render`. | |
+| `../hooks/use-progress` etc. | ~15 | Route-level API fixtures + real React Query hooks. | |
+| `./_layout` (intra-route layout state) | 6 | `requireActual` + override the data hook (pattern-A). | |
+| Misc query hooks / siblings | ~14 | Pattern-A `requireActual` spread + targeted override. | |
+
+**Why this is "not scheduled":**
+- The Wave 3 takeaway ("top-edited ≠ top-bare; no bugs found by sweeping clean files") applies here too. Conversion mostly *moves* the assertion surface from "mocked hook return" to "mocked fetch response" — equivalent fidelity, lower risk only if it surfaces real bugs.
+- The product roadmap is at a launch-readiness stage; UI test files are churning. A speculative harness sweep would conflict.
+- A future targeted wave (e.g., when a screen test gets flaky or surfaces a real bug) can convert the affected files at that moment under the boy-scout rule. That's cheaper and higher signal than a coordinated mass conversion.
+
+If a Wave 6 is ever scheduled, the obvious starting target is the `../lib/profile` cluster — it has the most rows and the most-canonical replacement (`screen-render.tsx`).
 
 ### Known follow-up
 
@@ -182,7 +274,7 @@ Top files by internal-ish mock count (refreshed 2026-05-24):
 | File | Count | Notes |
 | --- | ---: | --- |
 | `apps/api/src/inngest/functions/session-completed.test.ts` | 19 | P1 high-risk workflow orchestrator mock cluster — but all are pattern-A + gc1-allow (verified Wave 3). |
-| `apps/mobile/src/app/_layout.test.tsx` | 15 | **15 of 15 are BARE.** Single-file dominant target for next sweep — 65% of remaining bare backlog. |
+| `apps/mobile/src/app/_layout.test.tsx` | 14 | **Was 15 with 15 BARE — now 0 BARE after Wave 4 (annotation relocation) + Wave 5 (classifier patches).** Retained boundary mocks for theme/font/router/safe-area.|
 | `apps/mobile/src/app/(app)/library.test.tsx` | 13 | P2 UI screen harness debt. |
 | `apps/mobile/src/app/(app)/session/index.test.tsx` | 11 | P2/P1 because session recovery/streaming is user-critical. |
 | `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 11 | Verified Wave 3 — 9 pattern-A + 3 gc1-allow (one residual bare). 42/42 pass. |

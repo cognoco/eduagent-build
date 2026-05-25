@@ -12,9 +12,10 @@ import {
   summarySubmitSchema,
   interleavedSessionStartSchema,
   homeworkStateSyncSchema,
-  systemPromptBodySchema,
+  systemPromptIntentSchema,
   ERROR_CODES,
   filingRetryEventSchema,
+  getSessionEffectiveMode,
   learningSessionSchema,
   LlmStreamError,
   RateLimitedError,
@@ -22,6 +23,7 @@ import {
   SafetyFilterError,
   streamErrorFrameSchema,
   streamFallbackFrameSchema,
+  sessionAutoFileRequestedEventSchema,
   UpstreamLlmError,
   getSubjectSessionsResponseSchema,
   type SubscriptionTier,
@@ -59,6 +61,10 @@ import {
   evaluateSessionDepth,
   getResumeNudgeCandidate,
   claimSessionForFilingRetry,
+  markSessionKeptOutOfLibrary,
+  requestSessionLibraryFiling,
+  restoreSessionForAutoFiling,
+  resetFilingForRetry,
   getSubjectSessions,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
@@ -82,6 +88,7 @@ import {
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
 } from '../config';
+import { FILING_CONFIG } from '../config/filing';
 
 const logger = createLogger();
 
@@ -277,6 +284,29 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
+      if (getSessionEffectiveMode(session) === 'freeform') {
+        const reset = await resetFilingForRetry(db, profileId, sessionId);
+        if (!reset) {
+          const fresh = await getSession(db, profileId, sessionId);
+          if (!fresh) return notFound(c, 'Session not found');
+          throw new ConflictError(
+            `Session is not in a retriable state (status: ${
+              fresh.filingStatus ?? 'null'
+            })`,
+          );
+        }
+
+        await dispatchSessionAutoFileRequested(
+          profileId,
+          sessionId,
+          'retry',
+          reset.dispatchId,
+        );
+
+        const updatedSession = await getSession(db, profileId, sessionId);
+        return c.json({ session: updatedSession ?? reset.session });
+      }
+
       const updated = await claimSessionForFilingRetry(
         db,
         profileId,
@@ -286,7 +316,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       if (!updated) {
         const fresh = await getSession(db, profileId, sessionId);
         if (!fresh) return notFound(c, 'Session not found');
-        if (fresh.filingRetryCount >= 3) {
+        if (fresh.filingRetryCount >= FILING_CONFIG.maxRetries) {
           throw new RateLimitedError(
             'Retry limit reached for this session.',
             ERROR_CODES.RATE_LIMITED,
@@ -312,6 +342,81 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const updatedSession = await getSession(db, profileId, sessionId);
       if (!updatedSession) return notFound(c, 'Session not found');
       return c.json({ session: updatedSession });
+    },
+  )
+
+  .post(
+    '/sessions/:sessionId/library-filing/keep-out',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
+
+      const session = await markSessionKeptOutOfLibrary(
+        db,
+        profileId,
+        sessionId,
+      );
+      if (!session) return notFound(c, 'Session not found');
+
+      return c.json({ session });
+    },
+  )
+
+  .post(
+    '/sessions/:sessionId/library-filing/add',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
+
+      const request = await requestSessionLibraryFiling(
+        db,
+        profileId,
+        sessionId,
+      );
+      if (!request) {
+        throw new ConflictError('Session is not eligible for Library filing.');
+      }
+
+      await dispatchSessionAutoFileRequested(
+        profileId,
+        sessionId,
+        'user_requested',
+        request.dispatchId,
+      );
+
+      return c.json({ session: request.session });
+    },
+  )
+
+  .post(
+    '/sessions/:sessionId/library-filing/restore',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { sessionId } = c.req.valid('param');
+
+      const request = await restoreSessionForAutoFiling(
+        db,
+        profileId,
+        sessionId,
+      );
+      if (!request) {
+        throw new ConflictError('Session is not kept out of Library.');
+      }
+
+      await dispatchSessionAutoFileRequested(
+        profileId,
+        sessionId,
+        'restore',
+        request.dispatchId,
+      );
+
+      return c.json({ session: request.session });
     },
   )
 
@@ -1090,20 +1195,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   .post(
     '/sessions/:sessionId/system-prompt',
     zValidator('param', sessionIdParamsSchema),
-    zValidator('json', systemPromptBodySchema),
+    // WI-373: the client sends a typed intent, never free-form system text.
+    // The schema rejects any `content` field (the former injection vector).
+    zValidator('json', systemPromptIntentSchema),
     async (c) => {
       assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const body = c.req.valid('json');
+      const intent = c.req.valid('json');
 
-      await recordSystemPrompt(
-        db,
-        profileId,
-        c.req.param('sessionId'),
-        body.content,
-        body.metadata,
-      );
+      // Server owns the prompt text: recordSystemPrompt resolves the intent to
+      // the canonical string and stamps provenance (metadata.source='server').
+      await recordSystemPrompt(db, profileId, c.req.param('sessionId'), intent);
       return c.json({ ok: true });
     },
   )
@@ -1326,6 +1429,28 @@ function qualityRatingFromSummaryStatus(
   status: 'accepted' | 'submitted',
 ): number {
   return status === 'accepted' ? 4 : 2;
+}
+
+async function dispatchSessionAutoFileRequested(
+  profileId: string,
+  sessionId: string,
+  reason: 'user_requested' | 'retry' | 'restore',
+  dispatchId: string,
+): Promise<void> {
+  const payload = sessionAutoFileRequestedEventSchema.parse({
+    profileId,
+    sessionId,
+    requestedAt: new Date().toISOString(),
+    reason,
+    dispatchId,
+  });
+
+  // core-send: user-initiated Library filing must not show pending work unless queued.
+  await inngest.send({
+    id: `auto-file-${sessionId}-${dispatchId}`,
+    name: 'app/session.auto_file_requested',
+    data: payload,
+  });
 }
 
 /**

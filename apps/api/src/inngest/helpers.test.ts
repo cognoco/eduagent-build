@@ -5,11 +5,14 @@ const mockCreateDatabase = jest.fn(
 );
 const mockCloseDatabase = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: (databaseUrl: string, options?: unknown) =>
-    mockCreateDatabase(databaseUrl, options),
-  closeDatabase: (db: unknown) => mockCloseDatabase(db),
-}));
+jest.mock(
+  '@eduagent/database',
+  /* gc1-allow: db-boundary: createDatabase opens real Neon WebSocket connections unavailable in unit test environment; real DB covered by integration tests */ () => ({
+    createDatabase: (databaseUrl: string, options?: unknown) =>
+      mockCreateDatabase(databaseUrl, options),
+    closeDatabase: (db: unknown) => mockCloseDatabase(db),
+  }),
+);
 
 import {
   closeStepDatabases,
