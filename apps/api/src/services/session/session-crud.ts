@@ -50,6 +50,7 @@ import {
   homeworkSummarySchema,
   llmSummarySchema,
   engagementSignalSchema,
+  getSessionEffectiveMode,
   MAX_EXCHANGES_PER_SESSION,
 } from '@eduagent/schemas';
 import { NotFoundError } from '../../errors';
@@ -57,7 +58,7 @@ import { insertSessionEvent } from './session-events';
 import { resolveSystemPromptIntent } from './system-prompt-intents';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
-import { persistBookTopics } from '../curriculum';
+import { deleteTopicIfSafe, persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
 import { buildFallbackBookTopics } from '../book-generation-fallbacks';
 import { getProfileAge } from '../profile';
@@ -1487,11 +1488,31 @@ function createLibraryFilingDispatchId(prefix: string): string {
   return `${prefix}-${randomId}`;
 }
 
+async function hasDurableTranscriptEvents(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<boolean> {
+  const event = await db.query.sessionEvents.findFirst({
+    where: and(
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.profileId, profileId),
+      inArray(sessionEvents.eventType, ['user_message', 'ai_response']),
+    ),
+    columns: { id: true },
+  });
+
+  return Boolean(event);
+}
+
 export async function markSessionKeptOutOfLibrary(
   db: Database,
   profileId: string,
   sessionId: string,
 ): Promise<LearningSession | null> {
+  const existing = await getSession(db, profileId, sessionId);
+  if (!existing) return null;
+
   const [updated] = await db
     .update(learningSessions)
     .set({
@@ -1508,6 +1529,10 @@ export async function markSessionKeptOutOfLibrary(
     )
     .returning();
 
+  if (updated && existing.topicId) {
+    await deleteTopicIfSafe(db, profileId, sessionId, existing.topicId);
+  }
+
   return updated ? mapSessionRow(updated) : null;
 }
 
@@ -1516,6 +1541,39 @@ export async function requestSessionLibraryFiling(
   profileId: string,
   sessionId: string,
 ): Promise<LibraryFilingRequest | null> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) return null;
+
+  if (getSessionEffectiveMode(session) !== 'freeform') {
+    return null;
+  }
+
+  if (session.topicId !== null || session.filedAt !== null) {
+    return null;
+  }
+
+  if (
+    session.filingStatus !== null &&
+    session.filingStatus !== 'filing_failed' &&
+    session.filingStatus !== 'filing_kept_out'
+  ) {
+    return null;
+  }
+
+  const hasTranscript = await hasDurableTranscriptEvents(
+    db,
+    profileId,
+    sessionId,
+  );
+  if (!hasTranscript) {
+    return null;
+  }
+
+  const statusPredicate =
+    session.filingStatus === null
+      ? isNull(learningSessions.filingStatus)
+      : eq(learningSessions.filingStatus, session.filingStatus);
+
   const [updated] = await db
     .update(learningSessions)
     .set({
@@ -1529,41 +1587,14 @@ export async function requestSessionLibraryFiling(
         eq(learningSessions.profileId, profileId),
         isNull(learningSessions.topicId),
         isNull(learningSessions.filedAt),
-        inArray(learningSessions.filingStatus, [
-          'filing_failed',
-          'filing_kept_out',
-        ]),
+        statusPredicate,
       ),
     )
     .returning();
 
-  if (updated) {
-    return {
-      session: mapSessionRow(updated),
-      dispatchId: createLibraryFilingDispatchId('add'),
-    };
-  }
-
-  const [nullStatusUpdated] = await db
-    .update(learningSessions)
-    .set({
-      filingRetryCount: 0,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-        isNull(learningSessions.topicId),
-        isNull(learningSessions.filedAt),
-        isNull(learningSessions.filingStatus),
-      ),
-    )
-    .returning();
-
-  return nullStatusUpdated
+  return updated
     ? {
-        session: mapSessionRow(nullStatusUpdated),
+        session: mapSessionRow(updated),
         dispatchId: createLibraryFilingDispatchId('add'),
       }
     : null;
@@ -1574,6 +1605,21 @@ export async function restoreSessionForAutoFiling(
   profileId: string,
   sessionId: string,
 ): Promise<LibraryFilingRequest | null> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) return null;
+
+  if (getSessionEffectiveMode(session) !== 'freeform') {
+    return null;
+  }
+
+  if (
+    session.filingStatus !== 'filing_kept_out' ||
+    session.topicId !== null ||
+    session.filedAt !== null
+  ) {
+    return null;
+  }
+
   const [updated] = await db
     .update(learningSessions)
     .set({
@@ -1605,6 +1651,24 @@ export async function resetFilingForRetry(
   profileId: string,
   sessionId: string,
 ): Promise<LibraryFilingRequest | null> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) return null;
+
+  if (getSessionEffectiveMode(session) !== 'freeform') {
+    return null;
+  }
+
+  if (
+    session.filingStatus !== 'filing_failed' &&
+    session.filingStatus !== 'filing_kept_out'
+  ) {
+    return null;
+  }
+
+  if (session.topicId !== null || session.filedAt !== null) {
+    return null;
+  }
+
   const [updated] = await db
     .update(learningSessions)
     .set({
@@ -1616,10 +1680,7 @@ export async function resetFilingForRetry(
       and(
         eq(learningSessions.id, sessionId),
         eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.filingStatus, [
-          'filing_failed',
-          'filing_kept_out',
-        ]),
+        eq(learningSessions.filingStatus, session.filingStatus),
         isNull(learningSessions.topicId),
         isNull(learningSessions.filedAt),
       ),
@@ -1632,6 +1693,85 @@ export async function resetFilingForRetry(
         dispatchId: createLibraryFilingDispatchId('retry'),
       }
     : null;
+}
+
+export async function claimSessionForAutoFiling(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<{ id: string; filingRetryCount: number } | undefined> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: 'filing_pending',
+      filingRetryCount: sql`${learningSessions.filingRetryCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        isNull(learningSessions.topicId),
+        isNull(learningSessions.filedAt),
+        isNull(learningSessions.filingStatus),
+      ),
+    )
+    .returning({
+      id: learningSessions.id,
+      filingRetryCount: learningSessions.filingRetryCount,
+    });
+
+  return updated;
+}
+
+export async function markSessionAutoFiled(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  topicId: string,
+): Promise<boolean> {
+  const now = new Date();
+  const result = await db
+    .update(learningSessions)
+    .set({
+      topicId,
+      filedAt: now,
+      filingStatus: 'filing_recovered',
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.filingStatus, 'filing_pending'),
+      ),
+    )
+    .returning({ id: learningSessions.id });
+
+  return result.length > 0;
+}
+
+export async function markSessionAutoFilingFailed(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<boolean> {
+  const result = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: 'filing_failed',
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.filingStatus, 'filing_pending'),
+      ),
+    )
+    .returning({ id: learningSessions.id });
+
+  return result.length > 0;
 }
 
 export async function claimSessionForFilingRetry(

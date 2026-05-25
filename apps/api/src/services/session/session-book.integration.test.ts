@@ -13,7 +13,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { getBookSessions } from './session-book';
+import { getBookSessions, markSessionFiled } from './session-book';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
@@ -179,5 +179,29 @@ describeIfDb('getBookSessions (integration)', () => {
     const sessions = await getBookSessions(db, profileId, foreignBookId);
 
     expect(sessions).toEqual([]);
+  });
+
+  it('[CRITICAL-2] markSessionFiled writes topicId and filedAt together', async () => {
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId: null,
+        filedAt: null,
+        status: 'completed',
+        exchangeCount: 2,
+      })
+      .returning({ id: learningSessions.id });
+
+    await markSessionFiled(db, profileId, session!.id, ownedTopicId);
+
+    const stored = await db.query.learningSessions.findFirst({
+      where: eq(learningSessions.id, session!.id),
+    });
+
+    expect(stored!.topicId).toBe(ownedTopicId);
+    expect(stored!.filedAt).toEqual(expect.any(Date));
+    expect(stored!.updatedAt).toEqual(expect.any(Date));
   });
 });

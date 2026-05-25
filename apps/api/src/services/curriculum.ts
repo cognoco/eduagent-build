@@ -10,6 +10,8 @@ import {
   retentionCards,
   sessionSummaries,
   assessments,
+  needsDeepeningTopics,
+  xpLedger,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -1687,6 +1689,102 @@ export async function addCurriculumTopic(
     mode: 'create',
     topic: mapTopicRow(createdTopic),
   };
+}
+
+export async function deleteTopicIfSafe(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  topicId: string,
+): Promise<{ deleted: boolean; reason?: string }> {
+  const [topic] = await db
+    .select({
+      id: curriculumTopics.id,
+      sessionId: curriculumTopics.sessionId,
+      filedFrom: curriculumTopics.filedFrom,
+    })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+    .where(
+      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId)),
+    )
+    .limit(1);
+
+  if (!topic) {
+    return { deleted: false, reason: 'topic_not_found_or_not_owned' };
+  }
+
+  if (
+    topic.filedFrom !== 'freeform_filing' &&
+    topic.filedFrom !== 'session_filing'
+  ) {
+    return { deleted: false, reason: 'topic_not_auto_filed' };
+  }
+
+  if (topic.sessionId !== sessionId) {
+    return { deleted: false, reason: 'topic_session_mismatch' };
+  }
+
+  const [sessionReference] = await db
+    .select({ id: learningSessions.id })
+    .from(learningSessions)
+    .where(eq(learningSessions.topicId, topicId))
+    .limit(1);
+  if (sessionReference) {
+    return { deleted: false, reason: 'topic_has_session_references' };
+  }
+
+  const progressReferenceChecks = [
+    () =>
+      db
+        .select({ id: retentionCards.id })
+        .from(retentionCards)
+        .where(eq(retentionCards.topicId, topicId))
+        .limit(1),
+    () =>
+      db
+        .select({ id: assessments.id })
+        .from(assessments)
+        .where(eq(assessments.topicId, topicId))
+        .limit(1),
+    () =>
+      db
+        .select({ id: needsDeepeningTopics.id })
+        .from(needsDeepeningTopics)
+        .where(eq(needsDeepeningTopics.topicId, topicId))
+        .limit(1),
+    () =>
+      db
+        .select({ id: xpLedger.id })
+        .from(xpLedger)
+        .where(eq(xpLedger.topicId, topicId))
+        .limit(1),
+    () =>
+      db
+        .select({ id: sessionSummaries.id })
+        .from(sessionSummaries)
+        .where(eq(sessionSummaries.topicId, topicId))
+        .limit(1),
+  ];
+
+  for (const check of progressReferenceChecks) {
+    const [reference] = await check();
+    if (reference) {
+      return { deleted: false, reason: 'topic_has_progress_references' };
+    }
+  }
+
+  const deletedRows = await db
+    .delete(curriculumTopics)
+    .where(eq(curriculumTopics.id, topicId))
+    .returning({ id: curriculumTopics.id });
+
+  if (deletedRows.length === 0) {
+    return { deleted: false, reason: 'delete_race_lost' };
+  }
+
+  return { deleted: true };
 }
 
 // ---------------------------------------------------------------------------

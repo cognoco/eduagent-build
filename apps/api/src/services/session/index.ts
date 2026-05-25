@@ -61,6 +61,9 @@ export {
   requestSessionLibraryFiling,
   restoreSessionForAutoFiling,
   resetFilingForRetry,
+  claimSessionForAutoFiling,
+  markSessionAutoFiled,
+  markSessionAutoFilingFailed,
   getResumeNudgeCandidate,
   // Profile session list (extracted from dashboard.ts — PR-2)
   getProfileSessions,

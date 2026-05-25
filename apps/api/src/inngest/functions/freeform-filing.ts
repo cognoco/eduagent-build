@@ -214,13 +214,3 @@ export const freeformFilingRetry = inngest.createFunction(
   { event: 'app/filing.retry' },
   runFreeformFiling,
 );
-
-export const freeformAutoFileRequested = inngest.createFunction(
-  {
-    id: 'freeform-auto-file-requested',
-    name: 'Auto-file requested freeform session',
-    retries: 2,
-  },
-  { event: 'app/session.auto_file_requested' },
-  runFreeformFiling,
-);

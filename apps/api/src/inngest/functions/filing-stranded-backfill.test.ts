@@ -31,6 +31,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
       filingStatus: col('filingStatus'),
       sessionType: col('sessionType'),
       status: col('status'),
+      exchangeCount: col('exchangeCount'),
+      metadata: col('metadata'),
       createdAt: col('createdAt'),
     },
   },
@@ -87,6 +89,25 @@ type HandlerFn = (ctx: {
 
 function getHandler(): HandlerFn {
   return (filingStrandedBackfill as unknown as { fn: HandlerFn }).fn;
+}
+
+function containsDeep(value: unknown, expected: unknown): boolean {
+  if (value === expected) return true;
+  if (typeof expected === 'string') {
+    if (typeof value === 'string') return value.includes(expected);
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value).includes(expected);
+    }
+  }
+  if (value == null || typeof value !== 'object') return false;
+  if (Array.isArray(value)) {
+    return value.some((item) => containsDeep(item, expected));
+  }
+  return Object.entries(value as Record<string, unknown>).some(
+    ([key, item]) =>
+      (typeof expected === 'string' && key.includes(expected)) ||
+      containsDeep(item, expected),
+  );
 }
 
 describe('filingStrandedBackfill', () => {
@@ -152,6 +173,20 @@ describe('filingStrandedBackfill', () => {
     expect(dispatchedAt).toBeGreaterThan(
       oldCreatedAt.getTime() + 6 * 24 * 60 * 60 * 1000,
     );
+  });
+
+  it('filters out below-threshold freeform sessions and kept-out sessions from the stranded sweep', async () => {
+    mockFindMany.mockResolvedValue(makeStrandedRows(1));
+    const { step } = createInngestStepRunner();
+
+    await getHandler()({ event: { data: {} }, step });
+
+    expect(mockFindMany).toHaveBeenCalledTimes(1);
+    const callArg = mockFindMany.mock.calls[0][0] as { where: unknown };
+    expect(containsDeep(callArg.where, 'effectiveMode')).toBe(true);
+    expect(containsDeep(callArg.where, 'freeform')).toBe(true);
+    expect(containsDeep(callArg.where, 'exchangeCount')).toBe(true);
+    expect(containsDeep(callArg.where, 'filing_kept_out')).toBe(true);
   });
 
   it('returns capped:false and does NOT self-trigger when below the 500 limit', async () => {

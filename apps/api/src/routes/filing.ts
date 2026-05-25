@@ -228,6 +228,11 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         filedFrom,
         sessionId: body.sessionId,
       });
+
+      // Mark session filed so retry/recovery paths do not file it again.
+      if (body.sessionId && result.topicId) {
+        await markSessionFiled(db, profileId, body.sessionId, result.topicId);
+      }
     } catch (err) {
       // [logging sweep] structured logger so PII fields land as JSON context
       logger.error('[filing] resolveFilingResult failed', {
@@ -267,11 +272,6 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         },
         500,
       );
-    }
-
-    // Mark session filed so retry/recovery paths do not file it again.
-    if (body.sessionId && result.topicId) {
-      await markSessionFiled(db, profileId, body.sessionId, result.topicId);
     }
 
     // Mark suggestion as picked/used (prevents reappearing in picker)

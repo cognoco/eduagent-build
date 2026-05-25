@@ -1019,6 +1019,25 @@ describe('session routes', () => {
 
   describe('POST /v1/sessions/:sessionId/close', () => {
     let sendSpy: jest.SpyInstance;
+    const AUTO_FILE_PROFILE_ID = '880e8400-e29b-41d4-a716-446655440000';
+    const AUTO_FILE_AUTH_HEADERS = {
+      ...AUTH_HEADERS,
+      'X-Profile-Id': AUTO_FILE_PROFILE_ID,
+    };
+    const useAutoFileProfile = () => {
+      const profileServiceMock = jest.requireMock('../services/profile') as {
+        getProfile: jest.Mock;
+        findOwnerProfile: jest.Mock;
+      };
+      const profile = {
+        id: AUTO_FILE_PROFILE_ID,
+        birthYear: null,
+        location: null,
+        consentStatus: 'CONSENTED',
+      };
+      profileServiceMock.getProfile.mockResolvedValueOnce(profile);
+      profileServiceMock.findOwnerProfile.mockResolvedValueOnce(profile);
+    };
 
     beforeEach(() => {
       sendSpy = jest
@@ -1085,6 +1104,134 @@ describe('session routes', () => {
       );
 
       expect(sendSpy).not.toHaveBeenCalled();
+    });
+
+    it('dispatches close-path auto-file for eligible freeform sessions with the initial dedupe id', async () => {
+      useAutoFileProfile();
+      (getSession as jest.Mock).mockResolvedValueOnce({
+        id: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        topicId: null,
+        sessionType: 'learning',
+        inputMode: 'text',
+        verificationType: null,
+        status: 'completed',
+        escalationRung: 1,
+        exchangeCount: 3,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        durationSeconds: 300,
+        wallClockSeconds: 300,
+        metadata: { effectiveMode: 'freeform' },
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(sendSpy).toHaveBeenCalledWith({
+        id: `auto-file-${SESSION_ID}-initial`,
+        name: 'app/session.auto_file_requested',
+        data: expect.objectContaining({
+          profileId: AUTO_FILE_PROFILE_ID,
+          sessionId: SESSION_ID,
+          reason: 'freeform_session_closed',
+          dispatchId: 'initial',
+          requestedAt: expect.any(String),
+        }),
+      });
+    });
+
+    it('does not dispatch close-path auto-file for below-threshold freeform sessions', async () => {
+      useAutoFileProfile();
+      (getSession as jest.Mock).mockResolvedValueOnce({
+        id: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        topicId: null,
+        sessionType: 'learning',
+        inputMode: 'text',
+        verificationType: null,
+        status: 'completed',
+        escalationRung: 1,
+        exchangeCount: 2,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        durationSeconds: 180,
+        wallClockSeconds: 180,
+        metadata: { effectiveMode: 'freeform' },
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
+      });
+
+      await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTO_FILE_AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(sendSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not fail close when opportunistic auto-file dispatch fails', async () => {
+      useAutoFileProfile();
+      (getSession as jest.Mock).mockResolvedValueOnce({
+        id: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        topicId: null,
+        sessionType: 'learning',
+        inputMode: 'text',
+        verificationType: null,
+        status: 'completed',
+        escalationRung: 1,
+        exchangeCount: 3,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        durationSeconds: 300,
+        wallClockSeconds: 300,
+        metadata: { effectiveMode: 'freeform' },
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
+      });
+      sendSpy.mockRejectedValueOnce(new Error('inngest unavailable'));
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTO_FILE_AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.message).toBe('Session closed');
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: `auto-file-${SESSION_ID}-initial`,
+          name: 'app/session.auto_file_requested',
+        }),
+      );
     });
 
     it('[BUG-153] propagates inngest.send failure to client when CORE app/session.completed dispatch fails', async () => {
@@ -2669,6 +2816,31 @@ describe('session routes', () => {
       );
     });
 
+    it('surfaces add dispatch failure instead of returning a queued-looking success', async () => {
+      const unfiledSession = makeSession({
+        filingStatus: null,
+        metadata: { effectiveMode: 'freeform' },
+      });
+      (requestSessionLibraryFiling as jest.Mock).mockResolvedValue({
+        session: unfiledSession,
+        dispatchId: 'add-00000000-0000-4000-8000-000000000001',
+      });
+      mockInngestSend.mockRejectedValueOnce(new Error('inngest unavailable'));
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/library-filing/add`,
+        { method: 'POST', headers: RETRY_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/session.auto_file_requested',
+        }),
+      );
+    });
+
     it('restores kept-out sessions through the same auto-file event with a fresh dispatch id', async () => {
       const restoredSession = makeSession({
         filingStatus: null,
@@ -2694,6 +2866,64 @@ describe('session routes', () => {
             reason: 'restore',
             dispatchId: 'restore-00000000-0000-4000-8000-000000000001',
           }),
+        }),
+      );
+    });
+
+    it('surfaces restore dispatch failure instead of returning restored state', async () => {
+      const restoredSession = makeSession({
+        filingStatus: null,
+        filingRetryCount: 0,
+        metadata: { effectiveMode: 'freeform' },
+      });
+      (restoreSessionForAutoFiling as jest.Mock).mockResolvedValue({
+        session: restoredSession,
+        dispatchId: 'restore-00000000-0000-4000-8000-000000000001',
+      });
+      mockInngestSend.mockRejectedValueOnce(new Error('inngest unavailable'));
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/library-filing/restore`,
+        { method: 'POST', headers: RETRY_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/session.auto_file_requested',
+        }),
+      );
+    });
+
+    it('surfaces freeform retry dispatch failure instead of returning reset state', async () => {
+      const session = makeSession({
+        filingStatus: 'filing_failed',
+        filingRetryCount: 3,
+        metadata: { effectiveMode: 'freeform' },
+      });
+      const resetSession = makeSession({
+        filingStatus: null,
+        filingRetryCount: 0,
+        metadata: { effectiveMode: 'freeform' },
+      });
+      (getSession as jest.Mock).mockResolvedValueOnce(session);
+      (resetFilingForRetry as jest.Mock).mockResolvedValue({
+        session: resetSession,
+        dispatchId: 'retry-00000000-0000-4000-8000-000000000001',
+      });
+      mockInngestSend.mockRejectedValueOnce(new Error('inngest unavailable'));
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/retry-filing`,
+        { method: 'POST', headers: RETRY_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/session.auto_file_requested',
         }),
       );
     });

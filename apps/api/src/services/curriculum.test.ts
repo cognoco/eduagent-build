@@ -22,6 +22,7 @@ import {
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
   releaseBookGenerationClaimIfEmpty,
+  deleteTopicIfSafe,
 } from './curriculum';
 import type {
   CurriculumInput,
@@ -1876,6 +1877,187 @@ describe('releaseBookGenerationClaimIfEmpty', () => {
     expect(whereText).toContain(PROFILE_ID.toLowerCase());
     expect(whereText).toContain('subject_id');
     expect(whereText).toContain(SUBJECT_ID.toLowerCase());
+  });
+});
+
+describe('deleteTopicIfSafe', () => {
+  type SelectChain = {
+    from: jest.Mock;
+    innerJoin: jest.Mock;
+    where: jest.Mock;
+    limit: jest.Mock;
+  };
+
+  function createSafeDeleteMockDb(
+    selectResults: unknown[][],
+    deleteRows: unknown[] = [],
+  ) {
+    const results = [...selectResults];
+    const select = jest.fn(() => {
+      const chain = {} as SelectChain;
+      chain.from = jest.fn(() => chain);
+      chain.innerJoin = jest.fn(() => chain);
+      chain.where = jest.fn(() => chain);
+      chain.limit = jest.fn().mockImplementation(() => {
+        return Promise.resolve(results.shift() ?? []);
+      });
+      return chain;
+    });
+    const returning = jest.fn().mockResolvedValue(deleteRows);
+    const where = jest.fn(() => ({ returning }));
+    const deleteFn = jest.fn(() => ({ where }));
+
+    return {
+      db: {
+        select,
+        delete: deleteFn,
+      } as unknown as Database,
+      deleteFn,
+    };
+  }
+
+  const safeTopicRow = {
+    id: TOPIC_ID,
+    sessionId: 'session-1',
+    filedFrom: 'freeform_filing',
+  };
+
+  it('deletes an auto-filed topic when ownership and reference checks pass', async () => {
+    const { db, deleteFn } = createSafeDeleteMockDb(
+      [[safeTopicRow], [], [], [], [], [], [], []],
+      [{ id: TOPIC_ID }],
+    );
+
+    const result = await deleteTopicIfSafe(
+      db,
+      PROFILE_ID,
+      'session-1',
+      TOPIC_ID,
+    );
+
+    expect(result).toEqual({ deleted: true });
+    expect(deleteFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns false without deleting when the topic is not owned by the profile', async () => {
+    const { db, deleteFn } = createSafeDeleteMockDb([[]]);
+
+    const result = await deleteTopicIfSafe(
+      db,
+      PROFILE_ID,
+      'session-1',
+      TOPIC_ID,
+    );
+
+    expect(result).toEqual({
+      deleted: false,
+      reason: 'topic_not_found_or_not_owned',
+    });
+    expect(deleteFn).not.toHaveBeenCalled();
+  });
+
+  it('allows session_filing topics as auto-created filing topics', async () => {
+    const { db, deleteFn } = createSafeDeleteMockDb(
+      [
+        [{ ...safeTopicRow, filedFrom: 'session_filing' }],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+      [{ id: TOPIC_ID }],
+    );
+
+    const result = await deleteTopicIfSafe(
+      db,
+      PROFILE_ID,
+      'session-1',
+      TOPIC_ID,
+    );
+
+    expect(result).toEqual({ deleted: true });
+    expect(deleteFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns false without deleting when the topic was filed for another session', async () => {
+    const { db, deleteFn } = createSafeDeleteMockDb([
+      [{ ...safeTopicRow, sessionId: 'other-session' }],
+    ]);
+
+    const result = await deleteTopicIfSafe(
+      db,
+      PROFILE_ID,
+      'session-1',
+      TOPIC_ID,
+    );
+
+    expect(result).toEqual({
+      deleted: false,
+      reason: 'topic_session_mismatch',
+    });
+    expect(deleteFn).not.toHaveBeenCalled();
+  });
+
+  it('returns false without deleting when the topic is hand-created or pre-generated', async () => {
+    const { db, deleteFn } = createSafeDeleteMockDb([
+      [{ ...safeTopicRow, filedFrom: 'pre_generated' }],
+    ]);
+
+    const result = await deleteTopicIfSafe(
+      db,
+      PROFILE_ID,
+      'session-1',
+      TOPIC_ID,
+    );
+
+    expect(result).toEqual({
+      deleted: false,
+      reason: 'topic_not_auto_filed',
+    });
+    expect(deleteFn).not.toHaveBeenCalled();
+  });
+
+  it('returns false without deleting when a learning session still references the topic', async () => {
+    const { db, deleteFn } = createSafeDeleteMockDb([
+      [safeTopicRow],
+      [{ id: 'referencing-session' }],
+    ]);
+
+    const result = await deleteTopicIfSafe(
+      db,
+      PROFILE_ID,
+      'session-1',
+      TOPIC_ID,
+    );
+
+    expect(result).toEqual({
+      deleted: false,
+      reason: 'topic_has_session_references',
+    });
+    expect(deleteFn).not.toHaveBeenCalled();
+  });
+
+  it('returns false without deleting when progress or retention rows reference the topic', async () => {
+    const { db, deleteFn } = createSafeDeleteMockDb([
+      [safeTopicRow],
+      [],
+      [{ id: 'retention-1' }],
+    ]);
+
+    const result = await deleteTopicIfSafe(
+      db,
+      PROFILE_ID,
+      'session-1',
+      TOPIC_ID,
+    );
+
+    expect(result).toEqual({
+      deleted: false,
+      reason: 'topic_has_progress_references',
+    });
+    expect(deleteFn).not.toHaveBeenCalled();
   });
 });
 

@@ -400,6 +400,59 @@ describe('resolveFilingResult (integration)', () => {
     expect(topic!.sessionId).toBe(session!.id);
   });
 
+  it('[CRITICAL-2] does not mark the learning session when resolving a filing result', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId: profile.id,
+        name: `${PREFIX}-resolver-split-subject`,
+        status: 'active',
+      })
+      .returning();
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: profile.id,
+        subjectId: subject!.id,
+        topicId: null,
+        filedAt: null,
+      })
+      .returning();
+
+    const result = await resolveFilingResult(db, {
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: 'Music' },
+        book: {
+          name: 'Theory',
+          emoji: '🎼',
+          description: 'Music theory',
+        },
+        chapter: { name: 'Harmony' },
+        topic: {
+          title: 'Chord progressions',
+          description: 'How chords move in a key',
+        },
+      },
+      filedFrom: 'session_filing',
+      sessionId: session!.id,
+    });
+
+    const storedSession = await db.query.learningSessions.findFirst({
+      where: eq(learningSessions.id, session!.id),
+    });
+    expect(storedSession!.topicId).toBeNull();
+    expect(storedSession!.filedAt).toBeNull();
+
+    const topic = await db.query.curriculumTopics.findFirst({
+      where: eq(curriculumTopics.id, result.topicId),
+    });
+    expect(topic!.sessionId).toBe(session!.id);
+  });
+
   // ---------------------------------------------------------------------------
   // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup for shelves
   // Break test: two concurrent first-time-filings for the same shelf name

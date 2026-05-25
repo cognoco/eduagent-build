@@ -255,7 +255,7 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
 import { Hono } from 'hono';
 import { app } from '../index';
 import { filingRoutes } from './filing';
-import { getSession } from '../services/session';
+import { getSession, markSessionFiled } from '../services/session';
 import { fileToLibrary } from '../services/filing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
@@ -706,6 +706,41 @@ describe('filing routes', () => {
       expect(resolveFilingResult).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ filedFrom: 'session_filing' }),
+      );
+    });
+
+    it('[CRITICAL-2] explicitly marks the session filed after resolving Library placement', async () => {
+      const { resolveFilingResult } = await import('../services/filing');
+      (resolveFilingResult as jest.Mock).mockClear();
+      (markSessionFiled as jest.Mock).mockClear();
+
+      const sessionId = '00000000-0000-4000-8000-000000000456';
+
+      const res = await app.request(
+        '/v1/filing',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId,
+            sessionTranscript:
+              'Learner: teach me chords\nTutor: Let us file harmony',
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(200);
+
+      expect(resolveFilingResult).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ sessionId }),
+      );
+      expect(markSessionFiled).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        sessionId,
+        TEST_TOPIC_ID,
       );
     });
 

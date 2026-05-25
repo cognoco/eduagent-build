@@ -73,6 +73,7 @@ export const LLM_CALL_SITE_EXEMPT: readonly string[] = [
   //   (b) DB-level claim flags before the LLM call (e.g. topicsGenerated /
   //       retryInFlight in curriculum jobs) which short-circuit replays.
   // Covered by separate WPs (WI-125 etc.).
+  'apps/api/src/inngest/functions/auto-file-session.ts',
   'apps/api/src/inngest/functions/freeform-filing.ts',
   'apps/api/src/inngest/functions/post-session-suggestions.ts',
   // Service modules whose LLM-calling functions are only invoked from Inngest

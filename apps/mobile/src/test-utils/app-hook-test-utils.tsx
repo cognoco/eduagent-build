@@ -26,6 +26,10 @@ export function createQueryWrapper(
         gcTime: 0,
         ...userOpts.defaultOptions?.queries,
       },
+      mutations: {
+        gcTime: 0,
+        ...userOpts.defaultOptions?.mutations,
+      },
     },
   });
 
@@ -73,7 +77,10 @@ interface CreateHookWrapperOptions {
 
 export function createHookWrapper(options: CreateHookWrapperOptions = {}) {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { gcTime: 0 },
+    },
   });
 
   const activeProfile =

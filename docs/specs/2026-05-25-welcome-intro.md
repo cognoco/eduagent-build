@@ -1,6 +1,6 @@
 # Spec: First-Launch Welcome Intro
 
-**Status**: Locked, ready for implementation
+**Status**: Shipped 2026-05-25 (commits `2434dd6fa`, `4cba67f9d`, `10c62b236`, `9cfc90351`). Two known post-ship gaps — see "Known Gaps (Post-Ship)" at end of doc.
 **Owner**: TBD
 **Date**: 2026-05-25
 **Related**: None — ships standalone. (Original draft had a pair-ship constraint with a home "artifact strip" spec; that spec was dropped after review confirmed the existing My Notes entry point on home is sufficient. See "Pair-Ship Removed" below.)
@@ -216,3 +216,38 @@ Reversible. No schema changes, no migrations, no destructive ops.
 - "What's new" channel for existing users post-launch
 - Parent-home contextual banner (separate Phase 2 work)
 - Child-profile first-use family-awareness card (separate Phase 2 work)
+
+## Known Gaps (Post-Ship — 2026-05-25 audit)
+
+A spec-vs-code audit after shipping found two gaps. Both are recorded here rather than silently accepted so a future contributor reading the spec sees the same picture as one reading the code.
+
+### Gap 1 — i18n values are English placeholders in non-English locales
+
+**State:** `welcomeIntro.*` keys exist in all 7 locale files, but `de.json`, `es.json`, `ja.json`, `nb.json`, `pl.json`, `pt.json` carry the English strings verbatim (verified by reading lines 2902-2926 of each file, 2026-05-25). The `WelcomeIntro.test.tsx` "keys present in 7 locales" check passes because keys do exist; values are not translated.
+
+**Impact:** Norwegian and 5 other markets currently see English welcome copy. No runtime breakage (i18next renders the English fallback cleanly), but the localization promise in the "Localized via i18n keys in all 7 locales (en/de/es/ja/nb/pl/pt)" line under "The Four Cards" is not met for values.
+
+**Decision:** Defer to the planned full-app language sweep — translating welcome alone would create voice/terminology drift against the still-untranslated home/recap/memory copy that the cards point at. The English-fallback render is acceptable for pre-launch.
+
+**Trigger to revisit independently:** if a Norway-first launch is set for under ~2 weeks out, carve out `nb.json` for the four welcome cards ahead of the broader sweep. The cards are the literal first 60 seconds of the product.
+
+### Gap 2 — Three of six Integration test scenarios are not covered
+
+**State:** Three scenarios listed under "Tests → Integration" have no automated coverage:
+
+1. `(app)/_layout.tsx` routing order — intro fires after preview probe + SaveWizard, before CreateProfileGate, before consent
+2. Returning child with withdrawn consent + intro already seen → welcome skipped, consent gate fires
+3. Preview mode active → welcome gate suppressed by the preview-probe branch
+
+The remaining three Integration scenarios ARE covered:
+- "Sign out A → sign in B same device → B sees intro" — property of the userId-scoped key shape; covered by `intro-state.test.ts:57-61` (`does not leak the in-memory flag across userIds`)
+- "Profile switch within same Clerk userId does NOT re-trigger" — property of per-userId-not-per-profile key scope; covered by the key construction tests in `intro-state.test.ts:29-39`
+- "SecureStore write failure → metric fires, no trap" — `intro-state.test.ts:82-100`
+
+Maestro `welcome-intro.yaml` additionally covers the happy-path routing end-to-end on a real device.
+
+**Decision:** Accept the gap. The three uncovered scenarios are layout-level branch assertions on a straight-line if-cascade documented at `_layout.tsx:2318-2378` (`[CRITICAL-A3]` ordering block). The Maestro E2E proves the cascade resolves correctly under the happy path; jest-level coverage of the alternate branches would buy limited risk reduction.
+
+**Why not added now:** The only available host for layout-level integration tests is `apps/mobile/src/app/(app)/_layout.test.tsx`, which carries ~10 legacy `// gc1-allow:` internal mocks. Per CLAUDE.md GC1 (no new internal mocks) and GC6 (boy-scout existing internal mocks on every test-file edit), extending it would require either piggybacking on legacy mocks (violates the spirit of the rule) or boy-scouting the entire 2,426-line file (scope unrelated to welcome intro). Neither is justified by the risk.
+
+**Trigger to revisit:** if `_layout.tsx` routing order changes (new gate inserted, existing gate reordered, preview-probe contract changes), the welcome gate's correct placement must be re-verified at that time — either by Maestro E2E flows asserting alternate branches (`welcome-intro-already-seen.yaml`, `welcome-intro-suppressed-in-preview.yaml`) or by adding jest assertions as part of a broader `_layout.test.tsx` mock cleanup.

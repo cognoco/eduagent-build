@@ -1317,11 +1317,10 @@ describe('SessionScreen homework flow', () => {
   describe('post-session filing prompt', () => {
     /**
      * Helper: renders a freeform session, sends a message to start it,
-     * then triggers end-session via the Alert "End Session" callback to
-     * get `showFilingPrompt` set to true.
+     * then triggers end-session via the Alert "End Session" callback.
      */
-    async function renderAndTriggerFilingPrompt() {
-      // Use freeform mode (no subjectId) so filing prompt shows on close
+    async function renderAndCloseFreeformSession() {
+      // Use freeform mode (no subjectId) so close follows the freeform path.
       (useLocalSearchParams as jest.Mock).mockReturnValue({
         mode: 'freeform',
       });
@@ -1386,62 +1385,8 @@ describe('SessionScreen homework flow', () => {
       return testScreen;
     }
 
-    it('renders filing prompt when a freeform session is closed', async () => {
-      const testScreen = await renderAndTriggerFilingPrompt();
-
-      await waitFor(() => {
-        testScreen.getByTestId('filing-prompt');
-        testScreen.getByTestId('filing-prompt-accept');
-        testScreen.getByTestId('filing-prompt-dismiss');
-      });
-    }, 15000);
-
-    it('accept button calls filing and navigates to session summary with filed subject/book params', async () => {
-      const testScreen = await renderAndTriggerFilingPrompt();
-
-      await waitFor(() => {
-        testScreen.getByTestId('filing-prompt-accept');
-      });
-
-      fireEvent.press(testScreen.getByTestId('filing-prompt-accept'));
-      await flushAsyncWork();
-
-      await waitFor(() => {
-        // Filing is now called through hc() → mockFetch to /filing
-        const filingCalls = fetchCallsMatching(mockFetch, '/filing');
-        expect(filingCalls.length).toBeGreaterThan(0);
-        const body = extractJsonBody<{
-          sessionId: string;
-          sessionMode: string;
-        }>(filingCalls[0]?.init);
-        expect(body).toMatchObject({
-          sessionId: 'session-1',
-          sessionMode: 'freeform',
-        });
-        // After filing, the library redesign navigates to the session summary
-        // with filedSubjectId + filedBookId params (not directly to the book screen).
-        // The session-summary screen uses those params to show a "View in library" link.
-        expect(mockReplace).toHaveBeenCalledWith(
-          expect.objectContaining({
-            pathname: '/session-summary/session-1',
-            params: expect.objectContaining({
-              filedSubjectId: 'shelf-1',
-              filedBookId: 'book-1',
-            }),
-          }),
-        );
-      });
-    }, 15000);
-
-    it('dismiss button navigates to session summary', async () => {
-      const testScreen = await renderAndTriggerFilingPrompt();
-
-      await waitFor(() => {
-        testScreen.getByTestId('filing-prompt-dismiss');
-      });
-
-      fireEvent.press(testScreen.getByTestId('filing-prompt-dismiss'));
-      await flushAsyncWork();
+    it('navigates to summary without filing prompt when a freeform session is closed', async () => {
+      const testScreen = await renderAndCloseFreeformSession();
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith(
@@ -1450,6 +1395,11 @@ describe('SessionScreen homework flow', () => {
           }),
         );
       });
+
+      expect(testScreen.queryByTestId('filing-prompt')).toBeNull();
+      expect(testScreen.queryByTestId('filing-prompt-accept')).toBeNull();
+      expect(testScreen.queryByTestId('filing-prompt-dismiss')).toBeNull();
+      expect(fetchCallsMatching(mockFetch, '/filing')).toHaveLength(0);
     }, 15000);
   });
 });

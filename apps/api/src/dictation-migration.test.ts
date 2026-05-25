@@ -76,14 +76,11 @@ describe('dictation completion key migration', () => {
 
     expect(completionKey?.default).toBe('gen_random_uuid()');
 
-    const plan = readFileSync(
-      join(
-        __dirname,
-        '../../../docs/superpowers/plans/2026-05-23-wi-84-data-durability.md',
-      ),
+    const rollback = readFileSync(
+      join(__dirname, '../drizzle/0093_dictation_completion_key.rollback.md'),
       'utf8',
     ).toLowerCase();
-    expect(plan).toContain('alter column "completion_key" drop default');
+    expect(rollback).toContain('alter column "completion_key" drop default');
   });
 
   it('[WI-84 review] rollback leaves the preserved legacy unique index alone', () => {

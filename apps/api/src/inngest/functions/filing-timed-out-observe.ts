@@ -5,6 +5,8 @@ import {
   filingResolvedEventSchema,
   filingRetryEventSchema,
   filingTimedOutEventSchema,
+  getSessionEffectiveMode,
+  sessionAutoFileRequestedEventSchema,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -153,17 +155,34 @@ export const filingTimedOutObserve = inngest.createFunction(
     );
 
     if (attemptNumber != null) {
-      const retryPayload = filingRetryEventSchema.parse({
-        profileId,
-        sessionId,
-        sessionMode:
-          recheck?.sessionType === 'homework' ? 'homework' : 'freeform',
-      });
+      if (getSessionEffectiveMode(recheck ?? {}) === 'freeform') {
+        const dispatchId = `observer-retry-${attemptNumber}-${Date.now()}`;
+        const retryPayload = sessionAutoFileRequestedEventSchema.parse({
+          profileId,
+          sessionId,
+          requestedAt: new Date().toISOString(),
+          reason: 'retry',
+          dispatchId,
+        });
 
-      await step.sendEvent('dispatch-filing-retry', {
-        name: 'app/filing.retry',
-        data: retryPayload,
-      });
+        await step.sendEvent('dispatch-filing-retry', {
+          id: `auto-file-${sessionId}-${dispatchId}`,
+          name: 'app/session.auto_file_requested',
+          data: retryPayload,
+        });
+      } else {
+        const retryPayload = filingRetryEventSchema.parse({
+          profileId,
+          sessionId,
+          sessionMode:
+            recheck?.sessionType === 'homework' ? 'homework' : 'freeform',
+        });
+
+        await step.sendEvent('dispatch-filing-retry', {
+          name: 'app/filing.retry',
+          data: retryPayload,
+        });
+      }
 
       await step.sendEvent('emit-auto-retry-attempted', {
         name: 'app/filing.auto_retry_attempted',
