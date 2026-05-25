@@ -119,11 +119,17 @@ const ACCENT_STORE_PREFIX = 'accentPreset_';
 function ThemedApp() {
   const { activeProfile, profiles } = useProfile();
   const { signOut } = useClerk();
+  const { userId } = useAuth();
   // Keep the latest profile list in a ref so the auth-expired callback
   // (registered once at mount) can pass current ids into signOutWithCleanup
   // without re-registering on every profile change.
   const profilesRef = useRef(profiles);
   profilesRef.current = profiles;
+  // Same pattern for userId — the auth-expired callback is registered once
+  // at mount; reading from a ref keeps it pointing at the latest userId
+  // without re-registering.
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
   // Always follow the phone's system color scheme (light/dark).
   const systemColorScheme = useColorScheme();
   const colorScheme: ColorScheme =
@@ -179,6 +185,7 @@ function ThemedApp() {
         clerkSignOut: signOut,
         queryClient,
         profileIds: profilesRef.current.map((p) => p.id),
+        clerkUserId: userIdRef.current ?? undefined,
       })
         .catch(() => {
           platformAlert(

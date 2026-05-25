@@ -21,6 +21,12 @@ import { signOutWithCleanup } from './sign-out';
 
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { setActiveProfileId, resetAuthExpiredGuard } from './api-client';
+import {
+  markIntroSeenSync,
+  hasSeenIntro,
+  __resetIntroStateForTests,
+} from './intro-state';
+import * as SecureStore from './secure-storage';
 
 // Mock dependencies that signOutWithCleanup touches so the test is
 // self-contained and order-of-calls is verifiable via invocationCallOrder.
@@ -344,5 +350,74 @@ describe('signOutWithCleanup — auth-expired guard reset [BUG-560]', () => {
 
     // resetAuthExpiredGuard fires in the finally block, after clerkSignOut resolves.
     expect(clerkOrder).toBeLessThan(guardResetOrder);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Welcome-intro in-memory flag is cleared for the signed-out userId
+// ---------------------------------------------------------------------------
+
+describe('signOutWithCleanup — welcome-intro flag cleanup', () => {
+  beforeEach(() => {
+    __resetIntroStateForTests();
+    // Stub the SecureStore write fired by markIntroSeenSync so the test does
+    // not depend on Keychain/Keystore behavior under jest.
+    jest.spyOn(SecureStore, 'setItemAsync').mockResolvedValue(undefined);
+  });
+
+  it('drops the welcome-intro in-memory flag for the signed-out userId', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+
+    // Simulate the previous user having completed the intro.
+    markIntroSeenSync('user_a');
+    expect(hasSeenIntro('user_a', null)).toBe(true);
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+      clerkUserId: 'user_a',
+    });
+
+    // After sign-out, a fresh sign-in by a different account on the same
+    // device must not inherit the in-memory "seen" bit from user_a.
+    expect(hasSeenIntro('user_a', null)).toBe(false);
+  });
+
+  it("leaves other users' flags untouched", async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+
+    markIntroSeenSync('user_a');
+    markIntroSeenSync('user_b');
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+      clerkUserId: 'user_a',
+    });
+
+    expect(hasSeenIntro('user_a', null)).toBe(false);
+    expect(hasSeenIntro('user_b', null)).toBe(true);
+  });
+
+  it('is a no-op when clerkUserId is not supplied (auth-expired before user loaded)', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+
+    markIntroSeenSync('user_a');
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+      // clerkUserId intentionally omitted
+    });
+
+    // No userId supplied → can't clear; flag survives. SecureStore key remains
+    // scoped to user_a, so re-sign-in as user_a still skips the intro.
+    expect(hasSeenIntro('user_a', null)).toBe(true);
   });
 });

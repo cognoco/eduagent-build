@@ -16,6 +16,7 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
+import { hasSeenIntro, introSecureStoreKey } from '../../lib/intro-state';
 import { useProfile } from '../../lib/profile';
 import { computeAgeBracket, type Profile } from '@eduagent/schemas';
 import {
@@ -81,6 +82,7 @@ const FULL_SCREEN_ROUTES = new Set([
   'shelf',
   'shelf/[subjectId]',
   'shelf/[subjectId]/book/[bookId]',
+  'welcome',
 ]);
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
@@ -2111,6 +2113,37 @@ export default function AppLayout() {
     };
   }, []);
 
+  // Welcome intro probe — per-Clerk-userId, per-device. Mirrors the preview
+  // probe shape so the routing block below can treat it the same way (one
+  // 'loading' branch, one 'unseen' branch). Spec: docs/specs/2026-05-25-welcome-intro.md
+  const [introProbeState, setIntroProbeState] = React.useState<
+    'loading' | 'seen' | 'unseen'
+  >('loading');
+  React.useEffect(() => {
+    if (!userId) {
+      // No signed-in user → no intro decision to make. Stay 'loading' so the
+      // sign-in redirect runs first; the effect re-fires once userId hydrates.
+      return;
+    }
+    let cancelled = false;
+    void SecureStore.getItemAsync(introSecureStoreKey(userId))
+      .then((value) => {
+        if (cancelled) return;
+        setIntroProbeState(hasSeenIntro(userId, value) ? 'seen' : 'unseen');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Treat read failure as 'unseen' — at worst the user sees the intro
+        // one extra time, then markIntroSeenSync writes again successfully
+        // (spec: Failure Modes row 2). Falls through to the in-memory cache
+        // for the same userId so a within-session retry is still 'seen'.
+        setIntroProbeState(hasSeenIntro(userId, null) ? 'seen' : 'unseen');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   // [CRITICAL-B2] DELIBERATELY no auto-cleanup effect here. A previous
   // iteration had:
   //   useEffect(() => { if (activeProfile && profiles.length > 0) clearPreviewState() })
@@ -2288,10 +2321,15 @@ export default function AppLayout() {
   //   3. pendingAuthRedirect spinner  (OAuth-return redirect-replay)
   //   4. isProfileLoading spinner  (profile query in flight)
   //   5. profileLoadError fallback  (independent of preview state)
-  //   6. preview-probe-loading spinner  ← HERE
-  //   7. SaveWizardGate branch  ← HERE
-  //   8. !activeProfile → CreateProfileGate  (existing)
-  //   9. consent gates → Tabs  (existing)
+  //   6. preview-probe-loading spinner
+  //   7. SaveWizardGate branch
+  //   8. Welcome intro gate  ← HERE (spec: docs/specs/2026-05-25-welcome-intro.md)
+  //        - Fires AFTER preview probe + wizard so previewers/wizard users
+  //          are never unmounted mid-flow.
+  //        - Fires BEFORE CreateProfileGate so the longitudinal-companion
+  //          positioning lands before utility onboarding.
+  //   9. !activeProfile → CreateProfileGate
+  //  10. consent gates → Tabs
   if (
     FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
     previewProbeState === 'loading'
@@ -2320,6 +2358,23 @@ export default function AppLayout() {
         />
       </FeedbackProvider>
     );
+  }
+
+  // Step 8: welcome intro — once per Clerk userId per device. Loading branch
+  // holds the screen on the existing spinner so there's no flash of home/
+  // CreateProfileGate before the SecureStore probe settles (spec: Paint Goal).
+  if (userId && introProbeState === 'loading') {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="intro-state-loading"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  if (userId && introProbeState === 'unseen') {
+    return <Redirect href="/(app)/welcome" />;
   }
 
   // No profile exists — show gate that pushes to profile creation modal
