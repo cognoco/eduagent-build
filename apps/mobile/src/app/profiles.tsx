@@ -215,13 +215,15 @@ export default function ProfilesScreen() {
       // [BUG-774] /profiles is a root-level fullScreenModal (see _layout.tsx).
       // `router.replace` from inside that modal swaps the modal route in place
       // but never dismisses the modal stack, so the child-settings screen
-      // never mounts and the user stays staring at /profiles. Dismiss the
-      // modal first (back to the underlying /(app) stack), then push the
-      // child-settings target so the deep route lands in the correct stack
-      // and back-navigation from settings returns to the parent shell rather
-      // than re-opening the profiles modal.
-      if (router.canGoBack()) {
-        router.back();
+      // never mounts and the user stays staring at /profiles. Use the
+      // documented Expo Router modal-dismiss API (`router.dismiss`) to drop
+      // back to the underlying /(app) stack, then push the child-settings
+      // target so the deep route lands in the correct stack and back-nav
+      // from settings returns to the parent shell rather than re-opening
+      // the profiles modal. `router.dismiss` is the documented dismiss
+      // strategy required by screen-navigation.test.ts (`[BUG-BACK-RATCHET]`).
+      if (router.canDismiss?.()) {
+        router.dismiss();
       }
       router.push({
         pathname: '/(app)/child/[profileId]',
