@@ -20,25 +20,26 @@ Use one owning agent or engineer for the seed registry and shared conventions. I
 
 Do not split one subagent per seed. The seeds share account setup, cleanup, Clerk user creation, subscription state, profile relationships, and Playwright helpers, so per-seed ownership would create naming and state drift.
 
+## Navigation Contract Flag Matrix
+
+The guardian/Family shell behaves differently under `MODE_NAV_V1_ENABLED=false` (V0, current production, 5 tabs) vs `true` (V1, 4 tabs with Recaps). The hard constraint in `CLAUDE.md` requires V0 to remain green; the audit re-run must execute under both flag positions for every scenario that touches the guardian shell. Every Chrome walkthrough log row must record the flag position it was executed under. A row is not closed until both V0 and V1 are recorded for entries that depend on guardian-shell behaviour (every `mentor-audit-*` entry except the pre-shell ones — `empty-adult`, `session-expired`, `session-revoked`, `mfa-totp`).
+
 ## Existing Seed System
 
 Seed implementation belongs in `apps/api/src/services/test-seed.ts`, which already backs the gated test-seed API. Relevant existing scenarios include:
 
-| Existing scenario | Likely reuse |
+| Existing scenario | Status against mentor-audit contract |
 | --- | --- |
-| `pre-profile` | Starting point for first-profile/no-profile coverage, but verify it truly lands on first-profile creation in web. |
-| `parent-solo` | Starting point for adult-without-children, but the 2026-05-25 Chrome audit observed unreliable child-style post-approval behavior. |
-| `consent-pending` | Starting point for pending-consent gates and parent email flows. |
-| `consent-withdrawn`, `consent-withdrawn-solo` | Starting point for withdrawn/denied consent gates. |
-| `account-deletion-scheduled` | Starting point for scheduled deletion recovery. |
-| `parent-with-weekly-report` | Starting point for weekly report detail. |
-| `parent-subject-with-retention` | Starting point for subject retention badges/cards. |
-| `parent-session-with-recap` | Starting point for recap detail and session recap. |
-| `quota-exceeded`, `daily-limit-reached` | Starting point for quota/paywall states. |
-| `subscription-family-active`, `subscription-pro-active` | Starting point for family/pro billing and max-profile states. |
-| `quiz-*`, `dictation-*`, `review-empty` | Starting point for student-activity state, once Mentor route exposure is corrected. |
-
-The first implementation step is to verify which existing scenarios already satisfy the mentor-audit contract and which need dedicated variants. Prefer extending or composing existing scenarios over creating duplicates with similar but subtly different data.
+| `pre-profile` | Verified at `test-seed.ts:1579-1595` — creates account + Clerk user with **no profile row** (`profileId: ''`, `ids: {}`). Satisfies `mentor-audit-empty-adult` as a registry alias; no new seeder needed. |
+| `parent-solo` | Defined at `test-seed.ts:1522-1572` with the shape the audit asks for (adult `isOwner: true`, `tier: 'family'`, `CONSENTED`, no children, no `family_links`). The audit log line 133 reports it lands on child-style `/dashboard` with "You're approved! ... Pick a subject" copy. **This is a product-or-seed defect that must be root-caused before the seed is replaced — see Task 1.** |
+| `consent-pending` | Reusable for pending-consent gates. Extend to expose `consentToken` and `consentStateId` in `SeedResult.ids` for direct-route checks. |
+| `consent-withdrawn`, `consent-withdrawn-solo` | Reusable for withdrawn gates. **"Denied" is not a separate enum value** — `packages/database/src/schema/profiles.ts:20-25` has `'PENDING' \| 'PARENTAL_CONSENT_REQUESTED' \| 'CONSENTED' \| 'WITHDRAWN'`. No separate denied seeder. |
+| `account-deletion-scheduled` | Reusable as-is for scheduled deletion recovery. |
+| `parent-with-weekly-report`, `parent-subject-with-retention`, `parent-session-with-recap`, `with-bookmarks`, `parent-with-reports` | Reusable as starting points, but composition into `mentor-audit-rich-child-history` requires **Task 0** to extract shared insert helpers first. |
+| `quota-exceeded`, `daily-limit-reached` | Reusable for owner daily-quota states. **Constrained to Study/free tier** — Family and Pro tiers have no daily limit per `subscription.ts:35,50,61,72`. |
+| `trial-expired-child` | Reusable for child paywall notify-parent path. |
+| `subscription-family-active`, `subscription-pro-active` | Reusable for family/pro monthly quota and max-profile states. Family = 4 profiles, Pro = 6 profiles. |
+| `quiz-*`, `dictation-*`, `review-empty` | Reusable for student-activity state, once Mentor route exposure is corrected. |
 
 ## Seed Registry Contract
 
@@ -46,63 +47,86 @@ Add or document a stable mentor audit registry. Use names that describe the test
 
 | Registry name | Backing scenario |
 | --- | --- |
-| `mentor-audit-empty-adult` | Existing `pre-profile` if it lands on first-profile creation; otherwise new scenario. |
-| `mentor-audit-family-no-children` | Fixed `parent-solo` or new variant if current behavior remains child-style. |
-| `mentor-audit-family-at-profile-limit` | New variant built from `subscription-family-active` or `subscription-pro-active`. |
-| `mentor-audit-consent-pending-child` | Existing or extended `consent-pending`. |
-| `mentor-audit-consent-withdrawn-child` | Existing or extended `consent-withdrawn`. |
-| `mentor-audit-consent-post-approval` | New deterministic post-approval state or test route/state helper. |
-| `mentor-audit-regional-consent-matrix` | New matrix scenario or three explicit regional variants. |
-| `mentor-audit-deletion-scheduled-owner` | Existing `account-deletion-scheduled`. |
-| `mentor-audit-session-expired` | New Playwright storage/session fixture, not only DB seed. |
-| `mentor-audit-mfa-required` | New Clerk-backed account fixture or mocked provider lane. |
-| `mentor-audit-billing-boundaries` | New or composed billing scenarios for quota, child paywall, and family pool. |
-| `mentor-audit-rich-child-history` | New composite scenario using existing parent report, retention, recap, vocabulary, quiz, dictation, and homework seed helpers. |
-| `mentor-audit-resumable-session` | New scenario with resumable learning session state. |
+| `mentor-audit-empty-adult` | Alias for existing `pre-profile`. No new seeder. |
+| `mentor-audit-family-no-children` | Use existing `parent-solo` **after** Task 1 root-causes the landing-copy defect. May resolve to "no new seeder" (bug is in nav contract) or to extending `parent-solo` (missing row, e.g., onboarding marker). |
+| `mentor-audit-family-at-profile-limit` | New seeder built from `subscription-family-active`. Tier pinned to `family` (4 profiles: 1 owner + 3 children). `mentor-audit-pro-at-profile-limit` added only if the audit explicitly requires Pro gate-copy coverage. |
+| `mentor-audit-consent-pending-child` | Alias for existing `consent-pending`. Extend `SeedResult.ids` to include `consentToken` and `consentStateId`. |
+| `mentor-audit-consent-withdrawn-child` | Alias for existing `consent-withdrawn`. (No separate "denied" entry — see Existing Seed System table.) |
+| `mentor-audit-post-approval-steady-state` | Alias for existing `parent-multi-child`. Already verified to land on Family home (audit log line 131). |
+| `mentor-audit-post-approval-redirect` | New seeder: sits at `/consent/approve?token={consentToken}` so Playwright opens the same URL a parent clicks from the consent email. Reuses the `consentToken` already inserted by `seedConsentPending` (`test-seed.ts:1613`). |
+| `mentor-audit-consent-us-under-threshold` | New seeder (region=US, age below threshold). |
+| `mentor-audit-consent-eu-under-threshold` | New seeder (region=EU, age below threshold). |
+| `mentor-audit-consent-over-threshold` | New seeder (age above threshold — no consent required). |
+| `mentor-audit-deletion-scheduled-owner` | Alias for existing `account-deletion-scheduled`. |
+| `mentor-audit-session-expired` | New Playwright storage-state helper: mutate the persisted `__session` cookie to a malformed/expired token so Clerk middleware rejects on next request. Tests the **expired** banner + forced sign-out. |
+| `mentor-audit-session-revoked` | New seeder: after sign-in, call Clerk Backend `POST /sessions/{id}/revoke`. Tests the **revoked-token-refresh** path (different code path from cookie corruption). Combined coverage of both seeds is required for AUTH-11. |
+| `mentor-audit-mfa-totp` | New Clerk-backed seeder. Calls Clerk Backend `POST /users/{id}/totp` to attach a TOTP factor, returns the shared secret in `SeedResult.ids.totpSecret`. Playwright helper generates the rolling code via `otplib` at sign-in time. Backup-code and SMS factor paths are **out of scope** — file a follow-up if AUTH-05 requires them. |
+| `mentor-audit-quota-owner-daily` | New seeder built from `daily-limit-reached`. Constrained to Study/free tier (Family/Pro have no daily cap). |
+| `mentor-audit-quota-family-monthly` | New seeder: `subscription-family-active` with `quotaPools.usedThisMonth` driven over the monthly cap. Tests family-pool-exhausted owner state. |
+| `mentor-audit-paywall-child-notify` | New seeder built from `trial-expired-child`. Tests the child paywall → notify-parent path independently from owner billing states. |
+| `mentor-audit-rich-child-history` | New composite scenario. **Requires Task 0 (extract reusable insert helpers) to land first.** |
+| `mentor-audit-resumable-session` | New scenario: deterministic in-progress `learning_sessions` row + enough `session_events` for the resume card to render. No LLM calls during seeding. |
 
 Each registry entry must expose:
 
-- Email.
+- Email — see "Seed Email Convention" below.
 - Password when sign-in is possible.
 - Account ID.
 - Owner profile ID.
 - Child profile IDs where applicable.
 - Subject, topic, session, report, recap, and quiz/dictation IDs where applicable.
-- Expected landing route after sign-in.
-- Expected testIDs or visible copy for the first assertion.
+- Expected landing route after sign-in (imported from `apps/mobile/e2e-web/fixtures/scenarios.ts` constants — do not inline route strings in the registry).
+- Expected testIDs or visible copy for the first assertion (same — import the testID constant rather than inlining).
+
+A Playwright registry-smoke project (added in Task 5) opens each entry, signs in, and asserts the landing testID is visible. This converts route drift into a CI failure rather than silent registry staleness.
+
+## Seed Email Convention
+
+Two modes:
+
+- **Audit re-run (single human in Chrome).** Stable per-scenario email: `mentor-audit-{registry-key}@example.com`. Re-running the same scenario is safe because `seedScenario` deletes existing seed-managed rows for the same email before re-seeding (`apps/api/src/services/test-seed.ts:3649-3661`).
+- **Automated Playwright suites.** Run-id-prefixed email via `buildSeedEmail(alias)` from `apps/mobile/e2e-web/helpers/runtime.ts:32-34`, yielding `pw-${runId}-${alias}@example.com`. Parallel workers do not collide because each Playwright run gets a unique `PLAYWRIGHT_RUN_ID`.
+
+Cleanup-by-prefix handles both modes via the `clerk_seed_*` external_id (`test-seed.ts:3666-3744`).
+
+## Seed-Pack Failure Modes
+
+| State | Trigger | Recovery |
+| --- | --- | --- |
+| Clerk rate-limit on bulk seed | Many parallel workers seeding in <1s | Handled by `fetchWithRetry` in `apps/mobile/e2e-web/helpers/test-seed.ts:23-72` (exponential backoff + jitter). No plan action. |
+| Pre-existing real Clerk user with seed email | Email collision with non-seed user | Seeder throws `Refusing to reuse non-seed Clerk user` (`test-seed.ts:201-205`). Operator picks a different email. Document this when adopting stable per-scenario emails. |
+| Partial DB cleanup mid-loop | Interrupted reset between Clerk delete and DB delete | `resetDatabase` is idempotent — the `OR (clerkUserId LIKE 'clerk_seed_%')` clause at `test-seed.ts:3732-3741` still matches orphans. Safe to retry. |
+| Clerk Backend API down during seed | Network/5xx | Seeder throws; account row only inserted after Clerk user creation succeeds (`test-seed.ts:3640-3663`). No corruption. |
+| MFA TOTP shared secret leaks to CI logs | `SeedResult.ids.totpSecret` printed | Acceptable — seed accounts are environment-gated, never production. Do not redact; redaction breaks the otplib helper. |
+| `parent-solo` symptom recurs after Task 1 fix | Audit re-run still lands on child-style `/dashboard` | Task 1 has not actually root-caused. Re-open triage; do not silently replace the seed. |
 
 ## Seed Requirements
 
 ### 1. Fresh Verified Adult With No Profiles
 
-Requirement: Create an email-verified owner account with no profile records.
+Requirement: An email-verified owner account with no profile records.
 
-Acceptance:
+Seed contract (what this plan delivers):
 
-- Signing in lands on first-profile/profile-creation or the intended first-use onboarding gate.
-- The first-use path can capture Study/Family intent.
-- No Family/Children mentor home appears before a profile or child link exists.
-- The scenario is safe to rerun and cleans up by seed email prefix.
+- Account row exists, Clerk user exists and is email-verified, `profiles` has no row for the account.
+- Re-seeding is idempotent.
 
 Implementation notes:
 
-- Start by verifying `pre-profile`.
-- If `pre-profile` bypasses the first-profile gate, add `mentor-audit-empty-adult` as a new scenario that inserts only the account row and Clerk user, with no profile rows.
+- Alias `mentor-audit-empty-adult` → `pre-profile`. No new seeder. Already verified at `test-seed.ts:1579-1595`.
 
 ### 2. Adult With No Linked Children, Family-Eligible
 
-Requirement: Create an onboarding-complete adult owner with an eligible Family/Pro or trial state and no child links.
+Requirement: An onboarding-complete adult owner with an eligible Family/Pro or trial state and no child links.
 
-Acceptance:
+Seed contract (what this plan delivers):
 
-- Signing in lands in Study as the adult or in a neutral Family setup gate.
-- The app exposes the add/link-first-child path from the expected surface.
-- It does not show child-style post-approval copy such as "You're approved" or "Pick a subject".
-- It preserves the adult's Study access.
+- One owner profile (`isOwner: true`), `tier: 'family'` active subscription, `CONSENTED` consent state, no `family_links` rows, no child profiles.
+- `parent-solo` already satisfies this shape. The defect is in how the app renders for this state, not in the seed (unless Task 1 finds otherwise).
 
 Implementation notes:
 
-- Fix or replace `parent-solo`; the 2026-05-25 audit found it unreliable for this contract.
+- **Blocked on Task 1.** Do not extend or replace `parent-solo` until the root cause of the child-style landing copy is identified.
 
 ### 3. Family Owner At Profile Limit
 
@@ -136,37 +160,44 @@ Implementation notes:
 - Verify existing `consent-pending`.
 - Ensure the returned IDs include consent token/state IDs for direct-route checks.
 
-### 5. Underage Child With Withdrawn Or Denied Consent
+### 5. Underage Child With Withdrawn Consent
 
-Requirement: Create a child link where consent was withdrawn or denied after previously existing.
+Requirement: A child link where consent was withdrawn after previously being CONSENTED.
 
-Acceptance:
+Seed contract:
 
-- Parent/mentor child routes are blocked or reduced to the expected recovery state.
-- Child learning data is not visible.
-- Recovery/action copy is visible.
-- Direct child detail, progress, memory, and session routes cannot leak child data.
+- `consentStates` row with `status: 'WITHDRAWN'` and `respondedAt` set.
+- Child profile + family_link still exist; app gating is enforced at runtime by reading `status`.
 
 Implementation notes:
 
-- Verify `consent-withdrawn` and `consent-withdrawn-solo`.
-- Add a denied-consent variant if withdrawn and denied are distinct product states.
+- Alias `mentor-audit-consent-withdrawn-child` → existing `consent-withdrawn`. No separate "denied" variant — `consent_status` enum has no `DENIED` value (`packages/database/src/schema/profiles.ts:20-25`). "Denied" is product-language for `WITHDRAWN` from a never-CONSENTED transition; that variant is left out of this plan because the existing `consent-withdrawn` already produces a state the app cannot distinguish from "denied" without UI copy hints.
 
-### 6. Post-Approval Consent Landing
+### 6. Post-Approval Consent — Steady-State
 
-Requirement: Create a deterministic state that simulates returning after parent approval.
+Requirement: An owner who already has approved consent for their child and signs in normally.
 
-Acceptance:
+Seed contract:
 
-- Landing route restores child visibility.
-- The child appears on Family/Children home.
-- The app does not land on child-style learner onboarding for the parent.
-- The approval state cannot be replayed to create duplicate links.
+- Already covered by existing `parent-multi-child`. Audit log line 131 confirms it lands on Family home.
 
 Implementation notes:
 
-- Prefer a seed route/API helper that creates the approved link and returns the expected URL.
-- If a real email link is required, add a test-only consent approval token response in the seed result so Playwright can open the same URL a parent would open.
+- Alias only. Confirm in Task 1 and close.
+
+### 6b. Post-Approval Consent — Redirect
+
+Requirement: A user opening the same URL a parent clicks from the consent-approval email.
+
+Seed contract:
+
+- Pending-consent state exists (reuses `seedConsentPending` data), `consentToken` exposed in `SeedResult.ids`.
+- Playwright opens `/consent/approve?token={consentToken}` directly. The server validates, marks `CONSENTED`, and redirects to the post-approval landing route.
+- Approval token is single-use — re-opening the same URL must not create a duplicate link.
+
+Implementation notes:
+
+- New seeder `mentor-audit-post-approval-redirect`. Reuses the `consentToken` already inserted at `test-seed.ts:1613`.
 
 ### 7. Regional Consent Variants
 
@@ -188,66 +219,66 @@ Implementation notes:
 
 ### 8. Scheduled Deletion Owner
 
-Requirement: Create an owner account in scheduled-deletion state.
+Requirement: An owner account in scheduled-deletion state.
 
-Acceptance:
+Seed contract:
 
-- Signing in/account surface exposes Keep account recovery.
-- Owner-only safeguards remain in place.
-- Keeping the account clears the scheduled deletion state and preserves the owner profile.
+- Existing `account-deletion-scheduled` already produces the required state. Alias only.
 
 Implementation notes:
 
-- Verify `account-deletion-scheduled`.
-- Add Playwright coverage for the visible recovery path before exercising the state-clearing mutation.
+- Audit-side Playwright coverage for the recovery path is scoped to the audit re-run, not this plan.
 
-### 9. Expired Or Revoked Session
+### 9. Expired Session
 
-Requirement: Provide a reproducible signed-in browser state that becomes invalid.
+Requirement: A reproducible signed-in browser state whose token Clerk rejects on the next request.
 
-Acceptance:
+Seed contract:
 
-- App forces sign-out when the session is expired/revoked.
-- Sign-in screen shows the expected session-expired banner.
-- The app does not remain on stale Family/child content.
-- After re-authentication, authorized target route behavior matches the pending-redirect contract.
+- A normal signed-in storage-state is captured, then the persisted `__session` cookie is mutated to a malformed/expired token before the spec under test runs.
 
 Implementation notes:
 
-- This is not only a DB seed. Implement as a Playwright storage-state fixture or dev/test helper that writes an expired auth state.
-- Keep the helper gated to development/staging/E2E only.
+- New Playwright storage-state helper, not a DB seed. Gated to dev/staging/E2E.
+- Exercises Clerk middleware's reject-and-force-sign-out path.
 
-### 10. MFA / Additional Verification Account
+### 9b. Revoked Session
 
-Requirement: Provide accounts requiring supported and unsupported second-factor paths.
+Requirement: A reproducible signed-in browser state whose session Clerk has revoked server-side.
 
-Acceptance:
+Seed contract:
 
-- Supported factor routes show the correct verification form.
-- Unsupported factor routes show support fallback copy and contact action.
-- Backup-code path is reachable for accounts configured with backup-code support.
-- Mentor deep-link pending route is preserved only after successful verification.
+- After normal sign-in, Playwright calls Clerk Backend `POST /sessions/{id}/revoke`. Next API call from the page hits the revoked-token-refresh code path (distinct from the expired-cookie path).
 
 Implementation notes:
 
-- If Clerk staging can create these factors safely, use real Clerk seed users.
-- If not, place this in a provider-mocked web E2E lane and document that it is not a shared-staging Chrome seed.
+- New seeder. Combined coverage with §9 is required for AUTH-11.
+
+### 10. MFA TOTP Account
+
+Requirement: An account configured with a TOTP factor that Playwright can satisfy at sign-in.
+
+Seed contract:
+
+- New seeder calls Clerk Backend `POST /users/{id}/totp` to attach a TOTP factor.
+- `SeedResult.ids.totpSecret` returns the shared secret.
+- Playwright helper generates the rolling code via `otplib` at sign-in.
+
+Implementation notes:
+
+- Backup-code and SMS factor paths are **out of scope**. File a follow-up plan if AUTH-05 requires them.
 
 ### 11. Quota / Paywall States
 
-Requirement: Provide owner/child billing states for quota exceeded, child notify-parent, and family pool visibility.
+Requirement: Three distinct billing-boundary states. "Composed" boundary scenarios are not reachable in the data model.
 
-Acceptance:
+Seed contract — three separate seeders:
 
-- Owner daily quota exceeded state shows the correct paywall/recovery action.
-- Child paywall notify-parent path creates or displays mentor-facing response.
-- Family pool details are visible to eligible family owner.
-- Non-owner child profiles cannot access owner billing data.
+- `mentor-audit-quota-owner-daily` — Study/free tier, `quotaPools.usedThisMonth` driven over the daily cap. Family and Pro tiers have no daily limit (`subscription.ts:35,50,61,72`), so this scenario is Study-tier-only.
+- `mentor-audit-quota-family-monthly` — `subscription-family-active` with `quotaPools.usedThisMonth` over the monthly cap.
+- `mentor-audit-paywall-child-notify` — built from `trial-expired-child`, exercises the child paywall → notify-parent path.
 
-Implementation notes:
-
-- Verify `quota-exceeded`, `daily-limit-reached`, `trial-expired-child`, `subscription-family-active`, and `subscription-pro-active`.
-- Add one composed `mentor-audit-billing-boundaries` scenario if existing scenarios force too many separate sign-ins for the audit.
+Audit-side assertions (which states the app gates, whether non-owner child profiles can read billing) are scoped to the audit re-run rows, not the seed contract.
 
 ### 12. Child With Rich Learning History
 
@@ -284,16 +315,53 @@ Implementation notes:
 
 ## Implementation Tasks
 
-### Task 1 - Seed Inventory Verification
+### Task 0 - Extract Reusable Insert Helpers
 
-Run and document current behavior for these existing scenarios:
+Required before `mentor-audit-rich-child-history` is composable.
+
+Today each parent-history seeder (`seedParentWithReports`, `seedParentWithWeeklyReport`, `seedParentSubjectWithRetention`, `seedParentSessionWithRecap`, `seedWithBookmarks`) is a top-level function in `test-seed.ts` that inserts its own subject, sessions, reports, and retention cards inline. Composing them requires extracting:
+
+- `insertSubjectWithCurriculum(db, profileId, name)` — already exists as `createSubjectWithCurriculum` at the top of `test-seed.ts`; promote and document.
+- `insertWeeklyReport(db, profileId, opts)` — extract from `seedParentWithWeeklyReport`.
+- `insertRetentionCards(db, subjectId, count)` — extract from `seedParentSubjectWithRetention`.
+- `insertSessionWithRecap(db, profileId, subjectId, opts)` — extract from `seedParentSessionWithRecap`.
+- `insertVocabulary(db, subjectId, count)` and `insertBookmarks(db, profileId, count)` — extract from `seedWithBookmarks` and language seeders.
+
+Each existing scenario is rewritten to call the extracted helpers. Regression contract: `test-seed.test.ts` and `test-seed.medium-priority.integration.test.ts` must remain green:
+
+```powershell
+C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec jest --config apps/api/jest.config.ts apps/api/src/services/test-seed.test.ts apps/api/src/services/test-seed.medium-priority.integration.test.ts --runInBand --no-coverage
+```
+
+If a refactor would change the shape of `SeedResult.ids` for an existing scenario, do not change it — keep the old keys and add new ones.
+
+### Task 1 - Inventory Verification + `parent-solo` Root-Cause Triage
+
+Two subtasks. Both produce a written finding in this plan or a new Notion bug.
+
+**1a. Inventory pass.** Run:
 
 ```powershell
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec jest --config apps/api/jest.config.ts apps/api/src/services/test-seed.test.ts --runInBand --no-coverage
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec jest --config apps/api/jest.config.ts apps/api/src/services/test-seed.medium-priority.integration.test.ts --runInBand --no-coverage
 ```
 
-For each scenario in the Existing Seed System table, record whether it already satisfies the Mentor audit requirement, needs extension, or should be replaced by a new mentor-audit variant.
+For each scenario in the Existing Seed System table, confirm it produces the documented DB state. Record any drift as a follow-up Notion bug.
+
+**1b. `parent-solo` triage.** Sign in to staging Chrome with a freshly-seeded `parent-solo` account. Capture in a structured note:
+
+- Active feature-flag values: `MODE_NAV_V0_ENABLED`, `MODE_NAV_V1_ENABLED` (in Doppler).
+- What `resolveTabShape()` returns for this profile.
+- What the `LearnerScreen` `showParentHome` branch sees — `isOwner`, `hasLinkedChildren`, `mode`, `isFamilyPlanOwner`. (Add a temporary `console.log` if needed; remove before any commit.)
+- Whether `learning_profiles` row exists for the profile, and whether any onboarding-completion marker is missing vs `parent-multi-child`.
+
+Triage outcomes (pick one):
+
+- **Nav-contract bug.** File a Notion P1 against the navigation contract. `parent-solo` stays unchanged. `mentor-audit-family-no-children` becomes an alias.
+- **Missing seed row.** Extend `seedParentSolo` to insert the missing row(s). `mentor-audit-family-no-children` becomes an alias.
+- **Both.** File the nav bug AND extend the seed.
+
+Do not proceed to §2 acceptance work until 1b is closed.
 
 ### Task 2 - Add Registry Names
 
@@ -335,26 +403,37 @@ Add or extend tests beside `apps/api/src/services/test-seed.test.ts` and the exi
 Minimum assertions:
 
 - Every mentor-audit scenario is accepted by `seedScenario`.
-- The seed returns expected IDs.
-- Consent/pending/withdrawn states are distinct.
-- Profile-limit seed creates exactly the configured max profile count.
-- Rich child seed creates report, retention, recap, vocabulary, and session rows.
+- The seed returns expected IDs (per-scenario whitelist).
+- Consent pending vs withdrawn states are distinct (no test for "denied" — see §5).
+- Profile-limit seed creates exactly `getTierConfig('family').maxProfiles` profiles.
+- Rich child seed creates report, retention, recap, vocabulary, and session rows via the Task 0 helpers (assert the helpers are called, not the inline inserts).
+- Existing parent-history seeders still produce the same `SeedResult.ids` after Task 0's extraction (regression contract).
+- MFA seed returns a `totpSecret` whose `otplib.authenticator.generate()` output is accepted by Clerk.
+- Session-revoked seed returns a session-id-less storage state after the revoke call.
 - Seed cleanup still scopes to seed-managed Clerk users only.
 
-### Task 5 - Add Web E2E Setup Coverage
+### Task 5 - Add Web E2E Setup Coverage + Registry-Smoke Project
 
 Update `apps/mobile/e2e-web/README.md` and Playwright setup helpers so the mentor-audit seed pack can be run from Chrome.
 
-Add a setup output or helper naming convention for the storage states:
+Storage-state naming convention:
 
 ```text
 mentor-audit-empty-adult.json
 mentor-audit-family-no-children.json
 mentor-audit-rich-child-history.json
-mentor-audit-billing-boundaries.json
+mentor-audit-quota-family-monthly.json
 ```
 
-Do not make every seed part of the smoke suite. Add focused specs or opt-in projects for seed validation first.
+Add a Playwright **registry-smoke** project (opt-in via `--project=mentor-audit-registry-smoke`). One spec per registry entry that:
+
+1. Seeds the scenario.
+2. Signs in (or applies the storage-state helper for pre-shell scenarios).
+3. Asserts the landing route + landing testID from the registry constants resolve to a visible element.
+
+This converts landing-route drift into a CI failure. The smoke project is **not** part of the default suite — opt-in to keep CI runtime stable.
+
+Landing-route constants must be imported from `apps/mobile/e2e-web/fixtures/scenarios.ts` (extend the existing `authScenarios` const) — do not inline path strings.
 
 ### Task 6 - Re-run The Blocked Rows
 
