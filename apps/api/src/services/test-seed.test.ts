@@ -63,7 +63,7 @@ function createMockDb(): Database {
 // ---------------------------------------------------------------------------
 
 describe('VALID_SCENARIOS', () => {
-  it('contains all 43 expected scenarios', () => {
+  it('contains all expected scenarios', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
@@ -109,6 +109,27 @@ describe('VALID_SCENARIOS', () => {
       'review-empty',
       'dictation-with-mistakes',
       'dictation-perfect-score',
+      // Mentor Chrome audit seed pack
+      // (docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md).
+      'mentor-audit-empty-adult',
+      'mentor-audit-consent-pending-child',
+      'mentor-audit-consent-withdrawn-child',
+      'mentor-audit-post-approval-steady-state',
+      'mentor-audit-deletion-scheduled-owner',
+      'mentor-audit-family-at-profile-limit',
+      'mentor-audit-post-approval-redirect',
+      'mentor-audit-consent-us-under-threshold',
+      'mentor-audit-consent-eu-under-threshold',
+      'mentor-audit-consent-over-threshold',
+      'mentor-audit-quota-owner-daily',
+      'mentor-audit-quota-family-monthly',
+      'mentor-audit-paywall-child-notify',
+      'mentor-audit-resumable-session',
+      // Second wave (Task 0 helpers + remaining DB-backed audit seeds).
+      'mentor-audit-family-no-children',
+      'mentor-audit-rich-child-history',
+      'mentor-audit-session-revoked',
+      'mentor-audit-mfa-totp',
     ]);
   });
 
@@ -497,4 +518,238 @@ describe('new Stage-0 scenarios return required IDs', () => {
       expect(mockDb.insert).toHaveBeenCalled();
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// Mentor Chrome audit seed pack
+// docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md
+//
+// One row per `mentor-audit-*` registry entry. Each row lists the IDs Chrome
+// needs to assert a landing route or open a deep link. The test enforces both
+// the scenario-name contract (alias seeders rewrite the returned name) and
+// the per-scenario `ids` whitelist (Task 4 contract from the plan).
+//
+// `mentor-audit-empty-adult` aliases `pre-profile` and returns
+// `profileId: ''` by design — see seedPreProfile docstring. It is therefore
+// excluded from the `profileId` truthy assertion below.
+// ---------------------------------------------------------------------------
+
+describe('mentor-audit seed pack returns required IDs', () => {
+  const MENTOR_AUDIT_SCENARIOS: Array<{
+    scenario: SeedScenario;
+    requiredIds: string[];
+    /** Pre-profile leaves profileId empty; everything else has one. */
+    expectProfileId?: boolean;
+  }> = [
+    {
+      scenario: 'mentor-audit-empty-adult',
+      requiredIds: [],
+      expectProfileId: false,
+    },
+    {
+      scenario: 'mentor-audit-consent-pending-child',
+      requiredIds: ['consentToken', 'consentStateId'],
+    },
+    {
+      scenario: 'mentor-audit-consent-withdrawn-child',
+      requiredIds: [],
+    },
+    {
+      scenario: 'mentor-audit-post-approval-steady-state',
+      requiredIds: [
+        'parentProfileId',
+        'child1ProfileId',
+        'child2ProfileId',
+        'child3ProfileId',
+      ],
+    },
+    {
+      scenario: 'mentor-audit-deletion-scheduled-owner',
+      requiredIds: ['subjectId', 'subscriptionId'],
+    },
+    {
+      scenario: 'mentor-audit-family-at-profile-limit',
+      requiredIds: [
+        'parentProfileId',
+        'subscriptionId',
+        'childProfileId1',
+        'childProfileId2',
+        'childProfileId3',
+      ],
+    },
+    {
+      scenario: 'mentor-audit-post-approval-redirect',
+      requiredIds: [
+        'parentProfileId',
+        'childProfileId',
+        'consentToken',
+        'consentStateId',
+      ],
+    },
+    {
+      scenario: 'mentor-audit-consent-us-under-threshold',
+      requiredIds: [],
+    },
+    {
+      scenario: 'mentor-audit-consent-eu-under-threshold',
+      requiredIds: [],
+    },
+    {
+      scenario: 'mentor-audit-consent-over-threshold',
+      requiredIds: [],
+    },
+    {
+      scenario: 'mentor-audit-quota-owner-daily',
+      requiredIds: ['subscriptionId', 'subjectId'],
+    },
+    {
+      scenario: 'mentor-audit-quota-family-monthly',
+      requiredIds: ['subscriptionId', 'subjectId'],
+    },
+    {
+      scenario: 'mentor-audit-paywall-child-notify',
+      requiredIds: [
+        'parentProfileId',
+        'childProfileId',
+        'subscriptionId',
+        'subjectId',
+      ],
+    },
+    {
+      scenario: 'mentor-audit-resumable-session',
+      requiredIds: ['subjectId', 'topicId', 'sessionId'],
+    },
+    // Second wave — Task 0 composite + remaining DB-backed audit seeds.
+    {
+      scenario: 'mentor-audit-family-no-children',
+      // Alias of parent-solo: only the seeder's own ids survive the alias.
+      requiredIds: ['parentProfileId', 'subscriptionId'],
+    },
+    {
+      scenario: 'mentor-audit-rich-child-history',
+      requiredIds: [
+        'parentProfileId',
+        'childProfileId',
+        'mathSubjectId',
+        'englishSubjectId',
+        'mathTopicId',
+        'englishTopicId',
+        'recapSessionId',
+        'weeklyReportId',
+      ],
+    },
+    {
+      // session-revoked + mfa-totp call Clerk Backend; without CLERK_SECRET_KEY
+      // (unit-test env) they fall through to empty-string ids. Only assert the
+      // base ids that come from seedOnboardingComplete.
+      scenario: 'mentor-audit-session-revoked',
+      requiredIds: [],
+    },
+    {
+      scenario: 'mentor-audit-mfa-totp',
+      requiredIds: [],
+    },
+  ];
+
+  it.each(MENTOR_AUDIT_SCENARIOS)(
+    '$scenario returns correct scenario name and required IDs',
+    async ({ scenario, requiredIds, expectProfileId = true }) => {
+      const mockDb = createMockDb();
+      const result = await seedScenario(mockDb, scenario, 'test@example.com');
+
+      expect(result.scenario).toBe(scenario);
+      expect(result.accountId).toBeTruthy();
+      if (expectProfileId) {
+        expect(result.profileId).toBeTruthy();
+      }
+      expect(result.email).toBe('test@example.com');
+      expect(typeof result.password).toBe('string');
+
+      for (const idKey of requiredIds) {
+        expect(result.ids[idKey]).toBeTruthy();
+      }
+
+      expect(mockDb.insert).toHaveBeenCalled();
+    },
+  );
+
+  it('aliases rewrite the returned scenario name (not the inner seeder name)', async () => {
+    // mentor-audit-empty-adult is an alias of pre-profile. The wrapped
+    // result must carry the alias name, not the inner seeder name.
+    const mockDb = createMockDb();
+    const result = await seedScenario(
+      mockDb,
+      'mentor-audit-empty-adult',
+      'test@example.com',
+    );
+    expect(result.scenario).toBe('mentor-audit-empty-adult');
+    expect(result.scenario).not.toBe('pre-profile');
+  });
+
+  it('consent threshold seeders persist the configured location enum value', async () => {
+    // The per-region seeders rely on `profiles.location` to drive the consent
+    // gate. Capture the inserted row and assert the location value matches.
+    const captured: Array<Record<string, unknown>> = [];
+    const insertMock = jest.fn().mockImplementation(() => ({
+      values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
+        captured.push(row);
+        return Promise.resolve();
+      }),
+    }));
+    const db = {
+      insert: insertMock,
+      delete: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
+      }),
+      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
+    } as unknown as Database;
+
+    await seedScenario(
+      db,
+      'mentor-audit-consent-us-under-threshold',
+      'test@example.com',
+    );
+
+    const profileRow = captured.find(
+      (row) => 'birthYear' in row && 'displayName' in row,
+    );
+    expect(profileRow).toBeDefined();
+    expect(profileRow?.location).toBe('US');
+  });
+
+  it('family-at-profile-limit creates exactly maxProfiles family profiles', async () => {
+    // Capture all profile inserts and assert the total equals
+    // getTierConfig('family').maxProfiles (1 owner + 3 children = 4).
+    const captured: Array<Record<string, unknown>> = [];
+    const insertMock = jest.fn().mockImplementation(() => ({
+      values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
+        captured.push(row);
+        return Promise.resolve();
+      }),
+    }));
+    const db = {
+      insert: insertMock,
+      delete: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
+      }),
+      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
+    } as unknown as Database;
+
+    await seedScenario(
+      db,
+      'mentor-audit-family-at-profile-limit',
+      'test@example.com',
+    );
+
+    const profileRows = captured.filter(
+      (row) => 'birthYear' in row && 'displayName' in row && 'isOwner' in row,
+    );
+    expect(profileRows).toHaveLength(4);
+    expect(profileRows.filter((row) => row.isOwner === true)).toHaveLength(1);
+    expect(profileRows.filter((row) => row.isOwner === false)).toHaveLength(3);
+  });
 });
