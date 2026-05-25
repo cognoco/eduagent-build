@@ -110,10 +110,19 @@ export async function validateEvaluationEventIds(
   }
 
   // Replace learnerQuote with the verified event content.
-  return evals.map((e) => ({
-    ...e,
-    learnerQuote: rowMap.get(e.answerEventId)!,
-  }));
+  return evals.map((e) => {
+    const learnerQuote = rowMap.get(e.answerEventId);
+    if (learnerQuote === undefined) {
+      throw new Error(
+        `[#477] challenge_round_evaluation rejected: answerEventId ${e.answerEventId} not found in session ${sessionId} for profileId ${profileId}`,
+      );
+    }
+
+    return {
+      ...e,
+      learnerQuote,
+    };
+  });
 }
 
 export function decideMasteryAndReview(
