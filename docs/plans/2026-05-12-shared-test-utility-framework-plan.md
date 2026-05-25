@@ -1,5 +1,7 @@
 # Shared Test Utility Framework Plan
 
+> **Status (2026-05-25):** Phases 0–4 (framework U1–U8) shipped and verified — Inngest step runner, transport capture, LLM provider fixtures, local DB harness, mobile `screen-render.tsx`, native-shims catalog, Node-based mock guard, and the regenerable CSV inventory are all live. **Batches 1–3 not started** — these are the actual cleanup work using the framework (Batch 1: ratchet integration tests; Batch 2: session-completion Inngest; Batch 3: mobile query/profile). **Resume here:** Batch 1 — convert remaining integration tests in `apps/api/` to use U1 (Inngest step runner) + U2 (transport capture) instead of internal mocks. No new blockers; framework is ready to consume.
+
 **Date:** 2026-05-12  
 **Status:** Framework established; follow-up cleanup remains  
 **Related:** `docs/plans/2026-05-12-internal-mock-cleanup-inventory.md`

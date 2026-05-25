@@ -1,6 +1,28 @@
 # Progress Tab — "Currently Working On" + Self-View Polish
 
-> **Status (2026-05-23):** Partially implemented. Schema additions (`currentlyWorkingOn`, `thisWeekMini`) in `packages/schemas/src/snapshots.ts` ✅. API helper `getCurrentlyWorkingOn` in `apps/api/src/services/learner-profile.ts` ✅. Consumed in `progress/index.tsx` as `fallbackItems` prop ✅. Standalone `CurrentlyWorkingOnCard` component NOT created. D-PT-18 (`newLearner` gate removal) ✅. Other report card improvements (highlights/nextSteps rendering in `MonthlyReportCard`/`WeeklyReportCard`) unverified.
+> **Status (2026-05-25, deeper-dive revision):** More is shipped than the 2026-05-23 note recognised. The earlier "~50% missing" framing was wrong — backend, API, i18n strings for the new card, weekly mini-summary, parent-side surfaces, and detail-screen highlights/nextSteps render are all done. What remains is small, self-contained, and bounded.
+>
+> **✅ Done (verified in code 2026-05-25):**
+> - Schema: `currentlyWorkingOn` + `thisWeekMini` in `packages/schemas/src/snapshots.ts:84-85`.
+> - API helper: `getCurrentlyWorkingOn` exported at `apps/api/src/services/learner-profile.ts:1192`; wired through `dashboard.ts` (`selectCurrentlyWorkingOn` + per-child aggregation at `dashboard.ts:286, 397-433, 482-677, 995-1035`).
+> - D-PT-15 weekly mini-summary IS rendered on Progress at `progress/index.tsx:1171-1207` (`sessions / wordsLearned / topicsTouched` shown when any is non-zero). The 2026-05-23 note grouped this with not-done; that was wrong.
+> - Parent-side `currentlyWorkingOn` rendering: `ParentHomeScreen.tsx:250` (guardian home) and `child/[profileId]/index.tsx:122` (Family-tab child-detail) — first entry shown as the canonical "what they're working on" line.
+> - Monthly `highlights` + `nextSteps` ARE rendered on the detail screen `child/[profileId]/report/[reportId].tsx:192-227` — the spec'd "copy the working code" source (D-PT-10) is in place; only the inline summary card hasn't adopted the pattern.
+> - i18n keys for the new "Currently working on" card already shipped in all 7 locales (en/nb/de/es/pt/pl/ja): `progress.register.{child,adult}.currentlyWorkingOnTitle`, `progress.register.{child,adult}.currentlyWorkingOnDetected`, `progress.currentlyWorkingOn.andNMore`. Verified at `apps/mobile/src/i18n/locales/en.json:1484-1503`.
+> - `progress.test.tsx` fixtures + assertions for both `currentlyWorkingOn` and `thisWeekMini` already wired (lines 463-475, 1447-1623) — test scaffolding is waiting for the component.
+> - D-PT-18 `newLearner` gate removed from Progress (no `isNewLearner` / `newLearner` / `progressive-disclosure` references remain in `progress/index.tsx`).
+>
+> **🟡 Partial (data renders, but not as spec'd):**
+> - `currentlyWorkingOn` IS visible on Progress today — piped into `RecentFocusCard` as `fallbackItems` at `progress/index.tsx:1366`, surfaced at `progress/index.tsx:416` ONLY when `focusSessions.length === 0`. Capped at 2 (not 3), labelled under "Recent focus" (not "Currently working on"), no "Detected from recent sessions" sub-label, positioned below the growth chart (not above). The data flows; the dedicated surface doesn't.
+>
+> **❌ Genuinely remaining (the actual scope):**
+> 1. **`apps/mobile/src/components/progress/CurrentlyWorkingOnCard.tsx`** — new component placed between hero and growth chart per D-PT-2. Replaces the hidden fallback path in `RecentFocusCard`: surfaces unconditionally, lifts cap from 2 to 3, adds "Detected from recent sessions" sub-label per D-PT-9. i18n strings already exist — wire `progress.register.${register}.currentlyWorkingOnTitle` + `currentlyWorkingOnDetected` + `progress.currentlyWorkingOn.andNMore`.
+> 2. **Extend `apps/mobile/src/components/progress/ReportsList.tsx`** — currently renders only the headline stat (no references to `highlights` or `nextSteps`). Lift the detail-screen render block at `child/[profileId]/report/[reportId].tsx:192-227` into the inline summary card per D-PT-10. Note: detail screen uses `parentView.report.highlights` — replace with the new flat keys per D-PT-19.
+> 3. **Empty-state copy migration** — `ReportsList.tsx:215` still calls `t('parentView.index.firstReportSoon')`. Add register-aware `progress.weeklyReport.empty.{child,adult}` and `progress.monthlyReport.empty.{child,adult}` (interpolates `{{month}}` per D-PT-16) across all 7 locales, then swap the calls.
+> 4. **Monthly heading keys** — `progress.monthlyReport.highlightsTitle` / `nextStepsTitle` per D-PT-19 (flat, non-register). Not yet present in any locale.
+> 5. **Register naming reconciliation (small):** the spec text references `child / parent / teen` registers; the codebase i18n actually uses `child / adult` (two registers, not three — verified `en.json:1477, 1487`). Treat `parent` and `teen` from the spec as both mapping to `adult`. Update the new copy you add to use the live two-register shape; do not introduce a `teen` register that doesn't exist.
+>
+> **Resume order:** (1) create `CurrentlyWorkingOnCard.tsx` and swap out the `RecentFocusCard` fallback wiring; (2) add the 6 missing i18n keys × 7 locales; (3) extend `ReportsList.tsx` with highlights/nextSteps + new empty-state keys. The realistic surface is one new ~80-line component + one render extension + ~6 i18n keys × 7 locales. Backend, parent surfaces, weekly mini-summary, and test scaffolding are already in place.
 
 **Date:** 2026-05-09
 **Branch:** `ux-cleanup`

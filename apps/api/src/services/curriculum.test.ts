@@ -33,6 +33,8 @@ import type {
   BookWithTopics,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const PROFILE_ID = 'test-profile-id';
@@ -1979,6 +1981,30 @@ describe('deleteTopicIfSafe', () => {
 
     expect(result).toEqual({ deleted: true });
     expect(deleteFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('[MEDIUM-G sweep] keeps spec §4 and implementation aligned on auto-filed filedFrom values', () => {
+    const spec = readFileSync(
+      join(
+        __dirname,
+        '../../../../docs/specs/2026-05-23-freeform-library-filing.md',
+      ),
+      'utf8',
+    );
+    const implementation = readFileSync(
+      join(__dirname, './curriculum.ts'),
+      'utf8',
+    );
+
+    const safeDeleteSection = spec.slice(
+      spec.indexOf('**Safe-to-delete rule'),
+      spec.indexOf('If any condition fails'),
+    );
+
+    for (const source of [safeDeleteSection, implementation]) {
+      expect(source).toContain('freeform_filing');
+      expect(source).toContain('session_filing');
+    }
   });
 
   it('returns false without deleting when the topic was filed for another session', async () => {

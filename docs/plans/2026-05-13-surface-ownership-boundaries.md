@@ -1,5 +1,7 @@
 # Surface Ownership Boundaries Implementation Plan
 
+> **Status (2026-05-25):** 7 of 10 PRs shipped. **Done:** PR 1 (query-keys registry + isolation tests, `apps/mobile/src/lib/query-keys.ts`), PR 3 (session facade hooks, `use-session-context.ts`), PR 4 (library retention boundary, `use-library-context.ts`), PR 6 (ReportsList dedupe), PR 7 (subject rename to `SubjectTile`/`SubjectProgressRow`), PR 8 (AST-based ownership guard, `surface-ownership.test.ts`). **Stranded:** PR 2 (re-export shim for `getProfileSessions` lingers; `routes/progress.ts` import never flipped to session service), PR 5 (`ChildAccommodationRow` component never created — likely absorbed inline into ParentHomeScreen), PR 9 (payload-narrow queries — never decided, no profiling done), PR 10 (broad invalidations at session-close + profile-switch intentionally deferred with PR-10-deferred tags; tests confirm they still fire). **Resume here:** PR 2 (flip the import + delete the shim), then make the PR 9 profile/skip decision, then attack PR 10's deferred sites if invalidation latency matters in practice.
+
 > **For agentic workers:** Implement task-by-task. Keep PRs small, preserve current behavior first, and do not claim payload reduction unless the PR adds narrow API/query shapes.
 
 **Goal:** Turn the surface ownership design into an executable cleanup stream that prevents dashboard/progress/session/library/report concerns from bleeding across mobile surfaces.
