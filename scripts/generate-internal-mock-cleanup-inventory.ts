@@ -115,7 +115,6 @@ function collectRows(): MockRow[] {
 
   for (const file of files) {
     const source = readFileSync(resolve(REPO_ROOT, file), 'utf-8');
-    const sourceLines = source.split(/\r?\n/);
     const sourceFile = ts.createSourceFile(
       file,
       source,
@@ -136,10 +135,18 @@ function collectRows(): MockRow[] {
           const { line } = sourceFile.getLineAndCharacterOfPosition(
             node.getStart(sourceFile),
           );
+          // Extend the search window past the call's closing paren to the end
+          // of that physical line so a same-line trailing
+          // `jest.mock(...); // gc1-allow: ...` is captured. AST `getEnd()`
+          // stops at `)` and the trailing comment lives in the next node's
+          // leading trivia, which we'd otherwise miss.
+          const endOfCallLine = source.indexOf('\n', node.getEnd());
+          const windowEnd =
+            endOfCallLine === -1 ? source.length : endOfCallLine;
           const annotation = detectAnnotation(
             source,
-            sourceLines,
-            line,
+            node.getFullStart(),
+            windowEnd,
             target,
           );
           rows.push({
@@ -197,16 +204,19 @@ function collectTestFiles(dir: string, files: string[]): void {
 
 function detectAnnotation(
   source: string,
-  sourceLines: string[],
-  zeroBasedLine: number,
+  callFullStart: number,
+  callEnd: number,
   target: string,
 ): string {
-  // Look at: same line trailing comment, the line immediately above (a leading
-  // // comment), and the next line (start of the factory body which often holds
-  // an inline /* gc1-allow: ... */).
-  const windowStart = Math.max(0, zeroBasedLine - 1);
-  const windowEnd = Math.min(sourceLines.length - 1, zeroBasedLine + 1);
-  const windowText = sourceLines.slice(windowStart, windowEnd + 1).join('\n');
+  // The call's "full start" includes leading trivia (whitespace + comments
+  // between the previous sibling and this call) so a `// gc1-allow:` line
+  // immediately above is captured. Reading through `callEnd` covers the entire
+  // multi-line call expression — argument list, factory body, trailing options
+  // — so an inline `/* gc1-allow: ... */` between the target string and the
+  // factory body (the common formatter-friendly placement) is also captured.
+  // This replaces the previous fixed 3-line window, which missed comments on
+  // line+2 and beyond inside multi-line `jest.mock(...)` calls.
+  const windowText = source.slice(callFullStart, callEnd);
 
   // Match `gc1-allow: <label>` and capture the label up to a newline,
   // a `*/` block-comment terminator, or any `*` (avoids eating into a
@@ -448,12 +458,31 @@ function isNativeBoundary(target: string): boolean {
     /^expo-router$/,
     /^expo-/,
     /^@expo\//,
+    // Expo font packages: `@expo-google-fonts/<family>`. Distinct npm scope
+    // from `@expo/*`, easy to miss with the bare `^@expo\/` pattern.
+    /^@expo-google-fonts\//,
     /^react-native$/,
     /^react-native-/,
+    // Deep subpath imports off the `react-native` package itself, e.g.
+    // `react-native/Libraries/Utilities/BackHandler` — the legacy
+    // `^react-native-` pattern requires a literal dash and misses these.
+    /^react-native\//,
     /^@react-native\//,
+    // Sibling npm scopes maintained by the React Native community: things
+    // like `@react-native-community/netinfo` and
+    // `@react-native-async-storage/async-storage`. They are platform shims,
+    // not internal code.
+    /^@react-native-/,
     /^@react-navigation\//,
     /^@expo\/vector-icons$/,
-    /^nativewind$/,
+    // NativeWind ships subpath plugins (`nativewind/metro`, `nativewind/babel`)
+    // alongside the root package; treat the whole namespace as a boundary.
+    /^nativewind(?:\/|$)/,
+    // Third-party Metro plugins (`metro-config`, `metro-source-map`, etc.)
+    // and the official `@react-native/metro-*` configs are bundler plumbing,
+    // not internal app modules.
+    /^metro(?:-|$)/,
+    /^@react-native\/metro-/,
   ].some((pattern) => pattern.test(target));
 }
 
