@@ -15,6 +15,20 @@
       "inputs": ["production", "^production"],
       "outputs": ["{projectRoot}/dist"]
     },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/schemas",
+        "commands": [
+          "tsc --project tsconfig.lib.json --noEmit",
+          "tsc --project tsconfig.spec.json --noEmit"
+        ],
+        "parallel": false
+      },
+      "cache": true,
+      "inputs": ["default", "^production"],
+      "outputs": []
+    },
     "format:check": {}
   }
 }
