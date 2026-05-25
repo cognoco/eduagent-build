@@ -1,14 +1,10 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { CurriculumTopic } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 
-interface Topic {
-  id: string;
-  title: string;
-  sortOrder: number;
-  skipped: boolean;
-}
+type Topic = Pick<CurriculumTopic, 'id' | 'title' | 'sortOrder' | 'skipped'>;
 
 interface CollapsibleChapterProps {
   title: string;

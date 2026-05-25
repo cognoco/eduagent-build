@@ -23,6 +23,9 @@ import {
   updateQuotaPoolLimit,
 } from './subscription-core';
 import { getFamilyPoolBreakdownSharing } from '../settings';
+import { createLogger } from '../logger';
+
+const logger = createLogger();
 
 export type { FamilyMember } from '@eduagent/schemas';
 
@@ -166,7 +169,20 @@ function formatDateLabel(
       month: 'long',
       day: 'numeric',
     }).format(date);
-  } catch {
+  } catch (err) {
+    // [BUG-689] Invalid IANA timezone in billing data — `Intl.DateTimeFormat`
+    // throws a RangeError for unrecognized zones. Falling back to UTC silently
+    // hid bad subscription/profile timezone columns from observability, so
+    // cycle dates rendered to the wrong day for affected users with no audit
+    // trail. Emit a structured log so on-call can query "how many billing
+    // renders fell back to UTC in 24h" — per CLAUDE.md "Silent recovery
+    // without escalation is banned" in billing code.
+    logger.warn('[billing] invalid timezone fell back to UTC', {
+      event: 'billing.format_date.timezone_fallback',
+      requestedTimezone: timeZone,
+      locale,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return new Intl.DateTimeFormat(locale, {
       timeZone: 'UTC',
       year: 'numeric',

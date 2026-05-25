@@ -37,7 +37,6 @@ const logger = createLogger();
 // shape into the shared contract surface for no consumer benefit.
 const trialSubscriptionFailedDataSchema = z.object({
   accountId: z.string().min(1),
-  clerkUserId: z.string().min(1).optional(),
   reason: z.string().min(1).optional(),
   timestamp: z.string().optional(),
 });
@@ -87,7 +86,6 @@ export const billingTrialSubscriptionFailed = inngest.createFunction(
 
     logger.error('billing.trial_subscription_failed.received', {
       accountId: data.accountId,
-      clerkUserId: data.clerkUserId ?? 'unknown',
       reason: data.reason ?? 'unknown',
       receivedAt: new Date().toISOString(),
       eventTimestamp: data.timestamp ?? null,
@@ -104,7 +102,6 @@ export const billingTrialSubscriptionFailed = inngest.createFunction(
         extra: {
           surface: 'billing-trial-subscription-failed',
           accountId: data.accountId,
-          clerkUserId: data.clerkUserId,
           eventTimestamp: data.timestamp,
         },
       },

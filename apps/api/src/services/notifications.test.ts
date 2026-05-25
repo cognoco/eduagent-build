@@ -209,6 +209,35 @@ describe('sendPushNotification', () => {
 
     expect(result).toEqual({ sent: false, reason: 'network_error' });
   });
+
+  // [BUG-688] Regression: a DB error thrown by logNotification AFTER a
+  // successful Expo send must be classified as `db_error` / `log_write_failed`
+  // — NOT as `network_error`. The previous single-try shape wrapped both the
+  // fetch and the DB write, so a Postgres failure was misreported as a push
+  // network outage in Sentry/metrics and queries undercounted real outages.
+  it('classifies post-send logNotification failure as db_error (not network_error)', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-xyz', status: 'ok' } }),
+    });
+    mockLogNotification.mockRejectedValue(new Error('connection terminated'));
+
+    const result = await sendPushNotification(mockDb, payload);
+
+    // Push was delivered (sent: true) but DB write failed — surface the
+    // divergence via reason: 'log_write_failed'. Critically, the reason is
+    // NOT 'network_error'.
+    expect(result).toEqual({
+      sent: true,
+      ticketId: 'ticket-xyz',
+      reason: 'log_write_failed',
+    });
+    expect(result.reason).not.toBe('network_error');
+    expect(mockFetchFn).toHaveBeenCalled();
+    expect(mockLogNotification).toHaveBeenCalled();
+  });
 });
 
 describe('formatFilingFailedPush', () => {

@@ -15,6 +15,15 @@ export function withOpacity(color: string, alpha: number): string {
 
   if (trimmed.startsWith('#')) {
     const hex = trimmed.slice(1);
+    const validHex = /^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
+      hex,
+    );
+    if (!validHex) {
+      console.warn(
+        `withOpacity: invalid hex color "${trimmed}" — returning unchanged`,
+      );
+      return trimmed;
+    }
     if (hex.length === 3) {
       const expanded = hex
         .split('')

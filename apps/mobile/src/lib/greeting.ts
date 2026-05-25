@@ -37,13 +37,14 @@ function getDefaultSubtitle(hour: number): string {
   return 'Burning the midnight oil?';
 }
 
-export type TimeOfDay = 'morning' | 'afternoon' | 'evening';
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
 
 export function getTimeOfDay(now: Date = new Date()): TimeOfDay {
   const hour = now.getHours();
   if (hour >= 5 && hour < 12) return 'morning';
   if (hour >= 12 && hour < 17) return 'afternoon';
-  return 'evening';
+  if (hour >= 17 && hour < 21) return 'evening';
+  return 'night';
 }
 
 export function getGreeting(name: string, now: Date = new Date()): Greeting {

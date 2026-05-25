@@ -101,7 +101,6 @@ export async function findOrCreateAccount(
       // Account exists but has no subscription — race-condition recovery path.
       logger.warn('account.trial_missing_repair_attempted', {
         accountId: existing.id,
-        clerkUserId,
       });
       await safeSend(
         () =>
@@ -109,12 +108,11 @@ export async function findOrCreateAccount(
             name: 'app/account.trial_missing_repair_attempted',
             data: {
               accountId: existing.id,
-              clerkUserId,
               timestamp: new Date().toISOString(),
             },
           }),
         'account.trial_missing_repair_attempted',
-        { accountId: existing.id, clerkUserId },
+        { accountId: existing.id },
       );
       try {
         const plusTier = getTierConfig('plus');
@@ -132,7 +130,6 @@ export async function findOrCreateAccount(
       } catch (error) {
         logger.error('billing.trial_missing_repair_failed', {
           accountId: existing.id,
-          clerkUserId,
           reason: error instanceof Error ? error.message : String(error),
         });
         captureException(error, {
@@ -140,7 +137,6 @@ export async function findOrCreateAccount(
           extra: {
             flow: 'findOrCreateAccount.trialMissingRepair',
             accountId: existing.id,
-            clerkUserId,
           },
         });
       }
@@ -171,6 +167,7 @@ export async function findOrCreateAccount(
       const emailHash = hashEmail(email);
 
       logger.warn('account.reclaim_attempt_blocked', {
+        // Retained: only available Clerk audit join key — no accountId at this point
         incomingClerkUserId: clerkUserId,
         existingClerkUserId: existingByEmail.clerkUserId,
         emailHash,
@@ -262,7 +259,6 @@ export async function findOrCreateAccount(
     //      coupling to the lazy-provision path.
     logger.error('billing.trial_subscription_creation_failed', {
       accountId: row.id,
-      clerkUserId,
       reason: error instanceof Error ? error.message : String(error),
     });
     captureException(error, {
@@ -270,7 +266,6 @@ export async function findOrCreateAccount(
       extra: {
         flow: 'findOrCreateAccount.trialSubscription',
         accountId: row.id,
-        clerkUserId,
       },
     });
     // Inngest failure must not mask the primary error path. The structured
@@ -283,13 +278,12 @@ export async function findOrCreateAccount(
           name: 'app/billing.trial_subscription_failed',
           data: {
             accountId: row.id,
-            clerkUserId,
             reason: error instanceof Error ? error.message : String(error),
             timestamp: new Date().toISOString(),
           },
         }),
       'billing.trial_subscription_failed',
-      { accountId: row.id, clerkUserId },
+      { accountId: row.id },
     );
   }
 

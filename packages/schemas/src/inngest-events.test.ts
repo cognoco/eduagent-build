@@ -3,6 +3,7 @@ import {
   filingResolvedEventSchema,
   filingRetryCompletedEventSchema,
   filingRetryEventSchema,
+  sessionAutoFileRequestedEventSchema,
   filingTimedOutEventSchema,
   orphanPersistFailedEventSchema,
   sessionSummaryFailedEventSchema,
@@ -93,6 +94,31 @@ describe('filing lifecycle Inngest event schemas', () => {
         sessionId: validUuid,
         resolution: 'totally_unknown',
         timestamp: '2026-04-29T10:00:00.000Z',
+      }),
+    ).toThrow();
+  });
+});
+
+describe('sessionAutoFileRequestedEventSchema', () => {
+  it('accepts a user-initiated auto-file request with a dispatch id', () => {
+    expect(() =>
+      sessionAutoFileRequestedEventSchema.parse({
+        sessionId: validUuid,
+        profileId: validUuid,
+        requestedAt: '2026-05-25T10:00:00.000Z',
+        reason: 'user_requested',
+        dispatchId: 'manual-00000000-0000-4000-8000-000000000001',
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects auto-file requests without a dispatch id', () => {
+    expect(() =>
+      sessionAutoFileRequestedEventSchema.parse({
+        sessionId: validUuid,
+        profileId: validUuid,
+        requestedAt: '2026-05-25T10:00:00.000Z',
+        reason: 'retry',
       }),
     ).toThrow();
   });

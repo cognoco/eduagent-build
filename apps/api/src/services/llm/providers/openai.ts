@@ -229,8 +229,20 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                   const chunk = JSON.parse(jsonStr) as OpenAIResponse;
                   const text = processChunk(chunk);
                   if (text) yield text;
-                } catch {
-                  // Skip malformed JSON chunks
+                } catch (err) {
+                  // [BUG-695] Previously an empty catch silently discarded
+                  // malformed SSE chunks, leaving corrupt LLM responses
+                  // invisible. Log structurally so we can query
+                  // "openai.sse.malformed count over 24h" — discard still
+                  // happens (one bad chunk should not kill the stream) but
+                  // it is now observable. Truncate the chunk to avoid
+                  // bloating logs with multi-KB payloads.
+                  logger.warn('[llm:openai] malformed SSE chunk discarded', {
+                    event: 'openai.sse.malformed',
+                    site: 'stream_loop',
+                    chunk: jsonStr.slice(0, 200),
+                    error: err instanceof Error ? err.message : String(err),
+                  });
                 }
               }
             }
@@ -245,8 +257,14 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                     const chunk = JSON.parse(jsonStr) as OpenAIResponse;
                     const text = processChunk(chunk);
                     if (text) yield text;
-                  } catch {
-                    // Skip malformed
+                  } catch (err) {
+                    // [BUG-695] Same as above — flush-buffer path.
+                    logger.warn('[llm:openai] malformed SSE chunk discarded', {
+                      event: 'openai.sse.malformed',
+                      site: 'flush_buffer',
+                      chunk: jsonStr.slice(0, 200),
+                      error: err instanceof Error ? err.message : String(err),
+                    });
                   }
                 }
               }

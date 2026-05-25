@@ -32,7 +32,6 @@ afterAll(() => {
 
 interface FailureEventData {
   accountId: string;
-  clerkUserId: string;
   reason: string;
   timestamp: string;
 }
@@ -66,7 +65,6 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
   it('returns logged status with account metadata after validating the payload (BUG-754)', async () => {
     const result = await invokeHandler({
       accountId: 'acc-1',
-      clerkUserId: 'clerk_user_1',
       reason: 'DB constraint violation',
       timestamp: '2026-04-27T10:00:00.000Z',
     });
@@ -82,7 +80,6 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
     // handler returns a terminal status without trying to keep processing.
     const result = await invokeHandler({
       // accountId omitted intentionally
-      clerkUserId: 'clerk_user_2',
       reason: 'malformed event',
       timestamp: '2026-04-27T10:00:00.000Z',
     } as unknown as FailureEventData);
@@ -127,7 +124,6 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
   it('emits a structured error log with the failure reason (observability guarantee)', async () => {
     await invokeHandler({
       accountId: 'acc-2',
-      clerkUserId: 'clerk_user_2',
       reason: 'Transient network error',
       timestamp: '2026-04-27T10:00:00.000Z',
     });
@@ -144,7 +140,6 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
     expect(entry.level).toBe('error');
     expect(entry.context).toMatchObject({
       accountId: 'acc-2',
-      clerkUserId: 'clerk_user_2',
       reason: 'Transient network error',
       eventTimestamp: '2026-04-27T10:00:00.000Z',
     });

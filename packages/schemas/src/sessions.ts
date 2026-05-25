@@ -262,8 +262,25 @@ export const filingStatusSchema = z.enum([
   'filing_pending',
   'filing_failed',
   'filing_recovered',
+  'filing_kept_out',
 ]);
 export type FilingStatus = z.infer<typeof filingStatusSchema>;
+
+export type SessionEffectiveMode = 'freeform' | 'learning';
+
+export function getSessionEffectiveMode(session: {
+  metadata?: unknown;
+}): SessionEffectiveMode | undefined {
+  const parsed = sessionMetadataSchema.safeParse(session.metadata ?? {});
+  if (!parsed.success) {
+    return undefined;
+  }
+
+  return parsed.data.effectiveMode === 'freeform' ||
+    parsed.data.effectiveMode === 'learning'
+    ? parsed.data.effectiveMode
+    : undefined;
+}
 
 export const summaryStatusSchema = z.enum([
   'pending',

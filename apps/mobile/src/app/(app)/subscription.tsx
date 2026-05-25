@@ -23,6 +23,7 @@ import type {
 import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { subscriptionResponseSchema } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
@@ -839,8 +840,8 @@ function SubscriptionContent(): React.ReactElement | null {
           staleTime: 0,
           queryFn: async () => {
             const res = await client.subscription.$get({});
-            await assertOk(res);
-            const data = await res.json();
+            const okRes = await assertOk(res);
+            const data = subscriptionResponseSchema.parse(await okRes.json());
             return data.subscription;
           },
         });
@@ -955,8 +956,8 @@ function SubscriptionContent(): React.ReactElement | null {
             staleTime: 0,
             queryFn: async () => {
               const res = await client.subscription.$get({});
-              await assertOk(res);
-              const data = await res.json();
+              const okRes = await assertOk(res);
+              const data = subscriptionResponseSchema.parse(await okRes.json());
               return data.subscription;
             },
           });

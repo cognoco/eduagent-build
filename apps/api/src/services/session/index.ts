@@ -57,6 +57,10 @@ export {
   recordSessionEvent,
   flagContent,
   claimSessionForFilingRetry,
+  markSessionKeptOutOfLibrary,
+  requestSessionLibraryFiling,
+  restoreSessionForAutoFiling,
+  resetFilingForRetry,
   getResumeNudgeCandidate,
   // Profile session list (extracted from dashboard.ts — PR-2)
   getProfileSessions,
@@ -68,6 +72,7 @@ export type {
   ResumeNudgeCandidate,
   ChildSession,
   ChildSessionDrillScore,
+  LibraryFilingRequest,
 } from './session-crud';
 
 // System-prompt intents (WI-373 — server-owned prompt resolution)
@@ -107,7 +112,11 @@ export {
 } from './session-homework';
 
 // Book sessions
-export { getBookSessions, backfillSessionTopicId } from './session-book';
+export {
+  getBookSessions,
+  markSessionFiled,
+  backfillSessionTopicId,
+} from './session-book';
 export type { BookSession } from './session-book';
 
 // Depth evaluation

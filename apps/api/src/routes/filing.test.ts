@@ -152,7 +152,7 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
   return {
     ...actual,
     getSessionTranscript: jest.fn().mockResolvedValue(null),
-    backfillSessionTopicId: jest.fn().mockResolvedValue(undefined),
+    markSessionFiled: jest.fn().mockResolvedValue(undefined),
     // [CR-2026-05-19-H34] getSession is the ownership guard — mock it so we
     // can simulate (a) session owned by caller, (b) foreign session → null
     // (IDOR break test), and (c) post-claim re-read for the 429/409 paths.

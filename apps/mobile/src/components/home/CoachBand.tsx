@@ -1,10 +1,11 @@
 import { Pressable, View, Text } from 'react-native';
+import { getTimeOfDay } from '../../lib/greeting';
 import { useThemeColors } from '../../lib/theme';
 
 function getTimeAwareEyebrow(now: Date = new Date()): string {
-  const hour = now.getHours();
-  if (hour >= 5 && hour < 12) return 'THIS MORNING';
-  if (hour >= 12 && hour < 17) return 'THIS AFTERNOON';
+  const period = getTimeOfDay(now);
+  if (period === 'morning') return 'THIS MORNING';
+  if (period === 'afternoon') return 'THIS AFTERNOON';
   return 'TONIGHT';
 }
 
