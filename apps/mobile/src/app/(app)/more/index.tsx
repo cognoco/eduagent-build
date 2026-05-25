@@ -32,7 +32,7 @@ import {
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, userId } = useAuth();
   const { activeProfile, profiles } = useProfile();
   const navigationContract = useNavigationContract();
   const isImpersonating = navigationContract.isParentProxy;
@@ -270,6 +270,7 @@ export default function MoreScreen() {
                   clerkSignOut: signOut,
                   queryClient,
                   profileIds: profiles.map((p) => p.id),
+                  clerkUserId: userId ?? undefined,
                 });
               } catch {
                 platformAlert(

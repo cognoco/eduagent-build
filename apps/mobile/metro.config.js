@@ -21,6 +21,24 @@ const { assetExts, sourceExts } = defaultConfig.resolver;
 
 const monorepoRoot = path.resolve(__dirname, '../..');
 
+// [BUG-725] Exclude the `apps/mobile/src/app/dev-only/` Expo Router segment
+// from non-E2E bundles. The directory contains seed routes
+// (`seed-pending-redirect`, `seed-preview-state`) that exist only to support
+// Maestro flows by priming SecureStore state without waiting for real TTLs.
+// Each file carries a runtime `EXPO_PUBLIC_E2E === 'true'` guard, but the
+// component code (including the seed helpers) is still shipped in the JS
+// bundle when the runtime guard is the only line of defence — increasing the
+// attack surface on production APKs and bloating the bundle. Blocking the
+// directory at the resolver level means the files never enter the bundle in
+// the first place when E2E is off, and the runtime guard stays as
+// defence-in-depth for E2E builds. E2E builds are produced with
+// `EXPO_PUBLIC_E2E=true` (see `apps/mobile/eas.json` env profiles + CI APK
+// build steps).
+const isE2EBuild = process.env.EXPO_PUBLIC_E2E === 'true';
+const devOnlyBlockList = isE2EBuild
+  ? []
+  : [/[/\\]apps[/\\]mobile[/\\]src[/\\]app[/\\]dev-only[/\\].*/];
+
 /**
  * Metro configuration
  * https://reactnative.dev/docs/metro
@@ -45,6 +63,7 @@ const customConfig = {
       /[/\\]__mocks__[/\\].*/,
       /[/\\]test-utils[/\\].*/,
       /[/\\]\.worktrees[/\\].*/,
+      ...devOnlyBlockList,
     ],
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),

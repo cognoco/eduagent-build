@@ -35,7 +35,7 @@ export default function DeleteAccountScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { signOut } = useAuth();
+  const { signOut, userId } = useAuth();
   const queryClient = useQueryClient();
   const { profiles, activeProfile } = useProfile();
   const hasLinkedChildren = useHasLinkedChildren();
@@ -267,6 +267,7 @@ export default function DeleteAccountScreen() {
                   clerkSignOut: signOut,
                   queryClient,
                   profileIds: profiles.map((p) => p.id),
+                  clerkUserId: userId ?? undefined,
                 }).catch(() => {
                   platformAlert(
                     t('account.signOutFailedTitle'),

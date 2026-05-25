@@ -49,6 +49,8 @@ module.exports = {
         'practice-chip-bg': 'var(--color-practice-chip-bg)',
         reward: 'var(--color-reward)',
         'reward-soft': 'var(--color-reward-soft)',
+        'highlight-bg': 'var(--color-highlight-bg)',
+        'highlight-fg': 'var(--color-highlight-fg)',
       },
       borderRadius: {
         card: 'var(--radius-card)',

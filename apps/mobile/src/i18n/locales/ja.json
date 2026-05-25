@@ -2905,10 +2905,35 @@
     "updating": "更新中...",
     "updateButton": "パスワードを更新"
   },
+  "welcomeIntro": {
+    "card1": {
+      "headline": "Your notebook fills up as you learn",
+      "supporting": "Notes and what your mentor remembers about you build a study record you can come back to."
+    },
+    "card2": {
+      "headline": "Recaps and progress save automatically",
+      "supporting": "After every session, you'll see what you covered and what's worth revisiting."
+    },
+    "card3": {
+      "headline": "Your mentor remembers you",
+      "supporting": "Tell it once — your interests, how you learn, what's hard — and it carries that forward."
+    },
+    "card4": {
+      "headline": "Built for families",
+      "supporting": "Parents see what their kids worked on and get conversation starters for the week."
+    },
+    "next": "Next",
+    "letsStart": "Let's start",
+    "a11y": {
+      "previous": "Previous card",
+      "next": "Next card",
+      "dots": "Page {{current}} of {{total}}"
+    }
+  },
   "proxy": {
     "readOnly": {
-      "hint": "お子様のアカウントを閲覧中です。変更を加えるには、ご自身のプロフィールに切り替えてください。",
-      "title": "変更を加えるには、ご自身のプロフィールに切り替えてください",
+      "hint": "お子様のアカウントを表示しています。変更を加えるには、ご自身のプロフィールに切り替えてください。",
+      "title": "変更を加えるにはご自身のプロフィールに切り替えてください",
       "switchProfileCta": "プロフィールを切り替える"
     }
   }

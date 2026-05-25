@@ -45,11 +45,14 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // use-dictation-preferences.ts — getPaceKey + getPunctKey
   (id) => `dictation-pace-${id}`,
   (id) => `dictation-punctuation-${id}`,
-  // use-rating-prompt.ts — current + legacy (different separator)
+  // use-rating-prompt.ts — current keys only.
+  // Legacy `rating-recall-success-count:${id}` and `rating-last-prompt:${id}`
+  // colon-delimited keys removed 2026-05-24 (BUG-724 / FCR-2026-05-23-L14.F10).
+  // Codebase is pre-launch (no real devices) and SecureStore guardrail forbids
+  // colons in keys; the legacy migration in use-rating-prompt.ts is removed in
+  // the same change so there is nothing left to clean up.
   (id) => `rating-recall-success-count-${id}`,
   (id) => `rating-last-prompt-${id}`,
-  (id) => `rating-recall-success-count:${id}`,
-  (id) => `rating-last-prompt:${id}`,
   // session-recovery.ts — getRecoveryKey, sanitized
   (id) => sanitizeSecureStoreKey(`session-recovery-marker-${id}`),
   // [CR-SECURESTORE-REGISTRY-11] Previously-unregistered keys (BUG-723 leak).
@@ -163,6 +166,12 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
     line: 55,
     reason:
       'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API).',
+  },
+  {
+    file: 'apps/mobile/src/lib/intro-state.ts',
+    line: 43,
+    reason:
+      'Welcome-intro "seen" flag is per-Clerk-userId, not per-profileId — falls outside PER_PROFILE_KEYS. Per GLOBAL_KEYS comment, onboarding flags that legitimately survive sign-out cycles are intentionally excluded from global wipe: a user who signs out to switch accounts on the same device must not re-see the intro on next sign-in. Cross-user leakage is impossible because the key embeds the Clerk userId. Sign-out clears only the in-memory bit (clearIntroSeen).',
   },
 ];
 

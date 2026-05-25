@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
-  ScrollView,
   Text,
   View,
 } from 'react-native';
@@ -26,7 +26,12 @@ function subjectId(subject: DashboardSubject): string | null {
   return id && id.length > 0 ? id : null;
 }
 
-function SubjectRow({
+// Hoisted outside component to avoid recreation on every render (BUG-745)
+const CURRICULUM_CONTENT_CONTAINER_STYLE = {
+  paddingHorizontal: 20,
+} as const;
+
+const SubjectRow = memo(function SubjectRow({
   childName,
   profileId,
   subject,
@@ -104,7 +109,7 @@ function SubjectRow({
       {content}
     </Pressable>
   );
-}
+});
 
 function NotLinkedEmptyState({
   onPress,
@@ -171,6 +176,14 @@ export default function ChildCurriculumScreen(): React.ReactElement {
         params: { profileId },
       } as Href)
     : (FAMILY_HOME_PATH as Href);
+
+  const contentContainerStyle = useMemo(
+    () => ({
+      ...CURRICULUM_CONTENT_CONTAINER_STYLE,
+      paddingBottom: insets.bottom + 24,
+    }),
+    [insets.bottom],
+  );
 
   if (
     FEATURE_FLAGS.MODE_NAV_V1_ENABLED &&
@@ -263,52 +276,65 @@ export default function ChildCurriculumScreen(): React.ReactElement {
     );
   }
 
+  const header = (
+    <View className="flex-row items-center pb-2 pt-4">
+      <Pressable
+        onPress={() => goBackOrReplace(router, backHref)}
+        className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
+        accessibilityRole="button"
+        accessibilityLabel={t('common.goBack')}
+        testID="child-curriculum-back"
+      >
+        <Ionicons name="arrow-back" size={24} />
+      </Pressable>
+      <View className="flex-1">
+        <Text className="text-h2 font-bold text-text-primary">
+          {t('parentView.index.curriculumTitle', {
+            defaultValue: 'Curriculum',
+          })}
+        </Text>
+        <Text className="mt-1 text-body-sm text-text-secondary">
+          {t('parentView.index.curriculumSubtitle', {
+            name: childName,
+            defaultValue: `Browse ${childName}'s subjects and topics`,
+          })}
+        </Text>
+      </View>
+    </View>
+  );
+
   return (
     <View
       className="flex-1 bg-background"
       style={{ paddingTop: insets.top }}
       testID="child-curriculum-screen"
     >
-      <View className="flex-row items-center px-5 pb-2 pt-4">
-        <Pressable
-          onPress={() => goBackOrReplace(router, backHref)}
-          className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
-          testID="child-curriculum-back"
-        >
-          <Ionicons name="arrow-back" size={24} />
-        </Pressable>
-        <View className="flex-1">
-          <Text className="text-h2 font-bold text-text-primary">
-            {t('parentView.index.curriculumTitle', {
-              defaultValue: 'Curriculum',
-            })}
-          </Text>
-          <Text className="mt-1 text-body-sm text-text-secondary">
-            {t('parentView.index.curriculumSubtitle', {
-              name: childName,
-              defaultValue: `Browse ${childName}'s subjects and topics`,
-            })}
-          </Text>
-        </View>
-      </View>
-
-      <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-        testID="child-curriculum-scroll"
-      >
-        {subjects.length > 0 ? (
-          subjects.map((subject, index) => (
+      {subjects.length > 0 ? (
+        <FlatList
+          className="flex-1"
+          data={subjects}
+          keyExtractor={(subject, index) =>
+            subject.subjectId ?? `${subject.name}-${index}`
+          }
+          renderItem={({ item: subject, index }) => (
             <SubjectRow
               key={subject.subjectId ?? `${subject.name}-${index}`}
               profileId={profileId}
               childName={childName}
               subject={subject}
             />
-          ))
-        ) : (
+          )}
+          ListHeaderComponent={header}
+          contentContainerStyle={contentContainerStyle}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews
+          testID="child-curriculum-scroll"
+        />
+      ) : (
+        <View className="flex-1 px-5">
+          {header}
           <View
             className="mt-6 rounded-card bg-surface p-4"
             testID="child-curriculum-empty"
@@ -325,8 +351,8 @@ export default function ChildCurriculumScreen(): React.ReactElement {
               })}
             </Text>
           </View>
-        )}
-      </ScrollView>
+        </View>
+      )}
     </View>
   );
 }

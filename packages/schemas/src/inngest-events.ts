@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const filingTimedOutEventSchema = z.object({
   sessionId: z.string().uuid(),
   profileId: z.string().uuid(),
   sessionType: z.string().nullable(),
   timeoutMs: z.number().int().positive(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type FilingTimedOutEvent = z.infer<typeof filingTimedOutEventSchema>;
 
@@ -20,7 +21,7 @@ export type FilingRetryEvent = z.infer<typeof filingRetryEventSchema>;
 export const filingRetryCompletedEventSchema = z.object({
   sessionId: z.string().uuid(),
   profileId: z.string().uuid(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type FilingRetryCompletedEvent = z.infer<
   typeof filingRetryCompletedEventSchema
@@ -36,7 +37,7 @@ export const filingResolvedEventSchema = z.object({
     'recovered',
     'recovered_after_window',
   ]),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type FilingResolvedEvent = z.infer<typeof filingResolvedEventSchema>;
 
@@ -45,7 +46,7 @@ export const subjectCurriculumPrewarmRequestedEventSchema = z.object({
   subjectId: z.string().uuid(),
   profileId: z.string().uuid(),
   bookId: z.string().uuid(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type SubjectCurriculumPrewarmRequestedEvent = z.infer<
   typeof subjectCurriculumPrewarmRequestedEventSchema
@@ -56,7 +57,7 @@ export const subjectCurriculumRetryRequestedEventSchema = z.object({
   subjectId: z.string().uuid(),
   profileId: z.string().uuid(),
   bookId: z.string().uuid(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type SubjectCurriculumRetryRequestedEvent = z.infer<
   typeof subjectCurriculumRetryRequestedEventSchema
@@ -80,7 +81,7 @@ export const appNotificationSuppressedEventSchema = z.object({
   profileId: z.string().uuid(),
   notificationType: z.enum(['daily_reminder', 'review_reminder']),
   reason: z.string(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type AppNotificationSuppressedEvent = z.infer<
   typeof appNotificationSuppressedEventSchema
@@ -92,7 +93,7 @@ export const reviewCalibrationRequestedEventSchema = z.object({
   topicId: z.string().uuid(),
   learnerMessage: z.string().min(1),
   topicTitle: z.string().min(1),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type ReviewCalibrationRequestedEvent = z.infer<
   typeof reviewCalibrationRequestedEventSchema
@@ -106,7 +107,7 @@ export const topicProbeRequestedEventSchema = z.object({
   topicId: z.string().uuid(),
   learnerMessage: z.string().min(1),
   topicTitle: z.string().min(1),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type TopicProbeRequestedEvent = z.infer<
   typeof topicProbeRequestedEventSchema
@@ -223,7 +224,7 @@ export type ClassificationFailedEvent = z.infer<
 export const summaryEventPayloadSchema = z.object({
   profileId: z.string().uuid(),
   sessionId: z.string().uuid(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
   subjectId: z.string().uuid().nullable().optional(),
   topicId: z.string().uuid().nullable().optional(),
   sessionSummaryId: z.string().uuid().optional(),
@@ -238,7 +239,7 @@ export const bookTopicsGeneratedEventSchema = z.object({
   subjectId: z.string().uuid(),
   bookId: z.string().uuid(),
   profileId: z.string().uuid(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
 });
 export type BookTopicsGeneratedEvent = z.infer<
   typeof bookTopicsGeneratedEventSchema

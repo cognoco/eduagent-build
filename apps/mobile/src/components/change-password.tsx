@@ -74,6 +74,7 @@ export function ChangePassword(): React.JSX.Element {
         clerkSignOut: signOut,
         queryClient,
         profileIds: profiles.map((p) => p.id),
+        clerkUserId: user?.id,
       });
     } catch {
       platformAlert(

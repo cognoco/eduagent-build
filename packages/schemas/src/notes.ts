@@ -27,15 +27,19 @@ export const topicNoteSchema = noteResponseSchema.extend({
 });
 export type TopicNote = z.infer<typeof topicNoteSchema>;
 
-export const createNoteInputSchema = z.object({
-  content: z.string().min(1).max(5000),
-  sessionId: z.string().uuid().optional(),
-});
+export const createNoteInputSchema = z
+  .object({
+    content: z.string().min(1).max(5000),
+    sessionId: z.string().uuid().optional(),
+  })
+  .strict();
 export type CreateNoteInput = z.infer<typeof createNoteInputSchema>;
 
-export const updateNoteInputSchema = z.object({
-  content: z.string().min(1).max(5000),
-});
+export const updateNoteInputSchema = z
+  .object({
+    content: z.string().min(1).max(5000),
+  })
+  .strict();
 export type UpdateNoteInput = z.infer<typeof updateNoteInputSchema>;
 
 // Re-exported for backward compat — the local `_dateField` used to live in

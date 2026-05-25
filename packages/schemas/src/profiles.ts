@@ -53,19 +53,21 @@ export const birthYearSchema = z
     message: 'birthYear must correspond to a minimum age of 11',
   });
 
-export const profileCreateSchema = z.object({
-  displayName: z.string().min(1).max(50),
-  birthYear: birthYearSchema,
-  // WI-297: Optional full birth date components for exact age calculation.
-  // Persisted only as birthYear in the DB — these are used server-side to
-  // compute consent requirements precisely (avoids year-only overestimation).
-  birthMonth: z.number().int().min(1).max(12).optional(),
-  birthDay: z.number().int().min(1).max(31).optional(),
-  avatarUrl: z.string().url().optional(),
-  location: locationSchema.optional(),
-  conversationLanguage: conversationLanguageSchema.optional(),
-  pronouns: pronounsSchema.nullable().optional(),
-});
+export const profileCreateSchema = z
+  .object({
+    displayName: z.string().min(1).max(50),
+    birthYear: birthYearSchema,
+    // WI-297: Optional full birth date components for exact age calculation.
+    // Persisted only as birthYear in the DB — these are used server-side to
+    // compute consent requirements precisely (avoids year-only overestimation).
+    birthMonth: z.number().int().min(1).max(12).optional(),
+    birthDay: z.number().int().min(1).max(31).optional(),
+    avatarUrl: z.string().url().optional(),
+    location: locationSchema.optional(),
+    conversationLanguage: conversationLanguageSchema.optional(),
+    pronouns: pronounsSchema.nullable().optional(),
+  })
+  .strict();
 
 export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 
@@ -87,31 +89,39 @@ export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 // risking a merged write. NOTE: every field here MUST also be present in
 // profileUpdateSchema (and therefore profileCreateSchema) — these are parallel
 // paths into the same DB columns.
-export const onboardingLanguagePatchSchema = z.object({
-  conversationLanguage: conversationLanguageSchema,
-});
+export const onboardingLanguagePatchSchema = z
+  .object({
+    conversationLanguage: conversationLanguageSchema,
+  })
+  .strict();
 export type OnboardingLanguagePatch = z.infer<
   typeof onboardingLanguagePatchSchema
 >;
 
 // null clears the field; a string must be 1..32 chars.
-export const onboardingPronounsPatchSchema = z.object({
-  pronouns: pronounsSchema.nullable(),
-});
+export const onboardingPronounsPatchSchema = z
+  .object({
+    pronouns: pronounsSchema.nullable(),
+  })
+  .strict();
 export type OnboardingPronounsPatch = z.infer<
   typeof onboardingPronounsPatchSchema
 >;
 
-export const profileAppContextUpdateSchema = z.object({
-  defaultAppContext: appContextSchema,
-});
+export const profileAppContextUpdateSchema = z
+  .object({
+    defaultAppContext: appContextSchema,
+  })
+  .strict();
 export type ProfileAppContextUpdateInput = z.infer<
   typeof profileAppContextUpdateSchema
 >;
 
-export const profileSwitchSchema = z.object({
-  profileId: z.string().uuid(),
-});
+export const profileSwitchSchema = z
+  .object({
+    profileId: z.string().uuid(),
+  })
+  .strict();
 
 export type ProfileSwitchInput = z.infer<typeof profileSwitchSchema>;
 

@@ -97,16 +97,20 @@ export type AssessmentEvaluation = z.infer<typeof assessmentEvaluationSchema>;
 
 // Assessment answer submission
 
-export const assessmentAnswerSchema = z.object({
-  answer: z.string().min(1).max(10000),
-});
+export const assessmentAnswerSchema = z
+  .object({
+    answer: z.string().min(1).max(10000),
+  })
+  .strict();
 export type AssessmentAnswerInput = z.infer<typeof assessmentAnswerSchema>;
 
 // Quick check request — the learner's answer submission (not an HTTP response)
 
-export const quickCheckRequestSchema = z.object({
-  answer: z.string().min(1).max(5000),
-});
+export const quickCheckRequestSchema = z
+  .object({
+    answer: z.string().min(1).max(5000),
+  })
+  .strict();
 export type QuickCheckRequestInput = z.infer<typeof quickCheckRequestSchema>;
 
 // Verification type — standard, evaluate (Devil's Advocate), teach_back (Feynman)
@@ -130,9 +134,11 @@ export const analogyDomainSchema = z.enum([
 ]);
 export type AnalogyDomain = z.infer<typeof analogyDomainSchema>;
 
-export const analogyDomainUpdateSchema = z.object({
-  analogyDomain: analogyDomainSchema.nullable(),
-});
+export const analogyDomainUpdateSchema = z
+  .object({
+    analogyDomain: analogyDomainSchema.nullable(),
+  })
+  .strict();
 export type AnalogyDomainUpdateInput = z.infer<
   typeof analogyDomainUpdateSchema
 >;
@@ -187,6 +193,7 @@ export const recallTestSubmitSchema = z
     answer: z.string().max(10000).optional().default(''),
     attemptMode: z.enum(['standard', 'dont_remember']).optional(),
   })
+  .strict()
   .refine(
     (value) =>
       value.attemptMode === 'dont_remember' ||
@@ -200,11 +207,25 @@ export type RecallTestSubmitInput = z.infer<typeof recallTestSubmitSchema>;
 
 // Relearn topic request
 
-export const relearnTopicSchema = z.object({
-  topicId: z.string().uuid(),
-  method: z.enum(['same', 'different']),
-  preferredMethod: z.string().max(500).optional(), // only when method='different'
-});
+export const relearnTopicSchema = z
+  .object({
+    topicId: z.string().uuid(),
+    method: z.enum(['same', 'different']),
+    preferredMethod: z.string().max(500).optional(), // only when method='different'
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.method === 'different' &&
+      (value.preferredMethod ?? '').trim().length === 0
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['preferredMethod'],
+        message: "preferredMethod is required when method is 'different'",
+      });
+    }
+  });
 export type RelearnTopicInput = z.infer<typeof relearnTopicSchema>;
 
 // Teaching method preference
@@ -217,11 +238,13 @@ export const teachingMethodSchema = z.enum([
 ]);
 export type TeachingMethod = z.infer<typeof teachingMethodSchema>;
 
-export const teachingPreferenceSchema = z.object({
-  subjectId: z.string().uuid(),
-  method: teachingMethodSchema,
-  analogyDomain: analogyDomainSchema.nullable().optional(),
-});
+export const teachingPreferenceSchema = z
+  .object({
+    subjectId: z.string().uuid(),
+    method: teachingMethodSchema,
+    analogyDomain: analogyDomainSchema.nullable().optional(),
+  })
+  .strict();
 export type TeachingPreferenceInput = z.infer<typeof teachingPreferenceSchema>;
 
 // Needs deepening status

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const consentTypeSchema = z.enum(['GDPR', 'COPPA']);
 export type ConsentType = z.infer<typeof consentTypeSchema>;
@@ -11,18 +12,22 @@ export const consentStatusSchema = z.enum([
 ]);
 export type ConsentStatus = z.infer<typeof consentStatusSchema>;
 
-export const consentRequestSchema = z.object({
-  childProfileId: z.string().uuid(),
-  parentEmail: z.string().email(),
-  consentType: consentTypeSchema.default('GDPR'),
-});
+export const consentRequestSchema = z
+  .object({
+    childProfileId: z.string().uuid(),
+    parentEmail: z.string().email(),
+    consentType: consentTypeSchema.default('GDPR'),
+  })
+  .strict();
 
 export type ConsentRequest = z.infer<typeof consentRequestSchema>;
 
-export const consentRespondRequestSchema = z.object({
-  token: z.string(),
-  approved: z.boolean(),
-});
+export const consentRespondRequestSchema = z
+  .object({
+    token: z.string(),
+    approved: z.boolean(),
+  })
+  .strict();
 
 export type ConsentRespondRequest = z.infer<typeof consentRespondRequestSchema>;
 
@@ -52,7 +57,7 @@ export type MyConsentStatus = z.infer<typeof myConsentStatusSchema>;
 // Response for GET /consent/:childProfileId/status (parent view)
 export const childConsentStatusSchema = z.object({
   consentStatus: consentStatusSchema.nullable(),
-  respondedAt: z.string().datetime().nullable(),
+  respondedAt: isoDateField.nullable(),
   consentType: consentTypeSchema.nullable(),
 });
 export type ChildConsentStatus = z.infer<typeof childConsentStatusSchema>;

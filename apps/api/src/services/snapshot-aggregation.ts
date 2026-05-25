@@ -12,6 +12,7 @@ import {
   retentionCards,
   vocabulary,
   vocabularyRetentionCards,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -217,9 +218,54 @@ async function loadProgressStateOnce(
   }
 
   const subjectIds = subjectRows.map((subject) => subject.id);
-  const allCurricula = await db.query.curricula.findMany({
+  const repo = createScopedRepository(db, profileId);
+
+  // [BUG-742] Start the per-profile reads (sessions, assessments, retention
+  // cards, streak, vocabulary, vocabulary retention cards) in parallel with the
+  // curricula fetch, then await both before topic processing so either failure
+  // is observed before later synchronous topic shaping can throw.
+  const profileScopedReadsPromise = Promise.all([
+    // [BUG-250] Bound the session scan to the last 24 months. The previous
+    // unbounded query loaded every lifetime session row per profile, which on
+    // heavy learners (700+ sessions) multiplied across the daily cron fan-out
+    // produced significant nightly memory pressure for no useful signal —
+    // sessions older than 2 years are not surfaced in any user-facing metric
+    // (weekly digests, recent activity, current-week deltas) and the
+    // pedagogical relevance of multi-year-old activity is already captured by
+    // mastery / retention card state, not raw session rows. If true lifetime
+    // totals are needed later, pre-aggregate into a counters table (cheap
+    // count, no row materialisation) rather than reverting this bound.
+    repo.sessions.findMany(
+      and(
+        gte(learningSessions.exchangeCount, 1),
+        gte(learningSessions.startedAt, sessionWindowStart()),
+      ),
+    ),
+    repo.assessments.findMany(),
+    repo.retentionCards.findMany(),
+    // [BUG-912] Intentionally reads the RAW streak row (not findCurrentForToday)
+    // — snapshots represent point-in-time state for the snapshotDate, so
+    // applying today's decay rule would falsify what the user actually had on
+    // that historical date. Display paths must use repo.streaks.findCurrentForToday().
+    repo.streaks.findFirst(),
+    repo.vocabulary.findMany(),
+    repo.vocabularyRetentionCards.findMany(),
+  ]);
+
+  const curriculaPromise = db.query.curricula.findMany({
     where: inArray(curricula.subjectId, subjectIds),
   });
+  const [
+    [
+      sessionRows,
+      assessmentRows,
+      retentionCardRows,
+      streakRow,
+      vocabularyRows,
+      vocabularyCardRows,
+    ],
+    allCurricula,
+  ] = await Promise.all([profileScopedReadsPromise, curriculaPromise]);
 
   const latestCurriculumBySubject = new Map<string, string>();
   for (const curriculum of allCurricula.sort((a, b) => b.version - a.version)) {
@@ -277,52 +323,6 @@ async function loadProgressStateOnce(
       latestTopicsBySubject.set(topic.subjectId, latestTopics);
     }
   }
-
-  const [
-    sessionRows,
-    assessmentRows,
-    retentionCardRows,
-    streakRow,
-    vocabularyRows,
-    vocabularyCardRows,
-  ] = await Promise.all([
-    // [BUG-250] Bound the session scan to the last 24 months. The previous
-    // unbounded query loaded every lifetime session row per profile, which on
-    // heavy learners (700+ sessions) multiplied across the daily cron fan-out
-    // produced significant nightly memory pressure for no useful signal —
-    // sessions older than 2 years are not surfaced in any user-facing metric
-    // (weekly digests, recent activity, current-week deltas) and the
-    // pedagogical relevance of multi-year-old activity is already captured by
-    // mastery / retention card state, not raw session rows. If true lifetime
-    // totals are needed later, pre-aggregate into a counters table (cheap
-    // count, no row materialisation) rather than reverting this bound.
-    db.query.learningSessions.findMany({
-      where: and(
-        eq(learningSessions.profileId, profileId),
-        gte(learningSessions.exchangeCount, 1),
-        gte(learningSessions.startedAt, sessionWindowStart()),
-      ),
-    }),
-    db.query.assessments.findMany({
-      where: eq(assessments.profileId, profileId),
-    }),
-    db.query.retentionCards.findMany({
-      where: eq(retentionCards.profileId, profileId),
-    }),
-    // [BUG-912] Intentionally reads the RAW streak row (not findCurrentForToday)
-    // — snapshots represent point-in-time state for the snapshotDate, so
-    // applying today's decay rule would falsify what the user actually had on
-    // that historical date. Display paths must use repo.streaks.findCurrentForToday().
-    db.query.streaks.findFirst({
-      where: eq(streaks.profileId, profileId),
-    }),
-    db.query.vocabulary.findMany({
-      where: eq(vocabulary.profileId, profileId),
-    }),
-    db.query.vocabularyRetentionCards.findMany({
-      where: eq(vocabularyRetentionCards.profileId, profileId),
-    }),
-  ]);
 
   return {
     profileId,

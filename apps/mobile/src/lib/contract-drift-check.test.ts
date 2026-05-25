@@ -25,11 +25,22 @@ function freshModule() {
   };
 }
 
+function healthResponse(deploySha: string | null) {
+  return {
+    status: 'ok',
+    timestamp: '2026-05-25T10:00:00.000Z',
+    deploySha,
+    llm: {
+      providers: ['openai'],
+    },
+  };
+}
+
 describe('checkContractDrift', () => {
   it('logs info when API has no DEPLOY_SHA', async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'ok', deploySha: null }),
+      json: () => Promise.resolve(healthResponse(null)),
     });
     await freshModule().checkContractDrift();
     expect(infoSpy).toHaveBeenCalledWith(
@@ -44,7 +55,7 @@ describe('checkContractDrift', () => {
     process.env.EXPO_PUBLIC_GIT_SHA = 'aabbccdd1234';
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'ok', deploySha: '11223344' }),
+      json: () => Promise.resolve(healthResponse('11223344')),
     });
     await freshModule().checkContractDrift();
     expect(warnSpy).toHaveBeenCalledWith(
@@ -56,7 +67,7 @@ describe('checkContractDrift', () => {
     process.env.EXPO_PUBLIC_GIT_SHA = 'aabbccdd1234';
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'ok', deploySha: 'aabbccdd' }),
+      json: () => Promise.resolve(healthResponse('aabbccdd')),
     });
     await freshModule().checkContractDrift();
     expect(infoSpy).toHaveBeenCalledWith(
@@ -78,7 +89,7 @@ describe('checkContractDrift', () => {
   it('runs at most once per module load', async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'ok', deploySha: null }),
+      json: () => Promise.resolve(healthResponse(null)),
     });
     const mod = freshModule();
     await mod.checkContractDrift();

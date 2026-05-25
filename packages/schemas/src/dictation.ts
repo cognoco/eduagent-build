@@ -40,9 +40,11 @@ export type DictationMode = z.infer<typeof dictationModeSchema>;
 
 // --- prepare-homework ---
 
-export const prepareHomeworkInputSchema = z.object({
-  text: z.string().min(1).max(10000),
-});
+export const prepareHomeworkInputSchema = z
+  .object({
+    text: z.string().min(1).max(10000),
+  })
+  .strict();
 export type PrepareHomeworkInput = z.infer<typeof prepareHomeworkInputSchema>;
 
 export const prepareHomeworkOutputSchema = z.object({
@@ -84,30 +86,34 @@ export type DictationReviewResult = z.infer<typeof dictationReviewResultSchema>;
 
 // --- dictation result input (for recording results) ---
 
-export const recordDictationResultInputSchema = z.object({
-  completionKey: z.string().uuid().optional(),
-  localDate: z.string().date(),
-  sentenceCount: z.number().int().positive(),
-  mistakeCount: z.number().int().nonnegative().nullable().optional(),
-  mode: dictationModeSchema,
-  reviewed: z.boolean().optional().default(false),
-  subjectId: z.string().uuid().nullish(),
-});
+export const recordDictationResultInputSchema = z
+  .object({
+    completionKey: z.string().uuid().optional(),
+    localDate: z.string().date(),
+    sentenceCount: z.number().int().positive(),
+    mistakeCount: z.number().int().nonnegative().nullable().optional(),
+    mode: dictationModeSchema,
+    reviewed: z.boolean().optional().default(false),
+    subjectId: z.string().uuid().nullish(),
+  })
+  .strict();
 export type RecordDictationResultInput = z.infer<
   typeof recordDictationResultInputSchema
 >;
 
 // --- dictation review input (vision-based grading) ---
 
-export const dictationReviewInputSchema = z.object({
-  imageBase64: z.string().min(1).max(IMAGE_BASE64_MAX),
-  imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  sentences: z
-    .array(dictationSentenceSchema)
-    .min(1)
-    .max(DICTATION_REVIEW_MAX_SENTENCES),
-  language: z.string().min(2).max(10),
-});
+export const dictationReviewInputSchema = z
+  .object({
+    imageBase64: z.string().min(1).max(IMAGE_BASE64_MAX),
+    imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    sentences: z
+      .array(dictationSentenceSchema)
+      .min(1)
+      .max(DICTATION_REVIEW_MAX_SENTENCES),
+    language: z.string().min(2).max(10),
+  })
+  .strict();
 
 /**
  * Returns the total number of prompt-bearing characters in the input —

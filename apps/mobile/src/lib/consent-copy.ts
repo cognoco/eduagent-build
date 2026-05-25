@@ -1,3 +1,4 @@
+// Presentation-only: static copy shapes. Not API types. If consent copy ever becomes server-driven, move to @eduagent/schemas.
 import type { AgeBracket } from '@eduagent/schemas';
 
 // ── Consent Hand-Off Screen ──────────────────────────────────────────

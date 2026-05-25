@@ -66,7 +66,21 @@ const weeklyProgressPushEventSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  // [BUG-757] Optional retry counter. When the cron's batch sendEvent fails and
+  // the cron re-enqueues parents 5 minutes later, the retry event carries
+  // retryAttempt=1; subsequent re-runs (should never happen in practice given
+  // the generate-side idempotency dedup) would increment. Receiver bounds it
+  // via MAX_GENERATE_RETRY_ATTEMPTS to guarantee termination.
+  retryAttempt: z.number().int().min(0).optional(),
 });
+
+// [BUG-757] Hard cap on per-event retries — matches the cron's
+// MAX_GENERATE_RETRY_ATTEMPTS. If a generate event ever arrives with a
+// retryAttempt above this cap, the handler short-circuits to `skipped` with
+// reason `retry_cap_exhausted` and the cap is surfaced to Sentry by the cron
+// when it would have re-enqueued. Idempotency dedup means even a stale retry
+// chain cannot deliver duplicate pushes.
+const MAX_GENERATE_RETRY_ATTEMPTS = 3;
 
 type PreparedWeeklyProgressDigest =
   | {
@@ -355,14 +369,33 @@ export const weeklyProgressPushCron = inngest.createFunction(
     // blip) would either propagate and abort all subsequent batches OR —
     // worse — silently leave the parent function returning `completed` while
     // half the parents never got their weekly recap event. Each batch is now
-    // independently survivable: failures are captured to Sentry with batch
-    // metadata and counted in the final return so on-call and dashboards can
-    // detect partial fan-out.
+    // independently survivable.
+    //
+    // [BUG-850 / F-SVC-021] Per-batch try/catch + Sentry escalation. Without
+    // this, a single failing batch sendEvent (transient Inngest 5xx, network
+    // blip) would either propagate and abort all subsequent batches OR —
+    // worse — silently leave the parent function returning `completed` while
+    // half the parents never got their weekly recap event. Each batch is now
+    // independently survivable.
+    //
+    // [BUG-757] When a batch sendEvent fails the parent IDs in that batch are
+    // collected into `failedParentIds` and re-enqueued 5 minutes later via a
+    // delayed `step.sendEvent` (`ts: Date.now() + 5*60*1000`). Each retry event
+    // carries a `retryAttempt` field so the per-parent generate handler can
+    // enforce its own bound; the same idempotency key on the generate function
+    // (`parentId + reportWeekStart`) dedupes any accidental success+retry
+    // overlap within the 24h Inngest window, so a retry never produces a
+    // duplicate push. Sentry still receives the original batch failure with the
+    // full failed-parent list so on-call can detect partial fan-out.
     const BATCH_SIZE = 200;
+    const MAX_GENERATE_RETRY_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 5 * 60 * 1000;
     let queuedBatches = 0;
     let failedBatches = 0;
     let queuedParents = 0;
     let queuedSelfReports = 0;
+    let requeuedParents = 0;
+    const failedParentIds: string[] = [];
     for (let i = 0; i < targetProfileIds.length; i += BATCH_SIZE) {
       const batch = targetProfileIds.slice(i, i + BATCH_SIZE);
       try {
@@ -395,6 +428,40 @@ export const weeklyProgressPushCron = inngest.createFunction(
             batchSize: batch.length,
             totalParents: parentIds.length,
             totalSelfReports: selfReportProfileIds.length,
+            failedParentIds: batch,
+          },
+        });
+        failedParentIds.push(...batch);
+      }
+    }
+
+    // [BUG-757] Durable retry: re-enqueue failed-batch parents 5 minutes later
+    // with retryAttempt=1. Per-parent generate handler enforces the cap.
+    if (failedParentIds.length > 0) {
+      try {
+        await step.sendEvent(
+          `requeue-failed-batches`,
+          failedParentIds.map((parentId) => ({
+            name: 'app/weekly-progress-push.generate' as const,
+            ts: Date.now() + RETRY_DELAY_MS,
+            data: {
+              parentId,
+              reportWeekStart,
+              retryAttempt: 1,
+              ...(selfReportProfileIdSet.has(parentId)
+                ? { includeSelfReport: true }
+                : {}),
+            },
+          })),
+        );
+        requeuedParents = failedParentIds.length;
+      } catch (requeueErr) {
+        // Re-enqueue itself failed; surface terminal for ops paging.
+        captureException(requeueErr, {
+          extra: {
+            context: 'weekly-progress-push-cron-requeue-failed',
+            droppedParents: failedParentIds.length,
+            failedParentIds,
           },
         });
       }
@@ -408,6 +475,8 @@ export const weeklyProgressPushCron = inngest.createFunction(
       totalSelfReports: selfReportProfileIds.length,
       queuedBatches,
       failedBatches,
+      requeuedParents,
+      maxGenerateRetryAttempts: MAX_GENERATE_RETRY_ATTEMPTS,
     };
   },
 );
@@ -436,6 +505,32 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
       return { status: 'skipped', reason: 'invalid_payload' };
     }
     const { parentId, includeSelfReport } = parsed.data;
+    // [BUG-757] Hard cap on retry chain. The cron initiates retryAttempt=1; any
+    // event arriving with retryAttempt > MAX_GENERATE_RETRY_ATTEMPTS is dropped
+    // with a structured Sentry capture so a sustained Inngest issue never
+    // produces an unbounded re-enqueue loop.
+    const retryAttempt = parsed.data.retryAttempt ?? 0;
+    if (retryAttempt > MAX_GENERATE_RETRY_ATTEMPTS) {
+      captureException(
+        new Error(
+          'weekly-progress-push.generate: retry cap exhausted, event dropped',
+        ),
+        {
+          extra: {
+            context: 'weekly-progress-push-generate-retry-cap',
+            parentId,
+            retryAttempt,
+            maxRetryAttempts: MAX_GENERATE_RETRY_ATTEMPTS,
+          },
+        },
+      );
+      return {
+        status: 'skipped' as const,
+        reason: 'retry_cap_exhausted',
+        parentId,
+        retryAttempt,
+      };
+    }
     const reportWeekStart =
       parsed.data.reportWeekStart ?? isoDate(startOfCurrentWeek(new Date()));
 

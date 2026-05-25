@@ -59,14 +59,14 @@ function formatTranscriptForPrompt(transcript: SessionTranscript): string {
     .map((exchange) =>
       exchange.role === 'user'
         ? `Learner: ${escapeXml(exchange.content)}`
-        : `Tutor: ${escapeXml(exchange.content)}`
+        : `Tutor: ${escapeXml(exchange.content)}`,
     )
     .join('\n');
   return `<transcript>\n${lines}\n</transcript>`;
 }
 
 function parseDepthResponse(
-  raw: string
+  raw: string,
 ): Omit<DepthEvaluation, 'method'> | null {
   // [BUG-772] Use the shared brace-walker so prose preambles, fenced markdown
   // blocks, and trailing chatter all parse uniformly with every other LLM
@@ -109,7 +109,7 @@ function parseDepthResponse(
 
 function failOpen(
   exchangeCount: number,
-  learnerWordCount: number
+  learnerWordCount: number,
 ): DepthEvaluation {
   return {
     meaningful: true,
@@ -122,13 +122,14 @@ function failOpen(
 async function callWithTimeout(
   messages: ChatMessage[],
   timeoutMs: number,
-  ageBracket?: AgeBracket
+  ageBracket?: AgeBracket,
 ): Promise<string> {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error('timeout')), timeoutMs);
   });
+  // rung 1: Flash routing by design — depth analysis is latency-sensitive and doesn't need advanced model capabilities.
   const llmPromise = routeAndCall(messages, 1, { ageBracket }).then(
-    (result) => result.response
+    (result) => result.response,
   );
   return Promise.race([llmPromise, timeoutPromise]);
 }
@@ -136,7 +137,7 @@ async function callWithTimeout(
 async function detectTopicsOnly(
   transcript: SessionTranscript,
   timeoutMs: number,
-  ageBracket?: AgeBracket
+  ageBracket?: AgeBracket,
 ): Promise<DepthEvaluation['topics']> {
   try {
     const raw = await callWithTimeout(
@@ -145,7 +146,7 @@ async function detectTopicsOnly(
         { role: 'user', content: formatTranscriptForPrompt(transcript) },
       ],
       timeoutMs,
-      ageBracket
+      ageBracket,
     );
     return parseDepthResponse(raw)?.topics ?? [];
   } catch (error) {
@@ -164,7 +165,7 @@ async function evaluateWithLlm(
   exchangeCount: number,
   learnerWordCount: number,
   timeoutMs: number,
-  ageBracket?: AgeBracket
+  ageBracket?: AgeBracket,
 ): Promise<DepthEvaluation> {
   try {
     const raw = await callWithTimeout(
@@ -173,7 +174,7 @@ async function evaluateWithLlm(
         { role: 'user', content: formatTranscriptForPrompt(transcript) },
       ],
       timeoutMs,
-      ageBracket
+      ageBracket,
     );
     const parsed = parseDepthResponse(raw);
     if (parsed) {
@@ -199,10 +200,10 @@ export async function evaluateSessionDepth(
     timeoutMs?: number;
     topicTimeoutMs?: number;
     ageBracket?: AgeBracket;
-  }
+  },
 ): Promise<DepthEvaluation> {
   const exchangeCount = transcript.exchanges.filter(
-    (exchange) => exchange.role === 'user'
+    (exchange) => exchange.role === 'user',
   ).length;
   const learnerWordCount = countLearnerWords(transcript);
 
@@ -222,7 +223,7 @@ export async function evaluateSessionDepth(
     const topics = await detectTopicsOnly(
       transcript,
       options?.topicTimeoutMs ?? TOPIC_DETECTION_TIMEOUT_MS,
-      options?.ageBracket
+      options?.ageBracket,
     );
     return {
       meaningful: true,
@@ -237,6 +238,6 @@ export async function evaluateSessionDepth(
     exchangeCount,
     learnerWordCount,
     options?.timeoutMs ?? GATE_TIMEOUT_MS,
-    options?.ageBracket
+    options?.ageBracket,
   );
 }

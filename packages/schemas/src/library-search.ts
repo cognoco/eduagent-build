@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const librarySearchQuerySchema = z.object({
   q: z.string().min(1).max(200),
@@ -40,7 +41,7 @@ export const librarySearchResultSchema = z.object({
       subjectId: z.string().uuid(),
       subjectName: z.string(),
       contentSnippet: z.string(),
-      createdAt: z.string().datetime(),
+      createdAt: isoDateField,
     }),
   ),
   sessions: z.array(
@@ -52,7 +53,7 @@ export const librarySearchResultSchema = z.object({
       subjectId: z.string().uuid(),
       subjectName: z.string(),
       snippet: z.string(),
-      occurredAt: z.string().datetime(),
+      occurredAt: isoDateField,
     }),
   ),
 });

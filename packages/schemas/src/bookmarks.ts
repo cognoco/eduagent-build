@@ -14,9 +14,11 @@ export const bookmarkSchema = z.object({
 });
 export type Bookmark = z.infer<typeof bookmarkSchema>;
 
-export const createBookmarkSchema = z.object({
-  eventId: z.string().uuid(),
-});
+export const createBookmarkSchema = z
+  .object({
+    eventId: z.string().uuid(),
+  })
+  .strict();
 export type CreateBookmarkInput = z.infer<typeof createBookmarkSchema>;
 
 export const createBookmarkResponseSchema = z.object({

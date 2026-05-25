@@ -846,12 +846,15 @@ export default function LibraryScreen() {
           subjects.length > 0 &&
           !isSearching;
 
+        // Hoisted contentContainerStyle — avoids new object on every render (BUG-745)
+        const listContentContainerStyle = { paddingBottom: insets.bottom + 80 };
+
         if (!useVirtualList) {
           return (
             <ScrollView
               className="flex-1 px-5"
               style={{ zIndex: 0 }}
-              contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+              contentContainerStyle={listContentContainerStyle}
               keyboardShouldPersistTaps="handled"
             >
               {renderContent()}
@@ -892,7 +895,7 @@ export default function LibraryScreen() {
             style={{ zIndex: 0 }}
             sections={sections}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+            contentContainerStyle={listContentContainerStyle}
             keyboardShouldPersistTaps="handled"
             initialNumToRender={10}
             maxToRenderPerBatch={10}

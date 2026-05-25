@@ -33,22 +33,26 @@ export type CurriculumTopicSource = z.infer<typeof curriculumTopicSourceSchema>;
 
 // Subject schemas
 
-export const subjectCreateSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  rawInput: z.string().trim().min(1).max(200).optional(),
-  focus: z.string().trim().min(1).max(200).optional(),
-  focusDescription: z.string().trim().min(1).max(500).optional(),
-  pedagogyMode: pedagogyModeSchema.optional(),
-  languageCode: languageCodeSchema.optional(),
-});
+export const subjectCreateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    rawInput: z.string().trim().min(1).max(200).optional(),
+    focus: z.string().trim().min(1).max(200).optional(),
+    focusDescription: z.string().trim().min(1).max(500).optional(),
+    pedagogyMode: pedagogyModeSchema.optional(),
+    languageCode: languageCodeSchema.optional(),
+  })
+  .strict();
 export type SubjectCreateInput = z.infer<typeof subjectCreateSchema>;
 
-export const subjectUpdateSchema = z.object({
-  name: z.string().trim().min(1).max(200).optional(),
-  status: subjectStatusSchema.optional(),
-  pedagogyMode: pedagogyModeSchema.optional(),
-  languageCode: languageCodeSchema.nullable().optional(),
-});
+export const subjectUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    status: subjectStatusSchema.optional(),
+    pedagogyMode: pedagogyModeSchema.optional(),
+    languageCode: languageCodeSchema.nullable().optional(),
+  })
+  .strict();
 export type SubjectUpdateInput = z.infer<typeof subjectUpdateSchema>;
 
 export const subjectSchema = z.object({
@@ -69,9 +73,11 @@ export type Subject = z.infer<typeof subjectSchema>;
 
 // Subject name resolution — validate/resolve user input before creating subject
 
-export const subjectResolveInputSchema = z.object({
-  rawInput: z.string().min(1).max(200),
-});
+export const subjectResolveInputSchema = z
+  .object({
+    rawInput: z.string().min(1).max(200),
+  })
+  .strict();
 export type SubjectResolveInput = z.infer<typeof subjectResolveInputSchema>;
 
 export const subjectResolveStatusSchema = z.enum([
@@ -415,10 +421,12 @@ export type BookSuggestionGenerationResult = z.infer<
   typeof bookSuggestionGenerationResultSchema
 >;
 
-export const bookTopicGenerateInputSchema = z.object({
-  priorKnowledge: z.string().max(2000).optional(),
-  expandExisting: z.boolean().optional(),
-});
+export const bookTopicGenerateInputSchema = z
+  .object({
+    priorKnowledge: z.string().max(2000).optional(),
+    expandExisting: z.boolean().optional(),
+  })
+  .strict();
 export type BookTopicGenerateInput = z.infer<
   typeof bookTopicGenerateInputSchema
 >;
@@ -433,16 +441,20 @@ export type CurriculumTopicPreview = z.infer<
 >;
 
 export const curriculumTopicAddSchema = z.discriminatedUnion('mode', [
-  z.object({
-    mode: z.literal('preview'),
-    title: z.string().min(1).max(200),
-  }),
-  z.object({
-    mode: z.literal('create'),
-    title: z.string().min(1).max(200),
-    description: z.string().min(1).max(500),
-    estimatedMinutes: z.number().int().min(5).max(240),
-  }),
+  z
+    .object({
+      mode: z.literal('preview'),
+      title: z.string().min(1).max(200),
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal('create'),
+      title: z.string().min(1).max(200),
+      description: z.string().min(1).max(500),
+      estimatedMinutes: z.number().int().min(5).max(240),
+    })
+    .strict(),
 ]);
 export type CurriculumTopicAddInput = z.infer<typeof curriculumTopicAddSchema>;
 
@@ -489,12 +501,14 @@ export type ChildTopicSnapshotResponse = z.infer<
   typeof childTopicSnapshotResponseSchema
 >;
 
-export const cloneFromChildRequestSchema = z.object({
-  childProfileId: z.string().uuid(),
-  topicId: z.string().uuid(),
-  forceCopy: z.boolean().optional(),
-  requestId: z.string().uuid(),
-});
+export const cloneFromChildRequestSchema = z
+  .object({
+    childProfileId: z.string().uuid(),
+    topicId: z.string().uuid(),
+    forceCopy: z.boolean().optional(),
+    requestId: z.string().uuid(),
+  })
+  .strict();
 export type CloneFromChildRequest = z.infer<typeof cloneFromChildRequestSchema>;
 
 export const cloneTopicStateSchema = z.enum([
@@ -524,9 +538,11 @@ export type CloneFromChildResponse = z.infer<
   typeof cloneFromChildResponseSchema
 >;
 
-export const undoCloneFromChildRequestSchema = z.object({
-  createdIds: cloneCreatedIdsSchema,
-});
+export const undoCloneFromChildRequestSchema = z
+  .object({
+    createdIds: cloneCreatedIdsSchema,
+  })
+  .strict();
 export type UndoCloneFromChildRequest = z.infer<
   typeof undoCloneFromChildRequestSchema
 >;
@@ -543,19 +559,25 @@ export type UndoCloneFromChildResponse = z.infer<
 
 // Curriculum interaction schemas
 
-export const topicSkipSchema = z.object({
-  topicId: z.string().uuid(),
-});
+export const topicSkipSchema = z
+  .object({
+    topicId: z.string().uuid(),
+  })
+  .strict();
 export type TopicSkipInput = z.infer<typeof topicSkipSchema>;
 
-export const topicUnskipSchema = z.object({
-  topicId: z.string().uuid(),
-});
+export const topicUnskipSchema = z
+  .object({
+    topicId: z.string().uuid(),
+  })
+  .strict();
 export type TopicUnskipInput = z.infer<typeof topicUnskipSchema>;
 
-export const curriculumChallengeSchema = z.object({
-  feedback: z.string().min(1).max(2000),
-});
+export const curriculumChallengeSchema = z
+  .object({
+    feedback: z.string().min(1).max(2000),
+  })
+  .strict();
 export type CurriculumChallengeInput = z.infer<
   typeof curriculumChallengeSchema
 >;
@@ -570,14 +592,16 @@ export const curriculumAdaptSignalSchema = z.enum([
 ]);
 export type CurriculumAdaptSignal = z.infer<typeof curriculumAdaptSignalSchema>;
 
-export const curriculumAdaptRequestSchema = z.object({
-  /** Topic that triggered the adaptation */
-  topicId: z.string().uuid(),
-  /** Performance signal that drives reordering */
-  signal: curriculumAdaptSignalSchema,
-  /** Optional context for the adaptation audit trail */
-  context: z.string().max(500).optional(),
-});
+export const curriculumAdaptRequestSchema = z
+  .object({
+    /** Topic that triggered the adaptation */
+    topicId: z.string().uuid(),
+    /** Performance signal that drives reordering */
+    signal: curriculumAdaptSignalSchema,
+    /** Optional context for the adaptation audit trail */
+    context: z.string().max(500).optional(),
+  })
+  .strict();
 export type CurriculumAdaptRequest = z.infer<
   typeof curriculumAdaptRequestSchema
 >;
@@ -596,9 +620,11 @@ export type CurriculumAdaptResponse = z.infer<
 
 // --- Subject Classification (Story 10.20) ---
 
-export const subjectClassifyInputSchema = z.object({
-  text: z.string().min(1).max(5000),
-});
+export const subjectClassifyInputSchema = z
+  .object({
+    text: z.string().min(1).max(5000),
+  })
+  .strict();
 export type SubjectClassifyInput = z.infer<typeof subjectClassifyInputSchema>;
 
 export const subjectClassifyCandidateSchema = z.object({

@@ -219,74 +219,92 @@ export const sessionAnalysisOutputSchema = z.object({
 });
 export type SessionAnalysisOutput = z.infer<typeof sessionAnalysisOutputSchema>;
 
-export const deleteMemoryItemSchema = z.object({
-  category: z.enum([
-    'interests',
-    'strengths',
-    'struggles',
-    'communicationNotes',
-    'learningStyle',
-  ]),
-  value: z.string().min(1),
-  subject: z.string().optional(),
-  suppress: z.boolean().optional(),
-});
+export const deleteMemoryItemSchema = z
+  .object({
+    category: z.enum([
+      'interests',
+      'strengths',
+      'struggles',
+      'communicationNotes',
+      'learningStyle',
+    ]),
+    value: z.string().min(1),
+    subject: z.string().optional(),
+    suppress: z.boolean().optional(),
+  })
+  .strict();
 export type DeleteMemoryItemInput = z.infer<typeof deleteMemoryItemSchema>;
 
-export const toggleMemoryEnabledSchema = z.object({
-  memoryEnabled: z.boolean(),
-});
+export const toggleMemoryEnabledSchema = z
+  .object({
+    memoryEnabled: z.boolean(),
+  })
+  .strict();
 export type ToggleMemoryEnabledInput = z.infer<
   typeof toggleMemoryEnabledSchema
 >;
 
-export const toggleMemoryCollectionSchema = z.object({
-  memoryCollectionEnabled: z.boolean(),
-});
+export const toggleMemoryCollectionSchema = z
+  .object({
+    memoryCollectionEnabled: z.boolean(),
+  })
+  .strict();
 export type ToggleMemoryCollectionInput = z.infer<
   typeof toggleMemoryCollectionSchema
 >;
 
-export const toggleMemoryInjectionSchema = z.object({
-  memoryInjectionEnabled: z.boolean(),
-});
+export const toggleMemoryInjectionSchema = z
+  .object({
+    memoryInjectionEnabled: z.boolean(),
+  })
+  .strict();
 export type ToggleMemoryInjectionInput = z.infer<
   typeof toggleMemoryInjectionSchema
 >;
 
-export const grantMemoryConsentSchema = z.object({
-  consent: z.enum(['granted', 'declined']),
-});
+export const grantMemoryConsentSchema = z
+  .object({
+    consent: z.enum(['granted', 'declined']),
+  })
+  .strict();
 export type GrantMemoryConsentInput = z.infer<typeof grantMemoryConsentSchema>;
 
 // BKT-C.2 — wholesale replace of interests with context-tagged entries. Used
 // by the per-interest picker at the end of the onboarding interview. Writes
 // through createScopedRepository(profileId) in the onboarding service.
-export const onboardingInterestsContextPatchSchema = z.object({
-  interests: z.array(interestEntrySchema).max(20),
-});
+export const onboardingInterestsContextPatchSchema = z
+  .object({
+    interests: z.array(interestEntrySchema).max(20),
+  })
+  .strict();
 export type OnboardingInterestsContextPatch = z.infer<
   typeof onboardingInterestsContextPatchSchema
 >;
 
-export const tellMentorInputSchema = z.object({
-  text: z.string().min(1).max(500),
-  childProfileId: z.string().uuid().optional(),
-});
+export const tellMentorInputSchema = z
+  .object({
+    text: z.string().min(1).max(500),
+    childProfileId: z.string().uuid().optional(),
+  })
+  .strict();
 export type TellMentorInput = z.infer<typeof tellMentorInputSchema>;
 
-export const unsuppressInferenceSchema = z.object({
-  value: z.string().min(1),
-});
+export const unsuppressInferenceSchema = z
+  .object({
+    value: z.string().min(1),
+  })
+  .strict();
 export type UnsuppressInferenceInput = z.infer<
   typeof unsuppressInferenceSchema
 >;
 
 // --- Accommodation Modes (FR253) ---
 
-export const updateAccommodationModeSchema = z.object({
-  accommodationMode: accommodationModeSchema,
-});
+export const updateAccommodationModeSchema = z
+  .object({
+    accommodationMode: accommodationModeSchema,
+  })
+  .strict();
 export type UpdateAccommodationModeInput = z.infer<
   typeof updateAccommodationModeSchema
 >;

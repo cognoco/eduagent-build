@@ -1,9 +1,5 @@
+import { healthResponseSchema, type HealthResponse } from '@eduagent/schemas';
 import { getApiUrl } from './api';
-
-interface HealthResponse {
-  status: string;
-  deploySha: string | null;
-}
 
 let checked = false;
 
@@ -30,7 +26,15 @@ export async function checkContractDrift(): Promise<void> {
     });
     if (!res.ok) return;
 
-    const body = (await res.json()) as HealthResponse;
+    const parsed = healthResponseSchema.safeParse(await res.json());
+    if (!parsed.success) {
+      console.warn(
+        '[contract-drift] API response shape mismatch:',
+        parsed.error.flatten(),
+      );
+      return;
+    }
+    const body: HealthResponse = parsed.data;
     if (!body.deploySha) {
       console.info(
         '[contract-drift] API has no DEPLOY_SHA — cannot detect drift. ' +

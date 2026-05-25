@@ -63,7 +63,7 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
     );
   });
 
-  it('returns logged status with account metadata and the deferred-retry marker', async () => {
+  it('returns logged status with account metadata after validating the payload (BUG-754)', async () => {
     const result = await invokeHandler({
       accountId: 'acc-1',
       clerkUserId: 'clerk_user_1',
@@ -74,8 +74,54 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
     expect(result).toEqual({
       status: 'logged',
       accountId: 'acc-1',
-      retryDeferred: 'pending_billing_retry_strategy',
     });
+  });
+
+  it('returns invalid_payload when the event data fails Zod validation (BUG-754 / BUG-761)', async () => {
+    // Missing required `accountId` field — the schema rejects it and the
+    // handler returns a terminal status without trying to keep processing.
+    const result = await invokeHandler({
+      // accountId omitted intentionally
+      clerkUserId: 'clerk_user_2',
+      reason: 'malformed event',
+      timestamp: '2026-04-27T10:00:00.000Z',
+    } as unknown as FailureEventData);
+
+    expect(result).toEqual({
+      status: 'invalid_payload',
+      accountId: null,
+    });
+  });
+
+  it('declares retries: 2 so transient failures retry instead of silently terminating (BUG-754)', () => {
+    const opts =
+      (billingTrialSubscriptionFailed as any).opts ??
+      (billingTrialSubscriptionFailed as any).config ??
+      (billingTrialSubscriptionFailed as any);
+    // Inngest exposes function options under different keys across versions;
+    // the retries field should be 2 regardless of which surface holds it.
+    const retryCandidates = [
+      { path: 'opts.retries', value: opts?.retries },
+      {
+        path: 'fn.opts.retries',
+        value: (billingTrialSubscriptionFailed as any).fn?.opts?.retries,
+      },
+      {
+        path: 'options.retries',
+        value: (billingTrialSubscriptionFailed as any).options?.retries,
+      },
+    ];
+    const retries = retryCandidates.find(
+      (candidate) => candidate.value !== undefined,
+    )?.value;
+    if (retries === undefined) {
+      throw new Error(
+        `Could not locate retries config on billingTrialSubscriptionFailed; tried ${retryCandidates
+          .map((candidate) => candidate.path)
+          .join(', ')}`,
+      );
+    }
+    expect(retries).toBe(2);
   });
 
   it('emits a structured error log with the failure reason (observability guarantee)', async () => {

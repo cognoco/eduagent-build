@@ -1,7 +1,9 @@
-import { ScrollView, Text, View, Pressable } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import { FlatList, Text, View, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { MilestoneRecord } from '@eduagent/schemas';
 import { ErrorFallback } from '../../../components/common';
 import { MilestoneCard } from '../../../components/progress';
 import { useProgressMilestones } from '../../../hooks/use-progress';
@@ -19,6 +21,8 @@ function SkeletonRow(): React.ReactElement {
   );
 }
 
+const MILESTONE_ROW_CONTENT_PADDING = { paddingHorizontal: 20 } as const;
+
 export default function MilestonesListScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -33,6 +37,25 @@ export default function MilestonesListScreen(): React.ReactElement {
   const isEmpty = !isLoading && !isError && (milestones?.length ?? 0) === 0;
   const milestoneCount = milestones?.length ?? 0;
 
+  const contentContainerStyle = useMemo(
+    () => ({
+      ...MILESTONE_ROW_CONTENT_PADDING,
+      paddingBottom: insets.bottom + 28,
+    }),
+    [insets.bottom],
+  );
+
+  const renderMilestone = useCallback(
+    ({ item }: { item: MilestoneRecord }) => (
+      <View className="mt-3">
+        <MilestoneCard milestone={item} />
+      </View>
+    ),
+    [],
+  );
+
+  const keyExtractor = useCallback((item: MilestoneRecord) => item.id, []);
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
@@ -43,9 +66,7 @@ export default function MilestonesListScreen(): React.ReactElement {
           accessibilityLabel={t('common.goBack')}
           testID="milestones-back"
         >
-          <Text className="text-primary text-body font-semibold">
-            {'\u2190'}
-          </Text>
+          <Text className="text-primary text-body font-semibold">{'←'}</Text>
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
@@ -59,36 +80,33 @@ export default function MilestonesListScreen(): React.ReactElement {
         </View>
       </View>
 
-      <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
-      >
-        {isLoading ? (
-          <>
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-          </>
-        ) : isError ? (
-          <View testID="milestones-error">
-            <ErrorFallback
-              title={t('progress.milestones.errorTitle')}
-              message={t('progress.milestones.errorMessage')}
-              primaryAction={{
-                label: t('common.tryAgain'),
-                onPress: () => void refetch(),
-                testID: 'milestones-retry',
-              }}
-              secondaryAction={{
-                label: t('common.goBack'),
-                onPress: () =>
-                  goBackOrReplace(router, '/(app)/progress' as const),
-                testID: 'milestones-go-back',
-              }}
-              testID="milestones-error-fallback"
-            />
-          </View>
-        ) : isEmpty ? (
+      {isLoading ? (
+        <View className="px-5">
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </View>
+      ) : isError ? (
+        <View className="px-5" testID="milestones-error">
+          <ErrorFallback
+            title={t('progress.milestones.errorTitle')}
+            message={t('progress.milestones.errorMessage')}
+            primaryAction={{
+              label: t('common.tryAgain'),
+              onPress: () => void refetch(),
+              testID: 'milestones-retry',
+            }}
+            secondaryAction={{
+              label: t('common.goBack'),
+              onPress: () =>
+                goBackOrReplace(router, '/(app)/progress' as const),
+              testID: 'milestones-go-back',
+            }}
+            testID="milestones-error-fallback"
+          />
+        </View>
+      ) : isEmpty ? (
+        <View className="px-5">
           <View
             className="bg-surface rounded-card p-5 mt-4 items-center"
             testID="milestones-empty"
@@ -114,14 +132,20 @@ export default function MilestonesListScreen(): React.ReactElement {
               </Text>
             </Pressable>
           </View>
-        ) : (
-          milestones?.map((milestone) => (
-            <View key={milestone.id} className="mt-3">
-              <MilestoneCard milestone={milestone} />
-            </View>
-          ))
-        )}
-      </ScrollView>
+        </View>
+      ) : (
+        <FlatList
+          className="flex-1"
+          data={milestones}
+          keyExtractor={keyExtractor}
+          renderItem={renderMilestone}
+          contentContainerStyle={contentContainerStyle}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews
+        />
+      )}
     </View>
   );
 }

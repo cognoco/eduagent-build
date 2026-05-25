@@ -7,47 +7,112 @@
 // billing/auth/webhook code. The lazy-provision path can't fail account
 // creation when the trial subscription insert fails (the user must still
 // land in the app), so the recovery is a delegated retry/alert via this
-// handler. Until a real retry strategy is wired, the handler emits a
-// structured log + return shape so the failure stream is queryable and
-// every fan-out has a real listener.
+// handler. The handler:
+//   1. Validates the event payload with a Zod schema (BUG-754 / BUG-761) so
+//      malformed events fan out a structured contract-error to Sentry
+//      instead of silently coercing to `unknown`.
+//   2. Emits a structured error log + Sentry capture so on-call dashboards
+//      can quantify failure rate and page on sustained drift.
+//   3. Relies on Inngest's own `retries: 2` for transient-class failures
+//      (the structured log is queryable per-attempt so we can distinguish
+//      a one-off from a sustained outage).
+//
+// No notification fan-out is dispatched from here — there is no existing
+// "billing-failure → user" notification event registered, and inventing a
+// new orphan event would re-introduce the BUG-760 wired-but-untriggered
+// pattern. If/when a user-facing billing-failure notification path lands,
+// wire it here via `safeSend()`.
 // ---------------------------------------------------------------------------
 
+import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
+
+// [BUG-754 / BUG-761] Zod schema for the event payload. Defined locally
+// because the contract is private to the account.ts emitter ⇄ this handler
+// pair — adding it to @eduagent/schemas would pull a private internal event
+// shape into the shared contract surface for no consumer benefit.
+const trialSubscriptionFailedDataSchema = z.object({
+  accountId: z.string().min(1),
+  clerkUserId: z.string().min(1).optional(),
+  reason: z.string().min(1).optional(),
+  timestamp: z.string().optional(),
+});
+
+export type TrialSubscriptionFailedData = z.infer<
+  typeof trialSubscriptionFailedDataSchema
+>;
 
 export const billingTrialSubscriptionFailed = inngest.createFunction(
   {
     id: 'billing-trial-subscription-failed',
     name: 'Trial subscription creation failure',
+    // [BUG-754] Inngest retries cover transient cases (e.g. a Sentry dispatch
+    // hiccup); the structured log below is emitted per-attempt so on-call can
+    // distinguish a one-off from a sustained outage.
+    retries: 2,
   },
   { event: 'app/billing.trial_subscription_failed' },
   async ({ event }) => {
-    const data = event.data as {
-      accountId?: string;
-      clerkUserId?: string;
-      reason?: string;
-      timestamp?: string;
-    };
+    const parsed = trialSubscriptionFailedDataSchema.safeParse(event.data);
+
+    if (!parsed.success) {
+      // Contract drift — the emitter sent a payload shape we do not recognise.
+      // Capture to Sentry so we page on sustained drift, log structured, and
+      // return a `status: 'invalid_payload'` terminus so the Inngest run shows
+      // up as a successful (terminal) execution rather than a retry-loop.
+      const err = new Error(
+        `billing.trial_subscription_failed: invalid payload — ${parsed.error.message}`,
+      );
+      captureException(err, {
+        extra: {
+          surface: 'billing-trial-subscription-failed.invalid_payload',
+          rawData: event.data as unknown,
+        },
+      });
+      logger.error('billing.trial_subscription_failed.invalid_payload', {
+        reason: parsed.error.message,
+        receivedAt: new Date().toISOString(),
+      });
+      return {
+        status: 'invalid_payload' as const,
+        accountId: null,
+      };
+    }
+
+    const data = parsed.data;
 
     logger.error('billing.trial_subscription_failed.received', {
-      accountId: data.accountId ?? 'unknown',
+      accountId: data.accountId,
       clerkUserId: data.clerkUserId ?? 'unknown',
       reason: data.reason ?? 'unknown',
       receivedAt: new Date().toISOString(),
       eventTimestamp: data.timestamp ?? null,
     });
 
+    // [BUG-754] Sentry capture so a sustained spike in trial-subscription
+    // failures pages on-call (the logger.error above is queryable in
+    // Logpush; Sentry is what wakes a human at 2am).
+    captureException(
+      new Error(
+        `billing.trial_subscription_failed: ${data.reason ?? 'unknown'}`,
+      ),
+      {
+        extra: {
+          surface: 'billing-trial-subscription-failed',
+          accountId: data.accountId,
+          clerkUserId: data.clerkUserId,
+          eventTimestamp: data.timestamp,
+        },
+      },
+    );
+
     return {
       status: 'logged' as const,
-      accountId: data.accountId ?? null,
-      // The retry strategy is intentionally deferred — account creation
-      // already succeeded, so the user can use the app. A future story
-      // will add a retry-after-N handler (or a manual reconciliation
-      // path); until then, the structured log above is the on-call
-      // signal. Greppable marker so that future code review can find it.
-      retryDeferred: 'pending_billing_retry_strategy',
+      accountId: data.accountId,
     };
-  }
+  },
 );

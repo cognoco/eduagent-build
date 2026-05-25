@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { WeeklyReportSummary } from '@eduagent/schemas';
@@ -143,6 +143,10 @@ function ReportsHeaderSummary({
   );
 }
 
+// Sentinel item used so FlatList always has at least one item to render the
+// body content (loading, error, empty, or the ReportsList) via renderItem.
+const BODY_SENTINEL = [{ key: 'body' }] as const;
+
 export default function ChildReportsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -204,163 +208,101 @@ export default function ChildReportsScreen(): React.ReactElement {
     (report) => !report.viewedAt,
   );
 
-  return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-      >
-        <View className="flex-row items-center mt-4">
-          <Pressable
-            onPress={() =>
-              goBackOrReplace(
-                router,
-                profileId
-                  ? (`/(app)/child/${profileId}` as const)
-                  : FAMILY_HOME_PATH,
-              )
-            }
-            className="me-3 py-2 pe-2"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
-            testID="child-reports-back"
-          >
-            <Text className="text-body font-semibold text-primary">{'←'}</Text>
-          </Pressable>
-          <View className="flex-1">
-            <Text className="text-h2 font-bold text-text-primary">
-              {t('parentView.reports.title')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-0.5">
-              {t('parentView.reports.subtitle')}
-            </Text>
-          </View>
+  const listHeader = (
+    <View>
+      <View className="flex-row items-center mt-4">
+        <Pressable
+          onPress={() =>
+            goBackOrReplace(
+              router,
+              profileId
+                ? (`/(app)/child/${profileId}` as const)
+                : FAMILY_HOME_PATH,
+            )
+          }
+          className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.goBack')}
+          testID="child-reports-back"
+        >
+          <Text className="text-body font-semibold text-primary">{'←'}</Text>
+        </Pressable>
+        <View className="flex-1">
+          <Text className="text-h2 font-bold text-text-primary">
+            {t('parentView.reports.title')}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-0.5">
+            {t('parentView.reports.subtitle')}
+          </Text>
         </View>
+      </View>
 
-        <ReportsHeaderSummary
-          latestReport={selectedWeeklyReport}
-          showNewBadge={isViewingLatestWeeklyReport && hasUnviewedWeeklyReport}
-        />
-        {selectedWeeklyReport && !isViewingLatestWeeklyReport ? (
-          <Pressable
-            onPress={() =>
-              setSelectedWeeklyReportId(latestWeeklyReport?.id ?? null)
-            }
-            className="self-start mt-3 px-1 py-2"
-            accessibilityRole="button"
-            accessibilityLabel={t('parentView.reports.backToLatest')}
-            testID="child-reports-back-to-latest"
-          >
-            <Text className="text-body-sm font-semibold text-primary">
-              {t('parentView.reports.backToLatest')}
-            </Text>
-          </Pressable>
-        ) : null}
+      <ReportsHeaderSummary
+        latestReport={selectedWeeklyReport}
+        showNewBadge={isViewingLatestWeeklyReport && hasUnviewedWeeklyReport}
+      />
+      {selectedWeeklyReport && !isViewingLatestWeeklyReport ? (
+        <Pressable
+          onPress={() =>
+            setSelectedWeeklyReportId(latestWeeklyReport?.id ?? null)
+          }
+          className="self-start mt-3 px-1 py-2"
+          accessibilityRole="button"
+          accessibilityLabel={t('parentView.reports.backToLatest')}
+          testID="child-reports-back-to-latest"
+        >
+          <Text className="text-body-sm font-semibold text-primary">
+            {t('parentView.reports.backToLatest')}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 
-        {combinedLoading ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.reports.loadingReports')}
-            </Text>
-          </View>
-        ) : combinedError ? (
-          // [EP15-I3] Prior version destructured only `data, isLoading`.
-          // On API failure users saw the "no reports yet" empty state and
-          // thought their child had no learning activity, when really the
-          // server was down. Error must be visually distinct from empty.
-          <View
-            className="bg-surface rounded-card p-4 mt-4"
-            testID="child-reports-error"
-          >
-            <Text className="text-h3 font-semibold text-text-primary">
-              {t('parentView.reports.couldNotLoadReports')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-2">
-              {t('parentView.reports.checkConnectionRetry')}
-            </Text>
-            <View className="flex-row gap-3 mt-4">
-              <Pressable
-                onPress={() => {
-                  void refetch();
-                  void weeklyRefetch();
-                }}
-                className="bg-primary rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
-                accessibilityRole="button"
-                accessibilityLabel={t('parentView.reports.retryReports')}
-                testID="child-reports-error-retry"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('common.tryAgain')}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  goBackOrReplace(
-                    router,
-                    profileId
-                      ? (`/(app)/child/${profileId}` as const)
-                      : FAMILY_HOME_PATH,
-                  )
-                }
-                className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
-                accessibilityRole="button"
-                accessibilityLabel={t('common.goBack')}
-                testID="child-reports-error-back"
-              >
-                <Text className="text-body font-semibold text-text-primary">
-                  {t('common.goBack')}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : hasAnyData && hasOtherReports ? (
-          <View className="mt-4">
-            <ReportsList
-              monthlyReports={reports ?? []}
-              weeklyReports={remainingWeeklyReports}
-              onPressMonthly={(reportId) => {
-                if (!profileId) return;
-                router.push({
-                  pathname: '/(app)/child/[profileId]/report/[reportId]',
-                  params: { profileId, reportId },
-                } as Href);
+  // Body content rendered as a single FlatList item to keep the header
+  // and body in one scrollable surface without double-virtualization.
+  // ReportsList uses scrollEnabled={false} since the outer FlatList scrolls.
+  const renderBody = () => {
+    if (combinedLoading) {
+      return (
+        <View className="bg-surface rounded-card p-4 mt-4">
+          <Text className="text-body-sm text-text-secondary">
+            {t('parentView.reports.loadingReports')}
+          </Text>
+        </View>
+      );
+    }
+    if (combinedError) {
+      // [EP15-I3] Prior version destructured only `data, isLoading`.
+      // On API failure users saw the "no reports yet" empty state and
+      // thought their child had no learning activity, when really the
+      // server was down. Error must be visually distinct from empty.
+      return (
+        <View
+          className="bg-surface rounded-card p-4 mt-4"
+          testID="child-reports-error"
+        >
+          <Text className="text-h3 font-semibold text-text-primary">
+            {t('parentView.reports.couldNotLoadReports')}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-2">
+            {t('parentView.reports.checkConnectionRetry')}
+          </Text>
+          <View className="flex-row gap-3 mt-4">
+            <Pressable
+              onPress={() => {
+                void refetch();
+                void weeklyRefetch();
               }}
-              onPressWeekly={(reportId) => {
-                if (!profileId) return;
-                router.push({
-                  pathname:
-                    '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
-                  params: { profileId, weeklyReportId: reportId },
-                } as Href);
-              }}
-              showNewBadge
-              newReportId={latestWeeklyReport ? null : undefined}
-            />
-          </View>
-        ) : (
-          <View
-            className="bg-surface rounded-card p-4 mt-4 items-center"
-            testID="child-reports-empty"
-          >
-            {(() => {
-              const { date, timeContext } = getNextReportInfo();
-              return (
-                <Text
-                  className="text-body-sm text-text-secondary text-center"
-                  testID="child-reports-empty-time-context"
-                >
-                  {date
-                    ? t('parentView.reports.firstReportArriveOn', {
-                        name: childName,
-                        date,
-                      })
-                    : t('parentView.reports.firstReportTimeContext', {
-                        name: childName,
-                        timeContext,
-                      })}
-                </Text>
-              );
-            })()}
+              className="bg-primary rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={t('parentView.reports.retryReports')}
+              testID="child-reports-error-retry"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('common.tryAgain')}
+              </Text>
+            </Pressable>
             <Pressable
               onPress={() =>
                 goBackOrReplace(
@@ -370,20 +312,108 @@ export default function ChildReportsScreen(): React.ReactElement {
                     : FAMILY_HOME_PATH,
                 )
               }
-              className="bg-primary rounded-button px-5 py-3 mt-4 min-h-[48px] justify-center"
+              className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel={t('parentView.reports.seeProgressNow', {
-                name: childName,
-              })}
-              testID="child-reports-empty-progress"
+              accessibilityLabel={t('common.goBack')}
+              testID="child-reports-error-back"
             >
-              <Text className="text-body font-semibold text-text-inverse text-center">
-                {t('parentView.reports.seeProgressNow', { name: childName })}
+              <Text className="text-body font-semibold text-text-primary">
+                {t('common.goBack')}
               </Text>
             </Pressable>
           </View>
-        )}
-      </ScrollView>
+        </View>
+      );
+    }
+    if (hasAnyData && hasOtherReports) {
+      return (
+        <View className="mt-4">
+          <ReportsList
+            monthlyReports={reports ?? []}
+            weeklyReports={remainingWeeklyReports}
+            onPressMonthly={(reportId) => {
+              if (!profileId) return;
+              router.push({
+                pathname: '/(app)/child/[profileId]/report/[reportId]',
+                params: { profileId, reportId },
+              } as Href);
+            }}
+            onPressWeekly={(reportId) => {
+              if (!profileId) return;
+              router.push({
+                pathname:
+                  '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+                params: { profileId, weeklyReportId: reportId },
+              } as Href);
+            }}
+            showNewBadge
+            newReportId={latestWeeklyReport ? null : undefined}
+            scrollEnabled={false}
+          />
+        </View>
+      );
+    }
+    if (hasAnyData) return null;
+    return (
+      <View
+        className="bg-surface rounded-card p-4 mt-4 items-center"
+        testID="child-reports-empty"
+      >
+        {(() => {
+          const { date, timeContext } = getNextReportInfo();
+          return (
+            <Text
+              className="text-body-sm text-text-secondary text-center"
+              testID="child-reports-empty-time-context"
+            >
+              {date
+                ? t('parentView.reports.firstReportArriveOn', {
+                    name: childName,
+                    date,
+                  })
+                : t('parentView.reports.firstReportTimeContext', {
+                    name: childName,
+                    timeContext,
+                  })}
+            </Text>
+          );
+        })()}
+        <Pressable
+          onPress={() =>
+            goBackOrReplace(
+              router,
+              profileId
+                ? (`/(app)/child/${profileId}` as const)
+                : FAMILY_HOME_PATH,
+            )
+          }
+          className="bg-primary rounded-button px-5 py-3 mt-4 min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={t('parentView.reports.seeProgressNow', {
+            name: childName,
+          })}
+          testID="child-reports-empty-progress"
+        >
+          <Text className="text-body font-semibold text-text-inverse text-center">
+            {t('parentView.reports.seeProgressNow', { name: childName })}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  };
+
+  return (
+    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <FlatList
+        className="flex-1 px-5"
+        data={BODY_SENTINEL}
+        keyExtractor={(item) => item.key}
+        renderItem={renderBody}
+        ListHeaderComponent={listHeader}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        initialNumToRender={1}
+        removeClippedSubviews={false}
+      />
     </View>
   );
 }

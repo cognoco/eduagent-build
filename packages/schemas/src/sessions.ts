@@ -170,7 +170,7 @@ export type ChallengeRoundState = z.infer<typeof challengeRoundStateEnum>;
 
 export const challengeRoundSessionStateSchema = z.object({
   state: challengeRoundStateEnum,
-  startedAt: z.string().datetime().optional(),
+  startedAt: isoDateField.optional(),
   questionIndex: z.number().int().min(0).max(9).optional(),
   totalQuestions: z.number().int().min(1).max(10).optional(),
   offerCount: z.number().int().min(0).default(0),
@@ -226,15 +226,17 @@ export const sessionStartMetadataSchema = sessionMetadataSchema.omit({
   challengeRound: true,
 });
 
-export const sessionStartSchema = z.object({
-  subjectId: z.string().uuid(),
-  topicId: z.string().uuid().optional(),
-  sessionType: sessionTypeSchema.default('learning'),
-  verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
-  inputMode: inputModeSchema.default('text'),
-  metadata: sessionStartMetadataSchema.optional(),
-  rawInput: z.string().max(500).nullable().optional(),
-});
+export const sessionStartSchema = z
+  .object({
+    subjectId: z.string().uuid(),
+    topicId: z.string().uuid().optional(),
+    sessionType: sessionTypeSchema.default('learning'),
+    verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
+    inputMode: inputModeSchema.default('text'),
+    metadata: sessionStartMetadataSchema.optional(),
+    rawInput: z.string().max(500).nullable().optional(),
+  })
+  .strict();
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
 
 export const firstCurriculumSessionStartSchema = sessionStartSchema
@@ -242,7 +244,8 @@ export const firstCurriculumSessionStartSchema = sessionStartSchema
   .extend({
     bookId: z.string().uuid().optional(),
     topicId: z.string().uuid().optional(),
-  });
+  })
+  .strict();
 export type FirstCurriculumSessionStartInput = z.infer<
   typeof firstCurriculumSessionStartSchema
 >;
@@ -301,6 +304,7 @@ export const sessionMessageSchema = z
     /** MIME type of the attached image */
     imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
   })
+  .strict()
   .refine((data) => !!data.imageBase64 === !!data.imageMimeType, {
     message:
       'imageBase64 and imageMimeType must both be provided or both omitted',
@@ -334,18 +338,22 @@ export type LearningSession = z.infer<typeof learningSessionSchema>;
 
 // Session close request
 
-export const sessionCloseSchema = z.object({
-  reason: z.enum(['user_ended', 'silence_timeout']).optional(),
-  summaryStatus: summaryStatusSchema.optional(),
-  milestonesReached: z.array(celebrationReasonSchema).optional(),
-});
+export const sessionCloseSchema = z
+  .object({
+    reason: z.enum(['user_ended', 'silence_timeout']).optional(),
+    summaryStatus: summaryStatusSchema.optional(),
+    milestonesReached: z.array(celebrationReasonSchema).optional(),
+  })
+  .strict();
 export type SessionCloseInput = z.infer<typeof sessionCloseSchema>;
 
 // System prompt injection (quick chips: hint, example, simpler)
-export const systemPromptBodySchema = z.object({
-  content: z.string().min(1),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-});
+export const systemPromptBodySchema = z
+  .object({
+    content: z.string().min(1),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
 export type SystemPromptBody = z.infer<typeof systemPromptBodySchema>;
 
 export const sessionAnalyticsEventTypeSchema = z.enum([
@@ -356,11 +364,13 @@ export type SessionAnalyticsEventType = z.infer<
   typeof sessionAnalyticsEventTypeSchema
 >;
 
-export const sessionAnalyticsEventSchema = z.object({
-  eventType: sessionAnalyticsEventTypeSchema,
-  content: z.string().max(1000).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-});
+export const sessionAnalyticsEventSchema = z
+  .object({
+    eventType: sessionAnalyticsEventTypeSchema,
+    content: z.string().max(1000).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
 export type SessionAnalyticsEventInput = z.infer<
   typeof sessionAnalyticsEventSchema
 >;
@@ -411,17 +421,21 @@ export type FastCelebrationSummary = z.infer<
 
 // Content flag
 
-export const contentFlagSchema = z.object({
-  eventId: z.string().uuid(),
-  reason: z.string().min(1).max(1000).optional(),
-});
+export const contentFlagSchema = z
+  .object({
+    eventId: z.string().uuid(),
+    reason: z.string().min(1).max(1000).optional(),
+  })
+  .strict();
 export type ContentFlagInput = z.infer<typeof contentFlagSchema>;
 
 // Summary submission
 
-export const summarySubmitSchema = z.object({
-  content: z.string().min(10).max(2000),
-});
+export const summarySubmitSchema = z
+  .object({
+    content: z.string().min(10).max(2000),
+  })
+  .strict();
 export type SummarySubmitInput = z.infer<typeof summarySubmitSchema>;
 
 // Summary response
@@ -439,7 +453,7 @@ export const sessionSummarySchema = z.object({
   nextTopicReason: z.string().nullable(),
   baseXp: z.number().nullable().optional(),
   reflectionBonusXp: z.number().nullable().optional(),
-  purgedAt: z.string().datetime().nullable().optional(),
+  purgedAt: isoDateField.nullable().optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
@@ -464,9 +478,11 @@ export type LearnerRecapLlmOutput = z.infer<typeof learnerRecapLlmOutputSchema>;
 
 // Parking lot schemas
 
-export const parkingLotAddSchema = z.object({
-  question: z.string().min(1).max(2000),
-});
+export const parkingLotAddSchema = z
+  .object({
+    question: z.string().min(1).max(2000),
+  })
+  .strict();
 export type ParkingLotAddInput = z.infer<typeof parkingLotAddSchema>;
 
 export const parkingLotItemSchema = z.object({
@@ -516,22 +532,28 @@ export const OCR_CONSTRAINTS = {
   acceptedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
 
-export const homeworkStateSyncSchema = z.object({
-  metadata: homeworkSessionMetadataSchema,
-});
+export const homeworkStateSyncSchema = z
+  .object({
+    metadata: homeworkSessionMetadataSchema,
+  })
+  .strict();
 export type HomeworkStateSyncInput = z.infer<typeof homeworkStateSyncSchema>;
 
-export const sessionInputModeSchema = z.object({
-  inputMode: inputModeSchema,
-});
+export const sessionInputModeSchema = z
+  .object({
+    inputMode: inputModeSchema,
+  })
+  .strict();
 export type SessionInputModeInput = z.infer<typeof sessionInputModeSchema>;
 
 // Interleaved session start — optional filters for topic selection
 
-export const interleavedSessionStartSchema = z.object({
-  subjectId: z.string().uuid().optional(),
-  topicCount: z.number().int().min(1).max(10).default(5),
-});
+export const interleavedSessionStartSchema = z
+  .object({
+    subjectId: z.string().uuid().optional(),
+    topicCount: z.number().int().min(1).max(10).default(5),
+  })
+  .strict();
 export type InterleavedSessionStartInput = z.infer<
   typeof interleavedSessionStartSchema
 >;
