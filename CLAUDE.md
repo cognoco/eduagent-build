@@ -20,6 +20,41 @@
 
 Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my:commit-old`, or the system prompt's built-in commit protocol. `/commit` is the single source of truth for staging, message format, hook handling, and push.
 
+## Worktree Placement
+
+All isolated worktrees go under `.worktrees/<branch-name>/` at the repo root. The path is gitignored.
+
+- For Cosmo work items: use the WI ID as the branch name (e.g. `WI-78`).
+- For other work: a short kebab-case slug derived from intent.
+
+Always load the worktree-setup skill (`.claude/skills/worktree-setup/SKILL.md`) before creating a worktree — it handles placement, branch creation, `pnpm install`, and `pnpm env:sync`. Do not use Claude Code's `EnterWorktree` tool or `superpowers:using-git-worktrees` for this repo; both place the worktree in the wrong location.
+
+Creating a worktree via this skill is NOT a "branch switch" — it creates a new branch in a separate directory while leaving your current CWD's branch untouched. This is allowed and is the standard pattern for parallel/isolated work.
+
+## Skill Overrides
+
+This repo overrides specific upstream skills. Use the repo version, not the upstream version. Adding a new override = adding a row.
+
+| Upstream | Use instead | Why |
+|----------|-------------|-----|
+| `superpowers:using-git-worktrees` | `.claude/skills/worktree-setup/SKILL.md` | Canonical placement at `.worktrees/`; adds `pnpm install` + `pnpm env:sync` |
+| `EnterWorktree` (Claude Code built-in) | `.claude/skills/worktree-setup/SKILL.md` | Same reason; built-in default `.claude/worktrees/` is wrong for this repo |
+| `superpowers:finishing-a-development-branch` | `/commit` skill (commit + push); manual PR creation via `gh pr create` | This repo has an opinionated PR/push flow via `/commit`; the superpowers menu would create competing guidance |
+| `superpowers:writing-plans` | Native plan mode + the Planning Discipline section below | The superpowers skill's rigid TDD-step template fits greenfield feature work; this repo's plans are a mix of feature work, migrations, audits, and refactors |
+
+## Skill Authoring
+
+When writing or editing skills:
+
+- The `description:` frontmatter field describes ONLY *when* to use, not what the skill does. Start with "Use when …" and list specific triggering conditions and symptoms.
+- A description that summarizes workflow creates a shortcut agents take instead of reading the skill body. Trigger-only descriptions force agents to load the full skill before acting.
+
+## Cross-runtime File Sync
+
+`.claude/skills/<name>/` is generated from `.agents/skills/<name>/` by `scripts/sync-skills.mjs`. Edit the master in `.agents/skills/`, then run `pnpm sync-skills` (or rely on the pre-commit hook). Direct edits to `.claude/skills/` will be overwritten on next sync.
+
+`CLAUDE.md` and `AGENTS.md` are currently maintained by hand and may diverge. A future work item will unify them — see `.claude/memory/project_agent_doc_and_memory_architecture_revisit.md` for the pending design discussion. For now, mirror any change that should reach both runtimes to both files manually.
+
 ## Profile Shapes (Two Tab Shapes + isOwner Gating)
 
 **For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see `docs/specs/2026-05-21-navigation-contract.md`. The short version is below.
@@ -64,7 +99,7 @@ Key rules:
 - Non-core Inngest dispatches (telemetry, post-success notifications, observability events) go through `safeSend()` in `apps/api/src/services/safe-non-core.ts` so a dispatch failure is captured in Sentry but never throws and never breaks the user action. Bare `inngest.send(...)` is reserved for CORE flows where dispatch failure must short-circuit the user action — those sites carry a `// core-send: <reason>` comment on the line(s) immediately above the call. Forward-only ratchet test: `apps/api/src/services/safe-non-core.guard.test.ts`.
 - LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
 - When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook only checks that snapshot files are staged — it does NOT run the harness. Harness code: `apps/api/eval-llm/`.
-- Subagents must never run `git add`, `git commit`, or `git push` — except (a) the `/commit` skill, which runs as an authorized `context: fork` subagent, and (b) when the commit is a step prescribed by a structured workflow. All other subagents write code, run tests, and report which files they changed. The coordinator commits their work using `/commit`.
+- Subagents may run `/commit` only from within an isolated worktree they own (see Worktree Placement above). When operating in the coordinator's working tree (no worktree isolation), subagents must NOT run `git add`/`git commit`/`git push` — the coordinator handles all git operations there.
 - Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `assessments.mastery_challenge_verified_at` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to `needs_deepening_topics` with `source = 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. Challenge Round LLM calls must still route through `resolveExchangeLlmRouting()`; accepted/active/drafting turns may apply a routing-only rung-4 floor (mechanism planned — `ExchangeContext.llmRoutingRung` field not yet in source), Family standard remains Gemini-only, and the OpenAI advanced candidate stays rung 5+ only. The persistent Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed in Phase 0 (PR #325); today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
 
 ## Known Exceptions to Engineering Rules
@@ -86,7 +121,7 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 
 Pre-commit and pre-push hooks enforce lint, typecheck, and surgical tests automatically. See `docs/change-classes.md` for what each hook covers. Focus on what hooks do NOT cover:
 
-- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. Both hooks intentionally skip `.integration.test.` files.
+- Run integration tests before any commit that touches `apps/api/` or `tests/integration/`: `pnpm exec nx test:integration api`. The pre-commit and pre-push hooks both intentionally skip `.integration.test.` files, so unit tests don't catch DB/auth-scoping/Inngest-flow regressions.
 - Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
 - No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
 
@@ -132,6 +167,15 @@ These rules catch bugs that survive type-checking and only surface at runtime. L
 - **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
 - **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
 - **GC6 — Boy-scout internal mocks when editing test files.** Any time you edit a test file (`*.test.ts` / `*.test.tsx` / `*.integration.test.ts`) for any reason, scan it for `jest.mock('./...')`, `jest.mock('../...')`, or `jest.mock('@eduagent/...')` and remove the internal mocks before the edit is complete. Use the real implementation, or convert to `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`). Run `/my:sweep-mocks` for the full workflow. The PostToolUse hook at `~/.claude/hooks/post-edit-jest-mock-check.sh` surfaces offending lines after every test-file edit; treat that output as a blocker on task completion, not a follow-up. External-boundary mocks (LLM via `routeAndCall`, Stripe, Clerk JWKS, push, email, Inngest framework) use bare specifiers and are not violations. The `// gc1-allow: <reason>` escape applies only when the real code cannot run in the test environment — not as a convenience. **Policy:** internal mocks are not acceptable state, they are backlog. The codebase's direction is "if there is code to test, use the code; mock only what the test environment cannot exercise." **Why:** GC1 gates new violations; GC6 forces every test-file visit to reduce the legacy backlog. The deferral escape (leave the mocks, record file paths + count in the commit message) exists only when burn-down would balloon a focused task — it does not authorize preserving the mocks indefinitely.
+
+## Planning Discipline
+
+When writing implementation plans (via Claude Code plan mode, written specs, or otherwise):
+
+- No placeholders ("TBD", "implement later", "add validation"). If a step says what to do, include how.
+- Show actual code/commands for steps that need them. A step that changes code must show the code.
+- Check type and name consistency across tasks. A function called `clearLayers` in Task 3 must still be `clearLayers` in Task 7.
+- Use TDD step decomposition for greenfield logic; use design-doc + acceptance criteria for migrations, audits, refactors.
 
 ## Secrets Management
 
@@ -217,4 +261,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-05-23
+Last updated: 2026-05-24

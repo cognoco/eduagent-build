@@ -1811,7 +1811,7 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 
 **Architecture Status:** READY FOR IMPLEMENTATION
 
-**Next Phase:** Epics & Stories (`/bmad:bmm:workflows:create-epics-stories`)
+**Next Phase:** Epics & Stories
 
 **Document Maintenance:** Update this architecture when major technical decisions are made during implementation.
 

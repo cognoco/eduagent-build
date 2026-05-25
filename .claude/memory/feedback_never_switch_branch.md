@@ -14,3 +14,5 @@ NEVER switch git branches (git checkout, git switch, or any equivalent) unless t
 - If a task seems like it needs a different branch, ASK the user first — never assume.
 - When dispatching subagents, explicitly instruct them to stay on the current branch.
 - The only exception is if the user literally says "switch to X branch" or "checkout X".
+
+**Carve-out — worktree creation is not a branch switch.** Creating an isolated worktree via the repo's worktree skill (`git worktree add .worktrees/<name> -b <name>`) creates a new branch in a separate directory; the current CWD's branch is untouched. This is allowed and is the standard pattern for parallel/isolated work. The rule above applies only to `git checkout`/`git switch` operations on the current working tree.

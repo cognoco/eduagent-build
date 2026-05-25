@@ -6,6 +6,23 @@ set -e
 # slower but reliable. Harmless on macOS/Linux (cost is a few extra seconds).
 pnpm exec lint-staged --concurrent false
 
+# Cross-runtime sync: .claude/skills/ is generated from .agents/skills/. Use
+# --print-changed so we stage exactly the files this sync run touched, not
+# every working-tree edit under .claude/skills/. That distinction matters for
+# files intentionally excluded from sync (e.g. the commit skill, see
+# SKIP_SKILLS in scripts/sync-skills.mjs) where direct edits are valid and
+# should not be auto-staged. Status messages go to stderr in this mode; stdout
+# is one repo-relative path per line.
+# (AGENTS.md <-> CLAUDE.md sync is intentionally not productionized in this
+# PR — see .claude/memory/project_agent_doc_and_memory_architecture_revisit.md
+# for the future work item.)
+SYNC_CHANGES=$(node scripts/sync-skills.mjs --print-changed)
+if [ -n "$SYNC_CHANGES" ]; then
+  echo "pre-commit: auto-staging sync-generated changes:"
+  echo "$SYNC_CHANGES" | sed 's/^/  /'
+  echo "$SYNC_CHANGES" | xargs git add
+fi
+
 # Eval-harness guard: prompt-touching files require an accompanying snapshot
 # diff. Without this, prompt drift ships silently (the eval harness only
 # catches it post-hoc on the next manual run). See CLAUDE.md "When changing
