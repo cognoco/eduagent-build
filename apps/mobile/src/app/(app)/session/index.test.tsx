@@ -473,6 +473,7 @@ jest.mock(
 );
 
 jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../../lib/profile'),
   useProfile: () => ({
     activeProfile: {
       id: 'profile-1',

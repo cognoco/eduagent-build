@@ -75,6 +75,7 @@ const childProfile = {
 };
 
 jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../../lib/profile'),
   useProfile: () => ({
     activeProfile: ownerProfile,
     profiles: [ownerProfile, childProfile],

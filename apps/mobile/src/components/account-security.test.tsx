@@ -17,7 +17,10 @@ jest.mock('expo-router', () => ({
 
 // ChangePassword (rendered when the row is expanded) calls useQueryClient()
 // and useProfile() — both need providers. Pattern mirrors change-password.test.tsx.
-jest.mock('../lib/profile', () => ({ useProfile: () => ({ profiles: [] }) })); // gc1-allow: external boundary stub for QueryClient-dependent child component
+jest.mock('../lib/profile', () => ({
+  ...jest.requireActual('../lib/profile'),
+  useProfile: () => ({ profiles: [] }),
+})); // gc1-allow: external boundary stub for QueryClient-dependent child component
 
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({

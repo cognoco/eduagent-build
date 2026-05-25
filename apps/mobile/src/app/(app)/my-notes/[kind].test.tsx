@@ -89,6 +89,7 @@ jest.mock(
 jest.mock(
   '../../../lib/profile' /* gc1-allow: screen test isolates profile context */,
   () => ({
+    ...jest.requireActual('../../../lib/profile'),
     useProfile: () => ({
       activeProfile: {
         id: PROFILE_ID,

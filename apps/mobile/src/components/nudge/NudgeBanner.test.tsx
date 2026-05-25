@@ -27,6 +27,7 @@ jest.mock(
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
   () => ({
+    ...jest.requireActual('../../lib/profile'),
     useProfile: () => mockProfile(),
   }),
 );

@@ -303,6 +303,7 @@ jest.mock(
 jest.mock(
   '../../lib/profile' /* gc1-allow: ProfileProvider uses SecureStore native storage */,
   () => ({
+    ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
       activeProfile: { id: 'profile-1', isOwner: true },
       profiles: [{ id: 'profile-1', isOwner: true }],

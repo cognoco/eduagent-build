@@ -124,6 +124,7 @@ jest.mock(
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context uses native storage and query state */,
   () => ({
+    ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
       activeProfile: {
         id: 'test-profile-id',

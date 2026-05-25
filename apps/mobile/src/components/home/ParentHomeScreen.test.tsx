@@ -26,6 +26,7 @@ let mockDashboardData: DashboardData | undefined;
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
   () => ({
+    ...jest.requireActual('../../lib/profile'),
     useLinkedChildren: () => mockLinkedChildren,
   }),
 );
