@@ -140,6 +140,16 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | **Observability** | Structured JSON logging via `services/logger.ts`, compatible with Workers Logpush and `wrangler tail`. No Axiom SDK integration. Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. | Backend |
 | **i18n** | English-only UI for v1.0 — no i18n framework implemented. Multi-language UI deferred. Backend: English only. Learning languages: any (via LLM). RTL deferred. | Frontend |
 
+### Consumer Family Compliance Boundary
+
+_Added 2026-05-25 after the family tier/access pricing review._
+
+The consumer app may support a first learner profile on every tier, but subscription tier is not a child-safety or consent control. Age checks, consent state, family-link ownership, profile scoping, consent redaction, data retention/deletion, and vendor restrictions remain mandatory on Free, Plus, Family, and Pro.
+
+Voice remains core learner UX. For child learners, raw audio is transient by default: capture only to transcribe/respond, do not retain raw child voice recordings, do not train models on them, and delete audio immediately after the request is handled. Text transcripts follow the normal session retention and consent rules. Do not infer emotions from voice, tone, face, camera, or behavioral biometrics.
+
+The consumer product must not ship features intended for school/district/institutional decisions: admission, placement, formal learning-outcome evaluation, proctoring, test-cheating detection, or institutional student monitoring. Emotion recognition in education/workplace contexts is prohibited territory. No school, district, tutor, coach, or classroom sales channel may launch until a separate institutional/tutor SKU is scoped with its own data model, contracts, compliance review, governance controls, and feature set.
+
 ## Starter Template Evaluation
 
 ### Primary Technology Domain
