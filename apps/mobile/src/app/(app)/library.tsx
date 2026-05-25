@@ -29,6 +29,7 @@ import {
   type LibraryRetentionTopic,
 } from '../../hooks/use-library-context';
 import { isGuardianProfile, useProfile } from '../../lib/profile';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { formatApiError } from '../../lib/format-api-error';
 import {
   deriveRetentionStatus,
@@ -144,6 +145,8 @@ export default function LibraryScreen() {
   const themeColors = useThemeColors();
   const { colorScheme } = useTheme();
   const { activeProfile, profiles } = useProfile();
+  const navigationContract = useNavigationContract();
+  const canWrite = !navigationContract.isParentProxy;
   const isGuardian = isGuardianProfile(activeProfile, profiles);
   const activeProfileRole = useActiveProfileRole();
   const proxyChildProfileId =
@@ -391,6 +394,7 @@ export default function LibraryScreen() {
     subject: Subject,
     status: Subject['status'],
   ): Promise<void> => {
+    if (!canWrite) return;
     if (statusUpdateInFlightRef.current) return;
     statusUpdateInFlightRef.current = true;
     setPendingSubjectId(subject.id);
@@ -795,7 +799,7 @@ export default function LibraryScreen() {
           </View>
         </View>
 
-        {subjects.length > 0 && (
+        {subjects.length > 0 && canWrite && (
           <Pressable
             onPress={() => setShowManageSubjects(true)}
             className="rounded-full bg-surface-elevated px-4 py-2"
@@ -810,6 +814,15 @@ export default function LibraryScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Proxy read-only hint */}
+      {!canWrite && (
+        <View className="px-5 pb-2" testID="library-proxy-hint">
+          <Text className="text-body-sm text-text-secondary">
+            {t('proxy.readOnly.hint')}
+          </Text>
+        </View>
+      )}
 
       {/* Search bar */}
       <View className="px-5" style={{ zIndex: 2 }}>
@@ -1065,7 +1078,7 @@ export default function LibraryScreen() {
                             onPress={() =>
                               void handleSubjectStatusChange(subject, 'paused')
                             }
-                            disabled={isSavingAnySubject}
+                            disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`pause-subject-${subject.id}`}
                           >
@@ -1082,7 +1095,7 @@ export default function LibraryScreen() {
                                 'archived',
                               )
                             }
-                            disabled={isSavingAnySubject}
+                            disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`archive-subject-${subject.id}`}
                           >
@@ -1097,7 +1110,7 @@ export default function LibraryScreen() {
                             onPress={() =>
                               void handleSubjectStatusChange(subject, 'active')
                             }
-                            disabled={isSavingAnySubject}
+                            disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-primary py-2.5 items-center"
                             testID={`resume-subject-${subject.id}`}
                           >
@@ -1114,7 +1127,7 @@ export default function LibraryScreen() {
                                 'archived',
                               )
                             }
-                            disabled={isSavingAnySubject}
+                            disabled={isSavingAnySubject || !canWrite}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`archive-subject-${subject.id}`}
                           >
@@ -1128,7 +1141,7 @@ export default function LibraryScreen() {
                           onPress={() =>
                             void handleSubjectStatusChange(subject, 'active')
                           }
-                          disabled={isSavingAnySubject}
+                          disabled={isSavingAnySubject || !canWrite}
                           className="flex-1 rounded-button bg-primary py-2.5 items-center"
                           testID={`restore-subject-${subject.id}`}
                         >

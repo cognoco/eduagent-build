@@ -8,6 +8,7 @@ import type {
   SessionImageAttachment,
 } from './use-session-streaming';
 import { type PendingSubjectResolution, isGreeting } from './session-types';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 
 export interface UseSubjectClassificationOptions {
   // State
@@ -79,6 +80,7 @@ function getPendingImageOptions(
 export function useSubjectClassification(
   opts: UseSubjectClassificationOptions,
 ) {
+  const navigationContract = useNavigationContract();
   const {
     isStreaming,
     pendingClassification,
@@ -151,6 +153,7 @@ export function useSubjectClassification(
 
   const handleResolveSubject = useCallback(
     async (candidate: { subjectId: string; subjectName: string }) => {
+      if (navigationContract.isParentProxy) return;
       if (!pendingSubjectResolution || isStreaming || pendingClassification) {
         return;
       }
@@ -176,6 +179,7 @@ export function useSubjectClassification(
     [
       continueWithMessage,
       createLocalMessageId,
+      navigationContract.isParentProxy,
       isStreaming,
       pendingClassification,
       pendingSubjectResolution,
@@ -192,7 +196,8 @@ export function useSubjectClassification(
       name: string;
       description: string;
       focus?: string;
-    }) => {
+    }): Promise<void> => {
+      if (navigationContract.isParentProxy) return;
       if (isStreaming || pendingClassification || !pendingSubjectResolution)
         return;
 
@@ -233,6 +238,7 @@ export function useSubjectClassification(
       continueWithMessage,
       createLocalMessageId,
       createSubject,
+      navigationContract.isParentProxy,
       isStreaming,
       pendingClassification,
       pendingSubjectResolution,
@@ -245,7 +251,8 @@ export function useSubjectClassification(
   );
 
   // BUG-233: Create a new subject from the classifier's suggestion
-  const handleCreateSuggestedSubject = useCallback(async () => {
+  const handleCreateSuggestedSubject = useCallback(async (): Promise<void> => {
+    if (navigationContract.isParentProxy) return;
     if (
       !pendingSubjectResolution?.suggestedSubjectName ||
       isStreaming ||
@@ -292,6 +299,7 @@ export function useSubjectClassification(
     continueWithMessage,
     createLocalMessageId,
     createSubject,
+    navigationContract.isParentProxy,
     isStreaming,
     pendingClassification,
     pendingSubjectResolution,
@@ -303,7 +311,8 @@ export function useSubjectClassification(
   ]);
 
   const handleTypeSubject = useCallback(
-    async (typedSubject: string) => {
+    async (typedSubject: string): Promise<void> => {
+      if (navigationContract.isParentProxy) return;
       const rawInput = typedSubject.trim();
       if (
         !rawInput ||
@@ -395,6 +404,7 @@ export function useSubjectClassification(
       createLocalMessageId,
       createSubject,
       handleResolveSubject,
+      navigationContract.isParentProxy,
       isStreaming,
       pendingClassification,
       pendingSubjectResolution,
@@ -416,7 +426,8 @@ export function useSubjectClassification(
         attachImage?: boolean;
         imageAttachment?: SessionImageAttachment;
       },
-    ) => {
+    ): Promise<void> => {
+      if (navigationContract.isParentProxy) return;
       // CR-1: Guard on quotaError so programmatic callers (quick chips, homework
       // auto-send, queued problems) can't bypass the UI-disabled input guard.
       if (isStreaming || pendingClassification || quotaError) return;
@@ -755,6 +766,7 @@ export function useSubjectClassification(
       });
     },
     [
+      navigationContract.isParentProxy,
       isStreaming,
       pendingClassification,
       // CR-1: quotaError added so the callback re-creates when quota state changes.

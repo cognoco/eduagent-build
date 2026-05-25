@@ -260,3 +260,117 @@ describe('[BUG-907] CONTROLS switches expose accessibilityLabel', () => {
     cleanup();
   });
 });
+
+// ---------------------------------------------------------------------------
+// WI-264: consent-withdrawn blocks all reads, exports, and mutations
+// ---------------------------------------------------------------------------
+
+describe('ChildMentorMemoryScreen — consent-withdrawn empty state (WI-264)', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  afterEach(() => {
+    mockFetch.mockClear();
+  });
+
+  function setWithdrawnRoutes(): void {
+    // Consent endpoint returns WITHDRAWN.
+    mockFetch.setRoute('/consent/child-001/status', () => ({
+      consentStatus: 'WITHDRAWN',
+      respondedAt: new Date().toISOString(),
+      consentType: 'GDPR',
+    }));
+    // These endpoints must NOT be fetched when consent is withdrawn.
+    mockFetch.setRoute('/learner-profile/child-001', () => ({
+      profile: { ...childProfileBase },
+    }));
+    mockFetch.setRoute(
+      '/dashboard/children/child-001',
+      (url: string, init?: RequestInit) => {
+        if (url.includes('/memory')) return { memory: { categories: [] } };
+        if (url.includes('/sessions')) return { sessions: [] };
+        if (init?.method && init.method !== 'GET') return {};
+        return { child: { displayName: 'Emma', profileId: 'child-001' } };
+      },
+    );
+  }
+
+  it('[WI-264] renders the consent-withdrawn empty state when consent is WITHDRAWN', async () => {
+    setWithdrawnRoutes();
+
+    const { result, cleanup } = renderScreen(<ChildMentorMemoryScreen />, {
+      profile: guardianProfile,
+      profiles: [guardianProfile, linkedChildProfile],
+      installGlobalFetch: false,
+      routedFetch: mockFetch,
+    });
+
+    await waitFor(() => {
+      result.getByTestId('child-mentor-memory-consent-withdrawn');
+    });
+
+    cleanup();
+  });
+
+  it('[WI-264] shows empty state (not memory content) once consent resolves as WITHDRAWN', async () => {
+    // The memory fetch may fire on the initial render before consent resolves;
+    // the security guarantee is that once WITHDRAWN is known, the screen renders
+    // the consent-withdrawn empty state and does NOT render memory content.
+    setWithdrawnRoutes();
+
+    const { result, cleanup } = renderScreen(<ChildMentorMemoryScreen />, {
+      profile: guardianProfile,
+      profiles: [guardianProfile, linkedChildProfile],
+      installGlobalFetch: false,
+      routedFetch: mockFetch,
+    });
+
+    await waitFor(() => {
+      result.getByTestId('child-mentor-memory-consent-withdrawn');
+    });
+
+    // After consent resolves as WITHDRAWN, memory content must NOT render.
+    expect(
+      result.queryByTestId('child-mentor-memory-interests-section'),
+    ).toBeNull();
+    expect(result.queryByLabelText('Learn about child')).toBeNull();
+
+    cleanup();
+  });
+
+  it('[WI-264] does NOT fetch the learner-profile or memory endpoints with the real childProfileId when consent is WITHDRAWN', async () => {
+    // Negative-path: the learner-profile and memory hooks must never be
+    // called with the real childProfileId when consent is WITHDRAWN.
+    // They are gated as `consentResolved && !consentWithdrawn ? id : undefined`
+    // in the screen, so the only calls that may appear must carry undefined.
+    setWithdrawnRoutes();
+
+    const { result, cleanup } = renderScreen(<ChildMentorMemoryScreen />, {
+      profile: guardianProfile,
+      profiles: [guardianProfile, linkedChildProfile],
+      installGlobalFetch: false,
+      routedFetch: mockFetch,
+    });
+
+    await waitFor(() => {
+      result.getByTestId('child-mentor-memory-consent-withdrawn');
+    });
+
+    // Assert that no fetch was made to the learner-profile or memory endpoints
+    // with the real child profile id. The routed mock would record any call.
+    const profileCalls = fetchCallsMatching(
+      mockFetch,
+      '/learner-profile/child-001',
+    );
+    const memoryCalls = fetchCallsMatching(
+      mockFetch,
+      '/dashboard/children/child-001',
+    ).filter(({ url }) => url.includes('/memory'));
+
+    expect(profileCalls).toHaveLength(0);
+    expect(memoryCalls).toHaveLength(0);
+
+    cleanup();
+  });
+});

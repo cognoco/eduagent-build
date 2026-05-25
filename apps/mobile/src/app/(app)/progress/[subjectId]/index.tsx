@@ -21,6 +21,7 @@ import {
   useSubjectProgress,
 } from '../../../../hooks/use-progress';
 import { useActiveProfileRole } from '../../../../hooks/use-active-profile-role';
+import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { useLanguageProgress } from '../../../../hooks/use-language-progress';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { useUpdateSubject } from '../../../../hooks/use-subjects';
@@ -50,6 +51,8 @@ function StatCard({
 
 export default function ProgressSubjectScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const navigationContract = useNavigationContract();
+  const canWrite = !navigationContract.isParentProxy;
   const role = useActiveProfileRole();
   const register = copyRegisterFor(role);
   const router = useRouter();
@@ -139,7 +142,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   );
 
   const confirmHideSubject = (): void => {
-    if (!subject) return;
+    if (!subject || !canWrite) return;
     platformAlert(
       t('progress.subject.hideConfirmTitle', {
         subject: subject.subjectName,
@@ -614,9 +617,16 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                 </Text>
               </Pressable>
             </View>
+            {!canWrite && (
+              <View className="mt-3 px-1" testID="progress-subject-proxy-hint">
+                <Text className="text-body-sm text-text-secondary text-center">
+                  {t('proxy.readOnly.hint')}
+                </Text>
+              </View>
+            )}
             <Pressable
               onPress={confirmHideSubject}
-              disabled={updateSubject.isPending}
+              disabled={updateSubject.isPending || !canWrite}
               className="mt-3 bg-surface rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
               accessibilityRole="button"
               accessibilityLabel={t('progress.subject.hideSubject')}

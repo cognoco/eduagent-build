@@ -32,6 +32,7 @@ export default function HomeScreen(): React.ReactElement {
     accommodationMode: learnerProfile?.accommodationMode,
     audience: isOwner ? 'adult' : 'child',
     onAllComplete: () => {
+      if (navigationContract.isParentProxy) return;
       markCelebrationsSeen
         .mutateAsync({
           viewer: isOwner ? 'parent' : 'child',
@@ -69,10 +70,18 @@ export default function HomeScreen(): React.ReactElement {
     if (!firstNotice || visibleNoticeId !== firstNotice.id) return;
     const timer = setTimeout(() => {
       setVisibleNoticeId(null);
-      ackNotice.mutate({ id: firstNotice.id });
+      // [WI-270] Do not acknowledge the notice on the child's behalf in proxy
+      // mode — the dismissal is a write that belongs to the child.
+      if (!navigationContract.isParentProxy)
+        ackNotice.mutate({ id: firstNotice.id });
     }, 5000);
     return () => clearTimeout(timer);
-  }, [ackNotice, firstNotice, visibleNoticeId]);
+  }, [
+    ackNotice,
+    firstNotice,
+    visibleNoticeId,
+    navigationContract.isParentProxy,
+  ]);
 
   // Neutral placeholder while profiles load — prevents flash of wrong content.
   if (isLoading && !loadingTimedOut) {

@@ -37,6 +37,7 @@ import {
   assertOwnerAndParentAccess,
 } from '../services/family-access';
 import { assertChildDashboardDataVisible } from '../services/dashboard';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getOrCreateMemoryProjection,
   toLearnerSelfView,
@@ -115,6 +116,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/item',
     zValidator('json', deleteMemoryItemSchema),
     async (c) => {
+      // [WI-371 / DS-185] Proxy callers must use the owner-gated
+      // /:profileId/item route; the self route is not consent-managed and was
+      // otherwise unguarded (not metered), so a parent acting as a child could
+      // erase the child's memory items here. assertCanManageOwnConsent is not
+      // used because erasure is not a consent toggle.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
@@ -355,6 +362,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/tell',
     zValidator('json', tellMentorInputSchema),
     async (c) => {
+      // [WI-371 / DS-185] Route-level proxy guard (defense-in-depth alongside
+      // the metering middleware, which also guards this LLM-metered route). A
+      // parent acting as a child (isOwner === false) must not inject
+      // mentor-memory content via the child's self screen; the owner-gated
+      // /:profileId/tell route is the sanctioned parent path.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { text } = c.req.valid('json');
@@ -387,6 +400,11 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/unsuppress',
     zValidator('json', unsuppressInferenceSchema),
     async (c) => {
+      // [WI-371 / DS-185] Same rationale as DELETE /item: un-hiding an
+      // inference is a memory-content write, not a consent toggle, and the
+      // self route was unguarded. Proxy callers use the owner-gated
+      // /:profileId/unsuppress route.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.

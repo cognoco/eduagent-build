@@ -1136,7 +1136,13 @@
     "deliverySentBody": "Din forelder vil motta en e-post på {{email}}. Vi gir deg beskjed så snart de godkjenner.",
     "deliveryFailedBody": "Vi kunne ikke bekrefte at samtykke-e-posten nådde {{email}}. Vennligst dobbeltsjekk adressen og prøv igjen.",
     "deliveryFailedHint": "Du kan sende forespørselen på nytt nå eller gå tilbake og skrive inn en annen e-postadresse.",
-    "resendEmail": "Send e-post på nytt"
+    "resendEmail": "Send e-post på nytt",
+    "profileNotFound": "Denne profilen tilhører ikke kontoen din.",
+    "withdrawn": {
+      "hint": "{{name}} har satt deling av disse dataene på pause.",
+      "title": "Deling satt på pause",
+      "requestCta": "Be om samtykke på nytt"
+    }
   },
   "account": {
     "title": "Slett konto",
@@ -2922,6 +2928,13 @@
       "previous": "Previous card",
       "next": "Next card",
       "dots": "Page {{current}} of {{total}}"
+    }
+  },
+  "proxy": {
+    "readOnly": {
+      "hint": "Du ser på barnets konto. Bytt til din egen profil for å gjøre endringer.",
+      "title": "Bytt til din egen profil for å gjøre endringer",
+      "switchProfileCta": "Bytt profil"
     }
   }
 }

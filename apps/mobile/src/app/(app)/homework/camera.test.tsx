@@ -141,6 +141,20 @@ jest.mock(
   }),
 );
 
+let mockIsParentProxy = false;
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests */,
+  () => ({
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
+  }),
+);
+
+// lib/profile is still needed by use-subjects and use-homework-ocr (both call
+// useProfile() for activeProfile). WI-371 migrated the proxy gate to
+// use-navigation-contract, but the profile context must remain available.
 jest.mock(
   '../../../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
   () => ({
@@ -271,6 +285,7 @@ jest
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockIsParentProxy = false;
   appStateListeners = [];
   mockLaunchImageLibraryAsync.mockResolvedValue({
     canceled: true,
@@ -1478,6 +1493,61 @@ describe('CameraScreen', () => {
         jest.advanceTimersByTime(60_000);
       });
       expect(mockCancel).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---- WI-271: Proxy-mode write guard ----
+
+  describe('proxy mode gate', () => {
+    beforeEach(() => {
+      mockIsParentProxy = true;
+    });
+
+    it('renders the proxy read-only empty state instead of the camera pipeline', () => {
+      const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      getByTestId('proxy-read-only');
+      // Camera pipeline must NOT be initialized
+      expect(queryByTestId('camera-view')).toBeNull();
+      expect(queryByTestId('grant-permission-button')).toBeNull();
+    });
+
+    it('does not initialize classify or create-subject mutations', () => {
+      render(<CameraScreen />, { wrapper: createWrapper() });
+
+      // Neither mutation should have been called — we never reach the pipeline
+      expect(mockProcess).not.toHaveBeenCalled();
+    });
+
+    it('shows the switch-profile CTA button', () => {
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      getByTestId('proxy-switch-profile-button');
+    });
+
+    it('does NOT auto-request camera permission in proxy mode when status is undetermined [WI-271]', () => {
+      // Regression guard: the permission request effect must early-return when
+      // isParentProxy is true, even if the camera status is 'undetermined'.
+      // Without the guard the effect would call requestPermission() and trigger
+      // the OS camera dialog on behalf of the child's account.
+      const requestPermission = jest.fn();
+      useCameraPermissions.mockReturnValue([
+        { granted: false, canAskAgain: true, status: 'undetermined' },
+        requestPermission,
+        jest.fn().mockResolvedValue({
+          granted: false,
+          canAskAgain: true,
+          status: 'undetermined',
+        }),
+      ]);
+
+      render(<CameraScreen />, { wrapper: createWrapper() });
+
+      expect(requestPermission).not.toHaveBeenCalled();
     });
   });
 });

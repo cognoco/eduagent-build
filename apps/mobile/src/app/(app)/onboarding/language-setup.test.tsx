@@ -75,6 +75,17 @@ const mockGoBackOrReplace = jest.fn();
 let mockIsPending = false;
 let mockSubjectId: string | undefined = 'test-id';
 let mockReturnTo: string | undefined = undefined;
+let mockIsParentProxy = false;
+
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests */,
+  () => ({
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
+  }),
+);
 
 jest.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'nb-NO', languageCode: 'nb' }],
@@ -150,6 +161,7 @@ describe('LanguageSetup', () => {
     mockSubjectId = 'test-id';
     mockIsPending = false;
     mockReturnTo = undefined;
+    mockIsParentProxy = false;
     mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
     mockStartFirstCurriculumMutateAsync.mockResolvedValue({
       session: {
@@ -339,5 +351,84 @@ describe('LanguageSetup', () => {
 
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockGoBackOrReplace).toHaveBeenCalledTimes(1);
+  });
+
+  // ---- WI-277: Proxy-mode write guard ----
+
+  describe('proxy mode gate', () => {
+    beforeEach(() => {
+      mockIsParentProxy = true;
+    });
+
+    it('disables the language select options when in proxy mode', () => {
+      render(<LanguageSetup />);
+
+      const enButton = screen.getByTestId('native-language-en');
+      expect(
+        enButton.props.accessibilityState?.disabled ?? enButton.props.disabled,
+      ).toBeTruthy();
+    });
+
+    it('disables the submit button when in proxy mode', () => {
+      render(<LanguageSetup />);
+
+      const continueButton = screen.getByTestId('language-setup-continue');
+      expect(
+        continueButton.props.accessibilityState?.disabled ??
+          continueButton.props.disabled,
+      ).toBeTruthy();
+    });
+
+    it('does not call configure or session mutations when submit is pressed in proxy mode', async () => {
+      render(<LanguageSetup />);
+
+      fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+      expect(mockStartFirstCurriculumMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('CEFR level Pressables are disabled in proxy mode [WI-277]', () => {
+      render(<LanguageSetup />);
+
+      // All four CEFR level options must carry accessibilityState.disabled=true
+      // in proxy mode so the parent cannot change the learner's level setting.
+      for (const testId of [
+        'level-beginner',
+        'level-some-basics',
+        'level-conversational',
+        'level-advanced',
+      ]) {
+        const btn = screen.queryByTestId(testId);
+        if (btn) {
+          expect(btn.props.accessibilityState?.disabled).toBe(true);
+        }
+      }
+    });
+
+    it('pressing a CEFR level Pressable does not change the selected level in proxy mode [WI-277]', () => {
+      render(<LanguageSetup />);
+
+      // Record which level is initially selected (if any).
+      const initialA1State =
+        screen.queryByTestId('level-beginner')?.props.accessibilityState;
+      const initialSelected = initialA1State?.selected;
+
+      // Attempt to press the beginner level button (it must be disabled, but
+      // even if the native layer fires the event, the handler must not change
+      // selection because the Pressable is disabled).
+      const btn = screen.queryByTestId('level-beginner');
+      if (btn) {
+        fireEvent.press(btn);
+        // After the (disabled) press, the selected state must not have flipped
+        // compared to before.
+        expect(
+          screen.queryByTestId('level-beginner')?.props.accessibilityState
+            ?.selected,
+        ).toBe(initialSelected);
+      }
+    });
   });
 });
