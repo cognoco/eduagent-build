@@ -400,13 +400,11 @@ describe('Integration: session service', () => {
       },
     );
 
-    await recordSystemPrompt(
-      createIntegrationDb(),
-      profile.id,
-      session.id,
-      'Take your time. I am here when you are ready.',
-      { source: 'silence-nudge' },
-    );
+    // WI-373: recordSystemPrompt now takes only the intent token; the canonical
+    // prompt string is resolved server-side from the server-owned map.
+    await recordSystemPrompt(createIntegrationDb(), profile.id, session.id, {
+      kind: 'silence_nudge',
+    });
 
     const transcript = await getSessionTranscript(
       createIntegrationDb(),
@@ -444,7 +442,8 @@ describe('Integration: session service', () => {
       }),
       expect.objectContaining({
         role: 'assistant',
-        content: 'Take your time. I am here when you are ready.',
+        content:
+          "Still working on it? Take your time - I'm here when you're ready.",
         isSystemPrompt: true,
         escalationRung: undefined,
       }),

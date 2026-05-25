@@ -23,6 +23,7 @@ import type {
   SessionType,
   RecallBridgeResult,
   VerificationType,
+  SystemPromptIntent,
 } from '@eduagent/schemas';
 import {
   useApiClient,
@@ -621,24 +622,16 @@ export function useSession(
 
 export function useRecordSystemPrompt(
   sessionId: string,
-): UseMutationResult<
-  { ok: boolean },
-  Error,
-  { content: string; metadata?: Record<string, unknown> }
-> {
+): UseMutationResult<{ ok: boolean }, Error, SystemPromptIntent> {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async ({
-      content,
-      metadata,
-    }: {
-      content: string;
-      metadata?: Record<string, unknown>;
-    }) => {
+    // WI-373: the client sends a typed intent token; the server resolves the
+    // canonical system-prompt text. No client-authored system-role content.
+    mutationFn: async (intent: SystemPromptIntent) => {
       const res = await client.sessions[':sessionId']['system-prompt'].$post({
         param: { sessionId },
-        json: { content, metadata },
+        json: intent,
       });
       await assertOk(res);
       return (await res.json()) as { ok: boolean };

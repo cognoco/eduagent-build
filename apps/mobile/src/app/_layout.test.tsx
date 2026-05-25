@@ -12,15 +12,12 @@ import { ClerkGate } from './_layout';
 // Must be set before the module under test is loaded (hoisted require side-effect).
 // jest.mock calls are Babel-hoisted above import statements, so we piggy-back the
 // env-var assignment inside a mock factory to guarantee it runs first.
-jest.mock(
-  '../../global.css',
-  () => {
-    process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY =
-      'pk_test_mock_key_for_tests';
-    return {};
-  },
-  { virtual: true },
-);
+// prettier-ignore
+jest.mock('../../global.css', /* gc1-allow: global.css has no real JS module to import in jest; virtual mock also seeds EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY before _layout.tsx is required */ () => {
+  process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY =
+    'pk_test_mock_key_for_tests';
+  return {};
+}, { virtual: true });
 
 // Heavy module-level side-effect imports in _layout.tsx that don't execute
 // in JSDOM/Jest test environment. Bare specifiers only — GC1 compliant.
@@ -53,12 +50,10 @@ jest.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: ({ children }: { children?: unknown }) => children,
 }));
 
-jest.mock(
-  '../i18n',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    ensureI18nReady: jest.fn().mockResolvedValue(undefined),
-  }),
-);
+// prettier-ignore
+jest.mock('../i18n', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  ensureI18nReady: jest.fn().mockResolvedValue(undefined),
+}));
 
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
@@ -78,118 +73,88 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
   useTokenVars: () => ({}),
 }));
 
-jest.mock(
-  '../lib/profile',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    ProfileProvider: ({ children }: { children?: unknown }) => children,
-    useProfile: jest
-      .fn()
-      .mockReturnValue({ activeProfile: null, profiles: [] }),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/profile', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  ProfileProvider: ({ children }: { children?: unknown }) => children,
+  useProfile: jest.fn().mockReturnValue({ activeProfile: null, profiles: [] }),
+}));
 
-jest.mock(
-  '../lib/app-context',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    AppContextProvider: ({ children }: { children?: unknown }) => children,
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/app-context', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  AppContextProvider: ({ children }: { children?: unknown }) => children,
+}));
 
-jest.mock(
-  '../lib/api-client',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    setOnAuthExpired: jest.fn(),
-    clearOnAuthExpired: jest.fn(),
-    resetAuthExpiredGuard: jest.fn(),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/api-client', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  setOnAuthExpired: jest.fn(),
+  clearOnAuthExpired: jest.fn(),
+  resetAuthExpiredGuard: jest.fn(),
+}));
 
-jest.mock(
-  '../lib/auth-expiry',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    markSessionExpired: jest.fn(),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/auth-expiry', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  markSessionExpired: jest.fn(),
+}));
 
-jest.mock(
-  '../lib/sign-out',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    signOutWithCleanup: jest.fn().mockResolvedValue(undefined),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/sign-out', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  signOutWithCleanup: jest.fn().mockResolvedValue(undefined),
+}));
 
-jest.mock(
-  '../lib/secure-storage',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    getItemAsync: jest.fn().mockResolvedValue(null),
-    setItemAsync: jest.fn().mockResolvedValue(undefined),
-    deleteItemAsync: jest.fn().mockResolvedValue(undefined),
-    sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/secure-storage', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  getItemAsync: jest.fn().mockResolvedValue(null),
+  setItemAsync: jest.fn().mockResolvedValue(undefined),
+  deleteItemAsync: jest.fn().mockResolvedValue(undefined),
+  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+}));
 
-jest.mock(
-  '../components/common',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    ErrorBoundary: ({ children }: { children?: unknown }) => children,
-    OfflineBanner: () => null,
-  }),
-);
+// prettier-ignore
+jest.mock('../components/common', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  ErrorBoundary: ({ children }: { children?: unknown }) => children,
+  OfflineBanner: () => null,
+}));
 
-jest.mock(
-  '../providers/OutboxDrainProvider',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    OutboxDrainProvider: ({ children }: { children?: unknown }) => children,
-  }),
-);
+// prettier-ignore
+jest.mock('../providers/OutboxDrainProvider', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  OutboxDrainProvider: ({ children }: { children?: unknown }) => children,
+}));
 
-jest.mock(
-  '../hooks/use-network-status',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    useNetworkStatus: () => ({ isOffline: false }),
-  }),
-);
+// prettier-ignore
+jest.mock('../hooks/use-network-status', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  useNetworkStatus: () => ({ isOffline: false }),
+}));
 
-jest.mock(
-  '../lib/sentry',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    enableSentry: jest.fn(),
-    Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/sentry', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  enableSentry: jest.fn(),
+  Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
+}));
 
-jest.mock(
-  '../lib/revenuecat',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    configureRevenueCat: jest.fn(),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/revenuecat', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  configureRevenueCat: jest.fn(),
+}));
 
-jest.mock(
-  '../components/AnimatedSplash',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    AnimatedSplash: ({ onComplete }: { onComplete: () => void }) => {
-      require('react').useEffect(() => {
-        onComplete();
-      }, [onComplete]);
-      return null;
-    },
-  }),
-);
+// prettier-ignore
+jest.mock('../components/AnimatedSplash', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  AnimatedSplash: ({ onComplete }: { onComplete: () => void }) => {
+    require('react').useEffect(() => {
+      onComplete();
+    }, [onComplete]);
+    return null;
+  },
+}));
 
-jest.mock(
-  '../lib/query-persister',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    createScopedPersister: jest.fn().mockReturnValue({}),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/query-persister', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  createScopedPersister: jest.fn().mockReturnValue({}),
+}));
 
-jest.mock(
-  '../lib/query-error-reporting',
-  /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
-    shouldReportQueryErrorToSentry: jest.fn().mockReturnValue(false),
-  }),
-);
+// prettier-ignore
+jest.mock('../lib/query-error-reporting', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  shouldReportQueryErrorToSentry: jest.fn().mockReturnValue(false),
+}));
 
 // ---------------------------------------------------------------------------
 // ClerkGate unit tests — BUG-507

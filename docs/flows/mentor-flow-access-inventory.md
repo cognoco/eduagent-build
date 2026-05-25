@@ -13,6 +13,8 @@ If you during the walk through the flows find a missing flow, wrong flow or inco
 Notes:
 
 - This is not a new implementation plan and does not claim the Study/Family navigation contract is already shipped.
+- Current code has the navigation contract and selected contract consumers. Full Study/Family navigation is not in place; rows below are target mentor behavior unless explicitly marked as current V0 behavior.
+- Chrome walkthrough on 2026-05-25 (`d8d1ca6d2`, staging API, `parent-multi-child` seed) confirmed the current Family shell can sign in, show Children home, child detail, Reports, and Recaps, but still exposes old/extra navigation (`My Learning`, `Library`, and hidden route links with undefined params). Child subject drill-down from child detail reached the child subject URL and then made the browser automation session unresponsive.
 - "Mentor" here means an adult family-support user. It does not mean the AI mentor/tutor voice or the `mentor-memory` route.
 - The original flow IDs are preserved so each row can be traced back to `mobile-app-flow-inventory.md`.
 - Adults can be both students and mentors. Mentor access must not replace the adult's own Study flows.
@@ -27,7 +29,7 @@ Notes:
 | Target tabs | `home`, `recaps`, `progress`, `more`. The minimal Recaps path is implemented in the navigation-contract branch; if Recaps is disabled or rolled back, the tab must not be surfaced as a dead tab. (V1 target; current V0 family-mode = `home, progress, more` only — recaps tab requires `MODE_NAV_V1_ENABLED=true`) |
 | Home surface | Family/Children home, replacing the old guardian hybrid home as the target experience. |
 | Child data access | Parent-native child routes and APIs scoped by family-link/consent rules. |
-| Learning routes | Not directly surfaced from Mentor mode. "Learn this too" and similar bridges switch the adult into Study as themselves. |
+| Learning routes | Not directly surfaced from Mentor mode. "Add to my learning" and similar bridges switch the adult into Study as themselves. |
 | Child curriculum | Reachable from child cards/details, not through the adult's top-level Library tab. |
 | Parent proxy | Compatibility/internal only. Normal mentor flows use child detail, Recaps, Progress, reports, and curriculum routes. |
 
@@ -168,4 +170,4 @@ When the Study/Family navigation work starts, mentor tests should verify:
 - Family Progress excludes the adult's own Study progress.
 - Child detail, reports, recaps, curriculum, memory, accommodation, and consent actions are available only for linked/visible children.
 - Normal mentor review does not enter parent proxy mode.
-- Bridges such as "Learn this too" switch the adult into Study and write as the adult, not as the child.
+- Bridges such as "Add to my learning" switch the adult into Study and write as the adult, not as the child.

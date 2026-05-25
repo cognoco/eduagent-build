@@ -117,9 +117,12 @@ jest.mock(
 );
 
 // BackHandler — stub
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => ({
-  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
-}));
+jest.mock(
+  'react-native/Libraries/Utilities/BackHandler',
+  /* gc1-allow: native-boundary: BackHandler is a platform-specific native module not available in JSDOM */ () => ({
+    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  }),
+);
 
 const PlaybackScreen = require('./playback').default as React.ComponentType;
 
