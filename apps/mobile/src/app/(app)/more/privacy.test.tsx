@@ -38,6 +38,7 @@ let mockLinkedChildren: { id: string; displayName: string }[] = [];
 jest.mock(
   '../../../lib/profile' /* gc1-allow: profile context requires full provider tree */,
   () => ({
+    ...jest.requireActual('../../../lib/profile'),
     useLinkedChildren: () => mockLinkedChildren,
   }),
 );

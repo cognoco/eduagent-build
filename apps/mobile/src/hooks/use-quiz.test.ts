@@ -40,6 +40,7 @@ jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono cli
 
 // prettier-ignore
 jest.mock('../lib/profile', () => ({ // gc1-allow: hook tests need a fixed active profile without provider setup
+  ...jest.requireActual('../lib/profile'),
   useProfile: () => ({
     activeProfile: { id: 'test-profile-id' },
   }),
@@ -652,7 +653,10 @@ describe('useRoundDetail', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    const keys = sharedQc.getQueryCache().getAll().map((q) => q.queryKey);
+    const keys = sharedQc
+      .getQueryCache()
+      .getAll()
+      .map((q) => q.queryKey);
     const roundDetailKey = keys.find(
       (k) => Array.isArray(k) && k[0] === 'quiz-round-detail',
     );

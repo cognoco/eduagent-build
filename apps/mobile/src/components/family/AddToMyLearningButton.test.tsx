@@ -38,6 +38,7 @@ jest.mock(
 jest.mock(
   '../../lib/profile' /* gc1-allow: component test only needs active profile id for the AsyncStorage key */,
   () => ({
+    ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
       activeProfile: { id: 'adult-profile-id' },
     }),

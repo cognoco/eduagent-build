@@ -14,14 +14,17 @@ jest.mock('@clerk/clerk-expo', () => ({
 // Mock profile (internal lib — but useProfile is a React context wrapper
 // that would require a full provider tree in tests; mock at the boundary
 // of the React context, not the internal service)
-jest.mock('../lib/profile', () => ({ // gc1-allow: useProfile reads from a React context that requires a full app provider tree to wire; mock its return value only
+jest.mock('../lib/profile', () => ({
+  // gc1-allow: useProfile reads from a React context that requires a full app provider tree to wire; mock its return value only
+  ...jest.requireActual('../lib/profile'),
   useProfile: () => ({ activeProfile: { id: 'test-profile-id' } }),
 }));
 
 // Mock useCreateNote — we only verify the mutateAsync call shape here.
 // The full useCreateNote behaviour is covered in use-notes.test.ts.
 const mockMutateAsync = jest.fn();
-jest.mock('./use-notes', () => ({ // gc1-allow: useCreateNote depends on QueryClient + Hono client internals; isolating the challenge-round hook call shape requires a controlled stub
+jest.mock('./use-notes', () => ({
+  // gc1-allow: useCreateNote depends on QueryClient + Hono client internals; isolating the challenge-round hook call shape requires a controlled stub
   useCreateNote: () => ({
     mutateAsync: mockMutateAsync,
   }),

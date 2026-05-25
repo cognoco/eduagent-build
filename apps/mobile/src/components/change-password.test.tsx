@@ -33,7 +33,10 @@ jest.mock('expo-router', () => ({
 // The real useProfile transitively pulls in SecureStore, api-client, and
 // the TanStack Query provider — instantiating that whole shell in a
 // component-only password test would mask the behaviour under test.
-jest.mock('../lib/profile', () => ({ useProfile: () => ({ profiles: [] }) })); // gc1-allow: see comment above
+jest.mock('../lib/profile', () => ({
+  ...jest.requireActual('../lib/profile'),
+  useProfile: () => ({ profiles: [] }),
+})); // gc1-allow: see comment above
 
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({

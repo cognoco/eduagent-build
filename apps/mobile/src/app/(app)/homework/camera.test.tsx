@@ -144,6 +144,7 @@ jest.mock(
 jest.mock(
   '../../../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
   () => ({
+    ...jest.requireActual('../../../lib/profile'),
     useProfile: () => ({
       activeProfile: {
         id: 'test-profile-id',
