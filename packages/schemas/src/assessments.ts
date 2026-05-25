@@ -213,7 +213,19 @@ export const relearnTopicSchema = z
     method: z.enum(['same', 'different']),
     preferredMethod: z.string().max(500).optional(), // only when method='different'
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.method === 'different' &&
+      (value.preferredMethod ?? '').trim().length === 0
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['preferredMethod'],
+        message: "preferredMethod is required when method is 'different'",
+      });
+    }
+  });
 export type RelearnTopicInput = z.infer<typeof relearnTopicSchema>;
 
 // Teaching method preference

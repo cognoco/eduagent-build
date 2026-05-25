@@ -220,7 +220,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 : FAMILY_HOME_PATH,
             )
           }
-          className="me-3 py-2 pe-2"
+          className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
           testID="child-reports-back"
@@ -353,6 +353,7 @@ export default function ChildReportsScreen(): React.ReactElement {
         </View>
       );
     }
+    if (hasAnyData) return null;
     return (
       <View
         className="bg-surface rounded-card p-4 mt-4 items-center"

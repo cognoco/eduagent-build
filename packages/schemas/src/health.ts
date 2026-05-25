@@ -7,7 +7,7 @@ import { z } from 'zod';
  */
 export const healthResponseSchema = z.object({
   status: z.literal('ok'),
-  timestamp: z.string(),
+  timestamp: z.string().datetime(),
   deploySha: z.string().nullable(),
   llm: z.object({
     providers: z.array(z.string()),

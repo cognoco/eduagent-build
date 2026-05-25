@@ -444,13 +444,18 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
       totalParents: number;
       queuedBatches: number;
       failedBatches: number;
+      requeuedParents: number;
     };
 
-    expect(sendEventCalls).toHaveLength(3);
+    expect(sendEventCalls).toHaveLength(4);
+    expect(sendEventCalls.at(-1)).toMatchObject({
+      name: 'requeue-failed-batches',
+    });
     expect(result.status).toBe('partial');
     expect(result.failedBatches).toBe(1);
     expect(result.queuedBatches).toBe(2);
     expect(result.queuedParents).toBe(401 - 200); // batches 0 and 400 succeeded
+    expect(result.requeuedParents).toBe(200);
     expect(result.totalParents).toBe(401);
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
     expect(mockCaptureException).toHaveBeenCalledWith(

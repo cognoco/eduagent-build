@@ -455,6 +455,7 @@ describe('retention routes', () => {
           body: JSON.stringify({
             topicId: TOPIC_ID,
             method: 'different',
+            preferredMethod: 'Use a visual explanation',
           }),
         },
         TEST_ENV,

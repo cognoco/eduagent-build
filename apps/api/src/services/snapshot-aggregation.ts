@@ -12,6 +12,7 @@ import {
   retentionCards,
   vocabulary,
   vocabularyRetentionCards,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -217,16 +218,12 @@ async function loadProgressStateOnce(
   }
 
   const subjectIds = subjectRows.map((subject) => subject.id);
+  const repo = createScopedRepository(db, profileId);
 
   // [BUG-742] Start the per-profile reads (sessions, assessments, retention
-  // cards, streak, vocabulary, vocabulary retention cards) in parallel with
-  // the curricula → topics chain. They only depend on profileId — no need to
-  // block them behind the curriculum metadata lookup. The curricula → topics
-  // chain itself is genuinely sequential (topics filters by the latest
-  // curriculum per subject, which requires the curricula payload to compute),
-  // but it runs concurrently with the profile-scoped reads instead of
-  // serially after them. On heavy learners this collapses two network
-  // round-trip groups into one.
+  // cards, streak, vocabulary, vocabulary retention cards) in parallel with the
+  // curricula fetch, then await both before topic processing so either failure
+  // is observed before later synchronous topic shaping can throw.
   const profileScopedReadsPromise = Promise.all([
     // [BUG-250] Bound the session scan to the last 24 months. The previous
     // unbounded query loaded every lifetime session row per profile, which on
@@ -238,37 +235,37 @@ async function loadProgressStateOnce(
     // mastery / retention card state, not raw session rows. If true lifetime
     // totals are needed later, pre-aggregate into a counters table (cheap
     // count, no row materialisation) rather than reverting this bound.
-    db.query.learningSessions.findMany({
-      where: and(
-        eq(learningSessions.profileId, profileId),
+    repo.sessions.findMany(
+      and(
         gte(learningSessions.exchangeCount, 1),
         gte(learningSessions.startedAt, sessionWindowStart()),
       ),
-    }),
-    db.query.assessments.findMany({
-      where: eq(assessments.profileId, profileId),
-    }),
-    db.query.retentionCards.findMany({
-      where: eq(retentionCards.profileId, profileId),
-    }),
+    ),
+    repo.assessments.findMany(),
+    repo.retentionCards.findMany(),
     // [BUG-912] Intentionally reads the RAW streak row (not findCurrentForToday)
     // — snapshots represent point-in-time state for the snapshotDate, so
     // applying today's decay rule would falsify what the user actually had on
     // that historical date. Display paths must use repo.streaks.findCurrentForToday().
-    db.query.streaks.findFirst({
-      where: eq(streaks.profileId, profileId),
-    }),
-    db.query.vocabulary.findMany({
-      where: eq(vocabulary.profileId, profileId),
-    }),
-    db.query.vocabularyRetentionCards.findMany({
-      where: eq(vocabularyRetentionCards.profileId, profileId),
-    }),
+    repo.streaks.findFirst(),
+    repo.vocabulary.findMany(),
+    repo.vocabularyRetentionCards.findMany(),
   ]);
 
-  const allCurricula = await db.query.curricula.findMany({
+  const curriculaPromise = db.query.curricula.findMany({
     where: inArray(curricula.subjectId, subjectIds),
   });
+  const [
+    [
+      sessionRows,
+      assessmentRows,
+      retentionCardRows,
+      streakRow,
+      vocabularyRows,
+      vocabularyCardRows,
+    ],
+    allCurricula,
+  ] = await Promise.all([profileScopedReadsPromise, curriculaPromise]);
 
   const latestCurriculumBySubject = new Map<string, string>();
   for (const curriculum of allCurricula.sort((a, b) => b.version - a.version)) {
@@ -326,15 +323,6 @@ async function loadProgressStateOnce(
       latestTopicsBySubject.set(topic.subjectId, latestTopics);
     }
   }
-
-  const [
-    sessionRows,
-    assessmentRows,
-    retentionCardRows,
-    streakRow,
-    vocabularyRows,
-    vocabularyCardRows,
-  ] = await profileScopedReadsPromise;
 
   return {
     profileId,

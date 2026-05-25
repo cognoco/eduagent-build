@@ -100,10 +100,27 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
       (billingTrialSubscriptionFailed as any);
     // Inngest exposes function options under different keys across versions;
     // the retries field should be 2 regardless of which surface holds it.
-    const retries =
-      opts?.retries ??
-      (billingTrialSubscriptionFailed as any).fn?.opts?.retries ??
-      (billingTrialSubscriptionFailed as any).options?.retries;
+    const retryCandidates = [
+      { path: 'opts.retries', value: opts?.retries },
+      {
+        path: 'fn.opts.retries',
+        value: (billingTrialSubscriptionFailed as any).fn?.opts?.retries,
+      },
+      {
+        path: 'options.retries',
+        value: (billingTrialSubscriptionFailed as any).options?.retries,
+      },
+    ];
+    const retries = retryCandidates.find(
+      (candidate) => candidate.value !== undefined,
+    )?.value;
+    if (retries === undefined) {
+      throw new Error(
+        `Could not locate retries config on billingTrialSubscriptionFailed; tried ${retryCandidates
+          .map((candidate) => candidate.path)
+          .join(', ')}`,
+      );
+    }
     expect(retries).toBe(2);
   });
 
