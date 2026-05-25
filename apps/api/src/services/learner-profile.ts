@@ -1060,14 +1060,15 @@ export function buildMemoryBlock(
   }
 
   // B.4: Last session summary — quality-gated
+  const lastSessionSummary = profile.lastSessionSummary;
   const summaryQualityOk =
-    profile.lastSessionSummary &&
-    profile.lastSessionSummary.length <= 200 &&
+    lastSessionSummary &&
+    lastSessionSummary.length <= 200 &&
     (profile.lastSessionExchangeCount == null ||
       profile.lastSessionExchangeCount >= 4);
-  if (summaryQualityOk) {
+  if (summaryQualityOk && lastSessionSummary) {
     // [PROMPT-INJECT-478] escapeXml prevents summary from injecting a directive
-    const text = `- Last session summary: <learner_session_summary>${escapeXml(profile.lastSessionSummary!)}</learner_session_summary>`;
+    const text = `- Last session summary: <learner_session_summary>${escapeXml(lastSessionSummary)}</learner_session_summary>`;
     addSection(text, {
       kind: 'learning_style',
       text,

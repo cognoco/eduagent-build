@@ -80,6 +80,7 @@ jest.mock(
 jest.mock(
   '../../../lib/profile' /* gc1-allow: profile context requires full provider tree */,
   () => ({
+    ...jest.requireActual('../../../lib/profile'),
     useProfile: () => ({
       activeProfile: { id: 'profile-1', birthYear: 2005 },
     }),

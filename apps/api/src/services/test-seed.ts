@@ -108,7 +108,32 @@ export type SeedScenario =
   | 'quiz-answer-check-fails'
   | 'dictation-with-mistakes'
   | 'dictation-perfect-score'
-  | 'review-empty';
+  | 'review-empty'
+  // Mentor Chrome audit seed pack (docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md).
+  // Stable registry names used by the audit re-run. Many are aliases of existing
+  // scenarios — the alias preserves the audit's naming contract so blocked rows
+  // can be rerun without coupling them to internal seeder names.
+  | 'mentor-audit-empty-adult' // alias: pre-profile
+  | 'mentor-audit-consent-pending-child' // alias: consent-pending (with consentStateId in ids)
+  | 'mentor-audit-consent-withdrawn-child' // alias: consent-withdrawn
+  | 'mentor-audit-post-approval-steady-state' // alias: parent-multi-child
+  | 'mentor-audit-deletion-scheduled-owner' // alias: account-deletion-scheduled
+  | 'mentor-audit-family-at-profile-limit'
+  | 'mentor-audit-post-approval-redirect'
+  | 'mentor-audit-consent-us-under-threshold'
+  | 'mentor-audit-consent-eu-under-threshold'
+  | 'mentor-audit-consent-over-threshold'
+  | 'mentor-audit-quota-owner-daily'
+  | 'mentor-audit-quota-family-monthly'
+  | 'mentor-audit-paywall-child-notify'
+  | 'mentor-audit-resumable-session'
+  // Second wave — Task 0 composite + remaining DB-backed mentor-audit seeds.
+  // mentor-audit-session-expired lives in apps/mobile/e2e-web/ (Playwright
+  // storage-state mutation), not here.
+  | 'mentor-audit-family-no-children' // alias: parent-solo (see Task 1b note)
+  | 'mentor-audit-rich-child-history'
+  | 'mentor-audit-session-revoked'
+  | 'mentor-audit-mfa-totp';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -543,6 +568,221 @@ async function createSubjectWithCurriculum(
 
   const topicIds = topicValues.map((t) => t.id);
   return { subjectId, curriculumId, bookId, topicIds };
+}
+
+// ---------------------------------------------------------------------------
+// Reusable insert helpers (Task 0 from mentor-audit seed pack plan)
+//
+// These were extracted from the inline inserts inside seedParentWithWeeklyReport,
+// seedParentSubjectWithRetention, seedParentSessionWithRecap, seedWithBookmarks
+// (bookmarks/topicNotes), and seedLanguageLearner (vocabulary) so the
+// mentor-audit-rich-child-history composite seeder can compose them without
+// re-creating account/subject scaffolding for each call.
+//
+// Each helper returns the inserted row IDs so callers can put them into
+// SeedResult.ids. Helpers MUST NOT alter the SeedResult.ids shape of the
+// original seeders — the unit + integration test suites encode that contract
+// (see VALID_SCENARIOS it.each + the Stage-0 ids whitelist in test-seed.test.ts).
+// ---------------------------------------------------------------------------
+
+async function insertWeeklyReport(
+  db: Database,
+  opts: {
+    profileId: string; // parent
+    childProfileId: string;
+    childName?: string;
+    reportWeek?: string; // ISO YYYY-MM-DD, Monday start
+  },
+): Promise<{ reportId: string; reportWeek: string }> {
+  const reportId = generateUUIDv7();
+  const reportWeek = opts.reportWeek ?? '2026-04-28';
+  await db.insert(weeklyReports).values({
+    id: reportId,
+    profileId: opts.profileId,
+    childProfileId: opts.childProfileId,
+    reportWeek,
+    reportData: {
+      childName: opts.childName ?? 'Test Teen',
+      weekStart: reportWeek,
+      thisWeek: {
+        totalSessions: 4,
+        totalActiveMinutes: 48,
+        topicsMastered: 2,
+        topicsExplored: 3,
+        vocabularyTotal: 12,
+        streakBest: 4,
+      },
+      lastWeek: null,
+      highlights: ['Completed the fractions unit', 'Consistent daily practice'],
+      nextSteps: ['Start decimals', 'Review area and perimeter'],
+      subjects: [
+        {
+          subjectName: 'Mathematics',
+          topicsMastered: 2,
+          topicsAttempted: 3,
+          topicsExplored: 3,
+          vocabularyTotal: 12,
+          activeMinutes: 48,
+          trend: 'growing',
+        },
+      ],
+      headlineStat: {
+        value: 4,
+        label: 'Sessions this week',
+        comparison: 'Up from 2 last week',
+      },
+    },
+  });
+  return { reportId, reportWeek };
+}
+
+async function insertRetentionCards(
+  db: Database,
+  opts: {
+    profileId: string;
+    topicId: string;
+    count?: number;
+  },
+): Promise<{ retentionCardIds: string[] }> {
+  const count = opts.count ?? 1;
+  const rows = Array.from({ length: count }, () => ({
+    id: generateUUIDv7(),
+    profileId: opts.profileId,
+    topicId: opts.topicId,
+    easeFactor: 2.5,
+    intervalDays: 7,
+    repetitions: 3,
+    failureCount: 0,
+    consecutiveSuccesses: 3,
+    xpStatus: 'verified' as const,
+    nextReviewAt: futureDate(7),
+  }));
+  await db.insert(retentionCards).values(rows);
+  return { retentionCardIds: rows.map((row) => row.id) };
+}
+
+async function insertSessionWithRecap(
+  db: Database,
+  opts: {
+    profileId: string;
+    subjectId: string;
+    topicId: string;
+    recapContent?: string;
+    recapHighlight?: string;
+    engagementSignal?: 'curious' | 'focused' | 'restless' | 'frustrated';
+    endedDaysAgo?: number;
+    exchangeCount?: number;
+    wallClockSeconds?: number;
+  },
+): Promise<{ sessionId: string; summaryId: string }> {
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId: opts.profileId,
+    subjectId: opts.subjectId,
+    topicId: opts.topicId,
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: opts.exchangeCount ?? 10,
+    endedAt: pastDate(opts.endedDaysAgo ?? 1),
+    wallClockSeconds: opts.wallClockSeconds ?? 1080,
+  });
+
+  const summaryId = generateUUIDv7();
+  await db.insert(sessionSummaries).values({
+    id: summaryId,
+    sessionId,
+    profileId: opts.profileId,
+    topicId: opts.topicId,
+    content:
+      opts.recapContent ??
+      'We worked through the topic with growing confidence and self-corrected mid-way.',
+    aiFeedback: 'Great perseverance and clear reasoning throughout.',
+    highlight:
+      opts.recapHighlight ??
+      'Recognised the pattern before being prompted — strong sign of transfer.',
+    narrative:
+      'The learner approached the topic methodically and self-corrected on the second exchange without prompting.',
+    conversationPrompt:
+      'Can you spot any connection between this and the last topic?',
+    engagementSignal: opts.engagementSignal ?? 'curious',
+    status: 'accepted',
+  });
+
+  return { sessionId, summaryId };
+}
+
+async function insertVocabulary(
+  db: Database,
+  opts: {
+    profileId: string;
+    subjectId: string;
+    terms?: Array<{
+      term: string;
+      translation: string;
+      cefrLevel?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+      mastered?: boolean;
+      type?: 'word' | 'chunk';
+    }>;
+  },
+): Promise<{ vocabularyIds: string[] }> {
+  const terms = opts.terms ?? [
+    { term: 'hola', translation: 'hello', cefrLevel: 'A1', mastered: false },
+    {
+      term: 'gracias',
+      translation: 'thank you',
+      cefrLevel: 'A1',
+      mastered: true,
+      type: 'chunk',
+    },
+    {
+      term: 'biblioteca',
+      translation: 'library',
+      cefrLevel: 'A2',
+      mastered: false,
+    },
+  ];
+  const rows = terms.map((entry) => ({
+    id: generateUUIDv7(),
+    profileId: opts.profileId,
+    subjectId: opts.subjectId,
+    term: entry.term,
+    termNormalized: entry.term.toLowerCase(),
+    translation: entry.translation,
+    type: entry.type ?? ('word' as const),
+    cefrLevel: entry.cefrLevel ?? ('A1' as const),
+    mastered: entry.mastered ?? false,
+  }));
+  await db.insert(vocabulary).values(rows);
+  return { vocabularyIds: rows.map((row) => row.id) };
+}
+
+async function insertBookmarks(
+  db: Database,
+  opts: {
+    profileId: string;
+    sessionId: string;
+    subjectId: string;
+    topicId: string;
+    contents?: string[];
+  },
+): Promise<{ bookmarkIds: string[] }> {
+  const contents = opts.contents ?? [
+    'The Roman Republic was founded in 509 BC after the overthrow of the monarchy.',
+    'Julius Caesar crossed the Rubicon river in 49 BC, triggering the civil war.',
+  ];
+  const rows = contents.map((content) => ({
+    id: generateUUIDv7(),
+    profileId: opts.profileId,
+    sessionId: opts.sessionId,
+    // Bookmarks reference raw event IDs (no FK — by design in schema).
+    eventId: generateUUIDv7(),
+    subjectId: opts.subjectId,
+    topicId: opts.topicId,
+    content,
+  }));
+  await db.insert(bookmarks).values(rows);
+  return { bookmarkIds: rows.map((row) => row.id) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1611,9 +1851,10 @@ async function seedConsentPending(
     birthYear: 2014,
   });
   const consentToken = `seed-consent-${generateUUIDv7()}`;
+  const consentStateId = generateUUIDv7();
 
   await db.insert(consentStates).values({
-    id: generateUUIDv7(),
+    id: consentStateId,
     profileId,
     consentType: 'GDPR',
     status: 'PARENTAL_CONSENT_REQUESTED',
@@ -1628,7 +1869,7 @@ async function seedConsentPending(
     profileId,
     email,
     password,
-    ids: { consentToken },
+    ids: { consentToken, consentStateId },
   };
 }
 
@@ -2399,33 +2640,14 @@ async function seedWithBookmarks(
     endedAt: pastDate(1),
   });
 
-  // Bookmarks reference raw event IDs (no FK — by design in schema)
-  const event1Id = generateUUIDv7();
-  const event2Id = generateUUIDv7();
-
-  const bookmarkId = generateUUIDv7();
-  await db.insert(bookmarks).values([
-    {
-      id: bookmarkId,
-      profileId,
-      sessionId,
-      eventId: event1Id,
-      subjectId,
-      topicId,
-      content:
-        'The Roman Republic was founded in 509 BC after the overthrow of the monarchy.',
-    },
-    {
-      id: generateUUIDv7(),
-      profileId,
-      sessionId,
-      eventId: event2Id,
-      subjectId,
-      topicId,
-      content:
-        'Julius Caesar crossed the Rubicon river in 49 BC, triggering the civil war.',
-    },
-  ]);
+  const { bookmarkIds } = await insertBookmarks(db, {
+    profileId,
+    sessionId,
+    subjectId,
+    topicId,
+  });
+  const bookmarkId = bookmarkIds[0];
+  if (!bookmarkId) throw new Error('insertBookmarks returned no rows');
 
   await db.insert(topicNotes).values({
     profileId,
@@ -2465,47 +2687,9 @@ async function seedParentWithWeeklyReport(
     );
   }
 
-  const reportId = generateUUIDv7();
-  const reportWeek = '2026-04-28'; // Monday start
-  await db.insert(weeklyReports).values({
-    id: reportId,
+  const { reportId } = await insertWeeklyReport(db, {
     profileId: parentProfileId,
     childProfileId,
-    reportWeek,
-    reportData: {
-      childName: 'Test Teen',
-      // weeklyReportDataSchema requires `weekStart` (ISO YYYY-MM-DD);
-      // omitting it makes mapWeeklyReportRow's safeParse return null and
-      // the detail screen shows the gone fallback instead of the report.
-      weekStart: reportWeek,
-      thisWeek: {
-        totalSessions: 4,
-        totalActiveMinutes: 48,
-        topicsMastered: 2,
-        topicsExplored: 3,
-        vocabularyTotal: 12,
-        streakBest: 4,
-      },
-      lastWeek: null,
-      highlights: ['Completed the fractions unit', 'Consistent daily practice'],
-      nextSteps: ['Start decimals', 'Review area and perimeter'],
-      subjects: [
-        {
-          subjectName: 'Mathematics',
-          topicsMastered: 2,
-          topicsAttempted: 3,
-          topicsExplored: 3,
-          vocabularyTotal: 12,
-          activeMinutes: 48,
-          trend: 'growing',
-        },
-      ],
-      headlineStat: {
-        value: 4,
-        label: 'Sessions this week',
-        comparison: 'Up from 2 last week',
-      },
-    },
   });
 
   return {
@@ -2641,17 +2825,9 @@ async function seedParentSubjectWithRetention(
   });
   if (!topicRow) throw new Error('No topic found for curriculum');
 
-  await db.insert(retentionCards).values({
-    id: generateUUIDv7(),
+  await insertRetentionCards(db, {
     profileId: childProfileId,
     topicId: topicRow.id,
-    easeFactor: 2.5,
-    intervalDays: 7,
-    repetitions: 3,
-    failureCount: 0,
-    consecutiveSuccesses: 3,
-    xpStatus: 'verified',
-    nextReviewAt: futureDate(7),
   });
 
   return {
@@ -3574,6 +3750,678 @@ async function seedDictationPerfectScore(
 }
 
 // ---------------------------------------------------------------------------
+// Mentor Chrome audit seed pack
+//
+// See docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md. These seeders
+// back the `mentor-audit-*` registry names. Most entries are thin aliases of
+// existing scenarios (the registry preserves the audit's naming contract
+// without coupling it to internal seeder names). New seeders cover states the
+// audit cannot reach with current scenarios.
+// ---------------------------------------------------------------------------
+
+/** Wraps an existing seeder and rewrites the returned `scenario` field so
+ *  alias entries return the registry name the caller asked for. Other fields
+ *  (accountId, profileId, password, ids) are passed through unchanged. */
+function aliasSeeder(scenario: SeedScenario, inner: SeederFn): SeederFn {
+  return async (db, email, env) => {
+    const result = await inner(db, email, env);
+    return { ...result, scenario };
+  };
+}
+
+/** Family owner at the plan's profile cap (1 owner + 3 children = 4, which is
+ *  `getTierConfig('family').maxProfiles`). Exercises the "add child" gating UX
+ *  when the plan limit is already reached. */
+async function seedMentorAuditFamilyAtProfileLimit(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const familyTier = getTierConfig('family');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Capped Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'family',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: familyTier.monthlyQuota,
+    usedThisMonth: 120,
+    cycleResetAt: futureDate(30),
+  });
+
+  // 1 owner is already inserted above; add (maxProfiles - 1) children so the
+  // total exactly hits the cap.
+  const childProfileIds: string[] = [];
+  const childCount = familyTier.maxProfiles - 1;
+  for (let i = 0; i < childCount; i += 1) {
+    const childProfileId = await createBaseProfile(db, accountId, {
+      displayName: `Capped Child ${i + 1}`,
+      birthYear: 2014,
+      isOwner: false,
+    });
+    childProfileIds.push(childProfileId);
+
+    await db.insert(familyLinks).values({
+      id: generateUUIDv7(),
+      parentProfileId,
+      childProfileId,
+    });
+
+    await db.insert(consentStates).values({
+      id: generateUUIDv7(),
+      profileId: childProfileId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: email,
+      respondedAt: new Date(),
+    });
+  }
+
+  return {
+    scenario: 'mentor-audit-family-at-profile-limit',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: {
+      parentProfileId,
+      subscriptionId,
+      childProfileId1: childProfileIds[0] ?? '',
+      childProfileId2: childProfileIds[1] ?? '',
+      childProfileId3: childProfileIds[2] ?? '',
+    },
+  };
+}
+
+/** Parent landing at the consent-approve URL. Mirrors the data state a parent
+ *  hits when clicking the link in the consent-request email — pending child
+ *  consent with a usable `consentToken`. The parent (owner) is signed in. */
+async function seedMentorAuditPostApprovalRedirect(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Approving Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Awaiting-Approval Child',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  const consentToken = `seed-consent-${generateUUIDv7()}`;
+  const consentStateId = generateUUIDv7();
+  await db.insert(consentStates).values({
+    id: consentStateId,
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'PARENTAL_CONSENT_REQUESTED',
+    parentEmail: email,
+    consentToken,
+    expiresAt: futureDate(7),
+  });
+
+  return {
+    scenario: 'mentor-audit-post-approval-redirect',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: { parentProfileId, childProfileId, consentToken, consentStateId },
+  };
+}
+
+/** Region/age consent threshold variants. Each seeds a profile with the
+ *  specified `location` enum value and a birth year that produces the target
+ *  age relative to the current calendar year. The product code decides whether
+ *  parental consent is required based on these inputs — the seeder does NOT
+ *  pre-set `consent_states.status`; it leaves the threshold logic to the app
+ *  so the audit can observe each gate produced from the same starting state. */
+function makeConsentThresholdSeeder(
+  scenario: SeedScenario,
+  opts: { location: 'US' | 'EU' | 'OTHER'; ageYears: number },
+): SeederFn {
+  return async (db, email, env) => {
+    const { clerkUserId, password } = await createClerkTestUser(email, env);
+    const { accountId } = await createBaseAccount(db, email, clerkUserId);
+    const profileId = generateUUIDv7();
+    await db.insert(profiles).values({
+      id: profileId,
+      accountId,
+      displayName: `Consent Threshold (${opts.location} ${opts.ageYears}y)`,
+      birthYear: new Date().getFullYear() - opts.ageYears,
+      location: opts.location,
+      isOwner: true,
+    });
+
+    return {
+      scenario,
+      accountId,
+      profileId,
+      email,
+      password,
+      ids: {},
+    };
+  };
+}
+
+/** Free-tier owner that has hit the daily cap (10/day). Family/Pro tiers have
+ *  no daily limit (`getTierConfig` at `subscription.ts:35,50,61,72`), so this
+ *  state is Study/free-tier-only. */
+async function seedMentorAuditQuotaOwnerDaily(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Daily Cap Owner',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: 12,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: freeTier.dailyLimit ?? 10,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Mathematics',
+  );
+
+  return {
+    scenario: 'mentor-audit-quota-owner-daily',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+/** Family-tier owner whose monthly pool is exhausted. Tests the
+ *  family-pool-exhausted owner state (no daily cap on Family). */
+async function seedMentorAuditQuotaFamilyMonthly(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const familyTier = getTierConfig('family');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Family Monthly Cap Owner',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'family',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: familyTier.monthlyQuota,
+    usedThisMonth: familyTier.monthlyQuota,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'General Knowledge',
+  );
+
+  return {
+    scenario: 'mentor-audit-quota-family-monthly',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+/** Profile with a deterministic in-progress learning session — enough state
+ *  for the resume card to render. No LLM calls during seeding. */
+async function seedMentorAuditResumableSession(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Resume Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Geography',
+  );
+  const topicId = topicIds[0];
+  if (!topicId) {
+    throw new Error('resumable-session seed: subject created no topics');
+  }
+
+  const sessionId = generateUUIDv7();
+  const startedAt = pastDate(0); // a few minutes ago — kept simple
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId,
+    sessionType: 'learning',
+    status: 'active',
+    exchangeCount: 4,
+    startedAt,
+    lastActivityAt: startedAt,
+  });
+
+  // Enough events to render a meaningful resume card (alternating user / ai).
+  await db.insert(sessionEvents).values(
+    Array.from({ length: 4 }, (_, i) => ({
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      eventType:
+        i % 2 === 0 ? ('user_message' as const) : ('ai_response' as const),
+      content:
+        i % 2 === 0
+          ? 'What are the continents called?'
+          : 'There are seven continents. Want to name them with me?',
+    })),
+  );
+
+  return {
+    scenario: 'mentor-audit-resumable-session',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, topicId, sessionId },
+  };
+}
+
+/** Rich-history child — composes the Task 0 helpers so the audit can exercise
+ *  the parent-native review surfaces (weekly report, recap, retention,
+ *  vocabulary, bookmarks) against a single linked child. Deterministic — no
+ *  LLM calls during seeding. */
+async function seedMentorAuditRichChildHistory(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Rich-History Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Rich-History Child',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  // 2 subjects, ≥3 topics — one Math (retention surface), one English (recap +
+  // bookmarks + vocabulary).
+  const math = await createSubjectWithCurriculum(
+    db,
+    childProfileId,
+    'Mathematics',
+    'active',
+    3,
+  );
+  const english = await createSubjectWithCurriculum(
+    db,
+    childProfileId,
+    'English',
+    'active',
+    3,
+  );
+  const mathTopicId = math.topicIds[0];
+  const englishTopicId = english.topicIds[0];
+  if (!mathTopicId || !englishTopicId) {
+    throw new Error('rich-child-history: subject created no topics');
+  }
+
+  // Retention surface — at least one card on the math topic.
+  await insertRetentionCards(db, {
+    profileId: childProfileId,
+    topicId: mathTopicId,
+    count: 2,
+  });
+
+  // Recap surface — a completed session + summary on the english topic.
+  const { sessionId: recapSessionId } = await insertSessionWithRecap(db, {
+    profileId: childProfileId,
+    subjectId: english.subjectId,
+    topicId: englishTopicId,
+    recapContent:
+      'We read a short passage about migration patterns and discussed why birds fly south.',
+    recapHighlight:
+      'Connected vocabulary from the chapter to the broader theme without prompting.',
+    engagementSignal: 'curious',
+    endedDaysAgo: 1,
+    exchangeCount: 8,
+    wallClockSeconds: 900,
+  });
+
+  // Vocabulary surface — three terms on the english subject.
+  const { vocabularyIds } = await insertVocabulary(db, {
+    profileId: childProfileId,
+    subjectId: english.subjectId,
+  });
+  const vocabularyId = vocabularyIds[0];
+
+  // Bookmark surface — two bookmarks tied to the recap session.
+  const { bookmarkIds } = await insertBookmarks(db, {
+    profileId: childProfileId,
+    sessionId: recapSessionId,
+    subjectId: english.subjectId,
+    topicId: englishTopicId,
+    contents: [
+      'Birds migrate to follow seasonal food and warmer weather.',
+      'Some birds use the stars at night to navigate during migration.',
+    ],
+  });
+
+  // Weekly report — exposes the parent-side weekly surface.
+  const { reportId } = await insertWeeklyReport(db, {
+    profileId: parentProfileId,
+    childProfileId,
+    childName: 'Rich-History Child',
+  });
+
+  return {
+    scenario: 'mentor-audit-rich-child-history',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: {
+      parentProfileId,
+      childProfileId,
+      mathSubjectId: math.subjectId,
+      englishSubjectId: english.subjectId,
+      mathTopicId,
+      englishTopicId,
+      recapSessionId,
+      weeklyReportId: reportId,
+      vocabularyId: vocabularyId ?? '',
+      bookmarkId: bookmarkIds[0] ?? '',
+    },
+  };
+}
+
+/** Session-revoked — sign in normally, then call Clerk Backend
+ *  `POST /sessions/{id}/revoke` so the next API call from the page hits the
+ *  revoked-token-refresh code path. Distinct from the cookie-corruption path
+ *  exercised by the Playwright `session-expired` storage-state helper. */
+async function seedMentorAuditSessionRevoked(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const base = await seedOnboardingComplete(db, email, env);
+
+  // Best-effort revoke. Without CLERK_SECRET_KEY we still produce a usable
+  // SeedResult so unit-test runs (no Clerk env) succeed; the integration
+  // suite + Playwright bring real Clerk credentials.
+  let revokedSessionId = '';
+  if (env.CLERK_SECRET_KEY) {
+    // List active sessions for the seeded user, revoke the most recent.
+    const clerkUserId = await findClerkUserIdForAccount(db, base.accountId);
+    if (clerkUserId) {
+      revokedSessionId = await revokeNewestClerkSession(clerkUserId, env);
+    }
+  }
+
+  return {
+    ...base,
+    scenario: 'mentor-audit-session-revoked',
+    ids: {
+      ...base.ids,
+      revokedSessionId,
+    },
+  };
+}
+
+/** MFA TOTP — attach a TOTP factor via Clerk Backend
+ *  `POST /users/{id}/totp`. Returns the shared secret in `SeedResult.ids` so
+ *  the Playwright helper can generate the rolling code via `otplib` at
+ *  sign-in time. Backup-code + SMS factor paths are out of scope (plan §10). */
+async function seedMentorAuditMfaTotp(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const base = await seedOnboardingComplete(db, email, env);
+
+  let totpSecret = '';
+  if (env.CLERK_SECRET_KEY) {
+    const clerkUserId = await findClerkUserIdForAccount(db, base.accountId);
+    if (clerkUserId) {
+      totpSecret = await attachClerkTotpFactor(clerkUserId, env);
+    }
+  }
+
+  return {
+    ...base,
+    scenario: 'mentor-audit-mfa-totp',
+    ids: {
+      ...base.ids,
+      totpSecret,
+    },
+  };
+}
+
+/** Lookup helper for the post-sign-in Clerk-Backend mentor-audit flows. */
+async function findClerkUserIdForAccount(
+  db: Database,
+  accountId: string,
+): Promise<string | null> {
+  const row = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+  });
+  return row?.clerkUserId ?? null;
+}
+
+/** Revokes the most recently-created Clerk session for the given user.
+ *  Returns the revoked session id (empty string if the user has no sessions
+ *  yet — Clerk creates sessions lazily after sign-in, not on user creation). */
+async function revokeNewestClerkSession(
+  clerkUserId: string,
+  env: SeedEnv,
+): Promise<string> {
+  if (!env.CLERK_SECRET_KEY) return '';
+
+  const listRes = await fetch(
+    `${CLERK_API_BASE}/sessions?user_id=${encodeURIComponent(clerkUserId)}&status=active&limit=1&order_by=-created_at`,
+    { headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` } },
+  );
+  if (!listRes.ok) {
+    const body = await listRes.text();
+    throw new Error(`Clerk session list failed (${listRes.status}): ${body}`);
+  }
+
+  const sessions = (await listRes.json()) as Array<{ id: string }>;
+  const sessionId = sessions[0]?.id;
+  if (!sessionId) return '';
+
+  const revokeRes = await fetch(
+    `${CLERK_API_BASE}/sessions/${encodeURIComponent(sessionId)}/revoke`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    },
+  );
+  if (!revokeRes.ok) {
+    const body = await revokeRes.text();
+    throw new Error(
+      `Clerk session revoke failed (${revokeRes.status}): ${body}`,
+    );
+  }
+  return sessionId;
+}
+
+/** Attaches a TOTP factor to the given Clerk user. Returns the shared secret
+ *  the Playwright helper feeds to `otplib.authenticator.generate()` at
+ *  sign-in. */
+async function attachClerkTotpFactor(
+  clerkUserId: string,
+  env: SeedEnv,
+): Promise<string> {
+  if (!env.CLERK_SECRET_KEY) return '';
+
+  const res = await fetch(
+    `${CLERK_API_BASE}/users/${encodeURIComponent(clerkUserId)}/totp`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Clerk TOTP attach failed (${res.status}): ${body}`);
+  }
+  const payload = (await res.json()) as { secret?: string };
+  return payload.secret ?? '';
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -3622,6 +4470,61 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'review-empty': seedReviewEmpty,
   'dictation-with-mistakes': seedDictationWithMistakes,
   'dictation-perfect-score': seedDictationPerfectScore,
+  // Mentor Chrome audit seed pack — aliases of existing scenarios where the
+  // audit state matches a current seeder, and dedicated seeders where it doesn't.
+  'mentor-audit-empty-adult': aliasSeeder(
+    'mentor-audit-empty-adult',
+    seedPreProfile,
+  ),
+  'mentor-audit-consent-pending-child': aliasSeeder(
+    'mentor-audit-consent-pending-child',
+    seedConsentPending,
+  ),
+  'mentor-audit-consent-withdrawn-child': aliasSeeder(
+    'mentor-audit-consent-withdrawn-child',
+    seedConsentWithdrawn,
+  ),
+  'mentor-audit-post-approval-steady-state': aliasSeeder(
+    'mentor-audit-post-approval-steady-state',
+    seedParentMultiChild,
+  ),
+  'mentor-audit-deletion-scheduled-owner': aliasSeeder(
+    'mentor-audit-deletion-scheduled-owner',
+    seedAccountDeletionScheduled,
+  ),
+  'mentor-audit-family-at-profile-limit': seedMentorAuditFamilyAtProfileLimit,
+  'mentor-audit-post-approval-redirect': seedMentorAuditPostApprovalRedirect,
+  'mentor-audit-consent-us-under-threshold': makeConsentThresholdSeeder(
+    'mentor-audit-consent-us-under-threshold',
+    { location: 'US', ageYears: 11 },
+  ),
+  'mentor-audit-consent-eu-under-threshold': makeConsentThresholdSeeder(
+    'mentor-audit-consent-eu-under-threshold',
+    { location: 'EU', ageYears: 14 },
+  ),
+  'mentor-audit-consent-over-threshold': makeConsentThresholdSeeder(
+    'mentor-audit-consent-over-threshold',
+    { location: 'EU', ageYears: 17 },
+  ),
+  'mentor-audit-quota-owner-daily': seedMentorAuditQuotaOwnerDaily,
+  'mentor-audit-quota-family-monthly': seedMentorAuditQuotaFamilyMonthly,
+  'mentor-audit-paywall-child-notify': aliasSeeder(
+    'mentor-audit-paywall-child-notify',
+    seedTrialExpiredChild,
+  ),
+  'mentor-audit-resumable-session': seedMentorAuditResumableSession,
+  // Second wave. mentor-audit-family-no-children aliases parent-solo until
+  // Task 1b's manual Chrome triage confirms whether the audit's child-style
+  // landing-copy symptom is a nav-contract bug (alias stays) or a missing
+  // seed row (extend seedParentSolo). Either resolution preserves this
+  // registry name as the public contract.
+  'mentor-audit-family-no-children': aliasSeeder(
+    'mentor-audit-family-no-children',
+    seedParentSolo,
+  ),
+  'mentor-audit-rich-child-history': seedMentorAuditRichChildHistory,
+  'mentor-audit-session-revoked': seedMentorAuditSessionRevoked,
+  'mentor-audit-mfa-totp': seedMentorAuditMfaTotp,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

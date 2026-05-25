@@ -106,6 +106,8 @@ export interface ScreenWrapperOptions {
   profileLoadError?: unknown | null;
   profileWasRemoved?: boolean;
   queryClientOptions?: QueryClientConfig;
+  /** Render in proxy mode (parent acting on a child). Default false. */
+  isExplicitProxyMode?: boolean;
 }
 
 export function createScreenWrapper(options: ScreenWrapperOptions = {}) {
@@ -138,7 +140,7 @@ export function createScreenWrapper(options: ScreenWrapperOptions = {}) {
     profiles,
     activeProfile,
     switchProfile: jest.fn().mockResolvedValue({ success: true }),
-    isExplicitProxyMode: false,
+    isExplicitProxyMode: options.isExplicitProxyMode ?? false,
     isLoading: options.isLoading ?? false,
     profileLoadError: options.profileLoadError ?? null,
     profileWasRemoved: options.profileWasRemoved ?? false,

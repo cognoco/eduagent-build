@@ -16,11 +16,14 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile, type Profile } from '../lib/profile';
+import { useNavigationContract } from '../hooks/use-navigation-contract';
+import { useActiveProfileRole } from '../hooks/use-active-profile-role';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { Button } from '../components/common/Button';
@@ -72,6 +75,7 @@ function parseWebBirthDate(value: string): Date | null {
 }
 
 export default function CreateProfileScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ for?: 'child' }>();
@@ -80,6 +84,8 @@ export default function CreateProfileScreen() {
   const client = useApiClient();
   const { isLoaded, isSignedIn } = useAuth();
   const { activeProfile, profiles, switchProfile } = useProfile();
+  const navigationContract = useNavigationContract();
+  const activeProfileRole = useActiveProfileRole();
 
   // BUG-239: Detect whether the current user is a parent adding a child.
   // When an account owner (parent) who already has a profile creates another
@@ -146,6 +152,8 @@ export default function CreateProfileScreen() {
     !loading;
 
   const onSubmit = useCallback(async () => {
+    if (activeProfileRole !== 'owner' || navigationContract.isParentProxy)
+      return;
     if (!canSubmit || !birthDate) return;
 
     const trimmedName = displayName.trim();
@@ -274,6 +282,8 @@ export default function CreateProfileScreen() {
       setLoading(false);
     }
   }, [
+    activeProfileRole,
+    navigationContract.isParentProxy,
     canSubmit,
     displayName,
     birthDate,
@@ -299,6 +309,47 @@ export default function CreateProfileScreen() {
   }
   if (!isSignedIn) {
     return <Redirect href="/sign-in" />;
+  }
+
+  // WI-296: useActiveProfileRole returns null while the role is still
+  // resolving. Show a spinner rather than the access-blocked screen so a
+  // legitimate owner does not briefly see the blocked UI before the role lands.
+  if (activeProfileRole === null) {
+    return (
+      <View
+        testID="create-profile-role-loading"
+        className="flex-1 bg-background items-center justify-center"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  // WI-296: Block create-profile when the active profile is not the account
+  // owner, or when a parent is acting as a proxy for a child profile. In both
+  // cases the API would reject the request; gate early to avoid a misleading
+  // form that silently fails.
+  if (activeProfileRole !== 'owner' || navigationContract.isParentProxy) {
+    return (
+      <View
+        testID="create-profile-access-blocked"
+        className="flex-1 bg-background items-center justify-center px-8"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      >
+        <Text className="text-h2 font-bold text-text-primary text-center mb-3">
+          {t('proxy.readOnly.title')}
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-8">
+          {t('proxy.readOnly.hint')}
+        </Text>
+        <Button
+          variant="primary"
+          label={t('proxy.readOnly.switchProfileCta')}
+          onPress={handleClose}
+          testID="create-profile-blocked-close"
+        />
+      </View>
+    );
   }
 
   return (

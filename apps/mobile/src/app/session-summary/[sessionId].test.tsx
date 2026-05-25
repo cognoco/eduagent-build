@@ -94,6 +94,7 @@ jest.mock(
 
 // prettier-ignore
 jest.mock('../../lib/profile', /* gc1-allow: native-boundary: ProfileProvider uses SecureStore (native) */ () => ({
+    ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
       activeProfile: {
         id: 'test-profile-id',

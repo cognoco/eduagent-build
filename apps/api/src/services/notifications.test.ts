@@ -926,7 +926,7 @@ describe('[WI-82] notifyParentToSubscribe push preference gating', () => {
     jest.clearAllMocks();
   });
 
-  function dbForSubscribe(pushEnabled: boolean) {
+  function dbForSubscribe() {
     return {
       query: {
         familyLinks: {
@@ -952,10 +952,7 @@ describe('[WI-82] notifyParentToSubscribe push preference gating', () => {
     mockGetDailyNotificationCount.mockResolvedValue(0);
     mockIsPushEnabled.mockResolvedValue(false);
 
-    const result = await notifyParentToSubscribe(
-      dbForSubscribe(false),
-      'child-sub',
-    );
+    const result = await notifyParentToSubscribe(dbForSubscribe(), 'child-sub');
 
     // notifyParentToSubscribe doesn't propagate the inner push result directly,
     // but the push should not be delivered (fetch not called).

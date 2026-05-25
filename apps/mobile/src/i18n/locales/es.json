@@ -1136,7 +1136,13 @@
     "deliverySentBody": "Tu padre recibirá un correo en {{email}}. Te avisaremos tan pronto como lo aprueben.",
     "deliveryFailedBody": "No pudimos confirmar que el correo de consentimiento llegara a {{email}}. Por favor, comprueba la dirección e inténtalo de nuevo.",
     "deliveryFailedHint": "Puedes reenviar la solicitud ahora o volver e introducir una dirección de correo diferente.",
-    "resendEmail": "Reenviar correo"
+    "resendEmail": "Reenviar correo",
+    "profileNotFound": "Este perfil no pertenece a tu cuenta.",
+    "withdrawn": {
+      "hint": "{{name}} ha pausado el uso compartido de estos datos.",
+      "title": "Uso compartido en pausa",
+      "requestCta": "Solicitar consentimiento de nuevo"
+    }
   },
   "account": {
     "title": "Eliminar cuenta",
@@ -2922,6 +2928,13 @@
       "previous": "Previous card",
       "next": "Next card",
       "dots": "Page {{current}} of {{total}}"
+    }
+  },
+  "proxy": {
+    "readOnly": {
+      "hint": "Estás viendo la cuenta de tu hijo/a. Cambia a tu propio perfil para hacer cambios.",
+      "title": "Cambia a tu perfil para hacer cambios",
+      "switchProfileCta": "Cambiar perfil"
     }
   }
 }

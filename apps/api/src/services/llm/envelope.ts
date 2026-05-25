@@ -137,7 +137,7 @@ function repairBareQuotesInsideJsonStrings(jsonStr: string): string | null {
   let changed = false;
 
   for (let index = 0; index < jsonStr.length; index += 1) {
-    const char = jsonStr[index]!;
+    const char = jsonStr.charAt(index);
 
     if (!inString) {
       repaired += char;

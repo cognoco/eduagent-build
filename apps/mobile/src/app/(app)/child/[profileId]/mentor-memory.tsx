@@ -28,6 +28,7 @@ import {
   useChildDetail,
   useChildMemory,
 } from '../../../../hooks/use-dashboard';
+import { useChildConsentStatus } from '../../../../hooks/use-consent';
 import {
   useChildLearnerProfile,
   useDeleteAllMemory,
@@ -60,9 +61,18 @@ export default function ChildMentorMemoryScreen() {
   const { profiles } = useProfile();
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const childProfileId = profileId as string | undefined;
+  const { data: childConsentData } = useChildConsentStatus(childProfileId);
+  const consentResolved = childConsentData !== undefined;
+  const consentWithdrawn = childConsentData?.consentStatus === 'WITHDRAWN';
   const { data: child } = useChildDetail(childProfileId);
-  const { data: profile, isLoading } = useChildLearnerProfile(childProfileId);
-  const { data: memory } = useChildMemory(childProfileId);
+  // [WI-264] Hard-deny until consent is known: only read the child's learner
+  // profile + memory once the consent query has resolved AND is not withdrawn.
+  // Gating solely on `consentWithdrawn` still fires these reads on the first
+  // render (before consent loads) — a leak in the withdrawn state.
+  const readProfileId =
+    consentResolved && !consentWithdrawn ? childProfileId : undefined;
+  const { data: profile, isLoading } = useChildLearnerProfile(readProfileId);
+  const { data: memory } = useChildMemory(readProfileId);
   const deleteItem = useDeleteMemoryItem();
   const deleteAll = useDeleteAllMemory();
   const tellMentor = useTellMentor();
@@ -316,6 +326,35 @@ export default function ChildMentorMemoryScreen() {
     );
   }
 
+  if (consentWithdrawn) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top }}
+        testID="child-mentor-memory-consent-withdrawn"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          {t('consent.withdrawn.title')}
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          {t('consent.withdrawn.hint', {
+            name: child?.displayName ?? t('parentView.index.yourChild'),
+          })}
+        </Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          testID="child-mentor-memory-consent-withdrawn-back"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {t('common.back')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
@@ -334,7 +373,9 @@ export default function ChildMentorMemoryScreen() {
             {t('parentView.mentorMemory.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-0.5">
-            {t('parentView.mentorMemory.subtitle')}
+            {t('parentView.mentorMemory.subtitle', {
+              name: child?.displayName ?? t('parentView.index.yourChild'),
+            })}
           </Text>
         </View>
       </View>

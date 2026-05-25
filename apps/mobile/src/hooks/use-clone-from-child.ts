@@ -19,6 +19,7 @@ import {
   useApiClient,
 } from '../lib/api-client';
 import { formatApiError } from '../lib/format-api-error';
+import { combinedSignal } from '../lib/query-timeout';
 import { useEnsureStudyMode } from '../lib/use-mode-switch';
 import {
   FAMILY_CHILDREN_RETURN_TO,
@@ -220,11 +221,21 @@ export function useCloneFromChild(): {
 
   const undoMutation = useMutation({
     mutationFn: async (createdIds: CloneCreatedIds) => {
-      const res = await client.curriculum['clone-from-child'].undo.$delete({
-        json: { createdIds },
-      });
-      await assertOk(res);
-      return undoCloneFromChildResponseSchema.parse(await res.json());
+      // BUG-775: Mutation must carry an abort/timeout signal. Without one, a
+      // hung network request leaves the spinner spinning forever and the
+      // press handler never resolves. combinedSignal applies the default
+      // 12s timeout from query-timeout.ts.
+      const { signal, cleanup } = combinedSignal(undefined);
+      try {
+        const res = await client.curriculum['clone-from-child'].undo.$delete(
+          { json: { createdIds } },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return undoCloneFromChildResponseSchema.parse(await res.json());
+      } finally {
+        cleanup();
+      }
     },
     onSuccess: (result) => {
       if (result.reason === 'session_started') {
@@ -277,16 +288,31 @@ export function useCloneFromChild(): {
     mutationFn: async (
       args: CloneFromChildArgs & { requestId: string },
     ): Promise<CloneFromChildResponse> => {
-      const res = await client.curriculum['clone-from-child'].$post({
-        json: {
-          childProfileId: args.childProfileId,
-          topicId: args.topicId,
-          forceCopy: args.forceCopy,
-          requestId: args.requestId,
-        },
-      });
-      await assertOk(res);
-      return cloneFromChildResponseSchema.parse(await res.json());
+      // BUG-775: Mutation must carry an abort/timeout signal. Without one, a
+      // hung clone-from-child POST leaves the AddToMyLearningButton spinner
+      // spinning forever (Playwright observes a 45s timeout and the press
+      // never resolves). combinedSignal applies the default 12s timeout from
+      // query-timeout.ts; on timeout the request aborts and the mutation
+      // rejects, routing to the onError handler which surfaces a "Try again"
+      // toast.
+      const { signal, cleanup } = combinedSignal(undefined);
+      try {
+        const res = await client.curriculum['clone-from-child'].$post(
+          {
+            json: {
+              childProfileId: args.childProfileId,
+              topicId: args.topicId,
+              forceCopy: args.forceCopy,
+              requestId: args.requestId,
+            },
+          },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return cloneFromChildResponseSchema.parse(await res.json());
+      } finally {
+        cleanup();
+      }
     },
     onSuccess: (result, args) => {
       invalidateAdultLearningCaches(

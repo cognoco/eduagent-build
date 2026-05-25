@@ -29,7 +29,7 @@ import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 
-import { UsageMeter } from '../../components/common';
+import { TimeoutLoader, UsageMeter } from '../../components/common';
 import { TrackedView } from '../../components/common/TrackedView';
 import {
   useSubscription,
@@ -1327,11 +1327,34 @@ function SubscriptionContent(): React.ReactElement | null {
       </View>
 
       {isLoading ? (
+        // BUG-767: Bare ActivityIndicator left users stuck forever if any of
+        // subscription/usage/RevenueCat offerings/customerInfo never resolved
+        // (Chrome web reports the screen as unresponsive). TimeoutLoader gives
+        // a user-recoverable retry / go-home escape after 15s while keeping
+        // the same testID for existing assertions.
         <View
           className="flex-1 items-center justify-center"
           testID="subscription-loading"
         >
-          <ActivityIndicator />
+          <TimeoutLoader
+            isLoading={isLoading}
+            timeoutMs={15_000}
+            primaryAction={{
+              label: t('common.tryAgain'),
+              onPress: () => {
+                void refetchSub();
+                void refetchUsage();
+                void refetchOfferings();
+              },
+              testID: 'subscription-loading-timeout-retry',
+            }}
+            secondaryAction={{
+              label: t('common.goBack'),
+              onPress: () => router.replace('/(app)/more'),
+              testID: 'subscription-loading-timeout-back',
+            }}
+            testID="subscription-loading-spinner"
+          />
         </View>
       ) : hasLoadError ? (
         <View

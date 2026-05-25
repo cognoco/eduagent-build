@@ -73,17 +73,53 @@ import { assertOk } from '../../lib/assert-ok';
 initNotificationHandler();
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
+// Bug 770: `practice` was missing — direct navigation to /practice from any
+// shell (study / family / V0-guardian) was rendering the activity inside the
+// host tab bar, making the audience scope ambiguous. Adding it here collapses
+// the tab bar (height: 0) the same way quiz/homework/dictation already do.
 const FULL_SCREEN_ROUTES = new Set([
   'onboarding',
   'session',
   'homework',
   'dictation',
   'quiz',
+  'practice',
   'shelf',
   'shelf/[subjectId]',
   'shelf/[subjectId]/book/[bookId]',
   'welcome',
 ]);
+
+// Bug 763: Routes that must NEVER appear in the tab bar / debug-link surface,
+// regardless of the active tab shape. The dynamic-`screenOptions` whitelist
+// (`isVisible ? {} : { href: null, ... }`) is supposed to hide every route
+// not in `visibleTabs`, but Expo Router 6 / React Navigation 7 on web still
+// auto-discover these route directories (dynamic params, nested layouts) and
+// surface them as `/quiz`, `/shelf/undefined`, `/subject/undefined`,
+// `/pick-book/undefined`, `/child/undefined` links because the
+// per-route-options callback runs AFTER initial link list assembly. The
+// belt-and-braces fix is an explicit `<Tabs.Screen href={null}>` entry per
+// non-tab route below; this is the same pattern Expo Router docs recommend
+// for hidden routes.
+const HIDDEN_TAB_ROUTES = [
+  'dashboard',
+  'subscription',
+  'mentor-memory',
+  'session',
+  'homework',
+  'dictation',
+  'quiz',
+  'practice',
+  'shelf',
+  'subject',
+  'pick-book',
+  'child',
+  'my-notes',
+  'vocabulary',
+  'topic',
+  'onboarding',
+  'welcome',
+] as const;
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
@@ -197,10 +233,18 @@ function resolveAuthRedirectPath(pathname: string | undefined): string {
   if (Platform.OS === 'web') {
     // Access window via globalThis to avoid TS DOM-lib requirement in RN tsconfig.
     const win = (
-      globalThis as { window?: { location?: { pathname?: string } } }
+      globalThis as {
+        window?: { location?: { pathname?: string; search?: string } };
+      }
     ).window;
     if (typeof win?.location?.pathname === 'string') {
-      return toInternalAppRedirectPath(win.location.pathname);
+      // [BUG-766] Concatenate search so a hard-reload at e.g.
+      // /child/{id}?mode=progress preserves `?mode=progress` through the
+      // sign-in redirect round-trip; previously `pathname` alone dropped the
+      // query, landing the user on the child detail with no mode filter.
+      const search =
+        typeof win.location.search === 'string' ? win.location.search : '';
+      return toInternalAppRedirectPath(`${win.location.pathname}${search}`);
     }
   }
 
@@ -2569,6 +2613,20 @@ export default function AppLayout() {
               ),
             }}
           />
+          {/* Bug 763: Explicit href:null entries for non-tab routes so Expo
+              Router does not auto-surface them as /quiz, /shelf/undefined,
+              /subject/undefined, /pick-book/undefined, /child/undefined,
+              etc. in the tab bar / web link list. The dynamic screenOptions
+              callback above is the primary defense; these declarations are
+              the belt-and-braces backup for routes that the callback misses
+              on web auto-discovery. */}
+          {HIDDEN_TAB_ROUTES.map((routeName) => (
+            <Tabs.Screen
+              key={routeName}
+              name={routeName}
+              options={{ href: null }}
+            />
+          ))}
         </Tabs>
         {profileWasRemoved && (
           <Pressable

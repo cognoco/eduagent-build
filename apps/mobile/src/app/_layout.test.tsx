@@ -75,6 +75,7 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
 
 // prettier-ignore
 jest.mock('../lib/profile', /* gc1-allow: ClerkGate render test boundary — full stub of native/runtime modules */ () => ({
+  ...jest.requireActual('../lib/profile'),
   ProfileProvider: ({ children }: { children?: unknown }) => children,
   useProfile: jest.fn().mockReturnValue({ activeProfile: null, profiles: [] }),
 }));

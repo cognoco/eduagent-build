@@ -31,6 +31,7 @@ jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono cli
 
 // prettier-ignore
 jest.mock('../lib/profile', () => ({ // gc1-allow: hook tests need a fixed active profile without provider setup
+  ...jest.requireActual('../lib/profile'),
   useProfile: () => ({
     activeProfile: { id: 'test-profile-id' },
   }),

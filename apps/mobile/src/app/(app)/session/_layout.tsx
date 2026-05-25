@@ -1,9 +1,12 @@
 import { Redirect, Stack } from 'expo-router';
+import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../../lib/theme';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 export default function SessionLayout(): React.JSX.Element {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const navigationContract = useNavigationContract();
 
@@ -16,7 +19,19 @@ export default function SessionLayout(): React.JSX.Element {
     : navigationContract.isParentProxy;
 
   if (blocked) {
-    return <Redirect href="/(app)/home" />;
+    return (
+      <>
+        <Redirect href="/(app)/home" />
+        <View
+          className="flex-1 bg-background items-center justify-center px-6"
+          testID="session-proxy-fallback"
+        >
+          <Text className="text-body text-text-secondary text-center">
+            {t('proxy.readOnly.hint')}
+          </Text>
+        </View>
+      </>
+    );
   }
 
   return (

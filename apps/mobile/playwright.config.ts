@@ -174,5 +174,27 @@ export default defineConfig({
       testMatch:
         /flows[\\/](journeys[\\/](j0[89]|j[1-9][0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
     },
+    {
+      // [Mentor Chrome audit seed pack — Task 5]
+      // docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md
+      //
+      // Iterates over `mentorAuditScenarios` in e2e-web/fixtures/scenarios.ts.
+      // One test per registry entry. Each test seeds, signs in (or applies a
+      // storage-state mutator for pre-shell entries), and asserts the
+      // documented landing testID is visible.
+      //
+      // **Opt-in.** Not in the default smoke run. Invoke with:
+      //   pnpm exec playwright test --project=mentor-audit-registry-smoke
+      // CI invokes this twice (once per nav-contract flag position) — see
+      // the MENTOR_AUDIT_NAV_V1 env var consumed by the spec.
+      //
+      // No `dependencies: ['setup']` because each test seeds its own state
+      // — the smoke project is intentionally independent of the long-lived
+      // `solo-learner` / `owner-with-children` storage states so a single
+      // mentor-audit failure can't poison the rest of the suite.
+      name: 'mentor-audit-registry-smoke',
+      testMatch: /flows[\\/]mentor-audit[\\/]registry-smoke\.spec\.ts/,
+      fullyParallel: false,
+    },
   ],
 });

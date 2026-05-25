@@ -309,14 +309,28 @@ jest.mock(
   }),
 );
 
+const mockUseProfile = jest.fn(() => ({
+  activeProfile: { id: 'profile-1', isOwner: true },
+  profiles: [{ id: 'profile-1', isOwner: true }],
+}));
+
 jest.mock(
   '../../lib/profile' /* gc1-allow: ProfileProvider uses SecureStore native storage */,
   () => ({
-    useProfile: () => ({
-      activeProfile: { id: 'profile-1', isOwner: true },
-      profiles: [{ id: 'profile-1', isOwner: true }],
-    }),
+    ...jest.requireActual('../../lib/profile'),
+    useProfile: () => mockUseProfile(),
     isGuardianProfile: () => false,
+  }),
+);
+
+let mockIsParentProxy = false;
+jest.mock(
+  '../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests */,
+  () => ({
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
   }),
 );
 
@@ -361,6 +375,11 @@ describe('LibraryScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockUseProfile.mockReturnValue({
+      activeProfile: { id: 'profile-1', isOwner: true },
+      profiles: [{ id: 'profile-1', isOwner: true }],
+    });
     mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
     const { queryClient, Wrapper } = createWrapper();
     testQueryClient = queryClient;
@@ -1357,6 +1376,105 @@ describe('LibraryScreen', () => {
       expect(Array.isArray(list.props.sections)).toBe(true);
       // All 50 subjects live in the first (and only) section's data array.
       expect(list.props.sections[0]?.data).toHaveLength(50);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // WI-273: Proxy mode — write controls disabled, hint shown
+  // -------------------------------------------------------------------------
+  describe('proxy mode write guard [WI-273]', () => {
+    beforeEach(() => {
+      mockIsParentProxy = true;
+      mockUseProfile.mockReturnValue({
+        activeProfile: { id: 'profile-1', isOwner: true },
+        profiles: [{ id: 'profile-1', isOwner: true }],
+      });
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+    });
+
+    it('shows the proxy read-only hint when in proxy mode [WI-273]', () => {
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+      screen.getByTestId('library-proxy-hint');
+    });
+
+    it('hides the Manage subjects button in proxy mode [WI-273]', () => {
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+      expect(screen.queryByTestId('manage-subjects-button')).toBeNull();
+    });
+
+    it('does not dispatch updateSubject in proxy mode — manage-subjects button absent so modal interaction impossible [WI-273]', async () => {
+      // The manage-subjects button is hidden in proxy mode (canWrite=false).
+      // Without it, the modal cannot be opened and the status-change handler
+      // cannot be invoked from the UI. This confirms the write path is blocked.
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // Guard is active: proxy hint shown, manage button absent.
+      screen.getByTestId('library-proxy-hint');
+      expect(screen.queryByTestId('manage-subjects-button')).toBeNull();
+      expect(mockUpdateSubjectMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('positive control — updateSubject IS reachable when not in proxy mode [WI-273]', async () => {
+      // Flip to non-proxy so the manage button appears and the mutation is
+      // callable. This proves the negative proxy test is non-vacuous: the
+      // mutation CAN be triggered when the guard is absent.
+      mockIsParentProxy = false;
+      mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // Manage button must be present in non-proxy mode.
+      screen.getByTestId('manage-subjects-button');
+
+      // Open the modal and press the archive action for the subject.
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+      });
+
+      await waitFor(() => {
+        expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
+          subjectId: 'sub-1',
+          status: 'archived',
+        });
+      });
+    });
+
+    it('disables the in-modal status controls if proxy mode activates while the modal is open [WI-273]', async () => {
+      // Covers the one transient where the status-change controls render in
+      // proxy mode: the modal is opened in non-proxy (the Manage button is
+      // visible), then a profile switch flips the session to proxy while the
+      // modal stays open. The controls must become disabled so the write is
+      // unreachable. (The in-handler `if (!canWrite) return` is belt-and-
+      // suspenders behind this disabled prop — a disabled Pressable does not
+      // forward the press to its handler, so the handler is not reachable from
+      // the UI once disabled; the disabled state below is the reachable gate,
+      // and the server-side assertNotProxyMode is the authoritative backstop.)
+      // Non-vacuous: drop `!canWrite` from the control's `disabled` prop and the
+      // toBeDisabled assertions fail.
+      mockIsParentProxy = false;
+      const { rerender } = render(<LibraryScreen />, { wrapper: TestWrapper });
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      // Controls are enabled while the modal is open in non-proxy mode.
+      expect(screen.getByTestId('archive-subject-sub-1')).not.toBeDisabled();
+
+      // Proxy mode activates while the modal is still open (state persists).
+      mockIsParentProxy = true;
+      rerender(<LibraryScreen />);
+
+      expect(screen.getByTestId('archive-subject-sub-1')).toBeDisabled();
+      expect(screen.getByTestId('pause-subject-sub-1')).toBeDisabled();
     });
   });
 });
