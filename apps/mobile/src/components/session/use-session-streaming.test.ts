@@ -1376,4 +1376,36 @@ describe('useSessionStreaming', () => {
       expect(opts.setLowConfidenceMessageId).toHaveBeenCalledWith(null);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // WI-373: silence prompt sends an intent token, not free content
+  // -------------------------------------------------------------------------
+  describe('WI-373 silence intent', () => {
+    it('records a silence_nudge intent token when the silence timer fires', async () => {
+      jest.useFakeTimers();
+      try {
+        const opts = makeOpts({ activeSessionId: 'session-1', draftText: '' });
+        const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+        act(() => {
+          result.current.scheduleSilencePrompt('session-1', 2);
+        });
+
+        // Advance past the maximum (20-minute) threshold so the timer fires
+        // regardless of the pace multiplier, then flush the async callback.
+        await act(async () => {
+          jest.advanceTimersByTime(20 * 60 * 1000 + 1000);
+          await Promise.resolve();
+        });
+
+        expect(opts.recordSystemPrompt.mutateAsync).toHaveBeenCalledWith({
+          kind: 'silence_nudge',
+        });
+        const arg = opts.recordSystemPrompt.mutateAsync.mock.calls[0]?.[0];
+        expect(arg).not.toHaveProperty('content');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });
