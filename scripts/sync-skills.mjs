@@ -19,8 +19,16 @@
 // core.symlinks=true), so we generate copies via this Node script.
 //
 // Modes:
-//   sync-skills.mjs           — apply sync (default)
-//   sync-skills.mjs --check   — exit 1 if .agents/ content is missing from .claude/
+//   sync-skills.mjs                  — apply sync (default); status to stdout
+//   sync-skills.mjs --check          — exit 1 if .agents/ content is missing from .claude/
+//   sync-skills.mjs --print-changed  — apply sync; emit ONLY repo-relative paths of
+//                                      files this run created/updated to stdout, one
+//                                      per line. Status messages go to stderr. For
+//                                      the pre-commit hook to stage exactly the
+//                                      files sync touched (not other working-tree
+//                                      edits in .claude/skills/, e.g. manual edits
+//                                      to the commit skill which is excluded from
+//                                      sync via SKIP_SKILLS).
 
 import { readdir, readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -51,6 +59,12 @@ const SKIP_SKILLS = new Set([
 ]);
 
 const mode = process.argv.includes('--check') ? 'check' : 'sync';
+const printChanged = process.argv.includes('--print-changed');
+
+// In --print-changed mode, status messages go to stderr so stdout is parseable.
+const info = printChanged
+  ? (...args) => console.error(...args)
+  : (...args) => console.log(...args);
 
 /** Recursively list files under `dir`, returning paths relative to `dir`. Skips SKIP_DIRS at any depth. */
 async function listFiles(dir, base = dir) {
@@ -84,6 +98,10 @@ async function readIfExists(path) {
 
 const drift = [];
 const stats = { created: 0, updated: 0, identical: 0, removed: 0 };
+// Repo-relative paths of files this run created or updated. Used by
+// --print-changed so the pre-commit hook can stage exactly the files sync
+// touched, instead of staging every modified file under .claude/skills/.
+const changedPaths = [];
 
 async function syncSkill(name) {
   const sourceDir = join(SOURCE_ROOT, name);
@@ -104,11 +122,15 @@ async function syncSkill(name) {
       if (mode === 'sync') {
         await mkdir(dirname(dst), { recursive: true });
         await writeFile(dst, source);
+        changedPaths.push(relative(REPO_ROOT, dst));
       }
     } else if (target !== source) {
       drift.push(`${name}/${rel} (content differs)`);
       stats.updated++;
-      if (mode === 'sync') await writeFile(dst, source);
+      if (mode === 'sync') {
+        await writeFile(dst, source);
+        changedPaths.push(relative(REPO_ROOT, dst));
+      }
     } else {
       stats.identical++;
     }
@@ -131,15 +153,19 @@ async function main() {
       console.error('\nRun: pnpm sync-skills');
       process.exit(1);
     }
-    console.log(`sync-skills: ok (${stats.identical} files in sync)`);
+    info(`sync-skills: ok (${stats.identical} files in sync)`);
   } else {
     const changed = stats.created + stats.updated;
     if (changed === 0) {
-      console.log(`sync-skills: nothing to do (${stats.identical} files already in sync)`);
+      info(`sync-skills: nothing to do (${stats.identical} files already in sync)`);
     } else {
-      console.log(
-        `sync-skills: ${stats.created} created, ${stats.updated} updated, ${stats.identical} unchanged`,
-      );
+      info(`sync-skills: ${stats.created} created, ${stats.updated} updated, ${stats.identical} unchanged`);
+    }
+    if (printChanged) {
+      // Emit ONLY changed paths to stdout — one repo-relative path per line.
+      for (const path of changedPaths) {
+        process.stdout.write(path + '\n');
+      }
     }
   }
 }

@@ -6,14 +6,17 @@ set -e
 # slower but reliable. Harmless on macOS/Linux (cost is a few extra seconds).
 pnpm exec lint-staged --concurrent false
 
-# Cross-runtime sync: .claude/skills/ is generated from .agents/skills/. Run
-# sync in write mode (not --check) so drift gets fixed and auto-staged.
-# Lightweight (~100ms). See AGENTS.md "Cross-runtime File Sync" for rationale.
+# Cross-runtime sync: .claude/skills/ is generated from .agents/skills/. Use
+# --print-changed so we stage exactly the files this sync run touched, not
+# every working-tree edit under .claude/skills/. That distinction matters for
+# files intentionally excluded from sync (e.g. the commit skill, see
+# SKIP_SKILLS in scripts/sync-skills.mjs) where direct edits are valid and
+# should not be auto-staged. Status messages go to stderr in this mode; stdout
+# is one repo-relative path per line.
 # (AGENTS.md <-> CLAUDE.md sync is intentionally not productionized in this
 # PR — see .claude/memory/project_agent_doc_and_memory_architecture_revisit.md
 # for the future work item.)
-node scripts/sync-skills.mjs
-SYNC_CHANGES=$(git diff --name-only -- .claude/skills/ 2>/dev/null || true)
+SYNC_CHANGES=$(node scripts/sync-skills.mjs --print-changed)
 if [ -n "$SYNC_CHANGES" ]; then
   echo "pre-commit: auto-staging sync-generated changes:"
   echo "$SYNC_CHANGES" | sed 's/^/  /'
