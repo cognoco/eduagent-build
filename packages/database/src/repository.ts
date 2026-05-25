@@ -813,6 +813,14 @@ export function createScopedRepository(db: Database, profileId: string) {
           ...(limit ? { limit } : {}),
         });
       },
+      async listRecentDistinctDates(limit: number) {
+        return db
+          .selectDistinct({ date: dictationResults.date })
+          .from(dictationResults)
+          .where(scopedWhere(dictationResults))
+          .orderBy(desc(dictationResults.date))
+          .limit(limit);
+      },
       async insert(values: {
         completionKey: string;
         date: string;
