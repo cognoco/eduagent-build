@@ -140,7 +140,13 @@ async function executeTrialExpiry() {
 
   const result = await (
     trialExpiry as { fn: (input: unknown) => Promise<any> }
-  ).fn({ step });
+  ).fn({
+    event: {
+      name: 'inngest/scheduled.timer',
+      ts: Date.now(),
+    },
+    step,
+  });
 
   return {
     result,
