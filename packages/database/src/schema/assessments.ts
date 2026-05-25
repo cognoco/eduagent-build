@@ -47,6 +47,7 @@ export const teachingMethodEnum = pgEnum('teaching_method', [
 
 export const needsDeepeningStatusEnum = pgEnum('needs_deepening_status', [
   'active',
+  'pending_review',
   'resolved',
 ]);
 
@@ -168,6 +169,7 @@ export const needsDeepeningTopics = pgTable(
     concept: text('concept'),
     misconception: text('misconception'),
     correction: text('correction'),
+    pendingExpiresAt: timestamp('pending_expires_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

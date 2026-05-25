@@ -265,6 +265,7 @@ function setupScopedRepo({
     subjectId: string;
     status: string;
     consecutiveSuccessCount: number;
+    pendingExpiresAt?: Date | null;
     profileId?: string;
   }>,
   assessmentsFindMany = [] as Array<{
@@ -1370,9 +1371,16 @@ describe('getSubjectNeedsDeepening', () => {
   });
 
   it('returns active deepening topics', async () => {
+    const pendingExpiresAt = new Date('2026-06-01T12:00:00.000Z');
     setupScopedRepo({
       needsDeepeningFindMany: [
-        { topicId, subjectId, status: 'active', consecutiveSuccessCount: 0 },
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+          pendingExpiresAt,
+        },
       ],
     });
     const db = createMockDb();
@@ -1380,6 +1388,7 @@ describe('getSubjectNeedsDeepening', () => {
 
     expect(result.topics).toHaveLength(1);
     expect(result.topics[0]!.topicId).toBe(topicId);
+    expect(result.topics[0]!.pendingExpiresAt).toBe('2026-06-01T12:00:00.000Z');
     expect(result.count).toBe(1);
   });
 });

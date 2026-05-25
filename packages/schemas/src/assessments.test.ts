@@ -4,6 +4,7 @@ import {
   evaluateDifficultyRungSchema,
   evaluateFailureActionSchema,
   assessmentEligibleTopicSchema,
+  needsDeepeningSchema,
   retentionCardSchema,
   relearnTopicSchema,
   verificationTypeSchema,
@@ -238,6 +239,34 @@ describe('assessmentEligibleTopicSchema', () => {
         topicDescription: undefined,
       }),
     ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// needsDeepeningSchema
+// ---------------------------------------------------------------------------
+
+describe('needsDeepeningSchema', () => {
+  it('accepts pending review rows with an expiry timestamp', () => {
+    const data = {
+      topicId: TEST_UUID,
+      status: 'pending_review',
+      consecutiveSuccessCount: 0,
+      pendingExpiresAt: '2026-06-01T12:00:00.000Z',
+    };
+
+    expect(needsDeepeningSchema.parse(data)).toEqual(data);
+  });
+
+  it('accepts confirmed rows without a pending expiry timestamp', () => {
+    const data = {
+      topicId: TEST_UUID,
+      status: 'active',
+      consecutiveSuccessCount: 2,
+      pendingExpiresAt: null,
+    };
+
+    expect(needsDeepeningSchema.parse(data)).toEqual(data);
   });
 });
 
