@@ -1348,5 +1348,31 @@ describe('LibraryScreen', () => {
         });
       });
     });
+
+    it('disables the in-modal status controls if proxy mode activates while the modal is open [WI-273]', async () => {
+      // Covers the one transient where the status-change controls render in
+      // proxy mode: the modal is opened in non-proxy (the Manage button is
+      // visible), then a profile switch flips the session to proxy while the
+      // modal stays open. The controls must become disabled so the write is
+      // unreachable. (The in-handler `if (!canWrite) return` is belt-and-
+      // suspenders behind this disabled prop — a disabled Pressable does not
+      // forward the press to its handler, so the handler is not reachable from
+      // the UI once disabled; the disabled state below is the reachable gate,
+      // and the server-side assertNotProxyMode is the authoritative backstop.)
+      // Non-vacuous: drop `!canWrite` from the control's `disabled` prop and the
+      // toBeDisabled assertions fail.
+      mockIsParentProxy = false;
+      const { rerender } = render(<LibraryScreen />, { wrapper: TestWrapper });
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      // Controls are enabled while the modal is open in non-proxy mode.
+      expect(screen.getByTestId('archive-subject-sub-1')).not.toBeDisabled();
+
+      // Proxy mode activates while the modal is still open (state persists).
+      mockIsParentProxy = true;
+      rerender(<LibraryScreen />);
+
+      expect(screen.getByTestId('archive-subject-sub-1')).toBeDisabled();
+      expect(screen.getByTestId('pause-subject-sub-1')).toBeDisabled();
+    });
   });
 });
