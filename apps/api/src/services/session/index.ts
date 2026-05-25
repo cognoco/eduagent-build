@@ -112,7 +112,11 @@ export {
 } from './session-homework';
 
 // Book sessions
-export { getBookSessions, markSessionFiled } from './session-book';
+export {
+  getBookSessions,
+  markSessionFiled,
+  backfillSessionTopicId,
+} from './session-book';
 export type { BookSession } from './session-book';
 
 // Depth evaluation

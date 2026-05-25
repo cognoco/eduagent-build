@@ -120,3 +120,16 @@ export async function markSessionFiled(
       ),
     );
 }
+
+/**
+ * Backward-compatible name for older callers/tests that backfill a freeform
+ * session after Library filing. New code should call markSessionFiled().
+ */
+export async function backfillSessionTopicId(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  topicId: string,
+): Promise<void> {
+  await markSessionFiled(db, profileId, sessionId, topicId);
+}
