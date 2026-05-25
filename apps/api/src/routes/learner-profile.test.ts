@@ -159,6 +159,8 @@ jest.mock(
 );
 
 import { app } from '../index';
+import { Hono } from 'hono';
+import { learnerProfileRoutes } from './learner-profile';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 import { ERROR_CODES } from '@eduagent/schemas';
@@ -1011,6 +1013,52 @@ describe('learner-profile routes', () => {
       const body = await res.json();
       expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
       expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-371 / DS-185 / WI-274] Tell-Mentor self-write must be proxy-blocked at
+  // the ROUTE layer. In the full app the metering middleware already calls
+  // assertNotProxyMode for /learner-profile/tell (it is an LLM-metered route),
+  // so an end-to-end test cannot distinguish a route guard from the metering
+  // guard. This suite mounts learnerProfileRoutes in isolation (no metering)
+  // to verify the route handler itself rejects proxy callers — defense in
+  // depth that survives any future change to the metering allowlist, matching
+  // the WI-76 pattern (which route-guards the metered /stream).
+  // Red: 200 (handler calls parseLearnerInput) before the guard.
+  // Green: 403 PROXY_MODE after the guard.
+  // -------------------------------------------------------------------------
+  describe('[WI-371 / DS-185] Tell-Mentor self-write route-level proxy guard', () => {
+    const parseLearnerInputMock = (
+      jest.requireMock('../services/learner-input') as {
+        parseLearnerInput: jest.Mock;
+      }
+    ).parseLearnerInput;
+
+    function makeProxyApp() {
+      const proxyApp = new Hono();
+      proxyApp.use('*', async (c, next) => {
+        c.set('db' as never, {});
+        c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+        c.set('account' as never, { id: 'test-account-id' });
+        c.set('profileMeta' as never, { isOwner: false });
+        await next();
+      });
+      proxyApp.route('/', learnerProfileRoutes);
+      return proxyApp;
+    }
+
+    it('[BREAK] POST /learner-profile/tell returns 403 PROXY_MODE for a non-owner (proxy) profile', async () => {
+      const res = await makeProxyApp().request('/learner-profile/tell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Remember that I love dinosaurs' }),
+      });
+
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe('PROXY_MODE');
+      // Guard must fire before the parse service is reached.
+      expect(parseLearnerInputMock).not.toHaveBeenCalled();
     });
   });
 });

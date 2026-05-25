@@ -37,6 +37,7 @@ import {
   assertOwnerAndParentAccess,
 } from '../services/family-access';
 import { assertChildDashboardDataVisible } from '../services/dashboard';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getOrCreateMemoryProjection,
   toLearnerSelfView,
@@ -355,6 +356,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     '/learner-profile/tell',
     zValidator('json', tellMentorInputSchema),
     async (c) => {
+      // [WI-371 / DS-185] Route-level proxy guard (defense-in-depth alongside
+      // the metering middleware, which also guards this LLM-metered route). A
+      // parent acting as a child (isOwner === false) must not inject
+      // mentor-memory content via the child's self screen; the owner-gated
+      // /:profileId/tell route is the sanctioned parent path.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { text } = c.req.valid('json');
