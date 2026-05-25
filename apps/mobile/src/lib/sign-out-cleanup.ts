@@ -45,11 +45,14 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // use-dictation-preferences.ts — getPaceKey + getPunctKey
   (id) => `dictation-pace-${id}`,
   (id) => `dictation-punctuation-${id}`,
-  // use-rating-prompt.ts — current + legacy (different separator)
+  // use-rating-prompt.ts — current keys only.
+  // Legacy `rating-recall-success-count:${id}` and `rating-last-prompt:${id}`
+  // colon-delimited keys removed 2026-05-24 (BUG-724 / FCR-2026-05-23-L14.F10).
+  // Codebase is pre-launch (no real devices) and SecureStore guardrail forbids
+  // colons in keys; the legacy migration in use-rating-prompt.ts is removed in
+  // the same change so there is nothing left to clean up.
   (id) => `rating-recall-success-count-${id}`,
   (id) => `rating-last-prompt-${id}`,
-  (id) => `rating-recall-success-count:${id}`,
-  (id) => `rating-last-prompt:${id}`,
   // session-recovery.ts — getRecoveryKey, sanitized
   (id) => sanitizeSecureStoreKey(`session-recovery-marker-${id}`),
   // [CR-SECURESTORE-REGISTRY-11] Previously-unregistered keys (BUG-723 leak).

@@ -1,9 +1,5 @@
+import type { HealthResponse } from '@eduagent/schemas';
 import { getApiUrl } from './api';
-
-interface HealthResponse {
-  status: string;
-  deploySha: string | null;
-}
 
 let checked = false;
 

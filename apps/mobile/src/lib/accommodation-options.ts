@@ -1,3 +1,4 @@
+// Presentation-only: static option shapes. Not API types. If accommodation options ever become server-driven, move to @eduagent/schemas.
 import type { AccommodationMode } from '@eduagent/schemas';
 
 export interface AccommodationOption {

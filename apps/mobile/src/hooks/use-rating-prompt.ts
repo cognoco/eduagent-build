@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import * as StoreReview from 'expo-store-review';
 import * as SecureStore from '../lib/secure-storage';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { useProfile } from '../lib/profile';
-import { migrateSecureStoreKey } from '../lib/migrate-secure-store-key';
 
 /** Minimum successful recalls before prompting. */
 const MIN_SUCCESSFUL_RECALLS = 5;
@@ -15,18 +14,14 @@ const MIN_DAYS_SINCE_CREATION = 7;
 const MIN_DAYS_BETWEEN_PROMPTS = 90;
 
 // Keys renamed from colon to dash delimiters — colons caused SecureStore
-// crashes on some Android devices. See migrate-secure-store-key.ts.
+// crashes on some Android devices. Legacy `rating-recall-success-count:${id}`
+// and `rating-last-prompt:${id}` migration removed 2026-05-24 (BUG-724 /
+// FCR-2026-05-23-L14.F10) — pre-launch, no real devices had the legacy keys.
 const RECALL_COUNT_KEY = (profileId: string): string =>
   `rating-recall-success-count-${profileId}`;
 
 const LAST_PROMPT_KEY = (profileId: string): string =>
   `rating-last-prompt-${profileId}`;
-
-/** @deprecated Old colon-delimited keys — used only for migration. */
-const LEGACY_RECALL_COUNT_KEY = (profileId: string): string =>
-  `rating-recall-success-count:${profileId}`;
-const LEGACY_LAST_PROMPT_KEY = (profileId: string): string =>
-  `rating-last-prompt:${profileId}`;
 
 /**
  * Hook for prompting App Store rating at psychologically optimal moments.
@@ -42,19 +37,6 @@ export function useRatingPrompt(): {
   onSuccessfulRecall: () => Promise<void>;
 } {
   const { activeProfile } = useProfile();
-  const migrated = useRef(false);
-
-  // One-time migration from old colon-delimited SecureStore keys
-  useEffect(() => {
-    if (!activeProfile || migrated.current) return;
-    migrated.current = true;
-    const id = activeProfile.id;
-    void migrateSecureStoreKey(
-      LEGACY_RECALL_COUNT_KEY(id),
-      RECALL_COUNT_KEY(id),
-    );
-    void migrateSecureStoreKey(LEGACY_LAST_PROMPT_KEY(id), LAST_PROMPT_KEY(id));
-  }, [activeProfile]);
 
   const onSuccessfulRecall = useCallback(async () => {
     if (!activeProfile) return;
