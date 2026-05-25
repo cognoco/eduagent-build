@@ -15,7 +15,7 @@ description: |
   Triggers (init): "initialize archon", "set up .archon", "archon init", "add archon to repo".
   Capability: Runs AI workflows in isolated git worktrees for parallel development.
   Also: Creates and manages workflow YAML files, command files, and configuration.
-  NOT for: Direct Claude Code work - only for delegating to Archon CLI.
+  NOT for: Direct Codex work - only for delegating to Archon CLI.
 argument-hint: "[workflow] [message or issue number]"
 ---
 
@@ -72,7 +72,7 @@ The references in this skill are a distilled subset. The full, canonical docs li
 | Workflow authoring guide | [archon.diy/guides/authoring-workflows/](https://archon.diy/guides/authoring-workflows/) |
 | Command authoring guide | [archon.diy/guides/authoring-commands/](https://archon.diy/guides/authoring-commands/) |
 | Node type guides | [archon.diy/guides/loop-nodes/](https://archon.diy/guides/loop-nodes/), [/approval-nodes/](https://archon.diy/guides/approval-nodes/), [/script-nodes/](https://archon.diy/guides/script-nodes/) |
-| Per-node features (Claude only) | [/hooks/](https://archon.diy/guides/hooks/), [/mcp-servers/](https://archon.diy/guides/mcp-servers/), [/skills/](https://archon.diy/guides/skills/) |
+| Per-node features (Codex only) | [/hooks/](https://archon.diy/guides/hooks/), [/mcp-servers/](https://archon.diy/guides/mcp-servers/), [/skills/](https://archon.diy/guides/skills/) |
 | Global workflows/commands/scripts | [archon.diy/guides/global-workflows/](https://archon.diy/guides/global-workflows/) |
 | Variables reference | [archon.diy/reference/variables/](https://archon.diy/reference/variables/) |
 | CLI reference | [archon.diy/reference/cli/](https://archon.diy/reference/cli/) |
@@ -185,7 +185,7 @@ Archon uses a single workflow format: **nodes** (DAG). Workflows are YAML files 
 ```yaml
 name: my-workflow
 description: What this workflow does
-provider: claude          # Optional: 'claude' or 'codex'
+provider: Codex          # Optional: 'Codex' or 'codex'
 model: sonnet             # Optional: model override
 nodes:
   - id: first-node
@@ -304,7 +304,7 @@ For the full command authoring guide: Read `references/authoring-commands.md`
 
 Full variable reference: Read `references/variables.md`
 
-### Advanced Features (Command/Prompt Nodes, Claude Only)
+### Advanced Features (Command/Prompt Nodes, Codex Only)
 
 `hooks` (tool interception), `mcp` (external tool servers), `skills` (domain knowledge injection), `output_format` (structured JSON output), `allowed_tools`/`denied_tools` (tool restrictions).
 
