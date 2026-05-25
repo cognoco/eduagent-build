@@ -234,7 +234,14 @@ export async function createNoteForSession(
     topicId: string;
     sessionId: string;
     content: string;
-    // Note: source='challenge_round' MUST be guarded by validateNoteDraft (services/challenge-round/note-draft.ts) before this call — enforced by note-draft.guard.test.ts.
+    // [L15-003 / L15-001] When a challenge_round caller path is wired up, it
+    // MUST pass `params.content` through validateNoteDraft (services/challenge-round/note-draft.ts)
+    // first to enforce the lexical-overlap hallucination guard. The end-to-end
+    // pipeline (envelope projection → decideMasteryAndReview → validateNoteDraft
+    // → createNoteForSession) is currently UNWIRED — no production code path
+    // calls validateNoteDraft today, and no guard test exists. Re-add the
+    // guard test (services/challenge-round/note-draft.guard.test.ts) alongside
+    // the wiring work.
   },
 ): Promise<MappedNoteRow> {
   return insertNoteWithCap(
