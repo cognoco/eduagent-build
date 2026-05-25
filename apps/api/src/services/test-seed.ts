@@ -108,7 +108,25 @@ export type SeedScenario =
   | 'quiz-answer-check-fails'
   | 'dictation-with-mistakes'
   | 'dictation-perfect-score'
-  | 'review-empty';
+  | 'review-empty'
+  // Mentor Chrome audit seed pack (docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md).
+  // Stable registry names used by the audit re-run. Many are aliases of existing
+  // scenarios — the alias preserves the audit's naming contract so blocked rows
+  // can be rerun without coupling them to internal seeder names.
+  | 'mentor-audit-empty-adult' // alias: pre-profile
+  | 'mentor-audit-consent-pending-child' // alias: consent-pending (with consentStateId in ids)
+  | 'mentor-audit-consent-withdrawn-child' // alias: consent-withdrawn
+  | 'mentor-audit-post-approval-steady-state' // alias: parent-multi-child
+  | 'mentor-audit-deletion-scheduled-owner' // alias: account-deletion-scheduled
+  | 'mentor-audit-family-at-profile-limit'
+  | 'mentor-audit-post-approval-redirect'
+  | 'mentor-audit-consent-us-under-threshold'
+  | 'mentor-audit-consent-eu-under-threshold'
+  | 'mentor-audit-consent-over-threshold'
+  | 'mentor-audit-quota-owner-daily'
+  | 'mentor-audit-quota-family-monthly'
+  | 'mentor-audit-paywall-child-notify'
+  | 'mentor-audit-resumable-session';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1611,9 +1629,10 @@ async function seedConsentPending(
     birthYear: 2014,
   });
   const consentToken = `seed-consent-${generateUUIDv7()}`;
+  const consentStateId = generateUUIDv7();
 
   await db.insert(consentStates).values({
-    id: generateUUIDv7(),
+    id: consentStateId,
     profileId,
     consentType: 'GDPR',
     status: 'PARENTAL_CONSENT_REQUESTED',
@@ -1628,7 +1647,7 @@ async function seedConsentPending(
     profileId,
     email,
     password,
-    ids: { consentToken },
+    ids: { consentToken, consentStateId },
   };
 }
 
@@ -3574,6 +3593,404 @@ async function seedDictationPerfectScore(
 }
 
 // ---------------------------------------------------------------------------
+// Mentor Chrome audit seed pack
+//
+// See docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md. These seeders
+// back the `mentor-audit-*` registry names. Most entries are thin aliases of
+// existing scenarios (the registry preserves the audit's naming contract
+// without coupling it to internal seeder names). New seeders cover states the
+// audit cannot reach with current scenarios.
+// ---------------------------------------------------------------------------
+
+/** Wraps an existing seeder and rewrites the returned `scenario` field so
+ *  alias entries return the registry name the caller asked for. Other fields
+ *  (accountId, profileId, password, ids) are passed through unchanged. */
+function aliasSeeder(scenario: SeedScenario, inner: SeederFn): SeederFn {
+  return async (db, email, env) => {
+    const result = await inner(db, email, env);
+    return { ...result, scenario };
+  };
+}
+
+/** Family owner at the plan's profile cap (1 owner + 3 children = 4, which is
+ *  `getTierConfig('family').maxProfiles`). Exercises the "add child" gating UX
+ *  when the plan limit is already reached. */
+async function seedMentorAuditFamilyAtProfileLimit(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const familyTier = getTierConfig('family');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Capped Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'family',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: familyTier.monthlyQuota,
+    usedThisMonth: 120,
+    cycleResetAt: futureDate(30),
+  });
+
+  // 1 owner is already inserted above; add (maxProfiles - 1) children so the
+  // total exactly hits the cap.
+  const childProfileIds: string[] = [];
+  const childCount = familyTier.maxProfiles - 1;
+  for (let i = 0; i < childCount; i += 1) {
+    const childProfileId = await createBaseProfile(db, accountId, {
+      displayName: `Capped Child ${i + 1}`,
+      birthYear: 2014,
+      isOwner: false,
+    });
+    childProfileIds.push(childProfileId);
+
+    await db.insert(familyLinks).values({
+      id: generateUUIDv7(),
+      parentProfileId,
+      childProfileId,
+    });
+
+    await db.insert(consentStates).values({
+      id: generateUUIDv7(),
+      profileId: childProfileId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: email,
+      respondedAt: new Date(),
+    });
+  }
+
+  return {
+    scenario: 'mentor-audit-family-at-profile-limit',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: {
+      parentProfileId,
+      subscriptionId,
+      childProfileId1: childProfileIds[0] ?? '',
+      childProfileId2: childProfileIds[1] ?? '',
+      childProfileId3: childProfileIds[2] ?? '',
+    },
+  };
+}
+
+/** Parent landing at the consent-approve URL. Mirrors the data state a parent
+ *  hits when clicking the link in the consent-request email — pending child
+ *  consent with a usable `consentToken`. The parent (owner) is signed in. */
+async function seedMentorAuditPostApprovalRedirect(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Approving Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Awaiting-Approval Child',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  const consentToken = `seed-consent-${generateUUIDv7()}`;
+  const consentStateId = generateUUIDv7();
+  await db.insert(consentStates).values({
+    id: consentStateId,
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'PARENTAL_CONSENT_REQUESTED',
+    parentEmail: email,
+    consentToken,
+    expiresAt: futureDate(7),
+  });
+
+  return {
+    scenario: 'mentor-audit-post-approval-redirect',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: { parentProfileId, childProfileId, consentToken, consentStateId },
+  };
+}
+
+/** Region/age consent threshold variants. Each seeds a profile with the
+ *  specified `location` enum value and a birth year that produces the target
+ *  age relative to the current calendar year. The product code decides whether
+ *  parental consent is required based on these inputs — the seeder does NOT
+ *  pre-set `consent_states.status`; it leaves the threshold logic to the app
+ *  so the audit can observe each gate produced from the same starting state. */
+function makeConsentThresholdSeeder(
+  scenario: SeedScenario,
+  opts: { location: 'US' | 'EU' | 'OTHER'; ageYears: number },
+): SeederFn {
+  return async (db, email, env) => {
+    const { clerkUserId, password } = await createClerkTestUser(email, env);
+    const { accountId } = await createBaseAccount(db, email, clerkUserId);
+    const profileId = generateUUIDv7();
+    await db.insert(profiles).values({
+      id: profileId,
+      accountId,
+      displayName: `Consent Threshold (${opts.location} ${opts.ageYears}y)`,
+      birthYear: new Date().getFullYear() - opts.ageYears,
+      location: opts.location,
+      isOwner: true,
+    });
+
+    return {
+      scenario,
+      accountId,
+      profileId,
+      email,
+      password,
+      ids: {},
+    };
+  };
+}
+
+/** Free-tier owner that has hit the daily cap (10/day). Family/Pro tiers have
+ *  no daily limit (`getTierConfig` at `subscription.ts:35,50,61,72`), so this
+ *  state is Study/free-tier-only. */
+async function seedMentorAuditQuotaOwnerDaily(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Daily Cap Owner',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: 12,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: freeTier.dailyLimit ?? 10,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Mathematics',
+  );
+
+  return {
+    scenario: 'mentor-audit-quota-owner-daily',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+/** Family-tier owner whose monthly pool is exhausted. Tests the
+ *  family-pool-exhausted owner state (no daily cap on Family). */
+async function seedMentorAuditQuotaFamilyMonthly(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const familyTier = getTierConfig('family');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Family Monthly Cap Owner',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'family',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: familyTier.monthlyQuota,
+    usedThisMonth: familyTier.monthlyQuota,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'General Knowledge',
+  );
+
+  return {
+    scenario: 'mentor-audit-quota-family-monthly',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+/** Profile with a deterministic in-progress learning session — enough state
+ *  for the resume card to render. No LLM calls during seeding. */
+async function seedMentorAuditResumableSession(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Resume Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Geography',
+  );
+  const topicId = topicIds[0];
+  if (!topicId) {
+    throw new Error('resumable-session seed: subject created no topics');
+  }
+
+  const sessionId = generateUUIDv7();
+  const startedAt = pastDate(0); // a few minutes ago — kept simple
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId,
+    sessionType: 'learning',
+    status: 'active',
+    exchangeCount: 4,
+    startedAt,
+    lastActivityAt: startedAt,
+  });
+
+  // Enough events to render a meaningful resume card (alternating user / ai).
+  await db.insert(sessionEvents).values(
+    Array.from({ length: 4 }, (_, i) => ({
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      eventType:
+        i % 2 === 0 ? ('user_message' as const) : ('ai_response' as const),
+      content:
+        i % 2 === 0
+          ? 'What are the continents called?'
+          : 'There are seven continents. Want to name them with me?',
+    })),
+  );
+
+  return {
+    scenario: 'mentor-audit-resumable-session',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, topicId, sessionId },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -3622,6 +4039,49 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'review-empty': seedReviewEmpty,
   'dictation-with-mistakes': seedDictationWithMistakes,
   'dictation-perfect-score': seedDictationPerfectScore,
+  // Mentor Chrome audit seed pack — aliases of existing scenarios where the
+  // audit state matches a current seeder, and dedicated seeders where it doesn't.
+  'mentor-audit-empty-adult': aliasSeeder(
+    'mentor-audit-empty-adult',
+    seedPreProfile,
+  ),
+  'mentor-audit-consent-pending-child': aliasSeeder(
+    'mentor-audit-consent-pending-child',
+    seedConsentPending,
+  ),
+  'mentor-audit-consent-withdrawn-child': aliasSeeder(
+    'mentor-audit-consent-withdrawn-child',
+    seedConsentWithdrawn,
+  ),
+  'mentor-audit-post-approval-steady-state': aliasSeeder(
+    'mentor-audit-post-approval-steady-state',
+    seedParentMultiChild,
+  ),
+  'mentor-audit-deletion-scheduled-owner': aliasSeeder(
+    'mentor-audit-deletion-scheduled-owner',
+    seedAccountDeletionScheduled,
+  ),
+  'mentor-audit-family-at-profile-limit': seedMentorAuditFamilyAtProfileLimit,
+  'mentor-audit-post-approval-redirect': seedMentorAuditPostApprovalRedirect,
+  'mentor-audit-consent-us-under-threshold': makeConsentThresholdSeeder(
+    'mentor-audit-consent-us-under-threshold',
+    { location: 'US', ageYears: 11 },
+  ),
+  'mentor-audit-consent-eu-under-threshold': makeConsentThresholdSeeder(
+    'mentor-audit-consent-eu-under-threshold',
+    { location: 'EU', ageYears: 14 },
+  ),
+  'mentor-audit-consent-over-threshold': makeConsentThresholdSeeder(
+    'mentor-audit-consent-over-threshold',
+    { location: 'EU', ageYears: 17 },
+  ),
+  'mentor-audit-quota-owner-daily': seedMentorAuditQuotaOwnerDaily,
+  'mentor-audit-quota-family-monthly': seedMentorAuditQuotaFamilyMonthly,
+  'mentor-audit-paywall-child-notify': aliasSeeder(
+    'mentor-audit-paywall-child-notify',
+    seedTrialExpiredChild,
+  ),
+  'mentor-audit-resumable-session': seedMentorAuditResumableSession,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
