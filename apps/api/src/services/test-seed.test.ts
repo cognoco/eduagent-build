@@ -125,6 +125,11 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-quota-family-monthly',
       'mentor-audit-paywall-child-notify',
       'mentor-audit-resumable-session',
+      // Second wave (Task 0 helpers + remaining DB-backed audit seeds).
+      'mentor-audit-family-no-children',
+      'mentor-audit-rich-child-history',
+      'mentor-audit-session-revoked',
+      'mentor-audit-mfa-totp',
     ]);
   });
 
@@ -613,6 +618,36 @@ describe('mentor-audit seed pack returns required IDs', () => {
     {
       scenario: 'mentor-audit-resumable-session',
       requiredIds: ['subjectId', 'topicId', 'sessionId'],
+    },
+    // Second wave — Task 0 composite + remaining DB-backed audit seeds.
+    {
+      scenario: 'mentor-audit-family-no-children',
+      // Alias of parent-solo: only the seeder's own ids survive the alias.
+      requiredIds: ['parentProfileId', 'subscriptionId'],
+    },
+    {
+      scenario: 'mentor-audit-rich-child-history',
+      requiredIds: [
+        'parentProfileId',
+        'childProfileId',
+        'mathSubjectId',
+        'englishSubjectId',
+        'mathTopicId',
+        'englishTopicId',
+        'recapSessionId',
+        'weeklyReportId',
+      ],
+    },
+    {
+      // session-revoked + mfa-totp call Clerk Backend; without CLERK_SECRET_KEY
+      // (unit-test env) they fall through to empty-string ids. Only assert the
+      // base ids that come from seedOnboardingComplete.
+      scenario: 'mentor-audit-session-revoked',
+      requiredIds: [],
+    },
+    {
+      scenario: 'mentor-audit-mfa-totp',
+      requiredIds: [],
     },
   ];
 
