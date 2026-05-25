@@ -10,6 +10,26 @@
 
 ---
 
+## Amendments — 2026-05-25 (adversarial review)
+
+Twelve findings from the 2026-05-25 challenge pass are folded into this plan. Audit trail (each ID is cited inline at the change site):
+
+- **[CRITICAL-A]** `backfillSessionTopicId` (now `markSessionFiled`) extended to set `topicId + filedAt + updatedAt`. The old helper only wrote `topicId`. Splitting `resolveFilingResult` without this fix leaves every freshly-filed session with `filedAt = null`, and `freeform-filing.ts:56` keys "already filed" off `row.filedAt != null` → the next retry re-fires the LLM and double-creates the topic.
+- **[CRITICAL-B]** Spec §6 line 254 ("Retry resets the count") is the source of truth. Earlier wording in this plan ("share the 3-attempt cap, no reset") is replaced. Retry now goes through `resetFilingForRetry` (clears `filing_status` AND `filing_retry_count`).
+- **[HIGH-C]** Terminal `filing_failed` sessions had no path out under the original plan (`claimSessionForAutoFiling` CAS requires `filing_status IS NULL`). Fixed by routing the Retry button through `resetFilingForRetry`, not through the existing `claimSessionForFilingRetry`.
+- **[HIGH-D]** `restoreSessionForAutoFiling` now ALSO resets `filing_retry_count` to 0 via `resetFilingForRetry`. Without this, a user who exhausted retries → kept out → restored re-enters with `retry_count = 3` and dies on the first LLM error.
+- **[HIGH-E]** Safe-to-delete logic factored out as a shared exported helper `deleteTopicIfSafe(db, profileId, sessionId, topicId)`. Used by both the keep-out service AND the auto-file handler's 0-row branch — no rule duplication.
+- **[HIGH-F]** "Update retry endpoints to return 409 for `filing_kept_out`" reworded — the existing `claimSessionForFilingRetry` CAS at `session-crud.ts:1463-1486` already returns 409 for any non-failed status. Task is now a verification + integration test, not a code change.
+- **[MEDIUM-G]** Spec §4 line 165 contradicts §5: §4 requires `filedFrom = 'freeform_filing'` for safe-to-delete, §5 sets auto-file topics to `'session_filing'`. Spec §4 as written would never fire for auto-filed sessions. The plan correctly broadens to `IN (...)` and this amendments block flags the matching spec edit.
+- **[MEDIUM-H]** `MIN_FREEFORM_FILE_EXCHANGES` and `MAX_FILING_RETRIES` live in `apps/api/src/config/filing.ts` (new), per CLAUDE.md G4 (no raw `process.env` in API code).
+- **[MEDIUM-I]** Inngest dedupe key formula made explicit: `auto-file-${sessionId}-initial` for close-path dispatch; `auto-file-${sessionId}-retry-${retryCount}` for user-initiated Retry and restore dispatch. Reusing one key would let Inngest collapse a real retry as a duplicate.
+- **[MEDIUM-J]** PR 3 polling cadence locked: TanStack Query `refetchInterval: 3000`, stop on terminal state or after 10 polls (~30s) — matches spec §Failure Modes.
+- **[MEDIUM-K]** Spec §1 "Ask First" / Unsorted auto-subject is explicitly NOT shipping in this PR series. The "no friction before first turn" promise the spec opens with is unshipped after PR 3 merges.
+- **[MEDIUM-L]** PR 2 freeform-effective-mode audit task names the actual insert paths.
+- **[LOW-M]** CRITICAL-1 framing corrected: stranded backfill is operator-fired (`filing-stranded-backfill.ts:16-23` "No automatic trigger by design"), not a cron. Guard still required; risk window is "manual recovery after an incident."
+
+---
+
 ## In Scope / Out Of Scope
 
 In scope (this plan):
@@ -22,7 +42,7 @@ In scope (this plan):
 
 Out of scope — track in follow-up plans:
 
-- Spec §1 "Ask First" / per-profile "Unsorted" auto-subject and live subject reconciliation during the streaming reply. [HIGH-2] This is a separate workstream and is not addressed here. Freeform sessions in this PR series continue to be created with a real `subjectId` via the existing entry paths.
+- Spec §1 "Ask First" / per-profile "Unsorted" auto-subject and live subject reconciliation during the streaming reply. [HIGH-2 / MEDIUM-K] This is a separate workstream and is not addressed here. Freeform sessions in this PR series continue to be created with a real `subjectId` via the existing entry paths — **so the spec's "no friction before first turn" promise (spec lines 22-29) does NOT ship in this PR series.** PR 3's UX still relies on the existing subject-up-front entry path; the auto-file/keep-out behavior shipped here applies AFTER a session already has a `subjectId`. Do not claim "ask-first" is done after PR 3 merges.
 - Homework session filing. [MEDIUM-4] The current homework filing prompt and behavior are unchanged. Only the freeform path's blocking prompt is removed in PR 3.
 - Spec §7 `Change` subject-picker. V1 `Change` is "navigate to the filed topic" only.
 - Analytics events from spec §Analytics. [MEDIUM-6] Deferred to a follow-up plan; PR 2 does not emit `freeform_library_filing.*`. The eval harness still re-snapshots filing prompts when the LLM call surface changes.
@@ -76,6 +96,13 @@ Collect the scattered documentation:
 - `packages/schemas/src/sessions.test.ts` - update enum tests, response fixtures, and add accessor coverage (returns `'freeform'`, `'learning'`, `undefined` for missing metadata).
 - `packages/schemas/src/inngest-events.ts` - add `app/session.auto_file_requested` event schema. [HIGH-1] PR 2 introduces a dedicated event, not reuse of `app/filing.retry`.
 
+### Configuration
+
+- `apps/api/src/config/filing.ts` (new) - **[MEDIUM-H]** Typed config object exporting:
+  - `FILING_CONFIG.minFreeformExchanges = 3` (was inline `MIN_FREEFORM_FILE_EXCHANGES`).
+  - `FILING_CONFIG.maxRetries = 3` (was inline `MAX_FILING_RETRIES`).
+  All API-side reads import from here; never index `process.env` directly (CLAUDE.md G4). Mobile does NOT need these values — eligibility runs server-side. If a future PR adds mobile-visible thresholds, expose via `@eduagent/schemas`, not duplicated mobile constants.
+
 ### Database
 
 - `packages/database/src/schema/sessions.ts` - add `filing_kept_out` to the `filing_status` enum.
@@ -89,25 +116,28 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 
 - `apps/api/src/services/session/session-crud.ts` - add service functions:
   - `markSessionKeptOutOfLibrary(db, profileId, sessionId)` — sets terminal `filing_kept_out`.
-  - `restoreSessionForAutoFiling(db, profileId, sessionId)` — [HIGH-4] reverse of keep-out. Clears `filing_kept_out` (sets `filingStatus = null`) and is followed by a fresh `app/session.auto_file_requested` dispatch.
-  - `claimSessionForAutoFiling(db, profileId, sessionId)` — CAS UPDATE from `(filing_status IS NULL AND topic_id IS NULL)` → `filing_pending`. [HIGH-5] Reuses the existing `filing_retry_count` column; auto-file and manual retry share the same 3-attempt cap so a user can't exhaust both ladders separately. [MEDIUM-2]
+  - `restoreSessionForAutoFiling(db, profileId, sessionId)` — [HIGH-4 / HIGH-D] reverse of keep-out. Requires `filingStatus = 'filing_kept_out'`. Internally calls `resetFilingForRetry` so BOTH `filing_status` AND `filing_retry_count` are cleared. Returns the session row (including the fresh `filing_retry_count`) so the route can dispatch a fresh `app/session.auto_file_requested` with the correct dedupe key.
+  - `resetFilingForRetry(db, profileId, sessionId)` — **[HIGH-C / HIGH-D]** CAS UPDATE: `WHERE id = $sessionId AND profile_id = $profileId AND filing_status IN ('filing_failed', 'filing_kept_out') → filing_status = NULL, filing_retry_count = 0, updated_at = NOW() RETURNING id, filing_retry_count`. Predicate excludes `filing_pending` (would race with an in-flight handler) and `filing_recovered` (no recovery needed). Used by BOTH the Retry button (auto-file ladder) and `restoreSessionForAutoFiling`. This is the single mechanism that satisfies spec §6 line 254 ("Retry re-dispatches a new auto-file event (which resets the count)").
+  - `claimSessionForAutoFiling(db, profileId, sessionId)` — CAS UPDATE: `WHERE id = $sessionId AND profile_id = $profileId AND filing_status IS NULL AND topic_id IS NULL → filing_status = 'filing_pending', filing_retry_count = filing_retry_count + 1, updated_at = NOW() RETURNING id, filing_retry_count`. **[CRITICAL-B]** Reset on retry lives in `resetFilingForRetry`, NOT in this CAS. The 3-attempt cap is enforced inside the auto-file handler: after the claim, check `filing_retry_count > FILING_CONFIG.maxRetries` and exit via spec §6's terminal branch (set `filing_status = 'filing_failed'`, do not retry).
   - `detachSessionFromFiledTopic(db, profileId, sessionId)`.
+- `apps/api/src/services/curriculum/curriculum-topic.ts` - **[HIGH-E]** Add `deleteTopicIfSafe(db, profileId, sessionId, topicId)` implementing spec §4 fully: `filedFrom IN ('freeform_filing', 'session_filing')` **[MEDIUM-G]** (spec §4 line 165 says `'freeform_filing'` only, contradicting §5 which sets auto-file topics to `'session_filing'` — broaden here AND submit a spec PR fixing §4), `curriculum_topics.sessionId === sessionId`, no other `learning_sessions.topicId` references, no `curriculum_topic_progress` references, no `curriculum_topic_retention` references. Returns `{ deleted: boolean, reason?: string }`. Exported from the service barrel; called by BOTH `markSessionKeptOutOfLibrary` (keep-out-after-filing path) AND the auto-file handler's 0-row branch (PR 2). No duplicate inline checks anywhere.
 - `apps/api/src/routes/sessions.ts` - add session filing endpoints:
   - `POST /sessions/:sessionId/library-filing/keep-out`
-  - `POST /sessions/:sessionId/library-filing/restore` — [HIGH-4] re-enable filing on a kept-out session.
-- `apps/api/src/routes/filing.ts` - reject/skip filing requests for kept-out sessions.
-- `apps/api/src/services/filing.ts` - **[CRITICAL-2]** Split `resolveFilingResult()` so it stops touching `learning_sessions`. Today (`filing.ts:743-757`) it unconditionally writes `topicId` and `filedAt`. After this change:
+  - `POST /sessions/:sessionId/library-filing/restore` — [HIGH-4 / HIGH-D] re-enable filing on a kept-out session. Calls `restoreSessionForAutoFiling`, then dispatches `app/session.auto_file_requested` via `safeSend()` with dedupe key `auto-file-${sessionId}-retry-0` (count was just reset to 0). **[MEDIUM-I]**
+  - `POST /sessions/:sessionId/retry-filing` — **[HIGH-C]** existing endpoint reworked for the auto-file ladder. When `session.metadata.effectiveMode === 'freeform'`: call `resetFilingForRetry` instead of `claimSessionForFilingRetry`, then dispatch `app/session.auto_file_requested` via `safeSend()` with dedupe key `auto-file-${sessionId}-retry-${freshRetryCount}` (the returned count from the reset, which will be 0 since reset zeros it — but the formula is written this way so a future change that preserves count still produces a unique key). Homework sessions (`session.sessionType === 'homework'`) keep the existing `app/filing.retry` ladder unchanged.
+- `apps/api/src/routes/filing.ts` - reject/skip filing requests for kept-out sessions. **[HIGH-F]** Verification + test only — no code change. The existing `claimSessionForFilingRetry` CAS (`session-crud.ts:1463-1486`) already returns 409 for any non-`filing_failed` status, including `filing_kept_out`. Add an integration test in `routes/filing.test.ts` that POSTs `/filing/request-retry` against a kept-out session and asserts 409 + the kept-out status in the error message.
+- `apps/api/src/services/filing.ts` - **[CRITICAL-2]** Split `resolveFilingResult()` so it stops touching `learning_sessions`. Today (`filing.ts:813-826`, inside the topic-creation transaction) it unconditionally writes `topicId` and `filedAt`. After this change:
   - `resolveFilingResult()` returns the resolved subject/book/topic IDs only — no side effect on `learning_sessions`.
-  - The synchronous `/filing` POST handler issues its own simple UPDATE (matching today's behavior).
-  - The auto-file Inngest handler issues a **guarded** UPDATE per spec §6 (`WHERE id = $sessionId AND filing_status = 'filing_pending' RETURNING id`) and runs cleanup when 0 rows return. [CRITICAL-3]
-  - Existing `freeform-filing.ts` (manual retry) — keep its UPDATE behavior, but use the new split contract.
-- `apps/api/src/services/session/session-book.ts` - keep `backfillSessionTopicId()` profile-scoped; add null-detach helper if not placed in `session-crud.ts`.
+  - The synchronous `/filing` POST handler (`routes/filing.ts:225` + `:273`) calls the extended `markSessionFiled()` helper (see `session-book.ts` below). **[CRITICAL-A]** `markSessionFiled` must set `topicId` AND `filedAt` AND `updatedAt`. The old `backfillSessionTopicId` only wrote `topicId`; shipping the split without extending it leaves `filedAt = null` on every newly-filed session, and `freeform-filing.ts:56` keys "already filed" off `row.filedAt != null` — so the retry handler would re-fire `fileToLibrary` and double-create the topic.
+  - The auto-file Inngest handler issues a **guarded** UPDATE per spec §6: `WHERE id = $sessionId AND filing_status = 'filing_pending'` SETTING `{ topic_id, filed_at, filing_status = 'filing_recovered', updated_at }` RETURNING id. On 0 rows returned, call `deleteTopicIfSafe()` against the just-created topic. **[CRITICAL-3 / HIGH-E]**
+  - Existing `freeform-filing.ts` (manual retry) — calls `markSessionFiled()` after the new split `resolveFilingResult()`.
+- `apps/api/src/services/session/session-book.ts` - **[CRITICAL-A]** Rename `backfillSessionTopicId(db, profileId, sessionId, topicId)` → `markSessionFiled(db, profileId, sessionId, topicId)`. New body: `UPDATE learning_sessions SET topic_id = $topicId, filed_at = NOW(), updated_at = NOW() WHERE id = $sessionId AND profile_id = $profileId`. Add a JSDoc warning: "Canonical write for 'session is now filed.' After 2026-05-25 callers own this UPDATE because `resolveFilingResult` no longer touches `learning_sessions`. Do NOT add ad-hoc UPDATEs that set only `topicId` — `freeform-filing.ts:56` keys 'already filed' off `filedAt != null` and a partial update will cause re-filing." Update the call site at `routes/filing.ts:274` and the test mock at `routes/filing.test.ts:155`.
 
 ### Inngest
 
 - `apps/api/src/inngest/functions/freeform-filing.ts` - skip `filing_kept_out`; consume the new `resolveFilingResult()` contract (no session UPDATE inside resolver).
 - `apps/api/src/inngest/functions/auto-file-session.ts` - **new** handler for `app/session.auto_file_requested`. [HIGH-1] `filedFrom = 'session_filing'`. Owns the CAS claim, the LLM filing call, and the guarded final UPDATE.
-- `apps/api/src/inngest/functions/filing-stranded-backfill.ts` - **[CRITICAL-1]** Add `(metadata->>'effectiveMode' <> 'freeform' OR exchange_count >= MIN_FREEFORM_FILE_EXCHANGES)` to the WHERE clause so below-threshold freeform sessions are not swept up. The `IS NULL filing_status` filter already excludes `filing_kept_out`; the threshold filter is the new gate. Also exclude kept-out sessions via explicit `filing_status IS DISTINCT FROM 'filing_kept_out'` for clarity even though `IS NULL` covers it.
+- `apps/api/src/inngest/functions/filing-stranded-backfill.ts` - **[CRITICAL-1 / LOW-M]** Add `(metadata->>'effectiveMode' IS DISTINCT FROM 'freeform' OR exchange_count >= FILING_CONFIG.minFreeformExchanges)` to the WHERE clause so below-threshold freeform sessions are not swept up. **Risk framing:** this backfill is operator-fired only (see file header `:16-23` "No automatic trigger by design"), not a cron — the failure mode is "operator manually fires the recovery event after an incident, and the recovery sweeps up 1-2-turn freeform chats that legitimately should stay unfiled." Still a real bug; just not auto-firing in production. The `IS NULL filing_status` filter already excludes `filing_kept_out`; the threshold filter is the new gate. Also exclude kept-out sessions via explicit `filing_status IS DISTINCT FROM 'filing_kept_out'` for clarity even though `IS NULL` covers it.
 - `apps/api/src/inngest/functions/filing-timed-out-observe.ts` - do not mark kept-out sessions failed.
 - `apps/api/src/inngest/functions/filing-completed-observe.ts` - no-op for kept-out sessions.
 - `apps/api/src/inngest/functions/filing-observe.ts` - [MEDIUM-1] audit for `filing_kept_out` handling. This file is part of the filing observer set and was missing from earlier drafts of this plan; review it alongside the other observers.
@@ -160,11 +190,16 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
   - detach session first;
   - delete topic only when `curriculum_topics.sessionId === sessionId`, `filedFrom IN ('freeform_filing', 'session_filing')`, no other session references it, and no `curriculum_topic_progress` / `curriculum_topic_retention` rows reference it (full spec §4 safe-to-delete rule);
   - leave existing/reused topics intact.
-- [ ] Add `restoreSessionForAutoFiling(db, profileId, sessionId)` service. [HIGH-4] Requires `filingStatus = 'filing_kept_out'`; sets `filingStatus = null` and returns the session row so the route can dispatch a fresh `app/session.auto_file_requested`.
-- [ ] **[CRITICAL-2]** Split `resolveFilingResult()` in `apps/api/src/services/filing.ts`: remove the `learning_sessions` UPDATE block (currently lines ~743-757). Update both existing callers — synchronous `/filing` route handler and `freeform-filing.ts` retry — to perform their own simple UPDATE on success. PR 2 will add the guarded UPDATE for the auto-file path.
+- [ ] **[MEDIUM-H]** Create `apps/api/src/config/filing.ts` exporting `FILING_CONFIG.minFreeformExchanges = 3` and `FILING_CONFIG.maxRetries = 3`. Migrate every site that referenced inline `MIN_FREEFORM_FILE_EXCHANGES` / `MAX_FILING_RETRIES` (in this plan's text — none in code yet) to import from here.
+- [ ] **[CRITICAL-A]** Rename `backfillSessionTopicId` → `markSessionFiled(db, profileId, sessionId, topicId)` in `apps/api/src/services/session/session-book.ts`. New body sets `{ topicId, filedAt: new Date(), updatedAt: new Date() }`. Update the single call site at `apps/api/src/routes/filing.ts:274` and the test mock at `apps/api/src/routes/filing.test.ts:155`. Add the JSDoc warning quoted in the Files To Modify section so future contributors don't reintroduce a partial UPDATE.
+- [ ] **[HIGH-C / HIGH-D]** Add `resetFilingForRetry(db, profileId, sessionId)` service. CAS UPDATE: `WHERE id = $sessionId AND profile_id = $profileId AND filing_status IN ('filing_failed', 'filing_kept_out') → filing_status = NULL, filing_retry_count = 0, updated_at = NOW() RETURNING id, filing_retry_count`. Excludes `filing_pending` (in-flight) and `filing_recovered` (no reset needed). Returns the row.
+- [ ] **[HIGH-E]** Add `deleteTopicIfSafe(db, profileId, sessionId, topicId)` in `apps/api/src/services/curriculum/curriculum-topic.ts` (or appropriate service location). Implements the full spec §4 safe-to-delete rule with the broadened `filedFrom IN ('freeform_filing', 'session_filing')` check. Export from barrel. Used by keep-out service AND auto-file handler (PR 2).
+- [ ] Add `restoreSessionForAutoFiling(db, profileId, sessionId)` service. [HIGH-4 / HIGH-D] Requires `filingStatus = 'filing_kept_out'`; internally calls `resetFilingForRetry` so BOTH `filingStatus` and `filingRetryCount` are cleared. Returns the session row.
+- [ ] **[CRITICAL-2]** Split `resolveFilingResult()` in `apps/api/src/services/filing.ts`: remove the `learning_sessions` UPDATE block at lines 813-826 (inside the topic-creation transaction). Update both existing callers — synchronous `/filing` route handler (`routes/filing.ts:225` + `:273`) and `freeform-filing.ts` retry (`:161-175`) — to call `markSessionFiled()` on success. PR 2 will add the guarded UPDATE for the auto-file handler.
 - [ ] Add `POST /sessions/:sessionId/library-filing/keep-out`.
-- [ ] Add `POST /sessions/:sessionId/library-filing/restore`. [HIGH-4] On success, dispatch `app/session.auto_file_requested` via `safeSend()`.
-- [ ] Update retry endpoints to return 409 for `filing_kept_out`.
+- [ ] Add `POST /sessions/:sessionId/library-filing/restore`. [HIGH-4 / MEDIUM-I] On success, dispatch `app/session.auto_file_requested` via `safeSend()` with dedupe key `auto-file-${sessionId}-retry-0`.
+- [ ] **[HIGH-C / MEDIUM-I]** Rework `POST /sessions/:sessionId/retry-filing` for freeform sessions. When `session.metadata.effectiveMode === 'freeform'` (read via `getSessionEffectiveMode`): call `resetFilingForRetry` (not `claimSessionForFilingRetry`), then dispatch `app/session.auto_file_requested` via `safeSend()` with dedupe key `auto-file-${sessionId}-retry-${freshRetryCount}`. Homework path (`sessionType === 'homework'`) is unchanged. Test: a session at terminal `filing_failed` with `filing_retry_count = 3` can be retried (resets count, re-dispatches).
+- [ ] **[HIGH-F]** Verification + test only (no endpoint code change): the existing `claimSessionForFilingRetry` CAS at `session-crud.ts:1463-1486` already returns 409 for any `filing_status ≠ 'filing_failed'`, including `filing_kept_out`. Add an integration test in `apps/api/src/routes/filing.test.ts` that POSTs `/filing/request-retry` against a kept-out session and asserts 409 with the kept-out status in the message.
 - [ ] Update `FilingFailedBanner` data contract tests if the component receives this status.
 
 ### PR 1 Acceptance Criteria
@@ -173,14 +208,20 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 - Given profile B calls keep-out for profile A's session, when the request is processed, then the API returns protected/not-found and does not mutate the row.
 - Given a session is `filing_kept_out`, when retry filing is requested, then the API returns 409 and does not dispatch `app/filing.retry`.
 - Given a session is already attached to an existing Library topic, when keep-out is requested, then the session detaches but the existing topic remains.
-- [HIGH-4] Given a session is `filing_kept_out`, when the user calls `POST /sessions/:sessionId/library-filing/restore`, then `filingStatus` clears to `null` and `app/session.auto_file_requested` is dispatched. Profile B calling restore on profile A's session returns protected/not-found.
-- [CRITICAL-2] Given the synchronous `/filing` POST is called (existing manual path), when it succeeds, then the session is still updated to set `topicId` and `filedAt` — the `resolveFilingResult` split must not regress this. Covered by existing `apps/api/src/routes/filing.test.ts`; add an integration test if not present.
+- [HIGH-4 / HIGH-D] Given a session is `filing_kept_out` AND `filing_retry_count = 3`, when the user calls `POST /sessions/:sessionId/library-filing/restore`, then `filingStatus` clears to `null` AND `filing_retry_count` resets to `0` AND `app/session.auto_file_requested` is dispatched with dedupe key `auto-file-${sessionId}-retry-0`. Profile B calling restore on profile A's session returns protected/not-found.
+- [HIGH-C] Given a freeform session at `filing_failed` with `filing_retry_count = 3`, when the user calls `POST /sessions/:sessionId/retry-filing`, then `resetFilingForRetry` clears both fields AND a fresh `app/session.auto_file_requested` is dispatched. Without HIGH-C, this endpoint returns 429 ("Retry limit reached") forever.
+- [CRITICAL-A / CRITICAL-2] Given the synchronous `/filing` POST is called (existing manual path), when it succeeds, then the session row has BOTH `topicId` set AND `filedAt` set (`markSessionFiled` writes both). Add a positive assertion in `apps/api/src/routes/filing.test.ts` that explicitly reads back `filedAt != null` after a successful POST — without this, the resolver split could silently regress `filedAt` and the next retry would re-file.
 
 ---
 
 ## PR 2 Tasks - Auto-File Freeform Sessions
 
-- [ ] Audit every `learning_sessions` insert path (Ask Anything, regular learning, homework, review) and confirm the freeform entry actually writes `metadata.effectiveMode = 'freeform'`. [HIGH-3] Today `session-crud.ts` defaults to `'learning'`; if any freeform creation path forgets to override, auto-file silently never fires for that path. Add a unit test per insert path that asserts the persisted `effectiveMode`. Read all access through the new `getSessionEffectiveMode` accessor.
+- [ ] Audit every `learning_sessions` insert path and confirm the freeform entry actually writes `metadata.effectiveMode = 'freeform'`. **[HIGH-3 / MEDIUM-L]** Today `session-crud.ts:906` defaults to `effectiveMode: 'learning'`; if any freeform creation path forgets to override, auto-file silently never fires for that path. Target files to audit:
+  - `apps/api/src/services/session/session-crud.ts` — `startSession`, onboarding fast-path, curriculum-first session creation (the `'learning'` default lives here).
+  - `apps/api/src/inngest/functions/*.ts` — any handler that calls `startSession` or inserts into `learning_sessions` directly.
+  - `tests/integration/test-factory/sessions.ts` and any mobile/API test factories that seed sessions — failure here means the integration tests pass on a non-freeform fixture and the regression escapes.
+  - Mobile entry points that hit `POST /sessions` with `mode: 'freeform'` (`apps/mobile/src/app/(app)/_layout.tsx:1024`, `apps/mobile/src/app/create-subject.tsx:266`, `apps/mobile/src/components/home/LearnerScreen.tsx:404`) — verify the API route maps the request body `mode: 'freeform'` to `metadata.effectiveMode: 'freeform'` before insert.
+  Add a unit test per insert path asserting the persisted `metadata.effectiveMode`. Read all access through the new `getSessionEffectiveMode` accessor — never index `metadata` inline.
 - [ ] Add eligibility helper (reads through `getSessionEffectiveMode`):
   - effective mode is freeform;
   - `topicId` is null;
@@ -188,16 +229,16 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
   - `filingStatus` is null;
   - learner exchange count >= `MIN_FREEFORM_FILE_EXCHANGES`;
   - transcript exists.
-- [ ] On session close, enqueue auto-file for eligible sessions. **[HIGH-5]** Dispatch via `safeSend()` with Inngest event dedupe `id: \`auto-file-${sessionId}\`` so concurrent close + summary-load dispatches collapse to one execution.
+- [ ] On session close, enqueue auto-file for eligible sessions. **[HIGH-5 / MEDIUM-I]** Dispatch via `safeSend()` with Inngest event dedupe key `id: \`auto-file-${sessionId}-initial\`` so the close-path dispatch is idempotent against the summary-load opportunistic re-dispatch (if we add one). Retry / restore use a different key (`auto-file-${sessionId}-retry-${retryCount}`) so a fresh user-initiated retry is NEVER collapsed against the initial close dispatch.
 - [ ] **[HIGH-1]** Implement a dedicated `app/session.auto_file_requested` handler in `apps/api/src/inngest/functions/auto-file-session.ts`. Do NOT reuse `freeform-filing.ts` (that handler is `app/filing.retry`, hard-codes `filedFrom = 'freeform_filing'`, and does not implement the spec §6 CAS pattern). Auto-file sets `filedFrom = 'session_filing'`.
 - [ ] Claim the session with a CAS update to `filing_pending` before calling the LLM (`claimSessionForAutoFiling`). On 0 rows returned, exit without dispatching `app/filing.completed`.
-- [ ] Re-read before writes; skip if `filing_kept_out`, already filed, missing, ownership mismatch, or no longer eligible (full spec §6 exit list, including terminal `filing_failed` once `filing_retry_count >= 3`).
-- [ ] [MEDIUM-2] Auto-file shares the existing `filing_retry_count` column with manual retry — increment on each LLM attempt; both ladders cap at the same 3.
+- [ ] Re-read before writes; skip if `filing_kept_out`, already filed, missing, ownership mismatch, or no longer eligible (full spec §6 exit list).
+- [ ] **[CRITICAL-B]** Cap enforcement: after `claimSessionForAutoFiling` succeeds, if `filing_retry_count > FILING_CONFIG.maxRetries`, set `filing_status = 'filing_failed'` and exit — do not call the LLM. **Retry resets the count** (spec §6 line 254) — that reset is owned by `resetFilingForRetry` invoked from the Retry button / restore path; the auto-file handler itself never resets. This replaces the earlier "share the cap, no reset" wording.
 - [ ] Reuse `fileToLibrary()`. Call the new split `resolveFilingResult()` (PR 1) which no longer touches `learning_sessions`.
-- [ ] Final write is a **guarded UPDATE**: `WHERE id = $sessionId AND filing_status = 'filing_pending' RETURNING id`. On 0 rows returned (user keep-out raced), run the spec §4 safe-to-delete check against the topic just created and clean up if applicable. **[CRITICAL-3]** Without this branch, a topic with `sessionId = X` is orphaned in Library while the session is kept-out.
+- [ ] Final write is a **guarded UPDATE** SETTING `{ topic_id, filed_at, filing_status = 'filing_recovered', updated_at }` WHERE `id = $sessionId AND filing_status = 'filing_pending' RETURNING id`. On 0 rows returned (user keep-out raced), call `deleteTopicIfSafe(db, profileId, sessionId, topicId)` from the shared service (PR 1 / HIGH-E) against the topic just created. **[CRITICAL-3 / HIGH-E]** Without this branch, a topic with `sessionId = X` is orphaned in Library while the session is kept-out.
 - [ ] Emit existing `app/filing.completed` on success.
 - [ ] Preserve existing timeout observer behavior for pending/failed states.
-- [ ] **[CRITICAL-1]** Update `filing-stranded-backfill.ts` SELECT to add `(metadata->>'effectiveMode' IS DISTINCT FROM 'freeform' OR exchange_count >= MIN_FREEFORM_FILE_EXCHANGES)`. Without this, the 14-day backfill sweeps up below-threshold tiny freeform chats (which legitimately have `filingStatus = null`) and tries to file them. Add a regression integration test: create a 1-turn freeform session with `filingStatus = null`, run the backfill, assert no synthetic-timeout event was dispatched.
+- [ ] **[CRITICAL-1 / LOW-M]** Update `filing-stranded-backfill.ts` SELECT to add `(metadata->>'effectiveMode' IS DISTINCT FROM 'freeform' OR exchange_count >= FILING_CONFIG.minFreeformExchanges)`. Without this, when an operator manually fires the backfill (file header `:16-23` "Ops-only: fire manually from Inngest dashboard. No automatic trigger by design"), it sweeps up below-threshold freeform chats with `filingStatus = null` and tries to file them. Add a regression integration test: create a 1-turn freeform session with `filingStatus = null`, run the backfill, assert no synthetic-timeout event was dispatched.
 - [ ] Ensure stranded backfill excludes `filing_kept_out` (trivially covered by `filingStatus IS NULL` but add an explicit predicate for readability).
 - [ ] Audit `filing-observe.ts` for `filing_kept_out` handling. [MEDIUM-1]
 
@@ -209,8 +250,9 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 - [CRITICAL-3] Given the user marks keep-out **between** `resolveFilingResult()` (topic created) and the final guarded UPDATE, when the UPDATE returns 0 rows, then the handler runs the spec §4 safe-to-delete check on the just-created topic and removes it if eligible. Integration test must simulate this race.
 - Given filing fails, when observers run, then the session reaches `filing_failed` and the user can retry.
 - Given a freeform session has fewer than 3 learner turns, when it closes, then no Library filing is attempted.
-- [CRITICAL-1] Given a 1-turn freeform session ends with `filingStatus = null` (below threshold), when the 14-day stranded backfill runs, then no `app/session.filing_timed_out` event is dispatched for that session.
-- [HIGH-5] Given two concurrent close+retry events fire for the same session, when both arrive at Inngest, then the `auto-file-${sessionId}` dedupe collapses them and only one CAS claim succeeds.
+- [CRITICAL-1 / LOW-M] Given a 1-turn freeform session ends with `filingStatus = null` (below threshold), when an operator manually fires the stranded backfill, then no `app/session.filing_timed_out` event is dispatched for that session.
+- [HIGH-5 / MEDIUM-I] Given two concurrent close-path dispatches fire for the same session, when both arrive at Inngest, then the `auto-file-${sessionId}-initial` dedupe collapses them and only one CAS claim succeeds. Given a Retry click follows a failed close-path dispatch, the new dispatch key `auto-file-${sessionId}-retry-${count}` is distinct from the initial key so the retry is NOT collapsed as a duplicate.
+- [CRITICAL-B] Given a freeform session reached terminal `filing_failed` with `filing_retry_count = 3`, when the user calls Retry, then `resetFilingForRetry` clears both fields, a fresh `app/session.auto_file_requested` fires, and the auto-file handler runs the LLM call exactly once before the cap kicks in again. Confirms spec §6 line 254 ("Retry resets the count") is shipped, not the older "share the cap" wording.
 
 ---
 
@@ -224,6 +266,7 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
   - success;
   - failed with retry;
   - kept out.
+- [ ] **[MEDIUM-J]** Polling cadence in `useSessionLibraryFiling(sessionId)`: TanStack Query `refetchInterval: 3000`, `refetchIntervalInBackground: false`, `refetchOnWindowFocus: true`. Stop polling when `filingStatus` reaches a terminal value (`filing_recovered`, `filing_failed`, `filing_kept_out`) or after 10 polls (~30s elapsed). On timeout without terminal state, render the same failure copy as `filing_failed` with `Retry`. Matches spec §Failure Modes line 336 ("refetch-on-focus + refetch every 3s, max 10 polls (~30s), then show failure copy with Retry"). Add a unit test that fires 10 ticks and asserts the polling stops.
 - [ ] Add `Keep out of Library` action while pending, failed, or filed.
 - [ ] [HIGH-4] Add `Add to Library` action on kept-out summaries that calls `POST /sessions/:sessionId/library-filing/restore`. After success, the UI returns to the pending state and the user can see auto-file progress.
 - [ ] [MEDIUM-7] Both keep-out and restore mutations must invalidate the relevant TanStack Query keys (`use-sessions`, `use-filing`, session summary detail) on success — without invalidation, the user sees stale filing status until the next refetch-on-focus.
@@ -335,12 +378,20 @@ Run integration tests because this touches DB behavior, profile-scoped session w
 | Risk | Guardrail |
 | --- | --- |
 | Kept-out sessions get filed later by stranded backfill | Terminal `filing_kept_out` state; all filing jobs skip it. |
-| **[CRITICAL-1]** Below-threshold freeform sessions (1-2 turns) get swept up by 14-day stranded backfill | Backfill SELECT adds `effectiveMode <> 'freeform' OR exchange_count >= MIN_FREEFORM_FILE_EXCHANGES`; regression integration test. |
-| **[CRITICAL-2]** `resolveFilingResult` unconditionally writes session row, breaking the §6 opt-out race guard for every caller | Split the function so callers own the session UPDATE; auto-file handler uses the CAS WHERE clause. |
-| **[CRITICAL-3]** User taps Keep Out between topic creation and final session UPDATE → orphan topic in Library | Auto-file handler runs the §4 safe-to-delete check whenever the guarded UPDATE returns 0 rows. |
-| **[HIGH-5]** Two concurrent dispatches (close + retry, mobile retry + summary load) cause double execution | Inngest dedupe `id: auto-file-${sessionId}` + CAS UPDATE in the handler. |
-| **[HIGH-4]** User accidentally taps Keep Out and is permanently locked out | `POST /library-filing/restore` endpoint + `Add to Library` button on kept-out summaries. |
-| **[HIGH-3]** Freeform create paths forget to set `metadata.effectiveMode = 'freeform'` → eligibility helper rejects everything | Per-insert-path unit test; typed `getSessionEffectiveMode` accessor is the only allowed read site. |
+| **[CRITICAL-A]** Splitting `resolveFilingResult` regresses `filedAt` because `backfillSessionTopicId` only wrote `topicId` — `freeform-filing.ts:56` then re-fires the LLM and double-creates the topic | Rename to `markSessionFiled`; new body writes `{ topicId, filedAt, updatedAt }`; JSDoc warning; positive `filedAt != null` assertion in `routes/filing.test.ts`. |
+| **[CRITICAL-B]** Earlier plan wording ("share the 3-attempt cap, no reset") contradicted spec §6 line 254 ("Retry resets the count") → Retry button would die at the cap | Single `resetFilingForRetry` service owns the reset; Retry button and restore both route through it. |
+| **[CRITICAL-1 / LOW-M]** Below-threshold freeform sessions (1-2 turns) get swept up when an operator manually fires the stranded backfill | Backfill SELECT adds `effectiveMode <> 'freeform' OR exchange_count >= FILING_CONFIG.minFreeformExchanges`; regression integration test. |
+| **[CRITICAL-2]** `resolveFilingResult` unconditionally writes session row, breaking the §6 opt-out race guard for every caller | Split the function so callers own the session UPDATE; auto-file handler uses the CAS WHERE clause; sync route uses `markSessionFiled`. |
+| **[CRITICAL-3 / HIGH-E]** User taps Keep Out between topic creation and final session UPDATE → orphan topic in Library | Auto-file handler calls the shared `deleteTopicIfSafe()` helper whenever the guarded UPDATE returns 0 rows. Same helper is used by the keep-out service so the §4 rule lives in exactly one place. |
+| **[HIGH-C]** Terminal `filing_failed` sessions had no path out (`claimSessionForAutoFiling` CAS rejects non-NULL filing_status) → Retry button is dead UI after the 3rd failure | Retry endpoint routes through `resetFilingForRetry` (clears `filing_status` AND `filing_retry_count`); homework retry path unchanged. |
+| **[HIGH-D]** Restoring a kept-out session that previously exhausted retries leaves `filing_retry_count = 3` → next LLM error pushes it straight back to terminal failed | `restoreSessionForAutoFiling` calls `resetFilingForRetry` so both fields clear together. |
+| **[HIGH-5 / MEDIUM-I]** Two concurrent dispatches (close + summary load) cause double execution; a user retry collapses against the original initial dispatch | Initial close dispatch uses dedupe key `auto-file-${sessionId}-initial`; retry/restore dispatches use `auto-file-${sessionId}-retry-${count}` — distinct keys keep retries from being suppressed. |
+| **[HIGH-4]** User accidentally taps Keep Out and is permanently locked out | `POST /library-filing/restore` endpoint + `Add to Library` button on kept-out summaries; restore clears both `filing_status` and `filing_retry_count`. |
+| **[HIGH-3 / MEDIUM-L]** Freeform create paths forget to set `metadata.effectiveMode = 'freeform'` → eligibility helper rejects everything | Per-insert-path unit test against the enumerated list of insert sites (PR 2 audit task); typed `getSessionEffectiveMode` accessor is the only allowed read site. |
+| **[MEDIUM-G]** Spec §4 safe-to-delete rule (line 165) requires `filedFrom = 'freeform_filing'` but spec §5 sets auto-file topics to `'session_filing'` → as-written §4 never fires for auto-filed topics | Plan's `deleteTopicIfSafe` broadens to `IN ('freeform_filing', 'session_filing')`; matching spec edit recorded in Amendments block. |
+| **[MEDIUM-H]** Inline `MIN_FREEFORM_FILE_EXCHANGES` constant duplicated across multiple files would drift, and CLAUDE.md G4 forbids raw `process.env` reads | Single typed config object `apps/api/src/config/filing.ts` exports `FILING_CONFIG`; all sites import. |
+| **[MEDIUM-J]** Async auto-file with no polling spec leaves Summary stuck on "Adding to your Library..." forever | `useSessionLibraryFiling` polls every 3s, stops on terminal state or after 10 polls (~30s), then shows failure copy with Retry. |
+| **[MEDIUM-K]** Spec opens with "ask-first, low-friction" promise but the Unsorted auto-subject that delivers it is deferred → users still hit upfront subject creation after PR 3 ships | Plan In Scope/Out Of Scope block now explicitly says the §1 promise is unshipped after PR 3; no PR description, changelog, or memory entry should claim "ask-first is done." |
 | Keep-out deletes a session through topic cascade | Detach `learning_sessions.topicId` before any topic cleanup. |
 | Existing Library topics are deleted when the user only meant this session | Delete only auto-created topic rows with matching `sessionId`, `filedFrom IN ('freeform_filing','session_filing')`, and no other session/progress/retention references. |
 | Filing status banner renders weird unknown state | Update schema, hooks, and `FilingFailedBanner` together. |
