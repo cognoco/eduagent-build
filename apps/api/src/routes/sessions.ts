@@ -160,6 +160,8 @@ type SessionRouteEnv = {
     quotaDecrementSource: 'monthly' | 'top_up' | undefined;
     /** [CR-2026-05-19-C6] Set by metering middleware when source is top_up. */
     quotaDecrementTopUpCreditId: string | undefined;
+    quotaRemainingTurns: number | undefined;
+    quotaFractionRemaining: number | undefined;
   };
 };
 
@@ -445,6 +447,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       const llmTier = c.get('llmTier');
       const subscriptionTier = c.get('subscriptionTier');
+      const quotaRemainingTurns = c.get('quotaRemainingTurns');
+      const quotaFractionRemaining = c.get('quotaFractionRemaining');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
         c.env.MEMORY_FACTS_READ_ENABLED,
       );
@@ -461,6 +465,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           {
             llmTier,
             subscriptionTier,
+            quotaRemainingTurns,
+            quotaFractionRemaining,
             voyageApiKey: c.env.VOYAGE_API_KEY,
             clientId,
             memoryFactsReadEnabled,
@@ -622,6 +628,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       const llmTier = c.get('llmTier');
       const subscriptionTier = c.get('subscriptionTier');
+      const quotaRemainingTurns = c.get('quotaRemainingTurns');
+      const quotaFractionRemaining = c.get('quotaFractionRemaining');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
         c.env.MEMORY_FACTS_READ_ENABLED,
       );
@@ -638,6 +646,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           {
             llmTier,
             subscriptionTier,
+            quotaRemainingTurns,
+            quotaFractionRemaining,
             voyageApiKey: c.env.VOYAGE_API_KEY,
             clientId,
             memoryFactsReadEnabled,
@@ -704,6 +714,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   {
                     llmTier,
                     subscriptionTier,
+                    quotaRemainingTurns,
+                    quotaFractionRemaining,
                     voyageApiKey: c.env.VOYAGE_API_KEY,
                     clientId,
                     memoryFactsReadEnabled,
@@ -1053,6 +1065,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               {
                 llmTier,
                 subscriptionTier,
+                quotaRemainingTurns,
+                quotaFractionRemaining,
                 voyageApiKey: c.env.VOYAGE_API_KEY,
                 clientId,
                 memoryFactsReadEnabled,

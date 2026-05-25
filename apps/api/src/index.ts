@@ -87,6 +87,7 @@ import { feedbackRoutes } from './routes/feedback';
 import { supportRoutes } from './routes/support';
 import { librarySearchRoutes } from './routes/library-search';
 import { maintenanceRoutes } from './routes/maintenance';
+import { challengeRoundRoutes } from './routes/challenge-round';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -129,6 +130,8 @@ type Variables = {
   subscriptionId: string;
   subscriptionTier: SubscriptionTier | undefined;
   llmTier: LLMTier;
+  quotaRemainingTurns: number | undefined;
+  quotaFractionRemaining: number | undefined;
 };
 
 type Env = { Bindings: Bindings; Variables: Variables };
@@ -283,7 +286,8 @@ const routes = api
   .route('/', quizRoutes)
   .route('/', feedbackRoutes)
   .route('/support', supportRoutes)
-  .route('/', librarySearchRoutes);
+  .route('/', librarySearchRoutes)
+  .route('/', challengeRoundRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.

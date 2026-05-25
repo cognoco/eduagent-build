@@ -2564,6 +2564,61 @@ describe('buildUserContent', () => {
   });
 });
 
+describe('parseExchangeEnvelope Challenge Round pass-through', () => {
+  const ctx = { sessionId: 's1', profileId: 'p1', flow: 'processExchange' };
+
+  it('forwards offer, evaluation, and note draft fields from the envelope', () => {
+    const answerEventId = '550e8400-e29b-41d4-a716-446655440010';
+    const raw = JSON.stringify({
+      reply: 'Want a challenge round?',
+      signals: {
+        challenge_round_offer: true,
+        challenge_round_evaluation: [
+          {
+            concept: 'inputs and energy',
+            result: 'solid',
+            evidence: 'The learner connected inputs to energy.',
+            answerEventId,
+            learnerQuote: 'Cells use inputs to make energy.',
+          },
+        ],
+      },
+      ui_hints: {
+        note_draft: {
+          content: 'Cells use inputs to make energy.',
+          source_concepts: ['inputs and energy'],
+          source_answer_event_ids: [answerEventId],
+        },
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.challengeRoundOffer).toBe(true);
+    expect(result.challengeRoundEvaluation).toEqual([
+      expect.objectContaining({
+        concept: 'inputs and energy',
+        result: 'solid',
+        answerEventId,
+        learnerQuote: 'Cells use inputs to make energy.',
+      }),
+    ]);
+    expect(result.noteDraft).toEqual({
+      content: 'Cells use inputs to make energy.',
+      source_concepts: ['inputs and energy'],
+      source_answer_event_ids: [answerEventId],
+    });
+  });
+
+  it('returns safe empty Challenge Round fields on parse fallback', () => {
+    const result = parseExchangeEnvelope('{"signals":', ctx);
+
+    expect(result.challengeRoundOffer).toBe(false);
+    expect(result.challengeRoundEvaluation).toEqual([]);
+    expect(result.noteDraft).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Bug #348: envelope assessment signals must be surfaced onto
 // ParsedExchangeEnvelope so persistExchangeResult can write them under

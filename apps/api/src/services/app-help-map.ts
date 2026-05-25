@@ -130,6 +130,9 @@ interface ParsedSignals {
   needsDeepening: boolean;
   notePrompt: boolean;
   notePromptPostSession: boolean;
+  challengeRoundOffer?: boolean;
+  challengeRoundEvaluation?: unknown[];
+  noteDraft?: unknown | null;
   fluencyDrill: unknown;
   readyToFinish: boolean;
 }
@@ -142,6 +145,9 @@ export function applyAppHelpSignalGuard<T extends ParsedSignals>(parsed: T): T {
     understandingCheck: false,
     notePrompt: false,
     notePromptPostSession: false,
+    challengeRoundOffer: false,
+    challengeRoundEvaluation: [],
+    noteDraft: null,
     readyToFinish: false,
     fluencyDrill: null,
   };

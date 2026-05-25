@@ -30,6 +30,8 @@ import {
   type ExchangeFallbackReason,
   type LlmResponseEnvelope,
   type ExtractedInterviewSignals,
+  type ChallengeRoundEvaluationItem,
+  type ChallengeRoundNoteDraftHint,
 } from '@eduagent/schemas';
 import type { LLMTier } from './subscription';
 import {
@@ -252,6 +254,8 @@ export interface ExchangeContext {
   llmProviderPolicy?: LlmProviderPolicy;
   /** Human-readable routing reason stored in session metadata for observability. */
   llmRoutingReason?: string;
+  /** Optional routing-only rung. Leaves escalationRung available for pedagogy/analytics. */
+  llmRoutingRung?: EscalationRung;
   // BKT-C.1 — profile-level personalization surfaced to the router. Separate
   // from the per-subject `nativeLanguage` (used for L1-aware grammar in
   // language-learning flows). `conversationLanguage` applies universally; in
@@ -321,6 +325,12 @@ export interface ExchangeResult {
   notePrompt?: boolean;
   /** Whether the note prompt is a post-session prompt */
   notePromptPostSession?: boolean;
+  /** Challenge Round: LLM proposed an offer; server-side caller still gates it. */
+  challengeRoundOffer?: boolean;
+  /** Challenge Round: per-concept learner-answer evaluations. */
+  challengeRoundEvaluation?: ChallengeRoundEvaluationItem[];
+  /** Challenge Round: note draft UI hint, validated later before surfacing. */
+  noteDraft?: ChallengeRoundNoteDraftHint | null;
   /** Fluency drill annotation (language sessions only) */
   fluencyDrill?: FluencyDrillAnnotation;
   /** F6: LLM self-reported confidence level. Absent means treat as 'medium'. */
@@ -1278,23 +1288,20 @@ export async function processExchange(
   ];
 
   const ageBracket = resolveAgeBracket(context.birthYear);
-  const result: RouteResult = await routeAndCall(
-    messages,
-    context.escalationRung,
-    {
-      llmTier: context.llmTier,
-      preferredProvider: context.preferredLlmProvider,
-      providerPolicy: context.llmProviderPolicy,
-      ageBracket,
-      // BKT-C.1 — forward profile-level personalization to the router so the
-      // safety preamble carries it on every provider uniformly.
-      conversationLanguage: context.conversationLanguage,
-      pronouns: context.pronouns,
-      flow: 'exchange.process',
-      sessionId: context.sessionId,
-      responseFormat: 'json',
-    },
-  );
+  const routingRung = context.llmRoutingRung ?? context.escalationRung;
+  const result: RouteResult = await routeAndCall(messages, routingRung, {
+    llmTier: context.llmTier,
+    preferredProvider: context.preferredLlmProvider,
+    providerPolicy: context.llmProviderPolicy,
+    ageBracket,
+    // BKT-C.1 — forward profile-level personalization to the router so the
+    // safety preamble carries it on every provider uniformly.
+    conversationLanguage: context.conversationLanguage,
+    pronouns: context.pronouns,
+    flow: 'exchange.process',
+    sessionId: context.sessionId,
+    responseFormat: 'json',
+  });
 
   const parsed = parseExchangeEnvelope(result.response, {
     sessionId: context.sessionId,
@@ -1334,6 +1341,9 @@ export async function processExchange(
     latencyMs: result.latencyMs,
     notePrompt: finalParsed.notePrompt || undefined,
     notePromptPostSession: finalParsed.notePromptPostSession || undefined,
+    challengeRoundOffer: finalParsed.challengeRoundOffer || undefined,
+    challengeRoundEvaluation: finalParsed.challengeRoundEvaluation,
+    noteDraft: finalParsed.noteDraft,
     fluencyDrill: finalParsed.fluencyDrill ?? undefined,
     confidence: finalParsed.confidence,
     retrievalScore: finalParsed.retrievalScore,
@@ -1387,21 +1397,18 @@ export async function streamExchange(
   ];
 
   const ageBracket = resolveAgeBracket(context.birthYear);
-  const result: StreamResult = await routeAndStream(
-    messages,
-    context.escalationRung,
-    {
-      llmTier: context.llmTier,
-      preferredProvider: context.preferredLlmProvider,
-      providerPolicy: context.llmProviderPolicy,
-      ageBracket,
-      conversationLanguage: context.conversationLanguage,
-      pronouns: context.pronouns,
-      flow: 'exchange.stream',
-      sessionId: context.sessionId,
-      responseFormat: 'json',
-    },
-  );
+  const routingRung = context.llmRoutingRung ?? context.escalationRung;
+  const result: StreamResult = await routeAndStream(messages, routingRung, {
+    llmTier: context.llmTier,
+    preferredProvider: context.preferredLlmProvider,
+    providerPolicy: context.llmProviderPolicy,
+    ageBracket,
+    conversationLanguage: context.conversationLanguage,
+    pronouns: context.pronouns,
+    flow: 'exchange.stream',
+    sessionId: context.sessionId,
+    responseFormat: 'json',
+  });
 
   const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
     result.stream,
@@ -1434,6 +1441,12 @@ export interface ParsedExchangeEnvelope {
   needsDeepening: boolean;
   notePrompt: boolean;
   notePromptPostSession: boolean;
+  /** Challenge Round: model proposed an offer; caller gates eligibility. */
+  challengeRoundOffer: boolean;
+  /** Challenge Round: per-concept answer evaluations. */
+  challengeRoundEvaluation: ChallengeRoundEvaluationItem[];
+  /** Challenge Round: learner-reviewed note draft hint from the envelope. */
+  noteDraft: ChallengeRoundNoteDraftHint | null;
   fluencyDrill: FluencyDrillAnnotation | null;
   /** F6: LLM self-reported confidence level. Absent means treat as 'medium'. */
   confidence?: 'low' | 'medium' | 'high';
@@ -1482,6 +1495,9 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   needsDeepening: false,
   notePrompt: false,
   notePromptPostSession: false,
+  challengeRoundOffer: false,
+  challengeRoundEvaluation: [],
+  noteDraft: null,
   fluencyDrill: null,
   confidence: undefined,
   retrievalScore: undefined,
@@ -1611,6 +1627,9 @@ export function parseExchangeEnvelope(
       needsDeepening: false,
       notePrompt: false,
       notePromptPostSession: false,
+      challengeRoundOffer: false,
+      challengeRoundEvaluation: [],
+      noteDraft: null,
       fluencyDrill: null,
       readyToFinish: false,
       envelopeParseFailed: true,
@@ -1667,6 +1686,9 @@ function envelopeToParsedExchange(
     needsDeepening: signals.needs_deepening === true,
     notePrompt: notePrompt?.show === true,
     notePromptPostSession: notePrompt?.post_session === true,
+    challengeRoundOffer: signals.challenge_round_offer === true,
+    challengeRoundEvaluation: signals.challenge_round_evaluation ?? [],
+    noteDraft: uiHints.note_draft ?? null,
     fluencyDrill,
     confidence: envelope.confidence,
     privateSources: envelope.private_sources,
