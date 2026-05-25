@@ -47,24 +47,19 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../lib/theme',
-  /* The route uses useThemeColors() which depends on ThemeContext +
-     accent-preset resolution. The test does not exercise theming; stub it
-     out with a stable color object so the component renders deterministically. */
-  () => ({
-    useThemeColors: () => ({
-      background: '#000',
-      surface: '#111',
-      surfaceElevated: '#222',
-      textPrimary: '#fff',
-      textSecondary: '#aaa',
-      textInverse: '#000',
-      accent: '#0af',
-      border: '#333',
-    }),
+jest.mock('../../lib/theme', () => ({
+  // gc1-allow: ThemeProvider requires ThemeContext + accent-preset hooks the unit test does not exercise; stub returns stable color object for deterministic rendering
+  useThemeColors: () => ({
+    background: '#000',
+    surface: '#111',
+    surfaceElevated: '#222',
+    textPrimary: '#fff',
+    textSecondary: '#aaa',
+    textInverse: '#000',
+    accent: '#0af',
+    border: '#333',
   }),
-);
+}));
 
 describe('<WelcomeIntro />', () => {
   beforeEach(() => {

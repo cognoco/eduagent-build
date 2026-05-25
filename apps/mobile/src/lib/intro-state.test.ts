@@ -8,7 +8,7 @@ import {
 import * as SecureStore from './secure-storage';
 import { track } from './analytics';
 
-jest.mock('./analytics', () => ({ track: jest.fn() }));
+jest.mock('./analytics', () => ({ track: jest.fn() })); // gc1-allow: track() is the assertion surface for the SecureStore-write-failure metric. Pattern A would require spying on the Sentry breadcrumb the real `track()` emits, adding Sentry mock plumbing to a unit test that only needs to observe one event.
 
 const setItemSpy = jest.spyOn(SecureStore, 'setItemAsync');
 
