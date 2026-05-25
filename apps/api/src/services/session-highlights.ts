@@ -2,7 +2,11 @@
 // Session Insights — parent-facing recap generation for completed sessions
 // ---------------------------------------------------------------------------
 
-import { ENGAGEMENT_SIGNALS, type EngagementSignal } from '@eduagent/schemas';
+import {
+  ENGAGEMENT_SIGNALS,
+  type AgeBracket,
+  type EngagementSignal,
+} from '@eduagent/schemas';
 import { routeAndCall } from './llm/router';
 import { escapeXml } from './llm/sanitize';
 import { createLogger } from './logger';
@@ -237,6 +241,7 @@ export function buildSessionInsightsUserPrompt(transcript: string): string {
 
 export async function generateSessionInsights(
   transcript: string,
+  options?: { ageBracket?: AgeBracket },
 ): Promise<SessionInsightsResult> {
   const userPrompt = buildSessionInsightsUserPrompt(transcript);
 
@@ -247,6 +252,7 @@ export async function generateSessionInsights(
         { role: 'user', content: userPrompt },
       ],
       2,
+      { ageBracket: options?.ageBracket },
     );
 
     return validateSessionInsights(result.response);

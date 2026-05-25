@@ -5,6 +5,7 @@ import {
   evaluateFailureActionSchema,
   assessmentEligibleTopicSchema,
   retentionCardSchema,
+  relearnTopicSchema,
   verificationTypeSchema,
 } from './assessments.js';
 
@@ -237,5 +238,42 @@ describe('assessmentEligibleTopicSchema', () => {
         topicDescription: undefined,
       }),
     ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// relearnTopicSchema
+// ---------------------------------------------------------------------------
+
+describe('relearnTopicSchema', () => {
+  it('accepts same-method relearn requests without preferredMethod', () => {
+    expect(
+      relearnTopicSchema.parse({
+        topicId: TEST_UUID,
+        method: 'same',
+      }),
+    ).toEqual({
+      topicId: TEST_UUID,
+      method: 'same',
+    });
+  });
+
+  it("requires preferredMethod when method is 'different'", () => {
+    const result = relearnTopicSchema.safeParse({
+      topicId: TEST_UUID,
+      method: 'different',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ['preferredMethod'],
+            message: "preferredMethod is required when method is 'different'",
+          }),
+        ]),
+      );
+    }
   });
 });

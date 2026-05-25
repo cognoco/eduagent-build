@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 import { sessionTranscriptSchema } from './sessions';
 
 const llmSummaryBaseSchema = z.object({
@@ -59,7 +60,7 @@ export type ArchivedTranscriptSummary = z.infer<
 
 export const archivedTranscriptResponseSchema = z.object({
   archived: z.literal(true),
-  archivedAt: z.string().datetime(),
+  archivedAt: isoDateField,
   summary: archivedTranscriptSummarySchema,
 });
 export type ArchivedTranscriptResponse = z.infer<

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import { View, Text, type TextStyle } from 'react-native';
 import Animated, {
   FadeIn,
@@ -255,7 +255,29 @@ const VERIFICATION_BADGE_CONFIG: Record<VerificationBadge, { label: string }> =
     teach_back: { label: 'TEACH-BACK CLEARED' },
   };
 
-export function MessageBubble({
+// Custom comparator: re-render only when props that affect output change.
+// Deliberately excludes `actions` from the stable-reference check because
+// callers may pass inline JSX — fall back to reference equality for that prop.
+// Animated.View's `entering` prop (FadeInUp) only fires on mount, so memo
+// does not interfere with the enter animation; shared-value animations
+// (ThinkingDot, BlinkingCursor) live in child components and are unaffected.
+function areEqualMessageBubble(
+  prev: MessageBubbleProps,
+  next: MessageBubbleProps,
+): boolean {
+  return (
+    prev.sender === next.sender &&
+    prev.content === next.content &&
+    prev.streaming === next.streaming &&
+    prev.outboxStatus === next.outboxStatus &&
+    prev.escalationRung === next.escalationRung &&
+    prev.verificationBadge === next.verificationBadge &&
+    prev.actions === next.actions &&
+    prev.testID === next.testID
+  );
+}
+
+export const MessageBubble = memo(function MessageBubble({
   sender,
   content,
   streaming,
@@ -390,4 +412,4 @@ export function MessageBubble({
       ) : null}
     </Animated.View>
   );
-}
+}, areEqualMessageBubble);

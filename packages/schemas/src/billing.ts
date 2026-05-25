@@ -35,18 +35,22 @@ export const subscriptionSchema = z.object({
 });
 export type Subscription = z.infer<typeof subscriptionSchema>;
 
-export const checkoutRequestSchema = z.object({
-  tier: paidTierSchema,
-  interval: billingIntervalSchema,
-});
+export const checkoutRequestSchema = z
+  .object({
+    tier: paidTierSchema,
+    interval: billingIntervalSchema,
+  })
+  .strict();
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 
-export const topUpRequestSchema = z.object({
-  amount: z.literal(500),
-});
+export const topUpRequestSchema = z
+  .object({
+    amount: z.literal(500),
+  })
+  .strict();
 export type TopUpRequest = z.infer<typeof topUpRequestSchema>;
 
-export const byokWaitlistSchema = z.object({});
+export const byokWaitlistSchema = z.object({}).strict();
 export type ByokWaitlistInput = z.infer<typeof byokWaitlistSchema>;
 
 export const usageProfileBreakdownRowSchema = z.object({
@@ -113,14 +117,18 @@ export const cancelResponseSchema = z.object({
 });
 export type CancelResponse = z.infer<typeof cancelResponseSchema>;
 
-export const familyAddProfileSchema = z.object({
-  profileId: z.string().uuid(),
-});
+export const familyAddProfileSchema = z
+  .object({
+    profileId: z.string().uuid(),
+  })
+  .strict();
 export type FamilyAddProfileInput = z.infer<typeof familyAddProfileSchema>;
 
-export const familyRemoveProfileSchema = z.object({
-  profileId: z.string().uuid(),
-});
+export const familyRemoveProfileSchema = z
+  .object({
+    profileId: z.string().uuid(),
+  })
+  .strict();
 export type FamilyRemoveProfileInput = z.infer<
   typeof familyRemoveProfileSchema
 >;

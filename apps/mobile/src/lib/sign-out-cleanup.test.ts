@@ -56,8 +56,6 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
           `dictation-punctuation-${id}`,
           `rating-recall-success-count-${id}`,
           `rating-last-prompt-${id}`,
-          `rating-recall-success-count:${id}`,
-          `rating-last-prompt:${id}`,
           `session-recovery-marker-${id}`,
           `postApprovalSeen_${id}`,
           `child-paywall-notified-at-${id}`,

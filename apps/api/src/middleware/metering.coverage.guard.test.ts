@@ -58,7 +58,7 @@ const LLM_CALL_REGEX = /\b(?:routeAndCall|routeAndStream)\b/;
 
 // Files to skip during scan. Keep in sync with the rationale comment above.
 function shouldSkipFile(absolutePath: string): boolean {
-  const rel = relative(REPO_ROOT, absolutePath);
+  const rel = relative(REPO_ROOT, absolutePath).replace(/\\/g, '/');
   if (rel.endsWith('.test.ts') || rel.endsWith('.test.tsx')) return true;
   if (rel.includes('/test-utils/')) return true;
   // services/llm/* is the LLM router implementation. Its internal call sites

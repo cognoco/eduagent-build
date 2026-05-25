@@ -512,10 +512,9 @@ describe('[BUG-212] topicNoteSchema and noteResponseSchema share a single base',
     }
   });
 
-  // BUG-CANDIDATE: noteResponseSchema uses z.string().datetime() directly — it
-  // does NOT accept Date objects from Drizzle rows, unlike bookNotesResponseSchema
-  // and topicNotesResponseSchema which both use _noteDbRowSchema (with _dateField).
-  // Fix: change noteResponseSchema createdAt/updatedAt to use _dateField union.
+  // Regression guard (BUG-205 / BUG-212 / BUG-747): noteResponseSchema must
+  // accept raw Date objects from neon-serverless Drizzle rows — same contract
+  // as bookNotesResponseSchema / topicNotesResponseSchema (all use isoDateField).
   it('noteResponseSchema accepts Date objects (BUG-205 / BUG-212 unification)', () => {
     const parsed = noteResponseSchema.parse({
       id: UUID,

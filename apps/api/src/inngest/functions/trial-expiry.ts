@@ -132,20 +132,21 @@ async function sendTrialNotificationToAccountOwner(
 export const trialExpiry = inngest.createFunction(
   { id: 'trial-expiry-check', name: 'Check and process trial expirations' },
   { cron: '0 0 * * *' }, // Daily at midnight
-  async ({ step }) => {
-    // [BUG-189] now + today computed INSIDE step.run so Inngest memoises them
-    // as ISO strings on the step's cached result. Computing them in the outer
-    // handler causes the closure to recompute new Date() to a later wall-clock
-    // value on replay while the cached step output still reflects the original
-    // boundary. Downstream step.run callbacks reconstruct `now` from `nowIso`.
-    // Pattern mirrors transcript-purge-cron.ts:39-41 (BUG-189).
-    const { nowIso, today } = await step.run('compute-today', async () => {
-      const computedNow = new Date();
-      return {
-        nowIso: computedNow.toISOString(),
-        today: computedNow.toISOString().slice(0, 10),
-      };
-    });
+  async ({ event, step }) => {
+    // [BUG-762] Derive `now` from `event.ts` (Inngest event timestamp) instead
+    // of `Date.now()` captured at function entry. `event.ts` is stable across
+    // function replays (it's the cron-fire timestamp persisted by Inngest), so
+    // every replay produces the same `today` boundary. Previously the
+    // step.run('compute-today') memoization protected `today` from re-derivation
+    // on retry, but the FIRST execution still latched `Date.now()` at function
+    // entry — meaning a function that started near the day boundary could
+    // record `today` as the day BEFORE the cron actually fired. Tying to
+    // event.ts removes that entry-time drift entirely. Pattern mirrors the
+    // [BUG-189] family of fixes (transcript-purge-cron.ts) but uses the event
+    // timestamp as the authoritative source instead of step.run memoization.
+    const eventTs = new Date(event.ts ?? Date.now());
+    const nowIso = eventTs.toISOString();
+    const today = nowIso.slice(0, 10);
 
     // Step 1: Transition trials that just ended → extended trial (soft landing)
     // Instead of going directly to free, users get 15 questions/day for 14 more days.

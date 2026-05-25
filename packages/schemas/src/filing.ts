@@ -31,6 +31,7 @@ export const filingRequestSchema = z
     pickedSuggestionId: z.string().uuid().optional(),
     usedTopicSuggestionId: z.string().uuid().optional(),
   })
+  .strict()
   .refine((data) => data.rawInput || data.sessionTranscript || data.sessionId, {
     message: 'Either rawInput, sessionTranscript, or sessionId is required',
   });

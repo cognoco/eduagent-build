@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, memo, useMemo, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -525,14 +525,17 @@ function ChildActionButton({
   );
 }
 
-function ChildCommandCard({
+// React.memo prevents re-renders when parent re-renders but this child's
+// props haven't changed. The dispatch callbacks (onNavigateToProfile etc.)
+// are stable useCallback refs created by the parent, so shallow-equal holds.
+const ChildCommandCard = memo(function ChildCommandCard({
   child,
   conversationPrompts,
   dashboardChild,
   tint,
-  onOpenProfile,
-  onOpenProgress,
-  onOpenReports,
+  onNavigateToProfile,
+  onNavigateToProgress,
+  onNavigateToReports,
   onOpenNudge,
   t,
 }: {
@@ -540,24 +543,43 @@ function ChildCommandCard({
   conversationPrompts: TonightPrompt[];
   dashboardChild: DashboardChild | undefined;
   tint: SubjectTint | undefined;
-  onOpenProfile: () => void;
-  onOpenProgress: () => void;
-  onOpenReports: () => void;
-  onOpenNudge: () => void;
+  // Stable dispatch callbacks — each receives childId so the parent can
+  // define them once as useCallback without creating per-child closures.
+  onNavigateToProfile: (childId: string) => void;
+  onNavigateToProgress: (childId: string) => void;
+  onNavigateToReports: (childId: string) => void;
+  onOpenNudge: (childId: string) => void;
   t: Translate;
 }): React.ReactElement {
   const colors = useThemeColors();
   const accent = tint?.solid ?? colors.primary;
   const softAccent = tint?.soft ?? colors.primarySoft;
-  const handleOpenProfile = (event?: GestureResponderEvent): void => {
-    event?.stopPropagation();
-    onOpenProfile();
-  };
+
+  // Stable per-instance handlers — bound to this child's id so memo is safe.
+  const handleOpenProfile = useCallback(
+    (event?: GestureResponderEvent): void => {
+      event?.stopPropagation();
+      onNavigateToProfile(child.id);
+    },
+    [child.id, onNavigateToProfile],
+  );
+  const handleOpenProgress = useCallback(
+    () => onNavigateToProgress(child.id),
+    [child.id, onNavigateToProgress],
+  );
+  const handleOpenReports = useCallback(
+    () => onNavigateToReports(child.id),
+    [child.id, onNavigateToReports],
+  );
+  const handleOpenNudge = useCallback(
+    () => onOpenNudge(child.id),
+    [child.id, onOpenNudge],
+  );
 
   return (
     <View className="rounded-card px-4 py-4 bg-surface">
       <Pressable
-        onPress={onOpenProgress}
+        onPress={handleOpenProgress}
         className="flex-row items-center bg-background rounded-button px-3 py-3"
         style={{
           borderColor: accent + '24',
@@ -615,21 +637,21 @@ function ChildCommandCard({
           accentColor={accent}
           icon="stats-chart-outline"
           label={t('home.parent.childCard.progressAction')}
-          onPress={onOpenProgress}
+          onPress={handleOpenProgress}
           testID={`parent-home-child-progress-${child.id}`}
         />
         <ChildActionButton
           accentColor={accent}
           icon="document-text-outline"
           label={t('home.parent.childCard.reportsAction')}
-          onPress={onOpenReports}
+          onPress={handleOpenReports}
           testID={`parent-home-weekly-report-${child.id}`}
         />
         <ChildActionButton
           accentColor={accent}
           icon="heart-outline"
           label={t('home.parent.childCard.nudgeAction')}
-          onPress={onOpenNudge}
+          onPress={handleOpenNudge}
           testID={`parent-home-send-nudge-${child.id}`}
         />
       </View>
@@ -641,7 +663,7 @@ function ChildCommandCard({
       />
     </View>
   );
-}
+});
 
 interface FamilySummaryRow {
   key: string;
@@ -954,6 +976,13 @@ export function ParentHomeScreen({
     [router],
   );
 
+  // Stable dispatch for the nudge sheet — avoids a new inline arrow per child
+  // on every render, which would defeat ChildCommandCard's React.memo.
+  const handleOpenNudge = useCallback(
+    (childId: string): void => setSheetChildId(childId),
+    [],
+  );
+
   const parentInitial = initialOf(activeProfile?.displayName ?? firstName);
 
   return (
@@ -1031,10 +1060,10 @@ export function ParentHomeScreen({
               conversationPrompts={childPromptsById.get(child.id) ?? []}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               tint={childTintsById.get(child.id)}
-              onOpenProfile={() => pushChildProfile(child.id)}
-              onOpenProgress={() => pushChildProgress(child.id)}
-              onOpenReports={() => pushChildReports(child.id)}
-              onOpenNudge={() => setSheetChildId(child.id)}
+              onNavigateToProfile={pushChildProfile}
+              onNavigateToProgress={pushChildProgress}
+              onNavigateToReports={pushChildReports}
+              onOpenNudge={handleOpenNudge}
               t={t}
             />
           ))}

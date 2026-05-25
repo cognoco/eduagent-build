@@ -138,30 +138,35 @@ export const generateRoundInputSchema = z
       .optional(),
     subjectId: z.string().uuid().optional(),
   })
+  .strict()
   .refine((data) => data.activityType !== 'vocabulary' || !!data.subjectId, {
     message: 'subjectId is required for vocabulary rounds',
     path: ['subjectId'],
   });
 export type GenerateRoundInput = z.infer<typeof generateRoundInputSchema>;
 
-export const completeRoundInputSchema = z.object({
-  results: z.array(questionResultSchema).min(1),
-});
+export const completeRoundInputSchema = z
+  .object({
+    results: z.array(questionResultSchema).min(1),
+  })
+  .strict();
 export type CompleteRoundInput = z.infer<typeof completeRoundInputSchema>;
 
-export const questionCheckInputSchema = z.object({
-  questionIndex: z.number().int().min(0),
-  answerGiven: z.string().min(1),
-  // [BUG-STALE-OPTIONS] Defense-in-depth: API uses answerMode to verify MC
-  // answers are actually in question.options, catching stale-options race
-  // conditions on the client before they corrupt the score.
-  answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
-  // [WI-89] Guess Who has intermediate probe guesses. Wrong probes should be
-  // recorded for integrity but must not reveal the final answer or count as
-  // the first final scoring attempt.
-  finalAttempt: z.boolean().optional(),
-  cluesUsed: z.number().int().min(0).max(5).optional(),
-});
+export const questionCheckInputSchema = z
+  .object({
+    questionIndex: z.number().int().min(0),
+    answerGiven: z.string().min(1),
+    // [BUG-STALE-OPTIONS] Defense-in-depth: API uses answerMode to verify MC
+    // answers are actually in question.options, catching stale-options race
+    // conditions on the client before they corrupt the score.
+    answerMode: z.enum(['free_text', 'multiple_choice']).optional(),
+    // [WI-89] Guess Who has intermediate probe guesses. Wrong probes should be
+    // recorded for integrity but must not reveal the final answer or count as
+    // the first final scoring attempt.
+    finalAttempt: z.boolean().optional(),
+    cluesUsed: z.number().int().min(0).max(5).optional(),
+  })
+  .strict();
 export type QuestionCheckInput = z.infer<typeof questionCheckInputSchema>;
 
 // [F-Q-02/F-Q-07] Check response reveals correctAnswer on wrong submissions
@@ -288,9 +293,11 @@ export const guessWhoLlmOutputSchema = z.object({
 });
 export type GuessWhoLlmOutput = z.infer<typeof guessWhoLlmOutputSchema>;
 
-export const markSurfacedInputSchema = z.object({
-  activityType: quizActivityTypeSchema,
-});
+export const markSurfacedInputSchema = z
+  .object({
+    activityType: quizActivityTypeSchema,
+  })
+  .strict();
 export type MarkSurfacedInput = z.infer<typeof markSurfacedInputSchema>;
 
 // ─── Route response schemas ───────────────────────────────────────────────
