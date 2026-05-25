@@ -81,4 +81,4 @@ The top-level Library is part of the Study tab shape: `home`, `library`, `progre
 - What is the first parent-native child curriculum route: a dedicated `child/[profileId]/curriculum`, a child subject tab, or an action inside child detail?
 - Which child curriculum mutations are allowed for mentors: view only, add subject/book, pause/archive, generate topics, or start a child session?
 - Should Family child curriculum include learner notes/bookmarks, or only structured curriculum and progress summaries?
-- How should "Learn this too" from a child curriculum item bridge to the adult's own Study Library without writing to the child profile?
+- How should "Add to my learning" from a child curriculum item bridge to the adult's own Study Library without writing to the child profile?

@@ -37,7 +37,7 @@
 
 **Merge boundaries (phased shipping):**
 - **Phase 1 — Foundation** (Tasks 1-5): tab shape rename, migration + capability + intent screen. Independently mergeable and rollback-safe.
-- **Phase 2 — Recaps and bridges** (Tasks 6-15): mode switch, Children tab, Recaps, Learn this too, proxy removal, notifications.
+- **Phase 2 — Recaps and bridges** (Tasks 6-15): mode switch, Children tab, Recaps, Add to my learning, proxy removal, notifications.
 - **Phase 3 — Hardening** (Tasks 16-20): navigation helpers, analytics, leak guards, web E2E, branch-wide validation.
 
 Phase 1 is the cut line for "ship something useful and reviewable in isolation." Phase 2/3 may merge together if review cycle permits.
@@ -2023,7 +2023,7 @@ import { useRouter } from 'expo-router';
 //   }
 //
 // Task 13 replaces the stub with the entitlement-gated mutation. The Task 10
-// tests for "Learn this too triggers the hook" can stub `mutate` via
+// tests for "Add to my learning triggers the hook" can stub `mutate` via
 // jest.spyOn — they don't depend on the real implementation existing yet.
 // (Adversarial review §HIGH-6.)
 import { useLearnThisToo } from '../../hooks/use-learn-this-too';
@@ -2094,7 +2094,7 @@ export default function RecapsScreen() {
                 topicId: item.topicId ?? undefined,
               })}
             >
-              <Text>Learn this too</Text>
+              <Text>Add to my learning</Text>
             </Pressable>
             <Pressable
               testID={`recap-open-detail-${item.id}`}
@@ -2147,7 +2147,7 @@ describe('RecapsScreen', () => {
     expect(getByTestId('recaps-empty').props.children).toMatch(/hasn't completed a session/i);
   });
 
-  it('Learn this too triggers the hook with child context', async () => {
+  it('Add to my learning triggers the hook with child context', async () => {
     const { getByTestId } = render(<RecapsScreen />);
     fireEvent.press(getByTestId(`recap-learn-this-too-${recapId}`));
     expect(mockLearnThisTooMutate).toHaveBeenCalledWith(expect.objectContaining({
@@ -2385,7 +2385,7 @@ cd apps/mobile && pnpm exec tsc --noEmit
 
 ---
 
-## Task 13: Learn this too — quota pre-check + same-account Study switch
+## Task 13: Add to my learning — quota pre-check + same-account Study switch
 
 The bridge from a child recap to adult Study. Pre-check adult entitlement before patching mode. Spec §Learn This Too Contract + AC #17/18/19/28.
 
@@ -2605,7 +2605,7 @@ pnpm exec nx run api:typecheck
 
 - [ ] **Step 8: Commit**
 
-`/commit` description: `feat(mobile,api): Learn this too — adult quota pre-check, mode patch, router.replace into Study with StudySourceContext`
+`/commit` description: `feat(mobile,api): Add to my learning — adult quota pre-check, mode patch, router.replace into Study with StudySourceContext`
 
 ---
 
@@ -3083,7 +3083,7 @@ test.describe('Study/Family mode navigation', () => {
     await expect(page.getByTestId('proxy-banner')).not.toBeVisible();
   });
 
-  test('Learn this too switches into Study as the adult', async ({ page }) => {
+  test('Add to my learning switches into Study as the adult', async ({ page }) => {
     await page.goto('/(app)/recaps');
     await page.getByTestId(`recap-learn-this-too-${recapId}`).click();
     await expect(page.getByText('My Learning')).toBeVisible();
@@ -3096,7 +3096,7 @@ test.describe('Study/Family mode navigation', () => {
     await expect(page).toHaveURL(/\/recaps$/);
   });
 
-  test('Learn this too followed by Back does not jump to stale Family route', async ({ page }) => {
+  test('Add to my learning followed by Back does not jump to stale Family route', async ({ page }) => {
     await page.goto('/(app)/recaps');
     await page.getByTestId(`recap-learn-this-too-${recapId}`).click();
     await page.goBack();
@@ -3128,7 +3128,7 @@ C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web
 
 - [ ] **Step 4: Commit**
 
-`/commit` description: `test(web): Playwright journeys for Study/Family mode, Recaps, Learn this too, navigation`
+`/commit` description: `test(web): Playwright journeys for Study/Family mode, Recaps, Add to my learning, navigation`
 
 ---
 
