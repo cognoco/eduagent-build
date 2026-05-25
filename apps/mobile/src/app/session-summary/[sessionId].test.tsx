@@ -92,9 +92,8 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../lib/profile',
-  /* gc1-allow: native-boundary: ProfileProvider uses SecureStore (native) */ () => ({
+// prettier-ignore
+jest.mock('../../lib/profile', /* gc1-allow: native-boundary: ProfileProvider uses SecureStore (native) */ () => ({
     useProfile: () => ({
       activeProfile: {
         id: 'test-profile-id',
@@ -336,10 +335,9 @@ const mockFetch = createRoutedMockFetch({
   'topic-suggestions': () => mockTopicSuggestionsData,
 });
 
-jest.mock(
-  '../../lib/api-client',
-  /* gc1-allow: transport-boundary: Hono RPC client requires real HTTP transport */ () =>
-    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+// prettier-ignore
+jest.mock('../../lib/api-client', /* gc1-allow: transport-boundary: Hono RPC client requires real HTTP transport */ () =>
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 // Create a fresh QueryClient per test to prevent cross-test query cache
