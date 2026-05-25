@@ -158,6 +158,13 @@ export const consentRevocation = inngest.createFunction(
             return { archived: false, reason: 'consent_restored' };
           }
           const archivedAt = new Date();
+          // [BUG-662 / FCR-2026-05-23-L3.L3.3] Defense-in-depth parent-chain
+          // guard: in addition to the consent_states scoping inside the CTE,
+          // require the child profile's account_id to match the parent's
+          // account_id. Without this, a corrupted/replayed Inngest event with
+          // mismatched (childProfileId, parentProfileId) — where both happen
+          // to share a GDPR-WITHDRAWN consent row — could in principle archive
+          // a profile that does not belong to the event's parent account.
           const archiveResult = await db.execute(sql`
             WITH locked_consent AS (
               SELECT 1 FROM consent_states
@@ -171,6 +178,7 @@ export const consentRevocation = inngest.createFunction(
             SET archived_at = ${archivedAt}
             WHERE id = ${childProfileId}
             AND archived_at IS NULL
+            AND account_id = (SELECT account_id FROM profiles WHERE id = ${parentProfileId})
             AND EXISTS (SELECT 1 FROM locked_consent)
           `);
           if ((archiveResult.rowCount ?? 0) === 0) {

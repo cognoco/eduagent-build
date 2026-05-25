@@ -35,7 +35,12 @@ export type AuthEnv = {
 const PUBLIC_PATHS = [
   '/v1/health',
   '/v1/inngest',
-  '/v1/stripe/',
+  // [BUG-647 / FCR-2026-05-23-L2.M2.4] Pin to the exact known Stripe webhook
+  // path. The previous '/v1/stripe/' prefix entry auth-bypassed every future
+  // route added under /v1/stripe/* without explicit opt-in. Only the webhook
+  // route (POST /v1/stripe/webhook in routes/stripe-webhook.ts) is intentionally
+  // public — it verifies signatures via Stripe-Signature header.
+  '/v1/stripe/webhook',
   '/v1/revenuecat/webhook',
   // [WI-85] Resend (Svix) delivery webhook. Carries no Clerk token; the route
   // handler verifies the Svix HMAC signature itself (RESEND_WEBHOOK_SECRET).

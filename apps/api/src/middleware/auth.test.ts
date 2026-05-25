@@ -149,6 +149,42 @@ describe('authMiddleware', () => {
       expect(jwtMock.verifyJWT).not.toHaveBeenCalled();
     });
 
+    // [BUG-647 / FCR-2026-05-23-L2.M2.4] Break test: the '/v1/stripe/' prefix
+    // entry previously auth-bypassed every /v1/stripe/* path, not just the
+    // signature-verified webhook. Any arbitrary path under /v1/stripe/ must
+    // now require auth — only the exact /v1/stripe/webhook bypasses.
+    it('[BUG-647] requires auth for arbitrary /v1/stripe/* sub-paths (not just /webhook)', async () => {
+      const app = createTestApp();
+      app.get('/stripe/arbitrary-future-route', (c) => c.json({ ok: true }));
+
+      const res = await app.request(
+        '/v1/stripe/arbitrary-future-route',
+        {},
+        TEST_ENV,
+      );
+
+      // Must be 401 — middleware must NOT treat this as a public webhook path.
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.code).toBe('UNAUTHORIZED');
+      expect(jwtMock.verifyJWT).not.toHaveBeenCalled();
+    });
+
+    it('[BUG-647] still bypasses auth for exact /v1/stripe/webhook', async () => {
+      const app = createTestApp();
+      app.post('/stripe/webhook', (c) => c.json({ ok: true }));
+
+      const res = await app.request(
+        '/v1/stripe/webhook',
+        { method: 'POST' },
+        TEST_ENV,
+      );
+
+      // Route exists and middleware did not block it
+      expect(res.status).toBe(200);
+      expect(jwtMock.verifyJWT).not.toHaveBeenCalled();
+    });
+
     it('requires auth for /v1/auth/* paths — must never be in PUBLIC_PATHS [BUG-1007]', async () => {
       const app = createTestApp();
       app.post('/auth/register', (c) => c.json({ ok: true }));
