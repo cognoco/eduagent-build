@@ -334,7 +334,9 @@ export default function ChildMentorMemoryScreen() {
             {t('parentView.mentorMemory.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-0.5">
-            {t('parentView.mentorMemory.subtitle')}
+            {t('parentView.mentorMemory.subtitle', {
+              name: child?.displayName ?? t('parentView.index.yourChild'),
+            })}
           </Text>
         </View>
       </View>

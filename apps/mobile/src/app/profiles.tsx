@@ -212,7 +212,18 @@ export default function ProfilesScreen() {
   const handleProfileTap = (profile: (typeof profiles)[number]) => {
     if (activeProfile?.isOwner && !profile.isOwner) {
       setMode('family');
-      router.replace({
+      // [BUG-774] /profiles is a root-level fullScreenModal (see _layout.tsx).
+      // `router.replace` from inside that modal swaps the modal route in place
+      // but never dismisses the modal stack, so the child-settings screen
+      // never mounts and the user stays staring at /profiles. Dismiss the
+      // modal first (back to the underlying /(app) stack), then push the
+      // child-settings target so the deep route lands in the correct stack
+      // and back-navigation from settings returns to the parent shell rather
+      // than re-opening the profiles modal.
+      if (router.canGoBack()) {
+        router.back();
+      }
+      router.push({
         pathname: '/(app)/child/[profileId]',
         params: { profileId: profile.id, mode: 'settings' },
       });

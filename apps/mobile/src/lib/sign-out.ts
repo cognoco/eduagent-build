@@ -40,6 +40,21 @@ import {
 } from './api-client';
 import { clearIntroSeen } from './intro-state';
 
+// [BUG-771] Hard timeout on Clerk's signOut so a stuck network call (web
+// socket close, slow Clerk backend, hanging fetch) cannot trap the user in
+// their session. Sized well above clearProfileSecureStorageOnSignOut's 3s
+// internal cap so the storage cleanup that runs BEFORE clerkSignOut still
+// has its full budget; the cap here only guards the Clerk call itself plus
+// the resetAuthExpiredGuard finally block.
+export const CLERK_SIGNOUT_TIMEOUT_MS = 8_000;
+
+class ClerkSignOutTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Clerk signOut exceeded ${timeoutMs}ms timeout`);
+    this.name = 'ClerkSignOutTimeoutError';
+  }
+}
+
 export interface SignOutWithCleanupParams {
   /** Clerk's `signOut` function — obtain via `useClerk()` or `useAuth()`. */
   clerkSignOut: () => Promise<void>;
@@ -117,9 +132,61 @@ export async function signOutWithCleanup(
   // cleared regardless of whether clerkSignOut succeeds or throws. Without
   // this, _authExpiredFiring stays true permanently after sign-out, silently
   // swallowing all subsequent 401s for the next signed-in user.
+  //
+  // [BUG-771] Race clerkSignOut against a hard timeout. Symptom in production:
+  // sign-out button hangs > 45s and the user is never returned to the
+  // sign-in screen. Per CLAUDE.md UX Resilience Rules ("stuck states must
+  // have a timeout + recovery action") and Fix Development Rules ("silent
+  // recovery without escalation is banned") we:
+  //   1. Cap the Clerk call at CLERK_SIGNOUT_TIMEOUT_MS so the caller can
+  //      force-redirect to /sign-in regardless of Clerk's state.
+  //   2. Emit a Sentry breadcrumb + captureMessage when the timeout fires so
+  //      the fallback is observable in production — `console.warn` alone
+  //      would be invisible (you can't query how often it triggered).
+  // Cleanup that ran BEFORE this block (cache clear, SecureStore wipe,
+  // Sentry scope wipe) already removed the previous user's local state, so a
+  // timed-out Clerk call leaves the device in a safe state — the auth
+  // session may linger server-side but local UI is fully signed out.
   try {
-    await clerkSignOut();
+    await raceClerkSignOutWithTimeout(clerkSignOut);
   } finally {
     resetAuthExpiredGuard();
   }
 }
+
+async function raceClerkSignOutWithTimeout(
+  clerkSignOut: () => Promise<void>,
+): Promise<void> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      clerkSignOut(),
+      new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          const err = new ClerkSignOutTimeoutError(CLERK_SIGNOUT_TIMEOUT_MS);
+          Sentry.addBreadcrumb({
+            category: 'auth',
+            level: 'warning',
+            message: 'sign-out: clerkSignOut timed out',
+            data: { timeoutMs: CLERK_SIGNOUT_TIMEOUT_MS },
+          });
+          Sentry.captureMessage('sign-out: clerkSignOut timed out', {
+            level: 'warning',
+            tags: {
+              feature: 'auth',
+              fallback: 'clerk-signout-timeout',
+            },
+            extra: { timeoutMs: CLERK_SIGNOUT_TIMEOUT_MS },
+          });
+          reject(err);
+        }, CLERK_SIGNOUT_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle !== undefined) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+export { ClerkSignOutTimeoutError };

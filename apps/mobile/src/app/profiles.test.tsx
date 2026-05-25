@@ -184,7 +184,11 @@ describe('ProfilesScreen', () => {
     screen.getByTestId('profile-active-check');
   });
 
-  it('opens a child row in the parent-native child settings view', () => {
+  it('opens a child row in the parent-native child settings view [BUG-774]', () => {
+    // [BUG-774] /profiles is a fullScreenModal; replacing in place left the
+    // child-settings screen un-mounted. We now dismiss the modal (via
+    // router.back when canGoBack) then push the child-settings target.
+    mockCanGoBack.mockReturnValue(true);
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: ownerProfile,
@@ -199,11 +203,36 @@ describe('ProfilesScreen', () => {
     expect(mockSwitchProfile).not.toHaveBeenCalled();
     expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
     expect(mockSetMode).toHaveBeenCalledWith('family');
-    expect(mockReplace).toHaveBeenCalledWith({
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-id', mode: 'settings' },
     });
+    // replace must NOT be the navigation path — it never dismissed the modal
+    // in production (this was the actual symptom of BUG-774).
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('pushes child settings even when canGoBack is false [BUG-774]', () => {
+    // Edge case: profiles modal opened as the root entry (no back-stack).
+    // The push must still fire so the user is not trapped on /profiles.
+    mockCanGoBack.mockReturnValue(false);
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-child-id'));
+
     expect(mockBack).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-id', mode: 'settings' },
+    });
   });
 
   it('does not expose a normal UI path into child proxy mode', () => {
@@ -336,7 +365,10 @@ describe('ProfilesScreen', () => {
     screen.getByTestId('profiles-loading');
   });
 
-  it('replaces the profiles modal when opening a child row', () => {
+  it('pushes child settings when canGoBack is false (no back-stack to dismiss)', () => {
+    // [BUG-774] When the profiles modal is the only screen in the stack we
+    // skip the back() and push directly to /(app)/child/[profileId] so the
+    // user is not stranded on /profiles.
     mockCanGoBack.mockReturnValue(false);
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
@@ -351,7 +383,8 @@ describe('ProfilesScreen', () => {
 
     expect(mockSetMode).toHaveBeenCalledWith('family');
     expect(mockSwitchProfile).not.toHaveBeenCalled();
-    expect(mockReplace).toHaveBeenCalledWith({
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-id', mode: 'settings' },
     });
