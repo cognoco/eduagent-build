@@ -515,6 +515,9 @@ export default function ProgressScreen(): React.ReactElement {
   const isFamilyProgress = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.gates.progressScope === 'children'
     : mode === 'family';
+  const canViewLinkedChildProgress = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
+    ? navigationContract.gates.showProgressProfilePicker
+    : role === 'owner' && mode !== 'study';
   const hasLinked = linkedChildren.length > 0;
   const { colorScheme } = useTheme();
   const requestedProfileId = Array.isArray(rawRequestedProfileId)
@@ -537,14 +540,31 @@ export default function ProgressScreen(): React.ReactElement {
     if (!requestedProfileId) return;
     const knownTarget = isFamilyProgress
       ? linkedChildren.some((child) => child.id === requestedProfileId)
-      : requestedProfileId === activeProfile?.id;
+      : requestedProfileId === activeProfile?.id ||
+        (canViewLinkedChildProgress &&
+          linkedChildren.some((child) => child.id === requestedProfileId));
     if (knownTarget) {
       setSelectedProfileId(requestedProfileId);
     }
-  }, [requestedProfileId, activeProfile?.id, linkedChildren, isFamilyProgress]);
+  }, [
+    requestedProfileId,
+    activeProfile?.id,
+    canViewLinkedChildProgress,
+    linkedChildren,
+    isFamilyProgress,
+  ]);
 
   useEffect(() => {
-    if (!isFamilyProgress && activeProfile?.id) {
+    const selectedLinkedChildStillAllowed =
+      canViewLinkedChildProgress &&
+      linkedChildren.some((child) => child.id === selectedProfileId);
+
+    if (
+      !isFamilyProgress &&
+      activeProfile?.id &&
+      selectedProfileId !== activeProfile.id &&
+      !selectedLinkedChildStillAllowed
+    ) {
       setSelectedProfileId(activeProfile.id);
     }
     if (
@@ -554,7 +574,13 @@ export default function ProgressScreen(): React.ReactElement {
     ) {
       setSelectedProfileId(linkedChildren[0].id);
     }
-  }, [activeProfile?.id, isFamilyProgress, linkedChildren, selectedProfileId]);
+  }, [
+    activeProfile?.id,
+    canViewLinkedChildProgress,
+    isFamilyProgress,
+    linkedChildren,
+    selectedProfileId,
+  ]);
 
   // Re-seed when activeProfile loads after mount.
   useEffect(() => {
@@ -567,19 +593,24 @@ export default function ProgressScreen(): React.ReactElement {
   const isViewingSelf =
     selectedProfileId === activeProfile?.id ||
     (!hasLinked && !selectedProfileId);
+  const selectedLinkedChildProfile = linkedChildren.some(
+    (child) => child.id === selectedProfileId,
+  );
+  const isViewingLinkedChildProgress =
+    !isViewingSelf && canViewLinkedChildProgress && selectedLinkedChildProfile;
 
   const ownInventoryQuery = useProgressInventory();
   const childInventoryQuery = useChildInventory(
-    isViewingSelf ? undefined : selectedProfileId,
-    { enabled: isFamilyProgress && !isViewingSelf },
+    isViewingLinkedChildProgress ? selectedProfileId : undefined,
+    { enabled: isViewingLinkedChildProgress },
   );
   const inventoryQuery = isViewingSelf
     ? ownInventoryQuery
     : childInventoryQuery;
 
   const childSummaryQuery = useChildProgressSummary(
-    isViewingSelf ? undefined : selectedProfileId,
-    { enabled: isFamilyProgress && !isViewingSelf },
+    isViewingLinkedChildProgress ? selectedProfileId : undefined,
+    { enabled: isViewingLinkedChildProgress },
   );
   const overallProgressQuery = useOverallProgress();
 
@@ -782,7 +813,7 @@ export default function ProgressScreen(): React.ReactElement {
   // [B-600] Family-context users (proxy view or family progress tab) must not
   // be offered the adult Study Library — route them to child curriculum instead.
   const emptyProgressActionLabel =
-    isParentProxyView || isFamilyProgress
+    isParentProxyView || isViewingLinkedChildProgress
       ? t('progress.guardian.goToChildCurriculum')
       : t('progress.startLearning');
   const practiceActivityCount = isViewingSelf
@@ -874,7 +905,7 @@ export default function ProgressScreen(): React.ReactElement {
 
     // [B-600] Family-context users must never be routed to the adult Study
     // Library or the adult Shelf. Route them to the child's curriculum instead.
-    if (isParentProxyView || isFamilyProgress) {
+    if (isParentProxyView || isViewingLinkedChildProgress) {
       if (selectedProfileId) {
         router.push({
           pathname: '/(app)/child/[profileId]/curriculum',
@@ -923,7 +954,7 @@ export default function ProgressScreen(): React.ReactElement {
         {hasLinked &&
         (FEATURE_FLAGS.MODE_NAV_V1_ENABLED
           ? navigationContract.gates.showProgressProfilePicker
-          : mode !== 'study') ? (
+          : canViewLinkedChildProgress) ? (
           <ProgressPillRow
             childrenProfiles={linkedChildren}
             selectedProfileId={selectedProfileId}

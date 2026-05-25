@@ -646,6 +646,35 @@ describe('customer.subscription.updated', () => {
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
 
+  it('[WI-78 review] refreshes KV when a subscription retry is already applied', async () => {
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({
+        lastStripeEventId: 'evt_subscription_retry',
+        webhookApplied: false,
+      }),
+    );
+    const stripeSub = makeSubscription({ status: 'active' });
+    const event = makeStripeEvent('customer.subscription.updated', stripeSub);
+    event.id = 'evt_subscription_retry';
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(writeSubscriptionStatus).toHaveBeenCalledWith(
+      mockKv,
+      'acc-1',
+      expect.objectContaining({ status: 'active' }),
+    );
+  });
+
   // [CR-052 break test] A second subscription.updated event fired AFTER
   // cancellation (e.g. a period-end reminder) must NOT clobber cancelledAt
   // back to null. Pre-fix, the else branch always set cancelledAt = null when
@@ -786,15 +815,80 @@ describe('invoice.payment_failed', () => {
       TEST_ENV,
     );
 
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: expect.stringMatching(/^stripe-payment-failed:evt_/),
+        name: 'app/payment.failed',
+        data: expect.objectContaining({
+          subscriptionId: 'sub-internal-1',
+          stripeSubscriptionId: 'sub_stripe_123',
+          accountId: 'acc-1',
+          attempt: 2,
+        }),
+      }),
+    );
+  });
+
+  it('[WI-78 review] re-emits payment.failed when retry sees duplicate Stripe event stamp', async () => {
+    const invoice = makeInvoice({ attempt_count: 3 });
+    const event = makeStripeEvent('invoice.payment_failed', invoice);
+    event.id = 'evt_payment_failed_retry';
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({
+        status: 'past_due',
+        lastStripeEventId: 'evt_payment_failed_retry',
+        webhookApplied: false,
+      }),
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
     expect(inngest.send).toHaveBeenCalledWith({
+      id: 'stripe-payment-failed:evt_payment_failed_retry',
       name: 'app/payment.failed',
       data: expect.objectContaining({
         subscriptionId: 'sub-internal-1',
         stripeSubscriptionId: 'sub_stripe_123',
         accountId: 'acc-1',
-        attempt: 2,
+        attempt: 3,
       }),
     });
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
+  it('[WI-78 review] does not emit payment.failed when stale retry sees a newer Stripe event stamp', async () => {
+    const invoice = makeInvoice({ attempt_count: 3 });
+    const event = makeStripeEvent('invoice.payment_failed', invoice);
+    event.id = 'evt_payment_failed_stale_retry';
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+    (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription({
+        status: 'active',
+        lastStripeEventId: 'evt_newer_event_already_applied',
+        webhookApplied: false,
+      }),
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   it('does not emit event when subscription not found', async () => {
@@ -1397,6 +1491,33 @@ describe('tier metadata in subscription events', () => {
       expect.any(Number),
       null,
     );
+  });
+
+  it('[WI-78 review] returns 500 when quota pool update fails after subscription update', async () => {
+    const stripeSub = makeSubscription({
+      status: 'active',
+      metadata: { tier: 'pro' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub),
+    );
+    (updateQuotaPoolLimit as jest.Mock).mockRejectedValueOnce(
+      new Error('Missing quota pool for subscription sub-internal-1'),
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(500);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalled();
+    expect(updateQuotaPoolLimit).toHaveBeenCalled();
   });
 
   it('ignores invalid tier in metadata', async () => {

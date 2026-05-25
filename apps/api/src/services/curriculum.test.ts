@@ -21,6 +21,7 @@ import {
   previewCurriculumTopic,
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
+  releaseBookGenerationClaimIfEmpty,
 } from './curriculum';
 import type {
   CurriculumInput,
@@ -37,6 +38,52 @@ const PROFILE_ID = 'test-profile-id';
 const SUBJECT_ID = 'subject-1';
 const CURRICULUM_ID = 'curriculum-1';
 const TOPIC_ID = 'topic-1';
+
+function extractSqlTextAndValues(
+  node: unknown,
+  visited = new WeakSet<object>(),
+): string[] {
+  if (node === null || node === undefined) return [];
+  if (node instanceof Date) return [node.toISOString().toLowerCase()];
+  if (typeof node !== 'object') return [String(node).toLowerCase()];
+  if (visited.has(node as object)) return [];
+  visited.add(node as object);
+
+  const values: string[] = [];
+  const obj = node as Record<string, unknown>;
+  if (typeof obj['name'] === 'string') {
+    values.push(obj['name'].toLowerCase());
+  }
+  if (
+    'value' in obj &&
+    (typeof obj['value'] === 'string' ||
+      typeof obj['value'] === 'number' ||
+      obj['value'] instanceof Date)
+  ) {
+    const value = obj['value'];
+    values.push(
+      value instanceof Date
+        ? value.toISOString().toLowerCase()
+        : String(value).toLowerCase(),
+    );
+  }
+  if (Array.isArray(obj['value'])) {
+    for (const item of obj['value']) {
+      values.push(...extractSqlTextAndValues(item, visited));
+    }
+  }
+  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        values.push(...extractSqlTextAndValues(item, visited));
+      }
+    } else {
+      values.push(...extractSqlTextAndValues(child, visited));
+    }
+  }
+  return values;
+}
 
 const sampleTopics = JSON.stringify([
   {
@@ -1807,6 +1854,28 @@ describe('[BUG-110+109] previewCurriculumTopic resilience', () => {
       .join('\n');
     expect(logged).toMatch(/curriculum\.preview_topic\.no_json/);
     consoleSpy.mockRestore();
+  });
+});
+
+describe('releaseBookGenerationClaimIfEmpty', () => {
+  it('[WI-78 review] scopes the release update through the owning profile', async () => {
+    const where = jest.fn().mockResolvedValue(undefined);
+    const set = jest.fn().mockReturnValue({ where });
+    const update = jest.fn().mockReturnValue({ set });
+    const db = { update } as unknown as Database;
+
+    await releaseBookGenerationClaimIfEmpty(
+      db,
+      SUBJECT_ID,
+      'book-1',
+      PROFILE_ID,
+    );
+
+    const whereText = extractSqlTextAndValues(where.mock.calls[0][0]).join(' ');
+    expect(whereText).toContain('profile_id');
+    expect(whereText).toContain(PROFILE_ID.toLowerCase());
+    expect(whereText).toContain('subject_id');
+    expect(whereText).toContain(SUBJECT_ID.toLowerCase());
   });
 });
 

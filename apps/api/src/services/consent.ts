@@ -20,6 +20,7 @@ import {
   familyLinks,
   nudges,
   profiles,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -680,6 +681,29 @@ export async function getConsentStatus(
     orderBy: desc(consentStates.requestedAt),
   });
   return row?.status ?? null;
+}
+
+export async function isConsentRevocationGenerationCurrent(
+  db: Database,
+  profileId: string,
+  revokedAt?: Date,
+): Promise<boolean> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.consentStates.findFirst(
+    eq(consentStates.consentType, 'GDPR'),
+    desc(consentStates.requestedAt),
+  );
+  if (row?.status !== 'WITHDRAWN') return false;
+  if (!revokedAt) return true;
+
+  const currentRespondedAt = row.respondedAt?.getTime();
+  const eventRespondedAt = revokedAt.getTime();
+  return (
+    currentRespondedAt !== undefined &&
+    !Number.isNaN(currentRespondedAt) &&
+    !Number.isNaN(eventRespondedAt) &&
+    currentRespondedAt === eventRespondedAt
+  );
 }
 
 /**

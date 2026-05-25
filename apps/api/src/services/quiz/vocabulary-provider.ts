@@ -341,6 +341,8 @@ ${bankExclusions}${libraryHint}${struggleHint}${missedHint}
 Rules:
 - Generate exactly ${discoveryCount} questions.
 - Each question shows a ${languageName} word or phrase and asks for the English translation.
+- Prefer useful everyday language: greetings, small talk, home, school, food, travel, and other common daily situations.
+- Include a mix of single words and short reusable chunks/phrases. If at least 2 questions are requested, include at least one common daily phrase/chunk.
 - Include articles where the language normally uses them.
 - acceptedAnswers must include the main translation plus any common equivalent phrasing.
 - Distractors must be plausible English translations but still clearly wrong.

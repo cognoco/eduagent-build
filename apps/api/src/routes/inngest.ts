@@ -3,9 +3,10 @@ import { serve } from 'inngest/hono';
 
 import { inngest, functions } from '../inngest';
 
-// [BUG-237] Path is /v1/inngest, not /inngest. The Inngest Cloud dashboard's
-// "serve URL" for this app is api-{env}.mentomate.com/v1/inngest — keep these
-// two values in lock-step or syncs/dispatches silently fall on the floor.
+// [BUG-237] External path is /v1/inngest. This route is mounted under the
+// worker's /v1 basePath in index.ts, so the local segment must stay /inngest.
+// Keep the Inngest Cloud serve URL at api-{env}.mentomate.com/v1/inngest —
+// adding /v1 here would expose the handler at /v1/v1/inngest instead.
 //
 // [BUG-242] INNGEST_SIGNING_KEY enforcement: the `serve()` helper from
 // `inngest/hono` reads the signing key from `c.env.INNGEST_SIGNING_KEY` (set
@@ -15,6 +16,6 @@ import { inngest, functions } from '../inngest';
 // blocked by env separation alone. See env-validation tests for coverage.
 export const inngestRoute = new Hono().on(
   ['GET', 'POST', 'PUT'],
-  '/v1/inngest',
+  '/inngest',
   serve({ client: inngest, functions }),
 );

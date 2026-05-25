@@ -530,6 +530,12 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'practice', canEnter: true, isSurfaced: true },
       { route: 'mentor-memory', canEnter: true, isSurfaced: true },
       {
+        route: 'session-summary/[sessionId]',
+        params: { sessionId: 'session-1' },
+        canEnter: true,
+        isSurfaced: true,
+      },
+      {
         route: 'topic/relearn',
         params: { for: 'child' },
         canEnter: false,
@@ -569,6 +575,12 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'quiz', canEnter: true, isSurfaced: false },
       { route: 'practice', canEnter: true, isSurfaced: false },
       { route: 'mentor-memory', canEnter: true, isSurfaced: false },
+      {
+        route: 'session-summary/[sessionId]',
+        params: { sessionId: 'session-1' },
+        canEnter: true,
+        isSurfaced: false,
+      },
       {
         route: 'child/[profileId]',
         params: linkedChildParams,
@@ -640,6 +652,12 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'quiz', canEnter: false, isSurfaced: false },
       { route: 'practice', canEnter: false, isSurfaced: false },
       { route: 'mentor-memory', canEnter: false, isSurfaced: false },
+      {
+        route: 'session-summary/[sessionId]',
+        params: { sessionId: 'session-1' },
+        canEnter: false,
+        isSurfaced: false,
+      },
       {
         route: 'child/[profileId]',
         params: linkedChildParams,

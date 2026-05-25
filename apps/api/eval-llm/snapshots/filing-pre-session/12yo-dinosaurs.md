@@ -70,12 +70,16 @@ Arts & Music, Technology, Literature, Life Skills
 
 Only create custom shelves when none of these fit.
 
-Return ONLY valid JSON:
+For existing shelves/books, use only IDs that appear in <library_index>.
+For new shelves/books/chapters/topics, write concrete learner-specific names
+and descriptions. Never return schema-demo text or placeholder values.
+
+Return ONLY one valid JSON object. Shape examples:
 {
-  "shelf": { "id": "existing-uuid" } | { "name": "New Shelf Name" },
-  "book":  { "id": "existing-uuid" } | { "name": "...", "emoji": "...", "description": "..." },
-  "chapter": { "existing": "chapter name" } | { "name": "New Chapter" },
-  "topic": { "title": "...", "description": "..." }
+  "shelf": { "name": "Science" },
+  "book": { "name": "Biology", "emoji": "🧬", "description": "Living things and life processes" },
+  "chapter": { "name": "Plants" },
+  "topic": { "title": "Photosynthesis", "description": "How plants make food from light, water, and carbon dioxide" }
 }
 ```
 

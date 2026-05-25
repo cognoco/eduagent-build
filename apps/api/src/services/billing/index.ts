@@ -6,6 +6,7 @@
 // Shared types and mappers
 export type {
   SubscriptionRow,
+  AppliedSubscriptionRow,
   QuotaPoolRow,
   WebhookSubscriptionUpdate,
 } from './types';
@@ -34,6 +35,7 @@ export {
   findExpiredTrials,
   findSubscriptionsByTrialDateRange,
   transitionToExtendedTrial,
+  transitionToExtendedTrialFromRevenuecatEvent,
   findExpiredTrialsByDaysSinceEnd,
 } from './trial';
 
@@ -79,5 +81,6 @@ export type { RevenuecatWebhookUpdate } from './revenuecat';
 export {
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
 } from './revenuecat';

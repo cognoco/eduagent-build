@@ -180,4 +180,40 @@ describe('useSessionActions', () => {
       jest.useRealTimers();
     }
   });
+
+  it('[WI-78 DS-216] ignores rapid duplicate topic switch requests while close is in flight', async () => {
+    const closeSession = {
+      mutateAsync: jest.fn(
+        () =>
+          new Promise(() => {
+            /* keep close in flight */
+          }),
+      ),
+    };
+    const opts = createMockOpts({ closeSession });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    void result.current.handleTopicSwitch('topic-2', 'subject-2', 'Biology');
+    void result.current.handleTopicSwitch('topic-2', 'subject-2', 'Biology');
+
+    expect(closeSession.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-78 review] releases the topic-switch lock after a successful switch', async () => {
+    const opts = createMockOpts({ activeSessionId: undefined });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    await act(async () => {
+      await result.current.handleTopicSwitch('topic-2', 'subject-2', 'Biology');
+    });
+    await act(async () => {
+      await result.current.handleTopicSwitch(
+        'topic-3',
+        'subject-3',
+        'Chemistry',
+      );
+    });
+
+    expect(opts.router.replace).toHaveBeenCalledTimes(2);
+  });
 });

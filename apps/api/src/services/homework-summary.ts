@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -291,6 +291,10 @@ export async function extractAndStoreHomeworkSummary(
   // catches the common case (one caller finishes and writes before another
   // even starts); this in-tx re-check is the defence for the narrow
   // overlapping window only.
+  //
+  // The UPDATE uses jsonb_set (merged from origin/main) so it only writes
+  // the homeworkSummary key without overwriting other metadata that a
+  // concurrent unrelated path may have set during our LLM call.
   return db.transaction(async (tx) => {
     const [lockedRow] = await tx
       .select({ metadata: learningSessions.metadata })
@@ -314,10 +318,12 @@ export async function extractAndStoreHomeworkSummary(
     await tx
       .update(learningSessions)
       .set({
-        metadata: {
-          ...lockedMetadata,
-          homeworkSummary: summary,
-        },
+        metadata: sql`jsonb_set(
+          COALESCE(${learningSessions.metadata}, '{}'::jsonb),
+          '{homeworkSummary}',
+          ${JSON.stringify(summary)}::jsonb,
+          true
+        )`,
         updatedAt: new Date(),
       })
       .where(

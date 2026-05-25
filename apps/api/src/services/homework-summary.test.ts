@@ -29,17 +29,22 @@ function createSelectChain(result: unknown[]) {
   };
 }
 
-function createMockDb(options?: {
-  // [WI-216] When set, the store function's idempotency pre-check returns
-  // a row containing an existing homeworkSummary, forcing the short-circuit
-  // (no LLM call, no update). Defaults to undefined (no pre-existing
-  // summary; the LLM path proceeds normally).
-  withPreCheck?: { existingHomeworkSummary?: unknown };
-  // [WI-216 H2] When set, the in-transaction re-check sees a homeworkSummary
-  // that a concurrent caller wrote while our LLM call was in flight. The
-  // function must return that value and NOT overwrite it.
-  withTxRaceWinner?: unknown;
-}): Database {
+function createMockDb(
+  options: {
+    // [WI-216] When set, the store function's idempotency pre-check returns
+    // a row containing an existing homeworkSummary, forcing the short-circuit
+    // (no LLM call, no update). Defaults to undefined (no pre-existing
+    // summary; the LLM path proceeds normally).
+    withPreCheck?: { existingHomeworkSummary?: unknown };
+    // [WI-216 H2] When set, the in-transaction re-check sees a
+    // homeworkSummary that a concurrent caller wrote while our LLM call was
+    // in flight. The function must return that value and NOT overwrite it.
+    withTxRaceWinner?: unknown;
+    // [merge from origin/main] Spy on the value passed to db.update().set().
+    // Used by the jsonb_set assertions on the non-tx path.
+    captureUpdateSet?: (value: unknown) => void;
+  } = {},
+): Database {
   const homeworkMetadata = {
     homework: {
       problemCount: 2,
@@ -116,8 +121,14 @@ function createMockDb(options?: {
     : homeworkMetadata;
 
   const txUpdate = jest.fn().mockReturnValue({
-    set: jest.fn().mockReturnValue({
-      where: jest.fn().mockResolvedValue(undefined),
+    set: jest.fn((value: unknown) => {
+      // [merge from origin/main + WI-216 H2] The jsonb_set write moved
+      // inside the post-LLM transaction; capture there so the DS-217
+      // assertion still sees the SET value.
+      options.captureUpdateSet?.(value);
+      return {
+        where: jest.fn().mockResolvedValue(undefined),
+      };
     }),
   });
   const txSelect = jest
@@ -127,8 +138,11 @@ function createMockDb(options?: {
   return {
     select: selectMock,
     update: jest.fn().mockReturnValue({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+      set: jest.fn((value: unknown) => {
+        options.captureUpdateSet?.(value);
+        return {
+          where: jest.fn().mockResolvedValue(undefined),
+        };
       }),
     }),
     transaction: jest.fn().mockImplementation(async (callback) => {
@@ -529,5 +543,30 @@ describe('extractAndStoreHomeworkSummary', () => {
     const txUpdate = (db as unknown as { query: { __txUpdateMock: jest.Mock } })
       .query.__txUpdateMock;
     expect(txUpdate).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 DS-217] patches only homeworkSummary instead of replacing whole metadata', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValue({
+      response:
+        '{"problemCount":2,"practicedSkills":["linear equations"],"independentProblemCount":1,"guidedProblemCount":1,"summary":"2 problems, practiced linear equations.","displayTitle":"Math Homework"}',
+    });
+
+    let updateSet: unknown;
+    const db = createMockDb({
+      captureUpdateSet: (value) => {
+        updateSet = value;
+      },
+    });
+
+    await extractAndStoreHomeworkSummary(db, 'profile-1', 'session-1');
+
+    expect((updateSet as { metadata?: unknown }).metadata).not.toEqual(
+      expect.objectContaining({
+        homework: expect.anything(),
+      }),
+    );
+    expect((updateSet as { metadata?: unknown }).metadata).toHaveProperty(
+      'queryChunks',
+    );
   });
 });

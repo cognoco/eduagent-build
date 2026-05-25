@@ -159,22 +159,12 @@
       "familySummary": {
         "nameListWithMore_one": "{{names}} + {{count}} mais",
         "nameListWithMore_other": "{{names}} + {{count}} mais",
-        "withParent": "Voce + {{memberNames}}",
         "parentOnly": "Voce",
         "withMinutes_one": "{{memberNames}} · {{count}} min esta semana",
         "withMinutes_other": "{{memberNames}} · {{count}} min esta semana",
         "withSessions_one": "{{memberNames}} · {{count}} sessao esta semana",
         "withSessions_other": "{{memberNames}} · {{count}} sessoes esta semana",
         "noActivity": "{{memberNames}} · sem sessoes esta semana",
-        "childMinutes_one": "{{memberNames}}: {{count}} min esta semana",
-        "childMinutes_other": "{{memberNames}}: {{count}} min esta semana",
-        "childSessions_one": "{{memberNames}}: {{count}} sessao esta semana",
-        "childSessions_other": "{{memberNames}}: {{count}} sessoes esta semana",
-        "childNoActivity": "{{memberNames}}: sem sessoes esta semana",
-        "parentLearningWithTopic": "Voce: {{topicTitle}} em {{subjectName}}",
-        "parentLearningWithSubject": "Voce: {{subjectName}}",
-        "parentExampleLead": "Voce lidera pelo exemplo.",
-        "parentExampleNudge": "Mostre como se faz: comece uma sessao rapida.",
         "attentionChild": "{{childName}} pode precisar de atencao",
         "profileLimit": "{{count}} de {{max}} perfis usados",
         "addProfileAction": "Adicionar perfil",
@@ -183,24 +173,13 @@
       "encouragementNote": "Nudges sao incentivos breves e gentis, sem resposta obrigatoria.",
       "transitionNoticeTitle": "Agora você orienta {{childNames}}",
       "transitionNoticeBody": "Experimente uma destas perguntas para puxar conversa hoje à noite.",
-      "recentActivity": {
-        "title": "Atividade recente das crianças"
-      },
-      "studyActivation": {
-        "title": "Quer estudar também?",
-        "body": "Mude para Meu aprendizado quando for sua hora de estudar.",
-        "action": "Ir para Meu aprendizado"
-      },
       "cards": {
         "checkChild": "Ver como {{childName}} esta indo",
         "checkChildFallback": "Toque para ver o progresso desta semana",
         "weeklyReport": "Ler o relatorio semanal de {{childName}}",
         "weeklyReportSubtitle": "Veja o resumo mais recente",
         "sendNudge": "Enviar um incentivo para {{childName}}",
-        "sendNudgeSubtitle": "Escolha uma mensagem curta de apoio",
-        "continueOwn": "Continuar seu proprio aprendizado",
-        "continueOwnSubtitle": "Continue {{topicTitle}} em {{subjectName}}",
-        "continueOwnEmptySubtitle": "Continue de onde parou"
+        "sendNudgeSubtitle": "Escolha uma mensagem curta de apoio"
       },
       "snapshot": {
         "noActivity": "Nenhuma atividade esta semana",
@@ -211,12 +190,13 @@
         "titleMorning": "Ideias para conversar",
         "titleAfternoon": "Ideias para conversar",
         "titleEvening": "Ideias para conversar",
-        "promptWithTopic": "O que fez {{topic}} fazer sentido hoje?",
-        "promptNoActivity": "O que tornaria fácil começar esta noite?",
-        "promptFallback": "O que foi mais fácil hoje do que ontem?",
+        "promptWithTopic": "O que ficou mais claro em {{topic}} esta semana?",
+        "promptNoActivity": "O que tornaria fácil começar esta semana?",
+        "promptFallback": "O que foi mais fácil esta semana do que da última vez?",
         "promptTrickiestWithTopic": "Qual é a parte mais difícil de {{topic}} agora?",
-        "promptTomorrow": "No que devemos focar amanhã?",
-        "promptCurious": "Há algo que você tem curiosidade em aprender?"
+        "promptNextGoalWithTopic": "Querem escolher uma pequena meta de {{topic}} para esta semana?",
+        "promptRestartWithTopic": "Querem escolher uma pequena meta de {{topic}} para esta semana?",
+        "promptRestartEasierWithTopic": "Devemos tornar mais fácil retomar {{topic}}?"
       },
       "empty": {
         "title": "Your family dashboard starts here",

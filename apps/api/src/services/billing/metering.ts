@@ -3,7 +3,7 @@
 // decrementQuota, incrementQuota
 // ---------------------------------------------------------------------------
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, notInArray, sql, type SQL } from 'drizzle-orm';
 import {
   quotaPools,
   profiles,
@@ -236,27 +236,43 @@ export async function decrementQuota(
   // 2. Monthly exhausted, daily OK — fall back to top-up credits (FIFO)
   const now = new Date();
   const topUpResult = await db.transaction(async (tx) => {
-    const topUp = await tx.query.topUpCredits.findFirst({
-      where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
-        AND ${topUpCredits.remaining} > 0
-        AND ${topUpCredits.expiresAt} > ${now}`,
-      orderBy: sql`${topUpCredits.purchasedAt} ASC`,
-    });
+    let updatedTopUp: typeof topUpCredits.$inferSelect | undefined;
+    const contendedTopUpIds: string[] = [];
+    while (!updatedTopUp) {
+      const topUpConditions: SQL[] = [
+        eq(topUpCredits.subscriptionId, subscriptionId),
+        sql`${topUpCredits.remaining} > 0`,
+        sql`${topUpCredits.expiresAt} > ${now}`,
+      ];
+      if (contendedTopUpIds.length > 0) {
+        topUpConditions.push(notInArray(topUpCredits.id, contendedTopUpIds));
+      }
+      const topUp = await tx.query.topUpCredits.findFirst({
+        where: and(...topUpConditions),
+        orderBy: sql`${topUpCredits.purchasedAt} ASC, ${topUpCredits.id} ASC`,
+      });
 
-    if (!topUp) return null;
+      if (!topUp) return null;
+      if (contendedTopUpIds.includes(topUp.id)) return null;
 
-    // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it)
-    const [updatedTopUp] = await tx
-      .update(topUpCredits)
-      .set({
-        remaining: sql`${topUpCredits.remaining} - 1`,
-      })
-      .where(
-        and(eq(topUpCredits.id, topUp.id), sql`${topUpCredits.remaining} > 0`),
-      )
-      .returning();
+      // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it).
+      [updatedTopUp] = await tx
+        .update(topUpCredits)
+        .set({
+          remaining: sql`${topUpCredits.remaining} - 1`,
+        })
+        .where(
+          and(
+            eq(topUpCredits.id, topUp.id),
+            sql`${topUpCredits.remaining} > 0`,
+          ),
+        )
+        .returning();
 
-    if (!updatedTopUp) return null;
+      if (!updatedTopUp) {
+        contendedTopUpIds.push(topUp.id);
+      }
+    }
 
     // [S-2 / BUG-627] Atomically increment usedToday WITH a daily-limit
     // guard. The previous unguarded UPDATE allowed two concurrent top-up
@@ -314,6 +330,28 @@ export async function decrementQuota(
 
   if (topUpResult) {
     return topUpResult;
+  }
+
+  // A concurrent request can consume the last daily slot after the monthly
+  // failure snapshot but before/while we lose a contended top-up decrement.
+  // Re-read once so callers see the real hard-stop reason instead of a generic
+  // "none" exhaustion classification.
+  const latestPool = await findQuotaPool__unscoped(db, subscriptionId);
+  if (
+    latestPool &&
+    latestPool.dailyLimit !== null &&
+    latestPool.usedToday >= latestPool.dailyLimit
+  ) {
+    return {
+      success: false,
+      source: 'daily_exceeded',
+      remainingMonthly: Math.max(
+        0,
+        latestPool.monthlyLimit - latestPool.usedThisMonth,
+      ),
+      remainingTopUp: 0,
+      remainingDaily: 0,
+    };
   }
 
   // 3. Both exhausted or no top-ups available

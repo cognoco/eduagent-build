@@ -55,6 +55,7 @@ const mockGoBackOrReplace = jest.fn();
 jest.mock('../../../lib/navigation', () => ({
   ...jest.requireActual('../../../lib/navigation'),
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  PRACTICE_HREF: '/(app)/practice',
 }));
 
 jest.mock('../../../lib/platform-alert', () => ({
@@ -100,6 +101,8 @@ const DictationChoiceScreen = require('./index').default as React.ComponentType;
 describe('DictationChoiceScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGenerateMutateAsync.mockReset();
+    mockGenerateReset.mockReset();
     jest.useFakeTimers();
     mockGenerateIsPending = false;
   });
@@ -113,6 +116,21 @@ describe('DictationChoiceScreen', () => {
     const { getByTestId } = render(<DictationChoiceScreen />);
     getByTestId('dictation-homework');
     getByTestId('dictation-surprise');
+  });
+
+  it('returns to the practice hub from the choice screen', () => {
+    const { getByTestId } = render(<DictationChoiceScreen />);
+
+    fireEvent.press(getByTestId('dictation-choice-back'));
+
+    // goBackOrReplace pops the dictation entry when canGoBack, preserving the
+    // practice screen's existing params (returnTo, etc.) — the prior
+    // router.replace(PRACTICE_HREF) regressed cross-tab back chain by
+    // remounting practice without params.
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/practice',
+    );
   });
 
   it('calls generateMutation when Surprise Me is pressed', async () => {
@@ -232,5 +250,46 @@ describe('DictationChoiceScreen', () => {
 
     // The timeout set cancelledRef; push must be blocked
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('[WI-78 DS-178] blocks duplicate generation while the first attempt is in flight', async () => {
+    let resolveFirst!: (v: unknown) => void;
+    mockGenerateMutateAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
+
+    const { getByTestId } = render(<DictationChoiceScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('dictation-surprise'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('dictation-surprise'));
+      await Promise.resolve();
+    });
+
+    expect(mockGenerateMutateAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirst({
+        sentences: [{ text: 'Only prompt.' }],
+        language: 'en',
+        title: 'Only',
+        topic: 'only',
+      });
+      await Promise.resolve();
+    });
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(mockSetData).toHaveBeenCalledTimes(1);
+    expect(mockSetData).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Only', topic: 'only' }),
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 });

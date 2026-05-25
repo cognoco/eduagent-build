@@ -338,6 +338,119 @@ describe('updateSubscriptionFromWebhook', () => {
     expect(result!.lastStripeEventTimestamp).toBe(newerTs.toISOString());
   });
 
+  it('[WI-78 DS-176] applies distinct Stripe events created in the same second', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('webhook-same-second-distinct');
+
+    const ts = new Date('2026-06-10T10:00:00.000Z');
+    await db.insert(subscriptions).values({
+      accountId: acct.id,
+      tier: 'plus',
+      status: 'active',
+      stripeSubscriptionId: 'sub_same_second_001',
+      lastStripeEventTimestamp: ts,
+      lastStripeEventId: 'evt_same_second_first',
+    });
+
+    const result = await updateSubscriptionFromWebhook(
+      db,
+      'sub_same_second_001',
+      {
+        status: 'cancelled',
+        lastStripeEventTimestamp: ts.toISOString(),
+        stripeEventId: 'evt_same_second_second',
+      },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('cancelled');
+    expect(result!.lastStripeEventTimestamp).toBe(ts.toISOString());
+
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('cancelled');
+    expect(row!.lastStripeEventId).toBe('evt_same_second_second');
+  });
+
+  it('[WI-78 review] rejects same-second payment_failed after active recovery', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('webhook-same-second-past-due-stale');
+
+    const ts = new Date('2026-06-10T10:00:00.000Z');
+    await db.insert(subscriptions).values({
+      accountId: acct.id,
+      tier: 'plus',
+      status: 'active',
+      stripeSubscriptionId: 'sub_same_second_past_due_001',
+      lastStripeEventTimestamp: ts,
+      lastStripeEventId: 'evt_payment_succeeded_same_second',
+    });
+
+    const result = await updateSubscriptionFromWebhook(
+      db,
+      'sub_same_second_past_due_001',
+      {
+        status: 'past_due',
+        lastStripeEventTimestamp: ts.toISOString(),
+        stripeEventId: 'evt_payment_failed_same_second',
+      },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        lastStripeEventId: 'evt_payment_succeeded_same_second',
+        webhookApplied: false,
+      }),
+    );
+
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('active');
+    expect(row!.lastStripeEventId).toBe('evt_payment_succeeded_same_second');
+  });
+
+  it('[WI-78 review] applies a distinct same-second active recovery after payment_failed', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('webhook-same-second-active-recovery');
+
+    const ts = new Date('2026-06-10T10:00:00.000Z');
+    await db.insert(subscriptions).values({
+      accountId: acct.id,
+      tier: 'plus',
+      status: 'past_due',
+      stripeSubscriptionId: 'sub_same_second_active_recovery_001',
+      lastStripeEventTimestamp: ts,
+      lastStripeEventId: 'evt_payment_failed_same_second',
+    });
+
+    const result = await updateSubscriptionFromWebhook(
+      db,
+      'sub_same_second_active_recovery_001',
+      {
+        status: 'active',
+        lastStripeEventTimestamp: ts.toISOString(),
+        stripeEventId: 'evt_payment_succeeded_same_second',
+      },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        lastStripeEventId: 'evt_payment_succeeded_same_second',
+        webhookApplied: true,
+      }),
+    );
+
+    const row = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, acct.id),
+    });
+    expect(row!.status).toBe('active');
+    expect(row!.lastStripeEventId).toBe('evt_payment_succeeded_same_second');
+  });
+
   // [BREAK CR-2026-05-19-M11] Two concurrent deliveries of the same Stripe event
   // ID must result in exactly ONE write. Pre-fix: both calls saw "not yet processed"
   // (timestamp ordering check outside tx) and both wrote — divergent billing state.
@@ -593,6 +706,22 @@ describe('updateQuotaPoolLimit', () => {
     // Usage counts preserved (mid-cycle change)
     expect(pool!.usedThisMonth).toBe(50);
     expect(pool!.usedToday).toBe(3);
+  });
+
+  it('[WI-78 review] rejects when quota pool is missing', async () => {
+    const db = createIntegrationDb();
+    const acct = await seedAccount('update-pool-limit-missing');
+    const sub = await createSubscription(
+      db,
+      acct.id,
+      'free',
+      getTierConfig('free').monthlyQuota,
+    );
+    await db.delete(quotaPools).where(eq(quotaPools.subscriptionId, sub.id));
+
+    await expect(updateQuotaPoolLimit(db, sub.id, 700, null)).rejects.toThrow(
+      'quota pool',
+    );
   });
 });
 

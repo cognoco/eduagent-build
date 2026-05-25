@@ -15,10 +15,11 @@ import {
   ensureFreeSubscription,
   isRevenuecatEventProcessed,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
-  updateQuotaPoolLimit,
-  transitionToExtendedTrial,
+  transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
+  type AppliedSubscriptionRow,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
@@ -34,6 +35,17 @@ import type { Database } from '@eduagent/database';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
 export const LATE_REVENUECAT_EVENT_OBSERVATION_MS = 48 * 60 * 60 * 1000;
+
+function shouldRefreshRevenuecatKv(
+  updated: AppliedSubscriptionRow | null,
+  eventId: string,
+): updated is AppliedSubscriptionRow {
+  return (
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastRevenuecatEventId === eventId)
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
@@ -274,10 +286,10 @@ async function handleRenewal(
   // (period_type !== 'TRIAL').
   const isTrial = event.period_type === 'TRIAL';
 
-  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
+  const renewalUpdates = {
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
-    status: 'active',
+    status: 'active' as const,
     // Only include tier when the event actually signals a different product tier.
     // Omitting the key entirely prevents any DB write to the tier column.
     ...(tierChanged && eventTier ? { tier: eventTier } : {}),
@@ -291,20 +303,27 @@ async function handleRenewal(
     // Preserve trialEndsAt during trial-period renewals by omitting it;
     // clear it on conversion to active (period_type !== 'TRIAL').
     ...(isTrial ? {} : { trialEndsAt: null }),
-  });
+  };
 
   // Only update quota pool when the tier actually changed.
-  if (updated && tierChanged && eventTier) {
-    const tierConfig = getTierConfig(eventTier);
-    await updateQuotaPoolLimit(
-      db,
-      updated.id,
-      tierConfig.monthlyQuota,
-      tierConfig.dailyLimit,
-    );
-  }
+  const updated =
+    tierChanged && eventTier
+      ? await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+          db,
+          accountId,
+          renewalUpdates,
+          {
+            monthlyQuota: getTierConfig(eventTier).monthlyQuota,
+            dailyLimit: getTierConfig(eventTier).dailyLimit,
+          },
+        )
+      : await updateSubscriptionFromRevenuecatWebhook(
+          db,
+          accountId,
+          renewalUpdates,
+        );
 
-  if (updated) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -342,7 +361,7 @@ async function handleCancellation(
     cancelledAt: new Date().toISOString(),
   });
 
-  if (updated) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -375,49 +394,47 @@ async function handleExpiration(
     // Trial expiration triggers the reverse trial soft landing:
     // Days 15-28: extended access at 450 questions/month (15/day)
     // The daily trial-expiry Inngest function handles Day 29+ transition to free.
-    await transitionToExtendedTrial(
+    const updated = await transitionToExtendedTrialFromRevenuecatEvent(
       db,
       existingSub.id,
       EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
+      event.id,
+      event.event_timestamp_ms,
     );
 
-    // Record the event for idempotency
-    await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
-      eventId: event.id,
-      eventTimestampMs: event.event_timestamp_ms,
-      // transitionToExtendedTrial already set status to 'expired' and tier to 'free'
-      // but we need to record the eventId without overwriting those values
-    });
-
-    await safeRefreshKvCache(
-      kv,
-      db,
-      accountId,
-      'revenuecat.webhook.handleExpiration.trial',
-      {
-        eventId: event.id,
-      },
-    );
+    if (shouldRefreshRevenuecatKv(updated, event.id)) {
+      await safeRefreshKvCache(
+        kv,
+        db,
+        accountId,
+        'revenuecat.webhook.handleExpiration.trial',
+        {
+          eventId: event.id,
+        },
+      );
+    }
     return;
   }
 
   // Non-trial expiration: downgrade to free tier immediately
-  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
-    eventId: event.id,
-    eventTimestampMs: event.event_timestamp_ms,
-    status: 'expired',
-    tier: 'free',
-    cancelledAt: new Date().toISOString(),
-  });
+  const freeConfig = getTierConfig('free');
+  const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+    db,
+    accountId,
+    {
+      eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
+      status: 'expired',
+      tier: 'free',
+      cancelledAt: new Date().toISOString(),
+    },
+    {
+      monthlyQuota: freeConfig.monthlyQuota,
+      dailyLimit: freeConfig.dailyLimit,
+    },
+  );
 
-  if (updated) {
-    const freeConfig = getTierConfig('free');
-    await updateQuotaPoolLimit(
-      db,
-      updated.id,
-      freeConfig.monthlyQuota,
-      freeConfig.dailyLimit,
-    );
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -444,7 +461,12 @@ async function handleBillingIssue(
     status: 'past_due',
   });
 
-  if (updated) {
+  const shouldDispatchBillingIssue =
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastRevenuecatEventId === event.id);
+
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -454,10 +476,15 @@ async function handleBillingIssue(
         eventId: event.id,
       },
     );
+  }
 
+  if (!updated) return;
+
+  if (shouldDispatchBillingIssue) {
     // core-send: payment-failed alert - billing observability cannot be silent.
     // A swallowed dispatch leaves the failed payment unobserved by alerting.
     await inngest.send({
+      id: `revenuecat-payment-failed:${event.id}`,
       name: 'app/payment.failed',
       data: {
         subscriptionId: updated.id,
@@ -569,21 +596,23 @@ async function handleProductChange(
     return;
   }
 
-  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
-    eventId: event.id,
-    eventTimestampMs: event.event_timestamp_ms,
-    tier: newTier,
-    status: 'active',
-  });
+  const tierConfig = getTierConfig(newTier);
+  const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+    db,
+    accountId,
+    {
+      eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
+      tier: newTier,
+      status: 'active',
+    },
+    {
+      monthlyQuota: tierConfig.monthlyQuota,
+      dailyLimit: tierConfig.dailyLimit,
+    },
+  );
 
-  if (updated) {
-    const tierConfig = getTierConfig(newTier);
-    await updateQuotaPoolLimit(
-      db,
-      updated.id,
-      tierConfig.monthlyQuota,
-      tierConfig.dailyLimit,
-    );
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -699,7 +728,7 @@ async function handleUncancellation(
     cancelledAt: null,
   });
 
-  if (updated) {
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
     await safeRefreshKvCache(
       kv,
       db,
@@ -807,7 +836,7 @@ export const revenuecatWebhookRoute = new Hono<{
     event.id,
     event.event_timestamp_ms,
   );
-  if (alreadyProcessed) {
+  if (alreadyProcessed && event.type !== 'BILLING_ISSUE') {
     return c.json({ received: true, skipped: true });
   }
 

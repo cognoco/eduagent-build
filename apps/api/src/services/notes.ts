@@ -10,8 +10,13 @@ import {
 } from '@eduagent/database';
 import type { AllNote } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
+import { createLogger } from './logger';
+import { captureException } from './sentry';
 
 const MAX_NOTES_PER_TOPIC = 50;
+const POSTGRES_UNDEFINED_COLUMN = '42703';
+
+const logger = createLogger();
 
 /**
  * Raw DB row shape returned by neon-serverless for timestamp columns.
@@ -46,6 +51,71 @@ type MappedNoteRow = {
   updatedAt: string;
 };
 
+type AllNoteRow = Omit<AllNote, 'createdAt' | 'updatedAt'> & {
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function isMissingTopicNotesSessionIdColumn(error: unknown): boolean {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : '';
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+
+  // Require the literal "topic_notes.session_id" (optionally double-quoted) as
+  // a contiguous fragment of the Postgres error message. The previous matcher
+  // (two separate /topic_notes/ + /session_id/ tests) would fire on any 42703
+  // that happened to mention both tokens — e.g. a future query joining
+  // topic_notes with another table that references a different `session_id`
+  // column — silently routing through the legacy fallback and nulling out
+  // sessionId. The schema-drift hedge must only catch its one specific case.
+  return (
+    code === POSTGRES_UNDEFINED_COLUMN &&
+    /topic_notes\."?session_id"?/i.test(message)
+  );
+}
+
+function reportMissingTopicNotesSessionIdColumn(
+  error: unknown,
+  operation: string,
+  profileId: string,
+): void {
+  logger.warn('notes.topic_notes_session_id_missing', {
+    operation,
+    profileId,
+  });
+  captureException(error, {
+    profileId,
+    tags: {
+      surface: 'notes.session_id_schema_drift',
+      operation,
+    },
+  });
+}
+
+async function withTopicNotesSessionIdFallback<T>(
+  operation: string,
+  profileId: string,
+  primary: () => Promise<T>,
+  legacy: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await primary();
+  } catch (error) {
+    if (!isMissingTopicNotesSessionIdColumn(error)) {
+      throw error;
+    }
+    reportMissingTopicNotesSessionIdColumn(error, operation, profileId);
+    return legacy();
+  }
+}
+
 /**
  * Normalise a raw Drizzle NoteRow (neon-serverless returns Date objects for
  * timestamp columns) to the API-contract shape with ISO 8601 strings.
@@ -59,6 +129,12 @@ function mapNoteRow(row: NoteRow): MappedNoteRow {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function noteSessionIdSelection(includeSessionId: boolean): SQL<string | null> {
+  return includeSessionId
+    ? sql`${topicNotes.sessionId}`
+    : sql<string | null>`null`;
 }
 
 /**
@@ -264,16 +340,7 @@ export async function getNotesForBook(
   profileId: string,
   subjectId: string,
   bookId: string,
-): Promise<
-  {
-    id: string;
-    topicId: string;
-    sessionId: string | null;
-    content: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }[]
-> {
+): Promise<NoteRow[]> {
   // Verify subject belongs to profile
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
@@ -304,11 +371,25 @@ export async function getNotesForBook(
 
   const topicIds = topics.map((t) => t.id);
 
+  return withTopicNotesSessionIdFallback(
+    'getNotesForBook',
+    profileId,
+    () => selectNotesForTopicIds(db, profileId, topicIds, true),
+    () => selectNotesForTopicIds(db, profileId, topicIds, false),
+  );
+}
+
+async function selectNotesForTopicIds(
+  db: Database,
+  profileId: string,
+  topicIds: string[],
+  includeSessionId: boolean,
+): Promise<NoteRow[]> {
   return db
     .select({
       id: topicNotes.id,
       topicId: topicNotes.topicId,
-      sessionId: topicNotes.sessionId,
+      sessionId: noteSessionIdSelection(includeSessionId),
       content: topicNotes.content,
       createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,
@@ -367,27 +448,12 @@ export async function listAllNotes(
     conditions.push(lt(topicNotes.id, options.cursor));
   }
 
-  const rows = await db
-    .select({
-      id: topicNotes.id,
-      topicId: topicNotes.topicId,
-      topicTitle: curriculumTopics.title,
-      bookId: curriculumBooks.id,
-      bookTitle: curriculumBooks.title,
-      subjectId: subjects.id,
-      subjectName: subjects.name,
-      sessionId: topicNotes.sessionId,
-      content: topicNotes.content,
-      createdAt: topicNotes.createdAt,
-      updatedAt: topicNotes.updatedAt,
-    })
-    .from(topicNotes)
-    .innerJoin(curriculumTopics, eq(topicNotes.topicId, curriculumTopics.id))
-    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
-    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
-    .where(and(...conditions))
-    .orderBy(desc(topicNotes.id))
-    .limit(limit + 1);
+  const rows = await withTopicNotesSessionIdFallback(
+    'listAllNotes',
+    profileId,
+    () => selectAllNoteRows(db, conditions, limit, true),
+    () => selectAllNoteRows(db, conditions, limit, false),
+  );
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
@@ -400,6 +466,35 @@ export async function listAllNotes(
     })),
     nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
   };
+}
+
+async function selectAllNoteRows(
+  db: Database,
+  conditions: SQL[],
+  limit: number,
+  includeSessionId: boolean,
+): Promise<AllNoteRow[]> {
+  return db
+    .select({
+      id: topicNotes.id,
+      topicId: topicNotes.topicId,
+      topicTitle: curriculumTopics.title,
+      bookId: curriculumBooks.id,
+      bookTitle: curriculumBooks.title,
+      subjectId: subjects.id,
+      subjectName: subjects.name,
+      sessionId: noteSessionIdSelection(includeSessionId),
+      content: topicNotes.content,
+      createdAt: topicNotes.createdAt,
+      updatedAt: topicNotes.updatedAt,
+    })
+    .from(topicNotes)
+    .innerJoin(curriculumTopics, eq(topicNotes.topicId, curriculumTopics.id))
+    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
+    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
+    .where(and(...conditions))
+    .orderBy(desc(topicNotes.id))
+    .limit(limit + 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -481,23 +576,28 @@ export async function getNotesForTopic(
   profileId: string,
   subjectId: string,
   topicId: string,
-): Promise<
-  {
-    id: string;
-    topicId: string;
-    sessionId: string | null;
-    content: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }[]
-> {
+): Promise<NoteRow[]> {
   await verifyTopicOwnership(db, profileId, subjectId, topicId);
 
+  return withTopicNotesSessionIdFallback(
+    'getNotesForTopic',
+    profileId,
+    () => selectNotesForTopic(db, profileId, topicId, true),
+    () => selectNotesForTopic(db, profileId, topicId, false),
+  );
+}
+
+async function selectNotesForTopic(
+  db: Database,
+  profileId: string,
+  topicId: string,
+  includeSessionId: boolean,
+): Promise<NoteRow[]> {
   return db
     .select({
       id: topicNotes.id,
       topicId: topicNotes.topicId,
-      sessionId: topicNotes.sessionId,
+      sessionId: noteSessionIdSelection(includeSessionId),
       content: topicNotes.content,
       createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,

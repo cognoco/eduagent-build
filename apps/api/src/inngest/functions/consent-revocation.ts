@@ -1,16 +1,15 @@
 // @inngest-admin: parent-chain (profiles updated with explicit childProfileId + archivedAt guard)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { and, eq, isNull } from 'drizzle-orm';
-import { profiles } from '@eduagent/database';
+import { sql } from 'drizzle-orm';
 import {
   calculateAge,
   getFamilyOwnerProfileId,
-  getConsentStatus,
+  isConsentRevocationGenerationCurrent,
   getProfileForConsentRevocation,
   getProfileDisplayName,
 } from '../../services/consent';
-import { deleteProfile } from '../../services/deletion';
+import { deleteProfileIfConsentWithdrawn } from '../../services/deletion';
 import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
 import {
@@ -36,14 +35,21 @@ export const consentRevocation = inngest.createFunction(
     name: 'Process consent revocation with grace period',
     retries: 5,
     // [FIX-INNGEST-3] Operator re-fires or replay after a 7-day sleep jump must
-    // not trigger a second cascade delete. idempotency dedupes within 24h;
+    // not trigger a second cascade delete. idempotency dedupes within 24h.
+    // Include revokedAt so a restore + new withdrawal gets a fresh grace run.
     // concurrency(limit:1) serialises any concurrent runs for the same child.
-    idempotency: 'event.data.childProfileId',
+    idempotency: 'event.data.childProfileId + "-" + event.data.revokedAt',
     concurrency: { key: 'event.data.childProfileId', limit: 1 },
   },
   { event: 'app/consent.revoked' },
   async ({ event, step }) => {
-    const { childProfileId, parentProfileId } = event.data;
+    const { childProfileId, parentProfileId, revokedAt } = event.data;
+    const revokedAtDate =
+      typeof revokedAt === 'string' ? new Date(revokedAt) : undefined;
+    const revocationRespondedAt =
+      revokedAtDate && !Number.isNaN(revokedAtDate.getTime())
+        ? revokedAtDate
+        : undefined;
 
     // Immediately soft-clear all unread nudges to the child so they don't
     // see stale encouragements during the 7-day grace period.
@@ -57,8 +63,12 @@ export const consentRevocation = inngest.createFunction(
 
     await step.run('send-warning-push', async () => {
       const db = getStepDatabase();
-      const status = await getConsentStatus(db, childProfileId);
-      if (status !== 'WITHDRAWN') {
+      const isCurrentRevocation = await isConsentRevocationGenerationCurrent(
+        db,
+        childProfileId,
+        revocationRespondedAt,
+      );
+      if (!isCurrentRevocation) {
         return { sent: false, reason: 'restored' };
       }
 
@@ -88,8 +98,11 @@ export const consentRevocation = inngest.createFunction(
     // Check if consent was restored during grace period
     const restored = await step.run('check-restoration', async () => {
       const db = getStepDatabase();
-      const status = await getConsentStatus(db, childProfileId);
-      return status === 'CONSENTED';
+      return !(await isConsentRevocationGenerationCurrent(
+        db,
+        childProfileId,
+        revocationRespondedAt,
+      ));
     });
 
     if (restored) {
@@ -135,16 +148,34 @@ export const consentRevocation = inngest.createFunction(
         'archive-child-profile',
         async () => {
           const db = getStepDatabase();
-          const status = await getConsentStatus(db, childProfileId);
-          if (status !== 'WITHDRAWN') {
+          const isCurrentRevocation =
+            await isConsentRevocationGenerationCurrent(
+              db,
+              childProfileId,
+              revocationRespondedAt,
+            );
+          if (!isCurrentRevocation) {
             return { archived: false, reason: 'consent_restored' };
           }
-          await db
-            .update(profiles)
-            .set({ archivedAt: new Date() })
-            .where(
-              and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
-            );
+          const archivedAt = new Date();
+          const archiveResult = await db.execute(sql`
+            WITH locked_consent AS (
+              SELECT 1 FROM consent_states
+              WHERE consent_states.profile_id = ${childProfileId}
+              AND consent_states.consent_type = 'GDPR'
+              AND consent_states.status = 'WITHDRAWN'
+              ${revocationRespondedAt ? sql`AND consent_states.responded_at = ${revocationRespondedAt}` : sql``}
+              FOR UPDATE
+            )
+            UPDATE profiles
+            SET archived_at = ${archivedAt}
+            WHERE id = ${childProfileId}
+            AND archived_at IS NULL
+            AND EXISTS (SELECT 1 FROM locked_consent)
+          `);
+          if ((archiveResult.rowCount ?? 0) === 0) {
+            return { archived: false, reason: 'consent_restored' };
+          }
           return { archived: true };
         },
       );
@@ -211,6 +242,14 @@ export const consentRevocation = inngest.createFunction(
     // observability story consistent across cron-driven push paths.
     await step.run('notify-child', async () => {
       const db = getStepDatabase();
+      const isCurrentRevocation = await isConsentRevocationGenerationCurrent(
+        db,
+        childProfileId,
+        revocationRespondedAt,
+      );
+      if (!isCurrentRevocation) {
+        return { sent: false, reason: 'consent_restored' };
+      }
       const recentCount = await getRecentNotificationCount(
         db,
         childProfileId,
@@ -230,10 +269,19 @@ export const consentRevocation = inngest.createFunction(
     });
 
     // Delete child profile (FK cascades handle all data)
-    await step.run('delete-child-profile', async () => {
+    const deleteResult = await step.run('delete-child-profile', async () => {
       const db = getStepDatabase();
-      await deleteProfile(db, childProfileId);
+      return revocationRespondedAt
+        ? deleteProfileIfConsentWithdrawn(
+            db,
+            childProfileId,
+            revocationRespondedAt,
+          )
+        : deleteProfileIfConsentWithdrawn(db, childProfileId);
     });
+    if (!deleteResult) {
+      return { status: 'restored', childProfileId };
+    }
 
     // Notify parent of completion. [BUG-699-FOLLOWUP] same 24h dedup as the
     // child-side notify above — duplicate revocation events would otherwise

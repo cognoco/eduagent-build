@@ -45,6 +45,7 @@ import type {
 import {
   celebrationReasonSchema,
   extractedInterviewSignalsSchema,
+  homeworkSummarySchema,
   llmSummarySchema,
   engagementSignalSchema,
   MAX_EXCHANGES_PER_SESSION,
@@ -65,7 +66,7 @@ import { routeAndCall, extractFirstJsonObject } from '../llm';
 import type { ChatMessage } from '../llm';
 import { escapeXml } from '../llm/sanitize';
 import { createLogger } from '../logger';
-import { addBreadcrumb } from '../sentry';
+import { addBreadcrumb, captureException } from '../sentry';
 import type { TimedEvent } from './session-context-builders';
 import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
 
@@ -1607,6 +1608,61 @@ export function formatSessionDisplayTitle(
   }
 }
 
+function asNonNegativeInt(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function normalizeHomeworkSummary(raw: unknown): HomeworkSummary | null {
+  const parsed = homeworkSummarySchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  if (!isRecord(raw)) return null;
+
+  const summary =
+    typeof raw['summary'] === 'string' && raw['summary'].trim().length > 0
+      ? raw['summary'].trim()
+      : null;
+  if (!summary) return null;
+
+  // Schema-drift hedge: legacy/partial homework metadata. Surface in
+  // observability so persistent drift is queryable rather than silently
+  // fabricated downstream. Mirrors the notes.ts session_id fallback pattern.
+  logger.warn('session.homework_summary_schema_drift', {
+    issueCount: parsed.error.issues.length,
+    firstIssuePath: parsed.error.issues[0]?.path.join('.') ?? '',
+  });
+  captureException(parsed.error, {
+    tags: {
+      surface: 'session.homework_summary_schema_drift',
+    },
+  });
+
+  const displayTitle =
+    typeof raw['displayTitle'] === 'string' &&
+    raw['displayTitle'].trim().length > 0
+      ? raw['displayTitle'].trim()
+      : 'Homework';
+  const practicedSkills = Array.isArray(raw['practicedSkills'])
+    ? raw['practicedSkills'].filter(
+        (skill): skill is string => typeof skill === 'string',
+      )
+    : [];
+
+  return {
+    problemCount: asNonNegativeInt(raw['problemCount']),
+    practicedSkills,
+    independentProblemCount: asNonNegativeInt(raw['independentProblemCount']),
+    guidedProblemCount: asNonNegativeInt(raw['guidedProblemCount']),
+    summary,
+    displayTitle,
+  };
+}
+
 export function parseEngagementSignal(
   raw: string | null | undefined,
 ): EngagementSignal | null {
@@ -1773,7 +1829,9 @@ async function hydrateChildSessions(
     .filter((s) => subjectNameById.has(s.subjectId))
     .map((s) => {
       const metadata = getSessionMetadata(s.metadata);
-      const homeworkSummary = metadata.homeworkSummary ?? null;
+      const homeworkSummary = normalizeHomeworkSummary(
+        metadata.homeworkSummary ?? null,
+      );
 
       const summary = summaryBySession.get(s.id);
       const topic = s.topicId ? topicById.get(s.topicId) : null;

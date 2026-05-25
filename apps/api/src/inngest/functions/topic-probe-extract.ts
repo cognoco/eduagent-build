@@ -1,5 +1,5 @@
 // @inngest-admin: parent-chain (sessionEvents.profileId enforced in WHERE)
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 import {
   curriculumBooks,
@@ -235,28 +235,35 @@ export async function handleTopicProbeExtract({
 
   await step.run('persist-session-metadata', async () => {
     const db = getStepDatabase();
-    const [fresh] = await db
-      .select({ metadata: learningSessions.metadata })
-      .from(learningSessions)
-      .where(
-        and(
-          eq(learningSessions.id, payload.sessionId),
-          eq(learningSessions.profileId, payload.profileId),
+    const extractedAt = new Date().toISOString();
+    const basePatch = sql`jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          COALESCE(${learningSessions.metadata}, '{}'::jsonb),
+          '{extractedSignals}',
+          ${JSON.stringify(parsedSignals)}::jsonb,
+          true
         ),
-      )
-      .limit(1);
-    const metadata = {
-      ...((fresh?.metadata as Record<string, unknown> | null) ?? {}),
-      extractedSignals: parsedSignals,
-      topicProbeExtractedAt: new Date().toISOString(),
-      topicProbeExtractionStatus: 'completed',
-      ...(priorKnowledgeQuality != null
-        ? { topicProbePriorKnowledgeQuality: priorKnowledgeQuality }
-        : {}),
-    };
+        '{topicProbeExtractedAt}',
+        ${JSON.stringify(extractedAt)}::jsonb,
+        true
+      ),
+      '{topicProbeExtractionStatus}',
+      '"completed"'::jsonb,
+      true
+    )`;
+    const metadataPatch =
+      priorKnowledgeQuality != null
+        ? sql`jsonb_set(
+            ${basePatch},
+            '{topicProbePriorKnowledgeQuality}',
+            ${JSON.stringify(priorKnowledgeQuality)}::jsonb,
+            true
+          )`
+        : basePatch;
     await db
       .update(learningSessions)
-      .set({ metadata, updatedAt: new Date() })
+      .set({ metadata: metadataPatch, updatedAt: new Date() })
       .where(
         and(
           eq(learningSessions.id, payload.sessionId),
@@ -311,29 +318,22 @@ export const topicProbeExtract = inngest.createFunction(
 
       try {
         const db = getStepDatabase();
-        const [fresh] = await db
-          .select({ metadata: learningSessions.metadata })
-          .from(learningSessions)
-          .where(
-            and(
-              eq(learningSessions.id, payload.sessionId),
-              eq(learningSessions.profileId, payload.profileId),
-            ),
-          )
-          .limit(1);
         await db
           .update(learningSessions)
           .set({
-            metadata: {
-              ...((fresh?.metadata as Record<string, unknown> | null) ?? {}),
-              topicProbeExtractionStatus: 'failed',
-            },
+            metadata: sql`jsonb_set(
+              COALESCE(${learningSessions.metadata}, '{}'::jsonb),
+              '{topicProbeExtractionStatus}',
+              '"failed"'::jsonb,
+              true
+            )`,
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(learningSessions.id, payload.sessionId),
               eq(learningSessions.profileId, payload.profileId),
+              sql`COALESCE(${learningSessions.metadata} ->> 'topicProbeExtractionStatus', '') <> 'completed'`,
             ),
           );
       } catch (cleanupError) {

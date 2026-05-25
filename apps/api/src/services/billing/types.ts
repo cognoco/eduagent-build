@@ -22,9 +22,17 @@ export interface SubscriptionRow {
   currentPeriodEnd: string | null;
   cancelledAt: string | null;
   lastStripeEventTimestamp: string | null;
+  lastStripeEventId: string | null;
+  revenuecatOriginalAppUserId: string | null;
+  lastRevenuecatEventId: string | null;
+  lastRevenuecatEventTimestampMs: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+export type AppliedSubscriptionRow = SubscriptionRow & {
+  webhookApplied: boolean;
+};
 
 export interface QuotaPoolRow {
   id: string;
@@ -69,6 +77,10 @@ export function mapSubscriptionRow(
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
     lastStripeEventTimestamp:
       row.lastStripeEventTimestamp?.toISOString() ?? null,
+    lastStripeEventId: row.lastStripeEventId,
+    revenuecatOriginalAppUserId: row.revenuecatOriginalAppUserId,
+    lastRevenuecatEventId: row.lastRevenuecatEventId,
+    lastRevenuecatEventTimestampMs: row.lastRevenuecatEventTimestampMs,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

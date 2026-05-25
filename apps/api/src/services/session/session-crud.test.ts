@@ -11,8 +11,12 @@ import {
   formatSessionDisplayTitle,
   parseEngagementSignal,
   getSessionMetadata,
+  normalizeHomeworkSummary,
 } from './session-crud';
-import { MAX_EXCHANGES_PER_SESSION } from '@eduagent/schemas';
+import {
+  childSessionSchema,
+  MAX_EXCHANGES_PER_SESSION,
+} from '@eduagent/schemas';
 import type { LearningSession } from '@eduagent/schemas';
 
 const PROFILE_ID = '00000000-0000-7000-8000-000000000001';
@@ -860,6 +864,65 @@ describe('formatSessionDisplayTitle', () => {
 
   it('falls back to session-type label when homeworkSummary is null', () => {
     expect(formatSessionDisplayTitle('learning', null)).toBe('Learning');
+  });
+});
+
+describe('normalizeHomeworkSummary', () => {
+  it('passes through valid homework summaries', () => {
+    const summary = {
+      displayTitle: 'Chapter 3 HW',
+      summary: 'Solved five linear equations.',
+      problemCount: 5,
+      practicedSkills: ['linear equations'],
+      independentProblemCount: 3,
+      guidedProblemCount: 2,
+    };
+
+    expect(normalizeHomeworkSummary(summary)).toEqual(summary);
+  });
+
+  it('normalizes legacy summary-only metadata into a valid child-session response shape', () => {
+    const homeworkSummary = normalizeHomeworkSummary({
+      summary: 'Reviewed two fraction problems.',
+    });
+
+    expect(homeworkSummary).toEqual({
+      displayTitle: 'Homework',
+      summary: 'Reviewed two fraction problems.',
+      problemCount: 0,
+      practicedSkills: [],
+      independentProblemCount: 0,
+      guidedProblemCount: 0,
+    });
+
+    expect(() =>
+      childSessionSchema.parse({
+        sessionId: PROFILE_ID,
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: null,
+        topicTitle: null,
+        sessionType: 'homework',
+        startedAt: '2026-05-24T10:00:00.000Z',
+        endedAt: null,
+        exchangeCount: 3,
+        escalationRung: 1,
+        durationSeconds: null,
+        wallClockSeconds: null,
+        displayTitle: formatSessionDisplayTitle('homework', homeworkSummary),
+        displaySummary: homeworkSummary?.summary ?? null,
+        homeworkSummary,
+        highlight: null,
+        narrative: null,
+        conversationPrompt: null,
+        engagementSignal: null,
+        drills: [],
+      }),
+    ).not.toThrow();
+  });
+
+  it('drops malformed homework metadata without a usable summary', () => {
+    expect(normalizeHomeworkSummary({ problemCount: 2 })).toBeNull();
   });
 });
 

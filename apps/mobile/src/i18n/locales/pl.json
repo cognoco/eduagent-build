@@ -159,22 +159,12 @@
       "familySummary": {
         "nameListWithMore_one": "{{names}} + {{count}} więcej",
         "nameListWithMore_other": "{{names}} + {{count}} więcej",
-        "withParent": "Ty + {{memberNames}}",
         "parentOnly": "Ty",
         "withMinutes_one": "{{memberNames}} · {{count}} min w tym tygodniu",
         "withMinutes_other": "{{memberNames}} · {{count}} min w tym tygodniu",
         "withSessions_one": "{{memberNames}} · {{count}} sesja w tym tygodniu",
         "withSessions_other": "{{memberNames}} · {{count}} sesje w tym tygodniu",
         "noActivity": "{{memberNames}} · brak sesji w tym tygodniu",
-        "childMinutes_one": "{{memberNames}}: {{count}} min w tym tygodniu",
-        "childMinutes_other": "{{memberNames}}: {{count}} min w tym tygodniu",
-        "childSessions_one": "{{memberNames}}: {{count}} sesja w tym tygodniu",
-        "childSessions_other": "{{memberNames}}: {{count}} sesje w tym tygodniu",
-        "childNoActivity": "{{memberNames}}: brak sesji w tym tygodniu",
-        "parentLearningWithTopic": "Ty: {{topicTitle}} w {{subjectName}}",
-        "parentLearningWithSubject": "Ty: {{subjectName}}",
-        "parentExampleLead": "Dajesz dobry przykład.",
-        "parentExampleNudge": "Pokaż, jak to działa: rozpocznij krótką sesję.",
         "attentionChild": "{{childName}} może potrzebować uwagi",
         "profileLimit": "{{count}} z {{max}} profili użytych",
         "addProfileAction": "Dodaj profil",
@@ -183,24 +173,13 @@
       "encouragementNote": "Zachęty to krótkie, łagodne wiadomości w jedną stronę.",
       "transitionNoticeTitle": "Teraz mentorujesz {{childNames}}",
       "transitionNoticeBody": "Wypróbuj dziś wieczorem jedno z tych pytań na początek rozmowy.",
-      "recentActivity": {
-        "title": "Ostatnia aktywność dzieci"
-      },
-      "studyActivation": {
-        "title": "Też chcesz się uczyć?",
-        "body": "Przełącz na Moja nauka, gdy to jest twój czas na naukę.",
-        "action": "Przejdź do Moja nauka"
-      },
       "cards": {
         "checkChild": "Sprawdź, jak idzie {{childName}}",
         "checkChildFallback": "Dotknij, aby zobaczyć postępy z tego tygodnia",
         "weeklyReport": "Przeczytaj tygodniowy raport profilu {{childName}}",
         "weeklyReportSubtitle": "Zobacz najnowsze podsumowanie",
         "sendNudge": "Wyślij zachętę do {{childName}}",
-        "sendNudgeSubtitle": "Wybierz krótką wiadomość wsparcia",
-        "continueOwn": "Kontynuuj własną naukę",
-        "continueOwnSubtitle": "Wróć do {{topicTitle}} w {{subjectName}}",
-        "continueOwnEmptySubtitle": "Wróć tam, gdzie przerwano"
+        "sendNudgeSubtitle": "Wybierz krótką wiadomość wsparcia"
       },
       "snapshot": {
         "noActivity": "Brak aktywności w tym tygodniu",
@@ -211,12 +190,13 @@
         "titleMorning": "Pomysły na rozmowę",
         "titleAfternoon": "Pomysły na rozmowę",
         "titleEvening": "Pomysły na rozmowę",
-        "promptWithTopic": "Co sprawiło, że {{topic}} stało się dziś zrozumiałe?",
-        "promptNoActivity": "Co ułatwiłoby rozpoczęcie nauki dziś wieczorem?",
-        "promptFallback": "Co było dziś łatwiejsze niż wczoraj?",
+        "promptWithTopic": "Co w {{topic}} stało się jaśniejsze w tym tygodniu?",
+        "promptNoActivity": "Co ułatwiłoby rozpoczęcie nauki w tym tygodniu?",
+        "promptFallback": "Co było łatwiejsze w tym tygodniu niż ostatnim razem?",
         "promptTrickiestWithTopic": "Co jest teraz najtrudniejsze w {{topic}}?",
-        "promptTomorrow": "Na czym powinniśmy się skupić jutro?",
-        "promptCurious": "Czy jest coś, co cię ciekawi?"
+        "promptNextGoalWithTopic": "Chcecie wybrać jeden mały cel z {{topic}} na ten tydzień?",
+        "promptRestartWithTopic": "Chcecie wybrać jeden mały cel z {{topic}} na ten tydzień?",
+        "promptRestartEasierWithTopic": "Czy mamy ułatwić powrót do {{topic}}?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
