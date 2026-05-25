@@ -1,5 +1,5 @@
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
@@ -304,7 +304,9 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
       .returning({ id: learningSessions.id });
 
     await expect(
-      recordSystemPrompt(db, ownerB.profileId, sessionA!.id, 'evil prompt'),
+      recordSystemPrompt(db, ownerB.profileId, sessionA!.id, 'evil prompt', {
+        kind: 'silence_nudge',
+      }),
     ).rejects.toThrow();
 
     await expect(
@@ -319,6 +321,51 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
         eventId: generateUUIDv7(),
       }),
     ).rejects.toThrow();
+  });
+
+  // [WI-237 · DS-148] recordSystemPrompt must own provenance: it stamps
+  // metadata.source='server' and the structured intent, and persists the
+  // server-resolved content. Callers can no longer smuggle client text into a
+  // role:'system' replay because the stored source is always 'server'.
+  it('[WI-237] recordSystemPrompt stamps metadata.source=server + intent', async () => {
+    const owner = await seedProfileWithSubject('WI-237-source');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        exchangeCount: 1,
+      })
+      .returning({ id: learningSessions.id });
+
+    await recordSystemPrompt(
+      db,
+      owner.profileId,
+      session!.id,
+      'resolved server text',
+      {
+        kind: 'message_feedback',
+        action: 'helpful',
+        eventId: 'evt_abc',
+      },
+    );
+
+    const rows = await db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, session!.id),
+        eq(sessionEvents.eventType, 'system_prompt'),
+      ),
+    });
+
+    expect(rows).toHaveLength(1);
+    const meta = rows[0]!.metadata as Record<string, unknown>;
+    expect(rows[0]!.content).toBe('resolved server text');
+    expect(meta.source).toBe('server');
+    expect(meta.intent).toEqual({
+      kind: 'message_feedback',
+      action: 'helpful',
+      eventId: 'evt_abc',
+    });
   });
 
   // [CCR PR #266 / bug 275 verification] The book-ownership gate inside

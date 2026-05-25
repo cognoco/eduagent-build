@@ -41,6 +41,7 @@ import type {
   EngagementSignal,
   SessionMetadata,
   BookTopicGenerationResult,
+  SystemPromptIntent,
 } from '@eduagent/schemas';
 import {
   celebrationReasonSchema,
@@ -1383,12 +1384,19 @@ export async function getSessionTranscript(
 // Thin wrappers for event recording (require getSession)
 // ---------------------------------------------------------------------------
 
+/**
+ * Record a system-prompt event. WI-373: `content` is the server-resolved
+ * canonical string (never client-supplied text) and `intent` is the validated
+ * intent token that produced it. The provenance is owned here — every write
+ * stamps `metadata.source = 'server'` so the replay layer can distinguish
+ * trusted server-authored events from any (now-impossible) client-authored row.
+ */
 export async function recordSystemPrompt(
   db: Database,
   profileId: string,
   sessionId: string,
   content: string,
-  metadata?: Record<string, unknown>,
+  intent: SystemPromptIntent,
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -1399,7 +1407,7 @@ export async function recordSystemPrompt(
     sessionId,
     eventType: 'system_prompt',
     content,
-    metadata,
+    metadata: { source: 'server', intent },
     touchSession: true,
   });
 }

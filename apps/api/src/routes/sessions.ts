@@ -12,7 +12,7 @@ import {
   summarySubmitSchema,
   interleavedSessionStartSchema,
   homeworkStateSyncSchema,
-  systemPromptBodySchema,
+  systemPromptIntentSchema,
   ERROR_CODES,
   filingRetryEventSchema,
   learningSessionSchema,
@@ -51,6 +51,7 @@ import {
   getSessionCompletionContext,
   getSessionTranscript,
   recordSystemPrompt,
+  resolveSystemPromptIntent,
   recordSessionEvent,
   skipSummary,
   submitSummary,
@@ -1087,18 +1088,24 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   .post(
     '/sessions/:sessionId/system-prompt',
     zValidator('param', sessionIdParamsSchema),
-    zValidator('json', systemPromptBodySchema),
+    // WI-373: the client sends a typed intent, never free-form system text.
+    // The schema rejects any `content` field (the former injection vector).
+    zValidator('json', systemPromptIntentSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const body = c.req.valid('json');
+      const intent = c.req.valid('json');
+
+      // Server owns the prompt text: resolve the intent to a canonical string
+      // and stamp provenance inside recordSystemPrompt (metadata.source).
+      const content = resolveSystemPromptIntent(intent);
 
       await recordSystemPrompt(
         db,
         profileId,
         c.req.param('sessionId'),
-        body.content,
-        body.metadata,
+        content,
+        intent,
       );
       return c.json({ ok: true });
     },
