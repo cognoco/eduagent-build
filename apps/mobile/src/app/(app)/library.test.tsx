@@ -86,6 +86,7 @@ const mockUseAllBooks = jest.fn();
 const mockUseLibrarySearch = jest.fn();
 const mockUpdateSubjectMutateAsync = jest.fn();
 const mockUseActiveProfileRole = jest.fn(() => 'owner');
+const mockUseFailedFreeformLibraryFilingSessions = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
@@ -228,6 +229,14 @@ jest.mock(
 );
 
 jest.mock(
+  '../../hooks/use-sessions' /* gc1-allow: hook boundary mocked to isolate Library failed-filing attention states */,
+  () => ({
+    useFailedFreeformLibraryFilingSessions: (...args: unknown[]) =>
+      mockUseFailedFreeformLibraryFilingSessions(...args),
+  }),
+);
+
+jest.mock(
   '../../components/common/ShimmerSkeleton' /* gc1-allow: skeleton implementation is visual-only for these tests */,
   () => ({
     ShimmerSkeleton: ({
@@ -365,6 +374,12 @@ describe('LibraryScreen', () => {
     });
     mockUseLibrarySearch.mockReturnValue({
       data: null,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseFailedFreeformLibraryFilingSessions.mockReturnValue({
+      data: [],
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
@@ -638,6 +653,92 @@ describe('LibraryScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
+    });
+  });
+
+  describe('failed Library filing attention', () => {
+    function arrangePopulatedLibrary() {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+        isError: false,
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+        isError: false,
+      });
+    }
+
+    it('renders a small attention row and count when failed freeform Library additions exist', () => {
+      arrangePopulatedLibrary();
+      mockUseFailedFreeformLibraryFilingSessions.mockReturnValue({
+        data: [
+          {
+            sessionId: '11111111-1111-7111-8111-111111111111',
+            subjectId: '22222222-2222-7222-8222-222222222222',
+            topicId: null,
+            bookId: null,
+            startedAt: '2026-05-25T10:00:00.000Z',
+          },
+          {
+            sessionId: '33333333-3333-7333-8333-333333333333',
+            subjectId: '22222222-2222-7222-8222-222222222222',
+            topicId: null,
+            bookId: null,
+            startedAt: '2026-05-25T10:05:00.000Z',
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      screen.getByTestId('library-filing-attention-row');
+      screen.getByText('Topic placement needs attention');
+      expect(
+        screen.getByTestId('library-filing-attention-count').props.children,
+      ).toBe(2);
+    });
+
+    it('does not render the attention row when no failed freeform Library additions exist', () => {
+      arrangePopulatedLibrary();
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      expect(screen.queryByTestId('library-filing-attention-row')).toBeNull();
+    });
+
+    it('routes the attention row to the first failed session summary so retry is available', () => {
+      arrangePopulatedLibrary();
+      mockUseFailedFreeformLibraryFilingSessions.mockReturnValue({
+        data: [
+          {
+            sessionId: '11111111-1111-7111-8111-111111111111',
+            subjectId: '22222222-2222-7222-8222-222222222222',
+            topicId: null,
+            bookId: null,
+            startedAt: '2026-05-25T10:00:00.000Z',
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      fireEvent.press(screen.getByTestId('library-filing-attention-row'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/session-summary/[sessionId]',
+        params: {
+          sessionId: '11111111-1111-7111-8111-111111111111',
+          subjectId: '22222222-2222-7222-8222-222222222222',
+        },
+      });
     });
   });
 

@@ -83,7 +83,7 @@ describe('useSessionActions', () => {
     jest.clearAllMocks();
   });
 
-  it('shows filing prompt for freeform sessions after close', async () => {
+  it('navigates to summary for freeform sessions after close without filing prompt', async () => {
     const opts = createMockOpts();
     const { result } = renderHook(() => useSessionActions(opts as any));
 
@@ -102,8 +102,15 @@ describe('useSessionActions', () => {
       summaryStatus: 'pending',
       milestonesReached: [],
     });
-    expect(opts.setShowFilingPrompt).toHaveBeenCalledWith(true);
-    expect(opts.setIsClosing).toHaveBeenCalledWith(false);
+    expect(opts.setShowFilingPrompt).not.toHaveBeenCalled();
+    expect(opts.router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/session-summary/session-1',
+        params: expect.objectContaining({
+          sessionType: 'freeform',
+        }),
+      }),
+    );
   });
 
   it('shows filing prompt for homework sessions after close', async () => {

@@ -217,6 +217,7 @@ let mockTopicSuggestionsData: Array<{
   createdAt: string;
   usedAt: string | null;
 }> = [];
+let mockSessionData: Record<string, unknown> | null = null;
 
 // Per-test mutation result containers — default to success shapes; override
 // with setRoute() for tests that need rejections or custom shapes.
@@ -299,7 +300,7 @@ const mockFetch = createRoutedMockFetch({
       };
     }
     // GET /sessions/:id (session entity)
-    return { session: null };
+    return { session: mockSessionData };
   },
   // PUT /settings/learning-mode
   'learning-mode': () => ({ mode: 'casual' }),
@@ -443,6 +444,7 @@ describe('SessionSummaryScreen', () => {
     mockTotalSessions = 0;
     mockRecentlyResolvedTopics = [];
     mockTopicSuggestionsData = [];
+    mockSessionData = null;
     mockBack.mockClear();
     mockCanGoBack.mockReset();
     mockCanGoBack.mockReturnValue(false);
@@ -482,7 +484,47 @@ describe('SessionSummaryScreen', () => {
           summary: { ...mockSessionSummaryData, learnerRecap: 'mock-recap' },
         };
       }
-      return { session: null };
+      if (url.includes('/library-filing/keep-out')) {
+        return {
+          session: {
+            ...mockSessionData,
+            filingStatus: 'filing_kept_out',
+            topicId: null,
+            filedAt: null,
+          },
+        };
+      }
+      if (url.includes('/library-filing/add')) {
+        return {
+          session: {
+            ...mockSessionData,
+            filingStatus: 'filing_pending',
+            topicId: null,
+            filedAt: null,
+          },
+        };
+      }
+      if (url.includes('/library-filing/restore')) {
+        return {
+          session: {
+            ...mockSessionData,
+            filingStatus: 'filing_pending',
+            topicId: null,
+            filedAt: null,
+          },
+        };
+      }
+      if (url.includes('/retry-filing')) {
+        return {
+          session: {
+            ...mockSessionData,
+            filingStatus: 'filing_pending',
+            topicId: null,
+            filedAt: null,
+          },
+        };
+      }
+      return { session: mockSessionData };
     });
     // Create a fresh wrapper (and QueryClient) per test to prevent cross-test
     // query cache contamination from async fetch-boundary responses.
@@ -1576,6 +1618,173 @@ describe('SessionSummaryScreen', () => {
     },
     exchanges: [],
   };
+
+  function makeFreeformSession(
+    overrides: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    return {
+      id: '660e8400-e29b-41d4-a716-446655440000',
+      subjectId: '550e8400-e29b-41d4-a716-446655440000',
+      topicId: null,
+      sessionType: 'learning',
+      inputMode: 'text',
+      verificationType: null,
+      status: 'completed',
+      escalationRung: 1,
+      exchangeCount: 5,
+      startedAt: '2026-05-01T10:00:00.000Z',
+      lastActivityAt: '2026-05-01T10:15:00.000Z',
+      endedAt: '2026-05-01T10:15:00.000Z',
+      durationSeconds: 900,
+      wallClockSeconds: 900,
+      metadata: { effectiveMode: 'freeform' },
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      ...overrides,
+    };
+  }
+
+  describe('freeform Library filing controls', () => {
+    beforeEach(() => {
+      mockParams.sessionType = 'freeform';
+      mockTranscriptData = validTranscriptData as never;
+    });
+
+    it("renders adding-to-Library copy and a Don't add action while pending", async () => {
+      mockSessionData = makeFreeformSession({
+        filingStatus: 'filing_pending',
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('session-summary-library-filing');
+      });
+      screen.getByText('Adding this to your Library...');
+      const action = screen.getByText("Don't add to Library");
+
+      await pressAsync(action);
+
+      expect(
+        fetchCallsMatching(mockFetch, '/library-filing/keep-out'),
+      ).toHaveLength(1);
+    });
+
+    it('renders Still adding copy after local polling times out and does not expose Retry', async () => {
+      jest.useFakeTimers();
+      mockSessionData = makeFreeformSession({
+        filingStatus: 'filing_pending',
+      });
+
+      try {
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+        await waitFor(() => {
+          screen.getByText('Adding this to your Library...');
+        });
+
+        for (let i = 0; i < 10; i += 1) {
+          await act(async () => {
+            jest.advanceTimersByTime(3_000);
+            await Promise.resolve();
+            await Promise.resolve();
+          });
+        }
+
+        await waitFor(() => {
+          screen.getByText('Still adding this to your Library...');
+        });
+        expect(screen.queryByText('Retry')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('renders Add to Library for a null below-threshold session', async () => {
+      mockSessionData = makeFreeformSession({
+        exchangeCount: 1,
+        filingStatus: null,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const action = await screen.findByText('Add to Library');
+      await pressAsync(action);
+
+      expect(fetchCallsMatching(mockFetch, '/library-filing/add')).toHaveLength(
+        1,
+      );
+    });
+
+    it('renders Add to Library for a kept-out session', async () => {
+      mockSessionData = makeFreeformSession({
+        filingStatus: 'filing_kept_out',
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const action = await screen.findByText('Add to Library');
+      await pressAsync(action);
+
+      expect(
+        fetchCallsMatching(mockFetch, '/library-filing/restore'),
+      ).toHaveLength(1);
+    });
+
+    it('renders Retry for failed Library filing without raw error text', async () => {
+      mockSessionData = makeFreeformSession({
+        filingStatus: 'filing_failed',
+        filingRetryCount: 3,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const action = await screen.findByText('Retry');
+      expect(screen.queryByText(/filing_failed/)).toBeNull();
+
+      await pressAsync(action);
+
+      expect(fetchCallsMatching(mockFetch, '/retry-filing')).toHaveLength(1);
+    });
+
+    it('renders filed destination, tap-through, and Remove from Library when topic info is available', async () => {
+      mockSessionData = makeFreeformSession({
+        topicId: '11111111-1111-1111-1111-111111111111',
+        filedAt: '2026-05-01T10:16:00.000Z',
+        filingStatus: 'filing_recovered',
+        topicTitle: 'Photosynthesis basics',
+        bookId: '22222222-2222-2222-2222-222222222222',
+        bookTitle: 'Plant Biology',
+        subjectName: 'Biology',
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByText('Added to Library');
+      });
+      screen.getByText('Photosynthesis basics');
+      screen.getByText('Plant Biology - Biology');
+
+      fireEvent.press(screen.getByText('Open in Library'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/topic/[topicId]',
+        params: {
+          topicId: '11111111-1111-1111-1111-111111111111',
+          subjectId: '550e8400-e29b-41d4-a716-446655440000',
+          bookId: '22222222-2222-2222-2222-222222222222',
+        },
+      });
+
+      const remove = screen.getByText('Remove from Library');
+      await pressAsync(remove);
+      expect(
+        fetchCallsMatching(mockFetch, '/library-filing/keep-out'),
+      ).toHaveLength(1);
+    });
+  });
 
   describe('"You mastered" row', () => {
     it('shows mastered row when recentlyResolvedTopics is non-empty', async () => {

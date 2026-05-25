@@ -45,6 +45,7 @@ import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
 import { getSubjectTintMap } from '../../lib/subject-tints';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
+import { useFailedFreeformLibraryFilingSessions } from '../../hooks/use-sessions';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -229,6 +230,11 @@ export default function LibraryScreen() {
   // [PR-4 / surface-ownership] Inline query replaced by useLibraryRetention()
   // — library is the canonical owner of /library/retention.
   const libraryRetentionQuery = useLibraryRetention();
+  const failedLibraryFilingQuery = useFailedFreeformLibraryFilingSessions();
+  const failedLibraryFilingSessions = useMemo(
+    () => failedLibraryFilingQuery.data ?? [],
+    [failedLibraryFilingQuery.data],
+  );
 
   const retentionDataBySubjectId = useMemo(() => {
     const map = new Map<string, SubjectRetentionResponse>();
@@ -379,6 +385,21 @@ export default function LibraryScreen() {
     [proxyChildProfileId, router],
   );
 
+  const handleFailedLibraryFilingPress = useCallback(() => {
+    const firstFailedSession = failedLibraryFilingSessions[0];
+    if (!firstFailedSession) return;
+
+    router.push(
+      buildSessionDetailHref({
+        sessionId: firstFailedSession.sessionId,
+        subjectId: firstFailedSession.subjectId,
+        topicId: firstFailedSession.topicId,
+        bookId: firstFailedSession.bookId,
+        childProfileId: proxyChildProfileId,
+      }),
+    );
+  }, [failedLibraryFilingSessions, proxyChildProfileId, router]);
+
   const handleRetry = (): void => {
     void subjectsQuery.refetch();
     void activeSubjectsFallbackQuery.refetch();
@@ -477,6 +498,38 @@ export default function LibraryScreen() {
       </View>
     </ShimmerSkeleton>
   );
+
+  const renderFailedLibraryFilingAttention = (): React.ReactElement | null => {
+    const failedCount = failedLibraryFilingSessions.length;
+    if (failedCount === 0) return null;
+
+    return (
+      <Pressable
+        onPress={handleFailedLibraryFilingPress}
+        className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+        accessibilityRole="button"
+        accessibilityLabel={t('session.filingFailed.needsAttention')}
+        testID="library-filing-attention-row"
+      >
+        <View className="flex-1 pr-3">
+          <Text className="text-body font-semibold text-text-primary">
+            {t('session.filingFailed.needsAttention')}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {t('session.filingFailed.progressSaved')}
+          </Text>
+        </View>
+        <View className="min-w-[28px] h-7 rounded-full bg-warning/15 items-center justify-center px-2">
+          <Text
+            className="text-caption font-bold text-warning"
+            testID="library-filing-attention-count"
+          >
+            {failedCount}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   // ---- Main content -------------------------------------------------------
 
@@ -592,6 +645,8 @@ export default function LibraryScreen() {
 
     return (
       <>
+        {renderFailedLibraryFilingAttention()}
+
         {/* Stale-data banner — visible when cached data is shown after a refresh failure */}
         {showingStaleCachedData && (
           <Pressable
@@ -893,6 +948,8 @@ export default function LibraryScreen() {
             testID="shelves-list"
             ListHeaderComponent={
               <>
+                {renderFailedLibraryFilingAttention()}
+
                 {showingStaleCachedData && (
                   <Pressable
                     onPress={handleRetry}

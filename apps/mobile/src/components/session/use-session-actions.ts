@@ -372,10 +372,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 fastCelebrations,
               };
 
-              if (
-                effectiveMode === 'freeform' ||
-                effectiveMode === 'homework'
-              ) {
+              if (effectiveMode === 'homework') {
                 setShowFilingPrompt(true);
                 setIsClosing(false);
               } else {

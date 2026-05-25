@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
-import { computeAgeBracket } from '@eduagent/schemas';
+import { computeAgeBracket, getSessionEffectiveMode } from '@eduagent/schemas';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
@@ -57,6 +57,7 @@ import {
 } from '../../components/common';
 import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
 import { MentorMemoryCue } from '../../components/session-summary/MentorMemoryCue';
+import { SessionSummaryLibraryFilingControls } from '../../components/session-summary/SessionSummaryLibraryFilingControls';
 
 export default function SessionSummaryScreen() {
   const {
@@ -312,6 +313,9 @@ export default function SessionSummaryScreen() {
   const hasXpIncentive = baseXp != null && baseXp > 0;
 
   const isHomeworkSession = sessionType === 'homework';
+  const isFreeformSession =
+    sessionType === 'freeform' ||
+    getSessionEffectiveMode(session.data ?? {}) === 'freeform';
 
   const fallbackSession = liveTranscript?.session;
   // [BUG-801] Same parseInt-||-fallback anti-pattern as exchangeCountForRecap
@@ -889,7 +893,11 @@ export default function SessionSummaryScreen() {
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        {session.data ? <FilingFailedBanner session={session.data} /> : null}
+        {isFreeformSession ? (
+          <SessionSummaryLibraryFilingControls sessionId={sessionId} />
+        ) : session.data ? (
+          <FilingFailedBanner session={session.data} />
+        ) : null}
 
         {persisted?.closingLine ? (
           <Text
