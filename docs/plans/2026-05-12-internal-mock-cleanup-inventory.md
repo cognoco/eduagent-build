@@ -35,7 +35,7 @@ The inventory generator was extended to record an `annotation` column distinguis
 | `pattern-a` | 43 | `requireActual` used but no explicit `gc1-allow:` label. Acceptable: pattern-A *is* the running-the-real-code path, so the `gc1-allow:` boundary label does not strictly apply. Track but do not enforce. |
 | **`bare`** | **0** | **No remaining forward-only risk. Down from 131 (2026-05-19) → 23 (2026-05-24) → 6 (2026-05-25, Wave 4) → 0 (2026-05-25, Wave 5).** |
 
-Implication: **the backlog is fully drained.** The GC6 boy-scout rule remains in effect for new test-file edits, but there is no scheduled cleanup wave queued. Future BARE entries will appear only as regressions caught by GC1 or by re-running the inventory generator after large surface changes.
+Implication: **the GC1/bare backlog is fully drained.** The GC6 boy-scout rule remains in effect for new test-file edits. However, "no bare rows" does not mean "no internal mocks left to convert" — 369 internal-path rows still stub their target wholesale (with a `gc1-allow:` reason), and ~80-100 of those target modules where a real-code path is now feasible. See **Wave 6 backlog** below.
 
 > Pre-fix snapshot (2026-05-19, before generator regex fix): the first pass reported 180 bare mocks because the `gc1-allow` detection regex used `$` without the `m` flag, so trailing-line-comment annotations on `jest.mock(...)` calls were not matched. After fixing the regex (commit pending), 49 false-bare entries reclassified to `gc1-allow`. Always trust the regenerated post-fix snapshot.
 
@@ -132,6 +132,41 @@ Wave 4 queued three "tool-fragility findings" as out-of-scope: a 3-line annotati
 | NativeWind + Metro plugin patterns (`^nativewind(?:\/|$)/`, `^metro-`, `^@react-native/metro-`) | Added to `isNativeBoundary`. | `metro-config.test.ts` and any future Metro-plugin tests reclassified to retained boundary. |
 
 **Bare-mock count: 6 → 0** (100% reduction; tool-only delta, no test-file edits). The Wave 4 Tool-fragility findings table is now historical.
+
+### Wave 6 backlog (next, not scheduled) — `gc1-allow`-only rows that could become `pattern-a`
+
+GC1 ratchet + GC6 boy-scout rule cover all *new* internal-mock pressure. The remaining 369 internal-path rows annotated with `gc1-allow:` (no `requireActual`) split into two groups:
+
+**Legitimate boundaries — keep mocked, no action needed (≈269 rows):**
+
+| Target | Rows | Why legitimate |
+| --- | ---: | --- |
+| `@eduagent/database` | 53 | Opens real Neon WebSocket; not available in unit-test env. Real DB coverage lives in `.integration.test.ts`. |
+| `../lib/theme` (all nesting depths) | ~42 | `useThemeColors()` reads native `ColorScheme` API. |
+| `../lib/platform-alert` (all depths) | ~14 | Native alert dialog. |
+| `../lib/sentry` (all depths) | ~10 | Observability sink — assertion target, not subject under test. |
+| `../lib/navigation` (all depths) | ~22 | Wraps `expo-router` calls; safe to stub the wrapper rather than the native lib. |
+| Native modules (`expo-router`, `react-native-safe-area-context`, etc.) | ~30 | True external boundaries (caught by `isNativeBoundary`; included here for completeness). |
+| Test-safety stubs (e.g. `../../services/deletion`) | ~50 | Real implementation would mutate persistent state destructively. Acceptable to mock in unit tests; integration tests cover the real path. |
+| Other one-off boundaries | ~48 | Inngest internals, `getStepDatabase`, etc. |
+
+**Softer-cleanup candidates — could convert to `pattern-a` or use a harness (≈100 rows):**
+
+| Target | Rows | Replacement |
+| --- | ---: | --- |
+| `../lib/profile` (all depths) | ~33 | Use `apps/mobile/src/test-utils/screen-render.tsx` with `NAMED_PROFILES` or real `ProfileContext` provider. |
+| `../lib/api-client` (all depths) | ~23 | Use `createRoutedMockFetch` from `apps/mobile/src/test-utils/mock-api-routes.ts` against the real api-client. |
+| `../hooks/use-navigation-contract` | 9 | Use real hook + controlled profile in `screen-render`. |
+| `../hooks/use-progress` etc. | ~15 | Route-level API fixtures + real React Query hooks. |
+| `./_layout` (intra-route layout state) | 6 | `requireActual` + override the data hook (pattern-A). |
+| Misc query hooks / siblings | ~14 | Pattern-A `requireActual` spread + targeted override. |
+
+**Why this is "not scheduled":**
+- The Wave 3 takeaway ("top-edited ≠ top-bare; no bugs found by sweeping clean files") applies here too. Conversion mostly *moves* the assertion surface from "mocked hook return" to "mocked fetch response" — equivalent fidelity, lower risk only if it surfaces real bugs.
+- The product roadmap is at a launch-readiness stage; UI test files are churning. A speculative harness sweep would conflict.
+- A future targeted wave (e.g., when a screen test gets flaky or surfaces a real bug) can convert the affected files at that moment under the boy-scout rule. That's cheaper and higher signal than a coordinated mass conversion.
+
+If a Wave 6 is ever scheduled, the obvious starting target is the `../lib/profile` cluster — it has the most rows and the most-canonical replacement (`screen-render.tsx`).
 
 ### Known follow-up
 
