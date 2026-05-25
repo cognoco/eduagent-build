@@ -51,7 +51,6 @@ import {
   getSessionCompletionContext,
   getSessionTranscript,
   recordSystemPrompt,
-  resolveSystemPromptIntent,
   recordSessionEvent,
   skipSummary,
   submitSummary,
@@ -1096,17 +1095,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const intent = c.req.valid('json');
 
-      // Server owns the prompt text: resolve the intent to a canonical string
-      // and stamp provenance inside recordSystemPrompt (metadata.source).
-      const content = resolveSystemPromptIntent(intent);
-
-      await recordSystemPrompt(
-        db,
-        profileId,
-        c.req.param('sessionId'),
-        content,
-        intent,
-      );
+      // Server owns the prompt text: recordSystemPrompt resolves the intent to
+      // the canonical string and stamps provenance (metadata.source='server').
+      await recordSystemPrompt(db, profileId, c.req.param('sessionId'), intent);
       return c.json({ ok: true });
     },
   )

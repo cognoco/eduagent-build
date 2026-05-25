@@ -304,7 +304,7 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
       .returning({ id: learningSessions.id });
 
     await expect(
-      recordSystemPrompt(db, ownerB.profileId, sessionA!.id, 'evil prompt', {
+      recordSystemPrompt(db, ownerB.profileId, sessionA!.id, {
         kind: 'silence_nudge',
       }),
     ).rejects.toThrow();
@@ -338,17 +338,11 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
       })
       .returning({ id: learningSessions.id });
 
-    await recordSystemPrompt(
-      db,
-      owner.profileId,
-      session!.id,
-      'resolved server text',
-      {
-        kind: 'message_feedback',
-        action: 'helpful',
-        eventId: 'evt_abc',
-      },
-    );
+    await recordSystemPrompt(db, owner.profileId, session!.id, {
+      kind: 'message_feedback',
+      action: 'helpful',
+      eventId: 'evt_abc',
+    });
 
     const rows = await db.query.sessionEvents.findMany({
       where: and(
@@ -359,7 +353,11 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
 
     expect(rows).toHaveLength(1);
     const meta = rows[0]!.metadata as Record<string, unknown>;
-    expect(rows[0]!.content).toBe('resolved server text');
+    // Content is the server-resolved canonical string for the intent — the
+    // caller no longer supplies it.
+    expect(rows[0]!.content).toBe(
+      'The learner marked the previous answer as helpful. Keep the same pace and level of guidance.',
+    );
     expect(meta.source).toBe('server');
     expect(meta.intent).toEqual({
       kind: 'message_feedback',

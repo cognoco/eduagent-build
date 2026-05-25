@@ -949,14 +949,12 @@ describe('session routes', () => {
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ ok: true });
-      // The route resolves the intent server-side and passes the canonical
-      // string + the structured intent to recordSystemPrompt — never raw
-      // client content.
+      // The route passes only the validated intent token to recordSystemPrompt,
+      // which owns the canonical-string resolution — never raw client content.
       expect(recordSystemPrompt).toHaveBeenCalledWith(
         expect.anything(),
         expect.any(String),
         SESSION_ID,
-        "Still working on it? Take your time - I'm here when you're ready.",
         { kind: 'silence_nudge' },
       );
     });
