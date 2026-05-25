@@ -1,5 +1,10 @@
 // App Help Map - server-owned static map of user-facing destinations.
 //
+import type {
+  ChallengeRoundEvaluationItem,
+  ChallengeRoundNoteDraftHint,
+} from '@eduagent/schemas';
+
 // Every label MUST match the exact string visible in the app. Tests in
 // app-help-map.test.ts read the mobile en.json source for i18n-backed labels
 // and assert important hardcoded labels explicitly.
@@ -131,8 +136,8 @@ interface ParsedSignals {
   notePrompt: boolean;
   notePromptPostSession: boolean;
   challengeRoundOffer?: boolean;
-  challengeRoundEvaluation?: unknown[];
-  noteDraft?: unknown | null;
+  challengeRoundEvaluation?: ChallengeRoundEvaluationItem[];
+  noteDraft?: ChallengeRoundNoteDraftHint | null;
   fluencyDrill: unknown;
   readyToFinish: boolean;
 }

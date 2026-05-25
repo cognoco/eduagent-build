@@ -4,7 +4,7 @@ import { expirePendingDeepeningRows } from '../../services/needs-deepening/promo
 
 export const needsDeepeningExpirePending = inngest.createFunction(
   {
-    id: 'needs-deepening.expire-pending',
+    id: 'needs-deepening-expire-pending',
     name: 'Expire pending needs-deepening rows',
   },
   { cron: '0 3 * * *' },

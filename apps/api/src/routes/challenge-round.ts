@@ -8,7 +8,6 @@ import {
   acceptChallengeRound,
   abortChallengeRound,
   declineChallengeRound,
-  maybeOfferChallengeRound,
 } from '../services/challenge-round/route-actions';
 
 const challengeRoundRequestSchema = z.object({
@@ -21,20 +20,6 @@ const declineChallengeRoundRequestSchema = challengeRoundRequestSchema.extend({
 });
 
 export const challengeRoundRoutes = new Hono<RouteEnv>()
-  .post(
-    '/challenge-round/maybe-offer',
-    zValidator('json', challengeRoundRequestSchema),
-    async (c) => {
-      assertNotProxyMode(c);
-      const { db, profileId } = withProfile(c);
-      const challengeRound = await maybeOfferChallengeRound(
-        db,
-        profileId,
-        c.req.valid('json'),
-      );
-      return c.json({ challengeRound });
-    },
-  )
   .post(
     '/challenge-round/accept',
     zValidator('json', challengeRoundRequestSchema),

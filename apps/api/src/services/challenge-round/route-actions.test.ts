@@ -5,7 +5,6 @@ import {
   acceptChallengeRound,
   abortChallengeRound,
   declineChallengeRound,
-  maybeOfferChallengeRound,
 } from './route-actions';
 import { getSession, persistSessionMetadata } from '../session/session-crud';
 
@@ -55,53 +54,6 @@ describe('challenge-round route actions', () => {
     mockPersistSessionMetadata.mockResolvedValue(makeSession());
   });
 
-  it('maybe-offer persists an offered state for an owned learning session/topic', async () => {
-    const { db } = makeDb();
-    mockGetSession.mockResolvedValueOnce(makeSession());
-
-    const result = await maybeOfferChallengeRound(db, PROFILE_ID, {
-      sessionId: SESSION_ID,
-      topicId: TOPIC_ID,
-    });
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        state: 'offered',
-        topicId: TOPIC_ID,
-        offerCount: 1,
-      }),
-    );
-    expect(mockGetSession).toHaveBeenCalledWith(db, PROFILE_ID, SESSION_ID);
-    expect(mockPersistSessionMetadata).toHaveBeenCalledWith(
-      db,
-      PROFILE_ID,
-      SESSION_ID,
-      { challengeRound: result },
-    );
-  });
-
-  it('maybe-offer returns an existing non-reofferable state without overwriting it', async () => {
-    const { db } = makeDb();
-    const existing = {
-      state: 'offered',
-      topicId: TOPIC_ID,
-      offerCount: 1,
-      declinedDontAskAgain: false,
-      evaluations: [],
-    };
-    mockGetSession.mockResolvedValueOnce(
-      makeSession({ challengeRound: existing }),
-    );
-
-    await expect(
-      maybeOfferChallengeRound(db, PROFILE_ID, {
-        sessionId: SESSION_ID,
-        topicId: TOPIC_ID,
-      }),
-    ).resolves.toEqual(existing);
-    expect(mockPersistSessionMetadata).not.toHaveBeenCalled();
-  });
-
   it('throws not found when another profile cannot read the session', async () => {
     const { db } = makeDb();
     mockGetSession.mockResolvedValueOnce(null);
@@ -120,7 +72,7 @@ describe('challenge-round route actions', () => {
     mockGetSession.mockResolvedValueOnce(makeSession());
 
     await expect(
-      maybeOfferChallengeRound(db, PROFILE_ID, {
+      acceptChallengeRound(db, PROFILE_ID, {
         sessionId: SESSION_ID,
         topicId: OTHER_TOPIC_ID,
       }),

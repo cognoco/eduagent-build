@@ -78,8 +78,17 @@ export async function expirePendingDeepeningRows(
   db: Database,
   now = new Date(),
 ): Promise<ExpirePendingDeepeningRowsResult> {
+  // System-wide expiry cron - intentionally cross-profile. Per-profile scope is
+  // not required because the WHERE filters on (status, pending_expires_at) only.
+  // We UPDATE to 'resolved' rather than DELETE so the audit trail of every
+  // "learner had a wobble here that never got corroborated" survives.
   const expiredRows = await db
-    .delete(needsDeepeningTopics)
+    .update(needsDeepeningTopics)
+    .set({
+      status: 'resolved',
+      pendingExpiresAt: null,
+      updatedAt: now,
+    })
     .where(
       and(
         eq(needsDeepeningTopics.status, 'pending_review'),

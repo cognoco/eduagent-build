@@ -7,13 +7,11 @@ import {
   acceptChallengeRound,
   abortChallengeRound,
   declineChallengeRound,
-  maybeOfferChallengeRound,
 } from '../services/challenge-round/route-actions';
 
 jest.mock(
-  '../services/challenge-round/route-actions' /* gc1-allow: route unit test — route delegates to service; service has direct unit coverage */,
+  '../services/challenge-round/route-actions' /* gc1-allow: route unit test - route delegates to service; service has direct unit coverage */,
   () => ({
-    maybeOfferChallengeRound: jest.fn(),
     acceptChallengeRound: jest.fn(),
     declineChallengeRound: jest.fn(),
     abortChallengeRound: jest.fn(),
@@ -71,7 +69,6 @@ function postJson(path: string, body: unknown) {
 describe('challenge-round routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (maybeOfferChallengeRound as jest.Mock).mockResolvedValue(offeredState);
     (acceptChallengeRound as jest.Mock).mockResolvedValue({
       ...offeredState,
       state: 'accepted',
@@ -88,7 +85,6 @@ describe('challenge-round routes', () => {
   });
 
   it.each([
-    ['/v1/challenge-round/maybe-offer', maybeOfferChallengeRound],
     ['/v1/challenge-round/accept', acceptChallengeRound],
     ['/v1/challenge-round/abort', abortChallengeRound],
   ])('validates and delegates %s', async (path, service) => {
@@ -178,11 +174,11 @@ describe('challenge-round routes', () => {
   });
 
   it('maps missing owned session to 404 style responses', async () => {
-    (maybeOfferChallengeRound as jest.Mock).mockRejectedValueOnce(
+    (acceptChallengeRound as jest.Mock).mockRejectedValueOnce(
       new NotFoundError('Session'),
     );
 
-    const res = await postJson('/v1/challenge-round/maybe-offer', {
+    const res = await postJson('/v1/challenge-round/accept', {
       sessionId: SESSION_ID,
       topicId: TOPIC_ID,
     });

@@ -33,9 +33,9 @@
 - The real missing path is: envelope fields -> parsed exchange -> context gate
   -> state transition -> typed mobile affordance -> mastery/review/note/cooldown
   persistence.
-- The old `3 remaining turns` quota proposal conflicts with current code
-  (`MIN_CHALLENGE_REMAINING_TURNS = 5`). Keep 5 for the wiring PR unless a
-  product decision explicitly changes it with tests.
+- Product decision for the wiring PR: lower the Challenge Round absolute
+  budget floor to `MIN_CHALLENGE_REMAINING_TURNS = 3`. The trigger tests cover
+  both the under-floor rejection at 2 turns and eligibility at exactly 3 turns.
 - The old cooldown matrix (4h decline, 24h close, 1h global) is not represented
   by the current schema. Keep the existing per-topic 24h decline cooldown for
   the wiring PR; expand cooldown semantics in a separate migration-backed PR.
@@ -200,9 +200,8 @@ Rules:
 - Abort updates session metadata only; do not mark mastery or write review rows.
 - Do not add `/v1/challenge-round/maybe-offer` in this PR. Offers are created
   only inside the session-exchange pipeline after a gated LLM
-  `challenge_round_offer` signal. If the existing mobile `maybeOffer()` helper
-  is still present, remove it from learner-facing call sites or leave it dormant
-  behind today's non-Challenge "Too easy" fallback.
+  `challenge_round_offer` signal. The prior mobile `maybeOffer()` helper has
+  been removed so learner-facing call sites cannot create offers directly.
 - Register routes in `AppType` so mobile can move off raw `fetch` in a later
   cleanup. The first PR may keep raw mobile fetch if route typing becomes noisy,
   but API registration must exist.

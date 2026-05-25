@@ -5,10 +5,16 @@ const mockGetStepDatabase = jest.fn();
 
 jest.mock(
   '../../services/needs-deepening/promotion' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    expirePendingDeepeningRows: (...args: unknown[]) =>
-      mockExpirePendingDeepeningRows(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/needs-deepening/promotion',
+    ) as typeof import('../../services/needs-deepening/promotion');
+    return {
+      ...actual,
+      expirePendingDeepeningRows: (...args: unknown[]) =>
+        mockExpirePendingDeepeningRows(...args),
+    };
+  },
 );
 
 jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
@@ -55,7 +61,7 @@ describe('needsDeepeningExpirePending', () => {
 
   it('is configured as the daily pending-review expiry cron', () => {
     expect((needsDeepeningExpirePending as any).opts.id).toBe(
-      'needs-deepening.expire-pending',
+      'needs-deepening-expire-pending',
     );
     expect((needsDeepeningExpirePending as any).trigger.cron).toBe('0 3 * * *');
   });
@@ -91,5 +97,27 @@ describe('needsDeepeningExpirePending', () => {
     await executeHandler();
 
     expect(mockInngestTransport.sentEvents).toHaveLength(0);
+  });
+
+  it('returns a completed result when nothing expired', async () => {
+    mockExpirePendingDeepeningRows.mockResolvedValueOnce({
+      expiredCount: 0,
+      expiredIds: [],
+    });
+
+    const { result } = await executeHandler();
+
+    expect(result).toEqual({
+      status: 'completed',
+      expiredCount: 0,
+      expiredIds: [],
+    });
+  });
+
+  it('propagates errors from expirePendingDeepeningRows so Inngest can retry', async () => {
+    const boom = new Error('db unavailable');
+    mockExpirePendingDeepeningRows.mockRejectedValueOnce(boom);
+
+    await expect(executeHandler()).rejects.toBe(boom);
   });
 });

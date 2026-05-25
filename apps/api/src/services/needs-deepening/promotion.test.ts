@@ -18,16 +18,6 @@ function createUpdateChain(returnedRows: Array<{ id: string }> = []) {
   return chain;
 }
 
-function createDeleteChain(returnedRows: Array<{ id: string }> = []) {
-  const chain = {
-    where: jest.fn(),
-    returning: jest.fn(),
-  };
-  chain.where.mockReturnValue(chain);
-  chain.returning.mockResolvedValue(returnedRows);
-  return chain;
-}
-
 function createDb({
   pendingRows = [],
   promotedRows = [],
@@ -38,8 +28,9 @@ function createDb({
   expiredRows?: Array<{ id: string }>;
 } = {}) {
   const findMany = jest.fn().mockResolvedValue(pendingRows);
-  const updateChain = createUpdateChain(promotedRows);
-  const deleteChain = createDeleteChain(expiredRows);
+  const updateChain = createUpdateChain(
+    expiredRows.length > 0 ? expiredRows : promotedRows,
+  );
   const db = {
     query: {
       needsDeepeningTopics: {
@@ -47,10 +38,9 @@ function createDb({
       },
     },
     update: jest.fn(() => updateChain),
-    delete: jest.fn(() => deleteChain),
   } as unknown as Database;
 
-  return { db, findMany, updateChain, deleteChain };
+  return { db, findMany, updateChain };
 }
 
 function extractSqlValues(value: unknown): unknown[] {
@@ -135,8 +125,8 @@ describe('promotePendingDeepening', () => {
 });
 
 describe('expirePendingDeepeningRows', () => {
-  it('deletes expired pending_review rows and leaves active/non-expired rows alone', async () => {
-    const { db, deleteChain } = createDb({
+  it("transitions expired pending_review rows to 'resolved' (preserves audit trail)", async () => {
+    const { db, updateChain } = createDb({
       expiredRows: [{ id: 'expired-1' }, { id: 'expired-2' }],
     });
 
@@ -146,13 +136,33 @@ describe('expirePendingDeepeningRows', () => {
       expiredCount: 2,
       expiredIds: ['expired-1', 'expired-2'],
     });
-    expect(deleteChain.where).toHaveBeenCalledTimes(1);
-    const whereClause = deleteChain.where.mock.calls[0]![0];
+    expect(updateChain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'resolved',
+        pendingExpiresAt: null,
+        updatedAt: NOW,
+      }),
+    );
+    expect(updateChain.where).toHaveBeenCalledTimes(1);
+    const whereClause = updateChain.where.mock.calls[0]![0];
     expect(extractSqlValues(whereClause)).toEqual(
       expect.arrayContaining(['pending_review', NOW]),
     );
-    expect(deleteChain.returning).toHaveBeenCalledWith({
+    expect(updateChain.returning).toHaveBeenCalledWith({
       id: expect.anything(),
     });
+  });
+
+  it('returns empty result when nothing has expired', async () => {
+    const { db, updateChain } = createDb({ expiredRows: [] });
+
+    const result = await expirePendingDeepeningRows(db, NOW);
+
+    expect(result).toEqual({ expiredCount: 0, expiredIds: [] });
+    // UPDATE statement still runs (WHERE filters out nothing matched) - verify
+    // we didn't accidentally fall back to a DELETE path.
+    expect(updateChain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'resolved' }),
+    );
   });
 });

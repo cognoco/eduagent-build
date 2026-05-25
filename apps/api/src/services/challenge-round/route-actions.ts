@@ -21,11 +21,6 @@ interface DeclineChallengeRoundInput extends ChallengeRoundRouteInput {
   dontAskAgain: boolean;
 }
 
-const REOFFERABLE_STATES = new Set<ChallengeRoundSessionState['state']>([
-  'complete',
-  'aborted',
-]);
-
 function parseChallengeRoundState(
   session: LearningSession,
 ): ChallengeRoundSessionState | undefined {
@@ -81,26 +76,6 @@ function transitionOrConflict(
         : 'Invalid Challenge Round transition',
     );
   }
-}
-
-export async function maybeOfferChallengeRound(
-  db: Database,
-  profileId: string,
-  input: ChallengeRoundRouteInput,
-): Promise<ChallengeRoundSessionState> {
-  const session = await loadOwnedLearningSession(db, profileId, input);
-  const current = parseChallengeRoundState(session);
-  if (current && !REOFFERABLE_STATES.has(current.state)) return current;
-
-  const nextState = transitionOrConflict(current, {
-    type: 'offer',
-    topicId: input.topicId,
-  });
-  if (!nextState) {
-    throw new ConflictError('Challenge Round offer did not produce state');
-  }
-  await persistChallengeRoundState(db, profileId, input.sessionId, nextState);
-  return nextState;
 }
 
 export async function acceptChallengeRound(
