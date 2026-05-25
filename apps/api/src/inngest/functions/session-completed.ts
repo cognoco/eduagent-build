@@ -56,7 +56,11 @@ import {
 import { escapeXml } from '../../services/llm/sanitize';
 import { projectAiResponseContent } from '../../services/llm/project-response';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { cefrLevelSchema, verificationTypeSchema } from '@eduagent/schemas';
+import {
+  cefrLevelSchema,
+  computeAgeBracket,
+  verificationTypeSchema,
+} from '@eduagent/schemas';
 import {
   analyzeSessionTranscript,
   applyAnalysis,
@@ -163,6 +167,16 @@ export async function embedNewFactsForProfile(
     }),
   );
 
+  // [BUG-759] Collect successful embeddings, then issue grouped bulk
+  // UPDATEs after the failure-classification loop. Previously this was a
+  // per-row `db.update().where(eq(id, row.id))` inside the same for-loop,
+  // which (a) issued N round-trips on every replay and (b) bumped
+  // `updatedAt` on every retry because the predicate did not block writes
+  // that had already succeeded. The `isNull(embedding)` predicate below
+  // collapses replays to no-ops at the DB level.
+  type SuccessfulEmbed = { id: string; vector: number[] };
+  const successes: SuccessfulEmbed[] = [];
+
   for (const { row, result } of results) {
     if (!result.ok) {
       failed += 1;
@@ -194,18 +208,45 @@ export async function embedNewFactsForProfile(
       continue;
     }
 
-    await db
-      .update(memoryFacts)
-      .set({ embedding: result.vector, updatedAt: new Date() })
-      .where(
-        and(
-          eq(memoryFacts.id, row.id),
-          eq(memoryFacts.profileId, profileId),
-          isNull(memoryFacts.embedding),
-        ),
-      );
-    embedded += 1;
-    embeddedIds.push(row.id);
+    successes.push({ id: row.id, vector: result.vector });
+  }
+
+  if (successes.length > 0) {
+    // Each row has its own vector, so we cannot collapse to a single
+    // `set({embedding: X})`. Group by vector identity to coalesce
+    // duplicates (rare but possible: identical fact texts produced by
+    // distinct rows would dedupe at the embedder boundary), and use
+    // `inArray(id, ids)` so each group is one round-trip rather than N.
+    const now = new Date();
+    const grouped = new Map<string, { vector: number[]; ids: string[] }>();
+    for (const s of successes) {
+      const key = JSON.stringify(s.vector);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.ids.push(s.id);
+      } else {
+        grouped.set(key, { vector: s.vector, ids: [s.id] });
+      }
+    }
+
+    for (const { vector, ids } of grouped.values()) {
+      await db
+        .update(memoryFacts)
+        .set({ embedding: vector, updatedAt: now })
+        .where(
+          and(
+            inArray(memoryFacts.id, ids),
+            eq(memoryFacts.profileId, profileId),
+            // [BUG-759] Idempotency: a replay that finds the rows already
+            // embedded matches no rows here, so the UPDATE is a no-op
+            // rather than a re-write with a fresh updatedAt timestamp.
+            isNull(memoryFacts.embedding),
+          ),
+        );
+    }
+
+    embedded = successes.length;
+    embeddedIds.push(...successes.map((s) => s.id));
   }
 
   return { embedded, failed, scanned: rows.length, embeddedIds, failedIds };
@@ -955,7 +996,22 @@ export const sessionCompleted = inngest.createFunction(
               })
               .join('\n\n');
 
-            const result = await generateSessionInsights(transcriptText);
+            // [BUG-734] Pass ageBracket so router can apply age-appropriate
+            // safety preamble. Falls back to undefined if birthYear is missing
+            // (router applies minor-safe default).
+            const [profileForBracket] = await db
+              .select({ birthYear: profiles.birthYear })
+              .from(profiles)
+              .where(eq(profiles.id, profileId))
+              .limit(1);
+            const ageBracket =
+              profileForBracket?.birthYear != null
+                ? computeAgeBracket(profileForBracket.birthYear)
+                : undefined;
+
+            const result = await generateSessionInsights(transcriptText, {
+              ageBracket,
+            });
 
             if (result.valid) {
               highlight = result.insights.highlight;

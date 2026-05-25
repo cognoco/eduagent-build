@@ -164,7 +164,13 @@ const BANNED_FILLER_OPENERS = [
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
-const ADVANCED_MODEL_MIN_RUNG = 4;
+// [BUG-732] Gates Plus / addon-Premium profiles into the `premium` LLM tier
+// (Gemini Pro / Claude Sonnet — the "advanced" rung for the default Gemini
+// pool). Distinct from `OPENAI_ADVANCED_MODEL_MIN_RUNG = 5` in
+// services/llm/router.ts, which suppresses the OpenAI advanced candidate
+// even on premium tier until rung ≥ 5. Naming both constants by provider
+// makes the routing matrix self-documenting at the call site.
+const GEMINI_ADVANCED_MODEL_MIN_RUNG = 4;
 const PLUS_ADVANCED_RUNG_ROUTING_REASON = 'plus_included_advanced_rung';
 const PLUS_STANDARD_RUNG_ROUTING_REASON = 'plus_standard_below_advanced_rung';
 const PREMIUM_ADDON_ADVANCED_RUNG_ROUTING_REASON =
@@ -191,7 +197,7 @@ export function resolveExchangeLlmRouting(input: {
   requestedLlmTier?: LLMTier;
   effectiveRung: EscalationRung;
 }): ExchangeLlmRouting {
-  const isAdvancedRung = input.effectiveRung >= ADVANCED_MODEL_MIN_RUNG;
+  const isAdvancedRung = input.effectiveRung >= GEMINI_ADVANCED_MODEL_MIN_RUNG;
 
   if (input.subscriptionTier === 'plus') {
     return isAdvancedRung
@@ -1172,10 +1178,14 @@ export async function prepareExchangeContext(
 
     // Fire-and-forget by design: this silent-classification observation must
     // not add Inngest round-trip latency to prepareExchangeContext (which is
-    // on the synchronous /ask exchange hot path). safeSend still routes any
-    // dispatch failure to Sentry; the `void` discards the unresolved promise
-    // explicitly so the floating-promise lint does not fire.
-    void safeSend(
+    // on the synchronous /ask exchange hot path). safeSend internally routes
+    // both dispatch failures and dispatch timeouts to Sentry; the `.catch`
+    // here is the BUG-755 belt-and-braces guard against a future regression
+    // in safeSend itself silently throwing past its own try/catch (e.g. a
+    // synchronous bug in argument validation before the inner try block) —
+    // without this, such a regression would surface as an unhandledRejection
+    // instead of as a Sentry event.
+    safeSend(
       () =>
         inngest.send({
           name: 'app/ask.classify_silently',
@@ -1190,7 +1200,15 @@ export async function prepareExchangeContext(
         }),
       'ask.classify_silently',
       { sessionId, profileId },
-    );
+    ).catch((err) => {
+      captureException(err, {
+        profileId,
+        extra: {
+          surface: 'session-exchange.ask.classify_silently.safe_send_failed',
+          sessionId,
+        },
+      });
+    });
   }
 
   const [silentSubjectRows, silentTeachingPref] =

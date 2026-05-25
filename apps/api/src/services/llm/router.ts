@@ -273,6 +273,11 @@ export const OPENAI_ADVANCED_MODEL_CANDIDATES = [
 ] as const;
 export type OpenAIAdvancedModel =
   (typeof OPENAI_ADVANCED_MODEL_CANDIDATES)[number];
+// [BUG-732] Gates the OpenAI advanced candidate (`gpt-5` / `gpt-5.5`).
+// Distinct from `GEMINI_ADVANCED_MODEL_MIN_RUNG = 4` in
+// services/session/session-exchange.ts: even on the premium tier the
+// OpenAI candidate stays suppressed until rung ≥ 5 to keep the default
+// Gemini pool dominant until escalation truly warrants the cost.
 export const OPENAI_ADVANCED_MODEL_MIN_RUNG = 5;
 export const ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-6';
 
