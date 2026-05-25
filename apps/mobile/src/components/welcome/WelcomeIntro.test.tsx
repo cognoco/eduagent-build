@@ -47,19 +47,21 @@ jest.mock(
   }),
 );
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: ThemeProvider requires ThemeContext + accent-preset hooks the unit test does not exercise; stub returns stable color object for deterministic rendering
-  useThemeColors: () => ({
-    background: '#000',
-    surface: '#111',
-    surfaceElevated: '#222',
-    textPrimary: '#fff',
-    textSecondary: '#aaa',
-    textInverse: '#000',
-    accent: '#0af',
-    border: '#333',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: ThemeProvider requires ThemeContext + accent-preset hooks the unit test does not exercise; stub returns stable color object for deterministic rendering */,
+  () => ({
+    useThemeColors: () => ({
+      background: '#000',
+      surface: '#111',
+      surfaceElevated: '#222',
+      textPrimary: '#fff',
+      textSecondary: '#aaa',
+      textInverse: '#000',
+      accent: '#0af',
+      border: '#333',
+    }),
   }),
-}));
+);
 
 describe('<WelcomeIntro />', () => {
   beforeEach(() => {

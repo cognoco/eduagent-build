@@ -27,37 +27,39 @@ jest.mock(
 );
 
 jest.mock('../../lib/intro-state', () => ({
-  // gc1-allow: markIntroSeenSync is the assertion surface — the test verifies the route calls it with the Clerk userId, not the SecureStore-write behavior (covered by intro-state.test.ts).
+  ...jest.requireActual('../../lib/intro-state'),
   markIntroSeenSync: (...args: unknown[]) => mockMarkIntroSeenSync(...args),
 }));
 
 jest.mock('../../lib/analytics', () => ({
-  // gc1-allow: track() is the assertion surface — the test verifies intro_started/intro_card_advanced/intro_completed events fire with the right payloads.
+  ...jest.requireActual('../../lib/analytics'),
   track: (...args: unknown[]) => mockTrack(...args),
 }));
 
-jest.mock('../../components/welcome/WelcomeIntro', () => ({
-  // gc1-allow: WelcomeIntro is covered by its own unit suite (WelcomeIntro.test.tsx); the route test stubs it to a minimal driver so we can verify ONLY the route's wiring (analytics + intro-state + redirect param + router.replace).
-  WelcomeIntro: ({
-    onComplete,
-    onCardAdvanced,
-  }: {
-    onComplete: () => void;
-    onCardAdvanced?: (n: number) => void;
-  }) => {
-    const { Pressable, Text, View } = jest.requireActual('react-native');
-    return (
-      <View testID="welcome-intro-stub">
-        <Pressable testID="stub-advance" onPress={() => onCardAdvanced?.(2)}>
-          <Text>Advance</Text>
-        </Pressable>
-        <Pressable testID="stub-complete" onPress={onComplete}>
-          <Text>Complete</Text>
-        </Pressable>
-      </View>
-    );
-  },
-}));
+jest.mock(
+  '../../components/welcome/WelcomeIntro' /* gc1-allow: WelcomeIntro is fully covered by WelcomeIntro.test.tsx; this route test stubs the component to a minimal driver so it can verify ONLY the route's wiring (analytics + intro-state + redirect param + router.replace) without re-exercising the pager UI. */,
+  () => ({
+    WelcomeIntro: ({
+      onComplete,
+      onCardAdvanced,
+    }: {
+      onComplete: () => void;
+      onCardAdvanced?: (n: number) => void;
+    }) => {
+      const { Pressable, Text, View } = jest.requireActual('react-native');
+      return (
+        <View testID="welcome-intro-stub">
+          <Pressable testID="stub-advance" onPress={() => onCardAdvanced?.(2)}>
+            <Text>Advance</Text>
+          </Pressable>
+          <Pressable testID="stub-complete" onPress={onComplete}>
+            <Text>Complete</Text>
+          </Pressable>
+        </View>
+      );
+    },
+  }),
+);
 
 describe('<WelcomeRoute />', () => {
   beforeEach(() => {
