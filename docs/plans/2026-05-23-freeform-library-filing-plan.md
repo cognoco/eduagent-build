@@ -249,6 +249,11 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 
 ## PR 1 Tasks - Backend Filing State And Keep-Out
 
+**Static status (2026-05-25): Partial.**
+
+- Present: `filing_kept_out` schema/database/migration, `getSessionEffectiveMode()`, `FILING_CONFIG`, `markSessionFiled()`, kept-out/add/restore/retry-reset service scaffolding, and session route endpoints.
+- Needs follow-up: `requestSessionLibraryFiling()` still needs verification against the planned freeform/transcript eligibility contract; `deleteTopicIfSafe()` is missing; `resolveFilingResult()` still writes `learning_sessions`; kept-out retry exclusion/backfill/observer coverage needs a focused test pass.
+
 - [ ] Add `filing_kept_out` to shared `filingStatusSchema`.
 - [ ] Add typed `getSessionEffectiveMode(session)` accessor to `@eduagent/schemas`. [HIGH-3] All effective-mode reads in PR 2 must route through this.
 - [ ] Add DB migration for `filing_status` enum value. [MEDIUM-3] Verify the SQL file does NOT wrap `ALTER TYPE ADD VALUE` in a transaction block; run `pnpm run db:migrate:dev` locally before merge.
@@ -293,6 +298,11 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 ---
 
 ## PR 2 Tasks - Auto-File Freeform Sessions
+
+**Static status (2026-05-25): Not delivered.**
+
+- Present: `app/session.auto_file_requested` schema and an Inngest listener attached to `freeform-filing.ts`.
+- Needs implementation: eligible close-path dispatch, dedicated `auto-file-session` handler, `claimSessionForAutoFiling()`, guarded final update, terminal failure lifecycle, safe cleanup on opt-out race, repeated-topic dedupe acceptance coverage, and backfill threshold updates.
 
 - [ ] Audit every `learning_sessions` insert path and confirm the freeform entry actually writes `metadata.effectiveMode = 'freeform'`. **[HIGH-3 / MEDIUM-L]** Today `session-crud.ts:906` defaults to `effectiveMode: 'learning'`; if any freeform creation path forgets to override, auto-file silently never fires for that path. Target files to audit:
   - `apps/api/src/services/session/session-crud.ts` — `startSession`, onboarding fast-path, curriculum-first session creation (the `'learning'` default lives here).
@@ -341,6 +351,11 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 
 ## PR 3 Tasks - Mobile UX
 
+**Static status (2026-05-25): Not delivered.**
+
+- Present: legacy `FilingFailedBanner` supports `filing_kept_out` as a hidden/no-op state and existing session polling still handles `filing_pending`.
+- Needs implementation: compact Library status component/hook, state-specific actions, add/keep-out/remove mutations, filed destination/tap-through, rename affordance, 3s/10-poll timeout behavior, Library-tab failed-filing attention surface, and query invalidation coverage for the new mutations.
+
 - [ ] Remove the normal post-close blocking filing prompt **for freeform sessions only**. [MEDIUM-4 / MEDIUM-X] Homework filing prompt is out of scope and unchanged in this PR series; document the temporary inconsistency in flow docs and do not present it as the final cross-mode close pattern.
 - [ ] **[HIGH-S]** Release gate: PR 3 must either ship together with the upstream Ask First / Unsorted auto-subject work, or be released/communicated only as "freeform close no longer asks a second Library question." Do not market it as "Ask Anything has no upfront friction" while the subject picker still appears.
 - [ ] After freeform close, navigate to Session Summary immediately.
@@ -382,6 +397,11 @@ Rollback note: PostgreSQL enum value additions are not trivially reversible. Rol
 ---
 
 ## PR 4 Tasks - Documentation Reconciliation
+
+**Static status (2026-05-25): Not delivered.**
+
+- `docs/flows/flow-master-directory.md` still lists `LEARN-01`, `SUBJECT-03`, and `SUBJECT-05` as `Not created`.
+- Existing edits to `LEARN-07` / `LEARN-08` do not yet satisfy this plan's freeform Library filing reconciliation.
 
 - [ ] Create `LEARN-01` for Freeform chat / Ask Anything.
 - [ ] Create `SUBJECT-03` for subject creation/resolution from chat.
