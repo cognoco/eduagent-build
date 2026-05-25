@@ -43,7 +43,7 @@ import {
   serializeHomeworkProblems,
   splitHomeworkProblems,
 } from '../../../components/homework/problem-cards';
-import { useProfile } from '../../../lib/profile';
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -57,7 +57,7 @@ export default function CameraScreen(): React.ReactNode {
   }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { isExplicitProxyMode } = useProfile();
+  const navigationContract = useNavigationContract();
 
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
@@ -811,7 +811,7 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   // ---- Proxy-mode gate ----
-  if (isExplicitProxyMode) {
+  if (navigationContract.isParentProxy) {
     return (
       <View
         testID="proxy-read-only"

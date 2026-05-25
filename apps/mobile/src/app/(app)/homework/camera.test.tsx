@@ -141,7 +141,20 @@ jest.mock(
   }),
 );
 
-let mockIsExplicitProxyMode = false;
+let mockIsParentProxy = false;
+jest.mock(
+  '../../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests */,
+  () => ({
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
+  }),
+);
+
+// lib/profile is still needed by use-subjects and use-homework-ocr (both call
+// useProfile() for activeProfile). WI-371 migrated the proxy gate to
+// use-navigation-contract, but the profile context must remain available.
 jest.mock(
   '../../../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
   () => ({
@@ -156,7 +169,6 @@ jest.mock(
         pronouns: null,
         consentStatus: null,
       },
-      isExplicitProxyMode: mockIsExplicitProxyMode,
     }),
   }),
 );
@@ -272,7 +284,7 @@ jest
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockIsExplicitProxyMode = false;
+  mockIsParentProxy = false;
   appStateListeners = [];
   mockLaunchImageLibraryAsync.mockResolvedValue({
     canceled: true,
@@ -1487,7 +1499,7 @@ describe('CameraScreen', () => {
 
   describe('proxy mode gate', () => {
     beforeEach(() => {
-      mockIsExplicitProxyMode = true;
+      mockIsParentProxy = true;
     });
 
     it('renders the proxy read-only empty state instead of the camera pipeline', () => {

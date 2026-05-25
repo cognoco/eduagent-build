@@ -303,7 +303,6 @@ jest.mock(
 const mockUseProfile = jest.fn(() => ({
   activeProfile: { id: 'profile-1', isOwner: true },
   profiles: [{ id: 'profile-1', isOwner: true }],
-  isExplicitProxyMode: false,
 }));
 
 jest.mock(
@@ -311,6 +310,17 @@ jest.mock(
   () => ({
     useProfile: () => mockUseProfile(),
     isGuardianProfile: () => false,
+  }),
+);
+
+let mockIsParentProxy = false;
+jest.mock(
+  '../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests */,
+  () => ({
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
   }),
 );
 
@@ -355,10 +365,10 @@ describe('LibraryScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
     mockUseProfile.mockReturnValue({
       activeProfile: { id: 'profile-1', isOwner: true },
       profiles: [{ id: 'profile-1', isOwner: true }],
-      isExplicitProxyMode: false,
     });
     mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
     const { queryClient, Wrapper } = createWrapper();
@@ -1272,10 +1282,10 @@ describe('LibraryScreen', () => {
   // -------------------------------------------------------------------------
   describe('proxy mode write guard [WI-273]', () => {
     beforeEach(() => {
+      mockIsParentProxy = true;
       mockUseProfile.mockReturnValue({
         activeProfile: { id: 'profile-1', isOwner: true },
         profiles: [{ id: 'profile-1', isOwner: true }],
-        isExplicitProxyMode: true,
       });
       mockUseSubjects.mockReturnValue({
         data: [{ id: 'sub-1', name: 'Math', status: 'active' }],

@@ -108,6 +108,11 @@ jest.mock('../../hooks/use-active-profile-role', () => ({
 // Set to false in proxy-redirect tests to verify the Redirect guard fires.
 let mockCanEnterResult = true;
 
+// mockIsParentProxy drives the write-guard branch in mentor-memory.tsx.
+// Decoupled from mockCanEnterResult so tests can verify the screen body
+// renders (canEnter=true) but controls are disabled (isParentProxy=true).
+let mockIsParentProxy = false;
+
 jest.mock(
   '../../hooks/use-navigation-contract' /* gc1-allow: screen test pins navigation gates without the full app provider tree */,
   () => ({
@@ -115,12 +120,25 @@ jest.mock(
       gates: {
         sessionIsOwner: mockActiveRole === 'owner',
       },
-      // V0 fallback in the screen layouts reads `isParentProxy` when
-      // MODE_NAV_V1_ENABLED is off — keep it congruent with mockCanEnterResult
-      // so tests pass under either flag value.
-      isParentProxy: !mockCanEnterResult,
+      isParentProxy: mockIsParentProxy,
       canEnter: (_route: string) => mockCanEnterResult,
     }),
+  }),
+);
+
+// mockModeNavV1Enabled controls the feature flag that switches between V0
+// (blocked = isParentProxy) and V1 (blocked = !canEnter). WI-274 tests set
+// this to true so the screen body renders while isParentProxy=true (V1 uses
+// canEnter=true to skip the redirect, then the screen shows disabled controls).
+let mockModeNavV1Enabled = false;
+jest.mock(
+  '../../lib/feature-flags' /* gc1-allow: compile-time constant that switches redirect branch; needed to test V1-mode proxy write guards */,
+  () => ({
+    FEATURE_FLAGS: {
+      get MODE_NAV_V1_ENABLED() {
+        return mockModeNavV1Enabled;
+      },
+    },
   }),
 );
 
@@ -180,6 +198,8 @@ describe('MentorMemoryScreen — interests null guard', () => {
   afterEach(() => {
     mockProfileData = { ...mockProfileBase, interests: [] };
     mockSearchParams = {};
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
     jest.clearAllMocks();
   });
 
@@ -294,6 +314,8 @@ describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-91
   beforeEach(() => {
     jest.clearAllMocks();
     mockActiveRole = 'owner';
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
     mockProfileData = {
       ...mockProfileBase,
       interests: [],
@@ -338,6 +360,8 @@ describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-91
 describe('MentorMemoryScreen — accommodation badge text by age bracket', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
     mockProfileData = {
       ...mockProfileBase,
       interests: [],
@@ -372,6 +396,8 @@ describe('MentorMemoryScreen — accommodation badge text by age bracket', () =>
 describe('MentorMemoryScreen — catch blocks use formatApiError not generic copy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
     mockProfileData = {
       ...mockProfileBase,
       interests: [],
@@ -426,6 +452,8 @@ describe('MentorMemoryScreen — catch blocks use formatApiError not generic cop
 describe('MentorMemoryScreen — explicit return target from More', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
     mockSearchParams = { returnTo: 'more' };
     mockProfileData = {
       ...mockProfileBase,
@@ -455,6 +483,8 @@ describe('MentorMemoryScreen — explicit return target from More', () => {
 describe('MentorMemoryScreen — canEnter=false redirects to home', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
     mockCanEnterResult = false;
     mockProfileData = {
       ...mockProfileBase,
@@ -485,9 +515,12 @@ describe('MentorMemoryScreen — canEnter=false redirects to home', () => {
 describe('MentorMemoryScreen — proxy mode write guard (WI-274)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Keep canEnter=true so Redirect is NOT fired — we test the screen body
-    // rendering with disabled controls when isExplicitProxyMode=true.
+    // V1 mode: blocked = !canEnter(...). With canEnter=true the redirect does
+    // NOT fire, so the screen body renders. isParentProxy=true then disables
+    // the write controls. This decoupling is only possible under V1.
+    mockModeNavV1Enabled = true;
     mockCanEnterResult = true;
+    mockIsParentProxy = true;
     mockIsExplicitProxyMode = true;
     mockProfileData = {
       ...mockProfileBase,
@@ -498,6 +531,8 @@ describe('MentorMemoryScreen — proxy mode write guard (WI-274)', () => {
   });
 
   afterEach(() => {
+    mockModeNavV1Enabled = false;
+    mockIsParentProxy = false;
     mockIsExplicitProxyMode = false;
   });
 

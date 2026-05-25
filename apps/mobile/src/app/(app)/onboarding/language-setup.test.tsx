@@ -75,19 +75,14 @@ const mockGoBackOrReplace = jest.fn();
 let mockIsPending = false;
 let mockSubjectId: string | undefined = 'test-id';
 let mockReturnTo: string | undefined = undefined;
-let mockIsExplicitProxyMode = false;
+let mockIsParentProxy = false;
 
 jest.mock(
-  '../../../lib/profile', // gc1-allow: native-boundary: ProfileProvider requires SecureStore + Sentry + full provider tree
+  '../../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests */,
   () => ({
-    useProfile: () => ({
-      activeProfile: {
-        id: 'test-profile-id',
-        accountId: 'test-account-id',
-        displayName: 'Test Learner',
-        isOwner: true,
-      },
-      isExplicitProxyMode: mockIsExplicitProxyMode,
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
     }),
   }),
 );
@@ -166,7 +161,7 @@ describe('LanguageSetup', () => {
     mockSubjectId = 'test-id';
     mockIsPending = false;
     mockReturnTo = undefined;
-    mockIsExplicitProxyMode = false;
+    mockIsParentProxy = false;
     mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
     mockStartFirstCurriculumMutateAsync.mockResolvedValue({
       session: {
@@ -362,7 +357,7 @@ describe('LanguageSetup', () => {
 
   describe('proxy mode gate', () => {
     beforeEach(() => {
-      mockIsExplicitProxyMode = true;
+      mockIsParentProxy = true;
     });
 
     it('disables the language select options when in proxy mode', () => {

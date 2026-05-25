@@ -22,6 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile, type Profile } from '../lib/profile';
+import { useNavigationContract } from '../hooks/use-navigation-contract';
 import { useActiveProfileRole } from '../hooks/use-active-profile-role';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
@@ -82,8 +83,8 @@ export default function CreateProfileScreen() {
   const queryClient = useQueryClient();
   const client = useApiClient();
   const { isLoaded, isSignedIn } = useAuth();
-  const { activeProfile, profiles, switchProfile, isExplicitProxyMode } =
-    useProfile();
+  const { activeProfile, profiles, switchProfile } = useProfile();
+  const navigationContract = useNavigationContract();
   const activeProfileRole = useActiveProfileRole();
 
   // BUG-239: Detect whether the current user is a parent adding a child.
@@ -151,7 +152,8 @@ export default function CreateProfileScreen() {
     !loading;
 
   const onSubmit = useCallback(async () => {
-    if (activeProfileRole !== 'owner' || isExplicitProxyMode) return;
+    if (activeProfileRole !== 'owner' || navigationContract.isParentProxy)
+      return;
     if (!canSubmit || !birthDate) return;
 
     const trimmedName = displayName.trim();
@@ -281,7 +283,7 @@ export default function CreateProfileScreen() {
     }
   }, [
     activeProfileRole,
-    isExplicitProxyMode,
+    navigationContract.isParentProxy,
     canSubmit,
     displayName,
     birthDate,
@@ -313,7 +315,7 @@ export default function CreateProfileScreen() {
   // owner, or when a parent is acting as a proxy for a child profile. In both
   // cases the API would reject the request; gate early to avoid a misleading
   // form that silently fails.
-  if (activeProfileRole !== 'owner' || isExplicitProxyMode) {
+  if (activeProfileRole !== 'owner' || navigationContract.isParentProxy) {
     return (
       <View
         testID="create-profile-access-blocked"

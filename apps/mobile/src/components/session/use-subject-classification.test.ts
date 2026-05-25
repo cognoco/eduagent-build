@@ -1,11 +1,14 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useSubjectClassification } from './use-subject-classification';
 
-const mockUseProfile = jest.fn(() => ({ isExplicitProxyMode: false }));
+let mockIsParentProxy = false;
 jest.mock(
-  '../../lib/profile' /* gc1-allow: unit test boundary — drives isExplicitProxyMode for proxy write-guard tests (WI-307) */,
+  '../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests (WI-307) */,
   () => ({
-    useProfile: () => mockUseProfile(),
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
   }),
 );
 
@@ -48,7 +51,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
 describe('useSubjectClassification — greeting guard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
+    mockIsParentProxy = false;
   });
 
   it('intercepts a pure greeting in freeform mode — calls animateResponse, not classifySubject or continueWithMessage', async () => {
@@ -231,7 +234,7 @@ describe('useSubjectClassification — greeting guard', () => {
 describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
+    mockIsParentProxy = false;
   });
 
   it('Site A: does NOT auto-pick availableSubjects[0] when classifier returns 0 candidates — proceeds without subject', async () => {
@@ -355,7 +358,7 @@ describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
 describe('useSubjectClassification — typed subject override', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
+    mockIsParentProxy = false;
   });
 
   it('resolves a misspelled typed subject to an existing enrolled subject', async () => {
@@ -492,7 +495,7 @@ describe('useSubjectClassification — typed subject override', () => {
 describe('useSubjectClassification — homework image subject resolution', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
+    mockIsParentProxy = false;
   });
 
   it('preserves the image send request while waiting for a subject pick', async () => {
@@ -557,7 +560,7 @@ describe('useSubjectClassification — homework image subject resolution', () =>
 describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
+    mockIsParentProxy = false;
   });
 
   it('renders "Looks like {subject}." without the confident "Got it" prefix', async () => {
@@ -606,7 +609,7 @@ describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', (
 describe('useSubjectClassification — proxy mode write guard [WI-307]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseProfile.mockReturnValue({ isExplicitProxyMode: true });
+    mockIsParentProxy = true;
   });
 
   it('handleSend dispatches no mutations in proxy mode [WI-307]', async () => {

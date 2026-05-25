@@ -17,8 +17,7 @@ import { useProfile } from '../../lib/profile';
 export default function HomeScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { profiles, activeProfile, isLoading, isExplicitProxyMode } =
-    useProfile();
+  const { profiles, activeProfile, isLoading } = useProfile();
   const navigationContract = useNavigationContract();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
@@ -33,7 +32,7 @@ export default function HomeScreen(): React.ReactElement {
     accommodationMode: learnerProfile?.accommodationMode,
     audience: isOwner ? 'adult' : 'child',
     onAllComplete: () => {
-      if (isExplicitProxyMode) return;
+      if (navigationContract.isParentProxy) return;
       markCelebrationsSeen
         .mutateAsync({
           viewer: isOwner ? 'parent' : 'child',
@@ -73,10 +72,16 @@ export default function HomeScreen(): React.ReactElement {
       setVisibleNoticeId(null);
       // [WI-270] Do not acknowledge the notice on the child's behalf in proxy
       // mode — the dismissal is a write that belongs to the child.
-      if (!isExplicitProxyMode) ackNotice.mutate({ id: firstNotice.id });
+      if (!navigationContract.isParentProxy)
+        ackNotice.mutate({ id: firstNotice.id });
     }, 5000);
     return () => clearTimeout(timer);
-  }, [ackNotice, firstNotice, visibleNoticeId, isExplicitProxyMode]);
+  }, [
+    ackNotice,
+    firstNotice,
+    visibleNoticeId,
+    navigationContract.isParentProxy,
+  ]);
 
   // Neutral placeholder while profiles load — prevents flash of wrong content.
   if (isLoading && !loadingTimedOut) {

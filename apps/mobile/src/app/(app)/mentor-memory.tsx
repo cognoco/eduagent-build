@@ -49,7 +49,7 @@ export default function MentorMemoryScreen() {
   const { returnTo } = useLocalSearchParams<{
     returnTo?: string | string[];
   }>();
-  const { activeProfile, isExplicitProxyMode } = useProfile();
+  const { activeProfile } = useProfile();
   const { data: profile, isLoading, isError, refetch } = useLearnerProfile();
   const deleteItem = useDeleteMemoryItem();
   const deleteAll = useDeleteAllMemory();
@@ -199,7 +199,7 @@ export default function MentorMemoryScreen() {
 
   const handleInterestContextChange = useCallback(
     async (label: string, context: InterestContext) => {
-      if (isExplicitProxyMode) return;
+      if (navigationContract.isParentProxy) return;
       const interests = profile?.interests ?? [];
       try {
         await updateInterestsContext.mutateAsync({
@@ -218,7 +218,12 @@ export default function MentorMemoryScreen() {
         throw err;
       }
     },
-    [isExplicitProxyMode, profile?.interests, t, updateInterestsContext],
+    [
+      navigationContract.isParentProxy,
+      profile?.interests,
+      t,
+      updateInterestsContext,
+    ],
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
@@ -365,7 +370,7 @@ export default function MentorMemoryScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        {isExplicitProxyMode ? (
+        {navigationContract.isParentProxy ? (
           <View
             className="bg-primary-soft rounded-card px-4 py-3 mt-4"
             testID="proxy-read-only-hint"
@@ -413,7 +418,7 @@ export default function MentorMemoryScreen() {
               }
               onValueChange={handleToggleInjection}
               disabled={
-                isExplicitProxyMode ||
+                navigationContract.isParentProxy ||
                 !memoryEnabled ||
                 isLoading ||
                 toggleInjection.isPending
@@ -508,7 +513,7 @@ export default function MentorMemoryScreen() {
           <TellMentorInput
             birthYear={activeProfile?.birthYear}
             value={draft}
-            isPending={isExplicitProxyMode || tellMentor.isPending}
+            isPending={navigationContract.isParentProxy || tellMentor.isPending}
             onChangeText={setDraft}
             onSubmit={() => void handleTellMentor()}
           />
@@ -536,7 +541,7 @@ export default function MentorMemoryScreen() {
                 label={row.label}
                 source={row.source}
                 onRemove={
-                  isExplicitProxyMode
+                  navigationContract.isParentProxy
                     ? undefined
                     : async () => {
                         try {
@@ -588,11 +593,12 @@ export default function MentorMemoryScreen() {
                   interest={interest}
                   detail={detail}
                   disabled={
-                    updateInterestsContext.isPending || isExplicitProxyMode
+                    updateInterestsContext.isPending ||
+                    navigationContract.isParentProxy
                   }
                   onContextChange={handleInterestContextChange}
                   onRemove={
-                    isExplicitProxyMode
+                    navigationContract.isParentProxy
                       ? undefined
                       : async () => {
                           try {
@@ -629,7 +635,7 @@ export default function MentorMemoryScreen() {
                 label={`${entry.subject}: ${entry.topics.join(', ')}`}
                 source={entry.source}
                 onRemove={
-                  isExplicitProxyMode
+                  navigationContract.isParentProxy
                     ? undefined
                     : async () => {
                         try {
@@ -683,7 +689,7 @@ export default function MentorMemoryScreen() {
                   progressLabel={progress.progressLabel}
                   progressValue={progress.progressValue}
                   onRemove={
-                    isExplicitProxyMode
+                    navigationContract.isParentProxy
                       ? undefined
                       : async () => {
                           try {
@@ -724,7 +730,7 @@ export default function MentorMemoryScreen() {
                 key={note}
                 label={note}
                 onRemove={
-                  isExplicitProxyMode
+                  navigationContract.isParentProxy
                     ? undefined
                     : async () => {
                         try {
@@ -765,7 +771,7 @@ export default function MentorMemoryScreen() {
                 label={value}
                 actionLabel={t('session.mentorMemory.bringBack')}
                 onRemove={
-                  isExplicitProxyMode
+                  navigationContract.isParentProxy
                     ? undefined
                     : async () => {
                         try {
@@ -792,7 +798,7 @@ export default function MentorMemoryScreen() {
         <MemorySection title={t('session.mentorMemory.sections.privacy')}>
           <Pressable
             onPress={handleDeleteAll}
-            disabled={isExplicitProxyMode}
+            disabled={navigationContract.isParentProxy}
             className="bg-surface rounded-card px-4 py-3 disabled:opacity-50"
             accessibilityRole="button"
             accessibilityLabel={t(

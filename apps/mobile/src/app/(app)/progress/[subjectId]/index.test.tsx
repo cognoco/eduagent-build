@@ -133,11 +133,14 @@ jest.mock(
   }),
 );
 
-const mockUseProfile = jest.fn(() => ({ isExplicitProxyMode: false }));
+let mockIsParentProxy = false;
 jest.mock(
-  '../../../../lib/profile' /* gc1-allow: unit test boundary — drives isExplicitProxyMode for proxy write-guard tests (WI-279) */,
+  '../../../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests (WI-279) */,
   () => ({
-    useProfile: () => mockUseProfile(),
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
   }),
 );
 
@@ -341,7 +344,7 @@ function mockHooks({
 describe('ProgressSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseProfile.mockReturnValue({ isExplicitProxyMode: false });
+    mockIsParentProxy = false;
     mockLocalSearchParams.mockReturnValue({ subjectId: 's1' });
     mockMutateSubjectAsync.mockResolvedValue({ subject: {} });
   });
@@ -941,7 +944,7 @@ describe('ProgressSubjectScreen', () => {
   // ── Proxy mode write guard [WI-279] ──────────────────────────────────────
   describe('proxy mode write guard [WI-279]', () => {
     beforeEach(() => {
-      mockUseProfile.mockReturnValue({ isExplicitProxyMode: true });
+      mockIsParentProxy = true;
       mockHooks();
     });
 

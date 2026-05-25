@@ -93,6 +93,18 @@ jest.mock(
   }),
 );
 
+// WI-371: proxy write-guard in create-profile.tsx now reads navigationContract.isParentProxy.
+let mockIsParentProxy = false;
+jest.mock(
+  '../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy for proxy access-gate tests */,
+  () => ({
+    useNavigationContract: () => ({
+      isParentProxy: mockIsParentProxy,
+      gates: {},
+    }),
+  }),
+);
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
@@ -112,12 +124,12 @@ describe('CreateProfileScreen', () => {
     mockSearchParams = {};
     datePickerOnChange = null;
     mockCanGoBack.mockReturnValue(true);
+    mockIsParentProxy = false;
     // Default: non-parent flow (first-time user / child self-registering)
     mockUseProfile.mockReturnValue({
       switchProfile: mockSwitchProfile,
       activeProfile: null,
       profiles: [],
-      isExplicitProxyMode: false,
     });
     // Default: active profile is account owner
     mockActiveProfileRole = 'owner';
@@ -158,7 +170,6 @@ describe('CreateProfileScreen', () => {
         switchProfile: mockSwitchProfile,
         activeProfile: { id: 'parent-1', isOwner: true },
         profiles: [{ id: 'parent-1', isOwner: true }],
-        isExplicitProxyMode: false,
       });
     });
 
@@ -884,7 +895,6 @@ describe('CreateProfileScreen', () => {
         switchProfile: mockSwitchProfile,
         activeProfile: { id: 'child-1', isOwner: false },
         profiles: [{ id: 'child-1', isOwner: false }],
-        isExplicitProxyMode: false,
       });
     });
 
@@ -907,6 +917,7 @@ describe('CreateProfileScreen', () => {
     beforeEach(() => {
       // Owner role but in proxy mode (parent viewing child's context)
       mockActiveProfileRole = 'owner';
+      mockIsParentProxy = true;
       mockUseProfile.mockReturnValue({
         switchProfile: mockSwitchProfile,
         activeProfile: { id: 'parent-1', isOwner: true },
@@ -914,7 +925,6 @@ describe('CreateProfileScreen', () => {
           { id: 'parent-1', isOwner: true },
           { id: 'child-1', isOwner: false },
         ],
-        isExplicitProxyMode: true,
       });
     });
 

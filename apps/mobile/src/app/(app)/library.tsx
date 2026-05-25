@@ -29,6 +29,7 @@ import {
   type LibraryRetentionTopic,
 } from '../../hooks/use-library-context';
 import { isGuardianProfile, useProfile } from '../../lib/profile';
+import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { formatApiError } from '../../lib/format-api-error';
 import {
   deriveRetentionStatus,
@@ -143,8 +144,9 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const { colorScheme } = useTheme();
-  const { activeProfile, profiles, isExplicitProxyMode } = useProfile();
-  const canWrite = !isExplicitProxyMode;
+  const { activeProfile, profiles } = useProfile();
+  const navigationContract = useNavigationContract();
+  const canWrite = !navigationContract.isParentProxy;
   const isGuardian = isGuardianProfile(activeProfile, profiles);
   const activeProfileRole = useActiveProfileRole();
   const proxyChildProfileId =

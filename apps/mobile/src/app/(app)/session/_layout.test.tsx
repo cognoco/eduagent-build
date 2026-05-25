@@ -103,15 +103,16 @@ describe('SessionLayout — proxy fallback (WI-283)', () => {
     screen.getByText('proxy.readOnly.hint');
   });
 
-  it('[WI-283] reads isExplicitProxyMode from useProfile directly (not only from navigationContract)', () => {
-    // isParentProxy=false but isExplicitProxyMode=true: the blocked flag is false
-    // under V0, so no redirect fires. This verifies that isExplicitProxyMode is
-    // wired independently (it does NOT gate blocked here — that's intentional,
-    // blocked stays contract-driven). This test just asserts no crash when the
-    // two flags diverge.
+  it('[WI-371] isExplicitProxyMode alone does not block — blocked is contract-driven', () => {
+    // WI-371: blocked is now driven solely by navigationContract.isParentProxy.
+    // When isParentProxy=false but isExplicitProxyMode=true, the screen renders
+    // normally (no redirect, no proxy fallback). This is the regression guard for
+    // the migration away from raw isExplicitProxyMode reads in session/_layout.tsx.
     mockIsParentProxy = false;
     mockIsExplicitProxyMode = true;
 
-    expect(() => render(<SessionLayout />)).not.toThrow();
+    render(<SessionLayout />);
+
+    expect(screen.queryByTestId('session-proxy-fallback')).toBeNull();
   });
 });

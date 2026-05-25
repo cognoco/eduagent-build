@@ -21,7 +21,7 @@ import {
   useSubjectProgress,
 } from '../../../../hooks/use-progress';
 import { useActiveProfileRole } from '../../../../hooks/use-active-profile-role';
-import { useProfile } from '../../../../lib/profile';
+import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { useLanguageProgress } from '../../../../hooks/use-language-progress';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { useUpdateSubject } from '../../../../hooks/use-subjects';
@@ -51,8 +51,8 @@ function StatCard({
 
 export default function ProgressSubjectScreen(): React.ReactElement {
   const { t } = useTranslation();
-  const { isExplicitProxyMode } = useProfile();
-  const canWrite = !isExplicitProxyMode;
+  const navigationContract = useNavigationContract();
+  const canWrite = !navigationContract.isParentProxy;
   const role = useActiveProfileRole();
   const register = copyRegisterFor(role);
   const router = useRouter();

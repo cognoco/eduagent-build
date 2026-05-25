@@ -52,6 +52,7 @@ const mockRouterReplace = jest.fn();
 let mockNavigationEffectiveAppContext: 'study' | 'family' = 'study';
 let mockNavigationHomeScreen: 'LearnerHome' | 'FamilyHome' = 'LearnerHome';
 let mockNavigationSessionIsOwner = true;
+let mockNavigationIsParentProxy = false;
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
 }));
@@ -71,6 +72,7 @@ jest.mock(
       },
       effectiveAppContext: mockNavigationEffectiveAppContext,
       gates: { sessionIsOwner: mockNavigationSessionIsOwner },
+      isParentProxy: mockNavigationIsParentProxy,
       queryScope: {
         appContext: mockNavigationEffectiveAppContext,
         profileId: 'test-profile-id',
@@ -165,6 +167,7 @@ describe('HomeScreen intent router', () => {
     mockNavigationEffectiveAppContext = 'study';
     mockNavigationHomeScreen = 'LearnerHome';
     mockNavigationSessionIsOwner = true;
+    mockNavigationIsParentProxy = false;
     mockLastLearnerScreenProps = null;
   });
 
@@ -281,6 +284,7 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
     mockNavigationEffectiveAppContext = 'study';
     mockNavigationHomeScreen = 'LearnerHome';
     mockNavigationSessionIsOwner = true;
+    mockNavigationIsParentProxy = false;
     ({ wrapper: Wrapper } = createScreenWrapper({
       activeProfile: null,
       profiles: [],
@@ -417,9 +421,10 @@ describe('HomeScreen WI-270: proxy mode — markCelebrationsSeen is suppressed',
     jest.clearAllMocks();
     mockOnAllComplete = null;
     mockNavigationHomeScreen = 'LearnerHome';
+    mockNavigationIsParentProxy = true;
   });
 
-  it('does NOT call markCelebrationsSeen.mutateAsync when isExplicitProxyMode is true [WI-270]', async () => {
+  it('does NOT call markCelebrationsSeen.mutateAsync in proxy mode [WI-270]', async () => {
     const owner = createTestProfile({
       id: 'p1',
       displayName: 'Alex',
@@ -450,6 +455,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
     jest.clearAllMocks();
     mockOnAllComplete = null;
     mockNavigationHomeScreen = 'LearnerHome';
+    mockNavigationIsParentProxy = false;
   });
 
   it('logs error when markCelebrationsSeen.mutateAsync rejects — no unhandled rejection [SF-1]', async () => {
