@@ -53,7 +53,6 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { escapeXml } from '../../services/llm/sanitize';
 import { projectAiResponseContent } from '../../services/llm/project-response';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { cefrLevelSchema, verificationTypeSchema } from '@eduagent/schemas';
@@ -939,10 +938,23 @@ export const sessionCompleted = inngest.createFunction(
               columns: { eventType: true, content: true },
             });
 
-            // [PROMPT-INJECT] Mirror buildRecapTranscriptText in
-            // services/session-recap.ts: strip envelope JSON from assistant
-            // turns via projectAiResponseContent, then escapeXml every value
-            // so a learner cannot smuggle directives out of the data section.
+            // [PROMPT-INJECT][WI-122 / DS-033] Strip envelope JSON from
+            // assistant turns via projectAiResponseContent. The transcript-
+            // boundary fencing (HTML-entity encode every angle bracket and
+            // ampersand so a learner turn cannot escape the surrounding
+            // <transcript> tag) is owned by buildSessionInsightsUserPrompt
+            // in services/session-highlights.ts — keep the per-turn escape
+            // out of this assembly path so the same protection applies
+            // regardless of caller.
+            //
+            // INVARIANT: transcriptText must flow only to
+            // generateSessionInsights, which routes through
+            // buildSessionInsightsUserPrompt and applies escapeXml to the
+            // whole transcript inside the <transcript> data block. If a
+            // second consumer of transcriptText is ever added here, either
+            // route it through the same fencing helper or reinstate the
+            // per-turn escapeXml — bare transcript text is not safe for any
+            // sink that interpolates it into an XML data block.
             const transcriptText = transcriptEvents
               .map((e) => {
                 const content =
@@ -951,7 +963,7 @@ export const sessionCompleted = inngest.createFunction(
                     : e.content;
                 return `${
                   e.eventType === 'user_message' ? 'Student' : 'Mentor'
-                }: ${escapeXml(content)}`;
+                }: ${content}`;
               })
               .join('\n\n');
 

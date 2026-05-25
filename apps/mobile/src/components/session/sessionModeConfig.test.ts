@@ -1,4 +1,5 @@
 import {
+  escapeMarkdown,
   getOpeningMessage,
   getModeConfig,
   SESSION_MODE_CONFIGS,
@@ -315,5 +316,109 @@ describe('freeform greeting revert guards (copy sweep 2026-04-19)', () => {
     expect(FAMILIAR_SESSIONS.freeform).not.toBe(
       "What's on your mind? I'm ready when you are.",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-304 / DS-215] Markdown link injection — the opening message is
+// rendered by react-native-markdown-display, so `[tap](evil://x)` is a
+// tappable link unless we escape brackets/parens.
+// ---------------------------------------------------------------------------
+
+describe('escapeMarkdown [WI-304 / DS-215]', () => {
+  it('escapes [], () so a Markdown link cannot be smuggled', () => {
+    expect(escapeMarkdown('[tap me](https://attacker.example)')).toBe(
+      '\\[tap me\\]\\(https://attacker.example\\)',
+    );
+  });
+
+  it('escapes deep-link payload like [tap](myapp://admin)', () => {
+    const result = escapeMarkdown('[tap](myapp://admin/reset)');
+    expect(result).not.toMatch(/^\[[^\]]+\]\([^)]+\)$/);
+  });
+
+  it('escapes `, *, _, # so inline formatting and headings cannot escape', () => {
+    expect(escapeMarkdown('# heading **bold** `code`')).toContain('\\#');
+    expect(escapeMarkdown('**bold**')).toBe('\\*\\*bold\\*\\*');
+  });
+
+  it('escapes < and > so autolink <https://x> cannot be smuggled', () => {
+    const result = escapeMarkdown('<https://attacker.example>');
+    expect(result).not.toMatch(/^<https:\/\/[^>]+>$/);
+    expect(result).toContain('\\<');
+    expect(result).toContain('\\>');
+  });
+
+  it('escapes a reference-style link definition [ref]: url', () => {
+    // `[ref]` is escaped by the existing [ ] class; `:` is not a Markdown
+    // metachar so it survives, but the leading `[` is escaped so the
+    // definition line will never bind.
+    const result = escapeMarkdown('[evil]: https://attacker.example');
+    expect(result).toMatch(/^\\\[evil\\\]/);
+  });
+
+  it('leaves plain alphanumeric text untouched', () => {
+    expect(escapeMarkdown('Photosynthesis 101')).toBe('Photosynthesis 101');
+  });
+
+  // Hyphens are NOT escaped — hyphenated names ("Self-Directed Learning",
+  // "Year-over-Year") are common, and react-native-markdown-display is not
+  // guaranteed to render `\-` as `-`. The `-` character has no inline
+  // Markdown meaning; only `---` on its own line is a setext-heading rule,
+  // which can't occur in single-line interpolation.
+  it('does NOT escape hyphens in hyphenated names', () => {
+    expect(escapeMarkdown('Self-Directed Learning')).toBe(
+      'Self-Directed Learning',
+    );
+  });
+});
+
+describe('getOpeningMessage prompt-injection [WI-304 / DS-215]', () => {
+  // Signature: (mode, sessionExperience, problemText?, topicName?,
+  //             subjectName?, rawInput?, recap?)
+  it('a hostile topicName does not render as a tappable Markdown link', () => {
+    const result = getOpeningMessage(
+      'learning',
+      5,
+      undefined,
+      '[tap me](https://attacker.example)',
+    );
+    expect(result).not.toMatch(/\[tap me\]\(https:\/\/attacker\.example\)/);
+  });
+
+  it('a hostile rawInput does not render as a tappable Markdown link', () => {
+    const result = getOpeningMessage(
+      'learning',
+      5,
+      undefined,
+      'Math',
+      undefined,
+      '[click](myapp://admin)',
+    );
+    expect(result).not.toMatch(/\[click\]\(myapp:\/\/admin\)/);
+  });
+
+  it('a hostile subjectName does not render as a tappable Markdown link', () => {
+    const result = getOpeningMessage(
+      'learning',
+      5,
+      undefined,
+      undefined,
+      '[tap](https://evil.example)',
+    );
+    expect(result).not.toMatch(/\[tap\]\(https:\/\/evil\.example\)/);
+  });
+
+  it('a hostile recap value in relearn mode does not render as a Markdown link', () => {
+    const result = getOpeningMessage(
+      'relearn',
+      5,
+      undefined,
+      'Fractions',
+      undefined,
+      undefined,
+      '[click](evil://x) something',
+    );
+    expect(result).not.toMatch(/\[click\]\(evil:\/\/x\)/);
   });
 });
