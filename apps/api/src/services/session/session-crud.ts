@@ -219,35 +219,42 @@ export async function startSession(
     }
   }
 
-  const [row] = await db
-    .insert(learningSessions)
-    .values({
+  // [L10-001] Session row + session_start audit event must be atomic — if the
+  // audit insert fails after the session is created, the session would exist
+  // with no session_start event in its audit trail.
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId: input.topicId ?? null,
+        sessionType: input.sessionType ?? 'learning',
+        verificationType: input.verificationType ?? null,
+        inputMode: input.inputMode ?? 'text',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 0,
+        metadata: {
+          ...(input.metadata ?? {}),
+          inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
+        },
+        rawInput: input.rawInput ?? null,
+      })
+      .returning();
+
+    if (!inserted)
+      throw new Error('Insert learning session did not return a row');
+
+    await tx.insert(sessionEvents).values({
+      sessionId: inserted.id,
       profileId,
       subjectId,
-      topicId: input.topicId ?? null,
-      sessionType: input.sessionType ?? 'learning',
-      verificationType: input.verificationType ?? null,
-      inputMode: input.inputMode ?? 'text',
-      status: 'active',
-      escalationRung: 1,
-      exchangeCount: 0,
-      metadata: {
-        ...(input.metadata ?? {}),
-        inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
-      },
-      rawInput: input.rawInput ?? null,
-    })
-    .returning();
+      eventType: 'session_start' as const,
+      content: '',
+    });
 
-  if (!row) throw new Error('Insert learning session did not return a row');
-
-  // Record session_start event for the audit log
-  await db.insert(sessionEvents).values({
-    sessionId: row.id,
-    profileId,
-    subjectId,
-    eventType: 'session_start' as const,
-    content: '',
+    return inserted;
   });
 
   return mapSessionRow(row);

@@ -1719,26 +1719,29 @@ export async function skipTopic(
   });
   if (!topic) throw new NotFoundError('Topic');
 
-  await db
-    .update(curriculumTopics)
-    .set({
-      skipped: true,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(curriculumTopics.id, topicId),
-        eq(curriculumTopics.curriculumId, curriculum.id),
-      ),
-    );
+  // [L10-002] Topic skip flag + adaptation audit row must be atomic — if the
+  // adaptation insert fails, the topic appears skipped with no audit record.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(curriculumTopics)
+      .set({
+        skipped: true,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(curriculumTopics.id, topicId),
+          eq(curriculumTopics.curriculumId, curriculum.id),
+        ),
+      );
 
-  // Record the adaptation
-  await db.insert(curriculumAdaptations).values({
-    profileId,
-    subjectId,
-    topicId,
-    sortOrder: 0,
-    skipReason: 'User skipped',
+    await tx.insert(curriculumAdaptations).values({
+      profileId,
+      subjectId,
+      topicId,
+      sortOrder: 0,
+      skipReason: 'User skipped',
+    });
   });
 }
 
@@ -1774,26 +1777,28 @@ export async function unskipTopic(
 
   if (!topic.skipped) throw new TopicNotSkippedError();
 
-  await db
-    .update(curriculumTopics)
-    .set({
-      skipped: false,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(curriculumTopics.id, topicId),
-        eq(curriculumTopics.curriculumId, curriculum.id),
-      ),
-    );
+  // [L10-002] Topic restore + adaptation audit row must be atomic — see skipTopic.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(curriculumTopics)
+      .set({
+        skipped: false,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(curriculumTopics.id, topicId),
+          eq(curriculumTopics.curriculumId, curriculum.id),
+        ),
+      );
 
-  // Record the adaptation
-  await db.insert(curriculumAdaptations).values({
-    profileId,
-    subjectId,
-    topicId,
-    sortOrder: 0,
-    skipReason: 'User restored',
+    await tx.insert(curriculumAdaptations).values({
+      profileId,
+      subjectId,
+      topicId,
+      sortOrder: 0,
+      skipReason: 'User restored',
+    });
   });
 }
 
