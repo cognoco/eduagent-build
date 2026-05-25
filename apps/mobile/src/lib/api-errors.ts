@@ -20,6 +20,7 @@ import {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  UnauthorizedError,
   type QuotaExceededDetails,
   type UpgradeOption,
 } from '@eduagent/schemas';
@@ -33,6 +34,7 @@ export {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  UnauthorizedError,
   type QuotaExceededDetails,
   type UpgradeOption,
 };
