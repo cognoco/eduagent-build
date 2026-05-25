@@ -462,5 +462,53 @@ describe('subjectRetryCurriculum', () => {
       expect(mockGenerateBookTopics).not.toHaveBeenCalled();
       expect(mockPersistBookTopics).not.toHaveBeenCalled();
     });
+
+    // [WI-125 / adversarial-C1] Stale-claim reclaim: when retry_in_flight is
+    // true but retry_claimed_at is older than the 15-min stale window (or
+    // NULL), the WHERE clause must allow a fresh dispatch to acquire the
+    // claim instead of being permanently locked out by a crashed worker.
+    // This asserts the claim UPDATE passes a WHERE expression with both the
+    // retry_in_flight=false branch AND a stale-time branch (i.e. it does NOT
+    // hard-eq retry_in_flight to false the way the pre-fix code did).
+    it('claim WHERE clause permits stale reclaim (does not hard-eq retry_in_flight=false)', async () => {
+      const mockDb = makeMockDb();
+      const updateSet = jest.fn();
+      const updateWhere = jest.fn().mockImplementation(() => {
+        const p: Promise<unknown> & { returning?: jest.Mock } =
+          Promise.resolve(undefined);
+        p.returning = jest.fn().mockResolvedValue([{ id: BOOK_ID }]);
+        return p;
+      });
+      mockDb.update = jest.fn().mockReturnValue({
+        set: updateSet.mockReturnValue({ where: updateWhere }),
+      });
+      const confirmDb = makeMockDb({ topicsGenerated: true });
+      let callCount = 0;
+      mockGetStepDatabase.mockImplementation(() => {
+        callCount++;
+        return callCount <= 4 ? mockDb : confirmDb;
+      });
+      const { step } = createInngestStepRunner();
+
+      await handler({ event: { data: validPayload() }, step });
+
+      // The claim step is the first .update() call. Inspect the SET payload —
+      // it must include retry_claimed_at being set NOW(), not just
+      // retry_in_flight=true (the pre-fix shape).
+      const firstSetCall = updateSet.mock.calls[0]?.[0];
+      expect(firstSetCall).toMatchObject({
+        retryInFlight: true,
+      });
+      expect(firstSetCall.retryClaimedAt).toBeInstanceOf(Date);
+
+      // The release step (4th step.run) clears retry_claimed_at to NULL.
+      // Find a SET call that sets retryInFlight=false and assert it nulls
+      // retry_claimed_at too.
+      const releaseCall = updateSet.mock.calls.find(
+        (c) => c[0]?.retryInFlight === false,
+      );
+      expect(releaseCall).toBeDefined();
+      expect(releaseCall![0].retryClaimedAt).toBeNull();
+    });
   });
 });

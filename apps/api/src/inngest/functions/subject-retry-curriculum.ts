@@ -1,6 +1,6 @@
 // @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { NonRetriableError } from 'inngest';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, lt, isNull } from 'drizzle-orm';
 import { curriculumBooks, subjects, type Database } from '@eduagent/database';
 import { subjectCurriculumRetryRequestedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
@@ -96,16 +96,41 @@ export const subjectRetryCurriculum = inngest.createFunction(
     // concurrent execution sees 0 rows and exits early. The flag is reset
     // to false in a finally block so a subsequent retry (after this attempt
     // fails or completes) can re-claim.
+    //
+    // STALE CLAIM RECLAIM: if a worker crashes after setting retry_in_flight
+    // but before the finally-block release runs, the flag would otherwise
+    // stay true forever — permanently locking the book out of future retries.
+    // The WHERE clause therefore also matches rows whose retry_claimed_at is
+    // older than the stale window (15 min) OR retry_claimed_at is NULL with
+    // retry_in_flight=true (corrupted state from a deploy without this
+    // migration). retry_claimed_at is set NOW() alongside retry_in_flight
+    // and cleared on release.
     const claimed = await step.run('claim-retry-in-flight', async () => {
       const db = getStepDatabase();
+      const staleCutoff = new Date(Date.now() - 15 * 60 * 1000);
       const rows = await db
         .update(curriculumBooks)
-        .set({ retryInFlight: true, updatedAt: new Date() })
+        .set({
+          retryInFlight: true,
+          retryClaimedAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(
           and(
             eq(curriculumBooks.id, bookId),
             eq(curriculumBooks.subjectId, subjectId),
-            eq(curriculumBooks.retryInFlight, false),
+            or(
+              eq(curriculumBooks.retryInFlight, false),
+              lt(curriculumBooks.retryClaimedAt, staleCutoff),
+              // Defensive: retry_in_flight=true but retry_claimed_at=NULL is
+              // a corrupted state (e.g. row updated by code that predates the
+              // retry_claimed_at column). Treat it as reclaimable rather than
+              // locked-forever.
+              and(
+                eq(curriculumBooks.retryInFlight, true),
+                isNull(curriculumBooks.retryClaimedAt),
+              ),
+            ),
           ),
         )
         .returning({ id: curriculumBooks.id });
@@ -163,11 +188,17 @@ export const subjectRetryCurriculum = inngest.createFunction(
       });
     } finally {
       // Always release the claim so subsequent retries can re-acquire it.
+      // Clear retry_claimed_at alongside retry_in_flight so the stale-claim
+      // reclaim window cannot misclassify a fresh idle row as stale.
       await step.run('release-retry-in-flight', async () => {
         const db = getStepDatabase();
         await db
           .update(curriculumBooks)
-          .set({ retryInFlight: false, updatedAt: new Date() })
+          .set({
+            retryInFlight: false,
+            retryClaimedAt: null,
+            updatedAt: new Date(),
+          })
           .where(
             and(
               eq(curriculumBooks.id, bookId),
