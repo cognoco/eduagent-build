@@ -170,8 +170,8 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
     (useAuth as jest.Mock).mockReturnValue({ isLoaded: false });
   });
 
-  it('renders nothing while Clerk is loading and not timed out', () => {
-    const { toJSON } = render(
+  it('renders a visible loading fallback while Clerk is loading and not timed out', () => {
+    render(
       <ClerkGate
         onReady={noOp}
         timedOut={false}
@@ -181,7 +181,8 @@ describe('ClerkGate — BUG-507 retry / offline recovery', () => {
         {null}
       </ClerkGate>,
     );
-    expect(toJSON()).toBeNull();
+    expect(screen.getByTestId('clerk-loading-screen')).toBeTruthy();
+    expect(screen.getByText('Connecting securely...')).toBeTruthy();
   });
 
   it('renders the timeout screen when timedOut=true and Clerk not loaded', () => {

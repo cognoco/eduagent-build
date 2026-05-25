@@ -8,6 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   Text,
@@ -446,7 +447,31 @@ export function ClerkGate({
         </View>
       );
     }
-    return null;
+    return (
+      <View
+        testID="clerk-loading-screen"
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          backgroundColor: gateColors.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={gateColors.primary} />
+        <Text
+          style={{
+            marginTop: 16,
+            color: gateColors.textPrimary,
+            fontSize: 16,
+            fontWeight: '600',
+            textAlign: 'center',
+          }}
+        >
+          Connecting securely...
+        </Text>
+      </View>
+    );
   }
 
   return children as React.ReactElement;
