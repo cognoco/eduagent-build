@@ -484,7 +484,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           });
 
           try {
-            await recordSystemPrompt.mutateAsync({ content: prompt });
+            // WI-373: send the intent token; the server owns the prompt text.
+            // The visible `prompt` bubble above is display-only UI copy.
+            await recordSystemPrompt.mutateAsync({ kind: 'silence_nudge' });
           } catch (err) {
             console.warn('[Session] Silence prompt failed to persist:', err);
             // Best effort only.

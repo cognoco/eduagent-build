@@ -86,49 +86,39 @@ export const CONFIRMATION_BY_CHIP: Partial<
   too_hard: 'Breaking it down more.',
 };
 
+// WI-373: the per-chip `systemPrompt` steering strings moved server-side
+// (apps/api/src/services/session/system-prompt-intents.ts). The client now
+// sends a `quick_chip` intent token and never authors system-role text.
 export const QUICK_CHIP_CONFIG: Record<
   ContextualQuickChipId,
   {
     label: string;
     prompt: string;
-    systemPrompt: string;
   }
 > = {
   hint: {
     label: 'Hint',
     prompt: 'Give me a hint.',
-    systemPrompt:
-      'The learner tapped the hint chip. Give one short hint, not a full solution.',
   },
   example: {
     label: 'Example',
     prompt: 'Can you show a similar example?',
-    systemPrompt:
-      'The learner wants a fresh worked example. Use one similar example and keep it concise.',
   },
   know_this: {
     label: 'I know this',
     prompt: 'I know this part already. Can we move ahead?',
-    systemPrompt:
-      'The learner says they already know this. Briefly verify, then move forward or increase the challenge slightly.',
   },
   explain_differently: {
     label: 'Explain differently',
     prompt: 'Can you explain that differently?',
-    systemPrompt:
-      'The learner wants a different explanation. Re-explain with a new angle and one concrete example.',
   },
   too_easy: {
     label: 'Too easy',
     prompt: 'That feels too easy. Can you make it more challenging?',
-    systemPrompt:
-      'The learner says this is too easy. Raise the challenge a little and ask for more independent thinking.',
   },
   too_hard: {
     label: 'Too hard',
     prompt: 'That feels too hard. Can you break it down more?',
-    systemPrompt:
-      'The learner says this is too hard. Lower the difficulty, add more structure, and keep the next step small.',
   },
 };
 

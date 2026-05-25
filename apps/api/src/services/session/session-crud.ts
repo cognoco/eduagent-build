@@ -41,6 +41,7 @@ import type {
   EngagementSignal,
   SessionMetadata,
   BookTopicGenerationResult,
+  SystemPromptIntent,
 } from '@eduagent/schemas';
 import {
   celebrationReasonSchema,
@@ -52,6 +53,7 @@ import {
 } from '@eduagent/schemas';
 import { NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
+import { resolveSystemPromptIntent } from './system-prompt-intents';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
 import { persistBookTopics } from '../curriculum';
@@ -1390,12 +1392,19 @@ export async function getSessionTranscript(
 // Thin wrappers for event recording (require getSession)
 // ---------------------------------------------------------------------------
 
+/**
+ * Record a system-prompt event. WI-373: the caller supplies only the validated
+ * intent token; the canonical prompt text is resolved *here* from the
+ * server-owned map, so the persisted `content` can never diverge from the
+ * server's text regardless of caller. Provenance is owned here too — every
+ * write stamps `metadata.source = 'server'` so the replay layer can distinguish
+ * trusted server-authored events from any (now-impossible) client-authored row.
+ */
 export async function recordSystemPrompt(
   db: Database,
   profileId: string,
   sessionId: string,
-  content: string,
-  metadata?: Record<string, unknown>,
+  intent: SystemPromptIntent,
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -1405,8 +1414,8 @@ export async function recordSystemPrompt(
   await insertSessionEvent(db, session, profileId, {
     sessionId,
     eventType: 'system_prompt',
-    content,
-    metadata,
+    content: resolveSystemPromptIntent(intent),
+    metadata: { source: 'server', intent },
     touchSession: true,
   });
 }

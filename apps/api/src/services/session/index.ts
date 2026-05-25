@@ -70,6 +70,9 @@ export type {
   ChildSessionDrillScore,
 } from './session-crud';
 
+// System-prompt intents (WI-373 — server-owned prompt resolution)
+export { resolveSystemPromptIntent } from './system-prompt-intents';
+
 // Analytics (session-event aggregation primitives — extracted from dashboard.ts — PR-2)
 export {
   countGuidedMetrics,

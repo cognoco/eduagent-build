@@ -216,4 +216,50 @@ describe('useSessionActions', () => {
 
     expect(opts.router.replace).toHaveBeenCalledTimes(2);
   });
+
+  // -------------------------------------------------------------------------
+  // WI-373: system-prompt intents (client sends a token, never free text)
+  // -------------------------------------------------------------------------
+  describe('WI-373 system-prompt intents', () => {
+    it('handleQuickChip records a quick_chip intent token, never free content', async () => {
+      const opts = createMockOpts();
+      const { result } = renderHook(() => useSessionActions(opts as any));
+
+      await act(async () => {
+        await result.current.handleQuickChip('hint');
+      });
+
+      expect(opts.recordSystemPrompt.mutateAsync).toHaveBeenCalledWith({
+        kind: 'quick_chip',
+        chip: 'hint',
+      });
+      const arg = opts.recordSystemPrompt.mutateAsync.mock.calls[0]?.[0];
+      expect(arg).not.toHaveProperty('content');
+    });
+
+    it('handleMessageFeedback records a message_feedback intent token, never free content', async () => {
+      const opts = createMockOpts();
+      const { result } = renderHook(() => useSessionActions(opts as any));
+
+      await act(async () => {
+        await result.current.handleMessageFeedback(
+          {
+            id: 'm1',
+            eventId: 'evt-9',
+            role: 'assistant',
+            content: 'ans',
+          } as any,
+          'helpful',
+        );
+      });
+
+      expect(opts.recordSystemPrompt.mutateAsync).toHaveBeenCalledWith({
+        kind: 'message_feedback',
+        action: 'helpful',
+        eventId: 'evt-9',
+      });
+      const arg = opts.recordSystemPrompt.mutateAsync.mock.calls[0]?.[0];
+      expect(arg).not.toHaveProperty('content');
+    });
+  });
 });
