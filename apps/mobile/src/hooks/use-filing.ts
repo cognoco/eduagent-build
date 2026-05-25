@@ -15,10 +15,11 @@ import type {
 
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
-import { useAppContext } from '../lib/app-context';
+import type { NavigationAppContext } from '../lib/navigation-contract';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { queryKeys } from '../lib/query-keys';
+import { useNavigationDataScopeContract } from './use-navigation-contract';
 
 interface FilingInput {
   rawInput?: string;
@@ -69,7 +70,7 @@ function invalidateLibraryFilingQueries(
   input: {
     sessionId: string;
     profileId: string | undefined;
-    mode: ReturnType<typeof useAppContext>['mode'];
+    mode: NavigationAppContext;
     topicId?: string | null;
   },
 ): void {
@@ -131,7 +132,8 @@ function useSessionLibraryMutation(
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const navigationContract = useNavigationDataScopeContract();
+  const mode = navigationContract.queryScope.appContext;
   const profileId = activeProfile?.id;
 
   return useMutation({
@@ -207,7 +209,8 @@ export function useSessionLibraryFiling(
 } {
   const client = useApiClient();
   const { activeProfile } = useProfile();
-  const { mode } = useAppContext();
+  const navigationContract = useNavigationDataScopeContract();
+  const mode = navigationContract.queryScope.appContext;
   const pollCountRef = useRef(0);
   const manualPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pollCount, setPollCount] = useState(0);
