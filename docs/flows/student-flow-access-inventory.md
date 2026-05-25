@@ -8,6 +8,7 @@ Source of truth used for this map:
 
 - `docs/flows/mobile-app-flow-inventory.md`
 - `docs/specs/2026-05-21-navigation-contract.md`
+If you during the walk through the flows find a missing flow, wrong flow or incomplete flow, please update this document. 
 
 Notes:
 

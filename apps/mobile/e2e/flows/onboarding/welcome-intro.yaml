@@ -1,0 +1,127 @@
+# Flow: First-Launch Welcome Intro — 4-card swipe-through
+# Validates: after a fresh sign-in (clean SecureStore so the per-userId intro
+#   flag is absent), the app lands on the 4-card welcome intro, advances
+#   through each card, and the "Let's start" CTA navigates to the learner
+#   home where the My Notes entry point is visible.
+# Spec: docs/specs/2026-05-25-welcome-intro.md
+# Tags: smoke, onboarding, regression
+#
+# Usage:
+#   EMAIL=test@example.com PASSWORD=... maestro test \
+#     apps/mobile/e2e/flows/onboarding/welcome-intro.yaml
+#
+#   Or via the seed-and-run wrapper (which sets EMAIL / PASSWORD):
+#     ./apps/mobile/e2e/scripts/seed-and-run-release.sh \
+#       apps/mobile/e2e/flows/onboarding/welcome-intro.yaml
+#
+# What this catches:
+#   - Routing-order regression: intro fires after preview probe + SaveWizard
+#     and BEFORE CreateProfileGate / consent gate
+#   - "Let's start" CTA not wired (no navigation, or navigates to wrong route)
+#   - SecureStore write-and-redirect race: the next launch would otherwise
+#     re-show the intro because intro_seen_v1_<userId> is absent
+#   - testID drift on welcome-card-{1..4} / welcome-next-button /
+#     welcome-start-button / home-my-notes
+#
+# testIDs verified against:
+#   apps/mobile/src/components/welcome/WelcomeIntro.tsx (welcome-intro,
+#   welcome-card-{1..4}, welcome-next-button, welcome-start-button)
+#   apps/mobile/src/components/home/LearnerScreen.tsx (home-my-notes)
+appId: com.mentomate.app
+tags:
+  - smoke
+  - onboarding
+  - regression
+---
+# 1. App is launched by seed-and-run.sh via ADB with `pm clear` — SecureStore
+#    is empty so intro_seen_v1_<userId> is absent and the intro will fire on
+#    first sign-in. Wait for the sign-in screen.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 120000
+
+# 2. Sign in with the seeded test user.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-email"
+    timeout: 15000
+
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- hideKeyboard
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "sign-in-button"
+
+# 3. Land on the welcome intro. The layout gate routes here after the preview
+#    probe + SaveWizard settle and before CreateProfileGate / consent.
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-1"
+    timeout: 30000
+
+- takeScreenshot: welcome-intro-card-1
+
+# 4. Advance through cards 2 → 3 → 4 via the primary "Next" CTA.
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-2"
+    timeout: 10000
+
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-3"
+    timeout: 10000
+
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-4"
+    timeout: 10000
+
+# 5. The final card swaps the CTA to "Let's start". Confirm the next-button
+#    is no longer rendered (it must be unmounted, not just hidden) and the
+#    start-button is present.
+- assertNotVisible:
+    id: "welcome-next-button"
+- assertVisible:
+    id: "welcome-start-button"
+
+- takeScreenshot: welcome-intro-card-4
+
+# 6. Tap "Let's start" — markIntroSeenSync(userId) fires synchronously, then
+#    router.replace to /(app)/home. The learner-home My Notes entry point is
+#    the spec's card-1 promise surface and must be reachable immediately.
+- tapOn:
+    id: "welcome-start-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "home-my-notes"
+    timeout: 30000
+
+# 7. The intro must NOT re-render. (If the SecureStore write raced the
+#    redirect and the in-memory flag was not set, the layout gate would
+#    bounce back to /welcome.)
+- assertNotVisible:
+    id: "welcome-intro"
+
+- takeScreenshot: welcome-intro-completed-on-home

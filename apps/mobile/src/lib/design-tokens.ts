@@ -49,6 +49,12 @@ export interface ThemeTokens {
     proxyPreviewBorder: string;
     proxyPreviewSceneBackground: string;
     proxyPreviewTabBackground: string;
+    // Highlighter — fixed values across light/dark (a real highlighter's
+    // contents don't change with the theme). Used as a "look here" emphasis
+    // for the home My Notes entry-point to make the welcome-intro card-1
+    // promise more visible to first-week users.
+    highlightBg: string;
+    highlightFg: string;
   };
   radii: {
     card: string;
@@ -120,6 +126,8 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       proxyPreviewBorder: '#f59e0b',
       proxyPreviewSceneBackground: '#fffaf3',
       proxyPreviewTabBackground: '#fff7ed',
+      highlightBg: '#fde047',
+      highlightFg: '#1f2937',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -176,6 +184,8 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       proxyPreviewBorder: '#f59e0b',
       proxyPreviewSceneBackground: '#211a12',
       proxyPreviewTabBackground: '#2a2118',
+      highlightBg: '#fde047',
+      highlightFg: '#1f2937',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -369,6 +379,8 @@ export function tokensToCssVars(t: ThemeTokens): Record<`--${string}`, string> {
     '--color-proxy-preview-scene-background':
       t.colors.proxyPreviewSceneBackground,
     '--color-proxy-preview-tab-background': t.colors.proxyPreviewTabBackground,
+    '--color-highlight-bg': t.colors.highlightBg,
+    '--color-highlight-fg': t.colors.highlightFg,
     '--radius-card': t.radii.card,
     '--radius-button': t.radii.button,
     '--radius-input': t.radii.input,

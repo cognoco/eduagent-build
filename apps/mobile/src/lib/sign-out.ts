@@ -33,7 +33,12 @@ import type { QueryClient } from '@tanstack/react-query';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { clearTransitionState } from './auth-transition';
 import { clearPendingAuthRedirect } from './pending-auth-redirect';
-import { setActiveProfileId, setProxyMode, resetAuthExpiredGuard } from './api-client';
+import {
+  setActiveProfileId,
+  setProxyMode,
+  resetAuthExpiredGuard,
+} from './api-client';
+import { clearIntroSeen } from './intro-state';
 
 export interface SignOutWithCleanupParams {
   /** Clerk's `signOut` function — obtain via `useClerk()` or `useAuth()`. */
@@ -47,6 +52,16 @@ export interface SignOutWithCleanupParams {
    * load) — only global keys are wiped in that case.
    */
   profileIds: ReadonlyArray<string>;
+  /**
+   * Clerk userId of the account being signed out. Drops the in-memory
+   * welcome-intro flag so a second account signing in on the same device
+   * does NOT inherit the previous user's "seen" bit. The SecureStore key
+   * is userId-scoped, so this only matters for the in-memory cache, but
+   * skipping it leaks state across accounts within a single process.
+   * Optional because auth-expired call sites may fire before the user
+   * object is hydrated.
+   */
+  clerkUserId?: string;
 }
 
 /**
@@ -58,7 +73,7 @@ export interface SignOutWithCleanupParams {
 export async function signOutWithCleanup(
   params: SignOutWithCleanupParams,
 ): Promise<void> {
-  const { clerkSignOut, queryClient, profileIds } = params;
+  const { clerkSignOut, queryClient, profileIds, clerkUserId } = params;
 
   // Reset in-memory api-client identity FIRST so any request that fires
   // between here and the Clerk signOut resolution cannot ship a stale
@@ -72,6 +87,12 @@ export async function signOutWithCleanup(
   // user A can't carry over to user B.
   clearTransitionState();
   clearPendingAuthRedirect();
+
+  // Drop the in-memory welcome-intro flag for this userId so a second
+  // account signing in on the same device sees the intro fresh. The
+  // SecureStore key is userId-scoped, so this is belt-and-suspenders for
+  // the in-memory cache only.
+  if (clerkUserId) clearIntroSeen(clerkUserId);
 
   // Drop every cached query — profiles, subjects, progress, dashboard, etc.
   // Without this, ProfileProvider's "saved id exists in cached profiles"
