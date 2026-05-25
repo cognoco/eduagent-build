@@ -446,6 +446,42 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
+
+  it('dispatches app/session.auto_file_requested instead of legacy app/filing.retry for freeform auto-file sessions', async () => {
+    const { runner } = await executeHandler(
+      {
+        'mark-pending-and-claim-retry-slot': async () => 1,
+      },
+      null,
+      {
+        filedAt: null,
+        filingStatus: 'filing_pending',
+        filingRetryCount: 0,
+        topicId: null,
+        exchangeCount: 3,
+        metadata: { effectiveMode: 'freeform' },
+        updatedAt: new Date(),
+      },
+    );
+
+    const retryDispatch = runner.sendEventCalls.find(
+      (c) => c.name === 'dispatch-filing-retry',
+    );
+    expect(retryDispatch?.payload).toMatchObject({
+      name: 'app/session.auto_file_requested',
+      data: expect.objectContaining({
+        sessionId: SESSION_ID,
+        profileId: PROFILE_ID,
+        reason: 'retry',
+        dispatchId: expect.stringMatching(/^observer-retry-/),
+      }),
+    });
+    expect(
+      runner.sendEventCalls.some(
+        (c) => (c.payload as { name?: string }).name === 'app/filing.retry',
+      ),
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

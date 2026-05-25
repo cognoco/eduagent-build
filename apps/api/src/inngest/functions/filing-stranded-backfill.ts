@@ -22,11 +22,12 @@
 // live-path bug. The manual trigger forces an operator to ask "why are there
 // stranded sessions?" before recovering them. Do not fire speculatively.
 
-import { and, asc, eq, gt, gte, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';
 import { filingTimedOutEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { FILING_CONFIG } from '../../config/filing';
 
 // Optional cursor passed when a prior capped run self-reinvokes. Using a
 // composite (createdAt, id) cursor guarantees deterministic pagination even
@@ -77,6 +78,14 @@ export const filingStrandedBackfill = inngest.createFunction(
           inArray(learningSessions.sessionType, ['learning', 'homework']),
           inArray(learningSessions.status, ['completed', 'auto_closed']),
           gte(learningSessions.createdAt, cutoff),
+          sql`${learningSessions.filingStatus} IS DISTINCT FROM 'filing_kept_out'`,
+          or(
+            sql`${learningSessions.metadata}->>'effectiveMode' IS DISTINCT FROM 'freeform'`,
+            gte(
+              learningSessions.exchangeCount,
+              FILING_CONFIG.minFreeformExchanges,
+            ),
+          ),
           cursorFilter,
         ),
         columns: {

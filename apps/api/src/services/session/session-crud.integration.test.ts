@@ -22,6 +22,9 @@ import {
   listProfileSessions,
   recordSessionEvent,
   recordSystemPrompt,
+  requestSessionLibraryFiling,
+  resetFilingForRetry,
+  restoreSessionForAutoFiling,
   startFirstCurriculumSession,
 } from './session-crud';
 
@@ -396,5 +399,181 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
         bookId: bookA!.id,
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describeIfDb('session-crud Library filing requests (integration)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_session_archive_${RUN_ID}%`));
+  });
+
+  async function seedSession(input?: {
+    effectiveMode?: 'freeform' | 'learning';
+    filingStatus?: 'filing_failed' | 'filing_kept_out' | null;
+    filingRetryCount?: number;
+  }): Promise<{ profileId: string; subjectId: string; sessionId: string }> {
+    const owner = await seedProfileWithSubject('Library filing');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        exchangeCount: 1,
+        metadata: { effectiveMode: input?.effectiveMode ?? 'freeform' },
+        filingStatus: input?.filingStatus ?? null,
+        filingRetryCount: input?.filingRetryCount ?? 0,
+      })
+      .returning({ id: learningSessions.id });
+
+    return {
+      profileId: owner.profileId,
+      subjectId: owner.subjectId,
+      sessionId: session!.id,
+    };
+  }
+
+  async function seedTranscript(session: {
+    profileId: string;
+    subjectId: string;
+    sessionId: string;
+  }): Promise<void> {
+    await db.insert(sessionEvents).values([
+      {
+        sessionId: session.sessionId,
+        profileId: session.profileId,
+        subjectId: session.subjectId,
+        eventType: 'user_message',
+        content: 'Can we talk about photosynthesis?',
+      },
+      {
+        sessionId: session.sessionId,
+        profileId: session.profileId,
+        subjectId: session.subjectId,
+        eventType: 'ai_response',
+        content: 'Sure. Plants use light energy to make sugars.',
+      },
+    ]);
+  }
+
+  it('allows below-threshold unfiled freeform sessions with transcript and returns a generated dispatch id', async () => {
+    const session = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: null,
+      filingRetryCount: 2,
+    });
+    await seedTranscript(session);
+
+    const result = await requestSessionLibraryFiling(
+      db,
+      session.profileId,
+      session.sessionId,
+    );
+
+    expect(result?.session.id).toBe(session.sessionId);
+    expect(result?.session.filingStatus).toBeNull();
+    expect(result?.session.filingRetryCount).toBe(0);
+    expect(result?.dispatchId).toMatch(/^add-/);
+    expect(result?.dispatchId).not.toBe('add-0');
+  });
+
+  it.each(['filing_failed', 'filing_kept_out'] as const)(
+    'allows %s freeform sessions when unfiled and transcript-backed',
+    async (filingStatus) => {
+      const session = await seedSession({
+        effectiveMode: 'freeform',
+        filingStatus,
+        filingRetryCount: 3,
+      });
+      await seedTranscript(session);
+
+      const result = await requestSessionLibraryFiling(
+        db,
+        session.profileId,
+        session.sessionId,
+      );
+
+      expect(result?.session.filingStatus).toBeNull();
+      expect(result?.session.filingRetryCount).toBe(0);
+      expect(result?.dispatchId).toMatch(/^add-/);
+    },
+  );
+
+  it('rejects freeform add when no durable transcript events exist', async () => {
+    const session = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: null,
+    });
+
+    await expect(
+      requestSessionLibraryFiling(db, session.profileId, session.sessionId),
+    ).resolves.toBeNull();
+  });
+
+  it('rejects non-freeform add even when the session has a transcript', async () => {
+    const session = await seedSession({
+      effectiveMode: 'learning',
+      filingStatus: null,
+    });
+    await seedTranscript(session);
+
+    await expect(
+      requestSessionLibraryFiling(db, session.profileId, session.sessionId),
+    ).resolves.toBeNull();
+  });
+
+  it('restore clears kept-out exhausted retry count and returns a fresh dispatch id', async () => {
+    const session = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: 'filing_kept_out',
+      filingRetryCount: 3,
+    });
+
+    const result = await restoreSessionForAutoFiling(
+      db,
+      session.profileId,
+      session.sessionId,
+    );
+
+    expect(result?.session.filingStatus).toBeNull();
+    expect(result?.session.filingRetryCount).toBe(0);
+    expect(result?.dispatchId).toMatch(/^restore-/);
+    expect(result?.dispatchId).not.toBe('restore-0');
+  });
+
+  it('retry reset clears failed exhausted retry count and generates unique dispatch ids not based on retry count', async () => {
+    const first = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: 'filing_failed',
+      filingRetryCount: 3,
+    });
+    const second = await seedSession({
+      effectiveMode: 'freeform',
+      filingStatus: 'filing_failed',
+      filingRetryCount: 3,
+    });
+
+    const firstResult = await resetFilingForRetry(
+      db,
+      first.profileId,
+      first.sessionId,
+    );
+    const secondResult = await resetFilingForRetry(
+      db,
+      second.profileId,
+      second.sessionId,
+    );
+
+    expect(firstResult?.session.filingRetryCount).toBe(0);
+    expect(secondResult?.session.filingRetryCount).toBe(0);
+    expect(firstResult?.dispatchId).toMatch(/^retry-/);
+    expect(secondResult?.dispatchId).toMatch(/^retry-/);
+    expect(firstResult?.dispatchId).not.toBe(secondResult?.dispatchId);
+    expect(firstResult?.dispatchId).not.toBe('retry-0');
   });
 });

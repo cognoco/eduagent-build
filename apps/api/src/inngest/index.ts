@@ -29,10 +29,8 @@ import { bookPreGeneration } from './functions/book-pre-generation';
 import { recallNudge } from './functions/recall-nudge';
 import { recallNudgeSend } from './functions/recall-nudge-send';
 import { postSessionSuggestions } from './functions/post-session-suggestions';
-import {
-  freeformAutoFileRequested,
-  freeformFilingRetry,
-} from './functions/freeform-filing';
+import { freeformFilingRetry } from './functions/freeform-filing';
+import { autoFileSession } from './functions/auto-file-session';
 import { filingCompletedObserve } from './functions/filing-completed-observe';
 import { filingTimedOutObserve } from './functions/filing-timed-out-observe';
 import { filingStrandedBackfill } from './functions/filing-stranded-backfill';
@@ -147,7 +145,7 @@ export {
   monthlyReportCron,
   monthlyReportGenerate,
   selfProgressReportsBackfill,
-  freeformAutoFileRequested,
+  autoFileSession,
   freeformFilingRetry,
   filingCompletedObserve,
   filingTimedOutObserve,
@@ -227,7 +225,7 @@ export const functions = [
   weeklySelfReportCron,
   weeklySelfReportGenerate,
   selfProgressReportsBackfill,
-  freeformAutoFileRequested,
+  autoFileSession,
   freeformFilingRetry,
   filingCompletedObserve,
   filingTimedOutObserve,

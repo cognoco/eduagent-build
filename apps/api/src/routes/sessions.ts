@@ -1161,6 +1161,17 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         { ...body, summaryStatus: sanitizedSummaryStatus },
       );
 
+      if (
+        result.message === 'Session closed' ||
+        result.message === 'Session auto-closed'
+      ) {
+        await dispatchClosePathAutoFileIfEligible(
+          db,
+          profileId,
+          result.sessionId,
+        );
+      }
+
       // BUG-398: stale-session cron owns the dispatch for auto_closed; exclude here to prevent double-fire
       const shouldDispatchCompletionEvent =
         result.summaryStatus !== 'pending' &&
@@ -1440,6 +1451,51 @@ async function dispatchSessionAutoFileRequested(
     name: 'app/session.auto_file_requested',
     data: payload,
   });
+}
+
+async function dispatchClosePathAutoFileIfEligible(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<void> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session || !isClosePathAutoFileEligible(session)) return;
+
+  const dispatchId = 'initial';
+  const payload = sessionAutoFileRequestedEventSchema.parse({
+    profileId,
+    sessionId,
+    requestedAt: new Date().toISOString(),
+    reason: 'freeform_session_closed',
+    dispatchId,
+  });
+
+  await safeSend(
+    () =>
+      inngest.send({
+        id: `auto-file-${sessionId}-${dispatchId}`,
+        name: 'app/session.auto_file_requested',
+        data: payload,
+      }),
+    'sessions.close.auto_file_requested',
+    { profileId, sessionId },
+  );
+}
+
+function isClosePathAutoFileEligible(session: {
+  metadata?: unknown;
+  topicId?: string | null;
+  filedAt?: string | Date | null;
+  filingStatus?: string | null;
+  exchangeCount?: number;
+}): boolean {
+  return (
+    getSessionEffectiveMode(session) === 'freeform' &&
+    session.topicId == null &&
+    session.filedAt == null &&
+    session.filingStatus == null &&
+    (session.exchangeCount ?? 0) >= FILING_CONFIG.minFreeformExchanges
+  );
 }
 
 /**

@@ -325,6 +325,66 @@ describe('resolveFilingResult', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
+  it('[CRITICAL-2] does not update learning_sessions when sessionId is supplied', async () => {
+    const txDb = {
+      query: {
+        subjects: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'subject-1',
+            name: 'Science',
+          }),
+        },
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'curriculum-1' }),
+        },
+        curriculumBooks: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'book-1',
+            title: 'Physics',
+          }),
+        },
+        curriculumTopics: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'topic-1',
+              bookId: 'book-1',
+              title: 'Newton Laws',
+              sortOrder: 0,
+            },
+          ]),
+        },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    };
+    const db = {
+      transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
+        callback(txDb),
+      ),
+    };
+
+    const result = await resolveFilingResult(db as any, {
+      profileId: 'profile-1',
+      sessionId: 'session-1',
+      filedFrom: 'session_filing',
+      filingResponse: {
+        shelf: { id: 'subject-1' },
+        book: { id: 'book-1' },
+        chapter: { existing: 'Mechanics' },
+        topic: {
+          title: 'Newton Laws',
+          description: 'Laws of motion',
+        },
+      },
+    });
+
+    expect(result.topicId).toBe('topic-1');
+    expect(txDb.update).not.toHaveBeenCalled();
+  });
+
   // Integration coverage lives in services/filing.integration.test.ts.
   // The TODO that used to sit here (concurrent creation race, FOR UPDATE
   // locking) is now closed by:
