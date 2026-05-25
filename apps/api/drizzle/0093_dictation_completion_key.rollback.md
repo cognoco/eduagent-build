@@ -10,3 +10,11 @@ ALTER TABLE "dictation_results" DROP COLUMN IF EXISTS "completion_key";
 ```
 
 Data loss: none expected from rollback. The dropped `completion_key` values can be regenerated from `(profile_id,date,mode)` by re-running the forward migration.
+
+## Forward contract note
+
+After all deployed clients write explicit `completion_key` values, the follow-up contract migration can remove the rollout-only default:
+
+```sql
+ALTER TABLE "dictation_results" ALTER COLUMN "completion_key" DROP DEFAULT;
+```
