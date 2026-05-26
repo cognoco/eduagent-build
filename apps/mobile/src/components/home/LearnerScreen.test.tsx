@@ -16,6 +16,8 @@ import {
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
 } from '../../lib/navigation';
+import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
+import type { Profile } from '@eduagent/schemas';
 
 let mockLinkedChildren: Array<{
   id: string;
@@ -121,33 +123,11 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock(
-  '../../lib/profile' /* gc1-allow: profile context uses native storage and query state */,
-  () => ({
-    ...jest.requireActual('../../lib/profile'),
-    useProfile: () => ({
-      activeProfile: {
-        id: 'test-profile-id',
-        accountId: 'test-account-id',
-        displayName: 'Test Learner',
-        isOwner: true,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        pronouns: null,
-        consentStatus: null,
-      },
-      // [ACCOUNT-04] Expose the explicit proxy flag — individual tests override
-      // mockIsExplicitProxyMode before rendering to simulate proxy state.
-      isExplicitProxyMode: mockIsExplicitProxyMode,
-      switchProfile: mockSwitchProfile,
-    }),
-    useLinkedChildren: () => mockLinkedChildren,
-    useHasLinkedChildren: () => mockLinkedChildren.length > 0,
-    ProfileContext: {
-      Provider: ({ children }: { children: React.ReactNode }) => children,
-    },
-  }),
-);
+// [GC6] lib/profile mock removed — test now provides a real ProfileContext.Provider
+// via `createWrapper`. `useProfile`, `useLinkedChildren`, `useHasLinkedChildren`,
+// and `useParentProxy` (and therefore `useActiveProfileRole`) all read from this
+// real context, so each test can vary the active profile, proxy flag, and
+// linked-children list through `profiles` / `activeProfile` / `mockIsExplicitProxyMode`.
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -163,19 +143,10 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock(
-  '../common' /* gc1-allow: common animation subtree is outside LearnerScreen contract */,
-  () => ({
-    BookPageFlipAnimation: () => null,
-  }),
-);
-
-jest.mock(
-  '../feedback/FeedbackProvider' /* gc1-allow: native feedback modal/i18n subtree is outside LearnerScreen's contract */,
-  () => ({
-    useFeedbackContext: () => ({ openFeedback: jest.fn() }),
-  }),
-);
+// [GC6] `../common` and `../feedback/FeedbackProvider` mocks removed —
+// the real `BookPageFlipAnimation` renders harmlessly under react-native-svg,
+// and `useFeedbackContext` falls back to a no-op `openFeedback` when no
+// FeedbackProvider is mounted, which is exactly what these tests need.
 
 jest.mock(
   '../../lib/greeting' /* gc1-allow: deterministic greeting avoids clock-dependent assertions */,
@@ -188,12 +159,11 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../hooks/use-active-profile-role' /* gc1-allow: external hook boundary — wraps profile context + family-links query */,
-  () => ({
-    useActiveProfileRole: () => 'owner',
-  }),
-);
+// [GC6] use-active-profile-role mock removed — the real hook composes
+// `useProfile()` + `useParentProxy()`, both of which read from the real
+// ProfileContext.Provider set up in `createWrapper`. Tests no longer need
+// to stub the role; it is derived from the active profile's `isOwner` flag
+// and the `mockIsExplicitProxyMode` switch.
 
 jest.mock(
   '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
@@ -230,10 +200,35 @@ jest.mock(
   }),
 );
 
+// Holds the ProfileContext value for the current render. Tests render with the
+// repo-standard `render(..., { wrapper: Wrapper })` shape, but the wrapper
+// needs to react to per-test overrides (active profile, linked children,
+// explicit proxy flag). The wrapper reads from this ref so updates between
+// renders take effect without rebuilding the wrapper.
+let activeProfilesForRender: Profile[] = [];
+let activeProfileForRender: Profile | null = null;
+
+function buildProfileContextValue(): ProfileContextValue {
+  return {
+    profiles: activeProfilesForRender,
+    activeProfile: activeProfileForRender,
+    isExplicitProxyMode: mockIsExplicitProxyMode,
+    switchProfile: mockSwitchProfile,
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+}
+
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ProfileContext.Provider value={buildProfileContextValue()}>
+          {children}
+        </ProfileContext.Provider>
+      </QueryClientProvider>
     );
   };
 }
@@ -260,6 +255,37 @@ const QUIZ_DISCOVERY_CARD = {
 describe('LearnerScreen', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
   let queryClient: QueryClient | null = null;
+
+  // `renderLearner` mirrors the LearnerScreen props into module-level refs the
+  // wrapper reads from before rendering. This keeps the screen's `profiles` /
+  // `activeProfile` props in sync with what `useProfile()` / `useLinkedChildren()`
+  // / `useParentProxy()` see — without ever mocking the real profile module.
+  function renderLearner(
+    props: Partial<{
+      profiles: Array<{ id: string; displayName: string; isOwner: boolean }>;
+      activeProfile: {
+        id: string;
+        displayName: string;
+        isOwner: boolean;
+      } | null;
+    }> = {},
+  ): ReturnType<typeof render> {
+    const merged = { ...defaultProps, ...props };
+    // When the test explicitly sets `mockLinkedChildren`, merge them in too so
+    // useLinkedChildren returns the same set the legacy mock did.
+    const childrenAlreadyInProfiles = new Set(
+      (merged.profiles ?? []).map((p) => p.id),
+    );
+    const extraChildren = mockLinkedChildren.filter(
+      (c) => !childrenAlreadyInProfiles.has(c.id),
+    );
+    activeProfilesForRender = [
+      ...(merged.profiles ?? []),
+      ...extraChildren,
+    ] as Profile[];
+    activeProfileForRender = (merged.activeProfile ?? null) as Profile | null;
+    return render(<LearnerScreen {...merged} />, { wrapper: Wrapper });
+  }
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -337,7 +363,7 @@ describe('LearnerScreen', () => {
   });
 
   it('renders greeting with first name', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByText('Hey Alex!');
@@ -346,7 +372,7 @@ describe('LearnerScreen', () => {
   });
 
   it('shows empty-subjects state, ask-anything, and actions when no subjects', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByText('What do you need right now?');
@@ -368,7 +394,7 @@ describe('LearnerScreen', () => {
   });
 
   it('opens My Notes from learner Home', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-my-notes'));
     fireEvent.press(screen.getByTestId('home-my-notes'));
@@ -393,7 +419,7 @@ describe('LearnerScreen', () => {
       ),
     );
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('learner-screen');
@@ -412,7 +438,7 @@ describe('LearnerScreen', () => {
       totalTopicsVerified: 5,
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByText(/5 topics learned/);
@@ -460,20 +486,17 @@ describe('LearnerScreen', () => {
       demoMode: false,
     });
 
-    render(
-      <LearnerScreen
-        profiles={[
-          { id: 'owner-id', displayName: 'Parent', isOwner: true },
-          { id: 'child-id', displayName: 'Emma', isOwner: false },
-        ]}
-        activeProfile={{
-          id: 'owner-id',
-          displayName: 'Parent',
-          isOwner: true,
-        }}
-      />,
-      { wrapper: Wrapper },
-    );
+    renderLearner({
+      profiles: [
+        { id: 'owner-id', displayName: 'Parent', isOwner: true },
+        { id: 'child-id', displayName: 'Emma', isOwner: false },
+      ],
+      activeProfile: {
+        id: 'owner-id',
+        displayName: 'Parent',
+        isOwner: true,
+      },
+    });
 
     await waitFor(() => {
       screen.getByTestId('parent-home-screen');
@@ -489,17 +512,14 @@ describe('LearnerScreen', () => {
     mockSubscriptionTier = 'family';
     mockContractHomeScreen = 'FamilyHome';
 
-    render(
-      <LearnerScreen
-        profiles={[{ id: 'owner-id', displayName: 'Parent', isOwner: true }]}
-        activeProfile={{
-          id: 'owner-id',
-          displayName: 'Parent',
-          isOwner: true,
-        }}
-      />,
-      { wrapper: Wrapper },
-    );
+    renderLearner({
+      profiles: [{ id: 'owner-id', displayName: 'Parent', isOwner: true }],
+      activeProfile: {
+        id: 'owner-id',
+        displayName: 'Parent',
+        isOwner: true,
+      },
+    });
 
     await waitFor(() => {
       screen.getByTestId('parent-home-screen');
@@ -527,20 +547,17 @@ describe('LearnerScreen', () => {
         flags.FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }
       ).MODE_NAV_V1_ENABLED = true;
 
-      render(
-        <LearnerScreen
-          profiles={[
-            { id: 'owner-id', displayName: 'Parent', isOwner: true },
-            { id: 'c1', displayName: 'Kid', isOwner: false },
-          ]}
-          activeProfile={{
-            id: 'owner-id',
-            displayName: 'Parent',
-            isOwner: true,
-          }}
-        />,
-        { wrapper: Wrapper },
-      );
+      renderLearner({
+        profiles: [
+          { id: 'owner-id', displayName: 'Parent', isOwner: true },
+          { id: 'c1', displayName: 'Kid', isOwner: false },
+        ],
+        activeProfile: {
+          id: 'owner-id',
+          displayName: 'Parent',
+          isOwner: true,
+        },
+      });
 
       await waitFor(() => {
         screen.getByTestId('parent-home-screen');
@@ -557,7 +574,7 @@ describe('LearnerScreen', () => {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByText('What do you need right now?');
@@ -578,7 +595,7 @@ describe('LearnerScreen', () => {
       ],
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-subject-card-sub-1');
@@ -600,7 +617,7 @@ describe('LearnerScreen', () => {
       ],
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-subject-card-sub-preparing');
@@ -618,21 +635,17 @@ describe('LearnerScreen', () => {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(
-      <LearnerScreen
-        {...defaultProps}
-        profiles={[
-          { id: 'owner-id', displayName: 'Parent', isOwner: true },
-          { id: 'child-id', displayName: 'Alex', isOwner: false },
-        ]}
-        activeProfile={{
-          id: 'child-id',
-          displayName: 'Alex',
-          isOwner: false,
-        }}
-      />,
-      { wrapper: Wrapper },
-    );
+    renderLearner({
+      profiles: [
+        { id: 'owner-id', displayName: 'Parent', isOwner: true },
+        { id: 'child-id', displayName: 'Alex', isOwner: false },
+      ],
+      activeProfile: {
+        id: 'child-id',
+        displayName: 'Alex',
+        isOwner: false,
+      },
+    });
 
     await waitFor(() => {
       screen.getByTestId('home-subject-carousel');
@@ -654,21 +667,17 @@ describe('LearnerScreen', () => {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(
-      <LearnerScreen
-        {...defaultProps}
-        profiles={[
-          { id: 'owner-id', displayName: 'Parent', isOwner: true },
-          { id: 'child-id', displayName: 'Alex', isOwner: false },
-        ]}
-        activeProfile={{
-          id: 'child-id',
-          displayName: 'Alex',
-          isOwner: false,
-        }}
-      />,
-      { wrapper: Wrapper },
-    );
+    renderLearner({
+      profiles: [
+        { id: 'owner-id', displayName: 'Parent', isOwner: true },
+        { id: 'child-id', displayName: 'Alex', isOwner: false },
+      ],
+      activeProfile: {
+        id: 'child-id',
+        displayName: 'Alex',
+        isOwner: false,
+      },
+    });
 
     await waitFor(() => {
       screen.getByTestId('home-subject-carousel');
@@ -689,21 +698,17 @@ describe('LearnerScreen', () => {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(
-      <LearnerScreen
-        {...defaultProps}
-        profiles={[
-          { id: 'owner-id', displayName: 'Parent', isOwner: true },
-          { id: 'child-id', displayName: 'Alex', isOwner: false },
-        ]}
-        activeProfile={{
-          id: 'child-id',
-          displayName: 'Alex',
-          isOwner: false,
-        }}
-      />,
-      { wrapper: Wrapper },
-    );
+    renderLearner({
+      profiles: [
+        { id: 'owner-id', displayName: 'Parent', isOwner: true },
+        { id: 'child-id', displayName: 'Alex', isOwner: false },
+      ],
+      activeProfile: {
+        id: 'child-id',
+        displayName: 'Alex',
+        isOwner: false,
+      },
+    });
 
     await waitFor(() => screen.getByTestId('proxy-view-session-summaries'));
     fireEvent.press(screen.getByTestId('proxy-view-session-summaries'));
@@ -718,7 +723,7 @@ describe('LearnerScreen', () => {
   });
 
   it('navigates to create-subject on Study new action', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-action-study-new'));
     fireEvent.press(screen.getByTestId('home-action-study-new'));
@@ -729,7 +734,7 @@ describe('LearnerScreen', () => {
   });
 
   it('navigates to freeform session on Ask anything', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-ask-anything'));
     fireEvent.press(screen.getByTestId('home-ask-anything'));
@@ -740,7 +745,7 @@ describe('LearnerScreen', () => {
   });
 
   it('navigates to practice on Practice action', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-action-practice'));
     fireEvent.press(screen.getByTestId('home-action-practice'));
@@ -755,7 +760,7 @@ describe('LearnerScreen', () => {
   // duplicating the Home stack entry (back from camera → home → home again)
   // because LearnerScreen IS the Home tab — there's no need to seed it.
   it('navigates to homework camera on Homework action (single push, no home pre-seed)', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-action-homework'));
     fireEvent.press(screen.getByTestId('home-action-homework'));
@@ -783,7 +788,7 @@ describe('LearnerScreen', () => {
       },
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-coach-band');
@@ -817,7 +822,7 @@ describe('LearnerScreen', () => {
       nextUpcomingReviewAt: null,
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-coach-band');
@@ -842,7 +847,7 @@ describe('LearnerScreen', () => {
       updatedAt: new Date().toISOString(),
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-coach-band');
@@ -872,7 +877,7 @@ describe('LearnerScreen', () => {
     });
     mockIsRecoveryMarkerFresh.mockReturnValue(false);
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
@@ -882,9 +887,7 @@ describe('LearnerScreen', () => {
   });
 
   it('renders fallback greeting when activeProfile is null', async () => {
-    render(<LearnerScreen {...defaultProps} activeProfile={null} />, {
-      wrapper: Wrapper,
-    });
+    renderLearner({ activeProfile: null });
 
     await waitFor(() => {
       screen.getByText('Hey there!');
@@ -892,9 +895,7 @@ describe('LearnerScreen', () => {
   });
 
   it('reads recovery marker with undefined profileId when activeProfile is null', async () => {
-    render(<LearnerScreen {...defaultProps} activeProfile={null} />, {
-      wrapper: Wrapper,
-    });
+    renderLearner({ activeProfile: null });
 
     await waitFor(() => {
       expect(mockReadSessionRecoveryMarker).toHaveBeenCalledWith(undefined);
@@ -902,7 +903,7 @@ describe('LearnerScreen', () => {
   });
 
   it('does not render a gateway back button', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-action-study-new'));
     expect(screen.queryByTestId('learner-back')).toBeNull();
@@ -915,7 +916,7 @@ describe('LearnerScreen', () => {
       fallback: null,
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-coach-band');
@@ -963,7 +964,7 @@ describe('LearnerScreen', () => {
       },
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-coach-band');
@@ -981,7 +982,7 @@ describe('LearnerScreen', () => {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
@@ -996,21 +997,17 @@ describe('LearnerScreen', () => {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(
-      <LearnerScreen
-        {...defaultProps}
-        profiles={[
-          { id: 'owner-id', displayName: 'Parent', isOwner: true },
-          { id: 'child-id', displayName: 'Alex', isOwner: false },
-        ]}
-        activeProfile={{
-          id: 'child-id',
-          displayName: 'Alex',
-          isOwner: false,
-        }}
-      />,
-      { wrapper: Wrapper },
-    );
+    renderLearner({
+      profiles: [
+        { id: 'owner-id', displayName: 'Parent', isOwner: true },
+        { id: 'child-id', displayName: 'Alex', isOwner: false },
+      ],
+      activeProfile: {
+        id: 'child-id',
+        displayName: 'Alex',
+        isOwner: false,
+      },
+    });
 
     await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
@@ -1021,7 +1018,7 @@ describe('LearnerScreen', () => {
   });
 
   it('shows empty-state CTA when no subjects', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('home-empty-subjects');
@@ -1032,7 +1029,7 @@ describe('LearnerScreen', () => {
   });
 
   it('navigates to create-subject on empty-state Add a subject CTA', async () => {
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-add-first-subject'));
     fireEvent.press(screen.getByTestId('home-add-first-subject'));
@@ -1077,7 +1074,7 @@ describe('LearnerScreen', () => {
       demoMode: false,
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => {
       screen.getByTestId('withdrawal-countdown-banner');
@@ -1089,7 +1086,7 @@ describe('LearnerScreen', () => {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+    renderLearner();
 
     await waitFor(() => screen.getByTestId('home-add-subject-tile'));
     fireEvent.press(screen.getByTestId('home-add-subject-tile'));
@@ -1149,7 +1146,7 @@ describe('LearnerScreen', () => {
     });
 
     it('shows the timeout container with loading message after 15 s', async () => {
-      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+      renderLearner();
 
       // Loading state appears immediately — no timeout text yet.
       screen.getByTestId('learner-loading-state');
@@ -1167,7 +1164,7 @@ describe('LearnerScreen', () => {
     });
 
     it('shows the Retry CTA after timeout', async () => {
-      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+      renderLearner();
 
       act(() => {
         jest.advanceTimersByTime(16_000);
@@ -1184,7 +1181,7 @@ describe('LearnerScreen', () => {
       // This is the core regression test for HOME-08: the prior "Go home" button
       // looped back to the same screen (LearnerScreen IS the Home tab).
       // The fix replaces it with Library + More routes that change state.
-      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+      renderLearner();
 
       act(() => {
         jest.advanceTimersByTime(16_000);
@@ -1199,7 +1196,7 @@ describe('LearnerScreen', () => {
     });
 
     it('"More options" CTA navigates to More tab', async () => {
-      render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+      renderLearner();
 
       act(() => {
         jest.advanceTimersByTime(16_000);
