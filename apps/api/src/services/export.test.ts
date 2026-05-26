@@ -332,6 +332,37 @@ describe('generateExport', () => {
     expect(userRow!['content']).toBe('What is gravity?');
   });
 
+  it('[WI-213] projects raw envelope JSON in legacy sessionEmbedding rows before export', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const rawEnvelope = JSON.stringify({
+      reply: 'Embedding-visible tutoring prose.',
+      signals: { ready_to_finish: true },
+      ui_hints: { fluency_drill: { active: false } },
+    });
+    const embeddingRows = [
+      {
+        id: 'emb-1',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        content: rawEnvelope,
+        createdAt: NOW,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEmbeddings: embeddingRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    expect(result.sessionEmbeddings).toHaveLength(1);
+    const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
+    expect(embedding!['content']).toBe('Embedding-visible tutoring prose.');
+    expect(embedding!['content']).not.toContain('"signals"');
+    expect(embedding!['content']).not.toContain('"ui_hints"');
+  });
+
   // [BUG-413] Break tests: Drizzle / neon-serverless returns raw Date objects.
   // Without serializeDates, the export payload carries Date objects in rows
   // that were cast as `Record<string, unknown>[]`.  These are NOT ISO strings

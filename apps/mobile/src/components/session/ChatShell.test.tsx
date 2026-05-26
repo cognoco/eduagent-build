@@ -1005,6 +1005,31 @@ describe('ChatShell', () => {
         'Screen reader is on. Voice input is not available. Use text input below.',
       );
     });
+
+    it('[WI-302] speaks the projected visible reply when assistant content is a raw envelope', async () => {
+      const envelope = JSON.stringify({
+        reply: 'Visible answer only.',
+        signals: { partial_progress: true },
+        ui_hints: { note_prompt: { show: false } },
+      });
+
+      renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'assistant', content: envelope }],
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockSpeak).toHaveBeenCalledWith('Visible answer only.');
+      expect(mockSpeak).not.toHaveBeenCalledWith(
+        expect.stringContaining('"signals"'),
+      );
+      expect(mockSpeak).not.toHaveBeenCalledWith(
+        expect.stringContaining('"ui_hints"'),
+      );
+    });
   });
 
   describe('mic permission refresh', () => {

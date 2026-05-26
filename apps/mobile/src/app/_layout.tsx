@@ -51,6 +51,7 @@ import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
 import { createScopedPersister } from '../lib/query-persister';
 import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
+import { getSentryQueryKeyTag } from '../lib/sentry-query-key';
 
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
 // which crashes on web. Use our secure-storage wrapper instead.
@@ -87,7 +88,7 @@ const queryClient = new QueryClient({
       // screens become observable even when a screen forgets to handle
       // isError, but ensures no failure goes unnoticed.
       Sentry.captureException(error, {
-        tags: { queryKey: JSON.stringify(query.queryKey) },
+        tags: { queryKey: getSentryQueryKeyTag(query.queryKey) },
       });
     },
   }),

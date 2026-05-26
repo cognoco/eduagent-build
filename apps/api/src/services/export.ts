@@ -346,7 +346,18 @@ export async function generateExport(
     learningModes: learningModeRows.map(serializeDates),
     teachingPreferences: teachingPrefRows.map(serializeDates),
     parkingLotItems: parkingLotRows.map(serializeDates),
-    sessionEmbeddings: sessionEmbeddingRows.map(serializeDates),
+    sessionEmbeddings: sessionEmbeddingRows.map((row) => {
+      const serialized = serializeDates(row);
+      if (typeof serialized['content'] !== 'string') {
+        return serialized;
+      }
+      return {
+        ...serialized,
+        content: projectAiResponseContent(serialized['content'], {
+          silent: true,
+        }),
+      };
+    }),
     subscriptions: subscriptionRows.map(serializeDates),
     quotaPools: quotaPoolRows.map(serializeDates),
     topUpCredits: topUpCreditRows.map(serializeDates),

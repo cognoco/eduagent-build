@@ -6,6 +6,7 @@ import {
   checkConsentRequiredFromDate,
   createGrantedConsentState,
   createPendingConsentState,
+  getChildNameByToken,
   requestConsent,
   resendConsent,
   processConsentResponse,
@@ -903,6 +904,46 @@ describe('processConsentResponse — token expiry', () => {
     const result = await processConsentResponse(db, 'fresh-token', true);
 
     expect(result.status).toBe('CONSENTED');
+  });
+});
+
+describe('getChildNameByToken — disclosure gate [WI-144]', () => {
+  it('returns the child name for a valid unresponded token', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({
+        consentToken: 'valid-token',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        respondedAt: null,
+      }),
+    });
+
+    await expect(getChildNameByToken(db, 'valid-token')).resolves.toBe(
+      'Test Child',
+    );
+  });
+
+  it('[WI-144] returns null for an expired token so the consent page cannot disclose the child name', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({
+        consentToken: 'expired-token',
+        expiresAt: new Date(Date.now() - 1000),
+        respondedAt: null,
+      }),
+    });
+
+    await expect(getChildNameByToken(db, 'expired-token')).resolves.toBeNull();
+  });
+
+  it('[WI-144] returns null for an already-responded token so used links cannot disclose the child name', async () => {
+    const db = createMockDb({
+      findFirstResult: mockConsentRow({
+        consentToken: 'used-token',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        respondedAt: new Date(),
+      }),
+    });
+
+    await expect(getChildNameByToken(db, 'used-token')).resolves.toBeNull();
   });
 });
 
