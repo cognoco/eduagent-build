@@ -1323,6 +1323,227 @@ describe('AppLayout no-profile gate — preview branch', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// AppLayout welcome intro gate — routing order
+//
+// Closes the three layout-level integration scenarios listed under
+// docs/specs/2026-05-25-welcome-intro.md → "Known Gaps → Gap 2". The cascade
+// these scenarios exercise is documented at _layout.tsx:521-541
+// ([CRITICAL-A3] ordering block).
+// ---------------------------------------------------------------------------
+
+describe('AppLayout welcome intro gate — routing order', () => {
+  let testQueryClient: QueryClient;
+  let getPreviewStateSpy: jest.SpyInstance;
+  const { __resetIntroStateForTests } = require('../../lib/intro-state');
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/subscription/status',
+      () =>
+        new Response(
+          JSON.stringify({
+            status: {
+              tier: 'family',
+              status: 'active',
+              monthlyLimit: 700,
+              usedThisMonth: 0,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+  }
+
+  type TestProfile = {
+    id: string;
+    isOwner: boolean;
+    consentStatus: string | null;
+    birthYear: number;
+  };
+
+  function renderWithState(opts: {
+    userId: string;
+    activeProfile: TestProfile | null;
+    profiles?: TestProfile[];
+    introSeenAt: string | null;
+  }) {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: opts.userId,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles:
+        opts.profiles ?? (opts.activeProfile ? [opts.activeProfile] : []),
+      activeProfile: opts.activeProfile,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+      isExplicitProxyMode: false,
+    });
+    const introKey = `intro_seen_v1_${opts.userId}`;
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        Promise.resolve(key === introKey ? opts.introSeenAt : null),
+    );
+
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    // Real intro-state module is used; reset its in-memory Set so the
+    // "seen" flag does not leak between tests.
+    __resetIntroStateForTests();
+    await clearPreviewState();
+    setupDefaultRoutes();
+    // Default: preview probe resolves to absent. Tests that need the
+    // wizard branch override this per-test.
+    getPreviewStateSpy = jest
+      .spyOn(require('../../lib/preview-onboarding-state'), 'getPreviewState')
+      .mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    getPreviewStateSpy.mockRestore();
+  });
+
+  // Scenario A — welcome redirect pre-empts both CreateProfileGate (step 9)
+  // and the consent gates (step 10). Two assertions cover the cascade.
+  it('redirects to /welcome instead of CreateProfileGate when intro is unseen and no profile exists', async () => {
+    renderWithState({
+      userId: 'user_test_a1',
+      activeProfile: null,
+      introSeenAt: null,
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('redirect').props.href).toBe('/(app)/welcome');
+    });
+    expect(screen.queryByTestId('create-profile-gate')).toBeNull();
+    expect(screen.queryByTestId('consent-pending-gate')).toBeNull();
+    expect(screen.queryByTestId('consent-withdrawn-gate')).toBeNull();
+  });
+
+  it('redirects to /welcome instead of the pending-consent gate when intro is unseen', async () => {
+    const pendingProfile: TestProfile = {
+      id: 'p1',
+      isOwner: true,
+      consentStatus: 'PENDING',
+      birthYear: 1990,
+    };
+    renderWithState({
+      userId: 'user_test_a2',
+      activeProfile: pendingProfile,
+      introSeenAt: null,
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('redirect').props.href).toBe('/(app)/welcome');
+    });
+    expect(screen.queryByTestId('consent-pending-gate')).toBeNull();
+  });
+
+  // Scenario B — once the SecureStore probe returns a seen-at timestamp the
+  // cascade falls through the intro gate and the next blocking gate (here:
+  // withdrawn-consent) renders. Mirrors the spec's "Returning child with
+  // withdrawn consent, intro already seen by parent" failure-mode row.
+  it('skips the welcome redirect and renders the withdrawn-consent gate when intro has been seen', async () => {
+    const withdrawnProfile: TestProfile = {
+      id: 'c1',
+      isOwner: false,
+      consentStatus: 'WITHDRAWN',
+      birthYear: 2014,
+    };
+    renderWithState({
+      userId: 'user_test_b',
+      activeProfile: withdrawnProfile,
+      profiles: [
+        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
+        withdrawnProfile,
+      ],
+      introSeenAt: '2026-05-25T10:00:00.000Z',
+    });
+    expect(await screen.findByTestId('consent-withdrawn-gate')).toBeTruthy();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  // Scenario C — preview probe (step 7) sits above the welcome gate (step 8).
+  // A user with preview state present + no profile yet must see the
+  // SaveWizardGate, not the welcome redirect, even when intro is unseen.
+  it('suppresses the welcome redirect while the SaveWizardGate branch is active', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    // Override the beforeEach default so the layout sees preview state present.
+    getPreviewStateSpy.mockResolvedValue({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+
+    renderWithState({
+      userId: 'user_test_c',
+      activeProfile: null,
+      introSeenAt: null,
+    });
+
+    expect(await screen.findByTestId('save-wizard-gate')).toBeTruthy();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+    expect(screen.queryByTestId('intro-state-loading')).toBeNull();
+  });
+});
+
 describe('computeVisibleTabs', () => {
   it('returns all 5 tabs for guardian shape', () => {
     const tabs = computeVisibleTabs('guardian');

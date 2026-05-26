@@ -1,5 +1,28 @@
 # Challenge Round Runtime Wiring Plan
 
+> **Archived 2026-05-26.** All five phases (0-5) landed across PRs #476-#479
+> behind `CHALLENGE_ROUND_RUNTIME_ENABLED=false` (typed config flag at
+> `apps/api/src/config.ts:133`). The "Done Definition" at the bottom of this
+> doc is met — a real production exchange can move offer → accept → active →
+> draft/close with server-owned mastery/review persistence and typed mobile
+> rendering. Cutover is a Doppler flag flip. Code-verified mapping of every
+> row of the status table below: each item the table marked ❌ now has a
+> production caller; the bottom of `apps/api/src/services/session/session-exchange.ts`
+> (`finalizeChallengeRoundIfReady`, `persistChallengeRoundMasteryEvidence`,
+> `persistChallengeRoundReviewTargets`, `applyChallengeRoundRuntimeSignals`),
+> `apps/mobile/src/lib/sse.ts:94-98` (typed SSE fields), and
+> `apps/mobile/src/app/(app)/session/index.tsx:61-84, 632, 1125-1142` (mobile
+> rendering) close the loop end-to-end. `resolveMasteryVerificationState()`
+> exists at `apps/api/src/services/challenge-round/verification.ts:56` and is
+> integrated into the progress read site at `apps/api/src/services/progress.ts:420, 1316`.
+> One minor open seam — `apps/api/src/services/notes.ts:238-242` notes
+> `validateNoteDraft` is enforced in the CR pipeline but not on the generic
+> notes-API entry — is out of scope for this plan and tracked separately.
+>
+> **The status block and "Current State" table immediately below are the
+> 2026-05-26 pre-merge snapshot and are stale.** Kept verbatim for audit
+> context.
+
 > **Status (2026-05-26):** PR #458 (merged from branch `tier-rework`, despite
 > the misleading name) landed **Phase 0 + Phase 1 + Phase 2 only**. The plan's
 > stated blocker — "LLM can be prompted, but the server ignores the signals" —

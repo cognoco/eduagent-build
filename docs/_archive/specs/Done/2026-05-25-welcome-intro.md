@@ -1,6 +1,6 @@
 # Spec: First-Launch Welcome Intro
 
-**Status**: Shipped 2026-05-25 (commits `2434dd6fa`, `4cba67f9d`, `10c62b236`, `9cfc90351`). Two known post-ship gaps — see "Known Gaps (Post-Ship)" at end of doc.
+**Status**: Shipped 2026-05-25 (commits `2434dd6fa`, `4cba67f9d`, `10c62b236`, `9cfc90351`). Gap 2 closed 2026-05-26 (4 jest scenarios added to `_layout.test.tsx`). Gap 1 (non-English locale values) remains, deferred — see "Known Gaps (Post-Ship)" at end of doc.
 **Owner**: TBD
 **Date**: 2026-05-25
 **Related**: None — ships standalone. (Original draft had a pair-ship constraint with a home "artifact strip" spec; that spec was dropped after review confirmed the existing My Notes entry point on home is sufficient. See "Pair-Ship Removed" below.)
@@ -231,23 +231,25 @@ A spec-vs-code audit after shipping found two gaps. Both are recorded here rathe
 
 **Trigger to revisit independently:** if a Norway-first launch is set for under ~2 weeks out, carve out `nb.json` for the four welcome cards ahead of the broader sweep. The cards are the literal first 60 seconds of the product.
 
-### Gap 2 — Three of six Integration test scenarios are not covered
+### Gap 2 — Closed 2026-05-26
 
-**State:** Three scenarios listed under "Tests → Integration" have no automated coverage:
+**Original state:** Three Integration scenarios listed under "Tests → Integration" had no jest coverage at ship time:
 
 1. `(app)/_layout.tsx` routing order — intro fires after preview probe + SaveWizard, before CreateProfileGate, before consent
 2. Returning child with withdrawn consent + intro already seen → welcome skipped, consent gate fires
 3. Preview mode active → welcome gate suppressed by the preview-probe branch
 
-The remaining three Integration scenarios ARE covered:
-- "Sign out A → sign in B same device → B sees intro" — property of the userId-scoped key shape; covered by `intro-state.test.ts:57-61` (`does not leak the in-memory flag across userIds`)
-- "Profile switch within same Clerk userId does NOT re-trigger" — property of per-userId-not-per-profile key scope; covered by the key construction tests in `intro-state.test.ts:29-39`
-- "SecureStore write failure → metric fires, no trap" — `intro-state.test.ts:82-100`
+The remaining three Integration scenarios were (and remain) covered:
+- "Sign out A → sign in B same device → B sees intro" — property of the userId-scoped key shape; covered by `intro-state.test.ts` (`does not leak the in-memory flag across userIds`)
+- "Profile switch within same Clerk userId does NOT re-trigger" — property of per-userId-not-per-profile key scope; covered by the key construction tests in `intro-state.test.ts`
+- "SecureStore write failure → metric fires, no trap" — `intro-state.test.ts`
 
-Maestro `welcome-intro.yaml` additionally covers the happy-path routing end-to-end on a real device.
+**Closure:** Four scenarios added to `apps/mobile/src/app/(app)/_layout.test.tsx` under `describe('AppLayout welcome intro gate — routing order', ...)`:
 
-**Decision:** Accept the gap. The three uncovered scenarios are layout-level branch assertions on a straight-line if-cascade documented at `_layout.tsx:2318-2378` (`[CRITICAL-A3]` ordering block). The Maestro E2E proves the cascade resolves correctly under the happy path; jest-level coverage of the alternate branches would buy limited risk reduction.
+- Scenario A (2 tests): welcome redirect pre-empts both CreateProfileGate (step 9) and the pending-consent gate (step 10) when intro is unseen
+- Scenario B: once SecureStore returns a seen-at timestamp the cascade falls through the intro gate; a `WITHDRAWN`-consent profile renders the `consent-withdrawn-gate`
+- Scenario C: preview-probe-present + `!activeProfile` renders `save-wizard-gate` and suppresses the welcome redirect
 
-**Why not added now:** The only available host for layout-level integration tests is `apps/mobile/src/app/(app)/_layout.test.tsx`, which carries ~10 legacy `// gc1-allow:` internal mocks. Per CLAUDE.md GC1 (no new internal mocks) and GC6 (boy-scout existing internal mocks on every test-file edit), extending it would require either piggybacking on legacy mocks (violates the spirit of the rule) or boy-scouting the entire 2,426-line file (scope unrelated to welcome intro). Neither is justified by the risk.
+The original "Why not added now" concern — extending `_layout.test.tsx` would either piggyback on legacy internal mocks or require boy-scouting them — was reassessed: all 7 remaining `gc1-allow` mocks in that file are documented external-boundary stubs (api-client transport, expo-secure-store, expo-notifications, RevenueCat SDK, Sentry SDK, NativeWind, and two `requireActual`-with-targeted-override patterns). None are GC6 burn-down targets, so the new scenarios reuse them without violating CLAUDE.md GC1/GC6.
 
-**Trigger to revisit:** if `_layout.tsx` routing order changes (new gate inserted, existing gate reordered, preview-probe contract changes), the welcome gate's correct placement must be re-verified at that time — either by Maestro E2E flows asserting alternate branches (`welcome-intro-already-seen.yaml`, `welcome-intro-suppressed-in-preview.yaml`) or by adding jest assertions as part of a broader `_layout.test.tsx` mock cleanup.
+Maestro `welcome-intro.yaml` continues to cover the happy-path routing end-to-end on a real device.

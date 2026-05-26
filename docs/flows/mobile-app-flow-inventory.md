@@ -3,7 +3,7 @@
 # Mobile App Flow Inventory
 
 Current-state flow map for the Expo mobile app as of 2026-05-23.
-Please walk every single flow on the list from end uers persepective using Chrome and Playwrite. Always rebase to the latest "main". After each phase you complete, check if you are still on the latest phase. If you find a blocker of the type that the flow is impossible to run (missing seed) or a blocker that blocks more than 3 flows address them directly, do not create notion bugs. Do not worry about i18n bugs, this will be a separate clean up. If a flow that is documented in the document is not accurate, missing something, is obsolete or if you find a flow that is not yet documented, amend this document directly. 
+Please walk every single flow on the list from end uers persepective using Playwrithe Chromium. Always rebase to the latest "main". After each phase you complete, check if you are still on the latest phase. If you find a blocker of the type that the flow is impossible to run (missing seed) or a blocker that blocks more than 3 flows address them directly, do not create notion bugs. Do not worry about i18n bugs, this will be a separate clean up. If a flow that is documented in the document is not accurate, missing something, is obsolete or if you find a flow that is not yet documented, amend this document directly. 
 
 Source of truth used for this inventory:
 - `apps/mobile/src/app/**`
