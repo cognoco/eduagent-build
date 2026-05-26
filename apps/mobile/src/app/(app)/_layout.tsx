@@ -105,7 +105,7 @@ const HIDDEN_TAB_ROUTES = [
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
-const APP_AUTH_LOAD_TIMEOUT_MS = 12_000;
+const WELCOME_INTRO_PATH = '/(app)/welcome';
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
 const INTRO_PROBE_TIMEOUT_MS = 2_500;
 
@@ -150,6 +150,11 @@ export default function AppLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const currentAppPath = toInternalAppRedirectPath(pathname);
+  const isWelcomeIntroPath = currentAppPath === WELCOME_INTRO_PATH;
+  // The welcome route is a child of this layout. Parent-level app gates must
+  // let it mount, otherwise redirecting to /(app)/welcome loops forever and the
+  // route never gets to mark the intro as seen.
+  const shouldRunAppShellGates = !isWelcomeIntroPath;
   const {
     profiles,
     activeProfile,
@@ -187,28 +192,6 @@ export default function AppLayout() {
     const t = setTimeout(() => setPendingRedirectTimedOut(true), 15_000);
     return () => clearTimeout(t);
   }, [isPendingRedirectSpinning]);
-
-  // If Clerk's app-shell auth hydration stalls after session activation, do
-  // not strand the user on an unlabelled spinner. This is rare but observable
-  // in preview APKs after sign-in/OTA handoff.
-  const [authLoadTimedOut, setAuthLoadTimedOut] = React.useState(false);
-  React.useEffect(() => {
-    if (isLoaded) {
-      setAuthLoadTimedOut(false);
-      return;
-    }
-    if (authLoadTimedOut) return;
-
-    const t = setTimeout(() => {
-      Sentry.addBreadcrumb({
-        category: 'auth',
-        level: 'warning',
-        message: 'app shell Clerk auth load timed out',
-      });
-      setAuthLoadTimedOut(true);
-    }, APP_AUTH_LOAD_TIMEOUT_MS);
-    return () => clearTimeout(t);
-  }, [authLoadTimedOut, isLoaded]);
 
   // [M15] Timeout for isProfileLoading spinner
   const [profileLoadTimedOut, setProfileLoadTimedOut] = React.useState(false);
@@ -430,45 +413,12 @@ export default function AppLayout() {
     setWizardDone(true);
   }, []);
 
-  if (!isLoaded) {
-    if (authLoadTimedOut) {
-      return (
-        <View className="flex-1 bg-background">
-          <ErrorFallback
-            variant="centered"
-            title="Still signing you in"
-            message="The secure sign-in handoff is taking longer than expected. Try again, or sign out and sign in again."
-            primaryAction={{
-              label: t('common.retry'),
-              onPress: () => setAuthLoadTimedOut(false),
-              testID: 'app-auth-loading-timeout-retry',
-            }}
-            secondaryAction={{
-              label: t('common.signOut'),
-              onPress: () => {
-                void signOutWithCleanup({
-                  clerkSignOut,
-                  queryClient,
-                  profileIds: profiles.map((p) => p.id),
-                  clerkUserId: userId ?? undefined,
-                });
-              },
-              testID: 'app-auth-loading-timeout-signout',
-            }}
-            testID="app-auth-loading-timeout"
-          />
-        </View>
-      );
-    }
+  if (!isLoaded)
     return (
-      <View
-        className="flex-1 bg-background items-center justify-center"
-        testID="app-auth-loading"
-      >
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
       </View>
     );
-  }
   if (!isSignedIn) {
     if (__DEV__)
       console.warn(
@@ -618,6 +568,7 @@ export default function AppLayout() {
   //   9. !activeProfile → CreateProfileGate
   //  10. consent gates → Tabs
   if (
+    shouldRunAppShellGates &&
     FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
     previewProbeState === 'loading'
   ) {
@@ -632,6 +583,7 @@ export default function AppLayout() {
   }
 
   if (
+    shouldRunAppShellGates &&
     FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
     previewProbeState === 'present' &&
     !wizardDone &&
@@ -650,7 +602,7 @@ export default function AppLayout() {
   // Step 8: welcome intro — once per Clerk userId per device. Loading branch
   // holds the screen on the existing spinner so there's no flash of home/
   // CreateProfileGate before the SecureStore probe settles (spec: Paint Goal).
-  if (userId && introProbeState === 'loading') {
+  if (userId && introProbeState === 'loading' && shouldRunAppShellGates) {
     return (
       <View
         className="flex-1 bg-background items-center justify-center"
@@ -660,12 +612,12 @@ export default function AppLayout() {
       </View>
     );
   }
-  if (userId && introProbeState === 'unseen') {
+  if (userId && introProbeState === 'unseen' && shouldRunAppShellGates) {
     return <Redirect href="/(app)/welcome" />;
   }
 
   // No profile exists — show gate that pushes to profile creation modal
-  if (!activeProfile) {
+  if (shouldRunAppShellGates && !activeProfile) {
     return (
       <FeedbackProvider>
         <CreateProfileGate />
@@ -678,6 +630,7 @@ export default function AppLayout() {
 
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
   if (
+    shouldRunAppShellGates &&
     activeProfile?.consentStatus &&
     PENDING_CONSENT_STATUSES.has(activeProfile.consentStatus)
   ) {
@@ -689,7 +642,7 @@ export default function AppLayout() {
   }
 
   // Gate: block access when consent has been withdrawn (deletion pending)
-  if (activeProfile?.consentStatus === 'WITHDRAWN') {
+  if (shouldRunAppShellGates && activeProfile?.consentStatus === 'WITHDRAWN') {
     return (
       <FeedbackProvider>
         <ConsentWithdrawnGate />
@@ -698,7 +651,7 @@ export default function AppLayout() {
   }
 
   // Show celebratory landing once after consent approval
-  if (showPostApproval) {
+  if (shouldRunAppShellGates && showPostApproval) {
     return (
       <FeedbackProvider>
         <PostApprovalLanding onContinue={dismissPostApproval} />

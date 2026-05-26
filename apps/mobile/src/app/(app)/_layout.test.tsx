@@ -643,8 +643,7 @@ describe('AppLayout', () => {
     expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fquiz');
   });
 
-  it('[BUG] shows a retryable fallback when app-shell Clerk auth loading hangs', async () => {
-    jest.useFakeTimers();
+  it('renders nothing while Clerk auth is still loading', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: false,
       isSignedIn: undefined,
@@ -652,16 +651,9 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    screen.getByTestId('app-auth-loading');
+    // Should render nothing — no redirect, no tabs, no flash
     expect(screen.queryByTestId('redirect')).toBeNull();
     expect(screen.queryByTestId('tabs')).toBeNull();
-
-    await act(async () => {
-      jest.advanceTimersByTime(12_500);
-    });
-
-    screen.getByTestId('app-auth-loading-timeout');
-    expect(screen.queryByTestId('app-auth-loading')).toBeNull();
   });
 
   it('shows profile loading spinner while profiles load after auth', () => {
@@ -1526,6 +1518,22 @@ describe('AppLayout welcome intro gate — routing order', () => {
       expect(screen.getByTestId('redirect').props.href).toBe('/(app)/welcome');
     });
     expect(screen.queryByTestId('consent-pending-gate')).toBeNull();
+  });
+
+  it('[BUG] lets the welcome route render instead of redirecting to itself when intro is unseen', async () => {
+    mockUsePathname.mockReturnValue('/welcome');
+
+    renderWithState({
+      userId: 'user_test_welcome_loop',
+      activeProfile: null,
+      introSeenAt: null,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tabs')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('redirect')).toBeNull();
+    expect(screen.queryByTestId('create-profile-gate')).toBeNull();
   });
 
   // Scenario B — once the SecureStore probe returns a seen-at timestamp the
