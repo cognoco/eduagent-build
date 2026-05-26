@@ -396,6 +396,37 @@ describe('generateExport', () => {
     expect(embedding!['content']).not.toContain('"reply"');
   });
 
+  it('[WI-213] projects embedded raw envelopes when a legacy transcript starts with non-envelope JSON', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const learnerJson = JSON.stringify({ student: 'asked in JSON' });
+    const rawEnvelope = JSON.stringify({
+      reply: 'Visible reply.',
+      signals: { partial_progress: true },
+      private_sources: { reason: 'internal source-pack detail' },
+    });
+    const embeddingRows = [
+      {
+        id: 'emb-1',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        content: `${learnerJson}\n\n${rawEnvelope}`,
+        createdAt: NOW,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEmbeddings: embeddingRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
+    expect(embedding!['content']).toBe(`${learnerJson}\n\nVisible reply.`);
+    expect(embedding!['content']).not.toContain('"signals"');
+    expect(embedding!['content']).not.toContain('"private_sources"');
+  });
+
   // [BUG-413] Break tests: Drizzle / neon-serverless returns raw Date objects.
   // Without serializeDates, the export payload carries Date objects in rows
   // that were cast as `Record<string, unknown>[]`.  These are NOT ISO strings

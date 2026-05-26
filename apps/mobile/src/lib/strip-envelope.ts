@@ -23,7 +23,7 @@
 // silently rewriting legitimate assistant messages that happen to contain
 // JSON-shaped text with a `reply` field as part of prose. The parsed object
 // must contain ONLY keys from the known envelope vocabulary
-// (`reply`, `signals`, `ui_hints`). Any unrecognised key signals that the
+// (`reply`, `signals`, `ui_hints`, `private_sources`, `confidence`). Any unrecognised key signals that the
 // JSON is arbitrary data (e.g. a teaching example), not a leaked envelope.
 // ---------------------------------------------------------------------------
 
@@ -32,17 +32,28 @@
  * (`llmResponseEnvelopeSchema` in `@eduagent/schemas`). Any parsed object
  * whose key-set is not a strict subset of these is not an envelope.
  */
-const KNOWN_ENVELOPE_KEYS = new Set(['reply', 'signals', 'ui_hints']);
+const KNOWN_ENVELOPE_KEYS = new Set([
+  'reply',
+  'signals',
+  'ui_hints',
+  'private_sources',
+  'confidence',
+]);
 
 /**
  * A confirmed envelope must contain `reply` PLUS at least one structural
- * sibling key (`signals` or `ui_hints`). A lone `{"reply":"x"}` object is
+ * sibling key (`signals`, `ui_hints`, `private_sources`, or `confidence`). A lone `{"reply":"x"}` object is
  * ambiguous — it could be arbitrary JSON — so it is treated as prose.
  */
-const REQUIRED_ENVELOPE_SIBLINGS = new Set(['signals', 'ui_hints']);
+const REQUIRED_ENVELOPE_SIBLINGS = new Set([
+  'signals',
+  'ui_hints',
+  'private_sources',
+  'confidence',
+]);
 
 const EMBEDDED_ENVELOPE_TAIL_RE =
-  /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|confidence)["\u201c\u201d]\s*:/;
+  /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|private_sources|confidence)["\u201c\u201d]\s*:/;
 const EMBEDDED_ENVELOPE_CONFIRM_RE =
   /["\u201c\u201d](?:partial_progress|needs_deepening|understanding_check|ready_to_finish|retrieval_score|note_prompt|post_session|fluency_drill|confidence)["\u201c\u201d]\s*:/;
 

@@ -142,7 +142,7 @@ function findJsonObjectSpans(
 
 function projectSessionEmbeddingContent(content: string): string {
   const trimmed = content.trim();
-  if (trimmed.startsWith('{') || trimmed.startsWith('```')) {
+  if (trimmed.startsWith('```')) {
     return projectAiResponseContent(content, { silent: true });
   }
 
