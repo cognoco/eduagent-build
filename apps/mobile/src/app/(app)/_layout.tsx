@@ -105,6 +105,7 @@ const HIDDEN_TAB_ROUTES = [
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
+const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
 const INTRO_PROBE_TIMEOUT_MS = 2_500;
 
 const iconMap: Record<
@@ -299,12 +300,33 @@ export default function AppLayout() {
       return;
     }
     let cancelled = false;
-    void getPreviewState().then((s) => {
-      if (cancelled) return;
-      setPreviewProbeState(s ? 'present' : 'absent');
-    });
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (cancelled || settled) return;
+      settled = true;
+      Sentry.addBreadcrumb({
+        category: 'preview-onboarding',
+        level: 'warning',
+        message: 'preview SecureStore read timed out',
+      });
+      setPreviewProbeState('absent');
+    }, PREVIEW_PROBE_TIMEOUT_MS);
+    void getPreviewState()
+      .then((s) => {
+        if (cancelled || settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        setPreviewProbeState(s ? 'present' : 'absent');
+      })
+      .catch(() => {
+        if (cancelled || settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        setPreviewProbeState('absent');
+      });
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, []);
 
