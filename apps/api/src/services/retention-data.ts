@@ -1159,8 +1159,9 @@ export async function getSubjectNeedsDeepening(
 
   const topics: NeedsDeepeningStatus[] = subjectDeepening.map((d) => ({
     topicId: d.topicId,
-    status: d.status as 'active' | 'resolved',
+    status: d.status as NeedsDeepeningStatus['status'],
     consecutiveSuccessCount: d.consecutiveSuccessCount,
+    pendingExpiresAt: d.pendingExpiresAt?.toISOString() ?? null,
   }));
 
   return { topics, count: topics.length };

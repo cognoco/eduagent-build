@@ -20,6 +20,7 @@ import {
   getSession,
   getSessionTranscript,
   listProfileSessions,
+  persistSessionMetadata,
   recordSessionEvent,
   recordSystemPrompt,
   requestSessionLibraryFiling,
@@ -192,6 +193,72 @@ describeIfDb('listProfileSessions (integration)', () => {
     expect(row.drills).not.toContainEqual(
       expect.objectContaining({ correct: 9999, total: 9999 }),
     );
+  });
+});
+
+describeIfDb('persistSessionMetadata (integration IDOR breaks)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_session_archive_${RUN_ID}%`));
+  });
+
+  it('merges metadata without clobbering sibling keys and rejects cross-profile writes', async () => {
+    const owner = await seedProfileWithSubject('Algebra metadata');
+    const other = await seedProfileWithSubject('Biology metadata');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        metadata: { inputMode: 'text', continuationDepth: 'low' },
+      })
+      .returning({ id: learningSessions.id });
+
+    const updated = await persistSessionMetadata(
+      db,
+      owner.profileId,
+      session!.id,
+      { continuationDepth: 'mid', continuationOpenerActive: true },
+    );
+
+    expect(updated?.metadata).toEqual(
+      expect.objectContaining({
+        inputMode: 'text',
+        continuationDepth: 'mid',
+        continuationOpenerActive: true,
+      }),
+    );
+
+    const denied = await persistSessionMetadata(
+      db,
+      other.profileId,
+      session!.id,
+      {
+        continuationDepth: 'high',
+      },
+    );
+    expect(denied).toBeNull();
+
+    const afterDenied = await getSession(db, owner.profileId, session!.id);
+    expect(afterDenied?.metadata).toEqual(
+      expect.objectContaining({
+        inputMode: 'text',
+        continuationDepth: 'mid',
+      }),
+    );
+
+    const deletedKey = await persistSessionMetadata(
+      db,
+      owner.profileId,
+      session!.id,
+      { continuationOpenerActive: undefined },
+    );
+    expect(deletedKey?.metadata).not.toHaveProperty('continuationOpenerActive');
   });
 });
 

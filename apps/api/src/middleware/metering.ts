@@ -98,6 +98,10 @@ export type MeteringEnv = {
     quotaDecrementSource: 'monthly' | 'top_up';
     /** Set when quotaDecrementSource === 'top_up'. */
     quotaDecrementTopUpCreditId?: string;
+    /** Remaining billable turns after the current decrement. */
+    quotaRemainingTurns?: number;
+    /** Remaining-turn ratio against the user's currently enforced cap. */
+    quotaFractionRemaining?: number;
     /**
      * [WI-133] Belt-and-braces flag flipped after either refund path
      * (try/catch on handler throw, or post-`next()` status >= 400). Prevents
@@ -677,6 +681,27 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       c.set('quotaDecrementTopUpCreditId', decrement.topUpCreditId);
     }
 
+    const topUpRemainingAfterDecrement =
+      decrement.source === 'top_up'
+        ? await getTopUpCreditsRemaining(db, subscriptionId)
+        : decrement.remainingTopUp;
+    const quotaRemainingTurns =
+      decrement.remainingDaily === null
+        ? decrement.remainingMonthly + topUpRemainingAfterDecrement
+        : Math.min(
+            decrement.remainingMonthly + topUpRemainingAfterDecrement,
+            decrement.remainingDaily,
+          );
+    const quotaDenominator =
+      dailyLimit === null
+        ? monthlyLimit + topUpCreditsRemaining
+        : Math.min(monthlyLimit + topUpCreditsRemaining, dailyLimit);
+    c.set('quotaRemainingTurns', quotaRemainingTurns);
+    c.set(
+      'quotaFractionRemaining',
+      quotaDenominator > 0 ? quotaRemainingTurns / quotaDenominator : 0,
+    );
+
     // Expose the LLM tier so session route handlers can thread it to the LLM router.
     // Plus keeps the base tier standard; session exchange routing promotes its
     // included advanced entitlement only from rung 4 upward. Per-profile
@@ -767,10 +792,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // hundreds across other unspent batches. Aggregate across all batches
     // for the top-up case, and reuse the same aggregate for the KV cache
     // below so the header and the cached snapshot can't disagree.
-    const topUpRemainingAggregate =
-      decrement.source === 'top_up'
-        ? await getTopUpCreditsRemaining(db, subscriptionId)
-        : decrement.remainingTopUp;
+    const topUpRemainingAggregate = topUpRemainingAfterDecrement;
 
     const headerRemaining =
       decrement.remainingMonthly + topUpRemainingAggregate;

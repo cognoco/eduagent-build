@@ -1,377 +1,459 @@
-# Challenge Round — Target Decisions (Task 0.0 + 0.0a)
+# Challenge Round Runtime Wiring Plan
 
-> **Status (2026-05-25):** Schema decisions shipped (CRIT-1 `mastery_challenge_verified_at` ✅, CRIT-2 `needs_deepening_topics` extensions ✅, CRIT-4 `struggleStatusSchema` extracted ✅). **Two gaps still block Phase 1 (Tasks 8, 9, 11):** (a) **CRIT-3** — `persistSessionMetadata` is not exported from `session-crud.ts`; only file-local `updateSessionMetadata` exists at `apps/api/src/services/session/session-exchange.ts:374`, so callers in `challenge-round/state.ts:14` are broken; (b) **ROUTING-1..5** — `ExchangeContext` (`exchanges.ts:302`) has no `llmRoutingRung?: EscalationRung` field, no rung-4 floor logic in `prepareExchangeContext()`, no behavioral-metric persistence (`session-exchange.ts:306-366`). **Resume here:** (1) extract `persistSessionMetadata` to `session-crud.ts` with merge semantics (read-modify-write, not replace) and add an IDOR break test (`session-crud.persistSessionMetadata.scoped.integration.test.ts`); (2) add `llmRoutingRung` field + `Math.max(rung, 4)` floor in `prepareExchangeContext` and thread it through `processExchange()`/`streamExchange()`; (3) validate with `pnpm test:llm:premium-routing`.
+> **Status (2026-05-25):** supersedes the original 2026-05-18 target-decision
+> memo. The old doc correctly chose several storage and routing targets, but its
+> resume instructions are stale. The current blocker is **L15-001** from
+> `docs/audit/2026-05-25-full-codebase-review.md`: Challenge Round code exists,
+> but the runtime pipeline is not wired end to end.
 
-> Decision doc that resolves CRIT-1..4 and ROUTING-1..5 from
-> `docs/plans/2026-05-18-challenge-round-into-note.md`. Phase 1 (Tasks 8, 9, 11)
-> may not start until this doc is signed off and the named plan tasks have been
-> updated to cite the targets chosen here.
+## Current Reality
 
-**Status:** Decisions implemented (mostly). CRIT-1 (`mastery_challenge_verified_at` column on assessments) ✅. CRIT-2 (`needs_deepening_topics` extensions: source/concept/misconception/correction) ✅. CRIT-4 (`struggleStatusSchema` extracted in `packages/schemas/src/struggle-status.ts`) ✅. CRIT-3 (helper renames in `session-crud.ts`: `persistSessionMetadata` export) and ROUTING-1..5 (`llmRoutingRung` field, rung floor in `session-exchange.ts`) require code verification — not found as of 2026-05-23.
+### Keep
 
-Produced from a codebase-existence spike against `origin/main` at commit `3584e279d`.
+- `assessments.mastery_challenge_verified_at` remains the mastery-verification
+  persistence target. Do not create `topic_mastery_state` and do not store
+  mastery state in `learningSessions.metadata`.
+- `needs_deepening_topics` remains the durable target for partial /
+  misconception follow-up. Do not create `review_targets`.
+- `persistSessionMetadata(db, profileId, sessionId, partial)` is the canonical
+  session-metadata helper. It exists in `apps/api/src/services/session/session-crud.ts`.
+- Challenge Round LLM routing stays inside the commercial policy boundary.
+  Accepted / active / drafting turns may apply a routing-only rung-4 floor via
+  `llmRoutingRung`; Family standard remains Gemini-only and OpenAI remains rung
+  5+ only.
+- Notes are learner-reviewed before save. Server drafts may be shown, edited, or
+  skipped, but server must not auto-save a note without learner action.
 
-**Scope:** Storage targets, helper-name reconciliation, schema export
-placement, and Challenge Round LLM routing policy. No code changes ship with
-this doc.
+### Corrected Assumptions
 
----
+- `persistSessionMetadata` and `llmRoutingRung` are no longer missing. Do not
+  spend a PR on extracting them again.
+- `docs/project_context.md` currently describes Challenge Round as if runtime
+  wiring is live. Treat that section as optimistic until this plan lands.
+- The real missing path is: envelope fields -> parsed exchange -> context gate
+  -> state transition -> typed mobile affordance -> mastery/review/note/cooldown
+  persistence.
+- Product decision for the wiring PR: lower the Challenge Round absolute
+  budget floor to `MIN_CHALLENGE_REMAINING_TURNS = 3`. The trigger tests cover
+  both the under-floor rejection at 2 turns and eligibility at exactly 3 turns.
+- The old cooldown matrix (4h decline, 24h close, 1h global) is not represented
+  by the current schema. Keep the existing per-topic 24h decline cooldown for
+  the wiring PR; expand cooldown semantics in a separate migration-backed PR.
 
-## CRIT-1 — Mastery-verified persistence target
+### Runtime Blocker
 
-**Decision:** Add a `mastery_challenge_verified_at timestamp` column to the
-existing `assessments` table (`packages/database/src/schema/assessments.ts:65`),
-not to `retentionCards`, not to a new `topic_mastery_state` table, and not to
-`learningSessions.metadata`.
+`docs/audit/2026-05-25-full-codebase-review.md` records the blocker:
 
-**Why this beats the original (a)/(b)/(c) options:**
+- `decideMasteryAndReview()` has no production caller.
+- `validateEvaluationEventIds()` has no production caller.
+- `validateNoteDraft()` has no production caller.
+- `envelopeToParsedExchange()` drops `signals.challenge_round_offer`,
+  `signals.challenge_round_evaluation`, and `ui_hints.note_draft`.
+- `ExchangeContext.challengeEligible` and `ExchangeContext.challengeRound` are
+  declared but not populated in production.
+- `evaluateChallengeReadiness()` is not called from production.
+- `/v1/challenge-round/*` routes are referenced by mobile but are not registered.
 
-- The plan's (a) — adding to `retentionCards` — conflates spaced-repetition
-  state (`easeFactor`, `intervalDays`, `nextReviewAt`) with mastery-decision
-  state. SRS callers (`retention.ts`, `retention-data.ts`) read those rows on
-  every review cycle; widening the row with a non-SRS axis they have to ignore
-  is a foot-gun.
-- The plan's (b) — a net-new `topic_mastery_state` table — duplicates the
-  scoping pattern (`profile_id` + `topic_id`) that `assessments` already owns.
-  `assessments` already carries `masteryScore numeric(3,2)` per
-  `(profile_id, topic_id)`. Adding another mastery axis to the same row is the
-  natural extension.
-- The plan's (c) — JSON in `learningSessions.metadata` — cannot be indexed and
-  cannot answer "is this topic challenge-verified?" without scanning every
-  session row for that profile. Hard no.
+Net: the LLM can be prompted to emit Challenge Round signals, but the server
+currently ignores them.
 
-**Schema change (for Task 9 Step 1):**
+## Goal
 
-```sql
-ALTER TABLE assessments
-  ADD COLUMN mastery_challenge_verified_at timestamptz;
-```
+Make the existing Challenge Round design real at runtime for the standard
+LLM-offered path:
 
-No index required for v1: reads will join on `(profile_id, topic_id)` which is
-already covered by `assessments_profile_topic_idx`
-(`assessments.ts:85`). Revisit if a "challenge-verified topic count" surface
-needs to scan profile-wide.
+1. Server gates whether a round may be offered.
+2. Mobile can accept, decline, or dismiss a server-created offer.
+3. Accepted turns use the existing session exchange endpoint and voice/text
+   plumbing.
+4. Server consumes structured Challenge Round evaluation signals.
+5. Server persists mastery only when every evaluated concept is solid.
+6. Server persists partial/misconception follow-up rows before closing the round.
+7. Server validates any drafted note before showing it to the learner.
+8. Learner chooses Save, Edit & save, or Skip.
 
-**Scoping pattern:** Writes pass `profileId` explicitly through the
-`createScopedRepository(db, profileId).assessments.update(...)` path, matching
-how the rest of `assessments` writes already work.
+## Non-Goals For The First Wiring PR
 
-**Test coverage owed by Task 9:** integration test that a Challenge Round
-verdict sets the timestamp once, and that a subsequent partial/misconception
-outcome does NOT overwrite or clear it (the column is monotonic — challenge
-verification is sticky until an explicit unmark).
+- User-initiated "Challenge me" entry.
+- Public/manual `maybe-offer` entry, including wiring the existing "Too easy"
+  chip into Challenge Round creation.
+- Advisory re-verification surfacing.
+- Global cooldowns or the 4h/24h/1h cooldown matrix.
+- Guardian progress UI.
+- Provider-divergence dashboard.
 
----
+These are valid follow-ups, but they should not block proving the core runtime
+path. The first wiring PR should be big enough to be real and small enough to
+review.
 
-## CRIT-2 — Weak-spot persistence target (review of partial/misconception)
+## Rollout Gate
 
-**Decision:** Reuse the existing `needs_deepening_topics` table
-(`packages/database/src/schema/assessments.ts:137`) with two new columns and a
-source discriminator. Do NOT build a net-new `review_targets` table.
+The wiring PR may merge dark, but it must not become learner-visible until the
+read/surfacing hardening in Phase 5 is complete. Add a typed API config flag,
+`CHALLENGE_ROUND_RUNTIME_ENABLED`, defaulting to `false`. Prompt injection,
+state transitions from LLM offer signals, and typed `challengeOffer` SSE fields
+must all respect the flag. Mobile renders Challenge Round affordances only from
+those typed server fields, so a disabled API flag means no learner-visible offer.
+The flag may be flipped in Doppler only after the validation section passes.
 
-**Why this beats the original (a)/(b)/(c) options:**
+## Implementation Plan
 
-The plan was written without knowledge that `needs_deepening_topics` already
-exists. It is already:
+### Phase 0 - Lock The Contract
 
-- per-`(profile_id, subject_id, topic_id)` scoped,
-- enum-statused (`active` / `resolved` via `needsDeepeningStatusEnum`),
-- carrying `consecutive_success_count` for resolution accounting,
-- FK-cascaded on profile/subject/topic delete (matches CLAUDE.md's "cascade
-  cleanly" rule, and answers MED-2 for free).
+Update or add tests before wiring behavior:
 
-The plan's option (a) — extending `retentionCards` with a `source`
-discriminator — would again pollute SRS state. Option (b) — a net-new
-`review_targets` table — duplicates `needs_deepening_topics`. Option (c) —
-`learningSessions.metadata.gaps` (`packages/schemas/src/sessions.ts:170`) — is
-fine for in-session hints but is bounded to `.max(8)` per session and cannot be
-queried across sessions; it does not satisfy CRIT-8's durability requirement.
+- `packages/schemas/src/llm-envelope.test.ts`
+  - Assert `challenge_round_offer`, `challenge_round_evaluation`, and
+    `ui_hints.note_draft` parse and normalize.
+- `apps/api/src/services/exchanges.test.ts`
+  - Assert `envelopeToParsedExchange()` forwards:
+    - `challengeRoundOffer`
+    - `challengeRoundEvaluation`
+    - `noteDraft`
+  - Assert parse-fallback returns safe empty Challenge Round fields.
+- `apps/api/src/services/session/session-exchange.test.ts`
+  - Assert `prepareExchangeContext()` populates `challengeEligible` only when
+    `evaluateChallengeReadiness()` permits.
+  - Assert `CHALLENGE_ROUND_RUNTIME_ENABLED=false` suppresses
+    `challengeOfferPrompt` injection and ignores LLM offer signals.
+  - Assert active Challenge Round states still route with `llmRoutingRung = 4`
+    while preserving `escalationRung`.
 
-**Schema change (for Task 9 Step 1.5):**
-
-```sql
-ALTER TABLE needs_deepening_topics
-  ADD COLUMN source text NOT NULL DEFAULT 'system_signal',
-  ADD COLUMN concept text,
-  ADD COLUMN misconception text,
-  ADD COLUMN correction text;
-```
-
-- `source` discriminator values for v1: `'system_signal'` (existing rows — the
-  per-topic struggle-status signal that wrote to this table before Challenge
-  Round existed) and `'challenge_round'` (new). Future sources slot in without
-  another migration.
-- `concept`, `misconception`, `correction` are nullable because system-signal
-  rows do not carry that resolution. Challenge Round rows MUST populate all
-  three. Enforce in the service layer, not via a partial check constraint, to
-  keep the migration simple.
-- `consecutive_success_count` already exists and can drive eventual auto-resolve.
-
-**CRIT-8 satisfaction:** Challenge Round partial/misconception outcomes write a
-row here BEFORE the round closes. If the write fails, the round-close handler
-fails the request (no Sentry-only silent recovery). The "save correct work,
-forget weak spots" failure mode is mechanically prevented.
-
-**Cooldown FK semantics (MED-2):** the separate `challenge_round_cooldowns`
-table introduced in Task 2 cascades on `profile_id` delete; the
-`topic_id` FK uses `ON DELETE CASCADE` (consistent with neighbours). Document
-this in Task 2's migration, not here.
-
-**Test coverage owed by Task 9:** integration test that a mixed-outcome round
-(2 solid + 1 misconception) saves the solid quotes as a note (CRIT-1-adjacent)
-AND writes exactly one `needs_deepening_topics` row with `source =
-'challenge_round'`, populated `concept`/`misconception`/`correction`, and leaves
-`assessments.mastery_challenge_verified_at` unset.
-
----
-
-## CRIT-3 — Session CRUD helper names
-
-**Decision:** Replace every `getSessionById` reference in
-`docs/plans/2026-05-18-challenge-round-into-note.md` (Tasks 8, 9, 11) with
-`getSession`. Replace every `persistSessionMetadata` reference with a new
-exported helper `persistSessionMetadata(db, profileId, sessionId, partial)` that
-must be extracted from the file-local `updateSessionMetadata` currently at
-`apps/api/src/services/session/session-exchange.ts:310`.
-
-**What actually exists today:**
-
-| Plan name (does NOT exist)   | Real helper                                             | Location                          | Scoping                                                         |
-|------------------------------|---------------------------------------------------------|-----------------------------------|-----------------------------------------------------------------|
-| `getSessionById`             | `getSession(db, profileId, sessionId)`                  | `session-crud.ts:917`             | Uses `createScopedRepository(db, profileId)` — already scoped.  |
-| `persistSessionMetadata`     | file-local `updateSessionMetadata(db, profileId, ...)`  | `session-exchange.ts:310`         | Direct `db.update` with `eq(learningSessions.profileId, …)`.    |
-
-**Action for Task 8 / 9 / 11:**
-
-1. **`getSession`** is correctly scoped (`createScopedRepository` enforces
-   `profileId` at the repo boundary). No extraction needed. Plan references
-   to `getSessionById` are pure name drift — substitute and move on.
-2. **`persistSessionMetadata`** must be promoted from a file-private helper to
-   an exported `session-crud.ts` function so Task 8's challenge-round state
-   writes and Task 9's mastery/review writes call the same code path. The
-   shape:
-
-   ```ts
-   export async function persistSessionMetadata(
-     db: Database,
-     profileId: string,
-     sessionId: string,
-     partial: Partial<SessionMetadata>,
-   ): Promise<void> {
-     // merge with existing metadata first (read-modify-write under
-     // `(id, profileId)` predicate; the existing single-statement update
-     // currently overwrites — see Task 8.5 mid-round recovery).
-   }
-   ```
-3. **Break test (CLAUDE.md non-negotiable):** add
-   `session-crud.persistSessionMetadata.scoped.integration.test.ts` covering:
-   - Owner profile A can update session metadata for their session.
-   - Profile B passing A's `sessionId` updates zero rows (assert `result.rowCount === 0`).
-   - The merge does not clobber unrelated keys (read-modify-write, not full replace).
-
-   This is a v1 break test, not a follow-up. The whole Challenge Round state
-   machine is built on this helper; an IDOR here is a session takeover.
-
-**Why no Task 9.0 spin-off:** the work fits naturally inside Task 8 Step 0
-("session-crud surface extension"). Rename Task 8 Step 0 from "(nothing yet)"
-to "extract `persistSessionMetadata` to `session-crud.ts` with break test."
-
----
-
-## CRIT-4 — Schema export of `struggleStatusSchema`
-
-**Decision:** Extract to `packages/schemas/src/struggle-status.ts` mirroring
-`retention-status.ts`. Re-import from `progress.ts`. Re-export from the package
-barrel. Pre-decided by the original plan; recorded here for completeness.
-
-**Current state (verified via grep):**
-
-```
-packages/schemas/src/progress.ts:243
-  struggleStatus: z.enum(['normal', 'needs_deepening', 'blocked']),
-```
-
-The enum is inline inside `topicProgressSnapshotSchema`. It is not exported
-under any name and cannot be imported by the trigger evaluator
-(`evaluateChallengeReadiness`, Task 3).
-
-**Target shape (mirrors `retention-status.ts`):**
+Target shape in `ParsedExchangeEnvelope`:
 
 ```ts
-// packages/schemas/src/struggle-status.ts
-import { z } from 'zod';
-
-export const struggleStatusSchema = z.enum([
-  'normal',
-  'needs_deepening',
-  'blocked',
-]);
-export type StruggleStatus = z.infer<typeof struggleStatusSchema>;
+challengeRoundOffer: boolean;
+challengeRoundEvaluation: ChallengeRoundEvaluationItem[];
+noteDraft: {
+  content: string;
+  sourceConcepts: string[];
+  sourceAnswerEventIds: string[];
+} | null;
 ```
 
-Then in `progress.ts:243`:
+Use schema package types where they are exported. If a note-draft type is not
+exported, add one to `@eduagent/schemas` rather than redefining an API-facing
+shape locally.
+
+### Phase 1 - Parse And Gate Offers
+
+Files:
+
+- `apps/api/src/services/exchanges.ts`
+- `apps/api/src/services/session/session-exchange.ts`
+- `apps/api/src/services/exchange-prompts.ts`
+- `apps/api/src/services/challenge-round/trigger.ts`
+
+Work:
+
+1. Extend `ParsedExchangeEnvelope` and `EMPTY_PARSED_ENVELOPE`.
+2. Forward Challenge Round fields from `envelopeToParsedExchange()`.
+3. In `prepareExchangeContext()`, read `metadata.challengeRound` via
+   `challengeRoundSessionStateSchema`.
+4. Call `evaluateChallengeReadiness()` only for learning sessions with a
+   topic anchor. If any required input is unavailable, return not eligible with
+   an explicit reason rather than defaulting to eligible.
+5. Set `context.challengeEligible` and `context.challengeRound`.
+6. Keep `challengeOfferPrompt` injection gated by
+   `CHALLENGE_ROUND_RUNTIME_ENABLED` and then by the existing state predicate:
+   `cr?.state === 'offered' || (!cr && challengeEligible)`.
+7. Preserve the routing floor only for `accepted | active | drafting`.
+
+Acceptance:
+
+- An ineligible turn cannot produce an offer even if the LLM emits
+  `challenge_round_offer`.
+- A disabled `CHALLENGE_ROUND_RUNTIME_ENABLED` flag cannot produce an offer even
+  if the LLM emits `challenge_round_offer`.
+- An eligible turn may inject `challengeOfferPrompt` only when
+  `CHALLENGE_ROUND_RUNTIME_ENABLED` is true.
+- Offer turns route normally. Accepted / active / drafting turns use the
+  routing-only floor.
+
+### Phase 2 - Add Challenge Round Routes
+
+Files:
+
+- `apps/api/src/routes/challenge-round.ts` (new)
+- `apps/api/src/index.ts` route import and `.route('/', challengeRoundRoutes)`
+  chain, so `AppType` includes the endpoints
+- `apps/api/src/services/challenge-round/state.ts`
+- `apps/api/src/services/session/session-crud.ts`
+- `apps/api/src/services/challenge-round/*.test.ts`
+- `apps/api/src/routes/challenge-round.test.ts`
+
+Routes:
+
+```text
+POST /v1/challenge-round/accept
+POST /v1/challenge-round/decline
+POST /v1/challenge-round/abort
+```
+
+Rules:
+
+- Routes stay thin: validate body, resolve `profileId`, call services.
+- Verify the session belongs to `profileId` with `getSession()`.
+- Verify the topic belongs to the same session/profile before mutating state.
+- Persist state with `persistSessionMetadata()`.
+- Decline writes the existing per-topic cooldown row with `lastOutcome = 0`.
+- Abort updates session metadata only; do not mark mastery or write review rows.
+- Do not add `/v1/challenge-round/maybe-offer` in this PR. Offers are created
+  only inside the session-exchange pipeline after a gated LLM
+  `challenge_round_offer` signal. The prior mobile `maybeOffer()` helper has
+  been removed so learner-facing call sites cannot create offers directly.
+- Register routes in `AppType` so mobile can move off raw `fetch` in a later
+  cleanup. The first PR may keep raw mobile fetch if route typing becomes noisy,
+  but API registration must exist.
+
+Break tests:
+
+- Profile B cannot accept/decline/abort Profile A's round.
+- Decline writes cooldown only for the owner profile/topic.
+- Accept from a non-offered state returns a typed 409-style error, not a silent
+  metadata overwrite.
+- No mobile path can create an offer by calling a public `maybe-offer` route in
+  the first wiring PR.
+
+### Phase 3 - Wire Runtime State Transitions
+
+Files:
+
+- `apps/api/src/services/session/session-exchange.ts`
+- `apps/api/src/services/challenge-round/evaluation.ts`
+- `apps/api/src/services/challenge-round/note-draft.ts`
+- `apps/api/src/services/challenge-round/verification.ts`
+- `packages/database/src/schema/assessments.ts`
+- `apps/api/src/services/challenge-round/persistence.ts` (new, or equivalent
+  service-owned helpers)
+
+Work:
+
+1. When `CHALLENGE_ROUND_RUNTIME_ENABLED` is true,
+   `parsed.challengeRoundOffer === true`, and `context.challengeEligible` is
+   true, transition `undefined -> offered`, persist metadata, and include the
+   new state in the response metadata / stream done payload.
+2. When state is `accepted`, transition to `active` before asking the first
+   Challenge Round question.
+3. During `active`, validate every emitted `challenge_round_evaluation` item
+   with `validateEvaluationEventIds()` before storing it in session metadata.
+4. Append evaluations with `transitionChallengeState(..., { type:
+   'answer_complete', ... })`. Keep the hard cap from `caps.ts`; never trust
+   the LLM to terminate the round.
+5. When enough evaluations are collected, transition to `drafting`.
+6. In `drafting`, run `decideMasteryAndReview()`.
+7. If all concepts are solid:
+   - write Challenge Round mastery evidence via a dedicated service helper;
+   - do not write `needs_deepening_topics`;
+   - validate `ui_hints.note_draft` with `validateNoteDraft()` before surfacing.
+8. If any result is partial/missing/misconception:
+   - do not set mastery;
+   - write durable pending follow-up rows to `needs_deepening_topics` for
+     partial and misconception items;
+   - save only solid quotes as note-draft input;
+   - close the round even if the learner skips the note.
+9. Persist `challengeRoundVerdict` in `ai_response.metadata`:
 
 ```ts
-import { struggleStatusSchema } from './struggle-status';
-// ...
-struggleStatus: struggleStatusSchema,
+challengeRoundVerdict: {
+  solidCount: number;
+  partialCount: number;
+  missingCount: number;
+  misconceptionCount: number;
+};
 ```
 
-And add to `packages/schemas/src/index.ts` next to `retentionStatusSchema`.
+10. On note-draft guard rejection, return a typed fallback draft:
 
-**Action:** add this as **Task 3 Step 0** ("Extract `struggleStatusSchema`"),
-before existing Step 1. Tasks 8 and 9 also import the new schema once Task 3
-ships; they do not need their own extraction step.
-
----
-
-## Challenge Round LLM routing policy (0.0a — ROUTING-1..5)
-
-**Decision:** Challenge Round routing reuses the existing commercial policy
-boundary. No private model side channel. The only Challenge-Round-specific
-behaviour is an optional **routing-only rung floor of 4** applied during
-`accepted | active | drafting` states.
-
-**Confirmed routing facts (verified in code, `origin/main`):**
-
-| Fact                                                                                     | Citation                                                                |
-|------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `resolveExchangeLlmRouting()` is the commercial policy boundary.                         | `apps/api/src/services/session/session-exchange.ts:149`                 |
-| Family standard profiles get `providerPolicy: 'gemini_only'` — including fallback.       | `session-exchange.ts:182-188` + `router.ts:319-336, 430-461`            |
-| Plus and addon-premium profiles get `llmTier: 'premium'` only at rung ≥ 4.               | `session-exchange.ts:154-180`, with `ADVANCED_MODEL_MIN_RUNG = 4`       |
-| OpenAI advanced candidate is suppressed below rung 5 even on premium tier.               | `apps/api/src/services/llm/router.ts:277, 395` (`OPENAI_ADVANCED_MODEL_MIN_RUNG = 5`) |
-| Per-exchange `llmRoutingReason`, `llmProviderPolicy`, `llmProvider`, `llmModel` are persisted in `ai_response.metadata`. | `session-exchange.ts:288-301` (`ExchangeBehavioralMetrics`)             |
-
-These facts are load-bearing for what follows.
-
-### Policy for Challenge Round turns
-
-- **Offer turns** (the LLM is deciding whether to surface the offer card): use
-  **normal routing**. No floor. These are ordinary teach/check turns dressed up
-  with extra envelope schema.
-- **Accepted / active / drafting turns** (the LLM is evaluating learner
-  explanations or synthesising a note): apply a **routing-only minimum rung of
-  4**, fed through the existing resolver. Reason: per-answer concept evaluation
-  and faithful note synthesis are materially harder than ordinary turns —
-  Gemini-flash at rung 1 is not adequate, but the upgrade must respect the
-  user's plan (Family standard never crosses providers; addon-premium gates
-  OpenAI to rung ≥ 5).
-- **Floor mechanism:** add a separate `llmRoutingRung?: EscalationRung` field
-  to `ExchangeContext`. `prepareExchangeContext()` computes it AFTER the normal
-  escalation decision and BEFORE `resolveExchangeLlmRouting()`:
-
-  ```ts
-  const llmRoutingRung =
-    challengeState === 'accepted' || challengeState === 'active' || challengeState === 'drafting'
-      ? Math.max(escalationRung, 4) as EscalationRung
-      : escalationRung;
-  ```
-
-  `processExchange()` and `streamExchange()` then pass
-  `context.llmRoutingRung ?? context.escalationRung` to `routeAndCall()` /
-  `routeAndStream()`. `escalationRung` itself is unchanged — that field
-  continues to mean "pedagogy/analytics rung", and the existing escalation
-  decision does not get inflated by a Challenge Round being active.
-- **No direct provider/model selection.** Challenge Round code must never call
-  `routeAndCall(..., { preferredProvider: 'openai' })` or similar. The floor
-  is the only lever.
-- **Persistence proof.** Every Challenge Round turn writes `llmRoutingReason`,
-  `llmProviderPolicy`, `llmProvider`, `llmModel`, and the chosen `llmRoutingRung`
-  (new metric field) into `ai_response.metadata` so an auditor can confirm the
-  floor did not bypass the policy. The chosen `llmRoutingRung` field needs to
-  be added to `ExchangeBehavioralMetrics` (Task 8).
-
-### Quota gate (ROUTING-3)
-
-Replace the original plan's "5% remaining" readiness gate with an absolute
-remaining-turn budget. v1 sizing: require at least **3 remaining
-non-Challenge turns** in the per-period quota BEFORE offering — sized for a
-round of up to 3 evaluation turns plus the note-save turn. Document in Task 3
-trigger evaluator. The 5% threshold disproportionately blocks Plus/Family
-profiles whose monthly cap is high but whose daily cap is low.
-
-### Validation hook (ROUTING-5)
-
-Final Validation must run BOTH:
-
-```
-pnpm eval:llm --live           # envelope-shape + signal-distribution baseline
-pnpm test:llm:premium-routing  # commercial policy gate
+```ts
+draftedNote: {
+  id: string;
+  body: null;
+  sourceAnswerEventIds: string[];
+  fallbackPrompt: string;
+};
 ```
 
-`scripts/premium-routing-pass.ts` is the source of truth for the routing
-contract; if `pnpm test:llm:premium-routing` fails after Challenge Round
-ships, the floor mechanism violated the policy and the change must roll back
-before merge.
+Mastery persistence contract:
 
-### What this rules out
+- Do not update an arbitrary existing `assessments` row by broad
+  `(profileId, topicId)` criteria. The table is not unique by topic.
+- On `decision.markMasteryVerified === true`, insert a new owned assessment row
+  as the Challenge Round audit record:
 
-- Forcing OpenAI on any Challenge Round turn before rung 5.
-- Bypassing `gemini_only` for Family standard turns, even on "drafting" notes.
-- Logging Challenge Round routing as a "challenge_round" reason when the
-  underlying policy is "family_standard_gemini_only" — `routingReason` must
-  remain the policy-level reason; Challenge Round status lives in a separate
-  metric field.
+```ts
+await db.insert(assessments).values({
+  profileId,
+  subjectId: session.subjectId,
+  topicId,
+  sessionId,
+  verificationDepth: 'transfer',
+  status: 'passed',
+  masteryScore: 1,
+  qualityRating: 5,
+  exchangeHistory: [],
+  masteryChallengeVerifiedAt: now,
+});
+```
 
----
+- If no prior assessment exists, the insert above is still the correct path.
+- If multiple prior assessments exist for the same profile/topic, still insert
+  a fresh row; `progress.ts` already reads the latest
+  `masteryChallengeVerifiedAt`.
+- Verify topic ownership through the session/topic parent chain before insert.
 
-## Plan amendments required after this doc is signed off
+Weak-spot persistence contract:
 
-The following inline references in
-`docs/plans/2026-05-18-challenge-round-into-note.md` must be updated in the
-SAME PR that lands the first Challenge Round implementation task (Task 1 or
-Task 3 — whichever ships first). Doing them later means each downstream task
-needs to redo the lookup.
+- Challenge Round partial/misconception targets are first written as
+  `needs_deepening_topics.status = 'pending_review'`, not `active`.
+- Set `source = 'challenge_round'`, copy `concept`, `misconception`, and
+  `correction`, and set `pendingExpiresAt` to `now + 7 days`.
+- Before inserting, query existing owner-scoped rows for the same
+  `(profileId, subjectId, topicId, source, concept)` where status is
+  `active` or `pending_review`. Update the newest matching row instead of
+  inserting a duplicate; keep existing `active` rows active, and refresh
+  `pendingExpiresAt` only for existing/new `pending_review` rows. Otherwise
+  insert one row per review target.
+- A later corroborating signal promotes pending rows via
+  `promotePendingDeepening()`. Expired pending rows are deleted by the Inngest
+  expiry cron.
 
-- **Task 3 Step 0:** insert "Extract `struggleStatusSchema` to
-  `packages/schemas/src/struggle-status.ts` mirroring `retention-status.ts`,
-  re-import in `progress.ts:243`, add to package barrel." Existing Step 1
-  becomes Step 2.
-- **Task 8 Step 0:** insert "Extract `persistSessionMetadata` from
-  `session-exchange.ts:310` (file-local) to `session-crud.ts` as an exported
-  read-modify-write helper. Add IDOR break test."
-- **Task 8** (LLM routing wiring): add `llmRoutingRung?: EscalationRung` to
-  `ExchangeContext`; populate in `prepareExchangeContext()` per the rule
-  above; thread through `processExchange()` / `streamExchange()`. Add
-  `llmRoutingRung` to `ExchangeBehavioralMetrics`.
-- **Task 8 / 9 / 11:** s/`getSessionById`/`getSession`/g and
-  s/`persistSessionMetadata`/`persistSessionMetadata` (no rename — the new
-  export keeps that name)/g. Strip the implied `getSessionById` import path.
-- **Task 9 Step 1:** "Add `mastery_challenge_verified_at timestamptz` column
-  to `assessments` (not a new `topic_mastery_state` table, not `retentionCards`).
-  Cite `assessments.ts:65`." Update `## Rollback` block accordingly — drop
-  column on rollback; pre-launch, no real data.
-- **Task 9 Step 1.5:** "Extend `needs_deepening_topics` with `source` (default
-  `'system_signal'`, NOT NULL), `concept`, `misconception`, `correction`. Cite
-  `assessments.ts:137`. Do NOT build a net-new `review_targets` table." Update
-  `## Rollback` block to drop columns; existing rows back-fill default
-  `source = 'system_signal'`.
-- **Task 9 Step 4 (Inngest):** weak-spot persistence target is the extended
-  `needs_deepening_topics` table; the in-session `learningSessions.metadata.gaps`
-  array is NOT the durable target (it's the in-session hint surface only).
-- **Task 3 (trigger evaluator):** replace "5% quota remaining" with "at least
-  3 non-Challenge turns remaining in the active period budget" per ROUTING-3.
-- **Final Validation:** add `pnpm test:llm:premium-routing` next to
-  `pnpm eval:llm --live`.
+Acceptance:
 
----
+- The server is the only authority for mastery.
+- Empty evaluation is invalid and does not close as verified.
+- A disabled `CHALLENGE_ROUND_RUNTIME_ENABLED` flag never writes
+  `metadata.challengeRound`, mastery rows, cooldown rows, weak-spot rows, or
+  typed `challengeOffer` SSE fields.
+- A mixed result never marks mastery.
+- Weak-spot rows are written before the round closes.
+- Guard-rejected notes still give the learner a fallback close ritual.
+- Verified rounds insert a new Challenge Round assessment row even when no
+  prior assessment row exists.
+- Multiple prior assessments for a topic do not cause ambiguous updates.
+- Mixed rounds create or update pending-review rows without duplicating the same
+  concept.
 
-## Open follow-ups (not blocking)
+### Phase 4 - Extend SSE And Mobile UI
 
-1. **Auto-resolve for `needs_deepening_topics` rows of source `'challenge_round'`.**
-   The existing `consecutive_success_count` column already supports this. v1
-   ships without an auto-resolve cron; a follow-up plan can decide whether a
-   subsequent Challenge Round on the same topic that returns all-solid clears
-   the row, or whether the learner must explicitly mark it resolved.
-2. **`learning_modes` table rename.** The Phase 0 sunset (PR #325) left the
-   table holding only `medianResponseSeconds` and `celebrationLevel`. The name
-   is misleading post-sunset. Out of scope here; tracked separately.
-3. **`assessments_profile_topic_idx` width.** Once the
-   `mastery_challenge_verified_at` column is queried by "challenge-verified
-   topics in last 30 days" for any analytics surface, a partial index
-   (`WHERE mastery_challenge_verified_at IS NOT NULL`) may be worth adding.
-   Defer until that surface exists.
+Files:
 
----
+- `apps/mobile/src/lib/sse.ts`
+- `apps/mobile/src/hooks/use-sessions.ts`
+- `apps/mobile/src/components/session/use-session-streaming.ts`
+- `apps/mobile/src/hooks/use-challenge-round.ts`
+- `apps/mobile/src/components/session/ChallengeOfferCard.tsx`
+- `apps/mobile/src/components/session/ChallengeRoundBanner.tsx`
+- `apps/mobile/src/components/session/DraftedNoteReview.tsx`
+- `apps/mobile/src/app/(app)/session/index.tsx`
+- relevant i18n locale files
 
-_Sign-off received; this doc is now a historical decision record._
+SSE `done` payload should carry typed fields, never raw envelope JSON:
+
+```ts
+challengeRound?: ChallengeRoundSessionState;
+challengeOffer?: {
+  pitch: string;
+};
+draftedNote?: {
+  id: string;
+  body: string | null;
+  sourceAnswerEventIds: string[];
+  fallbackPrompt?: string;
+};
+```
+
+Work:
+
+1. Extend `StreamDoneEvent` and the `onDone` payload.
+2. Render `ChallengeOfferCard` when a typed offer arrives.
+3. Wire Accept / Decline / Don't ask again to `/challenge-round/*`.
+4. Render `ChallengeRoundBanner` for active rounds.
+5. Render `DraftedNoteReview` for typed `draftedNote`.
+6. Save edited notes through the existing notes API after learner action.
+7. Skip closes only the client-side review affordance; it must not undo mastery
+   or review-target persistence that already succeeded.
+8. Hide the "Too easy" chip while `challengeRound.state` is
+   `offered | accepted | active | drafting`.
+9. Preserve voice mode: Challenge Round exchanges still use the ordinary session
+   exchange endpoint and the existing inputMode/TTS path.
+10. Do not wire the "Too easy" chip to Challenge Round in this PR. While a round
+    is not in flight, "Too easy" keeps today's system-prompt fallback behavior.
+
+Mobile tests:
+
+- Offer card renders from typed done payload.
+- Accept/decline call the API with `sessionId`, `topicId`, and profile header.
+- "Too easy" does not call a Challenge Round `maybe-offer` endpoint.
+- Active banner renders question count.
+- Drafted note supports Save, Edit & save, and Skip.
+- Guard fallback (`body: null`) renders a write-your-own composer.
+- "Too easy" chip is hidden during an in-flight round.
+- Voice-mode session can continue a Challenge Round without a text-only branch.
+
+### Phase 5 - Required Enablement Gate
+
+Do after the core runtime path works and before flipping
+`CHALLENGE_ROUND_RUNTIME_ENABLED` to `true` in any learner-facing environment:
+
+- Integrate `resolveMasteryVerificationState()` into read/surfacing code so
+  raw `mastery_challenge_verified_at` is not treated as permanently active.
+- Use `needs_deepening_topics.status = 'pending_review'` for Challenge Round
+  weak spots. Add or verify:
+  - `promotePendingDeepening()`;
+  - an Inngest expiry cron;
+  - tests for corroborating signal promotion and expiry.
+- Add the no-clinical-copy ratchet before shipping new learner-visible strings.
+- Update `docs/project_context.md` only after the runtime behavior is true.
+
+## Validation
+
+Run these before calling the wiring complete:
+
+```bash
+pnpm exec nx run api:test
+pnpm exec nx run api:typecheck
+pnpm exec nx lint mobile
+cd apps/mobile && pnpm exec jest --findRelatedTests src/hooks/use-challenge-round.ts src/lib/sse.ts src/components/session/DraftedNoteReview.tsx --no-coverage
+```
+
+Because this touches LLM prompts / envelope behavior:
+
+```bash
+pnpm eval:llm
+pnpm eval:llm --live
+pnpm test:llm:premium-routing
+```
+
+This PR touches API routes, scoped ownership, assessments, cooldowns, and
+`needs_deepening_topics`, so integration tests are required:
+
+```bash
+pnpm exec nx test:integration api
+```
+
+Manual smoke after tests:
+
+1. Eligible learner gets an offer.
+2. Learner declines; no repeat offer inside cooldown.
+3. Learner accepts; three Challenge questions proceed through normal voice/text
+   exchange path.
+4. All-solid round marks mastery and shows note preview.
+5. Mixed round does not mark mastery and writes durable follow-up rows.
+6. Guard-rejected note shows fallback composer.
+
+## Follow-Ups
+
+- User-initiated "Challenge me" entry from topic/subject surfaces.
+- Advisory re-verification affordance.
+- Cooldown matrix expansion: 4h decline, 24h close, 1h global.
+- Guardian progress surface for Challenge Round activity.
+- Provider-divergence analytics dashboard.
+- Auto-resolve for confirmed `needs_deepening_topics` rows after later success.
+
+## Done Definition
+
+Challenge Round is not considered implemented until a real production exchange
+can move through offer -> accept -> active evaluation -> draft/close, with
+server-owned mastery/review persistence and typed mobile rendering. Schema,
+prompts, components, and tests alone do not count.

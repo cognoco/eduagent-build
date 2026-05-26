@@ -3,6 +3,7 @@ import { like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
+  challengeRoundCooldowns,
   createDatabase,
   curricula,
   curriculumBooks,
@@ -12,6 +13,7 @@ import {
   learningSessions,
   profiles,
   retentionCards,
+  sessionEvents,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -104,6 +106,7 @@ async function seedSession(
     topicId?: string | null;
     sessionType?: 'learning' | 'homework' | 'interleaved';
     metadata?: Record<string, unknown>;
+    exchangeCount?: number;
   },
 ): Promise<string> {
   const [session] = await db
@@ -116,7 +119,7 @@ async function seedSession(
       inputMode: 'text',
       status: 'active',
       escalationRung: 1,
-      exchangeCount: 0,
+      exchangeCount: input.exchangeCount ?? 0,
       metadata: input.metadata ?? {},
     })
     .returning({ id: learningSessions.id });
@@ -124,11 +127,60 @@ async function seedSession(
   return session!.id;
 }
 
+async function seedChallengeEligibleSession(db: Database): Promise<{
+  profileId: string;
+  subjectId: string;
+  topicId: string;
+  sessionId: string;
+}> {
+  const seeded = await seedProfileWithSubject(db, 'Challenge Biology');
+  const topicId = await seedTopic(db, {
+    subjectId: seeded.subjectId,
+    title: 'Cell Energy',
+  });
+  const sessionId = await seedSession(db, {
+    profileId: seeded.profileId,
+    subjectId: seeded.subjectId,
+    topicId,
+    exchangeCount: 7,
+  });
+
+  await db.insert(sessionEvents).values(
+    Array.from({ length: 4 }, (_, index) => ({
+      sessionId,
+      profileId: seeded.profileId,
+      subjectId: seeded.subjectId,
+      topicId,
+      eventType: 'ai_response' as const,
+      content: `solid answer ${index + 1}`,
+      metadata: { escalationRung: 1, correctAnswer: true },
+      createdAt: new Date(Date.UTC(2026, 4, 19, 12, index, 0)),
+    })),
+  );
+
+  return { ...seeded, topicId, sessionId };
+}
+
 async function prepare(db: Database, profileId: string, sessionId: string) {
   return prepareExchangeContext(db, profileId, sessionId, 'Can we continue?', {
     semanticMemoryRetrievalEnabled: false,
     memoryFactsReadEnabled: false,
     memoryFactsRelevanceEnabled: false,
+  });
+}
+
+async function prepareWithQuota(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+) {
+  return prepareExchangeContext(db, profileId, sessionId, 'Can we continue?', {
+    semanticMemoryRetrievalEnabled: false,
+    memoryFactsReadEnabled: false,
+    memoryFactsRelevanceEnabled: false,
+    subscriptionTier: 'free',
+    quotaRemainingTurns: 3,
+    quotaFractionRemaining: 0.3,
   });
 }
 
@@ -170,6 +222,37 @@ describeIfDb('prepareExchangeContext WI-80 ownership hardening', () => {
     expect(JSON.stringify(prep.context)).not.toContain(
       'Private cell-powerhouse notes',
     );
+  });
+
+  it('sets Challenge Round eligibility for a strong new-topic session with enough remaining quota', async () => {
+    const seeded = await seedChallengeEligibleSession(db);
+
+    const result = await prepareWithQuota(
+      db,
+      seeded.profileId,
+      seeded.sessionId,
+    );
+
+    expect(result.context.challengeEligible).toBe(true);
+  });
+
+  it('suppresses Challenge Round eligibility inside the decline cooldown window', async () => {
+    const seeded = await seedChallengeEligibleSession(db);
+    await db.insert(challengeRoundCooldowns).values({
+      profileId: seeded.profileId,
+      topicId: seeded.topicId,
+      lastOutcome: 0,
+      lastOfferedAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await prepareWithQuota(
+      db,
+      seeded.profileId,
+      seeded.sessionId,
+    );
+
+    expect(result.context.challengeEligible).toBe(false);
   });
 
   it('[WI-80] filters interleaved metadata topics through profile ownership before prompt hydration', async () => {
