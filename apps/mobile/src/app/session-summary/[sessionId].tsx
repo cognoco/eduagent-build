@@ -58,6 +58,16 @@ import {
 import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
 import { MentorMemoryCue } from '../../components/session-summary/MentorMemoryCue';
 import { SessionSummaryLibraryFilingControls } from '../../components/session-summary/SessionSummaryLibraryFilingControls';
+import {
+  buildMilestoneLabels,
+  buildSessionTakeaways,
+  deriveSessionSummaryCopy,
+  deriveSessionSummaryMode,
+  deriveSessionSummaryVisibility,
+  parseFastCelebrationsParam,
+  parseMilestonesParam,
+  resolveNumberParam,
+} from './_view-models/session-summary-derived';
 
 export default function SessionSummaryScreen() {
   const {
@@ -168,16 +178,10 @@ export default function SessionSummaryScreen() {
   // of the empty "Your Words" prompt. The local `submitted` state only covers
   // the just-submitted case in the same render; persisted state comes from
   // GET /sessions/:sessionId/summary.
-  // [BUG-801] Use Number.isFinite + ?? rather than `||` to preserve an
-  // explicit 0 from the URL param. parseInt(...,'') returned NaN which
-  // chained into `||` and silently fell back to the server count, but a
-  // legitimate 0-exchange session was indistinguishable from missing data.
-  const trimmedExchangeCount = (exchangeCount ?? '').trim();
-  const parsedExchangeCount =
-    trimmedExchangeCount === '' ? NaN : Number(trimmedExchangeCount);
-  const exchangeCountForRecap = Number.isFinite(parsedExchangeCount)
-    ? parsedExchangeCount
-    : (liveTranscript?.session.exchangeCount ?? 0);
+  const exchangeCountForRecap = resolveNumberParam(
+    exchangeCount,
+    liveTranscript?.session.exchangeCount ?? 0,
+  );
   const persistedSummary = useSessionSummary(sessionId ?? '', {
     refetchInterval: (data) => {
       if (recapTimedOut || exchangeCountForRecap < 3) {
@@ -282,29 +286,18 @@ export default function SessionSummaryScreen() {
     ? aiFeedback
     : (persisted?.aiFeedback ?? null);
   const transcriptSessionType = liveTranscript?.session.sessionType;
-  const sessionType: 'learning' | 'freeform' | 'homework' =
-    sessionTypeParam === 'homework' || transcriptSessionType === 'homework'
-      ? 'homework'
-      : sessionTypeParam === 'freeform'
-        ? 'freeform'
-        : 'learning';
+  const sessionType = deriveSessionSummaryMode({
+    sessionTypeParam,
+    transcriptSessionType,
+    effectiveSessionMode: getSessionEffectiveMode(session.data ?? {}),
+  });
   const conversationLanguage = activeProfile?.conversationLanguage ?? 'en';
   const summaryPrompts = getReflectionStarters(
     sessionType,
     conversationLanguage,
   );
-  const recapHeader =
-    sessionType === 'homework'
-      ? 'What you practiced'
-      : sessionType === 'freeform'
-        ? 'What you asked about'
-        : 'What you explored';
-  const reflectionPlaceholder =
-    sessionType === 'homework'
-      ? 'What I practiced...'
-      : sessionType === 'freeform'
-        ? 'What I found out...'
-        : 'In my own words...';
+  const { recapHeader, reflectionPlaceholder } =
+    deriveSessionSummaryCopy(sessionType);
   const baseXp = (submitted ? submittedXp?.baseXp : persisted?.baseXp) ?? null;
   const reflectionBonusXp =
     (submitted
@@ -313,17 +306,10 @@ export default function SessionSummaryScreen() {
   const hasXpIncentive = baseXp != null && baseXp > 0;
 
   const isHomeworkSession = sessionType === 'homework';
-  const isFreeformSession =
-    sessionType === 'freeform' ||
-    getSessionEffectiveMode(session.data ?? {}) === 'freeform';
+  const isFreeformSession = sessionType === 'freeform';
 
   const fallbackSession = liveTranscript?.session;
-  // [BUG-801] Same parseInt-||-fallback anti-pattern as exchangeCountForRecap
-  // above. An explicit "0" param must be honored, not silently overridden by
-  // the server count. Reuses the trimmed/parsed result from line 124-126.
-  const exchanges = Number.isFinite(parsedExchangeCount)
-    ? parsedExchangeCount
-    : (fallbackSession?.exchangeCount ?? 0);
+  const exchanges = exchangeCountForRecap;
   const rung = parseInt(escalationRung ?? '1', 10) || 1;
   // [BUG-801] Same fix for wallClockSeconds: parseInt('0') yields 0 which is
   // truthy-falsy in `||`. Use Number.isFinite to preserve a legitimate 0.
@@ -338,43 +324,25 @@ export default function SessionSummaryScreen() {
         : (fallbackSession?.wallClockSeconds ?? 0)) / 60,
     ),
   );
-  const parsedMilestones = (() => {
-    if (!milestones) {
-      return fallbackSession?.milestonesReached ?? [];
-    }
-
-    try {
-      // [BUG-821 / F-MOB-23] Type-guard parsed values are strings before
-      // render so a malformed param can't crash the celebration list.
-      const raw = JSON.parse(decodeURIComponent(milestones)) as unknown;
-      if (!Array.isArray(raw)) {
-        Sentry.captureMessage(
-          'session-summary milestone param parsed to non-array',
-          { level: 'warning', extra: { milestonesParam: milestones } },
-        );
-        return fallbackSession?.milestonesReached ?? [];
-      }
-      return raw.filter((v): v is string => typeof v === 'string');
-    } catch (err) {
+  const parsedMilestones = parseMilestonesParam({
+    milestonesParam: milestones,
+    fallbackMilestones: fallbackSession?.milestonesReached ?? [],
+    reportNonArray: (milestonesParam) => {
+      Sentry.captureMessage(
+        'session-summary milestone param parsed to non-array',
+        { level: 'warning', extra: { milestonesParam } },
+      );
+    },
+    reportParseError: (err, milestonesParam) => {
       // [BUG-821 / F-MOB-23] Surface parse failures to telemetry — silent
       // fallback was hiding both URL-corruption and prod regressions.
       Sentry.captureException(err, {
         tags: { surface: 'session-summary', field: 'milestones' },
-        extra: { milestonesParam: milestones },
+        extra: { milestonesParam },
       });
-      return fallbackSession?.milestonesReached ?? [];
-    }
-  })();
-  const parsedFastCelebrations = (() => {
-    try {
-      return JSON.parse(decodeURIComponent(fastCelebrations ?? '[]')) as Array<{
-        reason?: string;
-        detail?: string | null;
-      }>;
-    } catch {
-      return [] as Array<{ reason?: string; detail?: string | null }>;
-    }
-  })();
+    },
+  });
+  const parsedFastCelebrations = parseFastCelebrationsParam(fastCelebrations);
   const isRecallSummary =
     liveTranscript?.session.verificationType === 'evaluate' ||
     liveTranscript?.session.verificationType === 'teach_back';
@@ -783,73 +751,41 @@ export default function SessionSummaryScreen() {
     (fallbackSession?.wallClockSeconds != null &&
       fallbackSession.wallClockSeconds > 0);
 
-  const takeaways: string[] = [];
-  if (hasResolvedDuration) {
-    takeaways.push(
-      `${wallClockMinutes} minute${
-        wallClockMinutes === 1 ? '' : 's'
-      } - great session!`,
-    );
-  }
-  if (exchanges > 0) {
-    takeaways.push(
-      `You worked through ${exchanges} exchange${exchanges === 1 ? '' : 's'}`,
-    );
-  }
-  if (rung >= 3) {
-    takeaways.push('You tackled some challenging concepts with guidance');
-  } else if (exchanges > 0) {
-    takeaways.push('You showed strong independent thinking');
-  }
-  if (takeaways.length === 0) {
-    takeaways.push('Great effort today');
-  }
-
-  const milestoneLabels = parsedMilestones.map((milestone) => {
-    switch (milestone) {
-      case 'polar_star':
-        return 'Polar Star - first independent answer';
-      case 'deep_diver':
-        return 'Deep Diver - great thoughtful responses';
-      case 'comet':
-        return 'Comet - you had a breakthrough!';
-      case 'orions_belt':
-        return "Orion's Belt - 5 in a row without help!";
-      case 'persistent':
-        return 'Persistent - you kept going';
-      case 'twin_stars':
-        return 'Twin Stars - three strong answers in a row';
-      default:
-        return milestone;
-    }
+  const takeaways = buildSessionTakeaways({
+    hasResolvedDuration,
+    wallClockMinutes,
+    exchanges,
+    rung,
   });
+  const milestoneLabels = buildMilestoneLabels(parsedMilestones);
   const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId ?? null;
-  // boundary-enforced: facade returns 0 on cold cache, so hasMentorMemorySignal
-  // is false (0 >= 2 is false) while loading — same behaviour as the original
-  // `completedSessionCount !== undefined && completedSessionCount >= 2` guard.
-  const hasMentorMemorySignal = totalSessionCount >= 2;
-  const hasParentProxyMemoryAccess =
-    !isProxyMode ||
-    (childProfile?.consentStatus === 'CONSENTED' && !!childProfile.id);
-  const shouldShowMentorMemoryCue =
-    hasMentorMemorySignal && hasParentProxyMemoryAccess;
-  const shouldShowBookmarkPrompt =
-    exchanges >= 5 &&
-    (sessionBookmarks.data?.length ?? 0) === 0 &&
-    totalSessionCount <= 3;
 
   // Feature 1: "You mastered these" row
   const resolvedTopics: string[] =
     learnerProfile.data?.recentlyResolvedTopics ?? [];
-  const shouldShowMasteredRow = resolvedTopics.length > 0 && !isProxyMode;
 
   // Feature 2: "Try this next" topic suggestions rail
   const suggestionItems = (topicSuggestions.data ?? []).slice(0, 3);
-  const shouldShowSuggestionsRail = suggestionItems.length > 0;
 
   // Feature 3: Purged-transcript badge
   const transcriptPurgedAt = persisted?.purgedAt ?? null;
-  const isTranscriptPurged = !!transcriptPurgedAt;
+  const {
+    shouldShowMentorMemoryCue,
+    shouldShowBookmarkPrompt,
+    shouldShowMasteredRow,
+    shouldShowSuggestionsRail,
+    isTranscriptPurged,
+  } = deriveSessionSummaryVisibility({
+    exchanges,
+    bookmarkCount: sessionBookmarks.data?.length ?? 0,
+    totalSessionCount,
+    isProxyMode,
+    childConsentStatus: childProfile?.consentStatus,
+    childId: childProfile?.id,
+    resolvedTopicCount: resolvedTopics.length,
+    suggestionCount: suggestionItems.length,
+    transcriptPurgedAt,
+  });
 
   return (
     <KeyboardAvoidingView

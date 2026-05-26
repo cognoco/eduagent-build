@@ -609,7 +609,8 @@
     },
     "expired": {
       "title": "セッションが終了しました",
-      "message": "このセッションは終了しました。学習を続けるには、新しいセッションを開始してください。"
+      "message": "このセッションは終了しました。学習を続けるには、新しいセッションを開始してください。",
+      "startNewSession": "新しいセッションを開始"
     },
     "notePrompt": {
       "writeNote": "メモを書く",
@@ -2153,6 +2154,14 @@
         "completed": "完了",
         "verified": "検証済み",
         "stable": "安定"
+      },
+      "understandingLevels": {
+        "justStarting": "始めたばかり",
+        "gettingFamiliar": "慣れてきている",
+        "findingTheirFeet": "足場を固めている",
+        "gettingComfortable": "自信がついてきた",
+        "nearlyMastered": "ほぼ習得",
+        "mastered": "習得済み"
       }
     },
     "weeklyReport": {
@@ -2936,5 +2945,8 @@
       "title": "変更を加えるにはご自身のプロフィールに切り替えてください",
       "switchProfileCta": "プロフィールを切り替える"
     }
+  },
+  "profiles": {
+    "title": "プロフィール"
   }
 }

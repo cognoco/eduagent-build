@@ -258,15 +258,19 @@ export default function ProfilesScreen() {
       testID="profiles-screen"
     >
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
-        <Text className="text-h1 font-bold text-text-primary">Profiles</Text>
+        <Text className="text-h1 font-bold text-text-primary">
+          {t('profiles.title')}
+        </Text>
         <Pressable
           onPress={handleClose}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Done"
+          accessibilityLabel={t('common.done')}
           testID="profiles-close"
         >
-          <Text className="text-body text-primary font-semibold">Done</Text>
+          <Text className="text-body text-primary font-semibold">
+            {t('common.done')}
+          </Text>
         </Pressable>
       </View>
 
@@ -420,9 +424,11 @@ export default function ProfilesScreen() {
                   className="px-4 py-2"
                   testID="rename-cancel"
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel"
+                  accessibilityLabel={t('common.cancel')}
                 >
-                  <Text className="text-body text-text-secondary">Cancel</Text>
+                  <Text className="text-body text-text-secondary">
+                    {t('common.cancel')}
+                  </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleSaveRename}

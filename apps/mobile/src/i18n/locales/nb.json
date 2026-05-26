@@ -609,7 +609,8 @@
     },
     "expired": {
       "title": "Økten er avsluttet",
-      "message": "Denne økten er avsluttet. Start en ny for å fortsette å lære."
+      "message": "Denne økten er avsluttet. Start en ny for å fortsette å lære.",
+      "startNewSession": "Start ny økt"
     },
     "notePrompt": {
       "writeNote": "Skriv et notat",
@@ -2153,6 +2154,14 @@
         "completed": "Fullført",
         "verified": "Verifisert",
         "stable": "Stabil"
+      },
+      "understandingLevels": {
+        "justStarting": "Akkurat begynt",
+        "gettingFamiliar": "Blir kjent",
+        "findingTheirFeet": "Finner seg til rette",
+        "gettingComfortable": "Blir tryggere",
+        "nearlyMastered": "Nesten mestret",
+        "mastered": "Mestret"
       }
     },
     "weeklyReport": {
@@ -2936,5 +2945,8 @@
       "title": "Bytt til din egen profil for å gjøre endringer",
       "switchProfileCta": "Bytt profil"
     }
+  },
+  "profiles": {
+    "title": "Profiler"
   }
 }

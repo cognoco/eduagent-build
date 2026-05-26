@@ -80,7 +80,7 @@ describe('TopicDetailScreen', () => {
 
     screen.getByTestId('topic-understanding-card');
     screen.getByText('parentView.topic.understanding');
-    screen.getByText('Getting comfortable');
+    screen.getByText('parentView.topic.understandingLevels.gettingComfortable');
     screen.getByText('parentView.topic.reviewStatus');
     screen.getByText('A few things to refresh');
     screen.getByTestId('mock-add-to-my-learning');

@@ -609,7 +609,8 @@
     },
     "expired": {
       "title": "Sitzung beendet",
-      "message": "Diese Sitzung ist beendet. Starte eine neue, um weiterzulernen."
+      "message": "Diese Sitzung ist beendet. Starte eine neue, um weiterzulernen.",
+      "startNewSession": "Neue Sitzung starten"
     },
     "notePrompt": {
       "writeNote": "Notiz schreiben",
@@ -2153,6 +2154,14 @@
         "completed": "Abgeschlossen",
         "verified": "Verifiziert",
         "stable": "Stabil"
+      },
+      "understandingLevels": {
+        "justStarting": "Gerade angefangen",
+        "gettingFamiliar": "Macht sich vertraut",
+        "findingTheirFeet": "Findet sich zurecht",
+        "gettingComfortable": "Wird sicherer",
+        "nearlyMastered": "Fast gemeistert",
+        "mastered": "Gemeistert"
       }
     },
     "weeklyReport": {
@@ -2936,5 +2945,8 @@
       "title": "Wechsle zu deinem Profil, um Änderungen vorzunehmen",
       "switchProfileCta": "Profil wechseln"
     }
+  },
+  "profiles": {
+    "title": "Profile"
   }
 }

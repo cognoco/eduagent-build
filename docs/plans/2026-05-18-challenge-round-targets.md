@@ -1,10 +1,91 @@
 # Challenge Round Runtime Wiring Plan
 
-> **Status (2026-05-25):** supersedes the original 2026-05-18 target-decision
-> memo. The old doc correctly chose several storage and routing targets, but its
-> resume instructions are stale. The current blocker is **L15-001** from
-> `docs/audit/2026-05-25-full-codebase-review.md`: Challenge Round code exists,
-> but the runtime pipeline is not wired end to end.
+> **Status (2026-05-26):** PR #458 (merged from branch `tier-rework`, despite
+> the misleading name) landed **Phase 0 + Phase 1 + Phase 2 only**. The plan's
+> stated blocker — "LLM can be prompted, but the server ignores the signals" —
+> is still substantially true for the in-session signals
+> (`challenge_round_offer`, `challenge_round_evaluation`, `ui_hints.note_draft`).
+> Phases 3-5 are split below into two follow-up PRs (A + B). The original
+> 2026-05-25 status note kept for audit context:
+>
+> > Supersedes the original 2026-05-18 target-decision memo. The old doc
+> > correctly chose several storage and routing targets, but its resume
+> > instructions are stale. The current blocker is **L15-001** from
+> > `docs/audit/2026-05-25-full-codebase-review.md`: Challenge Round code
+> > exists, but the runtime pipeline is not wired end to end.
+
+## Current State (verified 2026-05-26 against `origin/main`)
+
+| Plan item | Status | Evidence |
+|---|---|---|
+| Envelope parsing of offer/evaluation/noteDraft | ✅ landed | `services/exchanges.ts:1689-1691`, `EMPTY_PARSED_ENVELOPE:1498-1500` |
+| `prepareExchangeContext()` sets `challengeEligible` + `challengeRound` | ✅ landed | `session-exchange.ts:1824-1825`, schema read at `:1436-1439` |
+| `challengeOfferPrompt` injection (state-gated) | ✅ landed | `exchange-prompts.ts:1186-1195` |
+| Routing-only rung-4 floor for `accepted\|active\|drafting` | ✅ landed | `session-exchange.ts:246-251` |
+| `/v1/challenge-round/{accept,decline,abort}` routes | ✅ landed | `routes/challenge-round.ts:22-64`, registered at `index.ts:90, 290` |
+| `transitionChallengeState` for manual events (accept/decline/abort) | ✅ called | `services/challenge-round/route-actions.ts:71` |
+| `promotePendingDeepening` + Inngest expiry cron | ✅ landed | `services/needs-deepening/promotion.ts`, `inngest/functions/needs-deepening-expire-pending.ts` |
+| `CHALLENGE_ROUND_RUNTIME_ENABLED` flag | ❌ **missing** | zero matches across `apps/` |
+| `decideMasteryAndReview()` | ❌ only called in `evaluation.test.ts` |
+| `validateEvaluationEventIds()` | ❌ only called in `evaluation.test.ts` |
+| `validateNoteDraft()` | ❌ only called in `note-draft.test.ts` |
+| `transitionChallengeState` for in-session `answer_complete` / `draft_ready` / `complete` | ❌ never called from `session-exchange.ts` |
+| Consumption of `parsed.challengeRoundOffer` / `Evaluation` / `noteDraft` after the envelope is parsed | ❌ persisted to `ai_response.metadata` via `behavioral` only; no transition triggered |
+| Mastery-row insert on all-solid | ❌ no production caller |
+| `needs_deepening_topics.status='pending_review'` writes from CR drafting | ❌ no production caller |
+| `challengeRoundVerdict` in `ai_response.metadata` | ❌ not constructed |
+| SSE `StreamDoneEvent` typed CR fields | ❌ `lib/sse.ts` has zero matches for `challengeRound` / `challengeOffer` / `draftedNote` |
+| Mobile components (`ChallengeOfferCard`, `ChallengeRoundBanner`, `DraftedNoteReview`, `use-challenge-round`) | ❌ files exist, but no screen imports them — `session/index.tsx` has zero references |
+| `resolveMasteryVerificationState()` (read-side gating) | ❌ does not exist anywhere in `apps/` |
+
+**Net:** Phases 0, 1 (minus the runtime flag), and 2 shipped. Phases 3, 4, and
+5 are open. The "Done Definition" at the bottom of this plan is not yet met —
+a real production exchange cannot move offer → accept → active → draft/close,
+because no in-session LLM signal triggers a state transition.
+
+## Follow-up PR Sequencing
+
+The remaining work splits into two PRs. Both land with
+`CHALLENGE_ROUND_RUNTIME_ENABLED=false`. The flag is the cutover point — PR A
+makes the runtime real; PR B hardens the read side so flipping the flag is
+safe.
+
+| PR | Scope | Phases | Risk | Coordination |
+|---|---|---|---|---|
+| **A — `challenge-round-runtime-wiring`** | Runtime flag, in-session state machine, mastery + weak-spot persistence, SSE typed fields, mobile rendering, break tests | Phase 1 (flag only) + Phase 3 + Phase 4 | High (server hot path + new mobile UI) | Touches `apps/mobile/src/app/(app)/session/index.tsx`, which is also the target of `docs/plans/2026-05-14-telemetry-sweep-and-route-shrink.md` Phase B2 — see Coordination note below |
+| **B — `challenge-round-rollout-readiness`** | `resolveMasteryVerificationState` at every read site, no-clinical-copy ratchet, `promotePendingDeepening` callsite verification, expiry-cron registration check, `project_context.md` update, then Doppler flag flip | Phase 5 | Medium (read-side surfacing across progress/recap/topic screens) | No overlap with telemetry plan |
+
+### Coordination with telemetry-sweep-and-route-shrink Phase B2
+
+PR A adds rendering and state plumbing to `apps/mobile/src/app/(app)/session/index.tsx`;
+the telemetry plan's Phase B2 is mechanically shrinking that same file from
+1,309 → 900 LOC. Real but tractable overlap. Lanes:
+
+- If telemetry Phase B2 ships first: PR A imports CR components into the
+  already-extracted, smaller `session/index.tsx`. Cleanest.
+- If PR A ships first: telemetry Phase B2 Step 3 (header/chrome extraction)
+  must absorb the new CR JSX when it moves out. Adds a small task to whoever
+  executes B2.
+- If they run in parallel: PR A confines its `session/index.tsx` edits to the
+  render tree only and does **not** touch the constants the telemetry plan
+  intends to extract — `endSessionButton`, `headerRight`, `subtitle`,
+  `classifyErrorChip`, `topicHeaderStrip`, `skipWarmupChip`, `headerBelow`.
+  Merge conflicts resolved manually.
+
+PR A also edits `apps/mobile/src/components/session/use-session-streaming.ts`
+to pass through new typed SSE done fields. The telemetry plan (line 253)
+explicitly says **not** to extract `useSessionStreaming`; PR A's edits are
+additive to the existing file and do not extract anything, so the two efforts
+are compatible inside that file.
+
+The rest of PR A (API server work + `lib/sse.ts` + `hooks/use-challenge-round.ts`)
+is outside the telemetry plan's scope and has zero overlap.
+
+---
+
+_The remainder of this document is the original implementation guidance from
+2026-05-25 and is still the authoritative how-to for each phase._
+
 
 ## Current Reality
 

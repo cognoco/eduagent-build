@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
-import { firstParam } from '../../../lib/route-params';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import {
   useRouter,
@@ -22,9 +21,7 @@ import {
   animateResponse,
   getModeConfig,
   getOpeningMessage,
-  SessionTimer,
   FluencyDrillStrip,
-  MilestoneDots,
   type ChatMessage,
 } from '../../../components/session';
 import type { FluencyDrillEvent } from '../../../lib/sse';
@@ -70,7 +67,6 @@ import { useCreateNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
 import * as SecureStore from '../../../lib/secure-storage';
-import { parseHomeworkProblems } from '../../../components/homework/problem-cards';
 import {
   getInputModeKey,
   getConversationStage,
@@ -93,17 +89,25 @@ import {
   TopicSwitcherModal,
 } from '../../../components/session/SessionModals';
 import { SessionFooter } from '../../../components/session/SessionFooter';
-import { SessionTopicHeader } from '../../../components/session/SessionTopicHeader';
-import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
 import { useTranslation } from 'react-i18next';
 import { track } from '../../../lib/analytics';
 import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
 import { ConfirmationToast } from './_components/ConfirmationToast';
+import { SessionScreenChrome } from './_components/SessionScreenChrome';
 import { useImageBase64 } from './_hooks/use-image-base64';
 import { useBookmarkHandler } from './_hooks/use-bookmark-handler';
 import { useSessionRecovery } from './_hooks/use-session-recovery';
+import { useSessionTranscriptHydration } from './_hooks/use-session-transcript-hydration';
 import { renderSessionMessageActions } from './_components/MessageActionsRenderer';
+import {
+  countLearnerMessages,
+  countPersistedAiResponses,
+  deriveSessionSubjectState,
+  getLatestAiMessageId,
+  getLearnerTurnCount,
+} from './_view-models/session-derived-state';
+import { getSessionRouteParams } from './_view-models/session-route-params';
 
 export default function SessionScreen() {
   return (
@@ -155,25 +159,6 @@ function SessionScreenInner() {
     imageUri?: string;
     imageMimeType?: string;
   }>();
-  // [BUG-635] Coerce Expo Router's `string | string[]` to a single string.
-  const imageUri = firstParam(rawImageUri);
-  const imageMimeType = firstParam(rawImageMimeType);
-  const returnTo = firstParam(rawReturnTo);
-  const returnId = firstParam(rawReturnId);
-  const gaps = useMemo(() => {
-    const raw = firstParam(rawGaps);
-    if (!raw) return undefined;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return undefined;
-      return parsed
-        .map((gap) => String(gap).trim())
-        .filter((gap) => gap.length > 0)
-        .slice(0, 8);
-    } catch {
-      return undefined;
-    }
-  }, [rawGaps]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
@@ -181,15 +166,48 @@ function SessionScreenInner() {
   const colors = useThemeColors();
   const { t } = useTranslation();
 
-  const effectiveMode = mode ?? 'freeform';
-  const homeBackHref = homeHrefForReturnTo(returnTo, returnId);
-  const chatBackFallback = returnTo
-    ? typeof homeBackHref === 'string'
-      ? homeBackHref
-      : undefined
-    : subjectId
-      ? `/(app)/shelf/${subjectId}`
-      : undefined;
+  const {
+    effectiveMode,
+    imageUri,
+    imageMimeType,
+    returnTo,
+    returnId,
+    gaps,
+    normalizedOcrText,
+    homeworkCaptureSource,
+    initialHomeworkProblems,
+    initialProblemText,
+    homeBackHref,
+    chatBackFallback,
+  } = useMemo(
+    () =>
+      getSessionRouteParams({
+        mode,
+        subjectId,
+        problemText,
+        homeworkProblems,
+        ocrText,
+        captureSource,
+        gaps: rawGaps,
+        returnTo: rawReturnTo,
+        returnId: rawReturnId,
+        imageUri: rawImageUri,
+        imageMimeType: rawImageMimeType,
+      }),
+    [
+      captureSource,
+      homeworkProblems,
+      mode,
+      ocrText,
+      problemText,
+      rawGaps,
+      rawImageMimeType,
+      rawImageUri,
+      rawReturnId,
+      rawReturnTo,
+      subjectId,
+    ],
+  );
   // [BUG-867] String-templated dynamic paths (`/(app)/shelf/${subjectId}`)
   // don't always resolve on web — the chevron looked clickable but the URL
   // never changed. Supplying an explicit handler that uses Expo Router's
@@ -239,24 +257,6 @@ function SessionScreenInner() {
     topicId,
     topicName,
   ]);
-  const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
-  const normalizedCaptureSource = Array.isArray(captureSource)
-    ? captureSource[0]
-    : captureSource;
-  const homeworkCaptureSource: HomeworkCaptureSource | undefined =
-    normalizedCaptureSource === 'camera' ||
-    normalizedCaptureSource === 'gallery'
-      ? normalizedCaptureSource
-      : undefined;
-  const initialHomeworkProblems = useMemo(
-    () =>
-      effectiveMode === 'homework'
-        ? parseHomeworkProblems(homeworkProblems, problemText)
-        : [],
-    [effectiveMode, homeworkProblems, problemText],
-  );
-  const initialProblemText =
-    initialHomeworkProblems[0]?.text ?? problemText ?? undefined;
   const modeConfig = getModeConfig(effectiveMode);
   const { data: streak } = useStreaks();
   const totalTopicsCompleted = useTotalTopicsCompleted();
@@ -559,18 +559,21 @@ function SessionScreenInner() {
 
   // '' is intentional: all consumers gate on truthiness or convert via `|| undefined`
   // before use as a route param or API argument (see ensureSession, writeSessionRecoveryMarker).
-  const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
-  const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
-  const noteSubjectId =
-    effectiveSubjectId ||
-    liveTranscript?.session.subjectId ||
-    activeSession.data?.subjectId ||
-    undefined;
-  const noteTopicId =
-    topicId ??
-    liveTranscript?.session.topicId ??
-    activeSession.data?.topicId ??
-    undefined;
+  const {
+    effectiveSubjectId,
+    effectiveSubjectName,
+    noteSubjectId,
+    noteTopicId,
+  } = deriveSessionSubjectState({
+    classifiedSubject,
+    routeSubjectId: subjectId,
+    routeSubjectName: subjectName ?? undefined,
+    transcriptSubjectId: liveTranscript?.session.subjectId ?? undefined,
+    activeSessionSubjectId: activeSession.data?.subjectId ?? undefined,
+    routeTopicId: topicId ?? undefined,
+    transcriptTopicId: liveTranscript?.session.topicId ?? undefined,
+    activeSessionTopicId: activeSession.data?.topicId ?? undefined,
+  });
   const activeSubject = availableSubjects.find(
     (availableSubject) => availableSubject.id === effectiveSubjectId,
   );
@@ -613,68 +616,18 @@ function SessionScreenInner() {
     return `${prefix}-${Date.now()}-${localMessageIdRef.current}`;
   }, []);
 
-  useEffect(() => {
-    if (!routeSessionId || !liveTranscript) return;
-
-    const transcriptMessages = liveTranscript.exchanges
-      .filter((entry, index, all) => {
-        if (entry.role !== 'user') return true;
-        return index !== all.length - 1 || all[index + 1]?.role === 'assistant';
-      })
-      .map((entry, index) => ({
-        id: `${entry.isSystemPrompt ? 'system' : entry.role}-${index}-${
-          entry.timestamp
-        }`,
-        role:
-          entry.role === 'assistant'
-            ? ('assistant' as const)
-            : ('user' as const),
-        content: entry.content,
-        eventId: entry.eventId,
-        isSystemPrompt: entry.isSystemPrompt,
-        escalationRung: entry.escalationRung,
-      }));
-
-    const currentMessages = messagesRef.current;
-    const transcriptUserContents = new Set(
-      transcriptMessages
-        .filter((message) => message.role === 'user')
-        .map((message) => message.content),
-    );
-    const hasInFlightLocalTurn =
-      currentMessages.some((message) => message.streaming) ||
-      currentMessages.some(
-        (message) =>
-          message.role === 'user' &&
-          !message.eventId &&
-          !transcriptUserContents.has(message.content),
-      );
-    if (hasInFlightLocalTurn) return;
-
-    setMessages(
-      transcriptMessages.length > 0
-        ? transcriptMessages
-        : // [M-7] Use the ref so late-arriving streak data (which changes
-          // openingContent reactively) doesn't re-trigger this effect and
-          // wipe out in-progress conversation messages.
-          [
-            {
-              id: 'opening',
-              role: 'assistant',
-              content: openingContentRef.current,
-            },
-          ],
-    );
-    setExchangeCount(liveTranscript.session.exchangeCount);
-    setEscalationRung(
-      liveTranscript.exchanges
-        .filter((entry) => entry.role === 'assistant' && !entry.isSystemPrompt)
-        .at(-1)?.escalationRung ?? 1,
-    );
-    setInputMode(liveTranscript.session.inputMode ?? 'text');
-    setActiveSessionId(routeSessionId);
-    setResumedBanner(true);
-  }, [liveTranscript, routeSessionId]);
+  useSessionTranscriptHydration({
+    routeSessionId,
+    liveTranscript,
+    messagesRef,
+    openingContentRef,
+    setMessages,
+    setExchangeCount,
+    setEscalationRung,
+    setInputMode,
+    setActiveSessionId,
+    setResumedBanner,
+  });
 
   useEffect(() => {
     if (!sessionExpired) return;
@@ -773,12 +726,15 @@ function SessionScreenInner() {
   // Defined here (before useSubjectClassification) so the greeting guard can
   // use it to decide whether to re-trigger classification.
   const userMessageCount = useMemo(
-    () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
+    () => countLearnerMessages(messages),
     [messages],
   );
   // Resumed sessions can receive exchangeCount before UI message history
   // hydrates; keep the server turn count so returning learners stay in-loop.
-  const learnerTurnCount = Math.max(userMessageCount, exchangeCount);
+  const learnerTurnCount = getLearnerTurnCount({
+    userMessageCount,
+    exchangeCount,
+  });
 
   const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
   const conversationStage = getConversationStage(
@@ -969,136 +925,59 @@ function SessionScreenInner() {
   });
 
   const latestAiMessageId = useMemo(
-    () =>
-      isStreaming
-        ? null
-        : ([...messages]
-            .reverse()
-            .find(
-              (message) => message.role === 'assistant' && !message.streaming,
-            )?.id ?? null),
+    () => getLatestAiMessageId({ messages, isStreaming }),
     [messages, isStreaming],
   );
 
   const aiResponseCount = useMemo(
-    () =>
-      messages.filter(
-        (message) =>
-          message.role === 'assistant' &&
-          !message.streaming &&
-          !message.isSystemPrompt &&
-          !!message.eventId,
-      ).length,
+    () => countPersistedAiResponses(messages),
     [messages],
   );
-
-  // [UX-DE-H5] Exit button is always rendered (no gating on session existence).
-  // Before session exists → "Exit" navigates home. After → normal "I'm Done".
-  const endSessionButton = (
-    <Pressable
-      onPress={activeSessionId ? handleEndSession : handleHomeBack}
-      disabled={isClosing || isStreaming || showFilingPrompt}
-      className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
-      style={{ maxWidth: 104 }}
-      testID="end-session-button"
-      accessibilityLabel={
-        isClosing ? 'Wrapping up' : activeSessionId ? "I'm done" : 'Exit'
-      }
-      accessibilityRole="button"
-    >
-      <Text
-        className="text-body-sm font-semibold text-text-secondary"
-        numberOfLines={1}
-      >
-        {isClosing ? 'Wrapping...' : activeSessionId ? 'Done' : 'Exit'}
-      </Text>
-    </Pressable>
-  );
-
-  const headerRight = (
-    <View className="flex-row flex-wrap items-center justify-end">
-      {modeConfig.showTimer && <SessionTimer />}
-      <MilestoneDots count={milestonesReached.length} />
-      {endSessionButton}
-    </View>
-  );
-
-  const subtitle = pendingClassification
-    ? 'Figuring out what this is about...'
-    : classifyError
-      ? classifyError
-      : sessionExpired
-        ? 'Session expired - start a new one.'
-        : resumedBanner
-          ? getResumeBannerCopy(topicName)
-          : apiChecked && !isApiReachable
-            ? 'Server unreachable - messages may fail'
-            : modeConfig.subtitle;
-
-  // [M6] Retry chip shown below the header when subject classification failed.
-  const classifyErrorChip = classifyError ? (
-    <View className="flex-row items-center gap-2 px-4 pb-2">
-      <Pressable
-        onPress={() => {
-          setClassifyError(null);
-          if (lastRetryPayloadRef.current) {
-            void handleSend(lastRetryPayloadRef.current.text);
-          }
-        }}
-        className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"
-        accessibilityRole="button"
-        accessibilityLabel="Retry classification"
-        testID="classify-error-retry"
-      >
-        <Text className="text-body-sm font-semibold text-text-secondary">
-          Retry classification
-        </Text>
-      </Pressable>
-    </View>
-  ) : null;
-
-  const topicHeaderStrip = topicName ? (
-    <SessionTopicHeader
-      topicName={topicName}
-      onChangeTopic={() => setShowTopicSwitcher(true)}
-    />
-  ) : null;
 
   const showSkipWarmup =
     activeSession.data?.metadata?.continuationDepth === 'low' ||
     activeSession.data?.metadata?.continuationDepth === 'mid' ||
     activeSession.data?.metadata?.continuationDepth === 'high';
-  const skipWarmupChip = showSkipWarmup ? (
-    <View className="flex-row items-center gap-2 px-4 pb-2">
-      <Pressable
-        onPress={async () => {
-          try {
-            await clearContinuationDepth.mutateAsync();
-          } catch {
-            platformAlert('Could not skip warm-up', 'Please try again.');
-          }
-        }}
-        disabled={clearContinuationDepth.isPending}
-        className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"
-        accessibilityRole="button"
-        accessibilityLabel="Skip the warm-up, jump in"
-        testID="session-skip-warmup"
-      >
-        <Text className="text-body-sm font-semibold text-text-secondary">
-          Skip the warm-up, jump in
-        </Text>
-      </Pressable>
-    </View>
-  ) : null;
+  const handleRetryClassification = useCallback(() => {
+    setClassifyError(null);
+    if (lastRetryPayloadRef.current) {
+      void handleSend(lastRetryPayloadRef.current.text);
+    }
+  }, [handleSend]);
+  const handleChangeTopic = useCallback(() => {
+    setShowTopicSwitcher(true);
+  }, []);
+  const handleSkipWarmup = useCallback(async () => {
+    try {
+      await clearContinuationDepth.mutateAsync();
+    } catch {
+      platformAlert('Could not skip warm-up', 'Please try again.');
+    }
+  }, [clearContinuationDepth]);
 
-  const headerBelow =
-    topicHeaderStrip || classifyErrorChip || skipWarmupChip ? (
-      <View className="gap-2">
-        {topicHeaderStrip}
-        {classifyErrorChip}
-        {skipWarmupChip}
-      </View>
-    ) : null;
+  const { headerRight, headerBelow, subtitle } = SessionScreenChrome({
+    activeSessionId,
+    isClosing,
+    isStreaming,
+    showFilingPrompt,
+    modeSubtitle: modeConfig.subtitle,
+    showTimer: modeConfig.showTimer,
+    milestoneCount: milestonesReached.length,
+    pendingClassification,
+    classifyError,
+    sessionExpired,
+    resumedBanner,
+    topicName,
+    apiChecked,
+    isApiReachable,
+    showSkipWarmup,
+    isSkippingWarmup: clearContinuationDepth.isPending,
+    onEndSession: handleEndSession,
+    onHomeBack: handleHomeBack,
+    onRetryClassification: handleRetryClassification,
+    onChangeTopic: handleChangeTopic,
+    onSkipWarmup: handleSkipWarmup,
+  });
 
   const isSubjectFlowBlockingComposer =
     pendingClassification || !!pendingSubjectResolution;

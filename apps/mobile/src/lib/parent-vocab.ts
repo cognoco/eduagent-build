@@ -12,13 +12,30 @@ type ParentMetricTooltip = {
   body: string;
 };
 
-export function getUnderstandingLabel(scorePercent: number): string {
-  if (scorePercent === 0) return 'Just starting';
-  if (scorePercent <= 30) return 'Getting familiar';
-  if (scorePercent <= 60) return 'Finding their feet';
-  if (scorePercent <= 85) return 'Getting comfortable';
-  if (scorePercent <= 99) return 'Nearly mastered';
-  return 'Mastered';
+export type UnderstandingLabelKey =
+  | 'parentView.topic.understandingLevels.justStarting'
+  | 'parentView.topic.understandingLevels.gettingFamiliar'
+  | 'parentView.topic.understandingLevels.findingTheirFeet'
+  | 'parentView.topic.understandingLevels.gettingComfortable'
+  | 'parentView.topic.understandingLevels.nearlyMastered'
+  | 'parentView.topic.understandingLevels.mastered';
+
+// Returns an i18n key; callers translate via useTranslation. Decouples this
+// pure helper from i18n setup so it stays testable without React context.
+export function getUnderstandingLabel(
+  scorePercent: number,
+): UnderstandingLabelKey {
+  if (scorePercent === 0)
+    return 'parentView.topic.understandingLevels.justStarting';
+  if (scorePercent <= 30)
+    return 'parentView.topic.understandingLevels.gettingFamiliar';
+  if (scorePercent <= 60)
+    return 'parentView.topic.understandingLevels.findingTheirFeet';
+  if (scorePercent <= 85)
+    return 'parentView.topic.understandingLevels.gettingComfortable';
+  if (scorePercent <= 99)
+    return 'parentView.topic.understandingLevels.nearlyMastered';
+  return 'parentView.topic.understandingLevels.mastered';
 }
 
 export function getParentRetentionInfo(
