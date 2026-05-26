@@ -203,16 +203,38 @@ function CreateSubjectScreenAuthenticated() {
   );
 
   // [M4] 30s timeout on resolve phase — show error + retry
+  //
+  // [BUG-520] Capture the timeout handle in the effect's closure so cleanup
+  // clears the exact timer this effect started, not whatever
+  // `resolveTimeoutRef.current` happens to hold when cleanup runs. Two
+  // parallel teardown paths (cleanup + the non-resolving branch below)
+  // previously raced through the same ref, so an in-flight handle could fire
+  // after `phase` had moved to `creating` and stomp the screen with
+  // `setError(resolveTookTooLong)`. Also clear any pre-existing handle BEFORE
+  // assigning the new one — defensive against a synchronous phase flip back
+  // to `resolving` before the prior cleanup ran.
   useEffect(() => {
     if (resolveState.phase === 'resolving') {
       setResolveTimedOut(false);
-      resolveTimeoutRef.current = setTimeout(() => {
+      // Clear before assigning — guards against a stale handle if the effect
+      // re-runs without the cleanup having executed first.
+      if (resolveTimeoutRef.current) {
+        clearTimeout(resolveTimeoutRef.current);
+        resolveTimeoutRef.current = null;
+      }
+      const handle = setTimeout(() => {
         setResolveTimedOut(true);
         setResolveState({ phase: 'idle' });
         setError(t('subject.resolveTookTooLong'));
       }, 30_000);
+      resolveTimeoutRef.current = handle;
       return () => {
-        if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
+        // Clear only the handle THIS effect created, not the ref's current
+        // value (which may have already been overwritten by a later effect).
+        clearTimeout(handle);
+        if (resolveTimeoutRef.current === handle) {
+          resolveTimeoutRef.current = null;
+        }
       };
     }
     if (resolveTimeoutRef.current) {

@@ -7,6 +7,7 @@ import {
 import {
   isConsentRespondRateLimited,
   CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS,
+  resolveRateLimitIp,
 } from './consent';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 
@@ -299,10 +300,10 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     // /consent/respond (consent.ts). Both endpoints perform expensive DB
     // lookups and destructive mutations (profile delete on denial). Shared
     // limiter state lives in consent.ts; same 30/hr cap, same Retry-After.
-    const ipKey =
-      c.req.header('cf-connecting-ip') ??
-      c.req.header('x-forwarded-for') ??
-      'unknown';
+    const ipKey = resolveRateLimitIp(
+      c.req.header('cf-connecting-ip'),
+      c.req.header('x-forwarded-for'),
+    );
     if (isConsentRespondRateLimited(ipKey)) {
       const retryAfterSecs = Math.ceil(
         CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000,

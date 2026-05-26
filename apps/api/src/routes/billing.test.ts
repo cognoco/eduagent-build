@@ -470,7 +470,7 @@ describe('billing routes', () => {
         expect.objectContaining({ email: 'test@example.com' }),
       );
       expect(mockLinkStripeCustomer).toHaveBeenCalledWith(
-        expect.anything(),
+        mockDatabaseModule.db,
         'test-account-id',
         'cus_new',
       );
@@ -552,7 +552,7 @@ describe('billing routes', () => {
         cancel_at_period_end: true,
       });
       expect(mockMarkSubscriptionCancelled).toHaveBeenCalledWith(
-        expect.anything(),
+        mockDatabaseModule.db,
         'sub-1',
       );
     });
@@ -1224,7 +1224,7 @@ describe('billing routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockRemoveProfileFromSubscription).toHaveBeenCalledWith(
-        expect.anything(),
+        mockDatabaseModule.db,
         'sub-1',
         '550e8400-e29b-41d4-a716-446655440000',
       );

@@ -1496,6 +1496,106 @@ describe('CreateSubjectScreen', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// [BUG-520] Resolve-phase 30s timeout cleanup must not leak across phase
+// changes.
+//
+// The effect at create-subject.tsx:206 starts a setTimeout when phase enters
+// `resolving` and shows `setError(resolveTookTooLong)` when it fires. The
+// effect must cancel that timer when phase moves away from `resolving` (e.g.
+// to `creating` or `suggestion`). Before the fix, cleanup read the timer
+// handle from a ref shared between two teardown paths, so a stale timer
+// could fire after the phase had moved on and stomp the screen with an
+// error during a perfectly healthy `creating` flow.
+//
+// Regression: after `resolving` transitions to `creating`, advancing fake
+// timers past 30s must NOT show the timeout error. The phase change itself
+// proves resolve completed; firing an error after success is the bug.
+// ---------------------------------------------------------------------------
+describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
+  let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = {};
+    subjectsListData = [];
+    subjectsListIsError = false;
+    createSubjectResponse = null;
+    createSubjectShouldError = false;
+    createSubjectErrorMessage = '';
+    mockCanGoBackValue = true;
+    mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
+    mockFetch.setRoute(
+      '/sessions/first-curriculum',
+      defaultFirstCurriculumHandler,
+    );
+    mockFetch.setRoute('/subjects', defaultSubjectsHandler);
+    Wrapper = createWrapper();
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    activeQueryClient?.clear();
+    activeQueryClient = null;
+  });
+
+  it('does not surface the resolve-timeout error after phase transitions out of resolving', async () => {
+    jest.useFakeTimers();
+    try {
+      // Make /subjects/resolve resolve immediately (direct_match) so the
+      // screen flips resolving → creating well within 30s.
+      setResolveResponse({
+        status: 'direct_match',
+        resolvedName: 'Geometry',
+        suggestions: [],
+        displayMessage: 'Geometry it is.',
+      });
+      // Stall create + first-curriculum indefinitely so the screen stays in
+      // `creating`/`preparing` after the resolve timer was scheduled.
+      mockFetch.setRoute(
+        '/subjects',
+        () => new Promise(() => undefined /* never resolves */),
+      );
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      await enterSubjectName('Geometry');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      // Wait for the screen to advance past `resolving` (loading copy
+      // changes once `creating` is entered).
+      await waitFor(() => {
+        // Either creating spinner or first-lesson preparing copy must show
+        // — confirms resolveState.phase !== 'resolving'.
+        screen.getByTestId('subject-book-loading');
+      });
+
+      // Sanity: no error yet.
+      expect(screen.queryByTestId('create-subject-error')).toBeNull();
+
+      // Advance well past the 30s resolve-timeout. If cleanup failed to
+      // cancel the timer (the BUG-520 bug), this would trigger
+      // setError(resolveTookTooLong).
+      await act(async () => {
+        jest.advanceTimersByTime(60_000);
+      });
+
+      // Timer must have been cancelled when phase left `resolving` — no
+      // error should appear despite the timer interval elapsing.
+      expect(screen.queryByTestId('create-subject-error')).toBeNull();
+      expect(
+        screen.queryByText('That took too long — please try again'),
+      ).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 // [BUG-829] KeyboardAvoidingView behavior prop must use Platform.select
 // rather than a hardcoded "padding" value. On Android, "padding" pushes the
 // input off-screen with prediction-bar keyboards; "height" is the documented
