@@ -37,6 +37,8 @@ import {
   bookmarks,
   topicNotes,
   quizRounds,
+  dictationResults,
+  milestones,
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
@@ -634,6 +636,61 @@ async function insertWeeklyReport(
     },
   });
   return { reportId, reportWeek };
+}
+
+async function insertMonthlyReport(
+  db: Database,
+  opts: {
+    profileId: string; // parent
+    childProfileId: string;
+    childName?: string;
+    reportMonth?: string; // ISO YYYY-MM-DD, first of month
+    monthLabel?: string;
+  },
+): Promise<{ reportId: string; reportMonth: string }> {
+  const reportId = generateUUIDv7();
+  const reportMonth = opts.reportMonth ?? '2026-03-01';
+  await db.insert(monthlyReports).values({
+    id: reportId,
+    profileId: opts.profileId,
+    childProfileId: opts.childProfileId,
+    reportMonth,
+    reportData: {
+      childName: opts.childName ?? 'Test Teen',
+      month: opts.monthLabel ?? 'March 2026',
+      thisMonth: {
+        totalSessions: 15,
+        totalActiveMinutes: 180,
+        topicsMastered: 12,
+        topicsExplored: 15,
+        vocabularyTotal: 45,
+        streakBest: 6,
+      },
+      lastMonth: null,
+      highlights: ['Completed the geometry unit', 'Consistent daily practice'],
+      nextSteps: [
+        'Start algebra fundamentals',
+        'Review weak areas in fractions',
+      ],
+      subjects: [
+        {
+          subjectName: 'Mathematics',
+          topicsMastered: 12,
+          topicsAttempted: 15,
+          topicsExplored: 15,
+          vocabularyTotal: 45,
+          activeMinutes: 180,
+          trend: 'growing',
+        },
+      ],
+      headlineStat: {
+        value: 12,
+        label: 'Topics mastered',
+        comparison: 'Up from 8 last month',
+      },
+    },
+  });
+  return { reportId, reportMonth };
 }
 
 async function insertRetentionCards(
@@ -2093,46 +2150,10 @@ async function seedParentWithReports(
     );
   }
 
-  const reportId = generateUUIDv7();
-  await db.insert(monthlyReports).values({
-    id: reportId,
+  const { reportId } = await insertMonthlyReport(db, {
     profileId: parentProfileId,
     childProfileId,
-    reportMonth: '2026-03-01',
-    reportData: {
-      childName: 'Test Teen',
-      month: 'March 2026',
-      thisMonth: {
-        totalSessions: 15,
-        totalActiveMinutes: 180,
-        topicsMastered: 12,
-        topicsExplored: 15,
-        vocabularyTotal: 45,
-        streakBest: 6,
-      },
-      lastMonth: null,
-      highlights: ['Completed the geometry unit', 'Consistent daily practice'],
-      nextSteps: [
-        'Start algebra fundamentals',
-        'Review weak areas in fractions',
-      ],
-      subjects: [
-        {
-          subjectName: 'Mathematics',
-          topicsMastered: 12,
-          topicsAttempted: 15,
-          topicsExplored: 15,
-          vocabularyTotal: 45,
-          activeMinutes: 180,
-          trend: 'growing',
-        },
-      ],
-      headlineStat: {
-        value: 12,
-        label: 'Topics mastered',
-        comparison: 'Up from 8 last month',
-      },
-    },
+    childName: 'Test Teen',
   });
 
   return {
@@ -4265,6 +4286,131 @@ async function seedMentorAuditRichChildHistory(
     childName: 'Rich-History Child',
   });
 
+  const { reportId: monthlyReportId } = await insertMonthlyReport(db, {
+    profileId: parentProfileId,
+    childProfileId,
+    childName: 'Rich-History Child',
+    reportMonth: '2026-04-01',
+    monthLabel: 'April 2026',
+  });
+
+  const milestoneId = generateUUIDv7();
+  await db.insert(milestones).values({
+    id: milestoneId,
+    profileId: childProfileId,
+    milestoneType: 'session_count',
+    threshold: 5,
+    subjectId: english.subjectId,
+    bookId: english.bookId,
+    metadata: {
+      title: 'Five focused sessions',
+      summary:
+        'Built enough momentum to unlock the first parent milestone view.',
+    },
+    celebratedAt: pastDate(1),
+  });
+
+  const topicNoteId = generateUUIDv7();
+  await db.insert(topicNotes).values({
+    id: topicNoteId,
+    profileId: childProfileId,
+    topicId: englishTopicId,
+    sessionId: recapSessionId,
+    content:
+      'Migration patterns depend on food supply, weather, and inherited routes.',
+  });
+
+  const quizRoundId = generateUUIDv7();
+  await db.insert(quizRounds).values({
+    id: quizRoundId,
+    profileId: childProfileId,
+    subjectId: english.subjectId,
+    activityType: 'vocabulary',
+    theme: 'Bird migration vocabulary',
+    questions: [
+      {
+        type: 'vocabulary',
+        prompt:
+          'Which word best matches a bird moving to a warmer place for winter?',
+        correctAnswer: 'migrate',
+        distractors: ['hibernate', 'evaporate', 'orbit'],
+      },
+    ],
+    results: [
+      {
+        questionIndex: 0,
+        userAnswer: 'migrate',
+        isCorrect: true,
+      },
+    ],
+    score: 1,
+    total: 1,
+    xpEarned: 12,
+    libraryQuestionIndices: [],
+    status: 'completed',
+    completedAt: pastDate(1),
+  });
+
+  const dictationResultId = generateUUIDv7();
+  await db.insert(dictationResults).values({
+    id: dictationResultId,
+    profileId: childProfileId,
+    completionKey: generateUUIDv7(),
+    date: '2026-05-01',
+    sentenceCount: 4,
+    mistakeCount: 1,
+    mode: 'homework',
+    reviewed: true,
+  });
+
+  const homeworkSessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: homeworkSessionId,
+    profileId: childProfileId,
+    subjectId: math.subjectId,
+    topicId: mathTopicId,
+    sessionType: 'homework',
+    status: 'completed',
+    exchangeCount: 6,
+    startedAt: pastDate(2),
+    lastActivityAt: pastDate(2),
+    endedAt: pastDate(2),
+    wallClockSeconds: 840,
+    metadata: {
+      homeworkSummary: {
+        problemCount: 3,
+        practicedSkills: ['fractions', 'word problems'],
+        independentProblemCount: 2,
+        guidedProblemCount: 1,
+        summary:
+          'Worked through fraction comparison and one multi-step word problem with growing independence.',
+        displayTitle: 'Fractions homework',
+      },
+    },
+  });
+  await db.insert(sessionEvents).values([
+    {
+      id: generateUUIDv7(),
+      sessionId: homeworkSessionId,
+      profileId: childProfileId,
+      subjectId: math.subjectId,
+      topicId: mathTopicId,
+      eventType: 'homework_problem_started',
+      content: 'Compare 3/4 and 5/8.',
+      metadata: { problemIndex: 1 },
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId: homeworkSessionId,
+      profileId: childProfileId,
+      subjectId: math.subjectId,
+      topicId: mathTopicId,
+      eventType: 'homework_problem_completed',
+      content: 'The learner solved the fraction comparison correctly.',
+      metadata: { problemIndex: 1, outcome: 'correct' },
+    },
+  ]);
+
   return {
     scenario: 'mentor-audit-rich-child-history',
     accountId,
@@ -4279,7 +4425,13 @@ async function seedMentorAuditRichChildHistory(
       mathTopicId,
       englishTopicId,
       recapSessionId,
+      reportId: monthlyReportId,
       weeklyReportId: reportId,
+      quizRoundId,
+      dictationResultId,
+      homeworkSessionId,
+      milestoneId,
+      topicNoteId,
       vocabularyId: vocabularyId ?? '',
       bookmarkId: bookmarkIds[0] ?? '',
     },

@@ -1,11 +1,18 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  bookmarks,
   createDatabase,
+  dictationResults,
   generateUUIDv7,
   learningProfiles,
   learningSessions,
+  milestones,
   monthlyReports,
+  quizRounds,
+  retentionCards,
+  topicNotes,
+  weeklyReports,
   vocabulary,
   type Database,
 } from '@eduagent/database';
@@ -129,5 +136,125 @@ describe('medium-priority seed scenarios integration', () => {
       );
 
     expect(sessions.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('creates a mentor-audit rich-child-history fixture with reports, recap, quiz, dictation, homework, milestone, bookmarks, and vocabulary', async () => {
+    const email = `${EMAIL_PREFIX}mentor-rich-history@test.invalid`;
+    const result = await seedScenario(
+      db,
+      'mentor-audit-rich-child-history',
+      email,
+    );
+
+    expect(result.scenario).toBe('mentor-audit-rich-child-history');
+    expect(result.ids.childProfileId).toBeTruthy();
+    expect(result.ids.reportId).toBeTruthy();
+    expect(result.ids.weeklyReportId).toBeTruthy();
+    expect(result.ids.quizRoundId).toBeTruthy();
+    expect(result.ids.dictationResultId).toBeTruthy();
+    expect(result.ids.homeworkSessionId).toBeTruthy();
+    expect(result.ids.milestoneId).toBeTruthy();
+    expect(result.ids.topicNoteId).toBeTruthy();
+    expect(result.ids.vocabularyId).toBeTruthy();
+    expect(result.ids.bookmarkId).toBeTruthy();
+
+    const [monthlyReport] = await db
+      .select()
+      .from(monthlyReports)
+      .where(eq(monthlyReports.id, result.ids.reportId));
+    expect(monthlyReport).toEqual(expect.objectContaining({}));
+
+    const [weeklyReport] = await db
+      .select()
+      .from(weeklyReports)
+      .where(eq(weeklyReports.id, result.ids.weeklyReportId));
+    expect(weeklyReport).toEqual(expect.objectContaining({}));
+
+    const [quizRound] = await db
+      .select()
+      .from(quizRounds)
+      .where(eq(quizRounds.id, result.ids.quizRoundId));
+    expect(quizRound).toEqual(
+      expect.objectContaining({
+        id: result.ids.quizRoundId,
+        profileId: result.ids.childProfileId,
+        status: 'completed',
+      }),
+    );
+
+    const [dictationResult] = await db
+      .select()
+      .from(dictationResults)
+      .where(eq(dictationResults.id, result.ids.dictationResultId));
+    expect(dictationResult).toEqual(
+      expect.objectContaining({
+        id: result.ids.dictationResultId,
+        profileId: result.ids.childProfileId,
+        reviewed: true,
+      }),
+    );
+
+    const [homeworkSession] = await db
+      .select()
+      .from(learningSessions)
+      .where(eq(learningSessions.id, result.ids.homeworkSessionId));
+    expect(homeworkSession).toEqual(
+      expect.objectContaining({
+        id: result.ids.homeworkSessionId,
+        profileId: result.ids.childProfileId,
+        sessionType: 'homework',
+        status: 'completed',
+      }),
+    );
+
+    const [milestone] = await db
+      .select()
+      .from(milestones)
+      .where(eq(milestones.id, result.ids.milestoneId));
+    expect(milestone).toEqual(
+      expect.objectContaining({
+        id: result.ids.milestoneId,
+        profileId: result.ids.childProfileId,
+      }),
+    );
+
+    const [topicNote] = await db
+      .select()
+      .from(topicNotes)
+      .where(eq(topicNotes.id, result.ids.topicNoteId));
+    expect(topicNote).toEqual(
+      expect.objectContaining({
+        id: result.ids.topicNoteId,
+        profileId: result.ids.childProfileId,
+      }),
+    );
+
+    const [bookmark] = await db
+      .select()
+      .from(bookmarks)
+      .where(eq(bookmarks.id, result.ids.bookmarkId));
+    expect(bookmark).toEqual(
+      expect.objectContaining({
+        id: result.ids.bookmarkId,
+        profileId: result.ids.childProfileId,
+      }),
+    );
+
+    const [vocab] = await db
+      .select()
+      .from(vocabulary)
+      .where(eq(vocabulary.id, result.ids.vocabularyId));
+    expect(vocab).toEqual(
+      expect.objectContaining({
+        id: result.ids.vocabularyId,
+        profileId: result.ids.childProfileId,
+      }),
+    );
+
+    const retentionRows = await db
+      .select()
+      .from(retentionCards)
+      .where(eq(retentionCards.profileId, result.ids.childProfileId));
+    expect(retentionRows.length).toBeGreaterThanOrEqual(1);
   });
 });
