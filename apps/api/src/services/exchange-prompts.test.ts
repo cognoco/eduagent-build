@@ -721,3 +721,126 @@ describe('allowsGeneralKnowledgeSource', () => {
     expect(prompt).not.toContain('id="general_knowledge"');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 0 — Challenge Round runtime kill switch
+//
+// Locks the contract that CHALLENGE_ROUND_RUNTIME_ENABLED (threaded into
+// ExchangeContext as `challengeRuntimeEnabled`) is the single chokepoint
+// for emitting any of the three Challenge Round prompt blocks. The plan
+// at docs/plans/2026-05-18-challenge-round-targets.md ships dark by
+// default: with the flag undefined or false, the LLM must never receive
+// the offer/active/drafting CR system prompts, regardless of eligibility
+// or in-session state. This test set guards against accidental
+// re-enablement before Phase 5 read-side hardening lands.
+// ---------------------------------------------------------------------------
+
+describe('buildSystemPrompt — Challenge Round runtime kill switch (Phase 0)', () => {
+  // Unique phrases lifted verbatim from
+  // apps/api/src/services/challenge-round/prompts.ts so we detect each
+  // prompt block independently rather than matching the common phrase
+  // "Challenge Round" (which also appears inside ordinary mentor copy).
+  const OFFER_MARKER = 'signals.challenge_round_offer';
+  const ACTIVE_MARKER = 'now running a Challenge Round';
+  const DRAFTING_MARKER = 'ui_hints.note_draft.content';
+
+  function withTopic(
+    overrides: Partial<ExchangeContext> = {},
+  ): ExchangeContext {
+    return makeContext({
+      topicTitle: 'Photosynthesis',
+      topicDescription: 'How plants convert sunlight into energy.',
+      ...overrides,
+    });
+  }
+
+  it('suppresses challengeOfferPrompt when challengeRuntimeEnabled is undefined, even if eligible', () => {
+    const prompt = buildSystemPrompt(withTopic({ challengeEligible: true }));
+    expect(prompt).not.toContain(OFFER_MARKER);
+  });
+
+  it('suppresses challengeOfferPrompt when challengeRuntimeEnabled is false, even if eligible', () => {
+    const prompt = buildSystemPrompt(
+      withTopic({ challengeEligible: true, challengeRuntimeEnabled: false }),
+    );
+    expect(prompt).not.toContain(OFFER_MARKER);
+  });
+
+  it('injects challengeOfferPrompt only when challengeRuntimeEnabled is true AND eligible', () => {
+    const prompt = buildSystemPrompt(
+      withTopic({ challengeEligible: true, challengeRuntimeEnabled: true }),
+    );
+    expect(prompt).toContain(OFFER_MARKER);
+  });
+
+  it('suppresses challengeOfferPrompt when state is "offered" but flag is false', () => {
+    const prompt = buildSystemPrompt(
+      withTopic({
+        challengeRuntimeEnabled: false,
+        challengeRound: {
+          state: 'offered',
+          offerCount: 0,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      }),
+    );
+    expect(prompt).not.toContain(OFFER_MARKER);
+  });
+
+  it('injects challengeRoundActivePrompt only when flag is true AND state is active', () => {
+    const flagOff = buildSystemPrompt(
+      withTopic({
+        challengeRuntimeEnabled: false,
+        challengeRound: {
+          state: 'active',
+          offerCount: 0,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      }),
+    );
+    expect(flagOff).not.toContain(ACTIVE_MARKER);
+
+    const flagOn = buildSystemPrompt(
+      withTopic({
+        challengeRuntimeEnabled: true,
+        challengeRound: {
+          state: 'active',
+          offerCount: 0,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      }),
+    );
+    expect(flagOn).toContain(ACTIVE_MARKER);
+  });
+
+  it('injects challengeRoundDraftingPrompt only when flag is true AND state is drafting', () => {
+    const flagOff = buildSystemPrompt(
+      withTopic({
+        challengeRuntimeEnabled: false,
+        challengeRound: {
+          state: 'drafting',
+          offerCount: 0,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      }),
+    );
+    expect(flagOff).not.toContain(DRAFTING_MARKER);
+
+    const flagOn = buildSystemPrompt(
+      withTopic({
+        challengeRuntimeEnabled: true,
+        challengeRound: {
+          state: 'drafting',
+          offerCount: 0,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      }),
+    );
+    expect(flagOn).toContain(DRAFTING_MARKER);
+  });
+});

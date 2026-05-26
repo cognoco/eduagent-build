@@ -117,6 +117,20 @@ const envSchema = z.object({
   // ADULT_OWNER_GATE_ENABLED feature flag (apps/mobile/src/lib/feature-flags.ts).
   // Default: true. Flip to 'false' via Doppler to disable without redeploying.
   ADULT_OWNER_GATE_ENABLED: z.enum(['true', 'false']).default('true'),
+
+  // Challenge Round runtime — single kill switch for the Phase 1+ wiring
+  // (envelope offer → state machine → mastery/weak-spot persistence → typed
+  // SSE → mobile rendering). Defaults to 'false' so the wiring may merge
+  // dark; flipped in Doppler only after Phase 5 read-side hardening lands
+  // (resolveMasteryVerificationState integration, pending_review promotion
+  // + expiry cron, no-clinical-copy ratchet). While false:
+  //   - exchange-prompts.ts emits no Challenge Round prompt block
+  //     (offer/active/drafting), even if state/eligibility says otherwise.
+  //   - LLM `signals.challenge_round_offer` must be ignored downstream.
+  //   - SSE done frames must not carry typed challengeOffer / challengeRound
+  //     / draftedNote fields, so mobile has nothing to render.
+  // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
+  CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -156,6 +170,24 @@ export function isProfileInDedupRollout(
 }
 
 export function isTopicIntentMatcherEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
+/**
+ * Challenge Round runtime kill switch. Threaded into `ExchangeContext` as
+ * `challengeRuntimeEnabled` at the route boundary; gates every CR prompt
+ * block in exchange-prompts.ts and every downstream consumer of LLM
+ * `signals.challenge_round_offer` / `signals.challenge_round_evaluation` /
+ * `ui_hints.note_draft`.
+ *
+ * Default-closed: undefined / anything-other-than 'true' returns false so
+ * a missing binding never accidentally enables the runtime. The full
+ * rollout contract lives in
+ * docs/plans/2026-05-18-challenge-round-targets.md.
+ */
+export function isChallengeRoundRuntimeEnabled(
   value: string | undefined,
 ): boolean {
   return value === 'true';

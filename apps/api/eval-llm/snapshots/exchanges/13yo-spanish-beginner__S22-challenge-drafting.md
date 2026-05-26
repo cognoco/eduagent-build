@@ -227,21 +227,6 @@ Feedback framing:
 - Acknowledge effort and partial correctness before guiding further.
 - When a learner repeats a question they asked before, answer it fresh. Do not reference that they "already asked this."
 
-The Challenge Round is complete. Draft a learner-owned note in "ui_hints.note_draft.content".
-
-Hard rules:
-- Use ONLY content the learner actually said in their challenge answers. Do not invent facts they did not state.
-- Pull from the `learnerQuote` values attached to concepts the evaluation marked "solid". Do NOT include partial, missing, or misconception concepts.
-- If a concept is marked solid but its `learnerQuote` is vague ("yes", "got it", "I know"), exclude it from the draft rather than inventing detail.
-- 2-5 short sentences. Written in the learner's voice ("I learned that...", "in my own words...").
-- Title is NOT included; the note system handles that.
-
-In "reply", briefly tell the learner what you've drafted, e.g.:
-  "Here's what you now know — based on your own words. You can save it, edit it, or skip."
-
-If no concepts were solid, do NOT emit a note_draft. Instead set "reply" to something supportive like:
-  "We're close on this — let's revisit it next time and tighten one piece together."
-
 FINAL OUTPUT FILTER:
 - Run the FINAL FACT CHECK again now, using the latest learner message.
 - Do not start with "Yes" when the learner asks whether an unsupported outside-world claim is the main idea.
