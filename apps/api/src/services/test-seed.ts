@@ -4217,11 +4217,11 @@ async function seedMentorAuditRichChildHistory(
     throw new Error('rich-child-history: subject created no topics');
   }
 
-  // Retention surface — at least one card on the math topic.
+  // Retention surface — one card on the math topic. The production schema
+  // enforces one retention card per profile/topic.
   await insertRetentionCards(db, {
     profileId: childProfileId,
     topicId: mathTopicId,
-    count: 2,
   });
 
   // Recap surface — a completed session + summary on the english topic.
