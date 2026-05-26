@@ -1270,6 +1270,25 @@ describe('AppLayout no-profile gate — preview branch', () => {
     });
   });
 
+  it('[BUG] falls through to the app shell when the preview-state SecureStore probe hangs', async () => {
+    jest.useFakeTimers();
+    jest
+      .spyOn(require('../../lib/preview-onboarding-state'), 'getPreviewState')
+      .mockReturnValue(new Promise<null>(() => undefined));
+
+    renderAppLayoutWithActiveProfile();
+
+    expect(screen.getByTestId('preview-state-loading')).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+    await Promise.resolve();
+
+    expect(screen.queryByTestId('preview-state-loading')).toBeNull();
+    expect(screen.getByTestId('tabs')).toBeTruthy();
+  });
+
   // [CRITICAL-A2 / HIGH-A2] Wizard outlives the auto-activation transition.
   it('keeps SaveWizardGate mounted after ProfileProvider auto-activates the first profile', async () => {
     await setPreviewState({
