@@ -52,10 +52,6 @@ import { ConsentPendingGate } from './_components/ConsentPendingGate';
 import { usePostApprovalLanding } from './_hooks/use-post-approval-landing';
 import { SaveWizardGate } from './_components/save-wizard/SaveWizardGate';
 
-// Re-export so `require('./_layout').buildSwitchProfileConfirmation`
-// (used by _layout.test.tsx) keeps resolving.
-export { buildSwitchProfileConfirmation } from './_lib/consent-gate-helpers';
-
 initNotificationHandler();
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
