@@ -9,6 +9,7 @@ import {
   useVocabulary,
   useCreateVocabulary,
   useReviewVocabulary,
+  useDeleteVocabulary,
 } from './use-vocabulary';
 import { queryKeys } from '../lib/query-keys';
 
@@ -257,11 +258,55 @@ describe('useReviewVocabulary', () => {
     // onSuccess fires synchronously after mutation resolves (notifyManager scheduler
     // is set to immediate in test-setup.ts), so invalidateQueries should already
     // have been called by the time mutateAsync resolves.
+    //
+    // [BUG-535] Profile-scoped, subject-scoped invalidation. The previous bare
+    // ['vocabulary'] / ['language-progress'] keys crossed account boundaries on
+    // a shared device via React Query's prefix matching.
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['vocabulary'] }),
+      expect.objectContaining({
+        queryKey: queryKeys.vocabulary.subject('test-profile-id', 'sub-1'),
+      }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['language-progress'] }),
+      expect.objectContaining({
+        queryKey: queryKeys.languageProgress.subject(
+          'test-profile-id',
+          'sub-1',
+        ),
+      }),
+    );
+
+    invalidateSpy.mockRestore();
+  });
+});
+
+describe('useDeleteVocabulary', () => {
+  it('invalidates profile-scoped vocabulary and language-progress queries on success', async () => {
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const { result } = renderHook(() => useDeleteVocabulary('sub-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync('vocab-1');
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: queryKeys.vocabulary.subject('test-profile-id', 'sub-1'),
+      }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: queryKeys.languageProgress.subject(
+          'test-profile-id',
+          'sub-1',
+        ),
+      }),
     );
 
     invalidateSpy.mockRestore();

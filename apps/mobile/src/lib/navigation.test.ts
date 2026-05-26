@@ -3,6 +3,8 @@ import {
   homeHrefForReturnTo,
   goBackOrReplace,
   pushLearningResumeTarget,
+  pushChildReport,
+  pushChildWeeklyReport,
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
   PRACTICE_HREF,
@@ -228,5 +230,51 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
         },
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-524] pushChildReport / pushChildWeeklyReport — cross-tab chain push
+//
+// A direct push to `child/[profileId]/report/[reportId]` (or
+// `weekly-report/[weeklyReportId]`) from another tab synthesises a 1-deep
+// stack containing only the leaf, so `router.back()` falls through to the
+// Tabs first-route (Home) instead of the child's index. unstable_settings
+// in `child/[profileId]/_layout.tsx` only seeds one level, so it does NOT
+// cover this 2-segment push. The helpers MUST push `child/[profileId]`
+// first, then the leaf.
+// ---------------------------------------------------------------------------
+
+describe('pushChildReport [BUG-524]', () => {
+  it('pushes child/[profileId] FIRST, then the report leaf', () => {
+    const router = { push: jest.fn() } satisfies Pick<Router, 'push'>;
+    pushChildReport(router, 'child-1', 'report-9');
+
+    expect(router.push).toHaveBeenCalledTimes(2);
+    expect(router.push).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-1' },
+    });
+    expect(router.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/child/[profileId]/report/[reportId]',
+      params: { profileId: 'child-1', reportId: 'report-9' },
+    });
+  });
+});
+
+describe('pushChildWeeklyReport [BUG-524]', () => {
+  it('pushes child/[profileId] FIRST, then the weekly-report leaf', () => {
+    const router = { push: jest.fn() } satisfies Pick<Router, 'push'>;
+    pushChildWeeklyReport(router, 'child-1', 'weekly-7');
+
+    expect(router.push).toHaveBeenCalledTimes(2);
+    expect(router.push).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-1' },
+    });
+    expect(router.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+      params: { profileId: 'child-1', weeklyReportId: 'weekly-7' },
+    });
   });
 });

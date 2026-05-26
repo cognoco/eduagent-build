@@ -45,12 +45,6 @@ jest.mock('../homework/problem-cards', () => ({
   withProblemMode: jest.fn((problems: unknown[]) => problems),
 }));
 
-// Mock milestone tracker
-jest.mock('../../hooks/use-milestone-tracker', () => ({
-  ...jest.requireActual('../../hooks/use-milestone-tracker'),
-  celebrationForReason: jest.fn((reason: string) => reason),
-}));
-
 const WATCHDOG_RECONNECT_TEXT = 'Connection dropped — Try again';
 
 function applyMessageUpdates(

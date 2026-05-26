@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, sql } from 'drizzle-orm';
+import { eq, and, gte, sql, exists } from 'drizzle-orm';
 import { NotFoundError } from '../errors';
 import {
   notificationPreferences,
@@ -125,7 +125,14 @@ export async function upsertNotificationPrefs(
     input.monthlyProgressEmail ?? existing?.monthlyProgressEmail ?? true;
 
   if (existing) {
-    await db
+    // [BUG-661 / FCR-2026-05-23-L3.L3.2] Defense-in-depth: even though
+    // verifyProfileOwnership above asserts that profileId belongs to
+    // accountId, also constrain the UPDATE itself so a future upstream bug
+    // that passes a mismatched (profileId, accountId) pair cannot silently
+    // mutate another account's notification preferences. The
+    // notification_preferences table has no accountId column, so we enforce
+    // the link via an EXISTS subquery against profiles.
+    const [updated] = await db
       .update(notificationPreferences)
       .set({
         reviewReminders: input.reviewReminders,
@@ -137,8 +144,48 @@ export async function upsertNotificationPrefs(
         maxDailyPush,
         updatedAt: new Date(),
       })
-      .where(eq(notificationPreferences.profileId, profileId));
+      .where(
+        and(
+          eq(notificationPreferences.profileId, profileId),
+          exists(
+            db
+              .select({ _: sql`1` })
+              .from(profiles)
+              .where(
+                and(
+                  eq(profiles.id, profileId),
+                  eq(profiles.accountId, accountId),
+                ),
+              ),
+          ),
+        ),
+      )
+      .returning({ id: notificationPreferences.id });
+    if (!updated) {
+      // Defense-in-depth tripwire: the WHERE filtered out the row, which
+      // means (profileId, accountId) didn't match in the profiles table.
+      // verifyProfileOwnership should have already thrown — getting here is
+      // a real bug (race, stale binding, or upstream auth gap). Surface it
+      // rather than silently no-op.
+      throw new Error(
+        `notification_preferences upsert blocked: profile ${profileId} not owned by account ${accountId}`,
+      );
+    }
   } else {
+    // [BUG-661] Same defense-in-depth on insert: verify profile ownership
+    // immediately before write to close the read-then-write TOCTOU window
+    // (in addition to verifyProfileOwnership at the top of the function).
+    const [ownerCheck] = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(
+        and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
+      );
+    if (!ownerCheck) {
+      throw new Error(
+        `notification_preferences upsert blocked: profile ${profileId} not owned by account ${accountId}`,
+      );
+    }
     await db.insert(notificationPreferences).values({
       profileId,
       reviewReminders: input.reviewReminders,

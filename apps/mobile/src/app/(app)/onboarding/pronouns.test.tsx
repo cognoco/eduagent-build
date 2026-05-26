@@ -118,11 +118,10 @@ jest.mock(
   }),
 );
 
-// @eduagent/schemas PRONOUNS_PROMPT_MIN_AGE
-jest.mock('@eduagent/schemas', () => ({
-  ...jest.requireActual('@eduagent/schemas'),
-  PRONOUNS_PROMPT_MIN_AGE: 13,
-}));
+// PRONOUNS_PROMPT_MIN_AGE is imported from the real @eduagent/schemas package.
+// The threshold is 13 (see packages/schemas/src/profiles.ts) — if that value
+// changes, the age-gate test below ("age-gates below-13 learners") should
+// continue to use a birthYear that yields an age below the real constant.
 
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: ({ name }: { name: string }) => {

@@ -126,3 +126,48 @@ export function pushLearningResumeTarget(
     },
   } as Href);
 }
+
+/**
+ * Cross-tab push from the Progress tab to a linked child's monthly report.
+ *
+ * [BUG-524] CLAUDE.md: cross-tab/cross-stack `router.push` must push the full
+ * ancestor chain. A direct push to `child/[profileId]/report/[reportId]` from
+ * the Progress tab synthesises a 1-deep stack containing only the leaf, so
+ * `router.back()` from the leaf falls through to the Tabs first-route (Home)
+ * rather than the child's index. `unstable_settings.initialRouteName` in
+ * `child/[profileId]/_layout.tsx` only seeds one level, so it does NOT cover
+ * this 2-segment push — push the parent first, then the leaf.
+ */
+export function pushChildReport(
+  router: Pick<Router, 'push'>,
+  profileId: string,
+  reportId: string,
+): void {
+  router.push({
+    pathname: '/(app)/child/[profileId]',
+    params: { profileId },
+  } as Href);
+  router.push({
+    pathname: '/(app)/child/[profileId]/report/[reportId]',
+    params: { profileId, reportId },
+  } as Href);
+}
+
+/**
+ * Cross-tab push from the Progress tab to a linked child's weekly report.
+ * See {@link pushChildReport} for the rationale.
+ */
+export function pushChildWeeklyReport(
+  router: Pick<Router, 'push'>,
+  profileId: string,
+  weeklyReportId: string,
+): void {
+  router.push({
+    pathname: '/(app)/child/[profileId]',
+    params: { profileId },
+  } as Href);
+  router.push({
+    pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+    params: { profileId, weeklyReportId },
+  } as Href);
+}

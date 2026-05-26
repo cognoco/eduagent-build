@@ -169,7 +169,7 @@ function createMockDb(options?: {
     },
   );
 
-  return {
+  const dbMock: Record<string, unknown> = {
     query: {
       curricula: {
         findFirst: jest.fn().mockResolvedValue({ id: curriculumId, subjectId }),
@@ -237,7 +237,15 @@ function createMockDb(options?: {
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
     }),
-  } as unknown as Database;
+  };
+  // [BUG-657] processRecallTest wraps its ownership check + retention-card
+  // bootstrap in db.transaction(). The mock just runs the callback with the
+  // db itself as the `tx` argument — the unit tests aren't asserting on
+  // real isolation, only that the function still composes correctly.
+  dbMock.transaction = jest
+    .fn()
+    .mockImplementation((cb: (tx: unknown) => unknown) => cb(dbMock));
+  return dbMock as unknown as Database;
 }
 
 function setupScopedRepo({
@@ -557,6 +565,53 @@ describe('getTopicRetention', () => {
 // ---------------------------------------------------------------------------
 
 describe('processRecallTest', () => {
+  // [BUG-657 / FCR-2026-05-23-L3.M3.3] Break test: the topic ownership check
+  // + retention-card bootstrap must run inside a single db.transaction(),
+  // so a concurrent topic transfer cannot slip between the ownership check
+  // and the auto-create of the retention_card. Without the fix
+  // processRecallTest ran 3 separate statements with no atomicity. With the
+  // fix, db.transaction is invoked exactly once and the ownership check +
+  // ensureRetentionCard call resolve within its callback.
+  it('wraps topic-ownership check + retention-card bootstrap in db.transaction [BUG-657]', async () => {
+    setupScopedRepo({ retentionCardFindFirst: undefined });
+    const db = createMockDb();
+    // ensureRetentionCard reads retentionCards.findFirst twice (pre-insert
+    // miss → onConflictDoNothing → read-back). Return undefined first
+    // (forces ensureRetentionCard's insert branch), then a real card.
+    (db.query.retentionCards.findFirst as jest.Mock)
+      .mockResolvedValueOnce(undefined) // outer transaction read
+      .mockResolvedValueOnce(undefined) // ensureRetentionCard pre-insert
+      .mockResolvedValue(mockRetentionCardRow()); // ensureRetentionCard read-back
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 1,
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+        xpStatus: 'verified',
+        nextReviewAt: NOW.toISOString(),
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'a real answer',
+    });
+
+    // Atomicity contract: transaction must be invoked exactly once for the
+    // ownership + card-bootstrap bundle. The cooldown claim and post-LLM
+    // write deliberately remain outside the transaction (long LLM call).
+    expect(
+      (db as unknown as { transaction: jest.Mock }).transaction,
+    ).toHaveBeenCalledTimes(1);
+  });
+
   it('[WI-80] rejects mixed-parent topics before recall processing', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });

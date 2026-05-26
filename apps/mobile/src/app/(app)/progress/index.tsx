@@ -52,7 +52,11 @@ import {
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { useSubjects } from '../../../hooks/use-subjects';
-import { pushLearningResumeTarget } from '../../../lib/navigation';
+import {
+  pushChildReport,
+  pushChildWeeklyReport,
+  pushLearningResumeTarget,
+} from '../../../lib/navigation';
 import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { isProfileStale } from '../../../lib/progress';
@@ -842,23 +846,13 @@ export default function ProgressScreen(): React.ReactElement {
       return;
     }
 
-    router.push(
-      latestReport.kind === 'weekly'
-        ? ({
-            pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
-            params: {
-              profileId: selectedProfileId,
-              weeklyReportId: latestReport.report.id,
-            },
-          } as Href)
-        : ({
-            pathname: '/(app)/child/[profileId]/report/[reportId]',
-            params: {
-              profileId: selectedProfileId,
-              reportId: latestReport.report.id,
-            },
-          } as Href),
-    );
+    // [BUG-524] Cross-tab push must seed the parent chain. See
+    // pushChildReport / pushChildWeeklyReport in lib/navigation.ts.
+    if (latestReport.kind === 'weekly') {
+      pushChildWeeklyReport(router, selectedProfileId, latestReport.report.id);
+    } else {
+      pushChildReport(router, selectedProfileId, latestReport.report.id);
+    }
   }, [isViewingSelf, latestReport, router, selectedProfileId]);
 
   const handleOpenMonthlyReport = useCallback(
@@ -870,10 +864,8 @@ export default function ProgressScreen(): React.ReactElement {
         } as Href);
         return;
       }
-      router.push({
-        pathname: '/(app)/child/[profileId]/report/[reportId]',
-        params: { profileId: selectedProfileId, reportId },
-      } as Href);
+      // [BUG-524] Cross-tab push must seed parent chain.
+      pushChildReport(router, selectedProfileId, reportId);
     },
     [isViewingSelf, router, selectedProfileId],
   );
@@ -887,10 +879,8 @@ export default function ProgressScreen(): React.ReactElement {
         } as Href);
         return;
       }
-      router.push({
-        pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
-        params: { profileId: selectedProfileId, weeklyReportId },
-      } as Href);
+      // [BUG-524] Cross-tab push must seed parent chain.
+      pushChildWeeklyReport(router, selectedProfileId, weeklyReportId);
     },
     [isViewingSelf, router, selectedProfileId],
   );

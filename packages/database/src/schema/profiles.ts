@@ -28,6 +28,17 @@ export const withdrawalArchivePreferenceEnum = pgEnum(
   ['auto', 'always', 'never'],
 );
 
+// BUG-571: pending_notices.type — was text + CHECK constraint, migrated to
+// pgEnum so the value set is enforced at the type system and adding a new
+// notice type requires a coordinated schema + migration change (instead of
+// failing silently at insert time with a generic CHECK violation). Keep the
+// member list in lockstep with `pendingNoticeTypeSchema` in
+// `@eduagent/schemas/progress.ts`.
+export const pendingNoticeTypeEnum = pgEnum('pending_notice_type', [
+  'consent_deleted',
+  'consent_archived',
+]);
+
 export const accounts = pgTable('accounts', {
   id: uuid('id')
     .primaryKey()
@@ -171,7 +182,7 @@ export const pendingNotices = pgTable(
     ownerProfileId: uuid('owner_profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
-    type: text('type').notNull(),
+    type: pendingNoticeTypeEnum('type').notNull(),
     payloadJson: jsonb('payload_json').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -182,10 +193,6 @@ export const pendingNotices = pgTable(
     index('pending_notices_owner_unseen_idx').on(
       table.ownerProfileId,
       table.seenAt,
-    ),
-    check(
-      'pending_notices_type_check',
-      sql`${table.type} in ('consent_deleted', 'consent_archived')`,
     ),
   ],
 );
