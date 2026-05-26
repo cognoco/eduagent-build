@@ -40,10 +40,13 @@ import { Sentry } from '../../../lib/sentry';
 import {
   createHomeworkProblem,
   getHomeworkProblemText,
-  serializeHomeworkProblems,
   splitHomeworkProblems,
 } from '../../../components/homework/problem-cards';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import {
+  buildHomeworkSessionParams,
+  getHomeworkProblemTruncationAlertMessage,
+} from './_view-models/homework-session-params';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -462,93 +465,42 @@ export default function CameraScreen(): React.ReactNode {
       sourceOcrText?: string,
       captureSource?: HomeworkCaptureSource,
     ) => {
-      const MAX_PARAM_LENGTH = 8000; // safe URL param budget
-
-      let homeworkProblemsParam: string | undefined;
-      let droppedProblemCount = 0;
-      let singleProblemTruncated = false;
-      if (problems && problems.length > 0) {
-        // Drop trailing problems until the serialized string fits.
-        let truncatedProblems = [...problems];
-        let serialized = serializeHomeworkProblems(truncatedProblems);
-        while (
-          serialized.length > MAX_PARAM_LENGTH &&
-          truncatedProblems.length > 1
-        ) {
-          truncatedProblems = truncatedProblems.slice(0, -1);
-          serialized = serializeHomeworkProblems(truncatedProblems);
-        }
-        droppedProblemCount = problems.length - truncatedProblems.length;
-        // If a single problem still exceeds the budget, truncate its text
-        // at a word boundary as a last resort.
-        if (
-          serialized.length > MAX_PARAM_LENGTH &&
-          truncatedProblems.length === 1
-        ) {
-          const problem = truncatedProblems[0];
-          if (problem) {
-            const maxTextLen =
-              problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
-            const wordBoundary = problem.text.lastIndexOf(
-              ' ',
-              Math.max(0, maxTextLen),
-            );
-            const truncatedText =
-              problem.text.slice(
-                0,
-                wordBoundary > 0 ? wordBoundary : maxTextLen,
-              ) + ' [truncated]';
-            truncatedProblems = [{ ...problem, text: truncatedText }];
-            serialized = serializeHomeworkProblems(truncatedProblems);
-            singleProblemTruncated = true;
-          }
-        }
-        homeworkProblemsParam = serialized;
-      }
+      const { params, truncation } = buildHomeworkSessionParams({
+        subjectId: sid,
+        subjectName: sName,
+        problemText,
+        problems,
+        sourceOcrText,
+        imageUri,
+        imageMimeType,
+        captureSource,
+        returnTo,
+      });
 
       // [BUG-823 / F-MOB-25] Surface truncation to the user instead of
       // silently dropping problems. Without this, a learner who imports 10
       // problems can lose 9 of them with no indication. We alert (non-blocking
       // toast/dialog) and log to Sentry so we can monitor frequency and
       // decide whether to raise MAX_PARAM_LENGTH or migrate off URL params.
-      if (droppedProblemCount > 0 || singleProblemTruncated) {
-        const alertMessage = singleProblemTruncated
-          ? droppedProblemCount > 0
-            ? `Some problems were too long to fit. Only the first ${
-                (problems?.length ?? 0) - droppedProblemCount
-              } were saved, and the last one was shortened.`
-            : 'This problem was too long to send in full and was shortened.'
-          : `Some problems were too long; only the first ${
-              (problems?.length ?? 0) - droppedProblemCount
-            } of ${problems?.length ?? 0} are saved.`;
-        platformAlert('Heads up', alertMessage);
+      if (truncation) {
+        platformAlert(
+          'Heads up',
+          getHomeworkProblemTruncationAlertMessage(truncation),
+        );
         Sentry.captureMessage('homework problems truncated for URL budget', {
           level: 'warning',
           extra: {
-            inputCount: problems?.length ?? 0,
-            droppedProblemCount,
-            singleProblemTruncated,
-            maxParamLength: MAX_PARAM_LENGTH,
+            inputCount: truncation.inputProblemCount,
+            droppedProblemCount: truncation.droppedProblemCount,
+            singleProblemTruncated: truncation.singleProblemTruncated,
+            maxParamLength: truncation.maxParamLength,
           },
         });
       }
 
       router.replace({
         pathname: '/(app)/session',
-        params: {
-          mode: 'homework',
-          subjectId: sid,
-          subjectName: sName,
-          problemText,
-          ...(homeworkProblemsParam !== undefined
-            ? { homeworkProblems: homeworkProblemsParam }
-            : {}),
-          ...(sourceOcrText ? { ocrText: sourceOcrText } : {}),
-          ...(imageUri ? { imageUri } : {}),
-          ...(imageMimeType ? { imageMimeType } : {}),
-          ...(captureSource ? { captureSource } : {}),
-          ...(returnTo ? { returnTo } : {}),
-        },
+        params,
       } as Href);
     },
     [imageMimeType, returnTo, router],

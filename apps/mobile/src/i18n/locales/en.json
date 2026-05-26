@@ -609,7 +609,8 @@
     },
     "expired": {
       "title": "Session ended",
-      "message": "This session has ended. Start a new one to keep learning."
+      "message": "This session has ended. Start a new one to keep learning.",
+      "startNewSession": "Start new session"
     },
     "notePrompt": {
       "writeNote": "Write a note",
@@ -2230,6 +2231,14 @@
         "completed": "Completed",
         "verified": "Verified",
         "stable": "Stable"
+      },
+      "understandingLevels": {
+        "justStarting": "Just starting",
+        "gettingFamiliar": "Getting familiar",
+        "findingTheirFeet": "Finding their feet",
+        "gettingComfortable": "Getting comfortable",
+        "nearlyMastered": "Nearly mastered",
+        "mastered": "Mastered"
       }
     },
     "weeklyReport": {
@@ -2936,5 +2945,8 @@
       "next": "Next card",
       "dots": "Page {{current}} of {{total}}"
     }
+  },
+  "profiles": {
+    "title": "Profiles"
   }
 }

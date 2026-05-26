@@ -1,7 +1,46 @@
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { ChatMessage } from '../../../../components/session';
 import { SessionMessageActions } from '../../../../components/session/SessionMessageActions';
 import { getConfidenceCopy } from '../_lib/confidence-copy';
+
+// Extracted so useTranslation can run in a component (renderSessionMessageActions
+// is a plain function called inside another render, not a component itself).
+function SessionExpiredActions({
+  onStartNewSession,
+  onHomeBack,
+}: {
+  onStartNewSession: () => void;
+  onHomeBack: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View className="flex-row gap-2 mt-2">
+      <Pressable
+        onPress={onStartNewSession}
+        className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[44px]"
+        accessibilityRole="button"
+        accessibilityLabel={t('session.expired.startNewSession')}
+        testID="session-expired-new-session"
+      >
+        <Text className="text-body-sm font-semibold text-text-inverse">
+          {t('session.expired.startNewSession')}
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={onHomeBack}
+        className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[44px]"
+        accessibilityRole="button"
+        accessibilityLabel={t('common.goHome')}
+        testID="session-expired-go-home"
+      >
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          {t('common.goHome')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
 
 type SessionMessageActionsProps = React.ComponentProps<
   typeof SessionMessageActions
@@ -43,30 +82,10 @@ export function renderSessionMessageActions(
   // [M5] Session-expired message: offer escape actions instead of normal chips.
   if (message.kind === 'session_expired') {
     return (
-      <View className="flex-row gap-2 mt-2">
-        <Pressable
-          onPress={handleStartNewSession}
-          className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[44px]"
-          accessibilityRole="button"
-          accessibilityLabel="Start new session"
-          testID="session-expired-new-session"
-        >
-          <Text className="text-body-sm font-semibold text-text-inverse">
-            Start new session
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={handleHomeBack}
-          className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[44px]"
-          accessibilityRole="button"
-          accessibilityLabel="Go Home"
-          testID="session-expired-go-home"
-        >
-          <Text className="text-body-sm font-semibold text-text-secondary">
-            Go Home
-          </Text>
-        </Pressable>
-      </View>
+      <SessionExpiredActions
+        onStartNewSession={handleStartNewSession}
+        onHomeBack={handleHomeBack}
+      />
     );
   }
 

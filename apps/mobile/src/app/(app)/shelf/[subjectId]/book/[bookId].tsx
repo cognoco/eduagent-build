@@ -67,66 +67,16 @@ import {
 import { useProfile } from '../../../../../lib/profile';
 import { useActiveProfileRole } from '../../../../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../../../../lib/session-detail-navigation';
+import {
+  computeBookRetentionStatus,
+  groupSessionsByChapter,
+  groupTopicsByChapter,
+} from './_view-models/book-derived-state';
+import { getBookStickyCtaLabel } from './_view-models/book-sticky-cta';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Derive a book-level retention status from per-topic nextReviewAt values.
- * Uses the same thresholds as services/progress.ts computeRetentionStatus:
- *   > 3 days until review = strong
- *   > 0 days = fading
- *   > -7 days = weak
- *   else = forgotten
- * Aggregation: if >30% forgotten → forgotten, >30% weak+forgotten → weak,
- * >30% fading+weak+forgotten → fading, else strong.
- */
-function computeBookRetentionStatus(
-  nextReviewAtValues: (string | null)[],
-): RetentionStatus | null {
-  if (nextReviewAtValues.length === 0) return null;
-  const now = Date.now();
-  const statuses = nextReviewAtValues.map((v): RetentionStatus => {
-    if (!v) return 'forgotten';
-    const daysUntilReview =
-      (new Date(v).getTime() - now) / (1000 * 60 * 60 * 24);
-    if (daysUntilReview > 3) return 'strong';
-    if (daysUntilReview > 0) return 'fading';
-    if (daysUntilReview > -7) return 'weak';
-    return 'forgotten';
-  });
-  const forgottenCount = statuses.filter((s) => s === 'forgotten').length;
-  const weakCount = statuses.filter((s) => s === 'weak').length;
-  const fadingCount = statuses.filter((s) => s === 'fading').length;
-  const n = statuses.length;
-  if (forgottenCount > n * 0.3) return 'forgotten';
-  if (weakCount + forgottenCount > n * 0.3) return 'weak';
-  if (fadingCount + weakCount + forgottenCount > n * 0.3) return 'fading';
-  return 'strong';
-}
-
-interface GroupedChapter {
-  chapter: string;
-  sessions: BookSession[];
-}
-
-function groupSessionsByChapter(sessions: BookSession[]): GroupedChapter[] {
-  const map = new Map<string, BookSession[]>();
-  for (const s of sessions) {
-    const key = s.chapter ?? 'Topics';
-    const group = map.get(key);
-    if (group) {
-      group.push(s);
-    } else {
-      map.set(key, [s]);
-    }
-  }
-  return Array.from(map.entries()).map(([chapter, items]) => ({
-    chapter,
-    sessions: items,
-  }));
-}
 
 interface BookSectionStripProps {
   testID: string;
@@ -241,31 +191,6 @@ function BookSectionStrip({
       </View>
     </Pressable>
   );
-}
-
-interface GroupedTopicChapter {
-  chapter: string;
-  topics: CurriculumTopic[];
-}
-
-function groupTopicsByChapter(
-  topics: CurriculumTopic[],
-): GroupedTopicChapter[] {
-  const map = new Map<string, CurriculumTopic[]>();
-  for (const t of topics) {
-    // null chapter → "Other" per spec (Book | Topics with null chapter)
-    const key = t.chapter ?? 'Other';
-    const group = map.get(key);
-    if (group) {
-      group.push(t);
-    } else {
-      map.set(key, [t]);
-    }
-  }
-  return Array.from(map.entries()).map(([chapter, chapterTopics]) => ({
-    chapter,
-    topics: [...chapterTopics].sort((a, b) => a.sortOrder - b.sortOrder),
-  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -1974,45 +1899,23 @@ export default function BookScreen() {
       {/* Sticky CTA - adapts to learner state */}
       {activeTopics.length > 0 && !isReadOnly
         ? (() => {
-            const hasContinue = !!primaryContinueTopic;
-            const hasUpNext = !!upNextTopic;
             const hasStarted = visibleStartedTopicIds.length > 0;
+            const newestStartedId = visibleStartedTopicIds[0];
+            const newestStartedTopic = newestStartedId
+              ? topicById.get(newestStartedId)
+              : null;
+            const label = getBookStickyCtaLabel({
+              isBookComplete,
+              continueTopicTitle: primaryContinueTopic?.title ?? null,
+              upNextTopicTitle: upNextTopic?.title ?? null,
+              newestStartedTopicTitle: newestStartedTopic?.title ?? null,
+            });
 
-            if (isBookComplete) {
+            if (
+              !label ||
+              (!upNextTopic && !primaryContinueTopic && !hasStarted)
+            ) {
               return null;
-            }
-
-            if (!hasContinue && !hasUpNext && !hasStarted) {
-              return null;
-            }
-
-            let label: string;
-            if (hasContinue) {
-              // [BUG-895] Surface the topic title in the sticky CTA so the
-              // user knows exactly which highlighted row they're resuming.
-              const continueTitle = primaryContinueTopic?.title ?? '';
-              const truncatedContinueTitle =
-                continueTitle.length > 25
-                  ? `${continueTitle.slice(0, 24)}...`
-                  : continueTitle;
-              label = truncatedContinueTitle
-                ? `▶ Continue: ${truncatedContinueTitle}`
-                : '▶ Continue learning';
-            } else if (hasUpNext) {
-              const truncatedTitle =
-                upNextTopic.title.length > 25
-                  ? `${upNextTopic.title.slice(0, 24)}...`
-                  : upNextTopic.title;
-              label = `▶ Start: ${truncatedTitle}`;
-            } else {
-              const newestStartedId = visibleStartedTopicIds[0];
-              const newestStartedTopic = newestStartedId
-                ? topicById.get(newestStartedId)
-                : null;
-              const title = newestStartedTopic?.title ?? '';
-              const truncatedTitle =
-                title.length > 25 ? `${title.slice(0, 24)}...` : title;
-              label = `▶ Resume: ${truncatedTitle}`;
             }
 
             return (
