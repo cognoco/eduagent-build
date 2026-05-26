@@ -185,14 +185,22 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           const activeTopicCount = existing.topics.filter(
             (topic) => !topic.skipped,
           ).length;
-          if (existing.book.topicsGenerated && activeTopicCount === 0) {
+          if (
+            existing.book.topicsGenerated &&
+            activeTopicCount < MIN_GENERATED_BOOK_TOPICS
+          ) {
             if (isStaleBookGenerationClaim(existing.book.updatedAt)) {
-              await releaseBookGenerationClaimIfEmpty(
+              const learnerAge = await getProfileAge(db, profileId);
+              const expanded = await expandExistingBookTopics(
                 db,
+                profileId,
                 subjectId,
                 bookId,
-                profileId,
+                existing,
+                priorKnowledge,
+                { learnerAge, generateBookTopics, captureException },
               );
+              return c.json(bookWithTopicsSchema.parse(expanded));
             }
             return apiError(
               c,

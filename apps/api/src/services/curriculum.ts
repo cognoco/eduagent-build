@@ -864,7 +864,16 @@ export async function releaseBookGenerationClaimIfEmpty(
         )`,
         sql`NOT EXISTS (
           SELECT 1 FROM curriculum_topics
+          INNER JOIN curricula
+          ON curricula.id = curriculum_topics.curriculum_id
           WHERE curriculum_topics.book_id = ${bookId}
+          AND curriculum_topics.skipped = false
+          AND curricula.subject_id = ${subjectId}
+          AND curricula.version = (
+            SELECT MAX(latest_curricula.version)
+            FROM curricula AS latest_curricula
+            WHERE latest_curricula.subject_id = ${subjectId}
+          )
         )`,
       ),
     );

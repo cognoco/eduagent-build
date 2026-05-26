@@ -2033,6 +2033,25 @@ describe('releaseBookGenerationClaimIfEmpty', () => {
     expect(whereText).toContain('subject_id');
     expect(whereText).toContain(SUBJECT_ID.toLowerCase());
   });
+
+  it('[WI-142] only treats non-skipped latest-curriculum topics as blocking release', async () => {
+    const where = jest.fn().mockResolvedValue(undefined);
+    const set = jest.fn().mockReturnValue({ where });
+    const update = jest.fn().mockReturnValue({ set });
+    const db = { update } as unknown as Database;
+
+    await releaseBookGenerationClaimIfEmpty(
+      db,
+      SUBJECT_ID,
+      'book-1',
+      PROFILE_ID,
+    );
+
+    const whereText = extractSqlTextAndValues(where.mock.calls[0][0]).join(' ');
+    expect(whereText).toContain('curriculum_topics.skipped = false');
+    expect(whereText).toContain('curricula.version = (');
+    expect(whereText).toContain('max(latest_curricula.version)');
+  });
 });
 
 describe('deleteTopicIfSafe', () => {
