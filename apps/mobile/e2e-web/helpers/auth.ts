@@ -9,6 +9,7 @@ export interface SignInOptions {
   password: string;
   landingTestId: string;
   landingPath?: string;
+  activeProfileId?: string;
 }
 
 export interface PersistedSignInOptions extends SignInOptions {
@@ -34,6 +35,7 @@ async function isAppShellAtPathVisible(
 
 type SignedInReadyState =
   | 'post-approval'
+  | 'welcome-intro'
   | 'landing'
   | 'app-shell'
   | 'error-boundary';
@@ -47,6 +49,7 @@ async function waitForSignedInReady(
   const maxProfileLoadRetries = 3;
   const deadline = Date.now() + timeout;
   const postApproval = page.getByTestId('post-approval-continue');
+  const welcomeIntro = page.getByTestId('welcome-intro');
   const landing = page.getByTestId(options.landingTestId);
   const errorBoundary = page.getByTestId('error-boundary-fallback');
   const profileLoadError = page.getByTestId('profile-load-error');
@@ -64,6 +67,10 @@ async function waitForSignedInReady(
       (await postApproval.isVisible().catch(() => false))
     ) {
       return 'post-approval';
+    }
+
+    if (await welcomeIntro.isVisible().catch(() => false)) {
+      return 'welcome-intro';
     }
 
     if (await landing.isVisible().catch(() => false)) {
@@ -110,6 +117,65 @@ async function waitForSignedInReady(
   );
 }
 
+async function completeWelcomeIntro(page: Page): Promise<void> {
+  const nextButton = page.getByTestId('welcome-next-button');
+  const startButton = page.getByTestId('welcome-start-button');
+
+  for (let step = 0; step < 8; step++) {
+    if (await startButton.isVisible().catch(() => false)) {
+      await pressableClick(startButton);
+      return;
+    }
+
+    if (await nextButton.isVisible().catch(() => false)) {
+      await pressableClick(nextButton);
+      await page.waitForTimeout(250);
+      continue;
+    }
+
+    await page.waitForTimeout(250);
+  }
+
+  throw new Error('Timed out advancing welcome intro during sign-in');
+}
+
+function decodeJwtPayload(token: string): { sub?: string } | null {
+  const [, payload] = token.split('.');
+  if (!payload) return null;
+
+  try {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8')) as {
+      sub?: string;
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function markWelcomeIntroSeenFromSession(page: Page): Promise<boolean> {
+  const cookies = await page.context().cookies();
+  const sessionCookie = cookies.find((cookie) => cookie.name === '__session');
+  const userId = sessionCookie
+    ? decodeJwtPayload(sessionCookie.value)?.sub
+    : undefined;
+
+  if (!userId) return false;
+
+  const key = `intro_seen_v1_${userId}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+  await page.evaluate(
+    ({ storageKey }) => {
+      window.localStorage.setItem(storageKey, new Date().toISOString());
+    },
+    { storageKey: key },
+  );
+  return true;
+}
+
 export async function signIn(
   page: Page,
   options: SignInOptions,
@@ -137,6 +203,18 @@ export async function signIn(
   await page.getByTestId('sign-in-email').fill(options.email);
   await page.getByTestId('sign-in-password').fill(options.password);
   await page.getByTestId('sign-in-button').click();
+  await expect
+    .poll(async () => markWelcomeIntroSeenFromSession(page), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+  if (options.activeProfileId) {
+    await page.evaluate((profileId) => {
+      window.localStorage.setItem('mentomate_active_profile_id', profileId);
+      window.localStorage.removeItem('parent-proxy-active');
+    }, options.activeProfileId);
+  }
+  await page.goto(options.landingPath ?? '/home', { waitUntil: 'commit' });
 
   try {
     // Tap through the post-approval landing if it appears (fresh SecureStore)
@@ -167,6 +245,38 @@ export async function signIn(
           diagnostics
             ? `Post-approval flow landed on the app error boundary: ${diagnostics}`
             : 'Post-approval flow landed on the app error boundary.',
+        );
+      }
+
+      if (second === 'welcome-intro') {
+        await completeWelcomeIntro(page);
+        const third = await waitForSignedInReady(page, options, {
+          allowPostApproval: false,
+        });
+
+        if (third === 'error-boundary') {
+          const diagnostics = [...pageErrors, ...consoleErrors].join(' | ');
+          throw new Error(
+            diagnostics
+              ? `Post-welcome flow landed on the app error boundary: ${diagnostics}`
+              : 'Post-welcome flow landed on the app error boundary.',
+          );
+        }
+      }
+    }
+
+    if (first === 'welcome-intro') {
+      await completeWelcomeIntro(page);
+      const second = await waitForSignedInReady(page, options, {
+        allowPostApproval: false,
+      });
+
+      if (second === 'error-boundary') {
+        const diagnostics = [...pageErrors, ...consoleErrors].join(' | ');
+        throw new Error(
+          diagnostics
+            ? `Post-welcome flow landed on the app error boundary: ${diagnostics}`
+            : 'Post-welcome flow landed on the app error boundary.',
         );
       }
     }

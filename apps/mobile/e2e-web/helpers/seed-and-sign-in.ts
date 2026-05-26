@@ -4,15 +4,17 @@ import { signIn, type SignInOptions } from './auth';
 import { buildSeedEmail } from './runtime';
 import { seedScenario, type SeedResponse } from './test-seed';
 
-interface SeedAndSignInOptions
-  extends Omit<SignInOptions, 'email' | 'password'> {
+interface SeedAndSignInOptions extends Omit<
+  SignInOptions,
+  'email' | 'password'
+> {
   scenario: string;
   alias: string;
 }
 
 export async function seedAndSignIn(
   page: Page,
-  options: SeedAndSignInOptions
+  options: SeedAndSignInOptions,
 ): Promise<SeedResponse> {
   const suffix = randomBytes(2).toString('hex');
   const seeded = await seedScenario({
@@ -25,6 +27,7 @@ export async function seedAndSignIn(
     password: seeded.password,
     landingTestId: options.landingTestId,
     landingPath: options.landingPath,
+    activeProfileId: seeded.profileId || undefined,
   });
 
   return seeded;
