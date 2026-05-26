@@ -22,6 +22,17 @@ jest.mock(
 
 let mockLinkedChildren: Profile[] = [];
 let mockDashboardData: DashboardData | undefined;
+let mockChildCapNotifications: Array<{
+  id: string;
+  ownerProfileId: string;
+  childProfileId: string;
+  childDisplayName: string;
+  kind: 'daily_exceeded' | 'monthly_exceeded';
+  occurredOn: string;
+  resetsAt: string;
+  createdAt: string;
+}> = [];
+const mockDismissChildCapNotification = jest.fn();
 
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
@@ -51,6 +62,17 @@ jest.mock(
     useSubscription: () => ({ data: { tier: 'family' } }),
     useFamilySubscription: () => ({
       data: { profileCount: 2, maxProfiles: 5 },
+    }),
+  }),
+);
+
+jest.mock(
+  '../../hooks/use-child-cap-notifications' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
+  () => ({
+    useChildCapNotifications: () => ({ data: mockChildCapNotifications }),
+    useDismissChildCapNotification: () => ({
+      mutate: mockDismissChildCapNotification,
+      isPending: false,
     }),
   }),
 );
@@ -167,6 +189,7 @@ describe('ParentHomeScreen', () => {
     jest.clearAllMocks();
     mockLinkedChildren = [];
     mockDashboardData = undefined;
+    mockChildCapNotifications = [];
     capturedBannerProps = null;
   });
 
@@ -675,5 +698,44 @@ describe('ParentHomeScreen', () => {
       displayName: 'Emma',
       respondedAt,
     });
+  });
+
+  it('renders child-cap notifications with reset-time copy and dismiss action', async () => {
+    mockLinkedChildren = [CHILD_A];
+    mockChildCapNotifications = [
+      {
+        id: 'b0000000-0000-4000-8000-000000000001',
+        ownerProfileId: 'profile-1',
+        childProfileId: 'child-a',
+        childDisplayName: 'Emma',
+        kind: 'daily_exceeded',
+        occurredOn: '2026-05-26',
+        resetsAt: '2026-05-27T01:00:00.000Z',
+        createdAt: '2026-05-26T12:00:00.000Z',
+      },
+    ];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    screen.getByTestId(
+      'parent-home-child-cap-notification-b0000000-0000-4000-8000-000000000001',
+    );
+    screen.getByText("Emma hit today's question limit");
+    const message = screen.getByTestId(
+      'parent-home-child-cap-notification-message-b0000000-0000-4000-8000-000000000001',
+    ).props.children;
+    expect(String(message)).toContain('They can try again after');
+    expect(String(message)).not.toMatch(/midnight|1st/i);
+
+    fireEvent.press(
+      screen.getByTestId(
+        'parent-home-child-cap-notification-dismiss-b0000000-0000-4000-8000-000000000001',
+      ),
+    );
+
+    expect(mockDismissChildCapNotification).toHaveBeenCalledWith(
+      'b0000000-0000-4000-8000-000000000001',
+    );
   });
 });

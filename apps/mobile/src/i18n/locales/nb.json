@@ -31,6 +31,16 @@
       "message": "Dette tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen."
     }
   },
+  "quota": {
+    "parent": {
+      "childCapHit": {
+        "title": "{{childName}} har nådd dagens spørsmålsgrense",
+        "dailyMessage": "Barnet kan prøve igjen etter {{resetAt}}. Family gir familien mer rom.",
+        "monthlyMessage": "Barnet kan stille flere spørsmål etter {{resetAt}}. Family gir familien en felles månedspott.",
+        "dismiss": "Lukk"
+      }
+    }
+  },
   "errors": {
     "generic": "Noe uventet skjedde. Prøv igjen.",
     "networkError": "Ser ut som du er frakoblet eller at serverne våre ikke kan nås. Sjekk internettforbindelsen din og prøv igjen.",

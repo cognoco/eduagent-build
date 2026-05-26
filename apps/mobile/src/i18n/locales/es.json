@@ -31,6 +31,16 @@
       "message": "Esto está tardando más de lo esperado. Revisa tu conexión e inténtalo de nuevo."
     }
   },
+  "quota": {
+    "parent": {
+      "childCapHit": {
+        "title": "{{childName}} alcanzó el límite de preguntas de hoy",
+        "dailyMessage": "Podrá intentarlo de nuevo después de {{resetAt}}. Family le da más margen a tu hogar.",
+        "monthlyMessage": "Podrá hacer más preguntas después de {{resetAt}}. Family le da a tu hogar una bolsa mensual compartida.",
+        "dismiss": "Descartar"
+      }
+    }
+  },
   "errors": {
     "generic": "Ocurrió algo inesperado. Inténtalo de nuevo.",
     "networkError": "Parece que no tienes conexión o no podemos contactar con nuestros servidores. Revisa tu conexión a internet e inténtalo de nuevo.",

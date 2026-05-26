@@ -107,6 +107,7 @@ import {
   filingAutoRetryAttemptedObserve,
 } from './functions/filing-observe';
 import { needsDeepeningExpirePending } from './functions/needs-deepening-expire-pending';
+import { notifyParentChildCapHit } from './functions/notify-parent-child-cap-hit';
 
 export {
   inngest,
@@ -186,6 +187,7 @@ export {
   sessionFilingResolvedObserve,
   filingAutoRetryAttemptedObserve,
   needsDeepeningExpirePending,
+  notifyParentChildCapHit,
 };
 
 // All Inngest functions to register with the serve handler
@@ -267,4 +269,5 @@ export const functions = [
   sessionFilingResolvedObserve,
   filingAutoRetryAttemptedObserve,
   needsDeepeningExpirePending,
+  notifyParentChildCapHit,
 ];

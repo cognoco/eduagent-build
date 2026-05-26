@@ -31,6 +31,16 @@
       "message": "Isso está demorando mais que o esperado. Verifique sua conexão e tente novamente."
     }
   },
+  "quota": {
+    "parent": {
+      "childCapHit": {
+        "title": "{{childName}} atingiu o limite de perguntas de hoje",
+        "dailyMessage": "Pode tentar de novo depois de {{resetAt}}. O Family dá mais margem à sua família.",
+        "monthlyMessage": "Poderá fazer mais perguntas depois de {{resetAt}}. O Family dá à sua família um pacote mensal compartilhado.",
+        "dismiss": "Dispensar"
+      }
+    }
+  },
   "errors": {
     "generic": "Ocorreu um erro inesperado. Tente novamente.",
     "networkError": "Parece que você está offline ou nossos servidores estão inacessíveis. Verifique sua conexão com a internet e tente novamente.",

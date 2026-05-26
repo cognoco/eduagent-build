@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isoDateField } from './common.ts';
+import { childCapNotificationKindSchema } from './notifications.ts';
 
 export const filingTimedOutEventSchema = z.object({
   sessionId: z.string().uuid(),
@@ -101,6 +102,17 @@ export const appNotificationSuppressedEventSchema = z.object({
 });
 export type AppNotificationSuppressedEvent = z.infer<
   typeof appNotificationSuppressedEventSchema
+>;
+
+export const billingProfileQuotaExhaustedEventSchema = z.object({
+  subscriptionId: z.string().min(1),
+  profileId: z.string().min(1),
+  kind: childCapNotificationKindSchema,
+  resetsAt: isoDateField,
+  occurredAt: isoDateField,
+});
+export type BillingProfileQuotaExhaustedEvent = z.infer<
+  typeof billingProfileQuotaExhaustedEventSchema
 >;
 
 export const reviewCalibrationRequestedEventSchema = z.object({

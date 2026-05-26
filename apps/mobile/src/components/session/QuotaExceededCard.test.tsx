@@ -10,15 +10,25 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-// BUG-143: child "notify parent" action calls useNotifyParentSubscribe.
-// Mock the settings hook surface so the card can exercise notify state
-// without spinning the full API client / React Query infrastructure.
-const mockNotifyMutate = jest.fn();
+// BUG-143 legacy path. PR3 must stop using this subscribe-specific endpoint
+// for quota caps; keep the mock so the test can prove it is not touched.
+const mockLegacySubscribeMutate = jest.fn();
 jest.mock(
   '../../hooks/use-settings' /* gc1-allow: useNotifyParentSubscribe is a thin react-query wrapper around a real network mutation */,
   () => ({
     // Mocked at the hook boundary so this UI test can drive sending/sent/failed states deterministically.
     useNotifyParentSubscribe: () => ({
+      mutate: mockLegacySubscribeMutate,
+      isPending: false,
+    }),
+  }),
+);
+
+const mockNotifyMutate = jest.fn();
+jest.mock(
+  '../../hooks/use-child-cap-notifications' /* gc1-allow: hook wraps quota notification API boundary */,
+  () => ({
+    useNotifyParentChildCap: () => ({
       mutate: mockNotifyMutate,
       isPending: false,
     }),
@@ -29,7 +39,11 @@ const { QuotaExceededCard } = require('./QuotaExceededCard');
 
 const ownerDetails = {
   tier: 'free' as const,
+  effectiveAccessTier: 'free' as const,
+  quotaModel: 'per-profile' as const,
+  profileRole: 'child' as const,
   reason: 'monthly' as const,
+  resetsAt: '2026-06-01T00:00:00.000Z',
   monthlyLimit: 100,
   usedThisMonth: 100,
   dailyLimit: 10,
@@ -123,7 +137,14 @@ describe('QuotaExceededCard', () => {
     it('tapping notify-parent invokes the mutation', () => {
       render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
       fireEvent.press(screen.getByTestId('quota-notify-parent-btn'));
-      expect(mockNotifyMutate).toHaveBeenCalledTimes(1);
+      expect(mockNotifyMutate).toHaveBeenCalledWith(
+        {
+          kind: 'monthly_exceeded',
+          resetsAt: '2026-06-01T00:00:00.000Z',
+        },
+        expect.any(Object),
+      );
+      expect(mockLegacySubscribeMutate).not.toHaveBeenCalled();
     });
 
     it('shows confirmation copy after successful notify', async () => {

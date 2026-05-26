@@ -31,6 +31,16 @@
       "message": "Das dauert länger als erwartet. Bitte überprüfe deine Verbindung und versuche es erneut."
     }
   },
+  "quota": {
+    "parent": {
+      "childCapHit": {
+        "title": "{{childName}} hat das heutige Fragenlimit erreicht",
+        "dailyMessage": "Ab {{resetAt}} kann weitergelernt werden. Family gibt eurem Haushalt mehr Spielraum.",
+        "monthlyMessage": "Ab {{resetAt}} können wieder Fragen gestellt werden. Family gibt eurem Haushalt einen gemeinsamen Monatspool.",
+        "dismiss": "Ausblenden"
+      }
+    }
+  },
   "errors": {
     "generic": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.",
     "networkError": "Du scheinst offline zu sein oder unsere Server sind nicht erreichbar. Überprüfe deine Internetverbindung und versuche es erneut.",

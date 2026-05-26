@@ -31,6 +31,16 @@
       "message": "Trwa to dłużej niż oczekiwano. Sprawdź połączenie i spróbuj ponownie."
     }
   },
+  "quota": {
+    "parent": {
+      "childCapHit": {
+        "title": "Dzisiejszy limit pytań dla {{childName}} został wykorzystany",
+        "dailyMessage": "Można spróbować ponownie po {{resetAt}}. Family daje domownikom więcej miejsca.",
+        "monthlyMessage": "Więcej pytań będzie dostępnych po {{resetAt}}. Family daje domownikom wspólną miesięczną pulę.",
+        "dismiss": "Zamknij"
+      }
+    }
+  },
   "errors": {
     "generic": "Wystąpił nieoczekiwany błąd. Spróbuj ponownie.",
     "networkError": "Wygląda na to, że jesteś offline lub nasze serwery są niedostępne. Sprawdź połączenie z internetem i spróbuj ponownie.",

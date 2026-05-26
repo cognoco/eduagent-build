@@ -31,6 +31,16 @@
       "message": "想定より時間がかかっています。接続を確認して、もう一度お試しください。"
     }
   },
+  "quota": {
+    "parent": {
+      "childCapHit": {
+        "title": "{{childName}}さんが今日の質問上限に達しました",
+        "dailyMessage": "{{resetAt}}以降にもう一度試せます。Familyなら家族全体でもっと余裕を持てます。",
+        "monthlyMessage": "{{resetAt}}以降にまた質問できます。Familyなら家族で使える月間プールが増えます。",
+        "dismiss": "閉じる"
+      }
+    }
+  },
   "errors": {
     "generic": "予期しないエラーが発生しました。もう一度お試しください。",
     "networkError": "オフラインか、サーバーに接続できないようです。インターネット接続を確認して、もう一度お試しください。",

@@ -17,10 +17,15 @@ function nextMonthlyReset(now: Date): Date {
   return cycleResetAt;
 }
 
+type ReconcileQuotaOptions = {
+  resetExpiredSharedPoolUsage?: boolean;
+};
+
 export async function reconcileQuotaStateForSubscription(
   db: Database,
   subscriptionId: string,
   now = new Date(),
+  options?: ReconcileQuotaOptions,
 ): Promise<SubscriptionTier | null> {
   const subscription = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, subscriptionId),
@@ -42,6 +47,7 @@ export async function reconcileQuotaStateForSubscription(
     subscriptionId,
     effectiveAccessTier,
     now,
+    options,
   );
   return effectiveAccessTier;
 }
@@ -51,10 +57,26 @@ export async function reconcileQuotaStateForEffectiveTier(
   subscriptionId: string,
   tier: SubscriptionTier,
   now = new Date(),
+  options?: ReconcileQuotaOptions,
 ): Promise<void> {
   const config = getTierConfig(tier);
 
   if (config.quotaModel === 'shared-pool') {
+    const nextReset = nextMonthlyReset(now);
+    const resetExpiredUsage = options?.resetExpiredSharedPoolUsage ?? true;
+    const sharedPoolUpdateSet = {
+      monthlyLimit: config.monthlyQuota,
+      dailyLimit: config.dailyLimit,
+      updatedAt: now,
+      ...(resetExpiredUsage
+        ? {
+            usedThisMonth: sql<number>`CASE WHEN ${quotaPools.cycleResetAt} <= ${now} THEN 0 ELSE ${quotaPools.usedThisMonth} END`,
+            usedToday: sql<number>`CASE WHEN ${quotaPools.cycleResetAt} <= ${now} THEN 0 ELSE ${quotaPools.usedToday} END`,
+            cycleResetAt: sql<Date>`CASE WHEN ${quotaPools.cycleResetAt} <= ${now} THEN ${nextReset} ELSE ${quotaPools.cycleResetAt} END`,
+          }
+        : {}),
+    };
+
     await db
       .delete(profileQuotaUsage)
       .where(eq(profileQuotaUsage.subscriptionId, subscriptionId));
@@ -67,17 +89,13 @@ export async function reconcileQuotaStateForEffectiveTier(
         usedThisMonth: 0,
         dailyLimit: config.dailyLimit,
         usedToday: 0,
-        cycleResetAt: nextMonthlyReset(now),
+        cycleResetAt: nextReset,
       })
       .onConflictDoUpdate({
         target: quotaPools.subscriptionId,
-        // Existing shared pools are mid-cycle state; only the limits change here.
-        // Cycle resets are handled by the quota reset cron.
-        set: {
-          monthlyLimit: config.monthlyQuota,
-          dailyLimit: config.dailyLimit,
-          updatedAt: now,
-        },
+        // Preserve active mid-cycle usage, but clear stale counters when a
+        // subscription re-enters shared-pool metering after its old cycle ended.
+        set: sharedPoolUpdateSet,
       });
     return;
   }
