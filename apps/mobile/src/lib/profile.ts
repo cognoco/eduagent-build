@@ -107,6 +107,7 @@ const ACTIVE_PROFILE_KEY = sanitizeSecureStoreKey(
   'mentomate_active_profile_id',
 );
 const PARENT_PROXY_KEY = sanitizeSecureStoreKey('parent-proxy-active');
+const ACTIVE_PROFILE_RESTORE_TIMEOUT_MS = 2_500;
 
 export const PROFILE_SCOPED_KEYS = [
   'all-notes',
@@ -201,13 +202,39 @@ export function useHasLinkedChildren(): boolean {
   return useLinkedChildren().length > 0;
 }
 
+async function getSecureStoreItemWithTimeout(
+  key: string,
+  timeoutMs: number,
+): Promise<string | null> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      SecureStore.getItemAsync(key),
+      new Promise<null>((resolve) => {
+        timeoutId = setTimeout(() => {
+          Sentry.addBreadcrumb({
+            category: 'profile',
+            level: 'warning',
+            message: 'active profile SecureStore read timed out',
+          });
+          resolve(null);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export function ProfileProvider({
   children,
 }: {
   children: ReactNode;
 }): ReactNode {
   const profilesQuery = useProfiles();
-  const profiles = profilesQuery.data ?? [];
+  const profiles = useMemo(() => profilesQuery.data ?? [], [profilesQuery.data]);
   const isProfilesLoading = profilesQuery.isLoading;
   const isProfilesFetching = profilesQuery.isFetching;
   // A stale-while-refetch failure should not eject a signed-in user from the
@@ -228,7 +255,10 @@ export function ProfileProvider({
   useEffect(() => {
     const restore = async () => {
       try {
-        const savedId = await SecureStore.getItemAsync(ACTIVE_PROFILE_KEY);
+        const savedId = await getSecureStoreItemWithTimeout(
+          ACTIVE_PROFILE_KEY,
+          ACTIVE_PROFILE_RESTORE_TIMEOUT_MS,
+        );
         if (savedId) {
           setActiveProfileId(savedId);
         }
