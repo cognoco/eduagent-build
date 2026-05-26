@@ -628,6 +628,12 @@ describe('SubscriptionScreen', () => {
     // (Default subscription tier is 'free'.)
     screen.getByTestId('static-tier-free');
     screen.getByTestId('static-tier-plus');
+    within(screen.getByTestId('static-tier-free')).getByText(
+      /Try it for you and one child/i,
+    );
+    within(screen.getByTestId('static-tier-plus')).getByText(
+      /Child uses Free-tier limits \(100\/mo, 10\/day\)/i,
+    );
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
   });
@@ -681,8 +687,10 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('static-tier-free');
     screen.getByTestId('static-tier-plus');
     // The fix:
-    screen.getByTestId('static-tier-family');
-    screen.getByText(/1,500 shared questions\/month/i);
+    const familyCard = screen.getByTestId('static-tier-family');
+    within(familyCard).getByText(
+      /1,500 shared questions\/month across all profiles/i,
+    );
     // Pro is still hidden — it's not the user's tier and not approved
     // for public listing.
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
@@ -743,7 +751,7 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('static-tier-plus');
     // The fix:
     const proCard = screen.getByTestId('static-tier-pro');
-    within(proCard).getByText(/Unlimited questions/i);
+    within(proCard).getByText(/3,000 shared questions\/month/i);
     // Family is still hidden — it's not this user's tier and not approved
     // for general public listing.
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
@@ -1881,6 +1889,65 @@ describe('SubscriptionScreen', () => {
       expect(
         screen.getByText('You learned 1 topic and earned 50 XP — great work!'),
       ).toBeTruthy();
+    });
+
+    it('[PR3] uses quota-specific copy and notification endpoint when a child has exhausted quota', async () => {
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: makeSubscription({ status: 'active' }),
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockFetch.setRoute(
+        '/usage',
+        () =>
+          new Response(
+            JSON.stringify({
+              usage: {
+                ...DEFAULT_USAGE,
+                warningLevel: 'exceeded',
+                dailyRemainingQuestions: 0,
+                resetsAt: '2026-06-01T00:00:00.000Z',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockFetch.setRoute(
+        '/notifications/child-cap/notify-parent',
+        () =>
+          new Response(JSON.stringify({ sent: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('child-paywall');
+      });
+      screen.getByText(/try again after/i);
+      expect(screen.queryByText(/upgrade/i)).toBeNull();
+
+      fireEvent.press(screen.getByTestId('notify-parent-button'));
+
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(
+            mockFetch,
+            '/notifications/child-cap/notify-parent',
+          ).length,
+        ).toBe(1);
+      });
+      expect(
+        fetchCallsMatching(mockFetch, '/settings/notify-parent-subscribe')
+          .length,
+      ).toBe(0);
     });
 
     it('[B-607] paywall strings flow through i18n (childPaywall + restore + byokWaitlist namespaces)', () => {

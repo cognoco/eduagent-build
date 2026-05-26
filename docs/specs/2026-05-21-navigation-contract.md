@@ -382,20 +382,22 @@ Client rules:
 
 ## Onboarding Intent
 
-> **Decision 2026-05-25:** No dedicated first-run intent screen for V0. Discovery happens on Home and in More, **not** in a forced first-run choice.
+> **Decision 2026-05-25:** No dedicated first-run intent screen for V0. Discovery happens in the Welcome Intro and in More, **not** in a forced first-run choice.
 >
-> Context: the earlier 2026-05-24 decision rested on Free/Plus users being unable to add a learner profile (`maxProfiles: 1`), which made every "Add a child" CTA a paywall tease. That constraint is being lifted by [`docs/specs/2026-05-25-tier-access-rework.md`](./2026-05-25-tier-access-rework.md) — Free and Plus will each support owner + 1 learner profile, with quota as the throttle. Once that rework ships, "Add a learner profile" works on every tier and discoverability stops being a paywall problem.
+> Context: the earlier 2026-05-24 decision rested on Free/Plus users being unable to add a learner profile (`maxProfiles: 1`), which made every "Add a child" CTA a paywall tease. That constraint is being lifted by [`docs/specs/2026-05-25-tier-access-rework.md`](./2026-05-25-tier-access-rework.md) — Free and Plus will each support owner + 1 learner profile, with quota as the throttle. Once that rework ships, "Add a child" works on every tier and discoverability stops being a paywall problem.
 >
 > **V0 discovery surfaces:**
-> - **Home empty-state CTA** for adult owners with zero subjects and zero linked children — primary action "Pick something to study", secondary action "Add a learner profile" (works on every tier post-rework). Lives in `LearnerScreen.tsx`, conditional on `isAdultOwner && subjects.length === 0 && hasLinkedChildren === false`.
-> - **More → Add a learner profile** — existing entry, no tier check needed post-rework. Aligns More with `ParentHomeScreen` server-trust pattern.
+> - **Welcome Intro family card** — explains that parents can add a child later by opening More and tapping "Add a child." This is the only first-run discovery hint in V0.
+> - **More → Add a child** — existing entry, no tier check needed post-rework. Aligns More with the `ParentHomeScreen` server-trust pattern.
 >
-> **Legal/product boundary:** "Add a learner profile" is a discovery and account-setup affordance, not a legal shortcut. Subscription tier must not bypass age checks, consent state, guardian verification, profile scoping, consent redaction, or retention/deletion policy. Free/Plus may create one learner profile, but Family-only surfaces remain Family-only: Recaps, nudges, multi-child management, and full parent workflows.
+> **Home stays quiet:** Do **not** broaden `LearnerScreen.tsx` / `showParentHome` to show a persistent Home empty-state CTA for adult owners with no linked children. Adult owners with zero linked children continue to see the learner home.
+>
+> **Legal/product boundary:** "Add a child" is a discovery and account-setup affordance, not a legal shortcut. Subscription tier must not bypass age checks, consent state, guardian verification, profile scoping, consent redaction, or retention/deletion policy. Family Hub surfaces are tier-open once an adult owner has a linked child; capacity is enforced by profile limits and quota.
 >
 > **Not built for V0:**
-> - `apps/mobile/src/app/(app)/onboarding/intent.tsx` — forced first-run Study/Family choice. The Home CTA covers discovery without forcing a decision under zero context.
+> - `apps/mobile/src/app/(app)/onboarding/intent.tsx` — forced first-run Study/Family choice. The Welcome Intro hint covers discovery without forcing a decision under zero context.
 > - `apps/mobile/src/app/(app)/family/setup.tsx` — standalone setup screen. Adding a learner profile uses the existing `create-profile?for=child` flow.
-> - "Link existing child account" — flow not implemented; do not label any UI with it. Use "Add a learner profile" instead.
+> - "Link existing child account" — flow not implemented; do not label any UI with it. Use "Add a child" / "Add a learner profile" only for the existing new-profile flow.
 >
 > **Revisit when:** V1 navigation contract ships and the Study/Family distinction becomes a first-class app concept users would benefit from declaring up-front. The V1 rules below apply *if and when* the screen is later built.
 

@@ -628,7 +628,17 @@ function SubscriptionContent(): React.ReactElement | null {
   // ---------------------------------------------------------------------------
 
   if (isChild && (trialOrExpired || quotaExhausted)) {
-    return <ChildPaywall />;
+    const quotaKind =
+      usage?.dailyLimit !== null && usage?.dailyRemainingQuestions === 0
+        ? 'daily_exceeded'
+        : 'monthly_exceeded';
+    return (
+      <ChildPaywall
+        mode={quotaExhausted ? 'quota' : 'subscription'}
+        quotaKind={quotaKind}
+        resetsAt={usage?.resetsAt ?? usage?.cycleResetAt}
+      />
+    );
   }
 
   if (isChild) {

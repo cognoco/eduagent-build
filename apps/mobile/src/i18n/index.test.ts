@@ -50,16 +50,32 @@ describe('SUPPORTED_LANGUAGES', () => {
 });
 
 describe('launch locale key parity', () => {
-  const locales = { de, es, ja, nb, pl, pt } as const;
+  const locales = { en, de, es, ja, nb, pl, pt } as const;
 
   it('keeps practice summary activity labels translated in every locale', () => {
     const sections = ['activityTypes', 'activitySubtypes'] as const;
 
-    for (const messages of Object.values(locales)) {
+    for (const messages of [de, es, ja, nb, pl, pt]) {
       for (const section of sections) {
         expect(
           Object.keys(messages.parentView.practiceSummary[section]).sort(),
         ).toEqual(Object.keys(en.parentView.practiceSummary[section]).sort());
+      }
+    }
+  });
+
+  it('keeps obsolete More family paywall keys deleted in every locale', () => {
+    const obsoleteKeys = [
+      'upgradeRequiredTitle',
+      'upgradeRequiredMessage',
+      'viewPlans',
+      'profileLimitTitle',
+      'profileLimitMessage',
+    ] as const;
+
+    for (const messages of Object.values(locales)) {
+      for (const key of obsoleteKeys) {
+        expect(messages.more.family).not.toHaveProperty(key);
       }
     }
   });
