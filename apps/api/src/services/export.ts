@@ -60,6 +60,13 @@ export function serializeDates(
   return out;
 }
 
+const EMBEDDED_ENVELOPE_KEYS = new Set([
+  'reply',
+  'signals',
+  'ui_hints',
+  'private_sources',
+  'confidence',
+]);
 const EMBEDDED_ENVELOPE_SIBLING_KEYS = new Set([
   'signals',
   'ui_hints',
@@ -80,10 +87,12 @@ function isEmbeddedEnvelopeObject(candidate: string): boolean {
   }
 
   const record = parsed as Record<string, unknown>;
+  const keys = Object.keys(record);
   return (
     typeof record['reply'] === 'string' &&
     record['reply'].length > 0 &&
-    Object.keys(record).some((key) => EMBEDDED_ENVELOPE_SIBLING_KEYS.has(key))
+    keys.every((key) => EMBEDDED_ENVELOPE_KEYS.has(key)) &&
+    keys.some((key) => EMBEDDED_ENVELOPE_SIBLING_KEYS.has(key))
   );
 }
 

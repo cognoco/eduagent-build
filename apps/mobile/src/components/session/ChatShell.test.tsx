@@ -1057,6 +1057,24 @@ describe('ChatShell', () => {
         expect.stringContaining('"confidence"'),
       );
     });
+
+    it('[WI-302] does not speak when envelope projection leaves no visible reply', async () => {
+      const envelope = JSON.stringify({
+        reply: '   ',
+        signals: { partial_progress: true },
+      });
+
+      renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'assistant', content: envelope }],
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockSpeak).not.toHaveBeenCalled();
+    });
   });
 
   describe('mic permission refresh', () => {

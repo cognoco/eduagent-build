@@ -423,8 +423,10 @@ export function ChatShell({
     if (lastAiMessage.id === lastSpokenIdRef.current) return;
     if (!lastAiMessage.content.trim()) return;
 
+    const spokenText = stripEnvelopeJson(lastAiMessage.content).trim();
+    if (!spokenText) return;
     lastSpokenIdRef.current = lastAiMessage.id;
-    speak(stripEnvelopeJson(lastAiMessage.content));
+    speak(spokenText);
   }, [messages, isVoiceEnabled, screenReaderEnabled, speak]);
 
   // BUG-348: Stop TTS immediately when screen reader activates mid-session

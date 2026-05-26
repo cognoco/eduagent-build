@@ -3,13 +3,23 @@ export function getSentryQueryKeyTag(queryKey: unknown): string {
     return 'unknown';
   }
 
-  const [firstSegment] = queryKey;
-  if (typeof firstSegment === 'string' && firstSegment.trim().length > 0) {
-    return firstSegment;
-  }
-  if (typeof firstSegment === 'number' || typeof firstSegment === 'boolean') {
-    return String(firstSegment);
+  for (const segment of queryKey) {
+    if (typeof segment !== 'string') continue;
+    const value = segment.trim();
+    if (!value) continue;
+    if (isLikelyIdentifier(value)) continue;
+    return value;
   }
 
   return 'unknown';
+}
+
+function isLikelyIdentifier(value: string): boolean {
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    ) ||
+    /^\d+$/.test(value) ||
+    (/^[A-Za-z0-9_-]{20,}$/.test(value) && /\d/.test(value))
+  );
 }

@@ -13,6 +13,16 @@ describe('getSentryQueryKeyTag [WI-294]', () => {
     expect(tag).not.toContain('profileId');
   });
 
+  it('[WI-294] skips identifier-like first segments before selecting a safe tag', () => {
+    expect(getSentryQueryKeyTag(['550e8400-e29b-41d4-a716-446655440000'])).toBe(
+      'unknown',
+    );
+    expect(getSentryQueryKeyTag([12345, 'topic'])).toBe('topic');
+    expect(
+      getSentryQueryKeyTag(['550e8400-e29b-41d4-a716-446655440000', 'topic']),
+    ).toBe('topic');
+  });
+
   it('uses a stable fallback for empty or non-array keys', () => {
     expect(getSentryQueryKeyTag([])).toBe('unknown');
     expect(getSentryQueryKeyTag('not-an-array')).toBe('unknown');

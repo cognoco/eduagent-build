@@ -427,6 +427,36 @@ describe('generateExport', () => {
     expect(embedding!['content']).not.toContain('"private_sources"');
   });
 
+  it('[WI-213] preserves embedded JSON examples that are not strict envelopes', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const jsonExample = JSON.stringify({
+      reply: 'Keep this field in the export.',
+      signals: { example: true },
+      extra: 'This makes the object arbitrary content, not an envelope.',
+    });
+    const embeddingRows = [
+      {
+        id: 'emb-1',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        content: `Please explain this JSON:\n\n${jsonExample}`,
+        createdAt: NOW,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEmbeddings: embeddingRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
+    expect(embedding!['content']).toBe(
+      `Please explain this JSON:\n\n${jsonExample}`,
+    );
+  });
+
   // [BUG-413] Break tests: Drizzle / neon-serverless returns raw Date objects.
   // Without serializeDates, the export payload carries Date objects in rows
   // that were cast as `Record<string, unknown>[]`.  These are NOT ISO strings
