@@ -288,6 +288,54 @@ describe('buildSystemPrompt — response envelope contract', () => {
   });
 });
 
+describe('buildSystemPrompt — Challenge Round runtime gate', () => {
+  it('does not inject Challenge Round prompts while the runtime flag is disabled', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        challengeEligible: true,
+        challengeRuntimeEnabled: false,
+      }),
+    );
+
+    expect(prompt).not.toContain('Challenge Round');
+    expect(prompt).not.toContain('challenge_round_offer');
+  });
+
+  it('injects the offer prompt when the runtime flag is enabled and the learner is eligible', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        challengeEligible: true,
+        challengeRuntimeEnabled: true,
+      }),
+    );
+
+    expect(prompt).toContain('Challenge Round');
+    expect(prompt).toContain('challenge_round_offer');
+  });
+
+  it('provides the current answer event id during an active Challenge Round', () => {
+    const currentUserMessageEventId = '550e8400-e29b-41d4-a716-446655440010';
+    const prompt = buildSystemPrompt(
+      makeContext({
+        challengeRuntimeEnabled: true,
+        currentUserMessageEventId,
+        challengeRound: {
+          state: 'active',
+          offerCount: 1,
+          topicId: '550e8400-e29b-41d4-a716-446655440000',
+          declinedDontAskAgain: false,
+          questionIndex: 0,
+          totalQuestions: 3,
+          evaluations: [],
+        },
+      }),
+    );
+
+    expect(prompt).toContain(currentUserMessageEventId);
+    expect(prompt).toContain('answerEventId');
+  });
+});
+
 describe('buildSystemPrompt — homework brevity', () => {
   it('caps youth help-me turns so first homework help stays chat-sized', () => {
     const prompt = buildSystemPrompt(

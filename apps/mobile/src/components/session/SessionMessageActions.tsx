@@ -25,6 +25,7 @@ export interface SessionMessageActionsProps {
   quotaError: QuotaExceededDetails | null;
   isOwner: boolean;
   stage: ConversationStage;
+  challengeRoundInFlight?: boolean;
   handleQuickChip: (
     chip: QuickChipId,
     sourceMessageId?: string,
@@ -49,6 +50,7 @@ export function SessionMessageActions({
   quotaError,
   isOwner,
   stage,
+  challengeRoundInFlight = false,
   handleQuickChip,
   handleMessageFeedback,
   onToggleBookmark,
@@ -102,7 +104,7 @@ export function SessionMessageActions({
     message.id !== 'opening' &&
     message.id === latestAiMessageId &&
     message.id !== consumedQuickChipMessageId
-      ? getContextualQuickChips(message)
+      ? getContextualQuickChips(message, { challengeRoundInFlight })
       : [];
   const messageControlChips: Array<{
     id: QuickChipId;

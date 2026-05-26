@@ -1,5 +1,6 @@
 import {
   getConversationStage,
+  getContextualQuickChips,
   isGreeting,
   errorHasCode,
   isTimeoutError,
@@ -100,6 +101,26 @@ describe('isGreeting', () => {
     'hii there',
   ])('rejects non-greeting: "%s"', (text) => {
     expect(isGreeting(text)).toBe(false);
+  });
+});
+
+describe('getContextualQuickChips', () => {
+  const nonQuestionMessage = {
+    id: 'ai-1',
+    role: 'assistant' as const,
+    content: 'You explained that clearly.',
+  };
+
+  it('includes too_easy after a non-question assistant reply by default', () => {
+    expect(getContextualQuickChips(nonQuestionMessage)).toContain('too_easy');
+  });
+
+  it('hides too_easy while a challenge round is in flight', () => {
+    expect(
+      getContextualQuickChips(nonQuestionMessage, {
+        challengeRoundInFlight: true,
+      }),
+    ).toEqual(['know_this', 'explain_differently', 'example']);
   });
 });
 

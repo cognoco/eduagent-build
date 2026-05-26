@@ -28,6 +28,7 @@ import type {
   RecallBridgeResult,
   VerificationType,
   SystemPromptIntent,
+  ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
   useApiClient,
@@ -46,6 +47,8 @@ import { queryKeys } from '../lib/query-keys';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import {
   streamSSEViaXHR,
+  type ChallengeRoundOfferEvent,
+  type DraftedChallengeNoteEvent,
   type FluencyDrillEvent,
   type StreamFallbackReason,
 } from '../lib/sse';
@@ -126,6 +129,24 @@ interface CloseResult {
     | 'skipped'
     | 'auto_closed';
 }
+
+type StreamMessageDoneResult = {
+  exchangeCount: number;
+  escalationRung: number;
+  expectedResponseMinutes?: number;
+  aiEventId?: string;
+  notePrompt?: boolean;
+  notePromptPostSession?: boolean;
+  fluencyDrill?: FluencyDrillEvent;
+  challengeRound?: ChallengeRoundSessionState;
+  challengeOffer?: ChallengeRoundOfferEvent;
+  draftedNote?: DraftedChallengeNoteEvent;
+  confidence?: 'low' | 'medium' | 'high';
+  fallback?: {
+    reason: StreamFallbackReason;
+    fallbackText: string;
+  };
+};
 
 interface SubmitSummaryResult {
   summary: {
@@ -374,20 +395,7 @@ export function useStreamMessage(sessionId: string): {
   stream: (
     message: string,
     onChunk: (accumulated: string) => void,
-    onDone: (result: {
-      exchangeCount: number;
-      escalationRung: number;
-      expectedResponseMinutes?: number;
-      aiEventId?: string;
-      notePrompt?: boolean;
-      notePromptPostSession?: boolean;
-      fluencyDrill?: FluencyDrillEvent;
-      confidence?: 'low' | 'medium' | 'high';
-      fallback?: {
-        reason: StreamFallbackReason;
-        fallbackText: string;
-      };
-    }) => void | Promise<void>,
+    onDone: (result: StreamMessageDoneResult) => void | Promise<void>,
     overrideSessionId?: string,
     options?: {
       homeworkMode?: 'help_me' | 'check_answer';
@@ -418,20 +426,7 @@ export function useStreamMessage(sessionId: string): {
     async (
       message: string,
       onChunk: (accumulated: string) => void,
-      onDone: (result: {
-        exchangeCount: number;
-        escalationRung: number;
-        expectedResponseMinutes?: number;
-        aiEventId?: string;
-        notePrompt?: boolean;
-        notePromptPostSession?: boolean;
-        fluencyDrill?: FluencyDrillEvent;
-        confidence?: 'low' | 'medium' | 'high';
-        fallback?: {
-          reason: StreamFallbackReason;
-          fallbackText: string;
-        };
-      }) => void | Promise<void>,
+      onDone: (result: StreamMessageDoneResult) => void | Promise<void>,
       overrideSessionId?: string,
       options?: {
         homeworkMode?: 'help_me' | 'check_answer';
@@ -528,6 +523,9 @@ export function useStreamMessage(sessionId: string): {
                 notePrompt: event.notePrompt,
                 notePromptPostSession: event.notePromptPostSession,
                 fluencyDrill: event.fluencyDrill,
+                challengeRound: event.challengeRound,
+                challengeOffer: event.challengeOffer,
+                draftedNote: event.draftedNote,
                 confidence: event.confidence,
                 fallback,
               });

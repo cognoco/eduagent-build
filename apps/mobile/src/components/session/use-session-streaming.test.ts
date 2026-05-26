@@ -97,6 +97,9 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     setResponseHistory: jest.fn(),
     setHomeworkProblemsState: jest.fn(),
     setFluencyDrill: jest.fn(),
+    setChallengeRound: jest.fn(),
+    setChallengeOffer: jest.fn(),
+    setDraftedNote: jest.fn(),
     setLowConfidenceMessageId: jest.fn(),
 
     homeworkProblemsState: [],
@@ -404,6 +407,57 @@ describe('useSessionStreaming', () => {
       expect(opts.setExchangeCount).toHaveBeenCalledWith(1);
       expect(opts.setEscalationRung).toHaveBeenCalledWith(0);
       expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
+    });
+
+    it('stores challenge round affordances from the typed done payload', async () => {
+      const challengeRound = {
+        state: 'active',
+        startedAt: '2026-05-26T10:00:00.000Z',
+        questionIndex: 1,
+        totalQuestions: 3,
+        offerCount: 1,
+        topicId: '11111111-1111-4111-8111-111111111111',
+        declinedDontAskAgain: false,
+        evaluations: [],
+      };
+      const draftedNote = {
+        id: 'draft-1',
+        body: null,
+        sourceAnswerEventIds: ['answer-event-1'],
+        fallbackPrompt: 'Write this one in your own words.',
+      };
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string,
+          ) => {
+            onChunk('Challenge time.');
+            await onComplete({
+              aiEventId: 'ai-event-1',
+              exchangeCount: 1,
+              escalationRung: 1,
+              expectedResponseMinutes: 5,
+              challengeRound,
+              challengeOffer: { pitch: 'Want a harder round?' },
+              draftedNote,
+            });
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('I know this already');
+      });
+
+      expect(opts.setChallengeRound).toHaveBeenCalledWith(challengeRound);
+      expect(opts.setChallengeOffer).toHaveBeenCalledWith({
+        pitch: 'Want a harder round?',
+      });
+      expect(opts.setDraftedNote).toHaveBeenCalledWith(draftedNote);
     });
 
     it('attaches a homework image only when the send explicitly requests it', async () => {

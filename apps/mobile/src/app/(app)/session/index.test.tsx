@@ -18,6 +18,10 @@ import {
 } from '../../../test-utils/mock-api-routes';
 import SessionScreen from './index';
 
+// Real session-recovery module; tests spy on readSessionRecoveryMarker as
+// needed via jest.spyOn().
+import * as sessionRecoveryModule from '../../../lib/session-recovery';
+
 // ---------------------------------------------------------------------------
 // Fetch boundary mock — API-calling hooks run against this
 // ---------------------------------------------------------------------------
@@ -138,6 +142,10 @@ const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
+const mockChallengeAccept = jest.fn();
+const mockChallengeDecline = jest.fn();
+const mockChallengeSaveNote = jest.fn();
+const mockChallengeSkipNote = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 
@@ -189,6 +197,19 @@ jest.mock(
     useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
     useParkingLot: () => ({ data: [], isLoading: false }),
     useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  }),
+);
+
+jest.mock(
+  '../../../hooks/use-challenge-round' /* gc1-allow: screen test owns only rendering/wiring; hook tests cover request details */,
+  () => ({
+    useChallengeRound: () => ({
+      accept: mockChallengeAccept,
+      decline: mockChallengeDecline,
+      abort: jest.fn(),
+      saveNote: mockChallengeSaveNote,
+      skipNote: mockChallengeSkipNote,
+    }),
   }),
 );
 
@@ -432,14 +453,10 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../lib/session-recovery' /* gc1-allow: unit test boundary */,
-  () => ({
-    clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-    readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
-    writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-  }),
-);
+// session-recovery uses the real implementation — it just wraps SecureStore
+// (already mocked in-memory below), so the empty-store default returns null
+// naturally. Individual tests use jest.spyOn() on readSessionRecoveryMarker
+// when they need to inject a marker (see hydrates-milestone-tracker test).
 
 const secureStore: Record<string, string> = {};
 jest.mock(
@@ -452,25 +469,25 @@ jest.mock(
       secureStore[key] = value;
       return Promise.resolve();
     }),
+    deleteItemAsync: jest.fn((key: string) => {
+      delete secureStore[key];
+      return Promise.resolve();
+    }),
     // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
     // but the module mock must export it or callers get "not a function".
     sanitizeSecureStoreKey: (raw: string) =>
       raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
   }),
 );
-
-const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
-  require('../../../lib/session-recovery') as {
-    readSessionRecoveryMarker: jest.Mock;
-  };
-
-jest.mock(
-  '../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
-  () => ({
-    formatApiError: (error: unknown) =>
-      error instanceof Error ? error.message : 'Unknown error',
-  }),
+const mockReadSessionRecoveryMarker = jest.spyOn(
+  sessionRecoveryModule,
+  'readSessionRecoveryMarker',
 );
+
+// format-api-error uses real implementation. i18n is initialized globally in
+// test-setup.ts, and no test asserts on specific error-display copy from this
+// formatter — it's only invoked on stream failure paths where the produced
+// text is rendered, not inspected.
 
 jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
   ...jest.requireActual('../../../lib/profile'),
@@ -549,11 +566,11 @@ describe('SessionScreen homework flow', () => {
           exchangeCount: number;
           escalationRung: number;
           aiEventId?: string;
-        }) => void,
+        }) => void | Promise<void>,
       ) => {
         // Real SSE streams always emit at least one token before completion
         onChunk('Got it.');
-        onDone({
+        await onDone({
           exchangeCount: 1,
           escalationRung: 1,
           aiEventId: `event-${++aiEventCount}`,
@@ -609,7 +626,9 @@ describe('SessionScreen homework flow', () => {
     const wrapper = createWrapper();
     const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await act(async () => {
+      fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    });
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -981,6 +1000,242 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('renders a challenge offer from the typed done payload and accepts it', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    mockChallengeAccept.mockResolvedValueOnce({
+      challengeRound: {
+        state: 'accepted',
+        topicId: '11111111-1111-4111-8111-111111111111',
+        offerCount: 1,
+        declinedDontAskAgain: false,
+        evaluations: [],
+      },
+    });
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('You are ready for a challenge.');
+        await onDone({
+          exchangeCount: 1,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-offer',
+          challengeRound: {
+            state: 'offered',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+          challengeOffer: { pitch: 'Want a harder round?' },
+        });
+      },
+    );
+
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('challenge-offer-card');
+      testScreen.getByText('Want a harder round?');
+    });
+
+    fireEvent.press(testScreen.getByTestId('challenge-offer-accept'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockChallengeAccept).toHaveBeenCalledTimes(1);
+      expect(testScreen.queryByTestId('challenge-offer-card')).toBeNull();
+    });
+  });
+
+  it('declines and permanently dismisses a typed challenge offer', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    mockChallengeDecline.mockResolvedValue({
+      challengeRound: {
+        state: 'declined',
+        topicId: '11111111-1111-4111-8111-111111111111',
+        offerCount: 1,
+        declinedDontAskAgain: false,
+        evaluations: [],
+      },
+    });
+    mockStream.mockImplementation(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('You are ready for a challenge.');
+        await onDone({
+          exchangeCount: 1,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-offer',
+          challengeRound: {
+            state: 'offered',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+          challengeOffer: { pitch: 'Want a harder round?' },
+        });
+      },
+    );
+
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+    await waitFor(() => {
+      testScreen.getByTestId('challenge-offer-card');
+    });
+
+    fireEvent.press(testScreen.getByTestId('challenge-offer-decline'));
+    await flushAsyncWork();
+    await waitFor(() => {
+      expect(mockChallengeDecline).toHaveBeenCalledWith(false);
+    });
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+    await waitFor(() => {
+      testScreen.getByTestId('challenge-offer-card');
+    });
+
+    fireEvent.press(testScreen.getByTestId('challenge-offer-dont-ask'));
+    await flushAsyncWork();
+    await waitFor(() => {
+      expect(mockChallengeDecline).toHaveBeenCalledWith(true);
+    });
+  });
+
+  it('renders the active challenge banner and hides the Too easy chip', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('That explanation is solid.');
+        await onDone({
+          exchangeCount: 1,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-active',
+          challengeRound: {
+            state: 'active',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            questionIndex: 1,
+            totalQuestions: 3,
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+        });
+      },
+    );
+
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('challenge-round-banner');
+      testScreen.getByText('Question 2 of 3');
+      expect(testScreen.queryByTestId('quick-chip-too_easy')).toBeNull();
+      testScreen.getByTestId('quick-chip-know_this');
+    });
+  });
+
+  it('renders a drafted note from the typed done payload and saves it', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    mockChallengeSaveNote.mockResolvedValueOnce({ note: { id: 'note-1' } });
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('Here is your note draft.');
+        await onDone({
+          exchangeCount: 3,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-draft',
+          challengeRound: {
+            state: 'drafting',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            questionIndex: 2,
+            totalQuestions: 3,
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+          draftedNote: {
+            id: 'draft-1',
+            body: 'Linear equations stay balanced when you do the same thing to both sides.',
+            sourceAnswerEventIds: ['answer-event-1'],
+          },
+        });
+      },
+    );
+
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('drafted-note-review');
+      testScreen.getByText(
+        'Linear equations stay balanced when you do the same thing to both sides.',
+      );
+    });
+
+    fireEvent.press(testScreen.getByTestId('drafted-note-save'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockChallengeSaveNote).toHaveBeenCalledWith(
+        'Linear equations stay balanced when you do the same thing to both sides.',
+      );
+      expect(testScreen.queryByTestId('drafted-note-review')).toBeNull();
+    });
+  });
+
   it('hydrates milestone tracker state from the recovery marker when resuming', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
@@ -1218,12 +1473,10 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
-    await waitFor(() => {
-      testScreen.getByTestId('session-subject-resolution');
-      expect(
-        testScreen.getAllByText(/math or physics/i).length,
-      ).toBeGreaterThan(0);
-    });
+    testScreen.getByTestId('session-subject-resolution');
+    expect(testScreen.getAllByText(/math or physics/i).length).toBeGreaterThan(
+      0,
+    );
 
     expect(testScreen.queryByTestId('input-disabled-banner')).toBeNull();
     expect(testScreen.queryByText('Switch topic')).toBeNull();
@@ -1231,37 +1484,37 @@ describe('SessionScreen homework flow', () => {
 
     expect(mockStartSession).not.toHaveBeenCalled();
 
-    fireEvent.press(testScreen.getByTestId('subject-resolution-subject-2'));
+    await act(async () => {
+      fireEvent.press(testScreen.getByTestId('subject-resolution-subject-2'));
+    });
     await flushAsyncWork();
 
     // After picking subject-2, use-session-streaming calls
     // apiClient.subjects[':subjectId'].sessions.$post via the hc() client,
     // which routes through mockFetch to /subjects/subject-2/sessions.
-    await waitFor(() => {
-      const startCalls = fetchCallsMatching(
-        mockFetch,
-        '/subjects/subject-2/sessions',
-      );
-      expect(startCalls.length).toBeGreaterThan(0);
-      const body = extractJsonBody<{ subjectId: string; inputMode: string }>(
-        startCalls[0]?.init,
-      );
-      expect(body).toMatchObject({
-        subjectId: 'subject-2',
-        inputMode: 'text',
-        rawInput: 'Solve 2x + 5 = 17',
-      });
+    const startCalls = fetchCallsMatching(
+      mockFetch,
+      '/subjects/subject-2/sessions',
+    );
+    expect(startCalls.length).toBeGreaterThan(0);
+    const body = extractJsonBody<{ subjectId: string; inputMode: string }>(
+      startCalls[0]?.init,
+    );
+    expect(body).toMatchObject({
+      subjectId: 'subject-2',
+      inputMode: 'text',
+      rawInput: 'Solve 2x + 5 = 17',
     });
 
-    await waitFor(() => {
-      expect(mockStream).toHaveBeenCalledWith(
-        'Solve 2x + 5 = 17',
-        expect.any(Function),
-        expect.any(Function),
-        'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) }),
-      );
-    });
+    expect(mockStream).toHaveBeenCalledWith(
+      'Solve 2x + 5 = 17',
+      expect.any(Function),
+      expect.any(Function),
+      'session-1',
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
+    );
+    await flushAsyncWork();
+    testScreen.unmount();
   });
 
   it('shows "+ New subject" escape hatch when classification fails [BUG-234]', async () => {
@@ -1280,14 +1533,13 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
-    await waitFor(() => {
-      // When classify fails and subjects haven't loaded yet, the screen falls
-      // back to the resolve API flow which shows the "Create a new subject"
-      // button (subject-resolution-create-new) as the zero-candidates escape hatch.
-      testScreen.getByTestId('subject-resolution-create-new');
-    });
+    // When classify fails and subjects haven't loaded yet, the screen falls
+    // back to the resolve API flow which shows the "Create a new subject"
+    // button (subject-resolution-create-new) as the zero-candidates escape hatch.
+    testScreen.getByTestId('subject-resolution-create-new');
 
     expect(mockStartSession).not.toHaveBeenCalled();
+    testScreen.unmount();
   });
 
   it('shows "+ New subject" chip alongside candidates when classification is ambiguous [BUG-234]', async () => {
@@ -1307,11 +1559,10 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
-    await waitFor(() => {
-      testScreen.getByTestId('session-subject-resolution');
-      testScreen.getByTestId('subject-resolution-new');
-      testScreen.getByText('+ New subject');
-    });
+    testScreen.getByTestId('session-subject-resolution');
+    testScreen.getByTestId('subject-resolution-new');
+    testScreen.getByText('+ New subject');
+    testScreen.unmount();
   });
 
   describe('post-session filing prompt', () => {
@@ -1400,6 +1651,7 @@ describe('SessionScreen homework flow', () => {
       expect(testScreen.queryByTestId('filing-prompt-accept')).toBeNull();
       expect(testScreen.queryByTestId('filing-prompt-dismiss')).toBeNull();
       expect(fetchCallsMatching(mockFetch, '/filing')).toHaveLength(0);
+      testScreen.unmount();
     }, 15000);
   });
 });
@@ -1429,10 +1681,13 @@ describe('voice mode persistence', () => {
       async (
         _msg: string,
         onChunk: (value: string) => void,
-        onDone: (r: { exchangeCount: number; escalationRung: number }) => void,
+        onDone: (r: {
+          exchangeCount: number;
+          escalationRung: number;
+        }) => void | Promise<void>,
       ) => {
         onChunk('Got it.');
-        onDone({ exchangeCount: 1, escalationRung: 1 });
+        await onDone({ exchangeCount: 1, escalationRung: 1 });
       },
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });

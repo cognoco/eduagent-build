@@ -405,6 +405,44 @@ describe('AppLayout', () => {
     jest.useRealTimers();
   });
 
+  it('[BUG] falls through to welcome when the intro SecureStore probe hangs', async () => {
+    jest.useFakeTimers();
+    const SecureStoreMock = require('../../lib/secure-storage');
+    const introKey = 'intro_seen_v1_user_test_1';
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user_test_1',
+    });
+    const getPreviewStateSpy = jest
+      .spyOn(require('../../lib/preview-onboarding-state'), 'getPreviewState')
+      .mockResolvedValue(null);
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === introKey
+          ? new Promise((resolve) => setTimeout(() => resolve(null), 60_000))
+          : Promise.resolve(null),
+    );
+
+    try {
+      renderLayout();
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByTestId('intro-state-loading')).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(2500);
+      });
+      await Promise.resolve();
+
+      expect(screen.getByTestId('redirect').props.href).toBe('/(app)/welcome');
+    } finally {
+      getPreviewStateSpy.mockRestore();
+    }
+  });
+
   it('renders guardian tab shell for accounts with linked children', async () => {
     renderLayout();
 

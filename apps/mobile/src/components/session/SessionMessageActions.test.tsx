@@ -101,6 +101,21 @@ describe('SessionMessageActions stage gating', () => {
     ).toContain('ms-auto');
   });
 
+  it('hides the Too easy chip while a challenge round is in flight', () => {
+    const { queryByTestId, getByTestId } = render(
+      <SessionMessageActions
+        {...defaultProps}
+        message={{ ...baseMessage, content: 'That explanation is solid.' }}
+        stage="teaching"
+        challengeRoundInFlight
+      />,
+    );
+
+    expect(queryByTestId('quick-chip-too_easy')).toBeNull();
+    expect(getByTestId('quick-chip-know_this')).toBeTruthy();
+    expect(getByTestId('quick-chip-explain_differently')).toBeTruthy();
+  });
+
   it('uses semantic theme color props for the bookmark icon', () => {
     const { getByTestId } = render(
       <SessionMessageActions

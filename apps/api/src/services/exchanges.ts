@@ -304,6 +304,8 @@ export interface ExchangeContext {
   challengeEligible?: boolean;
   /** Current Challenge Round state machine snapshot from session metadata. */
   challengeRound?: import('@eduagent/schemas').ChallengeRoundSessionState;
+  /** Server-generated id to use when evaluating the current learner answer. */
+  currentUserMessageEventId?: string;
   /**
    * Runtime kill switch for Challenge Round prompt injection and offer
    * consumption. Sourced from the typed `CHALLENGE_ROUND_RUNTIME_ENABLED`
