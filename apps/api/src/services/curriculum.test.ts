@@ -1174,6 +1174,14 @@ describe('persistBookTopics', () => {
     bookExists = true,
     curriculumExists = true,
     existingTopicCount = 0,
+    existingTopicRows = undefined as
+      | Array<{
+          id: string;
+          title?: string;
+          sortOrder: number;
+          skipped: boolean;
+        }>
+      | undefined,
     insertedTopicRows = [] as Array<{
       id: string;
       sortOrder: number;
@@ -1184,21 +1192,31 @@ describe('persistBookTopics', () => {
     const bookRow = bookExists ? mockBookRow() : undefined;
     const curriculumRow = curriculumExists ? mockCurriculumRow() : undefined;
 
-    const existingTopics = Array.from({ length: existingTopicCount }, (_, i) =>
-      mockTopicRow({
-        id: `existing-topic-${i}`,
-        sortOrder: i,
-        title: `Existing Topic ${i}`,
-      }),
-    );
+    const existingTopics =
+      existingTopicRows?.map((row) =>
+        mockTopicRow({
+          id: row.id,
+          sortOrder: row.sortOrder,
+          title: row.title ?? `Existing Topic ${row.sortOrder}`,
+          skipped: row.skipped,
+        }),
+      ) ??
+      Array.from({ length: existingTopicCount }, (_, i) =>
+        mockTopicRow({
+          id: `existing-topic-${i}`,
+          sortOrder: i,
+          title: `Existing Topic ${i}`,
+        }),
+      );
 
     // Build rows for the transaction's topic query
-    const insertedRows =
+    const generatedRows =
       insertedTopicRows.length > 0
-        ? insertedTopicRows.map((row) => ({
+        ? insertedTopicRows.map((row, index) => ({
             ...mockTopicRow({
               id: row.id,
               sortOrder: row.sortOrder,
+              title: sampleTopics[index]?.title ?? `Inserted Topic ${index}`,
             }),
             bookId: BOOK_ID,
             skipped: row.skipped,
@@ -1213,6 +1231,7 @@ describe('persistBookTopics', () => {
             chapter: topic.chapter,
             skipped: false,
           }));
+    const insertedRows = [...existingTopics, ...generatedRows];
 
     // For getBookWithTopics after persist — need a fresh set of query mocks
     const postPersistBookRow = bookExists
@@ -1324,6 +1343,40 @@ describe('persistBookTopics', () => {
       // Should return a BookWithTopics result
       expect(result).toEqual(expect.objectContaining({}));
       expect(result.book).toEqual(expect.objectContaining({}));
+    });
+
+    it('[WI-142] inserts generated topics when existing rows are skipped-only', async () => {
+      const db = createPersistMockDb({
+        existingTopicRows: [
+          {
+            id: 'skipped-topic-1',
+            title: 'Discarded angle',
+            sortOrder: 1,
+            skipped: true,
+          },
+          {
+            id: 'skipped-topic-2',
+            title: 'Discarded detail',
+            sortOrder: 2,
+            skipped: true,
+          },
+        ],
+      });
+
+      const result = await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections,
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(result.book.topicsGenerated).toBe(true);
+      expect(result.topics.filter((topic) => !topic.skipped)).toHaveLength(
+        sampleTopics.length,
+      );
     });
 
     it('calling twice with same data does not duplicate topics', async () => {

@@ -1370,8 +1370,8 @@ export async function persistBookTopics(
     ),
     orderBy: asc(curriculumTopics.sortOrder),
   });
+  const existingActiveTopics = existingTopics.filter((topic) => !topic.skipped);
 
-  // Idempotent: if topics already exist, just ensure the flag is set
   if (existingTopics.length > 0) {
     if (options.appendToExisting) {
       const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
@@ -1489,24 +1489,33 @@ export async function persistBookTopics(
       }
     }
 
-    await db
-      .update(curriculumBooks)
-      .set({
-        topicsGenerated: true,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(curriculumBooks.id, bookId),
-          eq(curriculumBooks.subjectId, subjectId),
-        ),
-      );
+    // Idempotent only when active topics already exist. Skipped-only rows are
+    // not a generated book and must continue into the initial insert path.
+    if (existingActiveTopics.length > 0) {
+      await db
+        .update(curriculumBooks)
+        .set({
+          topicsGenerated: true,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(curriculumBooks.id, bookId),
+            eq(curriculumBooks.subjectId, subjectId),
+          ),
+        );
 
-    const existing = await getBookWithTopics(db, profileId, subjectId, bookId);
-    if (!existing) {
-      throw new NotFoundError('Book');
+      const existing = await getBookWithTopics(
+        db,
+        profileId,
+        subjectId,
+        bookId,
+      );
+      if (!existing) {
+        throw new NotFoundError('Book');
+      }
+      return existing;
     }
-    return existing;
   }
 
   const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
