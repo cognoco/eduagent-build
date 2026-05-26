@@ -239,6 +239,11 @@ beforeEach(() => {
     id: 'acc-1',
     clerkUserId: 'clerk_user_123',
   });
+  mockDb.query = {
+    subscriptions: {
+      findFirst: jest.fn().mockResolvedValue(mockSubscriptionRow()),
+    },
+  };
 
   (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
     mockSubscriptionRow(),

@@ -8,6 +8,7 @@
 
 type BillingTier = 'free' | 'plus' | 'family' | 'pro';
 type BillingStatus = 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+type ProfileQuotaRole = 'owner' | 'child';
 
 type DbMethod = (...args: unknown[]) => unknown;
 
@@ -31,6 +32,7 @@ type RouteMeteringFixtureOptions = {
   usedThisMonth?: number;
   dailyLimit?: number | null;
   usedToday?: number;
+  profileRole?: ProfileQuotaRole;
   topUpCreditsRemaining?: number;
   notificationLogCount?: number;
   ownsProfile?: boolean;
@@ -40,12 +42,14 @@ type FixtureState = Required<
   Omit<
     RouteMeteringFixtureOptions,
     | 'dailyLimit'
+    | 'profileRole'
     | 'topUpCreditsRemaining'
     | 'notificationLogCount'
     | 'ownsProfile'
   >
 > & {
   dailyLimit: number | null;
+  profileRole: ProfileQuotaRole;
   topUpCreditsRemaining: number;
   notificationLogCount: number;
   ownsProfile: boolean;
@@ -63,6 +67,7 @@ function buildDefaultState(options: RouteMeteringFixtureOptions): FixtureState {
     usedThisMonth: options.usedThisMonth ?? 10,
     dailyLimit: options.dailyLimit ?? null,
     usedToday: options.usedToday ?? 0,
+    profileRole: options.profileRole ?? 'owner',
     topUpCreditsRemaining: options.topUpCreditsRemaining ?? 0,
     notificationLogCount: options.notificationLogCount ?? 0,
     ownsProfile: options.ownsProfile ?? true,
@@ -106,6 +111,20 @@ export function createRouteMeteringFixture(
     updatedAt: new Date('2026-05-01T00:00:00.000Z'),
   });
 
+  const buildProfileQuotaUsageRow = () => ({
+    id: 'pqu-seeded-route-test',
+    subscriptionId: state.subscriptionId,
+    profileId: state.profileId,
+    role: state.profileRole,
+    monthlyLimit: state.monthlyLimit,
+    usedThisMonth: state.usedThisMonth,
+    dailyLimit: state.dailyLimit,
+    usedToday: state.usedToday,
+    cycleResetAt: new Date('2026-06-01T00:00:00.000Z'),
+    createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+  });
+
   const subscriptionAccessor = {
     findFirst: jest.fn(async () => ({
       id: state.subscriptionId,
@@ -133,11 +152,16 @@ export function createRouteMeteringFixture(
     findMany: jest.fn().mockResolvedValue([]),
   };
 
+  const profileQuotaUsageAccessor = {
+    findFirst: jest.fn(async () => buildProfileQuotaUsageRow()),
+  };
+
   db.query = new Proxy(originalQuery ?? {}, {
     get(target, prop, receiver) {
       if (prop === 'subscriptions') return subscriptionAccessor;
       if (prop === 'quotaPools') return quotaPoolAccessor;
       if (prop === 'topUpCredits') return topUpCreditsAccessor;
+      if (prop === 'profileQuotaUsage') return profileQuotaUsageAccessor;
       return Reflect.get(target, prop, receiver);
     },
   });
@@ -151,7 +175,9 @@ export function createRouteMeteringFixture(
       }
 
       if (selectedTable === actualDb.profiles) {
-        return state.ownsProfile ? [{ id: state.profileId }] : [];
+        return state.ownsProfile
+          ? [{ id: state.profileId, isOwner: state.profileRole === 'owner' }]
+          : [];
       }
 
       if (selectedTable === actualDb.notificationLog) {
@@ -276,6 +302,84 @@ export function createRouteMeteringFixture(
             returning: jest.fn().mockResolvedValue([]),
           }),
         }),
+      };
+    }
+
+    if (table === actualDb.profileQuotaUsage) {
+      return {
+        set: jest
+          .fn()
+          .mockImplementation((setValues: Record<string, unknown>) => {
+            let applied = false;
+            let rows: ReturnType<typeof buildProfileQuotaUsageRow>[] = [];
+
+            const apply = () => {
+              if (applied) return rows;
+              applied = true;
+
+              if ('monthlyLimit' in setValues || 'dailyLimit' in setValues) {
+                if (typeof setValues.monthlyLimit === 'number') {
+                  state.monthlyLimit = setValues.monthlyLimit;
+                }
+                if (
+                  setValues.dailyLimit === null ||
+                  typeof setValues.dailyLimit === 'number'
+                ) {
+                  state.dailyLimit = setValues.dailyLimit;
+                }
+                rows = [buildProfileQuotaUsageRow()];
+                return rows;
+              }
+
+              if ('usedThisMonth' in setValues && 'usedToday' in setValues) {
+                const underMonthly = state.usedThisMonth < state.monthlyLimit;
+                const underDaily =
+                  state.dailyLimit === null ||
+                  state.usedToday < state.dailyLimit;
+
+                if (!underMonthly || !underDaily) {
+                  rows = [];
+                  return rows;
+                }
+
+                state.usedThisMonth += 1;
+                state.usedToday += 1;
+                rows = [buildProfileQuotaUsageRow()];
+                return rows;
+              }
+
+              if ('usedToday' in setValues) {
+                const underDaily =
+                  state.dailyLimit === null ||
+                  state.usedToday < state.dailyLimit;
+
+                if (!underDaily) {
+                  rows = [];
+                  return rows;
+                }
+
+                state.usedToday += 1;
+                rows = [buildProfileQuotaUsageRow()];
+                return rows;
+              }
+
+              throw new Error(
+                `route-metering-fixture: unrecognised profileQuotaUsage update shape — keys=[${Object.keys(
+                  setValues,
+                ).join(', ')}]. ` +
+                  'Either extend the fixture to handle this case or update the production helper.',
+              );
+            };
+
+            return {
+              where: jest.fn().mockImplementation(() => {
+                apply();
+                return {
+                  returning: jest.fn().mockImplementation(async () => apply()),
+                };
+              }),
+            };
+          }),
       };
     }
 
