@@ -22,6 +22,16 @@ jest.mock(
 
 let mockLinkedChildren: Profile[] = [];
 let mockDashboardData: DashboardData | undefined;
+let mockSubscription: { tier: 'free' | 'plus' | 'family' | 'pro' } | null = {
+  tier: 'family',
+};
+let mockFamilySubscription: {
+  profileCount: number;
+  maxProfiles: number;
+} | null = {
+  profileCount: 2,
+  maxProfiles: 5,
+};
 
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
@@ -48,10 +58,8 @@ jest.mock(
 jest.mock(
   '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
-    useSubscription: () => ({ data: { tier: 'family' } }),
-    useFamilySubscription: () => ({
-      data: { profileCount: 2, maxProfiles: 5 },
-    }),
+    useSubscription: () => ({ data: mockSubscription }),
+    useFamilySubscription: () => ({ data: mockFamilySubscription }),
   }),
 );
 
@@ -167,6 +175,8 @@ describe('ParentHomeScreen', () => {
     jest.clearAllMocks();
     mockLinkedChildren = [];
     mockDashboardData = undefined;
+    mockSubscription = { tier: 'family' };
+    mockFamilySubscription = { profileCount: 2, maxProfiles: 5 };
     capturedBannerProps = null;
   });
 
@@ -290,6 +300,22 @@ describe('ParentHomeScreen', () => {
     );
 
     fireEvent.press(screen.getByTestId('add-first-child-screen-primary'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
+  });
+
+  it('routes Free owners with linked children directly to add another child', async () => {
+    mockSubscription = { tier: 'free' };
+    mockFamilySubscription = { profileCount: 2, maxProfiles: 2 };
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    fireEvent.press(screen.getByTestId('parent-home-add-child'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-profile',

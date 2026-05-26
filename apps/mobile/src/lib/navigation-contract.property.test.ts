@@ -165,6 +165,8 @@ function pick<T>(rng: () => number, values: ReadonlyArray<T>): T {
 function randomContext(rng: () => number): ProfileContext {
   const activeProfile = pick(rng, PROFILE_POOL);
   const includeChild = rng() < 0.5;
+  const subscriptionStatus = pick(rng, SUB_STATUS);
+  const subscriptionTier = pick(rng, SUB_TIERS);
   const profiles: NavigationProfile[] = [];
   if (activeProfile) profiles.push(activeProfile);
   if (includeChild && activeProfile?.id !== LINKED_CHILD.id) {
@@ -177,8 +179,14 @@ function randomContext(rng: () => number): ProfileContext {
     appContext: pick(rng, APP_CONTEXTS),
     role: pick(rng, ROLES),
     subscription: {
-      status: pick(rng, SUB_STATUS),
-      tier: pick(rng, SUB_TIERS),
+      status: subscriptionStatus,
+      tier: subscriptionTier,
+      effectiveAccessTier:
+        subscriptionStatus === 'ready' ? subscriptionTier : null,
+      billingAccess:
+        subscriptionStatus === 'ready' && subscriptionTier !== null
+          ? 'current'
+          : null,
     },
     flags: {
       MODE_NAV_V0_ENABLED: pick(rng, BOOLS),

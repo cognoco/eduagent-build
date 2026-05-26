@@ -362,6 +362,28 @@ describe('ProfilesScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/create-profile');
   });
 
+  it('navigates to create-profile for Free owners instead of client-paywalling', () => {
+    mockUseSubscription.mockReturnValue({
+      data: { tier: 'free' },
+    });
+    mockUseFamilySubscription.mockReturnValue({
+      data: { profileCount: 2, maxProfiles: 2 },
+    });
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profiles-add-button'));
+
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/create-profile');
+  });
+
   it('shows loading indicator while loading', () => {
     useProfile.mockReturnValue({
       profiles: [],

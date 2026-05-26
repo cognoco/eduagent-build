@@ -43,7 +43,12 @@ function context(overrides: Partial<ProfileContext> = {}): ProfileContext {
     profiles: [parent, linkedChild],
     role: 'owner',
     flags: { MODE_NAV_V1_ENABLED: true },
-    subscription: { status: 'ready', tier: 'family' },
+    subscription: {
+      status: 'ready',
+      tier: 'family',
+      effectiveAccessTier: 'family',
+      billingAccess: 'current',
+    },
     ...overrides,
   };
 }

@@ -1,5 +1,6 @@
 import {
   computeAgeBracket,
+  type BillingAccess,
   type Profile,
   type SubscriptionTier,
 } from '@eduagent/schemas';
@@ -64,6 +65,8 @@ export interface NavigationFlags {
 export interface NavigationSubscriptionContext {
   status: 'loading' | 'ready';
   tier: SubscriptionTier | null;
+  effectiveAccessTier: SubscriptionTier | null;
+  billingAccess: BillingAccess | null;
 }
 
 export interface ProfileContext {
@@ -207,6 +210,17 @@ function isFamilyCapable(activeProfile: NavigationProfile | null): boolean {
   return activeProfile.hasFamilyLinks === true;
 }
 
+export function isFamilyHubEligible(context: ProfileContext): boolean {
+  if (!isAdultOwner(context.activeProfile)) return false;
+  if (context.role !== 'owner') return false;
+  if (context.isParentProxy) return false;
+  if (getLinkedChildIds(context.activeProfile, context.profiles).length < 1) {
+    return false;
+  }
+  if (context.subscription.status !== 'ready') return false;
+  return context.subscription.effectiveAccessTier !== null;
+}
+
 function isLegacyGuardian(
   activeProfile: NavigationProfile | null,
   linkedChildIds: ReadonlyArray<string>,
@@ -242,13 +256,7 @@ export function resolveNavigationContract(
   const familyCapable = isFamilyCapable(context.activeProfile);
   const ownerRole = isOwnerRole(context.role);
   const subscriptionReady = context.subscription.status === 'ready';
-  const familyPlanOwner =
-    isAdultOwner(context.activeProfile) &&
-    ownerRole &&
-    !context.isParentProxy &&
-    subscriptionReady &&
-    (context.subscription.tier === 'family' ||
-      context.subscription.tier === 'pro');
+  const familyHubEligible = isFamilyHubEligible(context);
   const legacyV0ModeNavActive =
     context.flags.MODE_NAV_V1_ENABLED === false &&
     context.flags.MODE_NAV_V0_ENABLED === true;
@@ -344,7 +352,7 @@ export function resolveNavigationContract(
     context.flags.MODE_NAV_V0_ENABLED === false &&
     !context.isParentProxy &&
     (isLegacyGuardian(context.activeProfile, linkedChildIds) ||
-      familyPlanOwner);
+      familyHubEligible);
   const showFamilyHome =
     context.flags.MODE_NAV_V1_ENABLED === true
       ? familyShape && !context.isParentProxy

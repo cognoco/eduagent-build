@@ -53,6 +53,8 @@ function toSubscriptionContext(
   return {
     status: data ? 'ready' : 'loading',
     tier: data?.tier ?? null,
+    effectiveAccessTier: data?.effectiveAccessTier ?? null,
+    billingAccess: data?.billingAccess ?? null,
   };
 }
 
@@ -65,6 +67,8 @@ function useResolvedNavigationState(
   const role = useActiveProfileRole();
   const subscriptionStatus = subscription.status;
   const subscriptionTier = subscription.tier;
+  const effectiveAccessTier = subscription.effectiveAccessTier;
+  const billingAccess = subscription.billingAccess;
 
   const contract = useMemo(
     () =>
@@ -77,6 +81,8 @@ function useResolvedNavigationState(
         subscription: {
           status: subscriptionStatus,
           tier: subscriptionTier,
+          effectiveAccessTier,
+          billingAccess,
         },
         flags: {
           MODE_NAV_V0_ENABLED: FEATURE_FLAGS.MODE_NAV_V0_ENABLED,
@@ -91,6 +97,8 @@ function useResolvedNavigationState(
       role,
       subscriptionStatus,
       subscriptionTier,
+      effectiveAccessTier,
+      billingAccess,
     ],
   );
 
@@ -181,11 +189,11 @@ export function useNavigationShellContract(): NavigationShellContract {
 }
 
 export function useNavigationHomeContract(): NavigationHomeContract {
-  // Home gates (showFamilyHome in particular) depend on familyPlanOwner,
+  // Home gates (showFamilyHome in particular) depend on familyHubEligible,
   // which is subscription-derived. Enable unconditionally so the gate
   // resolves correctly under any flag combo — including the transitional
   // V0-on/V1-off config where `V1 || !V0` would have stayed false and
-  // permanently suppressed familyPlanOwner.
+  // permanently suppressed the family home gate.
   const subscription = useSubscriptionStatus({ enabled: true });
   const { contract, parentProxy } = useResolvedNavigationState(
     toSubscriptionContext(subscription.data),
@@ -203,5 +211,7 @@ export function useNavigationDataScopeContract(): NavigationContract {
   return useResolvedNavigationState({
     status: 'ready',
     tier: null,
+    effectiveAccessTier: null,
+    billingAccess: null,
   }).contract;
 }

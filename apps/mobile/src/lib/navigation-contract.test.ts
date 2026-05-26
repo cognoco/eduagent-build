@@ -4,6 +4,7 @@ import {
   makeProfile,
 } from '../test-utils/profile-factories';
 import {
+  isFamilyHubEligible,
   resolveNavigationContract,
   type NavigationContract,
   type ProfileContext,
@@ -57,12 +58,30 @@ function makeContext(
   const subscription: SubscriptionContext = {
     status: 'ready',
     tier: 'free',
+    effectiveAccessTier: 'free',
+    billingAccess: 'current',
   };
   const {
     flags,
     subscription: subscriptionOverrides,
     ...baseOverrides
   } = overrides;
+  const mergedSubscription: SubscriptionContext = {
+    ...subscription,
+    ...subscriptionOverrides,
+  };
+  if (mergedSubscription.status === 'loading') {
+    mergedSubscription.effectiveAccessTier = null;
+    mergedSubscription.billingAccess = null;
+  } else {
+    if (!('effectiveAccessTier' in (subscriptionOverrides ?? {}))) {
+      mergedSubscription.effectiveAccessTier = mergedSubscription.tier;
+    }
+    if (!('billingAccess' in (subscriptionOverrides ?? {}))) {
+      mergedSubscription.billingAccess =
+        mergedSubscription.tier === null ? null : 'current';
+    }
+  }
   const base: Omit<ProfileContext, 'flags' | 'subscription'> = {
     activeProfile: adult,
     appContext: 'study',
@@ -78,10 +97,7 @@ function makeContext(
       MODE_NAV_V1_ENABLED: true,
       ...flags,
     },
-    subscription: {
-      ...subscription,
-      ...subscriptionOverrides,
-    },
+    subscription: mergedSubscription,
   };
 }
 
@@ -333,6 +349,86 @@ describe('resolveNavigationContract matrix', () => {
   });
 });
 
+describe('isFamilyHubEligible', () => {
+  it('allows an adult Free owner with a linked child to see Family Hub', () => {
+    const context = makeContext({
+      activeProfile: familyAdult,
+      appContext: 'family',
+      profiles: [familyAdult, child],
+      subscription: {
+        status: 'ready',
+        tier: 'free',
+        effectiveAccessTier: 'free',
+        billingAccess: 'current',
+      } as SubscriptionContext,
+    });
+
+    expect(isFamilyHubEligible(context)).toBe(true);
+  });
+
+  it('requires a linked child, owner role, and resolved effective access tier', () => {
+    expect(
+      isFamilyHubEligible(
+        makeContext({
+          activeProfile: adult,
+          profiles: [adult],
+          subscription: {
+            status: 'ready',
+            tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
+          } as SubscriptionContext,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isFamilyHubEligible(
+        makeContext({
+          activeProfile: child,
+          profiles: [familyAdult, child],
+          role: 'child',
+          subscription: {
+            status: 'ready',
+            tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
+          } as SubscriptionContext,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isFamilyHubEligible(
+        makeContext({
+          activeProfile: familyAdult,
+          profiles: [familyAdult, child],
+          subscription: {
+            status: 'loading',
+            tier: null,
+            effectiveAccessTier: null,
+            billingAccess: null,
+          } as SubscriptionContext,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps lapsed paid accounts eligible on effective Free access', () => {
+    const context = makeContext({
+      activeProfile: familyAdult,
+      appContext: 'family',
+      profiles: [familyAdult, child],
+      subscription: {
+        status: 'ready',
+        tier: 'plus',
+        effectiveAccessTier: 'free',
+        billingAccess: 'free_fallback',
+      } as SubscriptionContext,
+    });
+
+    expect(isFamilyHubEligible(context)).toBe(true);
+  });
+});
+
 describe('resolveNavigationContract gates', () => {
   it('sets owner-only More and family child-editor gates for a family adult', () => {
     const contract = resolveNavigationContract(
@@ -453,7 +549,7 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.gates.showFamilyHome).toBe(true);
   });
 
-  it('preserves V0-off family/pro owner home setup without linked children', () => {
+  it('keeps V0-off paid owners without linked children in the study home', () => {
     const contract = resolveNavigationContract(
       makeContext({
         activeProfile: adult,
@@ -468,7 +564,7 @@ describe('resolveNavigationContract gates', () => {
     );
 
     expect(contract.diagnostic.reason).toBe('v1-disabled');
-    expect(contract.gates.showFamilyHome).toBe(true);
+    expect(contract.gates.showFamilyHome).toBe(false);
     expect(contract.gates.showLearningActions).toBe(true);
   });
 
@@ -914,9 +1010,24 @@ describe('navigation-contract totality (fuzzed inputs never throw)', () => {
   ];
   const proxies: ReadonlyArray<boolean> = [true, false];
   const subs: ReadonlyArray<ProfileContext['subscription']> = [
-    { status: 'loading', tier: null },
-    { status: 'ready', tier: 'free' },
-    { status: 'ready', tier: 'family' },
+    {
+      status: 'loading',
+      tier: null,
+      effectiveAccessTier: null,
+      billingAccess: null,
+    },
+    {
+      status: 'ready',
+      tier: 'free',
+      effectiveAccessTier: 'free',
+      billingAccess: 'current',
+    },
+    {
+      status: 'ready',
+      tier: 'family',
+      effectiveAccessTier: 'family',
+      billingAccess: 'current',
+    },
   ];
   const profileShapes: ReadonlyArray<ProfileContext['activeProfile']> = [
     null,

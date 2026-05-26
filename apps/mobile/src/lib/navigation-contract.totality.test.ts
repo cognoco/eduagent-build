@@ -139,6 +139,8 @@ function makeRandomContext(i: number): ProfileContext {
   const activeProfile: NavigationProfile | null = bool()
     ? makeRandomProfile(i)
     : null;
+  const subscriptionStatus = pick(SUB_STATUSES);
+  const subscriptionTier = pick(SUB_TIERS);
   const linkedCount = Math.floor(rand() * 4);
   const profiles: NavigationProfile[] = [];
   if (activeProfile) profiles.push(activeProfile);
@@ -153,8 +155,14 @@ function makeRandomContext(i: number): ProfileContext {
     appContext: pick(APP_CONTEXTS),
     role: pick(ROLES),
     subscription: {
-      status: pick(SUB_STATUSES),
-      tier: pick(SUB_TIERS),
+      status: subscriptionStatus,
+      tier: subscriptionTier,
+      effectiveAccessTier:
+        subscriptionStatus === 'ready' ? subscriptionTier : null,
+      billingAccess:
+        subscriptionStatus === 'ready' && subscriptionTier !== null
+          ? 'current'
+          : null,
     },
     flags: {
       MODE_NAV_V0_ENABLED: bool(),
@@ -391,7 +399,12 @@ describe('resolveNavigationContract totality/fuzz', () => {
         isParentProxy: false,
         appContext: null,
         role: null,
-        subscription: { status: 'loading', tier: null },
+        subscription: {
+          status: 'loading',
+          tier: null,
+          effectiveAccessTier: null,
+          billingAccess: null,
+        },
         flags: { MODE_NAV_V1_ENABLED: true },
       } satisfies ProfileContext,
     },
@@ -413,7 +426,12 @@ describe('resolveNavigationContract totality/fuzz', () => {
           isParentProxy: false,
           appContext: null,
           role: 'owner',
-          subscription: { status: 'ready', tier: 'free' },
+          subscription: {
+            status: 'ready',
+            tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
+          },
           flags: { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: false },
         };
       })(),
@@ -426,7 +444,12 @@ describe('resolveNavigationContract totality/fuzz', () => {
         isParentProxy: true,
         appContext: 'family',
         role: 'impersonated-child',
-        subscription: { status: 'ready', tier: 'family' },
+        subscription: {
+          status: 'ready',
+          tier: 'family',
+          effectiveAccessTier: 'family',
+          billingAccess: 'current',
+        },
         flags: { MODE_NAV_V1_ENABLED: true },
       } satisfies ProfileContext,
     },

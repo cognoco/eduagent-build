@@ -96,10 +96,18 @@ jest.mock(
 jest.mock(
   '../../../hooks/use-subscription' /* gc1-allow: unit test boundary */,
   () => ({
-    useSubscription: () => ({ data: { tier: 'family' } }),
+    useSubscription: () => ({
+      data: {
+        tier: 'family',
+        effectiveAccessTier: 'family',
+        billingAccess: 'current',
+      },
+    }),
     useSubscriptionStatus: () => ({
       data: {
         tier: 'family',
+        effectiveAccessTier: 'family',
+        billingAccess: 'current',
         status: 'active',
         monthlyLimit: 700,
         usedThisMonth: 0,

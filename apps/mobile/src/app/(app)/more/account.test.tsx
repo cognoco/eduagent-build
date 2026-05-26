@@ -93,6 +93,8 @@ function subscriptionResponse(tier: 'plus' | 'free' = 'plus') {
   return {
     subscription: {
       tier,
+      effectiveAccessTier: tier,
+      billingAccess: 'current',
       status: 'active',
       trialEndsAt: null,
       currentPeriodEnd: '2030-01-01T00:00:00.000Z',
