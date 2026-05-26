@@ -191,6 +191,8 @@ jest.mock(
 
 const DEFAULT_SUBSCRIPTION = {
   tier: 'free',
+  effectiveAccessTier: 'free',
+  billingAccess: 'current',
   status: 'active',
   trialEndsAt: null,
   currentPeriodEnd: null,
