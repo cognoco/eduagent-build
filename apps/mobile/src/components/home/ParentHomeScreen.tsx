@@ -32,7 +32,6 @@ import {
   useSubscription,
 } from '../../hooks/use-subscription';
 import { getGreeting } from '../../lib/greeting';
-import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
 import { withOpacity } from '../../lib/color-opacity';
 import { useTheme, useThemeColors } from '../../lib/theme';
@@ -918,7 +917,6 @@ export function ParentHomeScreen({
     role,
     birthYear: activeProfile?.birthYear,
   });
-  const hasNoLinkedChildren = linkedChildren.length === 0;
   const familyActivitySummary = formatFamilyActivitySummary(
     linkedChildren,
     dashboard,
@@ -979,63 +977,9 @@ export function ParentHomeScreen({
     } as Href);
   }, [router]);
 
-  const navigateToSubscription = useCallback(() => {
-    router.push('/(app)/subscription' as Href);
-  }, [router]);
-
   const handleAddChild = useCallback(() => {
-    if (hasNoLinkedChildren) {
-      navigateToCreateChildProfile();
-      return;
-    }
-
-    if (!subscription) {
-      platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
-      return;
-    }
-    const tier = subscription.tier;
-    if (tier !== 'family' && tier !== 'pro') {
-      platformAlert(
-        t('more.family.upgradeRequiredTitle'),
-        t('more.family.upgradeRequiredMessage'),
-        [
-          {
-            text: t('more.family.viewPlans'),
-            onPress: navigateToSubscription,
-          },
-          { text: t('common.cancel'), style: 'cancel' },
-        ],
-      );
-      return;
-    }
-    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      platformAlert(
-        t('more.family.profileLimitTitle'),
-        t('more.family.profileLimitMessage', {
-          plan: tier === 'pro' ? 'Pro' : 'Family',
-          max: familyData.maxProfiles,
-        }),
-        tier === 'family'
-          ? [
-              {
-                text: t('more.family.viewPlans'),
-                onPress: navigateToSubscription,
-              },
-              { text: t('common.cancel'), style: 'cancel' },
-            ]
-          : [{ text: t('common.ok') }],
-      );
-      return;
-    }
     navigateToCreateChildProfile();
-  }, [
-    hasNoLinkedChildren,
-    subscription,
-    familyData,
-    t,
-    navigateToCreateChildProfile,
-    navigateToSubscription,
-  ]);
+  }, [navigateToCreateChildProfile]);
 
   const pushChildProfile = useCallback(
     (childProfileId: string): void => {

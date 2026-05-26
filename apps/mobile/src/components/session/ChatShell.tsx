@@ -27,6 +27,7 @@ import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useStickyLoading } from '../../hooks/use-sticky-loading';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
+import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
@@ -422,8 +423,10 @@ export function ChatShell({
     if (lastAiMessage.id === lastSpokenIdRef.current) return;
     if (!lastAiMessage.content.trim()) return;
 
+    const spokenText = stripEnvelopeJson(lastAiMessage.content).trim();
+    if (!spokenText) return;
     lastSpokenIdRef.current = lastAiMessage.id;
-    speak(lastAiMessage.content);
+    speak(spokenText);
   }, [messages, isVoiceEnabled, screenReaderEnabled, speak]);
 
   // BUG-348: Stop TTS immediately when screen reader activates mid-session

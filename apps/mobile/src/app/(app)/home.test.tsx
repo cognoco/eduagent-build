@@ -21,6 +21,8 @@ const mockFetch = createRoutedMockFetch({
   '/subscription/status': {
     status: {
       tier: 'family',
+      effectiveAccessTier: 'family',
+      billingAccess: 'current',
       status: 'active',
       monthlyLimit: 700,
       usedThisMonth: 0,

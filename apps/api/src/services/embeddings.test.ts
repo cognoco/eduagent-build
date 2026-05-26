@@ -310,6 +310,26 @@ describe('extractSessionContent', () => {
     expect(result).toBe('Hello\n\nHi there!');
   });
 
+  it('[WI-207] projects raw ai_response envelopes before building embedding input', async () => {
+    const rawEnvelope = JSON.stringify({
+      reply: 'Only this visible reply should be embedded.',
+      signals: { close: true },
+      ui_hints: { note_prompt: { show: false } },
+    });
+    const db = createMockDb([
+      { eventType: 'user_message', content: 'What should we remember?' },
+      { eventType: 'ai_response', content: rawEnvelope },
+    ]);
+
+    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
+
+    expect(result).toBe(
+      'What should we remember?\n\nOnly this visible reply should be embedded.',
+    );
+    expect(result).not.toContain('"signals"');
+    expect(result).not.toContain('"ui_hints"');
+  });
+
   it('truncates to 8000 characters max', async () => {
     const longMessage = 'A'.repeat(5000);
     const db = createMockDb([

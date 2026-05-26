@@ -104,7 +104,12 @@ function v1Flags(): ProfileContext['flags'] {
 function readySubscription(
   tier: ProfileContext['subscription']['tier'] = 'free',
 ): ProfileContext['subscription'] {
-  return { status: 'ready', tier };
+  return {
+    status: 'ready',
+    tier,
+    effectiveAccessTier: tier,
+    billingAccess: 'current',
+  };
 }
 
 export const matrixFixtures: ReadonlyArray<MatrixFixture> = [
@@ -243,7 +248,12 @@ export const matrixFixtures: ReadonlyArray<MatrixFixture> = [
       isParentProxy: false,
       appContext: null,
       role: null,
-      subscription: { status: 'loading', tier: null },
+      subscription: {
+        status: 'loading',
+        tier: null,
+        effectiveAccessTier: null,
+        billingAccess: null,
+      },
       flags: v1Flags(),
     },
     probeRoutes: STANDARD_PROBES,

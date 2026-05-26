@@ -38,7 +38,7 @@ export default function ProfilesScreen() {
   const { isLoaded, isSignedIn } = useAuth();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: subscription } = useSubscription();
-  const { data: familyData } = useFamilySubscription(
+  useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
   const [isSwitching, setIsSwitching] = useState(false);
@@ -98,55 +98,8 @@ export default function ProfilesScreen() {
   }, [router]);
 
   const handleAddProfile = useCallback(() => {
-    if (!subscription) {
-      // Query still loading — don't block with a false 'Upgrade required'
-      return;
-    }
-
-    // BUG-287: Always allow creating the first child profile (the owner profile
-    // is always profile #1, so profiles.length === 1 means no children yet).
-    // New users should never be blocked from adding their first child.
-    const hasNoChildren = profiles.length <= 1;
-
-    const tier = subscription.tier;
-    // Whitelist: only family/pro may add profiles. Blocks free and plus.
-    // Exception: first child profile is always allowed regardless of tier.
-    if (!hasNoChildren && tier !== 'family' && tier !== 'pro') {
-      platformAlert(
-        'Upgrade required',
-        'Adding more profiles requires a Family or Pro subscription.',
-        [
-          {
-            text: 'View plans',
-            onPress: () => router.push('/(app)/subscription'),
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ],
-      );
-      return;
-    }
-
-    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      platformAlert(
-        'Profile limit reached',
-        `Your ${tier === 'pro' ? 'Pro' : 'Family'} plan supports up to ${
-          familyData.maxProfiles
-        } profiles.`,
-        tier === 'family'
-          ? [
-              {
-                text: 'View plans',
-                onPress: () => router.push('/(app)/subscription'),
-              },
-              { text: t('common.ok'), style: 'cancel' },
-            ]
-          : [{ text: t('common.ok') }],
-      );
-      return;
-    }
-
     router.push('/create-profile');
-  }, [subscription, familyData, router, profiles.length, t]);
+  }, [router]);
 
   // UX-DE-L13: timeout on profile switch
   //

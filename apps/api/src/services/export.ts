@@ -60,6 +60,129 @@ export function serializeDates(
   return out;
 }
 
+const EMBEDDED_ENVELOPE_KEYS = new Set([
+  'reply',
+  'signals',
+  'ui_hints',
+  'private_sources',
+  'confidence',
+]);
+const EMBEDDED_ENVELOPE_SIBLING_KEYS = new Set([
+  'signals',
+  'ui_hints',
+  'private_sources',
+  'confidence',
+]);
+
+function isEmbeddedEnvelopeObject(candidate: string): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch {
+    return false;
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return false;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const keys = Object.keys(record);
+  return (
+    typeof record['reply'] === 'string' &&
+    record['reply'].length > 0 &&
+    keys.every((key) => EMBEDDED_ENVELOPE_KEYS.has(key)) &&
+    keys.some((key) => EMBEDDED_ENVELOPE_SIBLING_KEYS.has(key))
+  );
+}
+
+function findJsonObjectSpans(
+  text: string,
+): Array<{ start: number; end: number; value: string }> {
+  const spans: Array<{ start: number; end: number; value: string }> = [];
+  let searchFrom = 0;
+
+  while (searchFrom < text.length) {
+    const start = text.indexOf('{', searchFrom);
+    if (start === -1) break;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let found = false;
+
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\' && inString) {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+
+      if (ch === '{') depth += 1;
+      if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          const end = i + 1;
+          spans.push({ start, end, value: text.slice(start, end) });
+          searchFrom = end;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (!found) {
+      searchFrom = start + 1;
+    }
+  }
+
+  return spans;
+}
+
+function projectSessionEmbeddingContent(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.startsWith('```')) {
+    return projectAiResponseContent(content, { silent: true });
+  }
+
+  const spans = findJsonObjectSpans(content);
+  if (spans.length > 0) {
+    let out = '';
+    let cursor = 0;
+    let changed = false;
+
+    for (const span of spans) {
+      out += content.slice(cursor, span.start);
+      if (isEmbeddedEnvelopeObject(span.value)) {
+        const projected = projectAiResponseContent(span.value, {
+          silent: true,
+        });
+        out += projected;
+        changed = changed || projected !== span.value;
+      } else {
+        out += span.value;
+      }
+      cursor = span.end;
+    }
+
+    if (changed) {
+      return out + content.slice(cursor);
+    }
+  }
+
+  return projectAiResponseContent(content, { silent: true });
+}
+
 export async function generateExport(
   db: Database,
   accountId: string,
@@ -346,7 +469,16 @@ export async function generateExport(
     learningModes: learningModeRows.map(serializeDates),
     teachingPreferences: teachingPrefRows.map(serializeDates),
     parkingLotItems: parkingLotRows.map(serializeDates),
-    sessionEmbeddings: sessionEmbeddingRows.map(serializeDates),
+    sessionEmbeddings: sessionEmbeddingRows.map((row) => {
+      const serialized = serializeDates(row);
+      if (typeof serialized['content'] !== 'string') {
+        return serialized;
+      }
+      return {
+        ...serialized,
+        content: projectSessionEmbeddingContent(serialized['content']),
+      };
+    }),
     subscriptions: subscriptionRows.map(serializeDates),
     quotaPools: quotaPoolRows.map(serializeDates),
     topUpCredits: topUpCreditRows.map(serializeDates),

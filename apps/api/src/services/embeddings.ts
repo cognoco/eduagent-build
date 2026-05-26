@@ -13,6 +13,8 @@ import {
   type Database,
 } from '@eduagent/database';
 
+import { projectAiResponseContent } from './llm/project-response';
+
 export interface EmbeddingResult {
   vector: number[];
   dimensions: number;
@@ -200,7 +202,13 @@ export async function extractSessionContent(
     return `Session ${sessionId} \u2014 no conversation events recorded`;
   }
 
-  const joined = conversationEvents.map((e) => e.content).join('\n\n');
+  const joined = conversationEvents
+    .map((e) =>
+      e.eventType === 'ai_response'
+        ? projectAiResponseContent(e.content, { silent: true })
+        : e.content,
+    )
+    .join('\n\n');
 
   return joined.length > MAX_EMBEDDING_CHARS
     ? joined.slice(0, MAX_EMBEDDING_CHARS)
