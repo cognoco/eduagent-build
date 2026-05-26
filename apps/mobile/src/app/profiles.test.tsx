@@ -640,4 +640,90 @@ describe('ProfilesScreen', () => {
       expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // [CR-2026-05-21-107] 20s switch timeout must not fire a second alert / close
+  // the modal when the in-flight switchProfile() resolves AFTER the timeout.
+  // ---------------------------------------------------------------------------
+
+  describe('[CR-2026-05-21-107] 20s switch timeout', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('does not stack a second alert or close the modal when the switch resolves AFTER the timeout', async () => {
+      let resolveSwitch!: (value: { success: true }) => void;
+      const verySlowSwitch = jest.fn(
+        () =>
+          new Promise<{ success: true }>((resolve) => {
+            resolveSwitch = resolve;
+          }),
+      );
+      useProfile.mockReturnValue({
+        profiles: [ownerProfile, childProfile],
+        activeProfile: childProfile,
+        switchProfile: verySlowSwitch,
+        isLoading: false,
+      });
+
+      render(<ProfilesScreen />);
+      fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+      // Advance past the 20s timeout — the "Taking longer than expected" alert
+      // should have been shown by the timer.
+      act(() => {
+        jest.advanceTimersByTime(20_000);
+      });
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Taking longer than expected',
+        'Please try again.',
+      );
+      expect(mockPlatformAlert).toHaveBeenCalledTimes(1);
+      expect(mockBack).not.toHaveBeenCalled();
+
+      // Now the switchProfile() promise resolves successfully — late resolve.
+      // The post-await success path must NOT stack a second alert and must
+      // NOT close the modal (handleClose → mockBack).
+      await act(async () => {
+        resolveSwitch({ success: true });
+      });
+
+      expect(mockPlatformAlert).toHaveBeenCalledTimes(1);
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it('does not stack a second alert when the switch throws AFTER the timeout', async () => {
+      let rejectSwitch!: (err: Error) => void;
+      const slowFailingSwitch = jest.fn(
+        () =>
+          new Promise((_, reject) => {
+            rejectSwitch = reject;
+          }),
+      );
+      useProfile.mockReturnValue({
+        profiles: [ownerProfile, childProfile],
+        activeProfile: childProfile,
+        switchProfile: slowFailingSwitch,
+        isLoading: false,
+      });
+
+      render(<ProfilesScreen />);
+      fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+      act(() => {
+        jest.advanceTimersByTime(20_000);
+      });
+      expect(mockPlatformAlert).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        rejectSwitch(new Error('network down'));
+      });
+
+      // No second "Could not switch profiles" alert on top of the timeout one.
+      expect(mockPlatformAlert).toHaveBeenCalledTimes(1);
+    });
+  });
 });

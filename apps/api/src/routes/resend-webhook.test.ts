@@ -41,11 +41,8 @@ jest.mock(
 
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
-import {
-  resendWebhookRoute,
-  verifyResendSignature,
-  claimWebhookId,
-} from './resend-webhook';
+import { resendWebhookRoute, verifyResendSignature } from './resend-webhook';
+import { claimWebhookId } from '../services/webhook-idempotency';
 import { inngest } from '../inngest/client';
 
 // ---------------------------------------------------------------------------

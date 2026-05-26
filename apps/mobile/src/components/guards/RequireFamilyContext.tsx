@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { LEARNER_HOME_HREF } from '../../lib/navigation';
@@ -32,6 +33,7 @@ export function RequireFamilyContext({
   const enterFamilyMode = useEnterFamilyMode();
   const contract = useNavigationContract();
   const [switchFailed, setSwitchFailed] = useState(false);
+  const { t } = useTranslation();
 
   if (
     !FEATURE_FLAGS.MODE_NAV_V0_ENABLED &&
@@ -80,10 +82,10 @@ export function RequireFamilyContext({
       testID="family-route-blocked"
     >
       <Text className="text-title-sm text-text-primary text-center">
-        This is a family view
+        {t('guards.requireFamilyContext.title')}
       </Text>
       <Text className="text-body text-text-secondary text-center">
-        Child learning profiles are only visible in Family mode.
+        {t('guards.requireFamilyContext.body')}
       </Text>
 
       {switchFailed && (
@@ -91,8 +93,7 @@ export function RequireFamilyContext({
           testID="family-route-switch-error"
           className="text-body-sm text-danger text-center"
         >
-          We couldn&apos;t switch to Family mode. Try again, or contact support
-          if this keeps happening.
+          {t('guards.requireFamilyContext.switchError')}
         </Text>
       )}
 
@@ -103,7 +104,7 @@ export function RequireFamilyContext({
           onPress={handleSwitchToFamily}
         >
           <Text className="text-body font-semibold text-white">
-            Switch to Family mode
+            {t('guards.requireFamilyContext.switchCta')}
           </Text>
         </Pressable>
       )}
@@ -113,7 +114,9 @@ export function RequireFamilyContext({
         className="mt-1 px-6 py-3"
         onPress={handleGoHome}
       >
-        <Text className="text-body text-primary">Back to Home</Text>
+        <Text className="text-body text-primary">
+          {t('guards.requireFamilyContext.backToHome')}
+        </Text>
       </Pressable>
     </View>
   );

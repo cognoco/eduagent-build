@@ -167,7 +167,16 @@ export default function ProfilesScreen() {
     if (isSwitching || switchInFlightRef.current) return;
     switchInFlightRef.current = true;
     setIsSwitching(true);
+    // [CR-2026-05-21-107] Track whether the 20s "taking longer" alert has
+    // already fired. The setTimeout only resets isSwitching — it cannot
+    // cancel the in-flight switchProfile(). When the request resolves
+    // *after* the timeout, the success path would call handleClose() and
+    // (in the persistenceFailed branch) a second alert — both on top of
+    // the "Please try again" the user already saw. Guard the post-await
+    // continuation with this ref so the late resolve is a silent no-op.
+    let timedOut = false;
     const timeoutId = setTimeout(() => {
+      timedOut = true;
       switchInFlightRef.current = false;
       setIsSwitching(false);
       platformAlert('Taking longer than expected', 'Please try again.');
@@ -178,6 +187,14 @@ export default function ProfilesScreen() {
           ? await switchProfile(profileId, options)
           : await switchProfile(profileId);
       clearTimeout(timeoutId);
+      if (timedOut) {
+        // User already saw "Please try again"; do not stack a second alert
+        // or close the modal underneath them. If the switch actually
+        // succeeded server-side, the next render of the profiles screen
+        // will reflect the new active profile via useProfile() — no UX
+        // step needed here.
+        return;
+      }
       if (result?.success === false) {
         platformAlert(
           'Could not switch profiles',
@@ -201,6 +218,9 @@ export default function ProfilesScreen() {
       // when available rather than a generic "Please try again." per CLAUDE.md
       // rule: never replace specific server errors with generic messages.
       clearTimeout(timeoutId);
+      // [CR-2026-05-21-107] Same guard as the success path — if the 20s
+      // alert already fired, do not stack a second error dialog over it.
+      if (timedOut) return;
       platformAlert('Could not switch profiles', formatApiError(err));
     } finally {
       clearTimeout(timeoutId);

@@ -102,6 +102,15 @@
       "backToSignIn": "サインインに戻る"
     }
   },
+  "guards": {
+    "requireFamilyContext": {
+      "title": "これはファミリービューです",
+      "body": "お子さまの学習プロフィールはファミリーモードでのみ表示されます。",
+      "switchError": "ファミリーモードに切り替えできませんでした。もう一度お試しいただくか、解決しない場合はサポートにお問い合わせください。",
+      "switchCta": "ファミリーモードに切り替える",
+      "backToHome": "ホームに戻る"
+    }
+  },
   "home": {
     "loadingTimeoutMessage": "想定より時間がかかっています。接続を確認して、もう一度お試しください。",
     "retryLoadingLabel": "再読み込み",
@@ -140,7 +149,12 @@
       },
       "proxySessionSummariesTitle": "セッション要約は保護者ビューにあります",
       "proxySessionSummariesBody": "{{name}}のメモは非公開のままですが、プロフィールから保護者向けのセッション要約を確認できます。",
-      "proxySessionSummariesCta": "{{name}}のセッション要約を見る"
+      "proxySessionSummariesCta": "{{name}}のセッション要約を見る",
+      "familySetup": {
+        "title": "Set up Family",
+        "subtitle": "Add a child profile so they can learn with their own mentor",
+        "cta": "Set up Family"
+      }
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -1047,6 +1061,9 @@
       "missingMessage": "このトピックを読み込めませんでした。ライブラリでトピックを選んでください。",
       "goToLibrary": "ライブラリへ",
       "successPrompt": "準備ができたらライブラリに戻ってください。",
+      "successMessage": "よくできました — この内容をしっかり覚えています！準備ができたらライブラリに戻ってください。",
+      "partialResult": "よく頑張りました！重要なコンセプトを考えて、もう一度説明してみてください。一番印象に残っていることは何ですか？",
+      "needsReview": "もう少しです — もう少し練習すれば定着します。一緒に別のアプローチを探しましょう。",
       "dontRemember": "覚えていません",
       "stillStuck": "まだわかりません",
       "errorTitle": "問題が発生しました",
@@ -2162,6 +2179,45 @@
         "gettingComfortable": "自信がついてきた",
         "nearlyMastered": "ほぼ習得",
         "mastered": "習得済み"
+      }
+    },
+    "metricTooltips": {
+      "infoDotLabel": "{{title}}についての詳細",
+      "timeOnApp": {
+        "title": "アプリ利用時間",
+        "body": "このセッション中にお子さまがアプリで過ごした時間（実時間の分）。"
+      },
+      "sessionsThisWeek": {
+        "title": "今週のセッション",
+        "body": "お子さまが今週メンターと行った学習会話の回数。"
+      },
+      "engagementTrend": {
+        "title": "利用傾向",
+        "body": "お子さまの最近のメンター利用が増えているか、減っているか、ほぼ同じかを示します。"
+      },
+      "exchangeDelta": {
+        "title": "今週のやり取り",
+        "body": "今週と先週を比較したメッセージのやり取り数。学習活動の手軽な目安です。"
+      },
+      "guidedRatio": {
+        "title": "ガイド付き練習",
+        "body": "お子さまが軽い促しではなく、解き方の例やより強いガイドを必要とした返答の割合。"
+      },
+      "streakXp": {
+        "title": "連続記録とXP",
+        "body": "定期的な練習や完了した学習作業から得られるモチベーションの指標です。成績ではありません。"
+      },
+      "understanding": {
+        "title": "理解度",
+        "body": "お子さまの回答やメンターとの会話から、このトピックをどの程度理解しているかを示します。"
+      },
+      "reviewStatus": {
+        "title": "記憶チェック",
+        "body": "学んだことをまだ覚えているかどうか。間隔反復に基づき、トピックは少しずつ間隔を空けて戻ってきます。"
+      },
+      "milestone": {
+        "title": "マイルストーン",
+        "body": "マイルストーンは、初めてのセッション、学んだトピック、覚えた単語など、実際の達成を示します。"
       }
     },
     "weeklyReport": {

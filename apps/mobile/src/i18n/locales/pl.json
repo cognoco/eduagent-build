@@ -102,6 +102,15 @@
       "backToSignIn": "Wróć do logowania"
     }
   },
+  "guards": {
+    "requireFamilyContext": {
+      "title": "To jest widok rodzinny",
+      "body": "Profile nauki dzieci są widoczne tylko w trybie Rodzinnym.",
+      "switchError": "Nie udało się przełączyć na tryb Rodzinny. Spróbuj ponownie lub skontaktuj się z pomocą, jeśli problem się powtarza.",
+      "switchCta": "Przełącz na tryb Rodzinny",
+      "backToHome": "Wróć do strony głównej"
+    }
+  },
   "home": {
     "loadingTimeoutMessage": "Trwa to dłużej niż oczekiwano. Sprawdź połączenie i spróbuj ponownie.",
     "retryLoadingLabel": "Ponów ładowanie",
@@ -140,7 +149,12 @@
       },
       "proxySessionSummariesTitle": "Podsumowania sesji są w widoku rodzica",
       "proxySessionSummariesBody": "Notatki {{name}} pozostają prywatne, ale w profilu możesz zobaczyć bezpieczne dla rodzica podsumowania sesji.",
-      "proxySessionSummariesCta": "Zobacz podsumowania sesji {{name}}"
+      "proxySessionSummariesCta": "Zobacz podsumowania sesji {{name}}",
+      "familySetup": {
+        "title": "Set up Family",
+        "subtitle": "Add a child profile so they can learn with their own mentor",
+        "cta": "Set up Family"
+      }
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -1072,6 +1086,9 @@
       "missingMessage": "Nie mogliśmy załadować tego tematu. Przejdź do biblioteki, aby wybrać jeden.",
       "goToLibrary": "Przejdź do Biblioteki",
       "successPrompt": "Wróć do swojej Biblioteki, kiedy będziesz gotowy(-a).",
+      "successMessage": "Świetna robota — dobrze to pamiętasz! Wróć do swojej Biblioteki, kiedy będziesz gotowy(-a).",
+      "partialResult": "Dobry wysiłek! Pomyśl o kluczowych pojęciach i spróbuj ponownie. Co najbardziej Ci się wyróżnia?",
+      "needsReview": "Prawie — trochę więcej ćwiczeń i to utrwalisz. Znajdźmy dla Ciebie lepsze podejście.",
       "dontRemember": "Nie pamiętam",
       "stillStuck": "Nadal nie wiem",
       "errorTitle": "Coś poszło nie tak",
@@ -2187,6 +2204,45 @@
         "gettingComfortable": "Nabiera pewności",
         "nearlyMastered": "Prawie opanowane",
         "mastered": "Opanowane"
+      }
+    },
+    "metricTooltips": {
+      "infoDotLabel": "Więcej informacji o {{title}}",
+      "timeOnApp": {
+        "title": "Czas w aplikacji",
+        "body": "Ile czasu Twoje dziecko spędziło w aplikacji podczas tej sesji, mierzony w prawdziwych minutach."
+      },
+      "sessionsThisWeek": {
+        "title": "Sesje w tym tygodniu",
+        "body": "Liczba rozmów edukacyjnych, które Twoje dziecko odbyło z mentorem w tym tygodniu."
+      },
+      "engagementTrend": {
+        "title": "Trend aktywności",
+        "body": "Czy Twoje dziecko korzysta z mentora częściej, rzadziej czy mniej więcej tak samo jak w ostatnim czasie."
+      },
+      "exchangeDelta": {
+        "title": "Wymiany wiadomości w tym tygodniu",
+        "body": "Ile tur wiadomości miało miejsce w tym tygodniu w porównaniu z poprzednim. To prosty sygnał aktywności w nauce."
+      },
+      "guidedRatio": {
+        "title": "Ćwiczenia z prowadzeniem",
+        "body": "Udział odpowiedzi mentora, w których Twoje dziecko potrzebowało rozpisanego przykładu lub silniejszej wskazówki zamiast lekkiej podpowiedzi."
+      },
+      "streakXp": {
+        "title": "Passa i XP",
+        "body": "Sygnały motywacji wynikające z regularnej praktyki i ukończonej pracy edukacyjnej. To nie są oceny."
+      },
+      "understanding": {
+        "title": "Zrozumienie",
+        "body": "Jak dobrze Twoje dziecko rozumie ten temat, na podstawie odpowiedzi i rozmów z mentorem."
+      },
+      "reviewStatus": {
+        "title": "Sprawdzenie pamięci",
+        "body": "Czy Twoje dziecko nadal pamięta to, czego się nauczyło. Oparte na powtórkach rozłożonych w czasie, więc tematy wracają w coraz większych odstępach."
+      },
+      "milestone": {
+        "title": "Kamienie milowe",
+        "body": "Kamienie milowe oznaczają prawdziwe osiągnięcia, takie jak pierwsze sesje, poznane tematy i wyuczone słownictwo."
       }
     },
     "weeklyReport": {

@@ -97,6 +97,7 @@ import {
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { safeSend, safeWrite } from '../safe-non-core';
+import { applyChallengeRoundEvaluation } from '../challenge-round/persistence';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -2349,6 +2350,37 @@ export async function processMessage(
     );
   }
 
+  // [CR-2026-05-21-071] Challenge Round mastery gate.  When the envelope
+  // returned per-concept evaluations, run the server-owned conservative
+  // gate: validate every answerEventId belongs to this profile + session,
+  // decide mastery (all-solid required), route weak concepts to
+  // needs_deepening_topics, and persist any safe note draft.  Wrapped in
+  // safeWrite so a bad LLM payload or DB hiccup does NOT break the
+  // user-facing exchange — Sentry sees the failure and the user gets the
+  // AI response either way.
+  // Hoist into a local so TypeScript's narrowing (.length > 0 check below)
+  // survives the closure passed to safeWrite.
+  const crEvaluations = result.challengeRoundEvaluation;
+  if (
+    persisted.persistedUserMessage &&
+    crEvaluations &&
+    crEvaluations.length > 0
+  ) {
+    await safeWrite(
+      () =>
+        applyChallengeRoundEvaluation(db, {
+          profileId,
+          sessionId,
+          topicId: session.topicId,
+          subjectId: session.subjectId,
+          evaluations: crEvaluations,
+          noteDraft: result.noteDraft ?? null,
+        }),
+      'session-exchange.challenge-round-evaluation',
+      { profileId, sessionId },
+    );
+  }
+
   // [BUG-92 / CR-2026-05-19-C4] Apply the server-side hard cap for interview /
   // onboarding flows. See `resolveReadyToFinish` JSDoc for the contract.
   const readyToFinish = resolveReadyToFinish({
@@ -2653,6 +2685,31 @@ export async function streamMessage(
           input.message,
           context.topicTitle,
           context.isFirstEncounter === true,
+        );
+      }
+
+      // [CR-2026-05-21-071] Streaming-path mirror of the Challenge Round
+      // mastery gate. Same contract as the non-streaming branch in
+      // processMessage. The streaming envelope is fully parsed before we
+      // reach here, so the same gate applies.
+      const streamCrEvaluations = parsed.challengeRoundEvaluation;
+      if (
+        persisted.persistedUserMessage &&
+        streamCrEvaluations &&
+        streamCrEvaluations.length > 0
+      ) {
+        await safeWrite(
+          () =>
+            applyChallengeRoundEvaluation(db, {
+              profileId,
+              sessionId,
+              topicId: session.topicId,
+              subjectId: session.subjectId,
+              evaluations: streamCrEvaluations,
+              noteDraft: parsed.noteDraft ?? null,
+            }),
+          'session-exchange.challenge-round-evaluation.stream',
+          { profileId, sessionId },
         );
       }
 

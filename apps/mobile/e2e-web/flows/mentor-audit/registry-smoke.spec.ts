@@ -6,7 +6,7 @@ import {
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { seedScenario } from '../../helpers/test-seed';
 import { applyMentorAuditStorageStateMutator } from '../../helpers/mentor-audit-storage-state';
-import { buildSeedEmail } from '../../helpers/runtime';
+import { apiBaseUrl, buildSeedEmail } from '../../helpers/runtime';
 
 /**
  * Mentor Chrome audit — registry smoke
@@ -66,7 +66,7 @@ for (const [registryName, scenario] of entries) {
       );
       await page.context().storageState({ path: basePath });
 
-      const derivedPath = await applyMentorAuditStorageStateMutator({
+      const mutatorResult = await applyMentorAuditStorageStateMutator({
         mutator: scenario.storageStateMutator,
         baseStorageStatePath: basePath,
         scenarioKey: scenario.key,
@@ -76,12 +76,20 @@ for (const [registryName, scenario] of entries) {
       // pre-shell landing testID renders.
       await page.context().clearCookies();
       const newContext = await page.context().browser()?.newContext({
-        storageState: derivedPath,
+        storageState: mutatorResult.storageStatePath,
       });
       if (!newContext) {
         throw new Error(
           'Browser context unavailable when applying mentor-audit storage-state mutator',
         );
+      }
+      // [BUG-779/780] Install the sessionStorage banner-state seed BEFORE
+      // the first navigation. Playwright's storage-state file only carries
+      // cookies + localStorage; the in-app peek reads sessionStorage which
+      // must be primed via an init script. Without this the spec lands on
+      // the home shell because the banner never renders.
+      if (mutatorResult.sessionStorageInit) {
+        await newContext.addInitScript(mutatorResult.sessionStorageInit);
       }
       const mutatedPage = await newContext.newPage();
       await mutatedPage.goto(scenario.landingPath);
@@ -97,19 +105,29 @@ for (const [registryName, scenario] of entries) {
     }
 
     if (scenario.seedScenario === 'mentor-audit-post-approval-redirect') {
-      // The audit opens the consent-approve URL directly (mirrors the link a
-      // parent clicks from email). Seed first, then navigate to the URL with
-      // the returned token.
+      // [BUG-779] Consent approval is owned by the API consent-web flow
+      // (apps/api/src/routes/consent-web.ts) — a server-rendered HTML page
+      // at GET /consent-page?token=…, NOT a mobile Expo Router screen. Open
+      // the URL against `apiBaseUrl` so the spec exercises the actual surface
+      // a parent reaches by clicking the consent email link. The fixture's
+      // `landingPath` is the suffix; the heading text in `landingTestId`
+      // maps to the deterministic `<h1>Consent required for {child}</h1>`
+      // the route emits (consent-web.ts:189) when the token is valid.
       const seeded = await seedScenario({
         scenario: scenario.seedScenario,
         email: buildSeedEmail(scenario.key),
       });
       const consentToken = seeded.ids.consentToken;
       expect(consentToken).toBeTruthy();
-      await page.goto(
-        `${scenario.landingPath}?token=${encodeURIComponent(consentToken)}`,
-      );
-      await expect(page.getByTestId(scenario.landingTestId)).toBeVisible();
+      const url = `${apiBaseUrl}${scenario.landingPath}?token=${encodeURIComponent(
+        consentToken,
+      )}`;
+      await page.goto(url);
+      // The consent-web HTML page has no testIDs; assert on the heading copy
+      // which is the contract between consent-web.ts and this smoke.
+      await expect(
+        page.getByRole('heading', { name: /Consent required for/i }),
+      ).toBeVisible();
       return;
     }
 

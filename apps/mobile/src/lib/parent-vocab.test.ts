@@ -1,7 +1,9 @@
+import i18next from 'i18next';
 import {
+  getParentMetricTooltip,
   getParentRetentionInfo,
-  getUnderstandingLabel,
   getReconciliationLine,
+  getUnderstandingLabel,
 } from './parent-vocab';
 
 describe('getUnderstandingLabel', () => {
@@ -63,6 +65,34 @@ describe('getParentRetentionInfo', () => {
       label: 'Needs a fresh pass',
       colorKey: 'retentionWeak',
     });
+  });
+});
+
+describe('getParentMetricTooltip', () => {
+  const t = i18next.getFixedT('en');
+
+  it('returns null for an unknown metric key', () => {
+    expect(getParentMetricTooltip(t, 'not-a-real-key')).toBeNull();
+  });
+
+  it('returns the localized title and body for understanding', () => {
+    const tooltip = getParentMetricTooltip(t, 'understanding');
+    expect(tooltip).not.toBeNull();
+    expect(tooltip?.title).toBe('Understanding');
+    expect(tooltip?.body.toLowerCase()).toContain('understands');
+  });
+
+  it.each([
+    ['time-on-app', 'Time on app'],
+    ['sessions-this-week', 'Sessions this week'],
+    ['engagement-trend', 'Engagement trend'],
+    ['exchange-delta', 'Exchanges this week'],
+    ['guided-ratio', 'Guided practice'],
+    ['streak-xp', 'Streak and XP'],
+    ['review-status', 'Memory check'],
+    ['milestone', 'Milestones'],
+  ])('maps %s to the right title', (key, title) => {
+    expect(getParentMetricTooltip(t, key)?.title).toBe(title);
   });
 });
 

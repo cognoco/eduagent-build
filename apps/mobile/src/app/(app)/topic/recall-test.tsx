@@ -128,7 +128,7 @@ export default function RecallTestScreen() {
             if (result.passed) {
               // Success — animate a congratulatory response
               cleanupRef.current = animateResponse(
-                "Nice \u2014 your memory of this is solid! Head back to your Library whenever you're ready.",
+                t('topic.recallTest.successMessage'),
                 setMessages,
                 setIsStreaming,
                 () => {
@@ -139,7 +139,7 @@ export default function RecallTestScreen() {
             } else if (result.failureAction === 'feedback_only') {
               // Under 3 failures — encourage retry
               cleanupRef.current = animateResponse(
-                "Not quite there yet, but that's okay! Think about the key concepts and try explaining again. What stands out most to you?",
+                t('topic.recallTest.partialResult'),
                 setMessages,
                 setIsStreaming,
                 releaseSubmissionBlock,
@@ -147,7 +147,7 @@ export default function RecallTestScreen() {
             } else if (result.failureAction === 'redirect_to_library') {
               // 3+ failures — show remediation card
               cleanupRef.current = animateResponse(
-                "It looks like this topic needs some more work. Don't worry — that's completely normal! Let's find a better approach for you.",
+                t('topic.recallTest.needsReview'),
                 setMessages,
                 setIsStreaming,
                 () => {

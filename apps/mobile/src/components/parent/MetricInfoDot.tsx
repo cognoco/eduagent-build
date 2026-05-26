@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { PARENT_METRIC_TOOLTIPS } from '../../lib/parent-vocab';
+import { useTranslation } from 'react-i18next';
+import { getParentMetricTooltip } from '../../lib/parent-vocab';
 import { useThemeColors } from '../../lib/theme';
 
 interface MetricInfoDotProps {
@@ -11,8 +12,9 @@ interface MetricInfoDotProps {
 export function MetricInfoDot({ metricKey }: MetricInfoDotProps) {
   const [visible, setVisible] = useState(false);
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
-  const tooltip = PARENT_METRIC_TOOLTIPS[metricKey];
+  const tooltip = getParentMetricTooltip(t, metricKey);
   if (!tooltip) return null;
 
   return (
@@ -22,7 +24,9 @@ export function MetricInfoDot({ metricKey }: MetricInfoDotProps) {
         hitSlop={8}
         onPress={() => setVisible((v) => !v)}
         accessibilityRole="button"
-        accessibilityLabel={`More info about ${tooltip.title}`}
+        accessibilityLabel={t('parentView.metricTooltips.infoDotLabel', {
+          title: tooltip.title,
+        })}
       >
         <Ionicons
           name="information-circle-outline"

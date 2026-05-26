@@ -1,4 +1,5 @@
 import { Pressable, View, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { getTimeOfDay } from '../../lib/greeting';
 import { useThemeColors } from '../../lib/theme';
 
@@ -28,6 +29,7 @@ export function CoachBand({
 }: CoachBandProps) {
   const resolvedEyebrow = eyebrow ?? getTimeAwareEyebrow(now);
   const colors = useThemeColors();
+  const { t } = useTranslation();
   if (!headline) return null;
 
   return (
@@ -55,7 +57,9 @@ export function CoachBand({
           onPress={onContinue}
           className="bg-primary rounded-xl px-[18px] py-2.5"
         >
-          <Text className="text-sm font-bold text-text-inverse">Continue</Text>
+          <Text className="text-sm font-bold text-text-inverse">
+            {t('common.continue')}
+          </Text>
         </Pressable>
         {estimatedMinutes != null && (
           <Text className="text-[11px] text-text-secondary">

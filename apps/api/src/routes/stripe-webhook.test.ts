@@ -3,16 +3,10 @@
 // ---------------------------------------------------------------------------
 
 jest.mock(
-  './resend-webhook' /* gc1-allow: legacy internal mock — TODO convert to spyOn pattern */,
-  () => {
-    const actual = jest.requireActual(
-      './resend-webhook',
-    ) as typeof import('./resend-webhook');
-    return {
-      ...actual,
-      claimWebhookId: jest.fn(),
-    };
-  },
+  '../services/webhook-idempotency' /* gc1-allow: service boundary — claimWebhookId makes a live DB call; the real DB is not wired in this unit test. Integration tests (resend-webhook.test.ts) cover the real DB path. */,
+  () => ({
+    claimWebhookId: jest.fn(),
+  }),
 );
 
 jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
@@ -119,7 +113,7 @@ import {
 } from '../services/billing';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
-import { claimWebhookId } from './resend-webhook';
+import { claimWebhookId } from '../services/webhook-idempotency';
 
 // ---------------------------------------------------------------------------
 // Test app with mock db middleware

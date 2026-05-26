@@ -1,8 +1,13 @@
 import {
+  AUTH_EXPIRY_STORAGE_KEYS,
   clearSessionExpiredNotice,
+  clearSessionRevokedNotice,
   consumeSessionExpiredNotice,
+  consumeSessionRevokedNotice,
   markSessionExpired,
+  markSessionRevoked,
   peekSessionExpiredNotice,
+  peekSessionRevokedNotice,
 } from './auth-expiry';
 
 describe('auth-expiry notice state', () => {
@@ -118,5 +123,101 @@ describe('[AUTH-11] sessionStorage persistence — survives module reset on web'
       const fresh = require('./auth-expiry') as typeof import('./auth-expiry');
       expect(fresh.peekSessionExpiredNotice()).toBe(false);
     });
+  });
+});
+
+// [BUG-780] The revoked notice mirrors the expired one but is a separate
+// in-memory + sessionStorage state. The two states must not interfere — a
+// revoked notice must not clear an expired notice (and vice versa) so the
+// sign-in screen can show the correct banner if both were set in different
+// tabs / flows.
+describe('[BUG-780] auth-expiry revoked notice state', () => {
+  let storage: Record<string, string>;
+  let originalSessionStorage: unknown;
+  let nowSpy: jest.SpyInstance<number, []>;
+
+  beforeEach(() => {
+    storage = {};
+    originalSessionStorage = (globalThis as { sessionStorage?: unknown })
+      .sessionStorage;
+    (globalThis as { sessionStorage?: unknown }).sessionStorage = {
+      getItem: (key: string) => storage[key] ?? null,
+      setItem: (key: string, value: string) => {
+        storage[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete storage[key];
+      },
+    };
+    nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    clearSessionExpiredNotice();
+    clearSessionRevokedNotice();
+  });
+
+  afterEach(() => {
+    clearSessionExpiredNotice();
+    clearSessionRevokedNotice();
+    if (originalSessionStorage === undefined) {
+      delete (globalThis as { sessionStorage?: unknown }).sessionStorage;
+    } else {
+      (globalThis as { sessionStorage?: unknown }).sessionStorage =
+        originalSessionStorage;
+    }
+    nowSpy.mockRestore();
+  });
+
+  it('exposes a distinct storage key from the expired notice', () => {
+    expect(AUTH_EXPIRY_STORAGE_KEYS.revoked).toBe(
+      'mentomate_session_revoked_at',
+    );
+    expect(AUTH_EXPIRY_STORAGE_KEYS.expired).toBe(
+      'mentomate_session_expired_at',
+    );
+    expect(AUTH_EXPIRY_STORAGE_KEYS.revoked).not.toBe(
+      AUTH_EXPIRY_STORAGE_KEYS.expired,
+    );
+  });
+
+  it('allows peek without consuming the notice', () => {
+    markSessionRevoked();
+
+    expect(peekSessionRevokedNotice()).toBe(true);
+    expect(peekSessionRevokedNotice()).toBe(true);
+    expect(consumeSessionRevokedNotice()).toBe(true);
+    expect(peekSessionRevokedNotice()).toBe(false);
+  });
+
+  it('writes its own storage key — not the expired key', () => {
+    markSessionRevoked();
+    expect(storage['mentomate_session_revoked_at']).toBe('1000');
+    expect(storage['mentomate_session_expired_at']).toBeUndefined();
+  });
+
+  it('does not clear an expired notice when the revoked notice is cleared', () => {
+    markSessionExpired();
+    markSessionRevoked();
+
+    clearSessionRevokedNotice();
+
+    expect(peekSessionExpiredNotice()).toBe(true);
+    expect(peekSessionRevokedNotice()).toBe(false);
+  });
+
+  it('rehydrates from sessionStorage after a module reset', () => {
+    markSessionRevoked();
+
+    jest.isolateModules(() => {
+      const fresh = require('./auth-expiry') as typeof import('./auth-expiry');
+      expect(fresh.peekSessionRevokedNotice()).toBe(true);
+    });
+  });
+
+  it('clears the storage entry when the notice expires past the five-minute window', () => {
+    markSessionRevoked();
+    expect(storage['mentomate_session_revoked_at']).toBe('1000');
+
+    nowSpy.mockReturnValue(1_000 + 5 * 60_000);
+    expect(peekSessionRevokedNotice()).toBe(false);
+    expect(storage['mentomate_session_revoked_at']).toBeUndefined();
   });
 });

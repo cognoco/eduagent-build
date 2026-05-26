@@ -125,7 +125,27 @@ export const profileSwitchSchema = z
 
 export type ProfileSwitchInput = z.infer<typeof profileSwitchSchema>;
 
-export const profileSchema = z.object({
+// [CR-2026-05-21-181 / BUG-projectSchemaAccountIdLeak] Internal vs public split.
+//
+// `internalProfileSchema` is the server-side shape — it includes `accountId`
+// because billing, family-link resolution, and ownership checks all need it.
+// Service-layer code (services/profile.ts, services/billing/family.ts) reads
+// rows mapped to this shape and never sends them directly over the wire.
+//
+// `publicProfileSchema` is the client-facing shape — it omits `accountId`.
+// On a family plan, multiple profiles share a single accountId; exposing it
+// to mobile lets a client correlate sibling profiles back to one account
+// holder (a stable identifier that survives profile switches). Mobile code
+// never reads `profile.accountId`; ownership-style checks use `isOwner` and
+// the active `profileId` from the JWT/session, not accountId equality.
+// All `/profiles*` route responses serialize through the public schema.
+//
+// `profileSchema` stays as an alias of `internalProfileSchema` for backward
+// compatibility with existing server-side consumers (profile.ts, family.ts,
+// test factories). Routes MUST use `profileResponseSchema` /
+// `profileListResponseSchema` (which wrap the public shape) for client
+// responses — see `clientFacingProfileSchemaShape` guard test below.
+const profileSchemaShape = {
   id: z.string().uuid(),
   accountId: z.string().uuid(),
   displayName: z.string(),
@@ -144,22 +164,44 @@ export const profileSchema = z.object({
   linkCreatedAt: isoDateField.nullable(),
   createdAt: isoDateField,
   updatedAt: isoDateField,
-});
+} as const;
 
+export const internalProfileSchema = z.object(profileSchemaShape);
+export type InternalProfile = z.infer<typeof internalProfileSchema>;
+
+/**
+ * Backward-compat alias of {@link internalProfileSchema}. Server-side service
+ * code that reads DB rows mapped to the full shape (including `accountId`)
+ * should keep using this. New code that ships a profile to a client MUST use
+ * {@link publicProfileSchema} via the response envelope schemas below.
+ */
+export const profileSchema = internalProfileSchema;
 export type Profile = z.infer<typeof profileSchema>;
+
+/**
+ * Client-facing profile shape. Omits `accountId` to prevent cross-profile
+ * correlation by the mobile client (a stable per-account identifier that
+ * survives profile switches and would leak across owner/child boundaries
+ * on a family plan).
+ */
+export const publicProfileSchema = internalProfileSchema.omit({
+  accountId: true,
+});
+export type PublicProfile = z.infer<typeof publicProfileSchema>;
 
 // ---------------------------------------------------------------------------
 // Route response envelope schemas
-// Used in routes/profiles.ts to validate outgoing JSON bodies.
+// Used in routes/profiles.ts to validate outgoing JSON bodies. These wrap the
+// PUBLIC shape so `accountId` cannot accidentally cross the trust boundary.
 // ---------------------------------------------------------------------------
 
 export const profileResponseSchema = z.object({
-  profile: profileSchema,
+  profile: publicProfileSchema,
 });
 export type ProfileResponse = z.infer<typeof profileResponseSchema>;
 
 export const profileListResponseSchema = z.object({
-  profiles: z.array(profileSchema),
+  profiles: z.array(publicProfileSchema),
 });
 export type ProfileListResponse = z.infer<typeof profileListResponseSchema>;
 

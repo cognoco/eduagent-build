@@ -120,10 +120,23 @@ export const mentorAuditScenarios = {
     key: 'mentor-audit-post-approval-redirect',
     seedScenario: 'mentor-audit-post-approval-redirect',
     email: buildSeedEmail('mentor-audit-post-approval-redirect'),
-    // Audit opens /consent/approve?token=… directly. Spec resolves the
-    // token from seedResult.ids.consentToken at runtime.
-    landingPath: '/consent/approve',
-    landingTestId: 'consent-approve-confirmation',
+    // [BUG-779] Consent approval is owned by the API consent-web flow at
+    // GET /consent-page?token=… (apps/api/src/routes/consent-web.ts:153), not
+    // by a mobile Expo Router screen. The earlier landingPath '/consent/approve'
+    // pointed at a route that has never existed in apps/mobile/src/app/, so the
+    // smoke failed before exercising the consent-approval surface a parent
+    // actually clicks from email. The spec resolves the API base URL + appends
+    // the consentToken returned by the seeder at runtime; `landingPath` here
+    // is the suffix the spec joins onto `apiBaseUrl`.
+    landingPath: '/consent-page',
+    // The consent-web page is plain server-rendered HTML (no React testIDs).
+    // The spec asserts on the document heading 'Consent required for …' which
+    // is the deterministic shape consent-web.ts:189 emits when the token is
+    // valid. `landingTestId` is preserved as a textual key the spec maps to
+    // a heading assertion rather than a testID lookup; the
+    // post-approval-redirect branch in registry-smoke.spec.ts is the only
+    // consumer that interprets it this way.
+    landingTestId: 'consent-required-heading',
     requiresChromeOnly: true,
   },
   consentUsUnderThreshold: {
