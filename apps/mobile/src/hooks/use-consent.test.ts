@@ -152,18 +152,30 @@ describe('useRequestConsent', () => {
 
 describe('useResendConsent [WI-374]', () => {
   // Extract { url, body } from a fetch mock call regardless of whether the RPC
-  // client passes (url, init) or a Request object.
-  function readFetchCall(call: unknown[]): { url: string; body: string } {
+  // client passes (url, init) or a Request object. [CodeRabbit] When the first
+  // arg is a Request, the payload may live on the Request itself (not init.body),
+  // so read the Request body too — otherwise the "no parentEmail leaked"
+  // assertion could pass vacuously.
+  async function readFetchCall(
+    call: unknown[],
+  ): Promise<{ url: string; body: string }> {
     const first = call[0];
     const init = call[1] as RequestInit | undefined;
+    const initBody = String(init?.body ?? '');
     if (typeof first === 'string') {
-      return { url: first, body: String(init?.body ?? '') };
+      return { url: first, body: initBody };
     }
     if (first instanceof URL) {
-      return { url: first.toString(), body: String(init?.body ?? '') };
+      return { url: first.toString(), body: initBody };
     }
     const req = first as Request;
-    return { url: req.url, body: String(init?.body ?? '') };
+    let reqBody = '';
+    try {
+      reqBody = await req.clone().text();
+    } catch {
+      // body already consumed or not readable — fall back to init.body
+    }
+    return { url: req.url, body: reqBody || initBody };
   }
 
   it('[WI-261] POSTs /consent/resend with NO parentEmail (masked email can never be sent)', async () => {
@@ -190,7 +202,7 @@ describe('useResendConsent [WI-374]', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const { url, body } = readFetchCall(mockFetch.mock.calls[0]!);
+    const { url, body } = await readFetchCall(mockFetch.mock.calls[0]!);
     expect(url).toContain('/consent/resend');
     expect(body).not.toContain('parentEmail');
     expect(body).toContain('550e8400-e29b-41d4-a716-446655440000');
