@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS "profile_quota_usage" (
   CONSTRAINT "profile_quota_usage_today_non_negative" CHECK ("used_today" >= 0)
 );
 --> statement-breakpoint
+ALTER TABLE "profile_quota_usage" ENABLE ROW LEVEL SECURITY;
+--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "profile_quota_usage" ADD CONSTRAINT "profile_quota_usage_subscription_id_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscriptions"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION

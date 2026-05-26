@@ -63,6 +63,8 @@ describe('useSubscription', () => {
         JSON.stringify({
           subscription: {
             tier: 'plus',
+            effectiveAccessTier: 'plus',
+            billingAccess: 'current',
             status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: '2026-03-18T00:00:00Z',
@@ -98,6 +100,8 @@ describe('useSubscription', () => {
         JSON.stringify({
           subscription: {
             tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
             status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: null,

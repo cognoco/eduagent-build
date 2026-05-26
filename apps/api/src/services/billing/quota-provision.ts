@@ -129,6 +129,7 @@ export async function provisionProfileQuotaUsage(
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: operational billing marker consumed from Inngest event history; no function should run.
           name: 'app/billing.profile_quota.lazy_provisioned',
           data: {
             subscriptionId,

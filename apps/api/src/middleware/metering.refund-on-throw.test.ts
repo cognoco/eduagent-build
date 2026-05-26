@@ -33,6 +33,7 @@ const mockSafeRefundQuota = jest.fn().mockResolvedValue({ refunded: true });
 const mockDecrementQuota = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockEnsureFreeSubscription = jest.fn();
+const mockGetEffectiveAccessForSubscription = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
 jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
@@ -44,6 +45,8 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     ensureFreeSubscription: (...args: unknown[]) =>
       mockEnsureFreeSubscription(...args),
     getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
+    getEffectiveAccessForSubscription: (...args: unknown[]) =>
+      mockGetEffectiveAccessForSubscription(...args),
     decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
     safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
     getTopUpCreditsRemaining: (...args: unknown[]) =>
@@ -80,7 +83,7 @@ function mockSubscription() {
     accountId: 'test-account-id',
     stripeCustomerId: 'cus_test',
     stripeSubscriptionId: 'sub_stripe_1',
-    tier: 'plus' as const,
+    tier: 'family' as const,
     status: 'active' as const,
     trialEndsAt: null,
     currentPeriodEnd: '2025-02-15T00:00:00.000Z',
@@ -136,6 +139,11 @@ function buildApp(
 beforeEach(() => {
   jest.clearAllMocks();
   mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+  mockGetEffectiveAccessForSubscription.mockResolvedValue({
+    subscription: mockSubscription(),
+    effectiveAccessTier: 'family',
+    billingAccess: 'current',
+  });
   mockGetQuotaPool.mockResolvedValue({
     id: 'qp-1',
     subscriptionId: 'sub-1',
