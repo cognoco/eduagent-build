@@ -22,6 +22,7 @@ import {
   ensureFreeSubscription,
   updateQuotaPoolLimit,
 } from './subscription-core';
+import { getEffectiveAccessForSubscription } from './access';
 import { getFamilyPoolBreakdownSharing } from '../settings';
 import { createLogger } from '../logger';
 
@@ -97,9 +98,8 @@ export async function canAddProfile(
     return false;
   }
 
-  const tierConfig = getTierConfig(
-    (sub.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free',
-  );
+  const access = await getEffectiveAccessForSubscription(db, subscriptionId);
+  const tierConfig = getTierConfig(access?.effectiveAccessTier ?? sub.tier);
   const current = await getProfileCountForSubscription(db, subscriptionId);
 
   return current < tierConfig.maxProfiles;
@@ -667,7 +667,8 @@ export async function getFamilyPoolStatus(
     return null;
   }
 
-  const tierConfig = getTierConfig(sub.tier);
+  const access = await getEffectiveAccessForSubscription(db, subscriptionId);
+  const tierConfig = getTierConfig(access?.effectiveAccessTier ?? sub.tier);
   const profileCount = await getProfileCountForSubscription(db, subscriptionId);
   const remaining = Math.max(0, pool.monthlyLimit - pool.usedThisMonth);
 

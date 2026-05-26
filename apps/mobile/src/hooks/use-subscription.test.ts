@@ -63,6 +63,8 @@ describe('useSubscription', () => {
         JSON.stringify({
           subscription: {
             tier: 'plus',
+            effectiveAccessTier: 'plus',
+            billingAccess: 'current',
             status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: '2026-03-18T00:00:00Z',
@@ -98,6 +100,8 @@ describe('useSubscription', () => {
         JSON.stringify({
           subscription: {
             tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
             status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: null,
@@ -168,6 +172,9 @@ describe('useUsage', () => {
             topUpCreditsRemaining: 0,
             warningLevel: 'none',
             cycleResetAt: '2026-03-01T00:00:00Z',
+            dailyLimit: 10,
+            usedToday: 2,
+            dailyRemainingQuestions: 8,
           },
         }),
         { status: 200 },
@@ -198,6 +205,9 @@ describe('useUsage', () => {
             topUpCreditsRemaining: 0,
             warningLevel: 'exceeded',
             cycleResetAt: '2026-03-01T00:00:00Z',
+            dailyLimit: 10,
+            usedToday: 10,
+            dailyRemainingQuestions: 0,
           },
         }),
         { status: 200 },

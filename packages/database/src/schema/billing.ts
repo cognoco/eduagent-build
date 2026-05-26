@@ -121,6 +121,60 @@ export const quotaPools = pgTable(
   ],
 );
 
+export const profileQuotaUsage = pgTable(
+  'profile_quota_usage',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subscriptionId: uuid('subscription_id')
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: ['owner', 'child'] }).notNull(),
+    monthlyLimit: integer('monthly_limit').notNull(),
+    usedThisMonth: integer('used_this_month').notNull().default(0),
+    dailyLimit: integer('daily_limit'),
+    usedToday: integer('used_today').notNull().default(0),
+    cycleResetAt: timestamp('cycle_reset_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('profile_quota_usage_sub_profile_idx').on(
+      table.subscriptionId,
+      table.profileId,
+    ),
+    index('profile_quota_usage_subscription_idx').on(table.subscriptionId),
+    check(
+      'profile_quota_usage_role_valid',
+      sql`${table.role} IN ('owner', 'child')`,
+    ),
+    check(
+      'profile_quota_usage_monthly_limit_non_negative',
+      sql`${table.monthlyLimit} >= 0`,
+    ),
+    check(
+      'profile_quota_usage_daily_limit_non_negative',
+      sql`${table.dailyLimit} IS NULL OR ${table.dailyLimit} >= 0`,
+    ),
+    check(
+      'profile_quota_usage_month_non_negative',
+      sql`${table.usedThisMonth} >= 0`,
+    ),
+    check(
+      'profile_quota_usage_today_non_negative',
+      sql`${table.usedToday} >= 0`,
+    ),
+  ],
+).enableRLS();
+
 export const usageEvents = pgTable(
   'usage_events',
   {
@@ -160,6 +214,9 @@ export const topUpCredits = pgTable(
     subscriptionId: uuid('subscription_id')
       .notNull()
       .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    profileId: uuid('profile_id').references(() => profiles.id, {
+      onDelete: 'cascade',
+    }),
     amount: integer('amount').notNull(),
     remaining: integer('remaining').notNull(),
     purchasedAt: timestamp('purchased_at', { withTimezone: true })
@@ -173,6 +230,11 @@ export const topUpCredits = pgTable(
   },
   (table) => [
     index('top_up_credits_subscription_id_idx').on(table.subscriptionId),
+    index('top_up_credits_sub_profile_expires_idx').on(
+      table.subscriptionId,
+      table.profileId,
+      table.expiresAt,
+    ),
     uniqueIndex('top_up_credits_rc_txn_id_idx').on(
       table.revenuecatTransactionId,
     ),

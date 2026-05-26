@@ -20,6 +20,7 @@ import {
   type AppliedSubscriptionRow,
   type SubscriptionRow,
 } from './types';
+import { reconcileQuotaStateForSubscription } from './quota-reconcile';
 
 const logger = createLogger();
 import { getSubscriptionByAccountId } from './subscription-core';
@@ -101,11 +102,18 @@ export async function updateSubscriptionFromRevenuecatWebhook(
   },
 ): Promise<AppliedSubscriptionRow | null> {
   return db.transaction(async (tx) => {
-    return applySubscriptionUpdateFromRevenuecat(
+    const updated = await applySubscriptionUpdateFromRevenuecat(
       tx as unknown as Database,
       accountId,
       updates,
     );
+    if (updated && updated.webhookApplied !== false) {
+      await reconcileQuotaStateForSubscription(
+        tx as unknown as Database,
+        updated.id,
+      );
+    }
+    return updated;
   });
 }
 
@@ -116,7 +124,7 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
     eventId: string;
     eventTimestampMs?: number;
   },
-  quota: RevenuecatQuotaUpdate,
+  _quota: RevenuecatQuotaUpdate,
 ): Promise<AppliedSubscriptionRow | null> {
   return db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
@@ -127,21 +135,7 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhook(
     );
 
     if (updated && updated.webhookApplied !== false) {
-      const quotaRows = await tx
-        .update(quotaPools)
-        .set({
-          monthlyLimit: quota.monthlyQuota,
-          dailyLimit: quota.dailyLimit,
-          updatedAt: new Date(),
-        })
-        .where(eq(quotaPools.subscriptionId, updated.id))
-        .returning({ id: quotaPools.id });
-
-      if (quotaRows.length === 0) {
-        throw new Error(
-          `Missing quota pool for subscription ${updated.id}; rolling back RevenueCat subscription update`,
-        );
-      }
+      await reconcileQuotaStateForSubscription(txDb, updated.id);
     }
 
     return updated;
@@ -391,6 +385,10 @@ export async function activateSubscriptionFromRevenuecat(
         usedToday: 0,
         cycleResetAt,
       });
+      await reconcileQuotaStateForSubscription(
+        tx as unknown as Database,
+        inserted.id,
+      );
 
       return inserted;
     });
@@ -482,6 +480,10 @@ export async function activateSubscriptionFromRevenuecat(
     if (!quotaPool)
       throw new Error('Quota pool update (revenuecat) did not return a row');
 
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      existing.id,
+    );
     return row;
   });
 

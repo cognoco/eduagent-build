@@ -10,7 +10,7 @@
  * - LLM provider — via shared provider fixture (real routeAndCall dispatch)
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   accounts,
   subjects,
@@ -19,10 +19,10 @@ import {
   curriculumTopics,
   retentionCards,
   learningSessions,
+  profileQuotaUsage,
   sessionEvents,
   sessionSummaries,
   subscriptions,
-  quotaPools,
 } from '@eduagent/database';
 import type { SessionType } from '@eduagent/schemas';
 
@@ -221,7 +221,7 @@ async function loadSessionEvents(sessionId: string) {
   });
 }
 
-async function loadSubscriptionAndQuota() {
+async function loadSubscriptionAndQuota(profileId: string) {
   const db = createIntegrationDb();
   const account = await loadAccount();
   expect(account).not.toBeNull();
@@ -231,15 +231,18 @@ async function loadSubscriptionAndQuota() {
   });
   expect(subscription).not.toBeNull();
 
-  const quotaPool = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscription!.id),
+  const profileQuota = await db.query.profileQuotaUsage.findFirst({
+    where: and(
+      eq(profileQuotaUsage.subscriptionId, subscription!.id),
+      eq(profileQuotaUsage.profileId, profileId),
+    ),
   });
-  expect(quotaPool).not.toBeNull();
+  expect(profileQuota).not.toBeNull();
 
   return {
     account: account!,
     subscription: subscription!,
-    quotaPool: quotaPool!,
+    profileQuota: profileQuota!,
   };
 }
 
@@ -378,7 +381,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       const subject = await seedSubject(profileId);
       const session = await startSession(profileId, subject.id);
 
-      const before = await loadSubscriptionAndQuota();
+      const before = await loadSubscriptionAndQuota(profileId);
 
       const res = await app.request(
         `/v1/sessions/${session.id}/messages`,
@@ -404,10 +407,10 @@ describe('Integration: Learning Session Lifecycle', () => {
       const updatedSession = await loadSession(session.id);
       expect(updatedSession!.exchangeCount).toBe(1);
 
-      const quota = await loadSubscriptionAndQuota();
+      const quota = await loadSubscriptionAndQuota(profileId);
       expect(quota.subscription.id).toBe(before.subscription.id);
-      expect(quota.quotaPool.usedThisMonth).toBe(
-        before.quotaPool.usedThisMonth + 1,
+      expect(quota.profileQuota.usedThisMonth).toBe(
+        before.profileQuota.usedThisMonth + 1,
       );
 
       const events = await loadSessionEvents(session.id);

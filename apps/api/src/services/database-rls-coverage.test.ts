@@ -119,9 +119,12 @@ const KNOWN_PROFILE_TABLES: readonly string[] = [
   'progress_summaries',
   'support_messages',
   'weekly_reports',
+  'profile_quota_usage',
   'practice_activity_events',
   'celebration_events',
   'onboarding_drafts',
+  // Profile-linked buyer attribution, but policy remains account/subscription-scoped.
+  'top_up_credits',
   'challenge_round_cooldowns',
   'usage_events',
   // Owner-scoped (owner_profile_id FK)

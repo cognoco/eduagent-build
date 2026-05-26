@@ -39,6 +39,8 @@ import {
   removeProfileFromSubscription,
   ProfileRemovalNotImplementedError,
   getFamilyPoolStatus,
+  getEffectiveAccessForSubscription,
+  getOrProvisionProfileQuotaUsage,
 } from '../services/billing';
 import {
   resolveWarningLevel,
@@ -165,6 +167,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         subscriptionResponseSchema.parse({
           subscription: {
             tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
             status: 'trial',
             trialEndsAt: null,
             currentPeriodEnd: null,
@@ -180,13 +184,32 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    // Fetch quota pool for enriched response
-    const quota = await getQuotaPool(db, subscription.id);
-    const monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
-    const usedThisMonth = quota?.usedThisMonth ?? 0;
+    const access = await getEffectiveAccessForSubscription(db, subscription.id);
+    const effectiveAccessTier =
+      access?.effectiveAccessTier ?? subscription.tier;
+    const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
+    const activeProfileId = c.get('profileId');
+    const profileQuota =
+      quotaModel === 'per-profile' && activeProfileId
+        ? await getOrProvisionProfileQuotaUsage(
+            db,
+            subscription.id,
+            activeProfileId,
+            {
+              tier: effectiveAccessTier,
+            },
+          )
+        : null;
+    const quota = profileQuota ? null : await getQuotaPool(db, subscription.id);
+    const monthlyLimit =
+      profileQuota?.monthlyLimit ??
+      quota?.monthlyLimit ??
+      freeTier.monthlyQuota;
+    const usedThisMonth =
+      profileQuota?.usedThisMonth ?? quota?.usedThisMonth ?? 0;
     const remaining = Math.max(0, monthlyLimit - usedThisMonth);
-    const dailyLimit = quota?.dailyLimit ?? null;
-    const usedToday = quota?.usedToday ?? 0;
+    const dailyLimit = profileQuota?.dailyLimit ?? quota?.dailyLimit ?? null;
+    const usedToday = profileQuota?.usedToday ?? quota?.usedToday ?? 0;
     const dailyRemainingQuestions =
       dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
 
@@ -198,6 +221,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       subscriptionResponseSchema.parse({
         subscription: {
           tier: subscription.tier,
+          effectiveAccessTier,
+          billingAccess: access?.billingAccess ?? 'current',
           status: subscription.status,
           trialEndsAt: subscription.trialEndsAt,
           currentPeriodEnd: subscription.currentPeriodEnd,
@@ -493,17 +518,56 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    // [L7-F6] Parallelize: getQuotaPool and getTopUpCreditsRemaining are
-    // independent reads. Sequential awaits double the round-trip cost on
-    // the /usage hot path.
-    const [quota, topUpCreditsRemaining] = await Promise.all([
-      getQuotaPool(db, subscription.id),
-      getTopUpCreditsRemaining(db, subscription.id),
-    ]);
-    const monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
-    const usedThisMonth = quota?.usedThisMonth ?? 0;
-    const dailyLimit = quota?.dailyLimit ?? null;
-    const usedToday = quota?.usedToday ?? 0;
+    const activeProfileId = c.get('profileId');
+    const activeProfileMeta = c.get('profileMeta');
+    const access = await getEffectiveAccessForSubscription(db, subscription.id);
+    const effectiveAccessTier =
+      access?.effectiveAccessTier ?? subscription.tier;
+    const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
+    if (quotaModel === 'per-profile' && !activeProfileId) {
+      return apiError(
+        c,
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        'Profile required for per-profile quota status.',
+      );
+    }
+    const profileQuota =
+      quotaModel === 'per-profile' && activeProfileId
+        ? await getOrProvisionProfileQuotaUsage(
+            db,
+            subscription.id,
+            activeProfileId,
+            {
+              tier: effectiveAccessTier,
+            },
+          )
+        : null;
+    const [quota, topUpCreditsRemaining] =
+      quotaModel === 'per-profile' && profileQuota
+        ? [
+            null,
+            profileQuota.role === 'owner'
+              ? await getTopUpCreditsRemaining(
+                  db,
+                  subscription.id,
+                  new Date(),
+                  activeProfileId,
+                )
+              : 0,
+          ]
+        : await Promise.all([
+            getQuotaPool(db, subscription.id),
+            getTopUpCreditsRemaining(db, subscription.id),
+          ]);
+    const monthlyLimit =
+      profileQuota?.monthlyLimit ??
+      quota?.monthlyLimit ??
+      freeTier.monthlyQuota;
+    const usedThisMonth =
+      profileQuota?.usedThisMonth ?? quota?.usedThisMonth ?? 0;
+    const dailyLimit = profileQuota?.dailyLimit ?? quota?.dailyLimit ?? null;
+    const usedToday = profileQuota?.usedToday ?? quota?.usedToday ?? 0;
     const remaining = calculateRemainingQuestions({
       monthlyLimit,
       usedThisMonth,
@@ -517,9 +581,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       monthlyLimit,
       topUpCreditsRemaining,
     );
-    const activeProfileId = c.get('profileId');
-    const activeProfileMeta = c.get('profileMeta');
-    const cycleResetAt = quota?.cycleResetAt ?? new Date().toISOString();
+    const cycleResetAt =
+      profileQuota?.cycleResetAt ??
+      quota?.cycleResetAt ??
+      new Date().toISOString();
     const resetDate = new Date(cycleResetAt);
     const cycleStartAt =
       subscription.currentPeriodStart ??
@@ -542,7 +607,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       }
     })();
     const supportsProfileBreakdown =
-      subscription.tier === 'family' || subscription.tier === 'pro';
+      effectiveAccessTier === 'family' || effectiveAccessTier === 'pro';
     const usageBreakdown =
       activeProfileId && supportsProfileBreakdown
         ? await getUsageBreakdownForProfile(db, {
@@ -667,11 +732,19 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     if (kv) {
       try {
         const cached = await readSubscriptionStatus(kv, account.id);
-        if (cached) {
+        const cachedEffectiveAccessTier =
+          cached?.effectiveAccessTier ?? cached?.tier;
+        if (
+          cached &&
+          cachedEffectiveAccessTier &&
+          getTierConfig(cachedEffectiveAccessTier).quotaModel === 'shared-pool'
+        ) {
           return c.json(
             subscriptionStatusResponseSchema.parse({
               status: {
                 tier: cached.tier,
+                effectiveAccessTier: cachedEffectiveAccessTier,
+                billingAccess: cached.billingAccess ?? 'current',
                 status: cached.status,
                 monthlyLimit: cached.monthlyLimit,
                 usedThisMonth: cached.usedThisMonth,
@@ -706,6 +779,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         subscriptionStatusResponseSchema.parse({
           status: {
             tier: 'free',
+            effectiveAccessTier: 'free',
+            billingAccess: 'current',
             status: 'trial',
             monthlyLimit: freeTier.monthlyQuota,
             usedThisMonth: 0,
@@ -716,17 +791,45 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const quota = await getQuotaPool(db, subscription.id);
+    const access = await getEffectiveAccessForSubscription(db, subscription.id);
+    const effectiveAccessTier =
+      access?.effectiveAccessTier ?? subscription.tier;
+    const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
+    const activeProfileId = c.get('profileId');
+    if (quotaModel === 'per-profile' && !activeProfileId) {
+      return apiError(
+        c,
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        'Profile required for per-profile quota status.',
+      );
+    }
+    const profileQuota =
+      quotaModel === 'per-profile' && activeProfileId
+        ? await getOrProvisionProfileQuotaUsage(
+            db,
+            subscription.id,
+            activeProfileId,
+            { tier: effectiveAccessTier },
+          )
+        : null;
+    const quota = profileQuota ? null : await getQuotaPool(db, subscription.id);
 
     return c.json(
       subscriptionStatusResponseSchema.parse({
         status: {
           tier: subscription.tier,
+          effectiveAccessTier,
+          billingAccess: access?.billingAccess ?? 'current',
           status: subscription.status,
-          monthlyLimit: quota?.monthlyLimit ?? freeTier.monthlyQuota,
-          usedThisMonth: quota?.usedThisMonth ?? 0,
-          dailyLimit: quota?.dailyLimit ?? null,
-          usedToday: quota?.usedToday ?? 0,
+          monthlyLimit:
+            profileQuota?.monthlyLimit ??
+            quota?.monthlyLimit ??
+            freeTier.monthlyQuota,
+          usedThisMonth:
+            profileQuota?.usedThisMonth ?? quota?.usedThisMonth ?? 0,
+          dailyLimit: profileQuota?.dailyLimit ?? quota?.dailyLimit ?? null,
+          usedToday: profileQuota?.usedToday ?? quota?.usedToday ?? 0,
         },
       }),
     );

@@ -88,6 +88,78 @@ interface ColumnViolation {
   reason: string;
 }
 
+function findNextFieldBoundary(source: string): number {
+  let depth = 0;
+  let stringQuote: '"' | "'" | '`' | null = null;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+    const next = source[i + 1];
+
+    if (inLineComment) {
+      if (char === '\n') {
+        inLineComment = false;
+        if (depth === 0 && /^\n\s*\w[\w]*\s*[?]?\s*:/.test(source.slice(i))) {
+          return i;
+        }
+      }
+      continue;
+    }
+
+    if (inBlockComment) {
+      if (char === '*' && next === '/') {
+        inBlockComment = false;
+        i += 1;
+      }
+      continue;
+    }
+
+    if (stringQuote) {
+      if (char === '\\') {
+        i += 1;
+        continue;
+      }
+      if (char === stringQuote) {
+        stringQuote = null;
+      }
+      continue;
+    }
+
+    if (char === '/' && next === '/') {
+      inLineComment = true;
+      i += 1;
+      continue;
+    }
+
+    if (char === '/' && next === '*') {
+      inBlockComment = true;
+      i += 1;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      stringQuote = char;
+      continue;
+    }
+
+    if (char === '(' || char === '{' || char === '[') {
+      depth += 1;
+    } else if (char === ')' || char === '}' || char === ']') {
+      depth = Math.max(0, depth - 1);
+    }
+
+    if (char === '\n' && depth === 0) {
+      if (/^\n\s*\w[\w]*\s*[?]?\s*:/.test(source.slice(i))) {
+        return i;
+      }
+    }
+  }
+
+  return -1;
+}
+
 /**
  * Returns the raw content of every non-test schema file.
  */
@@ -138,7 +210,7 @@ function findViolationsInTableBlock(
 
     // Find next field boundary: a newline followed by optional whitespace and
     // an identifier immediately followed by ':' or '?:'.
-    const nextFieldBoundary = rest.search(/\n\s*\w[\w]*\s*[?]?\s*:/);
+    const nextFieldBoundary = findNextFieldBoundary(rest);
     const columnBlock =
       nextFieldBoundary === -1 ? rest : rest.slice(0, nextFieldBoundary);
 
@@ -247,5 +319,20 @@ describe('CASCADE FK guard [CR-2026-05-21-009]', () => {
     }
     // There are 40+ tables in the schema as of 2026-05-23.
     expect(tableCount).toBeGreaterThanOrEqual(20);
+  });
+
+  it('scanner keeps multiline reference options inside the same column block', () => {
+    const tableBlock = `
+      pgTable('example_table', {
+        profileId: uuid('profile_id').references(() => profiles.id, {
+          onDelete: 'cascade',
+        }),
+        displayName: text('display_name').notNull(),
+      })
+    `;
+
+    expect(
+      findViolationsInTableBlock('example_table', tableBlock, 'example.ts'),
+    ).toEqual([]);
   });
 });

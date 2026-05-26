@@ -197,13 +197,15 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 const mockEnsureFreeSubscription = jest.fn();
+const mockGetEffectiveAccessForSubscription = jest.fn();
+const mockGetOrProvisionProfileQuotaUsage = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockDecrementQuota = jest.fn();
 const mockSafeRefundQuota = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
 jest.mock(
-  '../services/billing' /* gc1-allow: ensureFreeSubscription/getQuotaPool/decrementQuota/safeRefundQuota/getTopUpCreditsRemaining are the assertion mechanism — the metering middleware's contract is "did decrementQuota fire with these args?", which requires spies on these exports. Per-tier behavior is covered end-to-end by services/billing/metering.integration.test.ts */,
+  '../services/billing' /* gc1-allow: ensureFreeSubscription/getEffectiveAccessForSubscription/getOrProvisionProfileQuotaUsage/getQuotaPool/decrementQuota/safeRefundQuota/getTopUpCreditsRemaining are the assertion mechanism — the metering middleware's contract is "did decrementQuota fire with these args?", which requires spies on these exports. Per-tier behavior is covered end-to-end by services/billing/metering.integration.test.ts */,
   () => {
     const actual = jest.requireActual(
       '../services/billing',
@@ -212,6 +214,10 @@ jest.mock(
       ...actual,
       ensureFreeSubscription: (...args: unknown[]) =>
         mockEnsureFreeSubscription(...args),
+      getEffectiveAccessForSubscription: (...args: unknown[]) =>
+        mockGetEffectiveAccessForSubscription(...args),
+      getOrProvisionProfileQuotaUsage: (...args: unknown[]) =>
+        mockGetOrProvisionProfileQuotaUsage(...args),
       getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
       decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
       safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
@@ -275,6 +281,7 @@ jest.mock(
 );
 
 import { app } from '../index';
+import { MeteringError } from '../services/billing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import {
   installTestJwksInterceptor,
@@ -357,7 +364,7 @@ function mockSubscription(overrides?: Record<string, unknown>) {
     accountId: 'test-account-id',
     stripeCustomerId: 'cus_test',
     stripeSubscriptionId: 'sub_stripe_1',
-    tier: 'plus',
+    tier: 'family',
     status: 'active',
     trialEndsAt: null,
     currentPeriodEnd: '2025-02-15T00:00:00.000Z',
@@ -366,6 +373,14 @@ function mockSubscription(overrides?: Record<string, unknown>) {
     lastStripeEventTimestamp: null,
     createdAt: '2025-01-15T00:00:00.000Z',
     updatedAt: '2025-01-15T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function mockEffectiveAccess(overrides?: Record<string, unknown>) {
+  return {
+    effectiveAccessTier: 'family',
+    billingAccess: 'current',
     ...overrides,
   };
 }
@@ -385,12 +400,31 @@ function mockQuota(overrides?: Record<string, unknown>) {
   };
 }
 
+function mockProfileQuota(overrides?: Record<string, unknown>) {
+  return {
+    id: 'pqu-1',
+    subscriptionId: 'sub-1',
+    profileId: 'test-profile-id',
+    role: 'owner',
+    monthlyLimit: 100,
+    usedThisMonth: 0,
+    dailyLimit: 10,
+    usedToday: 0,
+    cycleResetAt: '2025-02-15T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockSafeSendFn.mockResolvedValue(undefined);
   fakeKV.reset();
-  // Default: ensureFreeSubscription returns a plus subscription
+  // Default: ensureFreeSubscription returns a shared-pool paid subscription.
   mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+  mockGetEffectiveAccessForSubscription.mockResolvedValue(
+    mockEffectiveAccess(),
+  );
+  mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(mockProfileQuota());
   mockGetQuotaPool.mockResolvedValue(null);
   mockDecrementQuota.mockResolvedValue({
     success: true,
@@ -761,7 +795,7 @@ describe('metering middleware', () => {
       // an entry exists before the request, and is gone after.
       fakeKV.seed('test-account-id', {
         subscriptionId: 'sub-1',
-        tier: 'plus',
+        tier: 'family',
         status: 'active',
         monthlyLimit: 500,
         usedThisMonth: 101,
@@ -818,7 +852,7 @@ describe('metering middleware', () => {
 
       fakeKV.seed('test-account-id', {
         subscriptionId: 'sub-1',
-        tier: 'plus',
+        tier: 'family',
         status: 'active',
         monthlyLimit: 500,
         usedThisMonth: 101,
@@ -1119,6 +1153,17 @@ describe('metering middleware', () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
       );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          monthlyLimit: 100,
+          usedThisMonth: 10,
+          dailyLimit: 10,
+          usedToday: 3,
+        }),
+      );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
           monthlyLimit: 100,
@@ -1179,9 +1224,109 @@ describe('metering middleware', () => {
   // -----------------------------------------------------------------------
 
   describe('LLM routes with quota exceeded', () => {
+    it('enforces free fallback quota for past-due paid subscriptions', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'plus' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          effectiveAccessTier: 'free',
+          billingAccess: 'free_fallback',
+        }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          monthlyLimit: 100,
+          usedThisMonth: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        }),
+      );
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        code: 'QUOTA_EXCEEDED',
+        details: {
+          tier: 'plus',
+          effectiveAccessTier: 'free',
+          quotaModel: 'per-profile',
+          profileRole: 'owner',
+          reason: 'monthly',
+        },
+      });
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    it('allows requests within free fallback quota', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'plus' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          effectiveAccessTier: 'free',
+          billingAccess: 'free_fallback',
+        }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          monthlyLimit: 100,
+          usedThisMonth: 10,
+          dailyLimit: 10,
+          usedToday: 1,
+        }),
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 89,
+        remainingTopUp: 0,
+        remainingDaily: 8,
+        quotaModel: 'per-profile',
+      });
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+      );
+    });
+
     it('returns 402 when monthly quota is exhausted and decrement fails', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -1214,7 +1359,11 @@ describe('metering middleware', () => {
       const body = await res.json();
       expect(body.code).toBe('QUOTA_EXCEEDED');
       expect(body.details.tier).toBe('free');
+      expect(body.details.effectiveAccessTier).toBe('free');
+      expect(body.details.quotaModel).toBe('per-profile');
+      expect(body.details.profileRole).toBe('owner');
       expect(body.details.reason).toBe('monthly');
+      expect(body.details.resetsAt).toEqual(expect.any(String));
       expect(Array.isArray(body.details.upgradeOptions)).toBe(true);
       expect(body.details.upgradeOptions.length).toBeGreaterThan(0);
     });
@@ -1222,6 +1371,17 @@ describe('metering middleware', () => {
     it('returns 402 with daily reason when daily limit hit', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          usedThisMonth: 30,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 10,
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -1254,14 +1414,58 @@ describe('metering middleware', () => {
       const body = await res.json();
       expect(body.code).toBe('QUOTA_EXCEEDED');
       expect(body.details.reason).toBe('daily');
+      expect(body.details.effectiveAccessTier).toBe('free');
+      expect(body.details.quotaModel).toBe('per-profile');
+      expect(body.details.profileRole).toBe('owner');
+      expect(body.details.resetsAt).toEqual(expect.any(String));
       expect(body.details.dailyLimit).toBe(10);
       expect(body.details.usedToday).toBe(10);
       expect(body.message).toContain('daily');
     });
 
+    it('returns structured 500 when per-profile metering is called incorrectly', async () => {
+      mockDecrementQuota.mockRejectedValue(
+        new MeteringError('PROFILE_ID_REQUIRED', {
+          subscriptionId: 'sub-1',
+          tier: 'free',
+        }),
+      );
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body).toEqual({
+        error: 'PROFILE_ID_REQUIRED',
+        meta: {
+          subscriptionId: 'sub-1',
+          tier: 'free',
+        },
+      });
+    });
+
     it('includes upgrade options in 402 response', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -1302,6 +1506,18 @@ describe('metering middleware', () => {
       // ensureFreeSubscription auto-creates a free sub
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ id: 'sub-free', tier: 'free', status: 'active' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          subscriptionId: 'sub-free',
+          usedThisMonth: 0,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 0,
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -1353,7 +1569,7 @@ describe('metering middleware', () => {
     it('uses KV-cached subscription status when available (CR3 fix: includes subscriptionId)', async () => {
       fakeKV.seed('test-account-id', {
         subscriptionId: 'sub-1',
-        tier: 'plus',
+        tier: 'family',
         status: 'active',
         monthlyLimit: 500,
         usedThisMonth: 100,
@@ -1410,7 +1626,9 @@ describe('metering middleware', () => {
       const stored = fakeKV.storedData('test-account-id');
       expect(stored).toMatchObject({
         subscriptionId: 'sub-1',
-        tier: 'plus',
+        tier: 'family',
+        effectiveAccessTier: 'family',
+        billingAccess: 'current',
         status: 'active',
         monthlyLimit: 500,
         dailyLimit: null,
@@ -1561,6 +1779,18 @@ describe('metering middleware', () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ id: 'sub-free', tier: 'free' }),
       );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          subscriptionId: 'sub-free',
+          monthlyLimit: 100,
+          usedThisMonth: 10,
+          dailyLimit: 10,
+          usedToday: 0,
+        }),
+      );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
           subscriptionId: 'sub-free',
@@ -1592,7 +1822,7 @@ describe('metering middleware', () => {
       expect(res.status).toBe(200);
       // Stale KV was bypassed, DB was queried
       expect(mockEnsureFreeSubscription).toHaveBeenCalled();
-      expect(mockGetQuotaPool).toHaveBeenCalled();
+      expect(mockGetOrProvisionProfileQuotaUsage).toHaveBeenCalled();
       expect(res.headers.get('X-Daily-Remaining')).toBe('9');
     });
 
@@ -1600,7 +1830,7 @@ describe('metering middleware', () => {
       // KV read succeeds (cache hit), but KV write fails on post-decrement update
       fakeKV.seed('test-account-id', {
         subscriptionId: 'sub-1',
-        tier: 'plus',
+        tier: 'family',
         status: 'active',
         monthlyLimit: 500,
         usedThisMonth: 200,
@@ -1677,6 +1907,17 @@ describe('metering middleware', () => {
     it('returns 402 with daily reason when decrement returns daily_exceeded', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          usedThisMonth: 30,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 9,
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -1803,6 +2044,17 @@ describe('metering middleware', () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
       );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        }),
+      );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
           usedThisMonth: 100,
@@ -1829,6 +2081,17 @@ describe('metering middleware', () => {
     it('matches stream endpoint with trailing slash (I6 fix)', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 0,
+        }),
       );
       // Set exhausted quota so metering rejects
       mockGetQuotaPool.mockResolvedValue(
@@ -1967,6 +2230,17 @@ describe('metering middleware', () => {
         mockEnsureFreeSubscription.mockResolvedValue(
           mockSubscription({ tier: 'free' }),
         );
+        mockGetEffectiveAccessForSubscription.mockResolvedValue(
+          mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+        );
+        mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+          mockProfileQuota({
+            usedThisMonth: 100,
+            monthlyLimit: 100,
+            dailyLimit: 10,
+            usedToday: 0,
+          }),
+        );
         mockGetQuotaPool.mockResolvedValue(
           mockQuota({ usedThisMonth: 100, monthlyLimit: 100 }),
         );
@@ -2029,6 +2303,17 @@ describe('metering middleware', () => {
     it('WI-149: GET curriculum/topics/:id/explain — returns 402 when quota exhausted', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ effectiveAccessTier: 'free' }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 0,
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({ usedThisMonth: 100, monthlyLimit: 100 }),

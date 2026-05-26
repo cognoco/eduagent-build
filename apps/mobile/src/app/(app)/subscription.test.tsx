@@ -15,7 +15,7 @@ import {
 } from '../../test-utils/mock-api-routes';
 import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
-import type { Profile } from '@eduagent/schemas';
+import type { Profile, Subscription } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -189,8 +189,10 @@ jest.mock(
 // Default mock data shapes (real API shapes from @eduagent/schemas)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_SUBSCRIPTION = {
+const DEFAULT_SUBSCRIPTION: Subscription = {
   tier: 'free',
+  effectiveAccessTier: 'free',
+  billingAccess: 'current',
   status: 'active',
   trialEndsAt: null,
   currentPeriodEnd: null,
@@ -202,6 +204,15 @@ const DEFAULT_SUBSCRIPTION = {
   usedToday: 0,
   dailyRemainingQuestions: 10,
 };
+
+function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
+  const tier = overrides.tier ?? DEFAULT_SUBSCRIPTION.tier;
+  return {
+    ...DEFAULT_SUBSCRIPTION,
+    ...overrides,
+    effectiveAccessTier: overrides.effectiveAccessTier ?? tier,
+  };
+}
 
 const DEFAULT_USAGE = {
   monthlyLimit: 100,
@@ -238,7 +249,7 @@ function createWrapper(opts?: { seedCache?: boolean }) {
   if (opts?.seedCache) {
     queryClient.setQueryData(
       ['subscription', mockActiveProfile.id],
-      DEFAULT_SUBSCRIPTION,
+      makeSubscription(),
     );
     queryClient.setQueryData(['usage', mockActiveProfile.id], DEFAULT_USAGE);
   }
@@ -435,7 +446,7 @@ describe('SubscriptionScreen', () => {
     mockFetch.setRoute(
       '/subscription',
       () =>
-        new Response(JSON.stringify({ subscription: DEFAULT_SUBSCRIPTION }), {
+        new Response(JSON.stringify({ subscription: makeSubscription() }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
@@ -632,11 +643,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -686,11 +696,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -715,11 +724,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'pro',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -748,11 +756,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -778,11 +785,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -810,12 +816,11 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
               currentPeriodEnd: '2026-05-18T00:00:00Z',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -841,12 +846,11 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'trial',
               trialEndsAt: '2026-05-10T00:00:00.000Z',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -873,12 +877,11 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'trial',
               trialEndsAt: null,
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -902,11 +905,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -928,11 +930,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1004,7 +1005,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
+            subscription: makeSubscription({ tier: 'plus' }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1189,7 +1190,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
+            subscription: makeSubscription({ tier: 'plus' }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1237,7 +1238,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'free' },
+            subscription: makeSubscription({ tier: 'free' }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1347,12 +1348,11 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'free',
                 status: 'trial',
                 trialEndsAt: '2026-05-21T00:00:00.000Z',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1381,12 +1381,11 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'free',
                 status: 'trial',
                 trialEndsAt: '2026-05-21T00:00:00.000Z',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1521,11 +1520,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1573,11 +1571,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'pro',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1623,11 +1620,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1760,7 +1756,7 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: { ...DEFAULT_SUBSCRIPTION, status: 'expired' },
+              subscription: makeSubscription({ status: 'expired' }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1929,11 +1925,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'plus',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1984,11 +1979,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'plus',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -2021,11 +2015,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'plus',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -2168,6 +2161,9 @@ describe('SubscriptionScreen', () => {
   // -------------------------------------------------------------------------
 
   describe('V1 navigation contract gates', () => {
+    const v1OwnerProfileId = '550e8400-e29b-41d4-a716-446655440001';
+    const v1ChildProfileId = '550e8400-e29b-41d4-a716-446655440002';
+
     function withV1Flag(fn: () => Promise<void> | void) {
       const flags = require('../../lib/feature-flags') as {
         FEATURE_FLAGS: { MODE_NAV_V1_ENABLED: boolean };
@@ -2213,11 +2209,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'family',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -2249,11 +2244,15 @@ describe('SubscriptionScreen', () => {
                 maxProfiles: 4,
                 members: opts?.members ?? [
                   {
-                    profileId: 'profile-1',
+                    profileId: v1OwnerProfileId,
                     displayName: 'Alex',
                     isOwner: true,
                   },
-                  { profileId: 'p2', displayName: 'Kid', isOwner: false },
+                  {
+                    profileId: v1ChildProfileId,
+                    displayName: 'Kid',
+                    isOwner: false,
+                  },
                 ],
               },
             }),
@@ -2268,14 +2267,14 @@ describe('SubscriptionScreen', () => {
         setupFamilyTier({
           byProfile: [
             {
-              profile_id: 'profile-1',
+              profile_id: v1OwnerProfileId,
               name: 'Alex',
               used: 42,
               usedToday: 3,
               is_self: true,
             },
             {
-              profile_id: 'p2',
+              profile_id: v1ChildProfileId,
               name: 'Kid',
               used: 17,
               usedToday: 1,
@@ -2287,7 +2286,7 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('usage-profile-profile-1');
+          screen.getByTestId(`usage-profile-${v1OwnerProfileId}`);
         });
         screen.getByText('Your share');
         expect(screen.queryByText('Your usage')).toBeNull();
@@ -2304,7 +2303,7 @@ describe('SubscriptionScreen', () => {
         setupFamilyTier({
           byProfile: [
             {
-              profile_id: 'profile-1',
+              profile_id: v1OwnerProfileId,
               name: 'Alex',
               used: 42,
               usedToday: 3,
@@ -2316,7 +2315,7 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('usage-profile-profile-1');
+          screen.getByTestId(`usage-profile-${v1OwnerProfileId}`);
         });
         screen.getByText('Your usage');
         expect(screen.queryByText('Your share')).toBeNull();
@@ -2331,7 +2330,7 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('remove-family-member-p2');
+          screen.getByTestId(`remove-family-member-${v1ChildProfileId}`);
         });
       });
     });
@@ -2347,9 +2346,11 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('family-member-p2');
+          screen.getByTestId(`family-member-${v1ChildProfileId}`);
         });
-        expect(screen.queryByTestId('remove-family-member-p2')).toBeNull();
+        expect(
+          screen.queryByTestId(`remove-family-member-${v1ChildProfileId}`),
+        ).toBeNull();
       });
     });
   });

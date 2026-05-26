@@ -27,6 +27,7 @@ import {
   UpstreamLlmError,
   getSubjectSessionsResponseSchema,
   type SubscriptionTier,
+  type QuotaModel,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { z } from 'zod';
@@ -162,6 +163,8 @@ type SessionRouteEnv = {
     quotaDecrementSource: 'monthly' | 'top_up' | undefined;
     /** [CR-2026-05-19-C6] Set by metering middleware when source is top_up. */
     quotaDecrementTopUpCreditId: string | undefined;
+    /** Set by metering middleware; keeps refund routing stable if tier state changes mid-request. */
+    quotaDecrementQuotaModel: QuotaModel | undefined;
     quotaRemainingTurns: number | undefined;
     quotaFractionRemaining: number | undefined;
   };
@@ -512,6 +515,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             route: 'sessions.message',
             profileId,
             source: c.get('quotaDecrementSource'),
+            quotaModel: c.get('quotaDecrementQuotaModel'),
             topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
           });
         }
@@ -799,6 +803,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   // consumed; otherwise top-up consumptions silently inflate
                   // monthly quota on every LLM failure.
                   source: c.get('quotaDecrementSource'),
+                  quotaModel: c.get('quotaDecrementQuotaModel'),
                   topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
                 });
               } catch (refundErr) {
@@ -894,6 +899,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     sessionId,
                     // [CR-2026-05-19-C6] See sessions.stream.llm_error.
                     source: c.get('quotaDecrementSource'),
+                    quotaModel: c.get('quotaDecrementQuotaModel'),
                     topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
                   });
                 } catch (refundErr) {
@@ -1004,6 +1010,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   sessionId,
                   // [CR-2026-05-19-C6] See sessions.stream.llm_error.
                   source: c.get('quotaDecrementSource'),
+                  quotaModel: c.get('quotaDecrementQuotaModel'),
                   topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
                 });
               } catch (refundErr) {
@@ -1157,6 +1164,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             profileId,
             sessionId,
             source: c.get('quotaDecrementSource'),
+            quotaModel: c.get('quotaDecrementQuotaModel'),
             topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
           });
         }

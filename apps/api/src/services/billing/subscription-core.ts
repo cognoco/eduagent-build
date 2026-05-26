@@ -29,6 +29,7 @@ import {
   type QuotaPoolRow,
   type WebhookSubscriptionUpdate,
 } from './types';
+import { reconcileQuotaStateForSubscription } from './quota-reconcile';
 
 const logger = createLogger();
 
@@ -91,36 +92,45 @@ export async function createSubscription(
     status?: SubscriptionStatus;
   },
 ): Promise<SubscriptionRow> {
-  const [subRow] = await db
-    .insert(subscriptions)
-    .values({
-      accountId,
-      tier,
-      status: options?.status ?? 'trial',
-      stripeCustomerId: options?.stripeCustomerId ?? null,
-      stripeSubscriptionId: options?.stripeSubscriptionId ?? null,
-      trialEndsAt: options?.trialEndsAt ? new Date(options.trialEndsAt) : null,
-    })
-    .returning();
+  return db.transaction(async (tx) => {
+    const [subRow] = await tx
+      .insert(subscriptions)
+      .values({
+        accountId,
+        tier,
+        status: options?.status ?? 'trial',
+        stripeCustomerId: options?.stripeCustomerId ?? null,
+        stripeSubscriptionId: options?.stripeSubscriptionId ?? null,
+        trialEndsAt: options?.trialEndsAt
+          ? new Date(options.trialEndsAt)
+          : null,
+      })
+      .returning();
 
-  if (!subRow) throw new Error('Subscription insert did not return a row');
+    if (!subRow) throw new Error('Subscription insert did not return a row');
 
-  // Create the quota pool linked to this subscription
-  const now = new Date();
-  const cycleResetAt = new Date(now);
-  cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+    // Create the quota pool linked to this subscription.
+    const now = new Date();
+    const cycleResetAt = new Date(now);
+    cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
 
-  const tierConfig = getTierConfig(tier);
-  await db.insert(quotaPools).values({
-    subscriptionId: subRow.id,
-    monthlyLimit,
-    usedThisMonth: 0,
-    dailyLimit: tierConfig.dailyLimit,
-    usedToday: 0,
-    cycleResetAt,
+    const tierConfig = getTierConfig(tier);
+    await tx.insert(quotaPools).values({
+      subscriptionId: subRow.id,
+      monthlyLimit,
+      usedThisMonth: 0,
+      dailyLimit: tierConfig.dailyLimit,
+      usedToday: 0,
+      cycleResetAt,
+    });
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      subRow.id,
+      now,
+    );
+
+    return mapSubscriptionRow(subRow);
   });
-
-  return mapSubscriptionRow(subRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +307,10 @@ export async function updateSubscriptionFromWebhook(
       }
       throw new Error('Subscription webhook update did not return a row');
     }
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      updated.id,
+    );
     return { ...mapSubscriptionRow(updated), webhookApplied: true };
   });
 }
@@ -426,25 +440,27 @@ export async function ensureFreeSubscription(
   cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
   const tierConfig = getTierConfig('free');
 
-  const [inserted] = await db
-    .insert(subscriptions)
-    .values({
-      accountId,
-      tier: 'free',
-      status: 'active',
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
-      trialEndsAt: null,
-    })
-    .onConflictDoNothing({ target: subscriptions.accountId })
-    .returning();
+  const inserted = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(subscriptions)
+      .values({
+        accountId,
+        tier: 'free',
+        status: 'active',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        trialEndsAt: null,
+      })
+      .onConflictDoNothing({ target: subscriptions.accountId })
+      .returning();
 
-  if (inserted) {
+    if (!row) return null;
+
     // We won the race — also create the quota pool. Same race-safe insert.
-    await db
+    await tx
       .insert(quotaPools)
       .values({
-        subscriptionId: inserted.id,
+        subscriptionId: row.id,
         monthlyLimit: FREE_TIER_LIMIT,
         usedThisMonth: 0,
         dailyLimit: tierConfig.dailyLimit,
@@ -452,6 +468,15 @@ export async function ensureFreeSubscription(
         cycleResetAt,
       })
       .onConflictDoNothing({ target: quotaPools.subscriptionId });
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      row.id,
+      now,
+    );
+    return row;
+  });
+
+  if (inserted) {
     return mapSubscriptionRow(inserted);
   }
 
@@ -738,6 +763,10 @@ export async function activateSubscriptionFromCheckout(
               'Divergent-sub quota pool update did not return a row',
             );
 
+          await reconcileQuotaStateForSubscription(
+            tx as unknown as Database,
+            existing.id,
+          );
           return row;
         });
         await safeSend(
@@ -822,6 +851,10 @@ export async function activateSubscriptionFromCheckout(
 
     if (!quotaPool) throw new Error('Quota pool update did not return a row');
 
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      existing.id,
+    );
     return row;
   });
 

@@ -405,7 +405,11 @@ export const errorCodeSchema = z.enum(errorCodeValues);
 /** QUOTA_EXCEEDED details — mirrors `quotaExceededSchema.details` in billing.ts. */
 const quotaExceededDetailsSchema = z.object({
   tier: z.enum(['free', 'plus', 'family', 'pro']),
+  effectiveAccessTier: z.enum(['free', 'plus', 'family', 'pro']),
+  quotaModel: z.enum(['per-profile', 'shared-pool']),
+  profileRole: z.enum(['owner', 'child']).nullable(),
   reason: z.enum(['monthly', 'daily']),
+  resetsAt: z.string().datetime({ offset: true }),
   monthlyLimit: z.number().int(),
   usedThisMonth: z.number().int(),
   dailyLimit: z.number().int().nullable(),

@@ -92,6 +92,16 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }),
+    getEffectiveAccessForSubscription: jest.fn().mockResolvedValue({
+      subscription: {
+        id: 'sub-1',
+        accountId: 'test-account-id',
+        tier: 'free',
+        status: 'active',
+      },
+      effectiveAccessTier: 'free',
+      billingAccess: 'current',
+    }),
     getQuotaPool: jest.fn().mockResolvedValue({
       id: 'qp-1',
       subscriptionId: 'sub-1',
@@ -102,6 +112,17 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       cycleResetAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    }),
+    getOrProvisionProfileQuotaUsage: jest.fn().mockResolvedValue({
+      id: 'pqu-1',
+      subscriptionId: 'sub-1',
+      profileId: 'test-profile-id',
+      role: 'owner',
+      monthlyLimit: 100,
+      usedThisMonth: 10,
+      dailyLimit: 10,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
     }),
     decrementQuota: jest.fn().mockResolvedValue({
       success: true,

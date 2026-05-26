@@ -33,6 +33,9 @@ import {
   decrementQuota,
   getTopUpCreditsRemaining,
   safeRefundQuota,
+  getEffectiveAccessForSubscription,
+  getOrProvisionProfileQuotaUsage,
+  MeteringError,
 } from '../services/billing';
 import { getTierConfig } from '../services/subscription';
 import { checkQuota } from '../services/metering';
@@ -98,6 +101,8 @@ export type MeteringEnv = {
     quotaDecrementSource: 'monthly' | 'top_up';
     /** Set when quotaDecrementSource === 'top_up'. */
     quotaDecrementTopUpCreditId?: string;
+    /** Quota model that funded the decrement; refund paths must not re-resolve it. */
+    quotaDecrementQuotaModel?: 'per-profile' | 'shared-pool';
     /** Remaining billable turns after the current decrement. */
     quotaRemainingTurns?: number;
     /** Remaining-turn ratio against the user's currently enforced cap. */
@@ -398,6 +403,33 @@ function buildUpgradeOptions(currentTier: SubscriptionTier): Array<{
     });
 }
 
+function nextDailyResetAt(now = new Date()): string {
+  const reset = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      1,
+      0,
+      0,
+      0,
+    ),
+  );
+  if (reset <= now) {
+    reset.setUTCDate(reset.getUTCDate() + 1);
+  }
+  return reset.toISOString();
+}
+
+function resolveQuotaResetAt(input: {
+  reason: 'daily' | 'monthly';
+  cycleResetAt: string | null;
+}): string {
+  return input.reason === 'daily'
+    ? nextDailyResetAt()
+    : (input.cycleResetAt ?? new Date().toISOString());
+}
+
 // ---------------------------------------------------------------------------
 // KV helpers with error resilience (I4 fix)
 // ---------------------------------------------------------------------------
@@ -528,12 +560,17 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     }
 
     let tier: SubscriptionTier;
+    let effectiveAccessTier: SubscriptionTier;
+    let billingAccess: 'current' | 'free_fallback';
+    let quotaModel: 'per-profile' | 'shared-pool';
+    let profileRole: 'owner' | 'child' | null = null;
     let monthlyLimit: number;
     let usedThisMonth: number;
     let dailyLimit: number | null;
     let usedToday: number;
     let subscriptionId: string;
     let subscriptionStatus: SubscriptionStatus;
+    let cycleResetAt: string | null = null;
 
     // Don't trust KV when it reports daily exhaustion — the daily cron
     // resets used_today in DB but cannot invalidate KV entries (no KV binding).
@@ -565,10 +602,21 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       cached = null;
     }
 
+    if (
+      cached &&
+      getTierConfig(cached.effectiveAccessTier ?? cached.tier).quotaModel ===
+        'per-profile'
+    ) {
+      cached = null;
+    }
+
     if (cached) {
       // KV hit — use cached values (CR3: subscriptionId now in cache)
       subscriptionId = cached.subscriptionId;
       tier = cached.tier;
+      effectiveAccessTier = cached.effectiveAccessTier ?? cached.tier;
+      billingAccess = cached.billingAccess ?? 'current';
+      quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
       monthlyLimit = cached.monthlyLimit;
       usedThisMonth = cached.usedThisMonth;
       dailyLimit = cached.dailyLimit;
@@ -581,18 +629,52 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       subscriptionId = subscription.id;
       tier = subscription.tier;
       subscriptionStatus = subscription.status;
+      const access = await getEffectiveAccessForSubscription(
+        db,
+        subscriptionId,
+      );
+      effectiveAccessTier = access?.effectiveAccessTier ?? subscription.tier;
+      billingAccess = access?.billingAccess ?? 'current';
+      quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
 
-      const quota = await getQuotaPool(db, subscriptionId);
-      monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
-      usedThisMonth = quota?.usedThisMonth ?? 0;
-      dailyLimit = quota?.dailyLimit ?? null;
-      usedToday = quota?.usedToday ?? 0;
+      if (quotaModel === 'per-profile') {
+        const profileQuota = await getOrProvisionProfileQuotaUsage(
+          db,
+          subscriptionId,
+          profileId,
+          { tier: effectiveAccessTier },
+        );
+        if (!profileQuota) {
+          return c.json(
+            {
+              code: ERROR_CODES.INTERNAL_ERROR,
+              message: 'Profile quota state could not be resolved.',
+            },
+            500,
+          );
+        }
+        profileRole = profileQuota.role;
+        monthlyLimit = profileQuota.monthlyLimit;
+        usedThisMonth = profileQuota.usedThisMonth;
+        dailyLimit = profileQuota.dailyLimit;
+        usedToday = profileQuota.usedToday;
+        cycleResetAt = profileQuota.cycleResetAt;
+      } else {
+        const quota = await getQuotaPool(db, subscriptionId);
+        monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
+        usedThisMonth = quota?.usedThisMonth ?? 0;
+        dailyLimit = quota?.dailyLimit ?? null;
+        usedToday = quota?.usedToday ?? 0;
+        cycleResetAt = quota?.cycleResetAt ?? null;
+      }
 
       // Backfill KV cache on miss (I4: wrapped in try/catch)
-      if (kv) {
+      if (kv && quotaModel === 'shared-pool') {
         await safeWriteKV(kv, account.id, {
           subscriptionId,
           tier,
+          effectiveAccessTier,
+          billingAccess,
           status: subscriptionStatus,
           monthlyLimit,
           usedThisMonth,
@@ -606,6 +688,10 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const topUpCreditsRemaining = await getTopUpCreditsRemaining(
       db,
       subscriptionId,
+      new Date(),
+      quotaModel === 'per-profile' && profileRole === 'owner'
+        ? profileId
+        : undefined,
     );
 
     // 3. Check quota using pure business logic (checks both daily + monthly)
@@ -629,13 +715,20 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
             : 'Monthly quota exceeded. Upgrade your plan or purchase top-up credits.',
           details: {
             tier,
+            effectiveAccessTier,
+            quotaModel,
+            profileRole,
             reason: isDailyExceeded ? ('daily' as const) : ('monthly' as const),
+            resetsAt: resolveQuotaResetAt({
+              reason: isDailyExceeded ? 'daily' : 'monthly',
+              cycleResetAt,
+            }),
             monthlyLimit,
             usedThisMonth,
             dailyLimit,
             usedToday,
             topUpCreditsRemaining,
-            upgradeOptions: buildUpgradeOptions(tier),
+            upgradeOptions: buildUpgradeOptions(effectiveAccessTier),
           },
         },
         402,
@@ -643,10 +736,21 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     }
 
     // 4. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
-    const decrement = await decrementQuota(db, subscriptionId, profileId);
+    let decrement: Awaited<ReturnType<typeof decrementQuota>>;
+    try {
+      decrement = await decrementQuota(db, subscriptionId, profileId);
+    } catch (err) {
+      if (err instanceof MeteringError) {
+        return c.json({ error: err.code, meta: err.meta }, 500);
+      }
+      throw err;
+    }
 
     if (!decrement.success) {
       const isDailyExceeded = decrement.source === 'daily_exceeded';
+      const reason = isDailyExceeded
+        ? ('daily' as const)
+        : ('monthly' as const);
       return c.json(
         {
           code: ERROR_CODES.QUOTA_EXCEEDED,
@@ -655,13 +759,19 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
             : 'Monthly quota exceeded. Upgrade your plan or purchase top-up credits.',
           details: {
             tier,
-            reason: isDailyExceeded ? ('daily' as const) : ('monthly' as const),
-            monthlyLimit,
-            usedThisMonth,
-            dailyLimit,
-            usedToday,
+            effectiveAccessTier,
+            quotaModel,
+            profileRole: decrement.profileRole ?? profileRole,
+            reason,
+            resetsAt:
+              decrement.resetsAt ??
+              resolveQuotaResetAt({ reason, cycleResetAt }),
+            monthlyLimit: decrement.monthlyLimit ?? monthlyLimit,
+            usedThisMonth: decrement.usedThisMonth ?? usedThisMonth,
+            dailyLimit: decrement.dailyLimit ?? dailyLimit,
+            usedToday: decrement.usedToday ?? usedToday,
             topUpCreditsRemaining,
-            upgradeOptions: buildUpgradeOptions(tier),
+            upgradeOptions: buildUpgradeOptions(effectiveAccessTier),
           },
         },
         402,
@@ -670,20 +780,28 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
 
     // Store subscriptionId for potential refund on LLM failure
     c.set('subscriptionId', subscriptionId);
-    c.set('subscriptionTier', tier);
+    c.set('subscriptionTier', effectiveAccessTier);
     // [CR-2026-05-19-C6] Thread the decrement source so refund paths can
     // credit the correct pool.
     c.set(
       'quotaDecrementSource',
       decrement.source === 'top_up' ? 'top_up' : 'monthly',
     );
+    c.set('quotaDecrementQuotaModel', decrement.quotaModel ?? quotaModel);
     if (decrement.topUpCreditId) {
       c.set('quotaDecrementTopUpCreditId', decrement.topUpCreditId);
     }
 
     const topUpRemainingAfterDecrement =
       decrement.source === 'top_up'
-        ? await getTopUpCreditsRemaining(db, subscriptionId)
+        ? await getTopUpCreditsRemaining(
+            db,
+            subscriptionId,
+            new Date(),
+            quotaModel === 'per-profile' && profileRole === 'owner'
+              ? profileId
+              : undefined,
+          )
         : decrement.remainingTopUp;
     const quotaRemainingTurns =
       decrement.remainingDaily === null
@@ -707,7 +825,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // included advanced entitlement only from rung 4 upward. Per-profile
     // premium flags unlock the same rung-gated behavior for Pro seats and AI
     // upgrade add-ons.
-    const baseLlmTier = getTierConfig(tier).llmTier;
+    const baseLlmTier = getTierConfig(effectiveAccessTier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
     // [WI-133] Wrap handler invocation in try/catch so a thrown error refunds
@@ -737,6 +855,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
           route: `metering.${c.req.method}.${c.req.path}`,
           profileId,
           source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+          quotaModel: decrement.quotaModel ?? quotaModel,
           topUpCreditId: decrement.topUpCreditId,
         });
         c.set('quotaRefunded', true);
@@ -778,6 +897,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         profileId,
         // [CR-2026-05-19-C6] Refund to the same pool the decrement consumed.
         source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+        quotaModel: decrement.quotaModel ?? quotaModel,
         topUpCreditId: decrement.topUpCreditId,
       });
       c.set('quotaRefunded', true);
@@ -807,7 +927,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // Derive from the atomic DB result (decrement.remainingMonthly/Daily) to
     // avoid stale-read races under concurrency — two requests reading the same
     // cached count would each write original+1, understating actual usage.
-    if (kv) {
+    if (kv && quotaModel === 'shared-pool') {
       // Single formula for both branches: `remainingMonthly` is already 0 in
       // the top-up path, so `monthlyLimit - 0 - topUpRemainingAggregate` is
       // the same accounting as the monthly-source path. Use the SAME aggregate
@@ -824,6 +944,8 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       await safeWriteKV(kv, account.id, {
         subscriptionId,
         tier,
+        effectiveAccessTier,
+        billingAccess,
         status: subscriptionStatus,
         monthlyLimit,
         usedThisMonth: atomicUsedMonth,

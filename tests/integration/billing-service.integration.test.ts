@@ -8,6 +8,8 @@
 import { asc, eq } from 'drizzle-orm';
 import {
   accounts,
+  profileQuotaUsage,
+  profiles,
   quotaPools,
   subscriptions,
   topUpCredits,
@@ -75,6 +77,21 @@ async function seedAccount(index: number) {
   return row!;
 }
 
+async function seedOwnerProfile(accountId: string, displayName: string) {
+  const db = createIntegrationDb();
+  const [profile] = await db
+    .insert(profiles)
+    .values({
+      accountId,
+      displayName,
+      birthYear: 1990,
+      isOwner: true,
+    })
+    .returning();
+
+  return profile!;
+}
+
 async function seedSubscriptionWithQuota(input: {
   accountId: string;
   tier: 'free' | 'plus' | 'family' | 'pro';
@@ -131,6 +148,7 @@ async function seedSubscriptionWithQuota(input: {
 
 async function seedTopUpCredit(input: {
   subscriptionId: string;
+  profileId?: string | null;
   amount: number;
   remaining?: number;
   purchasedAt: Date;
@@ -142,6 +160,7 @@ async function seedTopUpCredit(input: {
     .insert(topUpCredits)
     .values({
       subscriptionId: input.subscriptionId,
+      profileId: input.profileId ?? null,
       amount: input.amount,
       remaining: input.remaining ?? input.amount,
       purchasedAt: input.purchasedAt,
@@ -151,6 +170,43 @@ async function seedTopUpCredit(input: {
     .returning();
 
   return row!;
+}
+
+async function seedProfileQuotaUsage(input: {
+  subscriptionId: string;
+  profileId: string;
+  monthlyLimit: number;
+  usedThisMonth?: number;
+  dailyLimit?: number | null;
+  usedToday?: number;
+}) {
+  const db = createIntegrationDb();
+  const [row] = await db
+    .insert(profileQuotaUsage)
+    .values({
+      subscriptionId: input.subscriptionId,
+      profileId: input.profileId,
+      role: 'owner',
+      monthlyLimit: input.monthlyLimit,
+      usedThisMonth: input.usedThisMonth ?? 0,
+      dailyLimit: input.dailyLimit ?? null,
+      usedToday: input.usedToday ?? 0,
+      cycleResetAt: new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
+
+  return row!;
+}
+
+async function loadProfileQuotaUsage(
+  subscriptionId: string,
+  profileId: string,
+) {
+  const db = createIntegrationDb();
+  return db.query.profileQuotaUsage.findFirst({
+    where: (row, { and, eq }) =>
+      and(eq(row.subscriptionId, subscriptionId), eq(row.profileId, profileId)),
+  });
 }
 
 async function loadSubscriptionByAccountId(accountId: string) {
@@ -245,8 +301,8 @@ describe('Integration: billing service', () => {
     const account = await seedAccount(2);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
-      monthlyLimit: 700,
+      tier: 'family',
+      monthlyLimit: 1500,
       usedThisMonth: 12,
       dailyLimit: null,
       usedToday: 3,
@@ -262,7 +318,8 @@ describe('Integration: billing service', () => {
     expect(result).toEqual({
       success: true,
       source: 'monthly',
-      remainingMonthly: 687,
+      quotaModel: 'shared-pool',
+      remainingMonthly: 1487,
       remainingTopUp: 0,
       remainingDaily: null,
     });
@@ -274,9 +331,9 @@ describe('Integration: billing service', () => {
     const account = await seedAccount(3);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
-      monthlyLimit: 700,
-      usedThisMonth: 700,
+      tier: 'family',
+      monthlyLimit: 1500,
+      usedThisMonth: 1500,
       dailyLimit: null,
       usedToday: 4,
     });
@@ -312,12 +369,13 @@ describe('Integration: billing service', () => {
     expect(result).toEqual({
       success: true,
       source: 'top_up',
+      quotaModel: 'shared-pool',
       remainingMonthly: 0,
       remainingTopUp: 4,
       remainingDaily: null,
       topUpCreditId: oldestTopUp.id,
     });
-    expect(updatedQuotaPool!.usedThisMonth).toBe(700);
+    expect(updatedQuotaPool!.usedThisMonth).toBe(1500);
     expect(updatedQuotaPool!.usedToday).toBe(5);
     expect(topUps.map((row) => row.remaining)).toEqual([4, 8]);
     expect(remainingTopUps).toBe(12);
@@ -326,6 +384,7 @@ describe('Integration: billing service', () => {
   it('returns daily_exceeded on the real free-tier guard path', async () => {
     const freeTier = getTierConfig('free');
     const account = await seedAccount(4);
+    const profile = await seedOwnerProfile(account.id, 'Free Owner');
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
       tier: 'free',
@@ -334,23 +393,40 @@ describe('Integration: billing service', () => {
       dailyLimit: freeTier.dailyLimit,
       usedToday: freeTier.dailyLimit!,
     });
+    await seedProfileQuotaUsage({
+      subscriptionId: seeded.subscription.id,
+      profileId: profile.id,
+      monthlyLimit: freeTier.ownerMonthlyQuota!,
+      usedThisMonth: freeTier.ownerMonthlyQuota!,
+      dailyLimit: freeTier.ownerDailyQuota,
+      usedToday: freeTier.ownerDailyQuota!,
+    });
 
     const result = await decrementQuota(
       createIntegrationDb(),
       seeded.subscription.id,
+      profile.id,
     );
 
-    const updatedQuotaPool = await loadQuotaPool(seeded.subscription.id);
+    const updatedProfileQuota = await loadProfileQuotaUsage(
+      seeded.subscription.id,
+      profile.id,
+    );
 
-    expect(result).toEqual({
-      success: false,
-      source: 'daily_exceeded',
-      remainingMonthly: 0,
-      remainingTopUp: 0,
-      remainingDaily: 0,
-    });
-    expect(updatedQuotaPool!.usedThisMonth).toBe(freeTier.monthlyQuota);
-    expect(updatedQuotaPool!.usedToday).toBe(freeTier.dailyLimit);
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: false,
+        source: 'daily_exceeded',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: 0,
+        profileRole: 'owner',
+        monthlyLimit: freeTier.ownerMonthlyQuota,
+        dailyLimit: freeTier.ownerDailyQuota,
+      }),
+    );
+    expect(updatedProfileQuota!.usedThisMonth).toBe(freeTier.ownerMonthlyQuota);
+    expect(updatedProfileQuota!.usedToday).toBe(freeTier.ownerDailyQuota);
   });
 
   it('grants a top-up pack once and rejects a duplicate RevenueCat transaction', async () => {
@@ -359,6 +435,7 @@ describe('Integration: billing service', () => {
       accountId: account.id,
       tier: 'plus',
     });
+    const ownerProfile = await seedOwnerProfile(account.id, 'Top Up Owner');
     const now = new Date('2026-04-12T12:00:00.000Z');
 
     const first = await purchaseTopUpCredits(
@@ -367,6 +444,7 @@ describe('Integration: billing service', () => {
       500,
       now,
       'rc_txn_real_001',
+      ownerProfile.id,
     );
     const duplicate = await purchaseTopUpCredits(
       createIntegrationDb(),
@@ -374,6 +452,7 @@ describe('Integration: billing service', () => {
       500,
       now,
       'rc_txn_real_001',
+      ownerProfile.id,
     );
 
     const topUps = await loadTopUps(seeded.subscription.id);
@@ -381,12 +460,14 @@ describe('Integration: billing service', () => {
       createIntegrationDb(),
       seeded.subscription.id,
       new Date('2026-04-13T00:00:00.000Z'),
+      ownerProfile.id,
     );
 
     expect(first).not.toBeNull();
     expect(first!.remaining).toBe(500);
     expect(duplicate).toBeNull();
     expect(topUps).toHaveLength(1);
+    expect(topUps[0]!.profileId).toBe(ownerProfile.id);
     expect(topUps[0]!.revenuecatTransactionId).toBe('rc_txn_real_001');
     expect(remainingCredits).toBe(500);
   });

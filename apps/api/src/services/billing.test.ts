@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
-import { subscriptions, quotaPools } from '@eduagent/database';
+import { profileQuotaUsage, subscriptions } from '@eduagent/database';
 
 const mockCaptureException = jest.fn();
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
@@ -148,6 +148,7 @@ function mockTopUpRow(
   overrides?: Partial<{
     id: string;
     subscriptionId: string;
+    profileId: string | null;
     remaining: number;
     expiresAt: Date;
     purchasedAt: Date;
@@ -156,6 +157,7 @@ function mockTopUpRow(
   return {
     id: overrides?.id ?? 'tu-1',
     subscriptionId: overrides?.subscriptionId ?? subscriptionId,
+    profileId: overrides?.profileId ?? null,
     amount: 500,
     remaining: overrides?.remaining ?? 500,
     purchasedAt: overrides?.purchasedAt ?? NOW,
@@ -255,10 +257,14 @@ function createMockDb({
         onConflictDoNothing: jest.fn().mockReturnValue({
           returning: jest.fn().mockResolvedValue(insertReturning),
         }),
+        onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
     }),
     update: jest.fn().mockReturnValue({ set: updateSet }),
+    delete: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue(createSelectChain()),
     }),
@@ -344,6 +350,15 @@ describe('createSubscription', () => {
 
     // db.insert called twice: once for subscription, once for quota pool
     expect(db.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates subscription and quota state inside one transaction', async () => {
+    const row = mockSubscriptionRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await createSubscription(db, accountId, 'plus', 500);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
   it('passes stripe IDs when provided', async () => {
@@ -804,6 +819,15 @@ describe('safeRefundQuota [BUG-661]', () => {
     };
     selectChain.innerJoin.mockReturnValue(selectChain);
     const db = {
+      query: {
+        subscriptions: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue(
+              mockSubscriptionRow({ tier: 'family', status: 'active' }),
+            ),
+        },
+      },
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue(selectChain),
       }),
@@ -867,6 +891,21 @@ describe('ensureFreeSubscription', () => {
     expect(result.tier).toBe('free');
     expect(result.status).toBe('active');
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('provisions the winning free subscription inside one transaction', async () => {
+    const created = mockSubscriptionRow({
+      tier: 'free',
+      status: 'active',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: undefined,
+      insertReturning: [created],
+    });
+
+    await ensureFreeSubscription(db, accountId);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -959,11 +998,23 @@ describe('canAddProfile', () => {
     expect(result).toBe(false);
   });
 
-  it('returns false for plus tier with 1 existing profile', async () => {
+  it('returns true for plus tier with 1 existing profile', async () => {
     const sub = mockSubscriptionRow({ tier: 'plus' });
     const db = createMockDb({
       subscriptionFindFirst: sub,
       selectResult: [{ count: 1 }],
+    });
+
+    const result = await canAddProfile(db, subscriptionId);
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false for plus tier with 2 existing profiles', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus' });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      selectResult: [{ count: 2 }],
     });
 
     const result = await canAddProfile(db, subscriptionId);
@@ -1042,8 +1093,8 @@ describe('activateSubscriptionFromCheckout', () => {
     expect(result!.stripeSubscriptionId).toBe(stripeSubId);
     expect(result!.tier).toBe('plus');
     expect(result!.status).toBe('active');
-    // update called twice: once for subscription, once for quota pool limit
-    expect(db.update).toHaveBeenCalledTimes(2);
+    // update called three times: subscription, quota pool limit, and per-profile reconciliation.
+    expect(db.update).toHaveBeenCalledTimes(3);
   });
 
   it('returns existing (idempotent) when already linked to same ID', async () => {
@@ -1137,8 +1188,8 @@ describe('activateSubscriptionFromCheckout', () => {
     expect(result).not.toBeNull();
     expect(result!.stripeSubscriptionId).toBe(stripeSubId);
     expect(result!.tier).toBe('family');
-    // Update called twice: subscription row + quota pool limit.
-    expect(db.update).toHaveBeenCalledTimes(2);
+    // Update called three times: subscription row, quota pool limit, and reconciliation.
+    expect(db.update).toHaveBeenCalledTimes(3);
     // Escalation MUST fire — divergence is still noteworthy even when
     // resolved automatically. Silent recovery is banned.
     expect(mockCaptureException).toHaveBeenCalledWith(
@@ -1245,8 +1296,8 @@ describe('activateSubscriptionFromCheckout', () => {
       eventTs,
     );
 
-    // update called twice: subscription + quota pool
-    expect(db.update).toHaveBeenCalledTimes(2);
+    // update called three times: subscription, quota pool, and reconciliation cleanup.
+    expect(db.update).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -1413,9 +1464,14 @@ describe('purchaseTopUpCredits', () => {
 
   it('creates top-up credits for plus tier', async () => {
     const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
-    const topUpRow = mockTopUpRow({ remaining: 500 });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
+    const topUpRow = mockTopUpRow({
+      profileId: owner.id,
+      remaining: 500,
+    });
     const db = createMockDb({
       subscriptionFindFirst: sub,
+      profileFindFirst: owner,
       insertReturning: [topUpRow],
     });
 
@@ -1424,7 +1480,42 @@ describe('purchaseTopUpCredits', () => {
     expect(result).not.toBeNull();
     expect(result!.amount).toBe(500);
     expect(result!.remaining).toBe(500);
+    expect(result!.profileId).toBe(owner.id);
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('returns null for per-profile top-ups when no owner profile exists', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: undefined,
+    });
+
+    const result = await purchaseTopUpCredits(db, subscriptionId, 500);
+
+    expect(result).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects per-profile top-ups for non-owner profile ids', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: owner,
+    });
+
+    const result = await purchaseTopUpCredits(
+      db,
+      subscriptionId,
+      500,
+      NOW,
+      undefined,
+      'child-profile',
+    );
+
+    expect(result).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   it('creates top-up credits for family tier', async () => {
@@ -1623,10 +1714,10 @@ describe('handleTierChange', () => {
   });
 
   // [CR-2026-05-19-H22] Break test — without the fix, handleTierChange updates
-  // quotaPools but never writes the new tier to subscriptions.tier, so the
-  // tier column and quota pool diverge silently. Asserts both tables receive
-  // an UPDATE so downstream readers (KV cache, metering middleware) see the
-  // new tier.
+  // quota state but never writes the new tier to subscriptions.tier, so the
+  // tier column and metering state diverge silently. Asserts both surfaces
+  // receive an UPDATE so downstream readers (KV cache, metering middleware)
+  // see the new tier.
   it('persists newTier to subscriptions table on Free -> Plus upgrade (CR-2026-05-19-H22)', async () => {
     const sub = mockSubscriptionRow({ tier: 'free', status: 'active' });
     const pool = mockQuotaPoolRow({ usedThisMonth: 0, monthlyLimit: 50 });
@@ -1642,11 +1733,11 @@ describe('handleTierChange', () => {
     expect(result!.newTier).toBe('plus');
 
     // db.update should be called for BOTH the subscriptions row and the
-    // quotaPools row. Without the fix, only quotaPools is updated.
+    // per-profile quota rows. Without the fix, only quota state is updated.
     const updateMock = db.update as unknown as jest.Mock;
     const tablesUpdated = updateMock.mock.calls.map((call) => call[0]);
     expect(tablesUpdated).toContain(subscriptions);
-    expect(tablesUpdated).toContain(quotaPools);
+    expect(tablesUpdated).toContain(profileQuotaUsage);
 
     // Verify the set() payload for the subscriptions update carries the new
     // tier value — guards against an empty set({}) update slipping through.
@@ -1837,7 +1928,7 @@ function createFamilyMockDb({
   });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
 
-  return {
+  const db = {
     query: {
       subscriptions: {
         findFirst: jest.fn().mockResolvedValue(subscriptionFindFirst),
@@ -1870,7 +1961,12 @@ function createFamilyMockDb({
         where: jest.fn().mockResolvedValue(selectResult),
       }),
     }),
-  } as unknown as Database;
+  };
+  (db as unknown as { transaction: jest.Mock }).transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+
+  return db as unknown as Database;
 }
 
 // ---------------------------------------------------------------------------
@@ -2531,6 +2627,7 @@ describe('decrementQuota — race with top-up expiry [4C.2]', () => {
 describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
   it('returns null on duplicate transactionId (ON CONFLICT DO NOTHING)', async () => {
     const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
 
     // INSERT returns empty array when ON CONFLICT DO NOTHING fires
     const insertValues = jest.fn().mockReturnValue({
@@ -2544,7 +2641,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
         subscriptions: { findFirst: jest.fn().mockResolvedValue(sub) },
         quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
         topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(owner) },
       },
       insert: jest.fn().mockReturnValue({ values: insertValues }),
       update: jest.fn().mockReturnValue({
@@ -2575,7 +2672,8 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
 
   it('succeeds on first call with transactionId', async () => {
     const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
-    const topUpRow = mockTopUpRow({ remaining: 500 });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
+    const topUpRow = mockTopUpRow({ profileId: owner.id, remaining: 500 });
 
     const insertValues = jest.fn().mockReturnValue({
       onConflictDoNothing: jest.fn().mockReturnValue({
@@ -2588,7 +2686,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
         subscriptions: { findFirst: jest.fn().mockResolvedValue(sub) },
         quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
         topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(owner) },
       },
       insert: jest.fn().mockReturnValue({ values: insertValues }),
       update: jest.fn().mockReturnValue({

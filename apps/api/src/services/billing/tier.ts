@@ -5,7 +5,6 @@
 
 import { eq } from 'drizzle-orm';
 import {
-  quotaPools,
   subscriptions,
   type Database,
   findSubscriptionById__unscoped,
@@ -13,6 +12,7 @@ import {
 } from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
+import { reconcileQuotaStateForSubscription } from './quota-reconcile';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,15 +93,11 @@ export async function handleTierChange(
       })
       .where(eq(subscriptions.id, subscriptionId));
 
-    // Update quota pool limit (preserves usedThisMonth)
-    await tx
-      .update(quotaPools)
-      .set({
-        monthlyLimit: newMonthlyLimit,
-        dailyLimit: newConfig.dailyLimit,
-        updatedAt: now,
-      })
-      .where(eq(quotaPools.subscriptionId, subscriptionId));
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      subscriptionId,
+      now,
+    );
   });
 
   return {

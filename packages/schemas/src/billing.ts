@@ -4,6 +4,15 @@ import { isoDateField } from './common.ts';
 export const subscriptionTierSchema = z.enum(['free', 'plus', 'family', 'pro']);
 export type SubscriptionTier = z.infer<typeof subscriptionTierSchema>;
 
+export const billingAccessSchema = z.enum(['current', 'free_fallback']);
+export type BillingAccess = z.infer<typeof billingAccessSchema>;
+
+export const quotaModelSchema = z.enum(['per-profile', 'shared-pool']);
+export type QuotaModel = z.infer<typeof quotaModelSchema>;
+
+export const profileQuotaRoleSchema = z.enum(['owner', 'child']);
+export type ProfileQuotaRole = z.infer<typeof profileQuotaRoleSchema>;
+
 /** Paid tiers (the purchasable subset of SubscriptionTier — excludes 'free'). */
 export const paidTierSchema = z.enum(['plus', 'family', 'pro']);
 export type PaidTier = z.infer<typeof paidTierSchema>;
@@ -22,6 +31,8 @@ export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 
 export const subscriptionSchema = z.object({
   tier: subscriptionTierSchema,
+  effectiveAccessTier: subscriptionTierSchema,
+  billingAccess: billingAccessSchema,
   status: subscriptionStatusSchema,
   trialEndsAt: isoDateField.nullable(),
   currentPeriodEnd: isoDateField.nullable(),
@@ -168,6 +179,8 @@ export type UsageResponse = z.infer<typeof usageResponseSchema>;
 export const subscriptionStatusResponseSchema = z.object({
   status: z.object({
     tier: subscriptionTierSchema,
+    effectiveAccessTier: subscriptionTierSchema,
+    billingAccess: billingAccessSchema,
     status: subscriptionStatusSchema,
     monthlyLimit: z.number().int(),
     usedThisMonth: z.number().int(),
@@ -217,7 +230,11 @@ export const quotaExceededSchema = z.object({
   message: z.string(),
   details: z.object({
     tier: subscriptionTierSchema,
+    effectiveAccessTier: subscriptionTierSchema,
+    quotaModel: quotaModelSchema,
+    profileRole: profileQuotaRoleSchema.nullable(),
     reason: z.enum(['monthly', 'daily']),
+    resetsAt: isoDateField,
     monthlyLimit: z.number().int(),
     usedThisMonth: z.number().int(),
     dailyLimit: z.number().int().nullable(),

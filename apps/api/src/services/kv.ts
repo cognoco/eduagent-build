@@ -4,7 +4,14 @@
 // ---------------------------------------------------------------------------
 
 import { z } from 'zod';
-import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import {
+  billingAccessSchema,
+  subscriptionStatusSchema,
+  subscriptionTierSchema,
+  type BillingAccess,
+  type SubscriptionTier,
+  type SubscriptionStatus,
+} from '@eduagent/schemas';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
 
@@ -13,6 +20,8 @@ const logger = createLogger();
 export interface CachedSubscriptionStatus {
   subscriptionId: string;
   tier: SubscriptionTier;
+  effectiveAccessTier: SubscriptionTier;
+  billingAccess: BillingAccess;
   status: SubscriptionStatus;
   monthlyLimit: number;
   usedThisMonth: number;
@@ -22,8 +31,10 @@ export interface CachedSubscriptionStatus {
 
 const cachedSubscriptionStatusSchema = z.object({
   subscriptionId: z.string(),
-  tier: z.string(),
-  status: z.string(),
+  tier: subscriptionTierSchema,
+  effectiveAccessTier: subscriptionTierSchema.optional(),
+  billingAccess: billingAccessSchema.optional(),
+  status: subscriptionStatusSchema,
   monthlyLimit: z.number(),
   usedThisMonth: z.number(),
   dailyLimit: z.number().nullable().optional(),
@@ -84,6 +95,9 @@ export async function readSubscriptionStatus(
     const parsed = cachedSubscriptionStatusSchema.parse(JSON.parse(raw));
     return {
       ...parsed,
+      effectiveAccessTier: (parsed.effectiveAccessTier ??
+        parsed.tier) as SubscriptionTier,
+      billingAccess: parsed.billingAccess ?? 'current',
       dailyLimit: parsed.dailyLimit ?? null,
       usedToday: parsed.usedToday ?? 0,
     } as CachedSubscriptionStatus;

@@ -131,7 +131,11 @@ describe('assertOk', () => {
       message: 'Quota reached',
       details: {
         tier: 'free',
+        effectiveAccessTier: 'free',
+        quotaModel: 'per-profile',
+        profileRole: 'owner',
         reason: 'monthly',
+        resetsAt: '2026-06-01T00:00:00.000Z',
         monthlyLimit: 100,
         usedThisMonth: 100,
         dailyLimit: null,

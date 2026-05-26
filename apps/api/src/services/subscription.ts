@@ -11,13 +11,18 @@ export interface SubscriptionState {
 }
 
 export type LLMTier = 'flash' | 'standard' | 'premium';
+export type BillingAccess = 'current' | 'free_fallback';
 
 export interface TierConfig {
   monthlyQuota: number;
   dailyLimit: number | null;
   maxProfiles: number;
-  premiumModelProfiles: number;
   llmTier: LLMTier;
+  quotaModel: 'per-profile' | 'shared-pool';
+  ownerMonthlyQuota: number | null;
+  ownerDailyQuota: number | null;
+  childMonthlyQuota: number | null;
+  childDailyQuota: number | null;
   priceMonthly: number;
   priceYearly: number;
   topUpPrice: number;
@@ -32,24 +37,39 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
   free: {
     monthlyQuota: 100,
     dailyLimit: 10,
-    maxProfiles: 1,
-    premiumModelProfiles: 0,
+    maxProfiles: 2,
     llmTier: 'flash',
+    quotaModel: 'per-profile',
+    ownerMonthlyQuota: 100,
+    ownerDailyQuota: 10,
+    childMonthlyQuota: 100,
+    childDailyQuota: 10,
     priceMonthly: 0,
     priceYearly: 0,
     topUpPrice: 0,
     topUpAmount: 0,
   },
-  // Plus is the one-person serious-study plan: one profile with advanced-model
-  // access on the hard rungs. Its base tier stays standard so easier turns
-  // remain on Gemini. Family/Pro are multi-profile plans; Pro still has two
-  // selectable advanced-model profiles out of its six seats.
+  // LLM tier resolution lives in two layers:
+  //
+  // 1. Base account `llmTier` (this config) is what bulk/background callers
+  //    read — Free -> 'flash', Plus/Family/Pro -> 'standard'. Used wherever a
+  //    per-request decision is not appropriate (for example background workers).
+  //
+  // 2. Per-exchange routing is decided by `resolveExchangeLlmRouting` at
+  //    `services/session/session-exchange.ts`. That function elevates Plus to
+  //    'premium' on advanced rungs and services the AI upgrade entitlement.
+  //    Family stays Gemini-only. Future owner-only premium routing belongs
+  //    there with an `isOwner` input, not in a parallel resolver.
   plus: {
     monthlyQuota: 700,
     dailyLimit: null,
-    maxProfiles: 1,
-    premiumModelProfiles: 1,
+    maxProfiles: 2,
     llmTier: 'standard',
+    quotaModel: 'per-profile',
+    ownerMonthlyQuota: 700,
+    ownerDailyQuota: null,
+    childMonthlyQuota: 100,
+    childDailyQuota: 10,
     priceMonthly: 18.99,
     priceYearly: 168,
     topUpPrice: 10,
@@ -59,8 +79,12 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     monthlyQuota: 1500,
     dailyLimit: null,
     maxProfiles: 4,
-    premiumModelProfiles: 0,
     llmTier: 'standard',
+    quotaModel: 'shared-pool',
+    ownerMonthlyQuota: null,
+    ownerDailyQuota: null,
+    childMonthlyQuota: null,
+    childDailyQuota: null,
     priceMonthly: 28.99,
     priceYearly: 252,
     topUpPrice: 5,
@@ -70,8 +94,12 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     monthlyQuota: 3000,
     dailyLimit: null,
     maxProfiles: 6,
-    premiumModelProfiles: 2,
     llmTier: 'standard',
+    quotaModel: 'shared-pool',
+    ownerMonthlyQuota: null,
+    ownerDailyQuota: null,
+    childMonthlyQuota: null,
+    childDailyQuota: null,
     priceMonthly: 48.99,
     priceYearly: 432,
     topUpPrice: 5,
@@ -117,6 +145,38 @@ const VALID_TRANSITIONS = new Set([
 /** Returns the configuration for a given subscription tier */
 export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
   return TIER_CONFIGS[tier];
+}
+
+export function resolveEffectiveAccessTier(
+  subscription: SubscriptionState,
+  now = new Date(),
+): {
+  effectiveAccessTier: SubscriptionState['tier'];
+  billingAccess: BillingAccess;
+} {
+  if (subscription.tier === 'free') {
+    return { effectiveAccessTier: 'free', billingAccess: 'current' };
+  }
+
+  if (subscription.status === 'trial' || subscription.status === 'active') {
+    return {
+      effectiveAccessTier: subscription.tier,
+      billingAccess: 'current',
+    };
+  }
+
+  if (
+    subscription.status === 'cancelled' &&
+    subscription.currentPeriodEnd &&
+    new Date(subscription.currentPeriodEnd) > now
+  ) {
+    return {
+      effectiveAccessTier: subscription.tier,
+      billingAccess: 'current',
+    };
+  }
+
+  return { effectiveAccessTier: 'free', billingAccess: 'free_fallback' };
 }
 
 /**

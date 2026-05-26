@@ -55,12 +55,28 @@ export {
 // Quota decrement / increment (Phase 4)
 // ---------------------------------------------------------------------------
 
-export type { DecrementResult } from './billing/metering';
+export type { DecrementResult, MeteringErrorCode } from './billing/metering';
 export {
+  MeteringError,
   decrementQuota,
   incrementQuota,
   safeRefundQuota,
 } from './billing/metering';
+
+export { getEffectiveAccessForSubscription } from './billing/access';
+export type {
+  ProfileQuotaUsageSnapshot,
+  ProfileQuotaRole,
+} from './billing/quota-provision';
+export {
+  getOrProvisionProfileQuotaUsage,
+  provisionProfileQuotaUsage,
+  resolveProfileQuotaRole,
+} from './billing/quota-provision';
+export {
+  reconcileQuotaStateForEffectiveTier,
+  reconcileQuotaStateForSubscription,
+} from './billing/quota-reconcile';
 
 // ---------------------------------------------------------------------------
 // Top-up credit management

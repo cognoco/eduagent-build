@@ -374,8 +374,8 @@ describe('Quiz routes', () => {
     });
 
     it('returns 402 when seeded quota is exhausted [Phase 2C]', async () => {
-      meteringFixture.state.monthlyLimit = 25;
-      meteringFixture.setQuotaUsage(25, 0);
+      meteringFixture.state.monthlyLimit = 100;
+      meteringFixture.setQuotaUsage(100, 0);
 
       const res = await app.request(
         '/v1/quiz/rounds',

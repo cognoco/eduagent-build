@@ -900,8 +900,8 @@ describe('POST /v1/dictation/review', () => {
 describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
   beforeEach(() => {
     // Seed the real billing service state so metering rejects before the route.
-    meteringFixture.state.monthlyLimit = 50;
-    meteringFixture.setQuotaUsage(50, 0);
+    meteringFixture.state.monthlyLimit = 100;
+    meteringFixture.setQuotaUsage(100, 0);
   });
 
   it('POST /dictation/generate returns 402 QUOTA_EXCEEDED', async () => {

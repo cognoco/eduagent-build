@@ -9,9 +9,10 @@
  * - Stripe SDK wrapper
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   accounts,
+  profileQuotaUsage,
   profiles,
   quotaPools,
   subscriptions,
@@ -147,6 +148,41 @@ async function seedSubscription(
     })
     .returning();
 
+  const config = getTierConfig(tier);
+  if (config.quotaModel === 'per-profile') {
+    const [ownerProfile] = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(
+        and(
+          eq(profiles.accountId, accountId),
+          eq(profiles.isOwner, true),
+          isNull(profiles.archivedAt),
+        ),
+      )
+      .limit(1);
+
+    if (ownerProfile) {
+      await db.insert(profileQuotaUsage).values({
+        subscriptionId: subscription!.id,
+        profileId: ownerProfile.id,
+        role: 'owner',
+        monthlyLimit:
+          overrides?.monthlyLimit ??
+          config.ownerMonthlyQuota ??
+          quotaPool!.monthlyLimit,
+        usedThisMonth: overrides?.usedThisMonth ?? 0,
+        dailyLimit:
+          overrides?.dailyLimit ??
+          config.ownerDailyQuota ??
+          quotaPool!.dailyLimit,
+        usedToday: overrides?.usedToday ?? 0,
+        cycleResetAt:
+          overrides?.cycleResetAt ?? new Date('2026-05-01T00:00:00.000Z'),
+      });
+    }
+  }
+
   return {
     subscription: subscription!,
     quotaPool: quotaPool!,
@@ -244,7 +280,6 @@ describe('Integration: billing lifecycle routes', () => {
     await seedSubscription(account.id, {
       tier: 'plus',
       status: 'active',
-      monthlyLimit: 500,
       usedThisMonth: 42,
       dailyLimit: null,
       usedToday: 15,
@@ -264,9 +299,9 @@ describe('Integration: billing lifecycle routes', () => {
     const body = await res.json();
     expect(body.subscription.tier).toBe('plus');
     expect(body.subscription.status).toBe('active');
-    expect(body.subscription.monthlyLimit).toBe(500);
+    expect(body.subscription.monthlyLimit).toBe(700);
     expect(body.subscription.usedThisMonth).toBe(42);
-    expect(body.subscription.remainingQuestions).toBe(458);
+    expect(body.subscription.remainingQuestions).toBe(658);
     expect(body.subscription.dailyLimit).toBeNull();
     expect(body.subscription.usedToday).toBe(15);
     expect(body.subscription.dailyRemainingQuestions).toBeNull();
@@ -373,7 +408,6 @@ describe('Integration: billing lifecycle routes', () => {
     await seedSubscription(account.id, {
       tier: 'plus',
       status: 'active',
-      monthlyLimit: 500,
       usedThisMonth: 120,
       dailyLimit: null,
       usedToday: 8,
@@ -391,9 +425,9 @@ describe('Integration: billing lifecycle routes', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.usage.monthlyLimit).toBe(500);
+    expect(body.usage.monthlyLimit).toBe(700);
     expect(body.usage.usedThisMonth).toBe(120);
-    expect(body.usage.remainingQuestions).toBe(380);
+    expect(body.usage.remainingQuestions).toBe(580);
     expect(body.usage.topUpCreditsRemaining).toBe(0);
     expect(body.usage.warningLevel).toBe('none');
     expect(body.usage.dailyLimit).toBeNull();

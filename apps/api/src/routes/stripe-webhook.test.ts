@@ -38,6 +38,7 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     updateSubscriptionFromWebhook: jest.fn(),
     getSubscriptionByAccountId: jest.fn(),
     ensureFreeSubscription: jest.fn(),
+    getEffectiveAccessForSubscription: jest.fn(),
     getQuotaPool: jest.fn(),
     activateSubscriptionFromCheckout: jest.fn(),
     updateQuotaPoolLimit: jest.fn(),
@@ -219,6 +220,19 @@ function mockUpdatedSubscription(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockDb.query = {
+    subscriptions: {
+      findFirst: jest.fn().mockResolvedValue({
+        ...mockUpdatedSubscription(),
+        trialEndsAt: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelledAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    },
+  };
 
   (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
     mockUpdatedSubscription(),

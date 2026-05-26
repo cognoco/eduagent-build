@@ -5,6 +5,7 @@
 
 import { and, eq, notInArray, sql, type SQL } from 'drizzle-orm';
 import {
+  profileQuotaUsage,
   quotaPools,
   profiles,
   subscriptions,
@@ -13,12 +14,21 @@ import {
   type Database,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
+import { getTierConfig } from '../subscription';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
 import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
+import { getEffectiveAccessForSubscription } from './access';
+import {
+  provisionProfileQuotaUsage,
+  resolveProfileQuotaRole,
+  type ProfileQuotaRole,
+} from './quota-provision';
 
 const logger = createLogger();
+
+type QuotaModel = 'per-profile' | 'shared-pool';
 
 /**
  * Emits a structured event on quota ownership mismatch so we can query how
@@ -61,9 +71,16 @@ async function emitOwnershipMismatchEvent(input: {
 export interface DecrementResult {
   success: boolean;
   source: 'monthly' | 'top_up' | 'none' | 'daily_exceeded' | 'profile_mismatch';
+  quotaModel?: QuotaModel;
   remainingMonthly: number;
   remainingTopUp: number;
   remainingDaily: number | null;
+  resetsAt?: string;
+  profileRole?: ProfileQuotaRole | null;
+  monthlyLimit?: number;
+  usedThisMonth?: number;
+  dailyLimit?: number | null;
+  usedToday?: number;
   /**
    * [CR-2026-05-19-C6] Set only when `source === 'top_up'`. Callers (refund
    * path) must thread this back into `incrementQuota` so the refund credits
@@ -71,6 +88,20 @@ export interface DecrementResult {
    * which would inflate monthly quota by 1 per LLM failure.
    */
   topUpCreditId?: string;
+}
+
+export type MeteringErrorCode =
+  | 'PROFILE_ID_REQUIRED'
+  | 'PROFILE_QUOTA_ROW_MISSING';
+
+export class MeteringError extends Error {
+  constructor(
+    public readonly code: MeteringErrorCode,
+    public readonly meta: Record<string, unknown>,
+  ) {
+    super(`MeteringError(${code})`);
+    this.name = 'MeteringError';
+  }
 }
 
 async function verifyProfileInSubscriptionAccount(
@@ -107,6 +138,50 @@ async function recordUsageEvent(
   });
 }
 
+function nextDailyResetAt(now: Date): string {
+  const reset = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      1,
+      0,
+      0,
+      0,
+    ),
+  );
+  if (reset <= now) {
+    reset.setUTCDate(reset.getUTCDate() + 1);
+  }
+  return reset.toISOString();
+}
+
+function profileQuotaContext(
+  row: typeof profileQuotaUsage.$inferSelect,
+  source: DecrementResult['source'],
+  now: Date,
+): Pick<
+  DecrementResult,
+  | 'profileRole'
+  | 'monthlyLimit'
+  | 'usedThisMonth'
+  | 'dailyLimit'
+  | 'usedToday'
+  | 'resetsAt'
+> {
+  return {
+    profileRole: row.role,
+    monthlyLimit: row.monthlyLimit,
+    usedThisMonth: row.usedThisMonth,
+    dailyLimit: row.dailyLimit,
+    usedToday: row.usedToday,
+    resetsAt:
+      source === 'daily_exceeded'
+        ? nextDailyResetAt(now)
+        : row.cycleResetAt.toISOString(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // decrementQuota
 // ---------------------------------------------------------------------------
@@ -124,6 +199,38 @@ async function recordUsageEvent(
  * All UPDATEs use SQL WHERE guards so concurrent requests cannot over-decrement.
  */
 export async function decrementQuota(
+  db: Database,
+  subscriptionId: string,
+  profileId?: string,
+): Promise<DecrementResult> {
+  const access = await getEffectiveAccessForSubscription(db, subscriptionId);
+  if (!access) {
+    const result = await decrementPoolQuota(db, subscriptionId, profileId);
+    return { ...result, quotaModel: 'shared-pool' };
+  }
+
+  const tier = access.effectiveAccessTier;
+  if (getTierConfig(tier).quotaModel === 'per-profile') {
+    if (!profileId) {
+      throw new MeteringError('PROFILE_ID_REQUIRED', {
+        subscriptionId,
+        tier,
+      });
+    }
+    const result = await decrementProfileQuota(
+      db,
+      subscriptionId,
+      profileId,
+      tier,
+    );
+    return { ...result, quotaModel: 'per-profile' };
+  }
+
+  const result = await decrementPoolQuota(db, subscriptionId, profileId);
+  return { ...result, quotaModel: 'shared-pool' };
+}
+
+async function decrementPoolQuota(
   db: Database,
   subscriptionId: string,
   profileId?: string,
@@ -367,6 +474,305 @@ export async function decrementQuota(
   };
 }
 
+async function decrementProfileQuota(
+  db: Database,
+  subscriptionId: string,
+  profileId: string,
+  tier: 'free' | 'plus' | 'family' | 'pro',
+): Promise<DecrementResult> {
+  const ownsProfile = await verifyProfileInSubscriptionAccount(
+    db,
+    subscriptionId,
+    profileId,
+  );
+  if (!ownsProfile) {
+    logger.warn('[metering] decrementQuota ownership mismatch', {
+      event: 'metering.ownership_mismatch',
+      flow: 'decrement',
+      subscriptionId,
+      profileId,
+    });
+    await emitOwnershipMismatchEvent({
+      flow: 'decrement',
+      subscriptionId,
+      profileId,
+    });
+    return {
+      success: false,
+      source: 'profile_mismatch',
+      remainingMonthly: 0,
+      remainingTopUp: 0,
+      remainingDaily: null,
+      profileRole: null,
+    };
+  }
+
+  return db.transaction(async (tx) =>
+    attemptProfileDecrementInTx(
+      tx as unknown as Database,
+      subscriptionId,
+      profileId,
+      tier,
+      true,
+    ),
+  );
+}
+
+async function clampProfileQuotaLimits(
+  db: Database,
+  subscriptionId: string,
+  profileId: string,
+  tier: 'free' | 'plus' | 'family' | 'pro',
+): Promise<void> {
+  const row = await db.query.profileQuotaUsage.findFirst({
+    where: and(
+      eq(profileQuotaUsage.subscriptionId, subscriptionId),
+      eq(profileQuotaUsage.profileId, profileId),
+    ),
+  });
+  if (!row) return;
+
+  const config = getTierConfig(tier);
+  if (config.quotaModel !== 'per-profile') return;
+  const monthlyLimit =
+    row.role === 'owner' ? config.ownerMonthlyQuota : config.childMonthlyQuota;
+  const dailyLimit =
+    row.role === 'owner' ? config.ownerDailyQuota : config.childDailyQuota;
+  if (monthlyLimit === null) return;
+  if (row.monthlyLimit === monthlyLimit && row.dailyLimit === dailyLimit) {
+    return;
+  }
+
+  await db
+    .update(profileQuotaUsage)
+    .set({ monthlyLimit, dailyLimit, updatedAt: new Date() })
+    .where(eq(profileQuotaUsage.id, row.id));
+}
+
+async function consumeOwnerTopUpCredit(
+  db: Database,
+  input: {
+    subscriptionId: string;
+    profileId: string;
+    row: typeof profileQuotaUsage.$inferSelect;
+    now: Date;
+  },
+): Promise<DecrementResult | null> {
+  let updatedTopUp: typeof topUpCredits.$inferSelect | undefined;
+  const contendedTopUpIds: string[] = [];
+  while (!updatedTopUp) {
+    const topUpConditions: SQL[] = [
+      eq(topUpCredits.subscriptionId, input.subscriptionId),
+      eq(topUpCredits.profileId, input.profileId),
+      sql`${topUpCredits.remaining} > 0`,
+      sql`${topUpCredits.expiresAt} > ${input.now}`,
+    ];
+    if (contendedTopUpIds.length > 0) {
+      topUpConditions.push(notInArray(topUpCredits.id, contendedTopUpIds));
+    }
+
+    const topUp = await db.query.topUpCredits.findFirst({
+      where: and(...topUpConditions),
+      orderBy: sql`${topUpCredits.purchasedAt} ASC, ${topUpCredits.id} ASC`,
+    });
+    if (!topUp) return null;
+    if (contendedTopUpIds.includes(topUp.id)) return null;
+
+    [updatedTopUp] = await db
+      .update(topUpCredits)
+      .set({ remaining: sql`${topUpCredits.remaining} - 1` })
+      .where(
+        and(
+          eq(topUpCredits.id, topUp.id),
+          eq(topUpCredits.profileId, input.profileId),
+          sql`${topUpCredits.remaining} > 0`,
+        ),
+      )
+      .returning();
+
+    if (!updatedTopUp) {
+      contendedTopUpIds.push(topUp.id);
+    }
+  }
+
+  const [updatedRow] = await db
+    .update(profileQuotaUsage)
+    .set({
+      usedToday: sql`${profileQuotaUsage.usedToday} + 1`,
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(profileQuotaUsage.subscriptionId, input.subscriptionId),
+        eq(profileQuotaUsage.profileId, input.profileId),
+        sql`(${profileQuotaUsage.dailyLimit} IS NULL OR ${profileQuotaUsage.usedToday} < ${profileQuotaUsage.dailyLimit})`,
+      ),
+    )
+    .returning();
+
+  if (!updatedRow) {
+    await db
+      .update(topUpCredits)
+      .set({ remaining: sql`${topUpCredits.remaining} + 1` })
+      .where(eq(topUpCredits.id, updatedTopUp.id));
+
+    return {
+      success: false,
+      source: 'daily_exceeded',
+      remainingMonthly: Math.max(
+        0,
+        input.row.monthlyLimit - input.row.usedThisMonth,
+      ),
+      remainingTopUp: 0,
+      remainingDaily: 0,
+      ...profileQuotaContext(input.row, 'daily_exceeded', input.now),
+    };
+  }
+
+  await recordUsageEvent(db, input.subscriptionId, input.profileId, 1);
+  return {
+    success: true,
+    source: 'top_up',
+    remainingMonthly: 0,
+    remainingTopUp: updatedTopUp.remaining,
+    remainingDaily:
+      updatedRow.dailyLimit !== null
+        ? updatedRow.dailyLimit - updatedRow.usedToday
+        : null,
+    topUpCreditId: updatedTopUp.id,
+    ...profileQuotaContext(updatedRow, 'top_up', input.now),
+  };
+}
+
+async function attemptProfileDecrementInTx(
+  db: Database,
+  subscriptionId: string,
+  profileId: string,
+  tier: 'free' | 'plus' | 'family' | 'pro',
+  allowLazyProvision: boolean,
+): Promise<DecrementResult> {
+  const now = new Date();
+  await clampProfileQuotaLimits(db, subscriptionId, profileId, tier);
+
+  const [updated] = await db
+    .update(profileQuotaUsage)
+    .set({
+      usedThisMonth: sql`${profileQuotaUsage.usedThisMonth} + 1`,
+      usedToday: sql`${profileQuotaUsage.usedToday} + 1`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(profileQuotaUsage.subscriptionId, subscriptionId),
+        eq(profileQuotaUsage.profileId, profileId),
+        sql`${profileQuotaUsage.usedThisMonth} < ${profileQuotaUsage.monthlyLimit}`,
+        sql`(${profileQuotaUsage.dailyLimit} IS NULL OR ${profileQuotaUsage.usedToday} < ${profileQuotaUsage.dailyLimit})`,
+      ),
+    )
+    .returning();
+
+  if (updated) {
+    await recordUsageEvent(db, subscriptionId, profileId, 1);
+    return {
+      success: true,
+      source: 'monthly',
+      remainingMonthly: updated.monthlyLimit - updated.usedThisMonth,
+      remainingTopUp: 0,
+      remainingDaily:
+        updated.dailyLimit !== null
+          ? updated.dailyLimit - updated.usedToday
+          : null,
+      ...profileQuotaContext(updated, 'monthly', now),
+    };
+  }
+
+  const snapshot = await db.query.profileQuotaUsage.findFirst({
+    where: and(
+      eq(profileQuotaUsage.subscriptionId, subscriptionId),
+      eq(profileQuotaUsage.profileId, profileId),
+    ),
+  });
+
+  if (!snapshot) {
+    if (!allowLazyProvision) {
+      throw new MeteringError('PROFILE_QUOTA_ROW_MISSING', {
+        subscriptionId,
+        profileId,
+      });
+    }
+    const role = await resolveProfileQuotaRole(db, subscriptionId, profileId);
+    if (!role) {
+      return {
+        success: false,
+        source: 'profile_mismatch',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+        profileRole: null,
+      };
+    }
+    await provisionProfileQuotaUsage(db, subscriptionId, profileId, role, {
+      tier,
+      now,
+      emitLazyProvisioned: true,
+    });
+    return attemptProfileDecrementInTx(
+      db,
+      subscriptionId,
+      profileId,
+      tier,
+      false,
+    );
+  }
+
+  if (
+    snapshot.dailyLimit !== null &&
+    snapshot.usedToday >= snapshot.dailyLimit
+  ) {
+    return {
+      success: false,
+      source: 'daily_exceeded',
+      remainingMonthly: Math.max(
+        0,
+        snapshot.monthlyLimit - snapshot.usedThisMonth,
+      ),
+      remainingTopUp: 0,
+      remainingDaily: 0,
+      ...profileQuotaContext(snapshot, 'daily_exceeded', now),
+    };
+  }
+
+  const config = getTierConfig(tier);
+  if (
+    snapshot.role === 'owner' &&
+    snapshot.usedThisMonth >= snapshot.monthlyLimit &&
+    config.topUpAmount > 0
+  ) {
+    const topUpResult = await consumeOwnerTopUpCredit(db, {
+      subscriptionId,
+      profileId,
+      row: snapshot,
+      now,
+    });
+    if (topUpResult) return topUpResult;
+  }
+
+  return {
+    success: false,
+    source: 'none',
+    remainingMonthly: Math.max(
+      0,
+      snapshot.monthlyLimit - snapshot.usedThisMonth,
+    ),
+    remainingTopUp: 0,
+    remainingDaily:
+      snapshot.dailyLimit !== null
+        ? Math.max(0, snapshot.dailyLimit - snapshot.usedToday)
+        : null,
+    ...profileQuotaContext(snapshot, 'none', now),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // incrementQuota
 // ---------------------------------------------------------------------------
@@ -395,9 +801,47 @@ export interface IncrementResult {
 export interface IncrementQuotaOptions {
   source?: 'monthly' | 'top_up';
   topUpCreditId?: string;
+  quotaModel?: QuotaModel;
 }
 
 export async function incrementQuota(
+  db: Database,
+  subscriptionId: string,
+  profileId?: string,
+  options?: IncrementQuotaOptions,
+): Promise<IncrementResult> {
+  if (options?.quotaModel === 'per-profile') {
+    if (!profileId) {
+      throw new MeteringError('PROFILE_ID_REQUIRED', {
+        subscriptionId,
+        quotaModel: options.quotaModel,
+      });
+    }
+    return incrementProfileQuota(db, subscriptionId, profileId, options);
+  }
+
+  if (options?.quotaModel === 'shared-pool') {
+    return incrementPoolQuota(db, subscriptionId, profileId, options);
+  }
+
+  const access = await getEffectiveAccessForSubscription(db, subscriptionId);
+  if (
+    access &&
+    getTierConfig(access.effectiveAccessTier).quotaModel === 'per-profile'
+  ) {
+    if (!profileId) {
+      throw new MeteringError('PROFILE_ID_REQUIRED', {
+        subscriptionId,
+        tier: access.effectiveAccessTier,
+      });
+    }
+    return incrementProfileQuota(db, subscriptionId, profileId, options);
+  }
+
+  return incrementPoolQuota(db, subscriptionId, profileId, options);
+}
+
+async function incrementPoolQuota(
   db: Database,
   subscriptionId: string,
   profileId?: string,
@@ -479,6 +923,91 @@ export async function incrementQuota(
   return { success: true };
 }
 
+async function incrementProfileQuota(
+  db: Database,
+  subscriptionId: string,
+  profileId: string,
+  options?: IncrementQuotaOptions,
+): Promise<IncrementResult> {
+  const ownsProfile = await verifyProfileInSubscriptionAccount(
+    db,
+    subscriptionId,
+    profileId,
+  );
+  if (!ownsProfile) {
+    logger.warn('[metering] incrementQuota ownership mismatch', {
+      event: 'metering.ownership_mismatch',
+      flow: 'increment',
+      subscriptionId,
+      profileId,
+    });
+    await emitOwnershipMismatchEvent({
+      flow: 'increment',
+      subscriptionId,
+      profileId,
+    });
+    return { success: false, reason: 'profile_mismatch' };
+  }
+
+  const source = options?.source ?? 'monthly';
+
+  await db.transaction(async (tx) => {
+    if (source === 'top_up' && options?.topUpCreditId) {
+      await tx
+        .update(topUpCredits)
+        .set({ remaining: sql`${topUpCredits.remaining} + 1` })
+        .where(
+          and(
+            eq(topUpCredits.id, options.topUpCreditId),
+            eq(topUpCredits.subscriptionId, subscriptionId),
+            eq(topUpCredits.profileId, profileId),
+          ),
+        );
+
+      await tx
+        .update(profileQuotaUsage)
+        .set({
+          usedToday: sql`GREATEST(${profileQuotaUsage.usedToday} - 1, 0)`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(profileQuotaUsage.subscriptionId, subscriptionId),
+            eq(profileQuotaUsage.profileId, profileId),
+          ),
+        );
+    } else {
+      if (source === 'top_up') {
+        logger.warn(
+          '[metering] incrementQuota top_up refund missing topUpCreditId - falling back to monthly refund',
+          {
+            event: 'metering.refund.missing_topup_id',
+            subscriptionId,
+            profileId,
+          },
+        );
+      }
+      await tx
+        .update(profileQuotaUsage)
+        .set({
+          usedThisMonth: sql`GREATEST(${profileQuotaUsage.usedThisMonth} - 1, 0)`,
+          usedToday: sql`GREATEST(${profileQuotaUsage.usedToday} - 1, 0)`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(profileQuotaUsage.subscriptionId, subscriptionId),
+            eq(profileQuotaUsage.profileId, profileId),
+          ),
+        );
+    }
+
+    await recordUsageEvent(tx, subscriptionId, profileId, -1);
+  });
+
+  return { success: true };
+}
+
 // ---------------------------------------------------------------------------
 // safeRefundQuota
 // ---------------------------------------------------------------------------
@@ -511,6 +1040,8 @@ export async function safeRefundQuota(
      * legacy callers — they fall back to a monthly refund.
      */
     source?: 'monthly' | 'top_up';
+    /** Set from the original decrement so refunds don't drift if tier state changes mid-request. */
+    quotaModel?: QuotaModel;
     /** Required when source === 'top_up'. From `DecrementResult.topUpCreditId`. */
     topUpCreditId?: string;
   },
@@ -518,6 +1049,7 @@ export async function safeRefundQuota(
   try {
     const result = await incrementQuota(db, subscriptionId, context.profileId, {
       source: context.source,
+      quotaModel: context.quotaModel,
       topUpCreditId: context.topUpCreditId,
     });
     if (!result.success) {
