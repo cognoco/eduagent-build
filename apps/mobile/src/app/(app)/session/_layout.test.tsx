@@ -4,7 +4,9 @@
 // Redirect to a no-op and verifies the explainer fallback View still renders
 // so the user never sees a blank screen if the redirect fires after mount.
 
-import { render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+
+const mockReplace = jest.fn();
 
 jest.mock('react-i18next' /* gc1-allow: i18n boundary */, () => ({
   useTranslation: () => ({
@@ -12,9 +14,11 @@ jest.mock('react-i18next' /* gc1-allow: i18n boundary */, () => ({
   }),
 }));
 
-// Mock Redirect as a no-op so the screen body can render past it.
+// Mock router so the explained redirect can navigate after rendering.
 jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
-  Redirect: () => null,
+  useRouter: () => ({
+    replace: mockReplace,
+  }),
   Stack: () => null,
 }));
 
@@ -73,10 +77,15 @@ jest.mock(
 const SessionLayout = require('./_layout').default as React.ComponentType;
 
 describe('SessionLayout — proxy fallback (WI-283)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
   afterEach(() => {
     mockIsParentProxy = false;
     mockIsExplicitProxyMode = false;
     jest.clearAllMocks();
+    jest.useRealTimers();
   });
 
   it('[WI-283] renders the Stack normally when not in proxy mode', () => {
@@ -101,6 +110,31 @@ describe('SessionLayout — proxy fallback (WI-283)', () => {
     render(<SessionLayout />);
 
     screen.getByText('proxy.readOnly.hint');
+  });
+
+  it('[BUG-388] gives proxy users a visible next action before redirecting away', () => {
+    mockIsParentProxy = true;
+    mockIsExplicitProxyMode = true;
+
+    render(<SessionLayout />);
+
+    screen.getByText('proxy.readOnly.title');
+    fireEvent.press(screen.getByTestId('session-proxy-switch-profile'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('[BUG-388] auto-redirects proxy users after showing the explanation', () => {
+    mockIsParentProxy = true;
+    mockIsExplicitProxyMode = true;
+
+    render(<SessionLayout />);
+
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('[WI-371] isExplicitProxyMode alone does not block — blocked is contract-driven', () => {

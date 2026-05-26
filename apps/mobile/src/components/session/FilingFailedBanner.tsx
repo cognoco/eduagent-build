@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
   CONFLICT_ERROR_NAME,
@@ -24,6 +25,7 @@ interface SessionLike {
 
 export function FilingFailedBanner({ session }: { session: SessionLike }) {
   const { t } = useTranslation();
+  const router = useRouter();
   const [hidden, setHidden] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const retry = useRetryFiling();
@@ -126,6 +128,17 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
               {retry.isPending
                 ? t('session.filingFailed.retryingButton')
                 : t('session.filingFailed.tryAgain')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/(app)/home')}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.goHome')}
+            className="rounded-button py-3 px-4 items-center mt-2 bg-surface"
+            testID="filing-go-home-button"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </View>

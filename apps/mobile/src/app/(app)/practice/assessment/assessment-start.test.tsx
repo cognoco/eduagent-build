@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
+import { ConsentRequiredError, QuotaExceededError } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Assessment start failure tests
@@ -58,6 +59,7 @@ jest.mock(
 jest.mock(
   '../../../../lib/format-api-error' /* gc1-allow: pure formatter with no RN dependency, stubbed for clarity */,
   () => ({
+    ...jest.requireActual('../../../../lib/format-api-error'),
     formatApiError: (err: unknown) =>
       err instanceof Error ? err.message : 'Unknown error',
   }),
@@ -272,6 +274,9 @@ const AssessmentScreen = require('./index').default as React.ComponentType;
 describe('AssessmentScreen — start failures and error states', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCreateAssessmentMutateAsync.mockReset();
+    mockSubmitAnswerMutateAsync.mockReset();
+    mockDeclineRefreshMutateAsync.mockReset();
     mockActiveAssessmentData = null;
     mockActiveAssessmentIsLoading = false;
     mockSearchParams = {
@@ -327,10 +332,12 @@ describe('AssessmentScreen — start failures and error states', () => {
         await Promise.resolve();
       });
 
-      // ErrorFallback should be in the footer
+      // ErrorFallback should be in the footer with classified recovery copy.
       getByTestId('error-fallback');
       const errorMessage = getByTestId('error-message');
-      expect(errorMessage.props.children).toContain('Network timeout');
+      expect(errorMessage.props.children).toContain(
+        "Looks like you're offline",
+      );
     });
 
     it('retry button re-sends the last message', async () => {
@@ -415,6 +422,63 @@ describe('AssessmentScreen — start failures and error states', () => {
       // must re-type their answer. This creates a silent dead-end if the quota
       // error message isn't actionable (no "Go to billing" CTA).
       getByTestId('error-fallback');
+    });
+
+    it('routes quota failures to the subscription screen instead of offering blind retry', async () => {
+      mockCreateAssessmentMutateAsync.mockRejectedValueOnce(
+        new QuotaExceededError("You've used all your questions.", {
+          tier: 'free',
+          effectiveAccessTier: 'free',
+          quotaModel: 'per-profile',
+          profileRole: 'child',
+          reason: 'daily',
+          resetsAt: '2026-05-27T00:00:00.000Z',
+          monthlyLimit: 100,
+          usedThisMonth: 100,
+          dailyLimit: 10,
+          usedToday: 10,
+          topUpCreditsRemaining: 0,
+          upgradeOptions: [],
+        }),
+      );
+
+      const { getByTestId, queryByTestId } = render(<AssessmentScreen />);
+      fireEvent.changeText(getByTestId('chat-input'), 'I am ready');
+      await act(async () => {
+        fireEvent.press(getByTestId('chat-send'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(queryByTestId('assessment-error-retry')).toBeNull();
+      fireEvent.press(getByTestId('assessment-error-upgrade'));
+
+      expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+    });
+
+    it('gives consent failures a way back instead of retrying the same request', async () => {
+      mockCreateAssessmentMutateAsync.mockRejectedValueOnce(
+        new ConsentRequiredError(
+          'Consent is required before this action is available.',
+          'CONSENT_REQUIRED',
+        ),
+      );
+
+      const { getByTestId, queryByTestId } = render(<AssessmentScreen />);
+      fireEvent.changeText(getByTestId('chat-input'), 'I am ready');
+      await act(async () => {
+        fireEvent.press(getByTestId('chat-send'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(queryByTestId('assessment-error-retry')).toBeNull();
+      fireEvent.press(getByTestId('assessment-error-back'));
+
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/practice',
+      );
     });
   });
 });

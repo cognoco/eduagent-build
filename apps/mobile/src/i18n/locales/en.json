@@ -1940,6 +1940,10 @@
       "saveErrorMessage": "Something went wrong. Please try again.",
       "somethingElse": "Something else",
       "customPlaceholder": "e.g. they/them"
+    },
+    "index": {
+      "redirectTitle": "First, let’s personalise a couple of basics",
+      "redirectBody": "We’ll start with pronouns so the next steps feel right from the beginning."
     }
   },
   "parentView": {
@@ -2019,6 +2023,8 @@
       "couldNotLoadSessions": "Could not load sessions",
       "refreshChildProfile": "Refresh child profile",
       "refresh": "Refresh",
+      "startSession": "Start a session",
+      "goToCurriculum": "Go to curriculum",
       "viewSessionFrom": "View session from",
       "mentorMemoryTitle": "What the mentor knows about {{name}}",
       "mentorMemoryTitleFallback": "Mentor memory",

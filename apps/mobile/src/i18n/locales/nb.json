@@ -1863,6 +1863,10 @@
       "saveErrorMessage": "Noe gikk galt. Prøv igjen.",
       "somethingElse": "Noe annet",
       "customPlaceholder": "f.eks. de/dem"
+    },
+    "index": {
+      "redirectTitle": "Først tilpasser vi et par grunnleggende ting",
+      "redirectBody": "Vi starter med pronomen, slik at de neste stegene føles riktige helt fra begynnelsen."
     }
   },
   "parentView": {
@@ -1938,6 +1942,8 @@
       "couldNotLoadSessions": "Kunne ikke laste økter",
       "refreshChildProfile": "Oppdater barneprofil",
       "refresh": "Oppdater",
+      "startSession": "Start en økt",
+      "goToCurriculum": "Gå til læreplan",
       "viewSessionFrom": "Se økt fra",
       "mentorMemoryTitle": "Hva mentoren vet om {{name}}",
       "mentorMemoryTitleFallback": "Mentorens minne",

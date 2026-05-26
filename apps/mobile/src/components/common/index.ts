@@ -11,6 +11,8 @@ export { GateContent, GATE_WEB_MAX_WIDTH } from './GateContent';
 export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
 export { DeskLampAnimation } from './DeskLampAnimation';
+export { EmptyStateCard } from './EmptyStateCard';
+export { ExplainedRedirect } from './ExplainedRedirect';
 export { LightBulbAnimation } from './LightBulbAnimation';
 export { LoadingMomentOverlay } from './LoadingMomentOverlay';
 export { MagicPenAnimation } from './MagicPenAnimation';

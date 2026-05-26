@@ -19,7 +19,11 @@ import {
   useDeclineAssessmentRefresh,
   useSubmitAnswer,
 } from '../../../../hooks/use-assessments';
-import { formatApiError } from '../../../../lib/format-api-error';
+import {
+  classifyApiError,
+  formatApiError,
+  recoveryActions,
+} from '../../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { platformAlert } from '../../../../lib/platform-alert';
 import type { Translate } from '../../../../i18n';
@@ -155,7 +159,7 @@ export default function AssessmentScreen() {
     }),
   );
   const [isStreaming, setIsStreaming] = useState(false);
-  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<unknown | null>(null);
   const [lastUserText, setLastUserText] = useState<string | null>(null);
 
   useEffect(() => {
@@ -275,9 +279,8 @@ export default function AssessmentScreen() {
         // the AI did not "say" this. Surface the error only in the footer
         // ErrorFallback (rendered below via lastError), which carries a
         // retry + go-home pair. Reset streaming so input/retry re-enable.
-        const errorMessage = formatApiError(err);
         setIsStreaming(false);
-        setLastError(errorMessage);
+        setLastError(err);
       }
     },
     [
@@ -361,6 +364,52 @@ export default function AssessmentScreen() {
     terminalResult !== null &&
     terminalResult.status !== 'failed_exhausted' &&
     (qualityRating !== null || showDepthChip);
+  const classifiedLastError = lastError ? classifyApiError(lastError) : null;
+  const assessmentErrorActions = classifiedLastError
+    ? classifiedLastError.category === 'quota'
+      ? {
+          primaryAction: {
+            label: t('subscription.upgradePlan'),
+            testID: 'assessment-error-upgrade',
+            onPress: () => router.push('/(app)/subscription'),
+          },
+          secondaryAction: {
+            label: t('common.goHome'),
+            testID: 'assessment-error-home',
+            onPress: () => goBackOrReplace(router, '/(app)/home' as const),
+          },
+        }
+      : (() => {
+          const actions = recoveryActions(classifiedLastError, {
+            retry: lastUserText
+              ? () => {
+                  void handleSend(lastUserText);
+                }
+              : undefined,
+            goBack: () => goBackOrReplace(router, '/(app)/practice' as const),
+            goHome: () => goBackOrReplace(router, '/(app)/home' as const),
+          });
+          return {
+            primaryAction: actions.primary
+              ? {
+                  ...actions.primary,
+                  testID:
+                    classifiedLastError.recovery === 'go-back'
+                      ? 'assessment-error-back'
+                      : actions.primary.testID === 'recovery-go-home'
+                        ? 'assessment-error-home'
+                        : 'assessment-error-retry',
+                }
+              : undefined,
+            secondaryAction: actions.secondary
+              ? {
+                  ...actions.secondary,
+                  testID: 'assessment-error-home',
+                }
+              : undefined,
+          };
+        })()
+    : null;
 
   const resultCard = terminalResult ? (
     <View
@@ -494,29 +543,23 @@ export default function AssessmentScreen() {
         }
         footer={
           resultCard ??
-          (lastError ? (
+          (classifiedLastError && assessmentErrorActions ? (
             <ErrorFallback
               variant="card"
-              message={lastError}
-              primaryAction={{
-                label: t('common.tryAgain'),
-                testID: 'assessment-error-retry',
-                // [UX-DE-H3] Disable retry while streaming to prevent double-submit
-                // on rapid taps during an in-flight answer check.
-                disabled: isStreaming,
-                onPress: () => {
-                  if (lastUserText) {
-                    void handleSend(lastUserText);
-                  } else {
-                    setLastError(null);
-                  }
-                },
-              }}
-              secondaryAction={{
-                label: t('common.goHome'),
-                testID: 'assessment-error-home',
-                onPress: () => goBackOrReplace(router, '/(app)/home' as const),
-              }}
+              message={classifiedLastError.message}
+              primaryAction={
+                assessmentErrorActions.primaryAction
+                  ? {
+                      ...assessmentErrorActions.primaryAction,
+                      disabled:
+                        assessmentErrorActions.primaryAction.testID ===
+                        'assessment-error-retry'
+                          ? isStreaming
+                          : false,
+                    }
+                  : undefined
+              }
+              secondaryAction={assessmentErrorActions.secondaryAction}
             />
           ) : undefined)
         }
