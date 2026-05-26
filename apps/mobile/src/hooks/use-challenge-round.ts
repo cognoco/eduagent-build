@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// useChallengeRound — orchestrates the challenge-round offer/accept/decline/abort
+// useChallengeRound - orchestrates the challenge-round accept/decline/abort
 // lifecycle and note saving.
 //
 // Routes /challenge-round/* are not yet registered in AppType (added in the
@@ -53,18 +53,6 @@ export function useChallengeRound(opts: {
   const { activeProfile } = useProfile();
   const createNote = useCreateNote(opts.subjectId, opts.bookId);
 
-  const maybeOffer = useMutation({
-    mutationFn: async () => {
-      const token = await getToken();
-      return postJson<{ offered: boolean; reason?: string }>(
-        `${getApiUrl()}/v1/challenge-round/maybe-offer`,
-        { sessionId: opts.sessionId, topicId: opts.topicId },
-        token,
-        activeProfile?.id,
-      );
-    },
-  });
-
   const accept = useMutation({
     mutationFn: async () => {
       const token = await getToken();
@@ -94,7 +82,7 @@ export function useChallengeRound(opts: {
       const token = await getToken();
       return postJson<Record<string, unknown>>(
         `${getApiUrl()}/v1/challenge-round/abort`,
-        { sessionId: opts.sessionId },
+        { sessionId: opts.sessionId, topicId: opts.topicId },
         token,
         activeProfile?.id,
       );
@@ -102,7 +90,6 @@ export function useChallengeRound(opts: {
   });
 
   return {
-    maybeOffer: () => maybeOffer.mutateAsync(),
     accept: () => accept.mutateAsync(),
     decline: (dontAskAgain = false) => decline.mutateAsync(dontAskAgain),
     abort: () => abort.mutateAsync(),

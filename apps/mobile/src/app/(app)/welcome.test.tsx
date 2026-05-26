@@ -4,7 +4,8 @@ import WelcomeRoute from './welcome';
 
 const mockReplace = jest.fn();
 let mockRedirectParam: string | undefined;
-let mockUserId: string | null = 'user_test_1';
+let mockAuthUserId: string | null = 'user_test_1';
+let mockHydratedUserId: string | null = 'user_test_1';
 
 const mockMarkIntroSeenSync = jest.fn();
 const mockTrack = jest.fn();
@@ -20,8 +21,11 @@ jest.mock(
 jest.mock(
   '@clerk/clerk-expo',
   /* gc1-allow: external-boundary — Clerk SDK */ () => ({
+    useAuth: () => ({
+      userId: mockAuthUserId,
+    }),
     useUser: () => ({
-      user: mockUserId ? { id: mockUserId } : null,
+      user: mockHydratedUserId ? { id: mockHydratedUserId } : null,
     }),
   }),
 );
@@ -67,7 +71,8 @@ describe('<WelcomeRoute />', () => {
     mockMarkIntroSeenSync.mockReset();
     mockTrack.mockReset();
     mockRedirectParam = undefined;
-    mockUserId = 'user_test_1';
+    mockAuthUserId = 'user_test_1';
+    mockHydratedUserId = 'user_test_1';
   });
 
   it('fires intro_started exactly once on mount', () => {
@@ -107,10 +112,26 @@ describe('<WelcomeRoute />', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
-  it('renders null and never fires markIntroSeenSync when Clerk has not hydrated the user', () => {
-    mockUserId = null;
+  it('[BUG] renders the intro when auth userId is ready but useUser has not hydrated yet', () => {
+    mockHydratedUserId = null;
+
     render(<WelcomeRoute />);
+
+    expect(screen.getByTestId('welcome-intro-stub')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('stub-complete'));
+    expect(mockMarkIntroSeenSync).toHaveBeenCalledWith('user_test_1');
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('shows a visible loading fallback and never fires markIntroSeenSync before Clerk userId is ready', () => {
+    mockAuthUserId = null;
+    mockHydratedUserId = null;
+
+    render(<WelcomeRoute />);
+
     expect(screen.queryByTestId('welcome-intro-stub')).toBeNull();
+    expect(screen.getByTestId('welcome-auth-loading')).toBeTruthy();
     expect(mockMarkIntroSeenSync).not.toHaveBeenCalled();
   });
 });

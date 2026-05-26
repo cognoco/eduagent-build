@@ -66,6 +66,7 @@ import {
   restoreSessionForAutoFiling,
   resetFilingForRetry,
   getSubjectSessions,
+  dispatchClosePathAutoFileIfEligible,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
@@ -159,6 +160,8 @@ type SessionRouteEnv = {
     quotaDecrementSource: 'monthly' | 'top_up' | undefined;
     /** [CR-2026-05-19-C6] Set by metering middleware when source is top_up. */
     quotaDecrementTopUpCreditId: string | undefined;
+    quotaRemainingTurns: number | undefined;
+    quotaFractionRemaining: number | undefined;
   };
 };
 
@@ -444,6 +447,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       const llmTier = c.get('llmTier');
       const subscriptionTier = c.get('subscriptionTier');
+      const quotaRemainingTurns = c.get('quotaRemainingTurns');
+      const quotaFractionRemaining = c.get('quotaFractionRemaining');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
         c.env.MEMORY_FACTS_READ_ENABLED,
       );
@@ -460,6 +465,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           {
             llmTier,
             subscriptionTier,
+            quotaRemainingTurns,
+            quotaFractionRemaining,
             voyageApiKey: c.env.VOYAGE_API_KEY,
             clientId,
             memoryFactsReadEnabled,
@@ -621,6 +628,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       const llmTier = c.get('llmTier');
       const subscriptionTier = c.get('subscriptionTier');
+      const quotaRemainingTurns = c.get('quotaRemainingTurns');
+      const quotaFractionRemaining = c.get('quotaFractionRemaining');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
         c.env.MEMORY_FACTS_READ_ENABLED,
       );
@@ -637,6 +646,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           {
             llmTier,
             subscriptionTier,
+            quotaRemainingTurns,
+            quotaFractionRemaining,
             voyageApiKey: c.env.VOYAGE_API_KEY,
             clientId,
             memoryFactsReadEnabled,
@@ -703,6 +714,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   {
                     llmTier,
                     subscriptionTier,
+                    quotaRemainingTurns,
+                    quotaFractionRemaining,
                     voyageApiKey: c.env.VOYAGE_API_KEY,
                     clientId,
                     memoryFactsReadEnabled,
@@ -1052,6 +1065,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               {
                 llmTier,
                 subscriptionTier,
+                quotaRemainingTurns,
+                quotaFractionRemaining,
                 voyageApiKey: c.env.VOYAGE_API_KEY,
                 clientId,
                 memoryFactsReadEnabled,
@@ -1462,51 +1477,6 @@ async function dispatchSessionAutoFileRequested(
     name: 'app/session.auto_file_requested',
     data: payload,
   });
-}
-
-async function dispatchClosePathAutoFileIfEligible(
-  db: Database,
-  profileId: string,
-  sessionId: string,
-): Promise<void> {
-  const session = await getSession(db, profileId, sessionId);
-  if (!session || !isClosePathAutoFileEligible(session)) return;
-
-  const dispatchId = 'initial';
-  const payload = sessionAutoFileRequestedEventSchema.parse({
-    profileId,
-    sessionId,
-    requestedAt: new Date().toISOString(),
-    reason: 'freeform_session_closed',
-    dispatchId,
-  });
-
-  await safeSend(
-    () =>
-      inngest.send({
-        id: `auto-file-${sessionId}-${dispatchId}`,
-        name: 'app/session.auto_file_requested',
-        data: payload,
-      }),
-    'sessions.close.auto_file_requested',
-    { profileId, sessionId },
-  );
-}
-
-function isClosePathAutoFileEligible(session: {
-  metadata?: unknown;
-  topicId?: string | null;
-  filedAt?: string | Date | null;
-  filingStatus?: string | null;
-  exchangeCount?: number;
-}): boolean {
-  return (
-    getSessionEffectiveMode(session) === 'freeform' &&
-    session.topicId == null &&
-    session.filedAt == null &&
-    session.filingStatus == null &&
-    (session.exchangeCount ?? 0) >= FILING_CONFIG.minFreeformExchanges
-  );
 }
 
 /**

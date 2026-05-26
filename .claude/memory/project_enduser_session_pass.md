@@ -14,7 +14,13 @@ The runner is a conventional quality gate, not only a transcript collector. Norm
 
 **How to apply:** Run `pnpm test:llm:enduser` for the full live pass. The canonical implementation is `scripts/enduser-session-pass.ts`; it accepts `--modes=freeform,learning,...`, `--run-id=<id>`, `--results-dir=<path>`, `--allow-quality-failures`, `--with-memory-embeddings`, `--with-clerk-users`, `--list-modes`, and `--list-learner-profiles`. The default run uses DB-only fake seed users and disables semantic memory retrieval/embeddings so the gate stays focused on tutoring/session quality and avoids Clerk/Voyage noise; use `--with-clerk-users` or `--with-memory-embeddings` only when explicitly validating those paths. The change-class script lists this as a slow required validation for LLM prompt changes.
 
-Run `pnpm test:llm:premium-routing` for the Plus/Family hard-topic routing pass. It accepts `--cases=...`, `--providers=openai,anthropic`, `--openai-model=gpt-5.5`, `--run-id=<id>`, `--results-dir=<path>`, `--allow-missing-provider`, `--allow-quality-failures`, and `--list-cases`. The default OpenAI advanced candidate is GPT-5.4 unless the runner explicitly overrides it for a comparison pass. The change-class script lists it as a slow required validation for LLM routing/subscription changes.
+As of 2026-05-25, `package.json` does not register `test:llm:premium-routing`; run the Plus/Family hard-topic routing pass directly:
+
+```bash
+C:/Tools/doppler/doppler.exe run --project mentomate --config stg -- pnpm exec tsx scripts/premium-routing-pass.ts
+```
+
+The runner accepts `--cases=...`, `--providers=openai,anthropic`, `--openai-model=gpt-5.5`, `--run-id=<id>`, `--results-dir=<path>`, `--allow-missing-provider`, `--allow-quality-failures`, and `--list-cases`. The default OpenAI advanced candidate is GPT-5.4 unless the runner explicitly overrides it for a comparison pass. The change-class script lists it as a slow required validation for LLM routing/subscription changes.
 
 The Four Strands live mode uses the `language-subject-active` seed and checks the whole five-turn flow for meaning-focused input, meaning-focused output, language-focused learning/direct correction, and fluency development via `ui_hints.fluency_drill`.
 

@@ -6,12 +6,12 @@ import { renderHook, act } from '@testing-library/react-native';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import { useChallengeRound } from './use-challenge-round';
 
-// External boundary mocks — Clerk auth and native fetch
+// External boundary mocks - Clerk auth and native fetch
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 
-// Mock profile (internal lib — but useProfile is a React context wrapper
+// Mock profile (internal lib - but useProfile is a React context wrapper
 // that would require a full provider tree in tests; mock at the boundary
 // of the React context, not the internal service)
 jest.mock(
@@ -22,7 +22,7 @@ jest.mock(
   }),
 );
 
-// Mock useCreateNote — we only verify the mutateAsync call shape here.
+// Mock useCreateNote - we only verify the mutateAsync call shape here.
 // The full useCreateNote behaviour is covered in use-notes.test.ts.
 const mockMutateAsync = jest.fn();
 jest.mock(
@@ -34,7 +34,7 @@ jest.mock(
   }),
 );
 
-// Spy on global fetch — the hook uses raw fetch for untyped routes
+// Spy on global fetch - the hook uses raw fetch for untyped routes
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
@@ -62,7 +62,6 @@ describe('useChallengeRound', () => {
       wrapper: createWrapper(),
     });
 
-    expect(typeof result.current.maybeOffer).toBe('function');
     expect(typeof result.current.accept).toBe('function');
     expect(typeof result.current.decline).toBe('function');
     expect(typeof result.current.abort).toBe('function');
@@ -89,23 +88,6 @@ describe('useChallengeRound', () => {
     const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(body.sessionId).toBe('session-uuid');
     expect(body.topicId).toBe('topic-uuid');
-  });
-
-  it('maybeOffer() POSTs to /v1/challenge-round/maybe-offer', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ offered: true }), { status: 200 }),
-    );
-
-    const { result } = renderHook(() => useChallengeRound(opts), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      await result.current.maybeOffer();
-    });
-
-    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://localhost:8787/v1/challenge-round/maybe-offer');
   });
 
   it('saveNote() calls createNote.mutateAsync with topicId, sessionId, and content', async () => {
@@ -156,5 +138,25 @@ describe('useChallengeRound', () => {
     expect(url).toBe('http://localhost:8787/v1/challenge-round/decline');
     const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(body.dontAskAgain).toBe(true);
+  });
+
+  it('abort() POSTs sessionId and topicId', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({}), { status: 200 }),
+    );
+
+    const { result } = renderHook(() => useChallengeRound(opts), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.abort();
+    });
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:8787/v1/challenge-round/abort');
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.sessionId).toBe('session-uuid');
+    expect(body.topicId).toBe('topic-uuid');
   });
 });

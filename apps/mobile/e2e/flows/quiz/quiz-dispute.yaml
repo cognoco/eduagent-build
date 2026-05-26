@@ -218,24 +218,40 @@ tags:
 - takeScreenshot: quiz-dispute-07-correct-no-dispute-button
 
 # 14. Quit back to quiz index (cleanup)
+# Strategy: quiz-play-quit may be absent if the round auto-advanced to a
+# results screen. Poll for it (optional), and if it appears, tap it — then
+# the modal and index-return are mandatory so we know cleanup actually ran.
+# The final assertVisible on quiz-index-screen is unconditional: if the quit
+# path was skipped, the round must have ended and Maestro should be on the
+# index screen via the results auto-return. Either way the test must land on
+# quiz-index-screen before completing.
+- extendedWaitUntil:
+    visible:
+      id: "quiz-play-quit"
+    timeout: 3000
+    optional: true  # justified: quit button is absent when round auto-completed to results screen before this step
+
 - tapOn:
     id: "quiz-play-quit"
-    optional: true  # justified: cleanup tap — quiz may have auto-advanced to results before this point, making quit button absent
+    optional: true  # justified: only present when the optional poll above found it (round still in progress)
 
 - extendedWaitUntil:
     visible:
       id: "quiz-quit-modal-backdrop"
     timeout: 5000
-    optional: true  # justified: quit modal only appears after quit tap; quit tap itself was optional
+    optional: true  # justified: modal only appears when quit button was tapped (line above was optional)
 
 - tapOn:
     id: "quiz-quit-confirm"
-    optional: true  # justified: confirm tap only applicable when quit modal appeared
+    optional: true  # justified: confirm is only required when the quit modal appeared (line above was optional)
 
+- takeScreenshot: quiz-dispute-08-done
+
+# Mandatory: verify clean nav-state return — the flow must end on quiz-index-screen
+# regardless of which path was taken (quit modal or auto-return from results).
+# [BUG-625] This assertion was absent; without it the cleanup chain could silently
+# fail and leave subsequent tests in a dirty nav state.
 - extendedWaitUntil:
     visible:
       id: "quiz-index-screen"
-    timeout: 10000
-    optional: true  # justified: return to index depends on modal confirmation; earlier cleanup steps were optional
-
-- takeScreenshot: quiz-dispute-08-done
+    timeout: 15000

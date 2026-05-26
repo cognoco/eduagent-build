@@ -75,6 +75,32 @@ export function __resetConsentRespondRateLimit(): void {
   consentRespondTimestamps.clear();
 }
 
+// [BUG-648 / FCR-2026-05-23-L2.M2.5] Extract the canonical client IP for
+// rate-limiting. Prefer Cloudflare's `cf-connecting-ip` (always the real
+// client at the edge), then fall back to the FIRST token of
+// `x-forwarded-for`. The previous implementation used the entire XFF header
+// verbatim as the bucket key — any unique proxy chain (e.g.
+// "1.2.3.4, 10.0.0.1, 10.0.0.2") produced its own bucket, allowing an
+// attacker rotating intermediate proxies to bypass the per-IP rate limit.
+// We deliberately use the LEFTMOST token (the original client) rather than
+// the rightmost, because at the Cloudflare edge `cf-connecting-ip` is
+// already the trusted value when present; the XFF fallback only fires in
+// non-CF environments (local dev, tests). The first token is what RFC 7239
+// defines as the originating client.
+export function resolveRateLimitIp(
+  cfConnectingIp: string | null | undefined,
+  xForwardedFor: string | null | undefined,
+): string {
+  const cf = cfConnectingIp?.trim();
+  if (cf) return cf;
+  const xff = xForwardedFor?.trim();
+  if (xff) {
+    const first = xff.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  return 'unknown';
+}
+
 export function isConsentRespondRateLimited(ipKey: string): boolean {
   const now = Date.now();
   const cutoff = now - CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS;
@@ -309,10 +335,10 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const db = c.get('db');
       const input = c.req.valid('json');
 
-      const ipKey =
-        c.req.header('cf-connecting-ip') ??
-        c.req.header('x-forwarded-for') ??
-        'unknown';
+      const ipKey = resolveRateLimitIp(
+        c.req.header('cf-connecting-ip'),
+        c.req.header('x-forwarded-for'),
+      );
       if (isConsentRespondRateLimited(ipKey)) {
         const retryAfterSecs = Math.ceil(
           CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000,

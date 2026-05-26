@@ -12,6 +12,13 @@
 const fs = require('fs');
 const path = require('path');
 
+// @expo/cli is intentionally NOT in the FORBIDDEN list.
+// It is a devDependency required as a peer dep by @nx/expo for the NX Expo
+// plugin integration. It is a build/CLI tool — it does not ship in the mobile
+// bundle and does not create a NativeWind peer-dep double-copy at runtime.
+// If @expo/cli ever migrates from devDependencies to dependencies in root
+// package.json, add it to FORBIDDEN immediately (that would be a bundler risk).
+// See: .claude/memory/feedback_nativewind_root_pkg_split.md and BUG-699.
 const FORBIDDEN = [
   '@expo/metro-config',
   '@expo/metro-runtime',

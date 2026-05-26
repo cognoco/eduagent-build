@@ -3,6 +3,7 @@ import {
   mergeMemoryContexts,
   computeCorrectStreak,
   resolveExchangeLlmRouting,
+  resolveChallengeRoundLlmRoutingRung,
   checkExchangeLimit,
   resolveReadyToFinish,
   type ExchangeHistoryEvent,
@@ -443,6 +444,29 @@ describe('resolveExchangeLlmRouting', () => {
     expect(result.llmTier).toBe('standard');
     expect(result.providerPolicy).toBeUndefined();
     expect(result.routingReason).toBeUndefined();
+  });
+});
+
+describe('resolveChallengeRoundLlmRoutingRung', () => {
+  it.each(['accepted', 'active', 'drafting'] as const)(
+    'floors %s rounds to the advanced routing rung',
+    (state) => {
+      expect(resolveChallengeRoundLlmRoutingRung(1, { state })).toBe(4);
+      expect(resolveChallengeRoundLlmRoutingRung(3, { state })).toBe(4);
+      expect(resolveChallengeRoundLlmRoutingRung(5, { state })).toBe(5);
+    },
+  );
+
+  it.each(['offered', 'declined', 'complete', 'aborted'] as const)(
+    'keeps normal routing for %s rounds',
+    (state) => {
+      expect(resolveChallengeRoundLlmRoutingRung(1, { state })).toBe(1);
+      expect(resolveChallengeRoundLlmRoutingRung(4, { state })).toBe(4);
+    },
+  );
+
+  it('keeps normal routing when no Challenge Round is in progress', () => {
+    expect(resolveChallengeRoundLlmRoutingRung(2, undefined)).toBe(2);
   });
 });
 

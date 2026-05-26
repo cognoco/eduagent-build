@@ -634,7 +634,8 @@
     },
     "expired": {
       "title": "Sesja zakończona",
-      "message": "Ta sesja została zakończona. Rozpocznij nową, aby kontynuować naukę."
+      "message": "Ta sesja została zakończona. Rozpocznij nową, aby kontynuować naukę.",
+      "startNewSession": "Rozpocznij nową sesję"
     },
     "notePrompt": {
       "writeNote": "Napisz notatkę",
@@ -2178,6 +2179,14 @@
         "completed": "Ukończony",
         "verified": "Zweryfikowany",
         "stable": "Stabilny"
+      },
+      "understandingLevels": {
+        "justStarting": "Dopiero zaczyna",
+        "gettingFamiliar": "Zaznajamia się",
+        "findingTheirFeet": "Odnajduje się",
+        "gettingComfortable": "Nabiera pewności",
+        "nearlyMastered": "Prawie opanowane",
+        "mastered": "Opanowane"
       }
     },
     "weeklyReport": {
@@ -2936,5 +2945,8 @@
       "title": "Przełącz się na własny profil, aby wprowadzić zmiany",
       "switchProfileCta": "Zmień profil"
     }
+  },
+  "profiles": {
+    "title": "Profile"
   }
 }

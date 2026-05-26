@@ -761,22 +761,48 @@ export async function processRecallTest(
   profileId: string,
   input: RecallTestSubmitInput,
 ): Promise<RecallTestResponse> {
-  const repo = createScopedRepository(db, profileId);
+  // [BUG-657 / FCR-2026-05-23-L3.M3.3] Eliminate the TOCTOU window between
+  // the topic ownership check, the retention-card read, and the
+  // ensureRetentionCard write. Previously these ran as 3 separate
+  // statements: a concurrent topic transfer (e.g. family migration) between
+  // step 1 and step 3 could let us auto-create a retention_card linked to a
+  // topic the profile no longer owns. Wrapping them in a single transaction
+  // makes them atomic — either the topic still resolves as owned at the
+  // moment we create the card, or the whole bundle aborts.
+  //
+  // The cooldown claim and post-LLM write below stay OUTSIDE the
+  // transaction on purpose: their own WHERE clauses already include
+  // `eq(retentionCards.profileId, profileId)`, and the LLM call between
+  // them is too slow to hold a DB transaction open.
+  const { topic, effectiveCard } = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    // Single-JOIN ownership check (subjects.profileId filter is enforced
+    // inside assertOwnedCurriculumTopic via findOwnedCurriculumTopic).
+    const ownedTopic = await assertOwnedCurriculumTopic(txDb, {
+      profileId,
+      topicId: input.topicId,
+    });
 
-  // IDOR prevention: verify the topic belongs to the profile through both topic
-  // parent chains before creating retention state or reading evaluation context.
-  const topic = await assertOwnedCurriculumTopic(db, {
-    profileId,
-    topicId: input.topicId,
+    // Read existing retention_card within the same transaction so its
+    // existence (or absence) is committed-state at the moment of the
+    // ownership check.
+    const existing = await txDb.query.retentionCards.findFirst({
+      where: and(
+        eq(retentionCards.profileId, profileId),
+        eq(retentionCards.topicId, input.topicId),
+      ),
+    });
+
+    if (existing) {
+      return { topic: ownedTopic, effectiveCard: existing };
+    }
+
+    // No card yet — create one in the same transaction. ensureRetentionCard
+    // re-asserts topic ownership; that second assertion is redundant but
+    // cheap and runs inside the same transaction.
+    const ensured = await ensureRetentionCard(txDb, profileId, input.topicId);
+    return { topic: ownedTopic, effectiveCard: ensured.card };
   });
-
-  const card = await repo.retentionCards.findFirst(
-    eq(retentionCards.topicId, input.topicId),
-  );
-
-  // Auto-create retention card on first encounter
-  const effectiveCard =
-    card ?? (await ensureRetentionCard(db, profileId, input.topicId)).card;
 
   // FR54: Anti-cramming cooldown — 24-hour minimum between recall tests
   const state = rowToRetentionState(effectiveCard);
@@ -1159,8 +1185,9 @@ export async function getSubjectNeedsDeepening(
 
   const topics: NeedsDeepeningStatus[] = subjectDeepening.map((d) => ({
     topicId: d.topicId,
-    status: d.status as 'active' | 'resolved',
+    status: d.status as NeedsDeepeningStatus['status'],
     consecutiveSuccessCount: d.consecutiveSuccessCount,
+    pendingExpiresAt: d.pendingExpiresAt?.toISOString() ?? null,
   }));
 
   return { topics, count: topics.length };

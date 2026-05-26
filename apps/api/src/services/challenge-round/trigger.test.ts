@@ -143,16 +143,25 @@ describe('evaluateChallengeReadiness — current-session new-topic path (MED-8)'
 });
 
 describe('evaluateChallengeReadiness — quota budget (ROUTING-3)', () => {
-  it('hard-gates when fewer than 5 turns remain regardless of tier', () => {
+  it('hard-gates when fewer than 3 turns remain regardless of tier', () => {
     for (const tier of ['free', 'plus', 'family', 'pro'] as const) {
       expect(
         evaluateChallengeReadiness({
           ...baseInput,
           subscriptionTier: tier,
-          quotaRemainingTurns: 4,
+          quotaRemainingTurns: 2,
         }).eligible,
       ).toBe(false);
     }
+  });
+
+  it('allows the absolute budget floor when exactly 3 turns remain', () => {
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        quotaRemainingTurns: 3,
+      }).eligible,
+    ).toBe(true);
   });
 
   it('uses quota fraction only as a secondary free-tier guard', () => {

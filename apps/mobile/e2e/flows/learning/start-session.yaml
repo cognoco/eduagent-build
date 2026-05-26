@@ -43,11 +43,12 @@ tags:
     id: "chat-input"
 - inputText: "Hello, can you help me understand the basics?"
 
-# Tap send button (testID: send-button)
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
-- pressKey: Enter
+# BUG-267 / BUG-35: pressKey: Enter does not reliably fire onSubmitEditing
+# in the WHPX dev-client build. send-button is covered by the keyboard on
+# Android — same hideKeyboard + tapOn pattern that seed-and-sign-in.yaml uses.
+- hideKeyboard
+- tapOn:
+    id: "send-button"
 
 # Visual integrity: verify user message rendered in chat
 - scrollUntilVisible:

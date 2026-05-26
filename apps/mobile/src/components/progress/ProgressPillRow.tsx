@@ -20,14 +20,16 @@ export function ProgressPillRow({
 
   const scrollRef = useRef<ScrollView>(null);
 
-  if (!ownProfileId || childrenProfiles.length === 0) return null;
+  if (childrenProfiles.length === 0) return null;
 
   const pills = [
     ...childrenProfiles.map((profile) => ({
       id: profile.id,
       label: profile.displayName,
     })),
-    { id: ownProfileId, label: t('progress.ownProfilePill') },
+    ...(ownProfileId
+      ? [{ id: ownProfileId, label: t('progress.ownProfilePill') }]
+      : []),
   ];
 
   const handleSelect = (id: string, index: number) => {

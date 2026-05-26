@@ -29,6 +29,7 @@ import {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  UnauthorizedError,
   UpstreamError,
 } from './api-errors';
 import type { QuotaExceededDetails } from './api-errors';
@@ -43,6 +44,7 @@ export {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  UnauthorizedError,
   UpstreamError,
 } from './api-errors';
 export type { QuotaExceededDetails, UpgradeOption } from './api-errors';
@@ -261,8 +263,18 @@ export function useApiClient(): ApiClient {
             _authExpiredFiring = true;
             _onAuthExpired();
           }
-          throw new Error(
-            token ? 'Session expired — signing out' : 'Auth token not ready',
+          // [BUG-694] Throw typed UnauthorizedError instead of a bare Error
+          // so the response status, server code, and raw body are preserved
+          // for callers (format-api-error, logging, retry logic). Previously
+          // the bare Error discarded all structured signal — screens had to
+          // string-match the message to detect 401s.
+          throw new UnauthorizedError(
+            token ? 'session-expired' : 'token-not-ready',
+            {
+              ...(apiMessage !== undefined ? { message: apiMessage } : {}),
+              ...(code !== undefined ? { apiCode: code } : {}),
+              responseBody: errBody,
+            },
           );
         }
 

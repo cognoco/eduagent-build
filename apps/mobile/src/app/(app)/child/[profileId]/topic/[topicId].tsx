@@ -200,7 +200,7 @@ export default function TopicDetailScreen() {
                   <MetricInfoDot metricKey="understanding" />
                 </View>
                 <Text className="text-body font-semibold text-text-primary">
-                  {getUnderstandingLabel(masteryPercent)}
+                  {t(getUnderstandingLabel(masteryPercent))}
                 </Text>
               </View>
               <View className="h-2.5 bg-border rounded-full overflow-hidden">

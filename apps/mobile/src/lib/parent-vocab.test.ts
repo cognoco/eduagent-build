@@ -5,19 +5,21 @@ import {
 } from './parent-vocab';
 
 describe('getUnderstandingLabel', () => {
+  const KEY = (suffix: string) =>
+    `parentView.topic.understandingLevels.${suffix}` as const;
   it.each([
-    [0, 'Just starting'],
-    [1, 'Getting familiar'],
-    [15, 'Getting familiar'],
-    [30, 'Getting familiar'],
-    [31, 'Finding their feet'],
-    [60, 'Finding their feet'],
-    [61, 'Getting comfortable'],
-    [85, 'Getting comfortable'],
-    [86, 'Nearly mastered'],
-    [99, 'Nearly mastered'],
-    [100, 'Mastered'],
-  ])('maps %i%% to "%s"', (score, expected) => {
+    [0, KEY('justStarting')],
+    [1, KEY('gettingFamiliar')],
+    [15, KEY('gettingFamiliar')],
+    [30, KEY('gettingFamiliar')],
+    [31, KEY('findingTheirFeet')],
+    [60, KEY('findingTheirFeet')],
+    [61, KEY('gettingComfortable')],
+    [85, KEY('gettingComfortable')],
+    [86, KEY('nearlyMastered')],
+    [99, KEY('nearlyMastered')],
+    [100, KEY('mastered')],
+  ])('maps %i%% to %s', (score, expected) => {
     expect(getUnderstandingLabel(score)).toBe(expected);
   });
 });

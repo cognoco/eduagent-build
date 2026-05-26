@@ -157,6 +157,22 @@ const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
+const mockSessionCrudGetSession = jest.fn();
+
+jest.mock(
+  '../services/session/session-crud' /* gc1-allow: route unit test routes extracted helper through real session-crud import; implementation covered by session-crud tests */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/session/session-crud',
+    ) as typeof import('../services/session/session-crud');
+    return {
+      ...actual,
+      getSession: (...args: Parameters<typeof actual.getSession>) =>
+        mockSessionCrudGetSession(...args),
+    };
+  },
+);
+
 jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
   // Use real error classes so instanceof checks in route handlers match production behavior.
   const actual = jest.requireActual(
@@ -1040,12 +1056,16 @@ describe('session routes', () => {
     };
 
     beforeEach(() => {
+      mockSessionCrudGetSession.mockImplementation((...args) =>
+        (getSession as jest.Mock)(...args),
+      );
       sendSpy = jest
         .spyOn(inngest, 'send')
         .mockResolvedValue({ ids: [] } as never);
     });
 
     afterEach(() => {
+      mockSessionCrudGetSession.mockReset();
       sendSpy.mockRestore();
     });
 

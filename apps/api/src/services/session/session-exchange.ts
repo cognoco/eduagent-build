@@ -8,6 +8,8 @@ import {
   sessionEvents,
   sessionSummaries,
   retentionCards,
+  needsDeepeningTopics,
+  challengeRoundCooldowns,
   vocabulary,
   subjects,
   createScopedRepository,
@@ -23,11 +25,13 @@ import type {
   FocusAreaEntry,
   SubscriptionTier,
   VerificationType,
+  ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
   ConflictError,
   LlmStreamError,
   classifyOrphanError,
+  challengeRoundSessionStateSchema,
   extractedInterviewSignalsSchema,
 } from '@eduagent/schemas';
 import { persistUserMessageOnly } from './persist-user-message-only';
@@ -107,6 +111,7 @@ import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from '../curriculum-topic-ownership';
+import { evaluateChallengeReadiness } from '../challenge-round/trigger';
 
 /**
  * [BUG-92 / CR-2026-05-19-C4] Decide whether the interview / onboarding loop
@@ -236,6 +241,23 @@ export function resolveExchangeLlmRouting(input: {
   return { llmTier: input.requestedLlmTier };
 }
 
+export function resolveChallengeRoundLlmRoutingRung(
+  escalationRung: EscalationRung,
+  challengeRound: Pick<ChallengeRoundSessionState, 'state'> | undefined,
+): EscalationRung {
+  if (
+    challengeRound?.state === 'accepted' ||
+    challengeRound?.state === 'active' ||
+    challengeRound?.state === 'drafting'
+  ) {
+    return Math.max(
+      escalationRung,
+      GEMINI_ADVANCED_MODEL_MIN_RUNG,
+    ) as EscalationRung;
+  }
+  return escalationRung;
+}
+
 async function recordSessionPracticeActivityEvent(
   db: Database,
   input: RecordPracticeActivityEventInput,
@@ -339,6 +361,8 @@ export interface ExchangeBehavioralMetrics {
   llmProviderPolicy?: LlmProviderPolicy;
   /** Reason code for any non-default routing choice. */
   llmRoutingReason?: string;
+  /** Effective rung sent to the LLM router; may differ from escalationRung for Challenge Round. */
+  llmRoutingRung?: EscalationRung;
   /** Provider that produced the response, or the initial streaming provider. */
   llmProvider?: string;
   /** Model that produced the response, or the initial streaming model. */
@@ -847,6 +871,8 @@ export async function prepareExchangeContext(
     homeworkMode?: 'help_me' | 'check_answer';
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
+    quotaRemainingTurns?: number;
+    quotaFractionRemaining?: number;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
@@ -924,6 +950,8 @@ export async function prepareExchangeContext(
     subject,
     profileRows,
     retentionRows,
+    challengeCooldownRows,
+    activeDeepeningRows,
     priorTopicSessionRows,
     events,
     memory,
@@ -942,6 +970,34 @@ export async function prepareExchangeContext(
             and(
               eq(retentionCards.topicId, ownedSessionTopic.topicId),
               eq(retentionCards.profileId, profileId),
+            ),
+          )
+          .limit(1)
+      : Promise.resolve([]),
+    ownedSessionTopic
+      ? db
+          .select({
+            lastOfferedAt: challengeRoundCooldowns.lastOfferedAt,
+            lastOutcome: challengeRoundCooldowns.lastOutcome,
+          })
+          .from(challengeRoundCooldowns)
+          .where(
+            and(
+              eq(challengeRoundCooldowns.profileId, profileId),
+              eq(challengeRoundCooldowns.topicId, ownedSessionTopic.topicId),
+            ),
+          )
+          .limit(1)
+      : Promise.resolve([]),
+    ownedSessionTopic
+      ? db
+          .select({ id: needsDeepeningTopics.id })
+          .from(needsDeepeningTopics)
+          .where(
+            and(
+              eq(needsDeepeningTopics.profileId, profileId),
+              eq(needsDeepeningTopics.topicId, ownedSessionTopic.topicId),
+              eq(needsDeepeningTopics.status, 'active'),
             ),
           )
           .limit(1)
@@ -1377,10 +1433,55 @@ export async function prepareExchangeContext(
   const effectiveRung = escalationDecision.shouldEscalate
     ? escalationDecision.newRung
     : currentRung;
+  const parsedChallengeRound = challengeRoundSessionStateSchema.safeParse(
+    sessionMeta['challengeRound'],
+  );
+  const challengeRound = parsedChallengeRound.success
+    ? parsedChallengeRound.data
+    : undefined;
+  const correctStreak = computeCorrectStreak(events, effectiveRung);
+  const challengeCorrectStreak = computeCorrectStreak(events, currentRung);
+  const challengeQuotaRemainingTurns = options?.quotaRemainingTurns;
+  const challengeQuotaFractionRemaining = options?.quotaFractionRemaining;
+  const hasChallengeQuotaInputs =
+    typeof challengeQuotaRemainingTurns === 'number' &&
+    typeof challengeQuotaFractionRemaining === 'number';
+  const challengeReadiness =
+    topic && hasChallengeQuotaInputs
+      ? evaluateChallengeReadiness({
+          sessionType: session.sessionType,
+          exchangeCount: session.exchangeCount,
+          retentionStatus: retentionStatusValue ?? 'new',
+          struggleStatus:
+            activeDeepeningRows.length > 0
+              ? retentionCard && retentionCard.failureCount >= 3
+                ? 'blocked'
+                : 'needs_deepening'
+              : 'normal',
+          recentCorrectStreak: challengeCorrectStreak,
+          currentSessionSolidAnswerCount: aiResponseEvents.filter(
+            (event) =>
+              (event.metadata as Record<string, unknown> | null)
+                ?.correctAnswer === true,
+          ).length,
+          subscriptionTier: options?.subscriptionTier,
+          quotaRemainingTurns: challengeQuotaRemainingTurns,
+          quotaFractionRemaining: challengeQuotaFractionRemaining,
+          challengeRoundState: challengeRound,
+          cooldownLastOfferedAt:
+            challengeCooldownRows[0]?.lastOfferedAt ?? null,
+          cooldownLastOutcome: challengeCooldownRows[0]?.lastOutcome ?? null,
+          now: new Date(),
+        })
+      : { eligible: false };
+  const llmRoutingRung = resolveChallengeRoundLlmRoutingRung(
+    effectiveRung,
+    challengeRound,
+  );
   const llmRouting = resolveExchangeLlmRouting({
     subscriptionTier: options?.subscriptionTier,
     requestedLlmTier: options?.llmTier,
-    effectiveRung,
+    effectiveRung: llmRoutingRung,
   });
 
   // 5. Build prior learning context (FR40 — bridge FR)
@@ -1693,6 +1794,7 @@ export async function prepareExchangeContext(
     preferredLlmProvider: llmRouting.preferredProvider,
     llmProviderPolicy: llmRouting.providerPolicy,
     llmRoutingReason: llmRouting.routingReason,
+    llmRoutingRung,
     // CFLF: Original learner input so the LLM stays anchored to intent
     rawInput: session.rawInput,
     inputMode: session.inputMode,
@@ -1718,7 +1820,9 @@ export async function prepareExchangeContext(
     extractedSignalsToReflect,
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
-    correctStreak: computeCorrectStreak(events, effectiveRung),
+    correctStreak,
+    challengeEligible: challengeReadiness.eligible,
+    challengeRound,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -1787,6 +1891,9 @@ export async function persistExchangeResult(
       }),
       ...(behavioral.llmRoutingReason !== undefined && {
         llmRoutingReason: behavioral.llmRoutingReason,
+      }),
+      ...(behavioral.llmRoutingRung !== undefined && {
+        llmRoutingRung: behavioral.llmRoutingRung,
       }),
       ...(behavioral.llmProvider !== undefined && {
         llmProvider: behavioral.llmProvider,
@@ -2074,6 +2181,8 @@ export async function processMessage(
     voyageApiKey?: string;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
+    quotaRemainingTurns?: number;
+    quotaFractionRemaining?: number;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
@@ -2212,6 +2321,7 @@ export async function processMessage(
       preferredLlmProvider: context.preferredLlmProvider,
       llmProviderPolicy: context.llmProviderPolicy,
       llmRoutingReason: context.llmRoutingReason,
+      llmRoutingRung: context.llmRoutingRung ?? context.escalationRung,
       llmProvider: result.provider,
       llmModel: result.model,
       // Bug #348: forward EVALUATE / TEACH_BACK assessment signals onto
@@ -2280,6 +2390,8 @@ export async function streamMessage(
     voyageApiKey?: string;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
+    quotaRemainingTurns?: number;
+    quotaFractionRemaining?: number;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
@@ -2516,6 +2628,7 @@ export async function streamMessage(
           preferredLlmProvider: context.preferredLlmProvider,
           llmProviderPolicy: context.llmProviderPolicy,
           llmRoutingReason: context.llmRoutingReason,
+          llmRoutingRung: context.llmRoutingRung ?? context.escalationRung,
           llmProvider: result.provider,
           llmModel: result.model,
           llmFallbackUsed: result.fallbackUsed === true,

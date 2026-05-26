@@ -197,7 +197,7 @@ export async function runDedupForProfile(
         continue;
       }
 
-      decision = llmResult.decision;
+      const llmDecision = llmResult.decision;
       modelVersion = llmResult.modelVersion;
       await args.db
         .insert(memoryDedupDecisions)
@@ -205,11 +205,35 @@ export async function runDedupForProfile(
           profileId: args.profileId,
           pairKey,
           category: candidate.category,
-          decision: decision.action,
-          mergedText: decision.action === 'merge' ? decision.merged_text : null,
+          decision: llmDecision.action,
+          mergedText:
+            llmDecision.action === 'merge' ? llmDecision.merged_text : null,
           modelVersion,
         })
         .onConflictDoNothing();
+      // [BUG-402] Re-read after onConflictDoNothing: a concurrent dedup pass
+      // may have won the race and persisted a different decision. Always
+      // apply the row that actually landed so memo and applyDedupAction agree.
+      const persisted = await args.db
+        .select()
+        .from(memoryDedupDecisions)
+        .where(
+          and(
+            eq(memoryDedupDecisions.profileId, args.profileId),
+            eq(memoryDedupDecisions.pairKey, pairKey),
+            eq(memoryDedupDecisions.category, candidate.category),
+          ),
+        )
+        .limit(1);
+      if (persisted[0]) {
+        // decisionFromMemo returns null only for a corrupted merge row
+        // (merge decision with no mergedText). Fall back to llmDecision
+        // in that edge case so decision is always non-null below.
+        decision = decisionFromMemo(persisted[0]) ?? llmDecision;
+        modelVersion = persisted[0].modelVersion;
+      } else {
+        decision = llmDecision;
+      }
     }
 
     const outcome = await args.db.transaction(async (tx) => {

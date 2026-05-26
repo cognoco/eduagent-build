@@ -59,7 +59,12 @@ function createMockDb({
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockReturnValue({
+          // Default: simulate one row matched + returned (defense-in-depth
+          // EXISTS subquery hit). Tests for the ownership-mismatch branch
+          // override this via createMockDb({ updateReturning: [] }).
+          returning: jest.fn().mockResolvedValue([{ id: profileId }]),
+        }),
       }),
     }),
     select: jest.fn().mockReturnValue({
@@ -194,6 +199,75 @@ describe('upsertNotificationPrefs', () => {
     );
 
     expect(result.maxDailyPush).toBe(3);
+  });
+
+  // [BUG-661 / FCR-2026-05-23-L3.L3.2] Break test: defense-in-depth guard on
+  // UPDATE. If verifyProfileOwnership at the top of upsertNotificationPrefs
+  // were ever bypassed or raced, the EXISTS(profiles WHERE id = ? AND
+  // account_id = ?) filter in the UPDATE WHERE clause must still block the
+  // write. We simulate this by making the UPDATE return zero rows (which is
+  // what would happen when (profileId, accountId) doesn't link to a row in
+  // profiles). The function must throw rather than silently no-op.
+  it('throws when UPDATE matches zero rows (account ownership mismatch defense) [BUG-661]', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        reviewReminders: false,
+        dailyReminders: false,
+        pushEnabled: false,
+        maxDailyPush: 3,
+      },
+    });
+    // Override the update chain to return [] (no rows matched the EXISTS
+    // subquery — simulates a mismatched (profileId, accountId) pair).
+    (db.update as jest.Mock).mockReturnValueOnce({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    await expect(
+      upsertNotificationPrefs(db, profileId, TEST_ACCOUNT_ID, {
+        reviewReminders: true,
+        dailyReminders: false,
+        pushEnabled: false,
+      }),
+    ).rejects.toThrow(/not owned by account/);
+  });
+
+  // [BUG-661] Break test on INSERT path: even when no existing row exists,
+  // the ownership check immediately before INSERT must block when
+  // (profileId, accountId) doesn't link in profiles.
+  it('throws on INSERT path when profile is not owned by account [BUG-661]', async () => {
+    // findFirstResult undefined → no existing row → INSERT path
+    // selectResult: [] → ownership pre-check fails
+    const db = createMockDb({
+      findFirstResult: undefined,
+      selectResult: [{ id: profileId }],
+    });
+    // First select (verifyProfileOwnership at top) returns the profile,
+    // second select (pre-insert ownership check) returns empty.
+    let callCount = 0;
+    (db.select as jest.Mock).mockImplementation(() => {
+      callCount++;
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest
+            .fn()
+            .mockResolvedValue(callCount === 1 ? [{ id: profileId }] : []),
+        }),
+      };
+    });
+
+    await expect(
+      upsertNotificationPrefs(db, profileId, TEST_ACCOUNT_ID, {
+        reviewReminders: true,
+        dailyReminders: false,
+        pushEnabled: false,
+      }),
+    ).rejects.toThrow(/not owned by account/);
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 

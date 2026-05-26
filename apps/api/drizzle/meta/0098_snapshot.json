@@ -1,5 +1,5 @@
 {
-  "id": "27eac74f-08bf-466f-9bc7-c6a827c2ce73",
+  "id": "291ddfc3-7534-45d0-8eab-caf68f4fe865",
   "prevId": "1000a9b4-1235-4c16-8277-ad6dd7d19205",
   "version": "7",
   "dialect": "postgresql",
@@ -1749,13 +1749,6 @@
         },
         "resend_count": {
           "name": "resend_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "recipient_change_count": {
-          "name": "recipient_change_count",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

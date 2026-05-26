@@ -538,7 +538,13 @@ export async function requestConsent(
                 updatedAt: sql`now()`,
               },
         )
-        .where(eq(consentStates.id, row.id));
+        // [BUG-660] profile-scoped rollback (matches the scoped upsert above).
+        .where(
+          and(
+            eq(consentStates.id, row.id),
+            eq(consentStates.profileId, row.profileId),
+          ),
+        );
     } catch (rollbackError) {
       // If rollback fails we still throw the delivery error — losing one
       // counter slot is better than silently claiming the email was sent.
@@ -646,7 +652,13 @@ export async function resendConsent(
           resendCount: sql`GREATEST(${consentStates.resendCount} - 1, 0)`,
           updatedAt: sql`now()`,
         })
-        .where(eq(consentStates.id, row.id));
+        // [BUG-660] profile-scoped rollback (matches the scoped update above).
+        .where(
+          and(
+            eq(consentStates.id, row.id),
+            eq(consentStates.profileId, row.profileId),
+          ),
+        );
     } catch {
       // best-effort rollback
     }
@@ -680,6 +692,12 @@ export async function resendConsent(
     }
 
     // Roll back the resend counter — don't burn attempts when email fails.
+    // Use GREATEST to avoid negative values on initial insert (resendCount=0).
+    // [BUG-660 / FCR-2026-05-23-L3.L3.1] Include profileId in WHERE as
+    // defense-in-depth: the preceding upsert was profile-scoped, so this
+    // rollback must be profile-scoped too. Without the explicit profileId
+    // guard, a stale/wrong row.id could affect an unrelated profile's
+    // consent record.
     try {
       await db
         .update(consentStates)
@@ -687,7 +705,12 @@ export async function resendConsent(
           resendCount: sql`GREATEST(${consentStates.resendCount} - 1, 0)`,
           updatedAt: sql`now()`,
         })
-        .where(eq(consentStates.id, row.id));
+        .where(
+          and(
+            eq(consentStates.id, row.id),
+            eq(consentStates.profileId, row.profileId),
+          ),
+        );
     } catch (rollbackError) {
       logger.warn('[consent] Failed to rollback resend counter', {
         error:

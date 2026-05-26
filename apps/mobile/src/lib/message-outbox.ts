@@ -222,23 +222,64 @@ export async function deletePermanentlyFailed(
   });
 }
 
+/**
+ * [BUG-635] Per-(profileId, flow) drain-in-flight singleton.
+ *
+ * `drain()` reads `listPending()` then iterates, calling the handler outside
+ * the storage lock. Without a singleton guard, two concurrent `drain()` calls
+ * (e.g. provider remount + manual retry) both observe the same pending list
+ * and both invoke the handler for every entry — duplicate replays to the
+ * server, double counting of attempts, etc.
+ *
+ * We cannot wrap the entire drain body in `withLock` because mutation
+ * helpers inside the handler (`beginAttempt`, `recordFailure`, `markConfirmed`)
+ * also acquire the same lock — `withLock` is non-reentrant, that would
+ * deadlock. A separate in-flight set restricted to drain is the smallest
+ * correct fix: serialise drain calls per key without blocking the per-entry
+ * mutations that drain itself performs.
+ *
+ * Concurrent drain attempts for the same key resolve immediately with `0`
+ * (no work done — the caller's "is anything pending?" question is implicitly
+ * "no, the other drain is processing them").
+ *
+ * Exported for tests only.
+ */
+const _drainInFlight = new Set<string>();
+
+/** @internal — exposed for tests. */
+export function _isDrainInFlight(key: string): boolean {
+  return _drainInFlight.has(key);
+}
+
 export async function drain(
   profileId: string,
   flow: OutboxFlow,
   handler: (entry: OutboxEntry) => Promise<void>,
 ): Promise<number> {
-  const entries = await listPending(profileId, flow);
-  for (const entry of entries) {
-    try {
-      await handler(entry);
-    } catch {
-      // Handler errors are non-fatal — continue draining remaining entries.
-      // Callers that need per-entry error handling (e.g. recordFailure + Sentry)
-      // should catch inside their handler; this catch prevents a single throw
-      // from aborting the entire drain loop.
-    }
+  const key = storageKey(profileId, flow);
+  if (_drainInFlight.has(key)) {
+    // Another drain is already processing this key. Returning 0 prevents the
+    // double-handler footgun where two drains both see the same pending
+    // entries and both invoke `handler(entry)` for every one of them.
+    return 0;
   }
-  return entries.length;
+  _drainInFlight.add(key);
+  try {
+    const entries = await listPending(profileId, flow);
+    for (const entry of entries) {
+      try {
+        await handler(entry);
+      } catch {
+        // Handler errors are non-fatal — continue draining remaining entries.
+        // Callers that need per-entry error handling (e.g. recordFailure + Sentry)
+        // should catch inside their handler; this catch prevents a single throw
+        // from aborting the entire drain loop.
+      }
+    }
+    return entries.length;
+  } finally {
+    _drainInFlight.delete(key);
+  }
 }
 
 export async function escalate(

@@ -1,5 +1,7 @@
 # AGENTS.md ↔ CLAUDE.md merge plan
 
+> **Status (2026-05-25):** ~25% complete. Only the **Profile Shapes** section has been backported from `CLAUDE.md` into `AGENTS.md`. ~14 of 15 RECOVER sections are still missing from `AGENTS.md` (safeSend, Challenge Round mastery, GC1/GC6 details, expanded PR Review protocol, etc.). `diff AGENTS.md CLAUDE.md` is **318 lines**. No `scripts/sync-agent-docs.mjs` exists (the failed prototype was rolled back as planned). **Resume here:** pick the next RECOVER section by priority order in the plan body (suggest safeSend or GC1/GC6 next — both are referenced by active workflows), backport into `AGENTS.md`, re-run `diff` to confirm convergence on that section, then loop. Choose a sync strategy (hand-maintained vs. resurrected script) only after the content merge is complete.
+
 **Status:** Open — follow-up from PR #412 (`worktree-rules`).
 **Trigger memory:** `.claude/memory/project_agent_doc_and_memory_architecture_revisit.md`.
 

@@ -938,6 +938,55 @@ export async function getSession(
   return row ? mapSessionRow(row) : null;
 }
 
+export async function persistSessionMetadata(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  partial: Partial<SessionMetadata>,
+): Promise<LearningSession | null> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+
+    if (!current) return null;
+
+    const nextMetadata: Record<string, unknown> = {
+      ...((current.metadata as Record<string, unknown> | null) ?? {}),
+    };
+    for (const [key, value] of Object.entries(
+      partial as Record<string, unknown>,
+    )) {
+      if (value === undefined) {
+        delete nextMetadata[key];
+      } else {
+        nextMetadata[key] = value;
+      }
+    }
+
+    const [row] = await tx
+      .update(learningSessions)
+      .set({ metadata: nextMetadata, updatedAt: new Date() })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .returning();
+
+    return row ? mapSessionRow(row) : null;
+  });
+}
+
 export async function clearContinuationDepth(
   db: Database,
   profileId: string,

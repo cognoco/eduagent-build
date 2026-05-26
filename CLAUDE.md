@@ -40,7 +40,7 @@ This repo overrides specific upstream skills. Use the repo version, not the upst
 | `superpowers:using-git-worktrees` | `.claude/skills/worktree-setup/SKILL.md` | Canonical placement at `.worktrees/`; adds `pnpm install` + `pnpm env:sync` |
 | `EnterWorktree` (Claude Code built-in) | `.claude/skills/worktree-setup/SKILL.md` | Same reason; built-in default `.claude/worktrees/` is wrong for this repo |
 | `superpowers:finishing-a-development-branch` | `/commit` skill (commit + push); manual PR creation via `gh pr create` | This repo has an opinionated PR/push flow via `/commit`; the superpowers menu would create competing guidance |
-| `superpowers:writing-plans` | Native plan mode + the Planning Discipline section below | The superpowers skill's rigid TDD-step template fits greenfield feature work; this repo's plans are a mix of feature work, migrations, audits, and refactors |
+| `superpowers:writing-plans` | `.claude/skills/writing-plans/SKILL.md` | Repo-local, profile-aware planner (embryo of a global ZDX planner) — keeps the useful mechanics (naming, location, file-map-first, self-review) and drops the upstream's prescriptive 5-step TDD template that degrades frontier-model planning |
 
 ## Skill Authoring
 

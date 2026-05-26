@@ -286,7 +286,7 @@ const challengeRoundUiHintSchema = z.preprocess(
     .optional(),
 );
 
-const noteDraftUiHintSchema = z.preprocess(
+export const noteDraftUiHintSchema = z.preprocess(
   optionalObjectInput,
   z
     .object({
@@ -299,6 +299,9 @@ const noteDraftUiHintSchema = z.preprocess(
     })
     .optional(),
 );
+export type ChallengeRoundNoteDraftHint = NonNullable<
+  z.infer<typeof noteDraftUiHintSchema>
+>;
 
 const uiHintsSchema = z.preprocess(
   optionalObjectInput,

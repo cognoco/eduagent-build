@@ -824,6 +824,78 @@ describe('consent routes', () => {
       );
       expect(otherIp.status).toBe(200);
     });
+
+    // [BUG-648 / FCR-2026-05-23-L2.M2.5] Break test: an attacker rotating the
+    // proxy chain in X-Forwarded-For must NOT escape the per-IP bucket. The
+    // pre-fix implementation used the entire XFF header as the bucket key, so
+    // each unique chain would land in its own bucket. With the fix,
+    // resolveRateLimitIp parses the leftmost token, so all rotations from the
+    // same client IP share one bucket.
+    it('rate-limits the same source IP across rotating X-Forwarded-For chains [BUG-648]', async () => {
+      const { __resetConsentRespondRateLimit } = jest.requireActual(
+        './consent',
+      ) as { __resetConsentRespondRateLimit: () => void };
+      __resetConsentRespondRateLimit();
+
+      const { processConsentResponse: mockProcess } = jest.requireMock(
+        '../services/consent',
+      ) as { processConsentResponse: jest.Mock };
+      mockProcess.mockResolvedValue(undefined);
+
+      const clientIp = '203.0.113.50';
+      const body = JSON.stringify({ token: 't', approved: true });
+
+      // Send 30 attempts, each with a DIFFERENT proxy chain but the SAME
+      // originating client IP. Pre-fix: each chain hashes to its own bucket
+      // and all 30 pass. Post-fix: all 30 land in the bucket keyed by
+      // `clientIp` and the 31st is blocked.
+      for (let i = 0; i < 30; i++) {
+        const xff = `${clientIp}, 10.0.0.${i}, 10.0.1.${i}`;
+        const res = await app.request(
+          '/v1/consent/respond',
+          {
+            method: 'POST',
+            headers: { ...AUTH_HEADERS, 'x-forwarded-for': xff },
+            body,
+          },
+          TEST_ENV,
+        );
+        expect(res.status).toBe(200);
+      }
+
+      // 31st attempt from the same client IP — different chain again — must
+      // be blocked. Without the fix this returns 200.
+      const blocked = await app.request(
+        '/v1/consent/respond',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'x-forwarded-for': `${clientIp}, 10.0.0.99, 10.0.1.99`,
+          },
+          body,
+        },
+        TEST_ENV,
+      );
+      expect(blocked.status).toBe(429);
+    });
+
+    // [BUG-648] Direct unit test for the parser to lock down the contract.
+    it('resolveRateLimitIp prefers cf-connecting-ip, then leftmost XFF token [BUG-648]', () => {
+      const { resolveRateLimitIp } = jest.requireActual('./consent') as {
+        resolveRateLimitIp: (
+          cf: string | null | undefined,
+          xff: string | null | undefined,
+        ) => string;
+      };
+      expect(resolveRateLimitIp('1.2.3.4', '5.6.7.8, 9.9.9.9')).toBe('1.2.3.4');
+      expect(resolveRateLimitIp(undefined, '5.6.7.8, 9.9.9.9')).toBe('5.6.7.8');
+      expect(resolveRateLimitIp(undefined, '  5.6.7.8 , 9.9.9.9 ')).toBe(
+        '5.6.7.8',
+      );
+      expect(resolveRateLimitIp(null, null)).toBe('unknown');
+      expect(resolveRateLimitIp('', '')).toBe('unknown');
+    });
   });
 
   // -------------------------------------------------------------------------

@@ -251,8 +251,9 @@ export type TeachingPreferenceInput = z.infer<typeof teachingPreferenceSchema>;
 
 export const needsDeepeningSchema = z.object({
   topicId: z.string().uuid(),
-  status: z.enum(['active', 'resolved']),
+  status: z.enum(['active', 'pending_review', 'resolved']),
   consecutiveSuccessCount: z.number().int(),
+  pendingExpiresAt: isoDateField.nullable(),
 });
 export type NeedsDeepeningStatus = z.infer<typeof needsDeepeningSchema>;
 

@@ -106,6 +106,7 @@ import {
   sessionFilingResolvedObserve,
   filingAutoRetryAttemptedObserve,
 } from './functions/filing-observe';
+import { needsDeepeningExpirePending } from './functions/needs-deepening-expire-pending';
 
 export {
   inngest,
@@ -184,6 +185,7 @@ export {
   sessionTranscriptPurgeSkippedObserve,
   sessionFilingResolvedObserve,
   filingAutoRetryAttemptedObserve,
+  needsDeepeningExpirePending,
 };
 
 // All Inngest functions to register with the serve handler
@@ -264,4 +266,5 @@ export const functions = [
   sessionTranscriptPurgeSkippedObserve,
   sessionFilingResolvedObserve,
   filingAutoRetryAttemptedObserve,
+  needsDeepeningExpirePending,
 ];

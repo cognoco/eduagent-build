@@ -65,10 +65,12 @@ tags:
 - inputText: "I want to learn the basics"
 
 # 8. Tap send
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
-- pressKey: Enter
+# BUG-267 / BUG-35: pressKey: Enter does not reliably fire onSubmitEditing
+# in the WHPX dev-client build. send-button is covered by the keyboard on
+# Android — same hideKeyboard + tapOn pattern that seed-and-sign-in.yaml uses.
+- hideKeyboard
+- tapOn:
+    id: "send-button"
 
 # 9. AI responds (chat input re-enabled after streaming)
 # M06 regression: 15s timeout catches Gemini hangs (FIX-01: no AbortSignal).

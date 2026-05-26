@@ -34,6 +34,7 @@ import { routeAndCall } from '../services/llm';
 import { captureException } from '../services/sentry';
 import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
+import { safeSend } from '../services/safe-non-core';
 
 const logger = createLogger();
 
@@ -169,26 +170,20 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       });
       // Fire async retry for freeform/homework sessions
       if (sessionTranscript && body.sessionId) {
-        await inngest
-          .send({
-            name: 'app/filing.retry',
-            data: {
-              profileId,
-              sessionId: body.sessionId,
-              sessionTranscript,
-              sessionMode: body.sessionMode ?? 'freeform',
-            },
-          })
-          .catch((retryErr) => {
-            captureException(retryErr, {
-              profileId,
-              extra: {
-                event: 'app/filing.retry',
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/filing.retry',
+              data: {
+                profileId,
                 sessionId: body.sessionId,
-                phase: 'fileToLibrary',
+                sessionTranscript,
+                sessionMode: body.sessionMode ?? 'freeform',
               },
-            });
-          });
+            }),
+          'filing.retry.fileToLibrary',
+          { profileId, sessionId: body.sessionId },
+        );
       }
       // [BUG-871] Pre-session fallback: when the LLM filing call fails we
       // forward the user's `selectedSuggestion` so the fallback book is
@@ -244,26 +239,20 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       // Without this guard, two app/filing.retry events fire for the same
       // sessionId, causing duplicate topic rows + ghost filing.completed events.
       if (!usedFallback && sessionTranscript && body.sessionId) {
-        await inngest
-          .send({
-            name: 'app/filing.retry',
-            data: {
-              profileId,
-              sessionId: body.sessionId,
-              sessionTranscript,
-              sessionMode: body.sessionMode ?? 'freeform',
-            },
-          })
-          .catch((retryErr) => {
-            captureException(retryErr, {
-              profileId,
-              extra: {
-                event: 'app/filing.retry',
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/filing.retry',
+              data: {
+                profileId,
                 sessionId: body.sessionId,
-                phase: 'resolveFilingResult',
+                sessionTranscript,
+                sessionMode: body.sessionMode ?? 'freeform',
               },
-            });
-          });
+            }),
+          'filing.retry.resolveFilingResult',
+          { profileId, sessionId: body.sessionId },
+        );
       }
       return c.json(
         {

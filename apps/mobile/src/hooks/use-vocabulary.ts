@@ -37,6 +37,7 @@ export function useVocabulary(subjectId: string) {
 export function useCreateVocabulary(subjectId: string) {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input: VocabularyCreateInput) => {
@@ -49,7 +50,15 @@ export function useCreateVocabulary(subjectId: string) {
       return data.vocabulary;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.vocabulary.subject(activeProfile?.id, subjectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.languageProgress.subject(
+          activeProfile?.id,
+          subjectId,
+        ),
+      });
     },
   });
 }
@@ -57,6 +66,7 @@ export function useCreateVocabulary(subjectId: string) {
 export function useReviewVocabulary(subjectId: string) {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async ({
@@ -75,14 +85,22 @@ export function useReviewVocabulary(subjectId: string) {
       await assertOk(res);
       return res.json();
     },
+    // [BUG-535] Profile-scoped, subject-scoped invalidation. The previous
+    // bare ['vocabulary'] / ['language-progress'] keys matched every profile's
+    // cached entry on a shared device — broad-prefix matching crossed account
+    // boundaries and ratcheted excess network. Use the canonical typed keys
+    // from query-keys.ts so invalidation targets only the active profile's
+    // cache entry for `subjectId`.
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
-      // PR-10 deferred: broad ['language-progress'] — review affects the per-subject
-      // language progress for `subjectId`, which maps to
-      // queryKeys.languageProgress.subject(activeProfileId, subjectId). But
-      // activeProfileId is not available here (useReviewVocabulary does not call
-      // useProfile). Keep broad until a workflow test proves the precise key.
-      void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.vocabulary.subject(activeProfile?.id, subjectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.languageProgress.subject(
+          activeProfile?.id,
+          subjectId,
+        ),
+      });
     },
   });
 }
@@ -90,6 +108,7 @@ export function useReviewVocabulary(subjectId: string) {
 export function useDeleteVocabulary(subjectId: string) {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (vocabularyId: string) => {
@@ -100,11 +119,17 @@ export function useDeleteVocabulary(subjectId: string) {
       });
       await assertOk(res);
     },
+    // [BUG-535] See useReviewVocabulary above — same profile-scoping fix.
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
-      // PR-10 deferred: broad ['language-progress'] — same reason as
-      // useReviewVocabulary above: activeProfileId not in scope here.
-      void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.vocabulary.subject(activeProfile?.id, subjectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.languageProgress.subject(
+          activeProfile?.id,
+          subjectId,
+        ),
+      });
     },
   });
 }
