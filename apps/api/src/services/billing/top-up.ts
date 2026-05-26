@@ -4,11 +4,13 @@
 
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import {
+  profiles,
   topUpCredits,
   type Database,
   findSubscriptionById__unscoped,
   findTopUpByTransactionId__unscoped,
 } from '@eduagent/database';
+import { getTierConfig } from '../subscription';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -17,6 +19,7 @@ import {
 export interface TopUpCreditRow {
   id: string;
   subscriptionId: string;
+  profileId: string | null;
   amount: number;
   remaining: number;
   purchasedAt: string;
@@ -35,6 +38,7 @@ function mapTopUpCreditRow(
   return {
     id: row.id,
     subscriptionId: row.subscriptionId,
+    profileId: row.profileId,
     amount: row.amount,
     remaining: row.remaining,
     purchasedAt: row.purchasedAt.toISOString(),
@@ -56,19 +60,23 @@ export async function getTopUpCreditsRemaining(
   db: Database,
   subscriptionId: string,
   now: Date = new Date(),
+  profileId?: string,
 ): Promise<number> {
+  const filters = [
+    eq(topUpCredits.subscriptionId, subscriptionId),
+    sql`${topUpCredits.remaining} > 0`,
+    sql`${topUpCredits.expiresAt} > ${now}`,
+  ];
+  if (profileId) {
+    filters.push(eq(topUpCredits.profileId, profileId));
+  }
+
   const result = await db
     .select({
       total: sql<number>`COALESCE(SUM(${topUpCredits.remaining}), 0)::int`,
     })
     .from(topUpCredits)
-    .where(
-      and(
-        eq(topUpCredits.subscriptionId, subscriptionId),
-        sql`${topUpCredits.remaining} > 0`,
-        sql`${topUpCredits.expiresAt} > ${now}`,
-      ),
-    );
+    .where(and(...filters));
 
   return result[0]?.total ?? 0;
 }
@@ -107,6 +115,7 @@ export async function purchaseTopUpCredits(
   amount: number,
   now: Date = new Date(),
   transactionId?: string,
+  profileId?: string,
 ): Promise<TopUpCreditRow | null> {
   // Verify subscription exists and tier is eligible
   // safe-caller: RevenueCat IPN webhook — authenticated by signed IPN payload; subscriptionId from verified payload
@@ -114,6 +123,19 @@ export async function purchaseTopUpCredits(
 
   if (!sub || sub.tier === 'free') {
     return null;
+  }
+
+  const quotaModel = getTierConfig(sub.tier).quotaModel;
+  let buyerProfileId: string | null = profileId ?? null;
+  if (quotaModel === 'per-profile' && !buyerProfileId) {
+    const owner = await db.query.profiles.findFirst({
+      where: and(
+        eq(profiles.accountId, sub.accountId),
+        eq(profiles.isOwner, true),
+      ),
+      columns: { id: true },
+    });
+    buyerProfileId = owner?.id ?? null;
   }
 
   const expiresAt = new Date(now);
@@ -127,6 +149,7 @@ export async function purchaseTopUpCredits(
       .insert(topUpCredits)
       .values({
         subscriptionId,
+        profileId: quotaModel === 'per-profile' ? buyerProfileId : null,
         amount,
         remaining: amount,
         purchasedAt: now,
@@ -153,6 +176,7 @@ export async function purchaseTopUpCredits(
     .insert(topUpCredits)
     .values({
       subscriptionId,
+      profileId: quotaModel === 'per-profile' ? buyerProfileId : null,
       amount,
       remaining: amount,
       purchasedAt: now,

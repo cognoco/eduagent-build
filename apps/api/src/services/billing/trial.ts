@@ -6,6 +6,7 @@ import { and, eq, gte, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import {
   subscriptions,
   quotaPools,
+  profileQuotaUsage,
   type Database,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
@@ -89,7 +90,7 @@ export async function resetDailyQuotas(
   db: Database,
   now: Date,
 ): Promise<number> {
-  const result = await db
+  const poolResult = await db
     .update(quotaPools)
     .set({
       usedToday: 0,
@@ -98,7 +99,16 @@ export async function resetDailyQuotas(
     .where(sql`${quotaPools.usedToday} > 0`)
     .returning();
 
-  return result.length;
+  const profileResult = await db
+    .update(profileQuotaUsage)
+    .set({
+      usedToday: 0,
+      updatedAt: now,
+    })
+    .where(sql`${profileQuotaUsage.usedToday} > 0`)
+    .returning();
+
+  return poolResult.length + profileResult.length;
 }
 
 /**
@@ -144,7 +154,18 @@ export async function resetExpiredQuotaCycles(
       AND qp.cycle_reset_at <= ${now}
   `);
 
-  return result.rowCount ?? 0;
+  const profileResult = await db
+    .update(profileQuotaUsage)
+    .set({
+      usedThisMonth: 0,
+      usedToday: 0,
+      cycleResetAt: sql`${profileQuotaUsage.cycleResetAt} + INTERVAL '1 month'`,
+      updatedAt: now,
+    })
+    .where(sql`${profileQuotaUsage.cycleResetAt} <= ${now}`)
+    .returning();
+
+  return (result.rowCount ?? 0) + profileResult.length;
 }
 
 // ---------------------------------------------------------------------------

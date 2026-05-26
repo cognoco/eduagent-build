@@ -87,6 +87,8 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockGetSubscriptionByAccountId = jest.fn();
 const mockEnsureFreeSubscription = jest.fn();
+const mockGetEffectiveAccessForSubscription = jest.fn();
+const mockGetOrProvisionProfileQuotaUsage = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockLinkStripeCustomer = jest.fn();
 const mockAddToByokWaitlist = jest.fn().mockResolvedValue(undefined);
@@ -120,6 +122,10 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       mockGetSubscriptionByAccountId(...args),
     ensureFreeSubscription: (...args: unknown[]) =>
       mockEnsureFreeSubscription(...args),
+    getEffectiveAccessForSubscription: (...args: unknown[]) =>
+      mockGetEffectiveAccessForSubscription(...args),
+    getOrProvisionProfileQuotaUsage: (...args: unknown[]) =>
+      mockGetOrProvisionProfileQuotaUsage(...args),
     getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
     linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
     addToByokWaitlist: (...args: unknown[]) => mockAddToByokWaitlist(...args),
@@ -268,6 +274,30 @@ function mockQuotaPool(overrides?: Record<string, unknown>) {
   };
 }
 
+function mockEffectiveAccess(overrides?: Record<string, unknown>) {
+  return {
+    subscription: mockSubscription(),
+    effectiveAccessTier: 'plus',
+    billingAccess: 'current',
+    ...overrides,
+  };
+}
+
+function mockProfileQuota(overrides?: Record<string, unknown>) {
+  return {
+    id: 'pqu-1',
+    subscriptionId: 'sub-1',
+    profileId: 'test-profile-id',
+    role: 'owner',
+    monthlyLimit: 500,
+    usedThisMonth: 42,
+    dailyLimit: null,
+    usedToday: 0,
+    cycleResetAt: '2025-02-15T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 beforeAll(() => {
   installTestJwksInterceptor();
 });
@@ -280,6 +310,10 @@ beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
   mockGetSubscriptionByAccountId.mockResolvedValue(null);
+  mockGetEffectiveAccessForSubscription.mockResolvedValue(
+    mockEffectiveAccess(),
+  );
+  mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(mockProfileQuota());
   mockGetQuotaPool.mockResolvedValue(null);
   mockLinkStripeCustomer.mockResolvedValue(null);
   mockReadSubscriptionStatus.mockResolvedValue(null);
@@ -689,6 +723,9 @@ describe('billing routes', () => {
 
     it('returns real usage data when subscription exists', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({ usedThisMonth: 450 }),
+      );
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
       mockGetUsageBreakdownForProfile.mockResolvedValue({
         byProfile: [],
@@ -732,6 +769,12 @@ describe('billing routes', () => {
       });
       mockGetSubscriptionByAccountId.mockResolvedValue(
         mockSubscription({ tier: 'family' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          subscription: mockSubscription({ tier: 'family' }),
+          effectiveAccessTier: 'family',
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
       mockGetUsageBreakdownForProfile.mockResolvedValue({
@@ -870,6 +913,93 @@ describe('billing routes', () => {
       expect(body.status.status).toBe('active');
       expect(body.status.monthlyLimit).toBe(500);
       expect(body.status.usedThisMonth).toBe(42);
+      expect(mockGetOrProvisionProfileQuotaUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+        { tier: 'plus' },
+      );
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+    });
+
+    it('returns shared-pool cached status without hitting the DB', async () => {
+      const fakeKv = {} as unknown;
+      mockReadSubscriptionStatus.mockResolvedValueOnce({
+        subscriptionId: 'sub-family',
+        tier: 'family',
+        effectiveAccessTier: 'family',
+        billingAccess: 'current',
+        status: 'active',
+        monthlyLimit: 1500,
+        usedThisMonth: 123,
+        dailyLimit: null,
+        usedToday: 0,
+      });
+
+      const res = await app.request(
+        '/v1/subscription/status',
+        { headers: AUTH_HEADERS },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKv },
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toMatchObject({
+        tier: 'family',
+        effectiveAccessTier: 'family',
+        billingAccess: 'current',
+        monthlyLimit: 1500,
+        usedThisMonth: 123,
+      });
+      expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
+    });
+
+    it('ignores per-profile cached status and reads the active profile quota', async () => {
+      const fakeKv = {} as unknown;
+      mockReadSubscriptionStatus.mockResolvedValueOnce({
+        subscriptionId: 'sub-1',
+        tier: 'plus',
+        effectiveAccessTier: 'plus',
+        billingAccess: 'current',
+        status: 'active',
+        monthlyLimit: 999,
+        usedThisMonth: 888,
+        dailyLimit: null,
+        usedToday: 0,
+      });
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          monthlyLimit: 700,
+          usedThisMonth: 12,
+        }),
+      );
+
+      const res = await app.request(
+        '/v1/subscription/status',
+        { headers: AUTH_HEADERS },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKv },
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.status).toMatchObject({
+        tier: 'plus',
+        effectiveAccessTier: 'plus',
+        billingAccess: 'current',
+        monthlyLimit: 700,
+        usedThisMonth: 12,
+      });
+      expect(mockGetSubscriptionByAccountId).toHaveBeenCalled();
+      expect(mockGetOrProvisionProfileQuotaUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+        { tier: 'plus' },
+      );
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
     it('returns 401 without auth header', async () => {
@@ -898,7 +1028,7 @@ describe('billing routes', () => {
       // Without the try/catch the unhandled rejection bubbles → 500.
       expect(res.status).toBe(200);
       const body = await res.json();
-      // DB fallback wins — values come from mockSubscription + mockQuotaPool.
+      // DB fallback wins — values come from the active profile quota row.
       expect(body.status.tier).toBe('plus');
       expect(body.status.status).toBe('active');
       expect(body.status.monthlyLimit).toBe(500);

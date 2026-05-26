@@ -50,7 +50,7 @@ describe('Integration: GET /v1/profiles', () => {
           email: PROFILE_USER.email,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -85,7 +85,7 @@ describe('Integration: GET /v1/profiles', () => {
           'Content-Type': 'application/json',
         },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -131,7 +131,7 @@ describe('Integration: POST /v1/profiles', () => {
         }),
         body: JSON.stringify({ birthYear: 2014 }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -145,6 +145,13 @@ describe('Integration: POST /v1/profiles', () => {
       displayName: 'Owner',
       birthYear: 2000,
     });
+    await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: PROFILE_USER,
+      displayName: 'Second Profile',
+      birthYear: 2010,
+    });
 
     const res = await app.request(
       '/v1/profiles',
@@ -155,11 +162,11 @@ describe('Integration: POST /v1/profiles', () => {
           email: PROFILE_USER.email,
         }),
         body: JSON.stringify({
-          displayName: 'Second Profile',
-          birthYear: 2010,
+          displayName: 'Third Profile',
+          birthYear: 2012,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(402);
@@ -181,7 +188,7 @@ describe('Integration: POST /v1/profiles', () => {
           displayName: 'Missing Birth Year',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -202,7 +209,7 @@ describe('Integration: POST /v1/profiles', () => {
           birthYear: null,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -229,7 +236,7 @@ describe('Integration: GET /v1/profiles/:id', () => {
           email: PROFILE_USER.email,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -262,7 +269,7 @@ describe('Integration: PATCH /v1/profiles/:id', () => {
         }),
         body: JSON.stringify({ displayName: 'Updated Name' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -292,7 +299,7 @@ describe('Integration: PATCH /v1/profiles/:id', () => {
         }),
         body: JSON.stringify({ avatarUrl: 'not-a-url' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -319,7 +326,7 @@ describe('Integration: POST /v1/profiles/switch', () => {
         }),
         body: JSON.stringify({ profileId: created.id }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -341,7 +348,7 @@ describe('Integration: POST /v1/profiles/switch', () => {
         }),
         body: JSON.stringify({ profileId: 'not-a-uuid' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);

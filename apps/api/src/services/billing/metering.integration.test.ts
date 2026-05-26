@@ -8,9 +8,11 @@
  * Each test seeds its own data and cleans up in beforeEach / afterAll.
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
+  profileQuotaUsage,
+  profiles,
   quotaPools,
   subscriptions,
   topUpCredits,
@@ -22,6 +24,7 @@ import { resolve } from 'path';
 import {
   decrementQuota,
   incrementQuota,
+  MeteringError,
   type DecrementResult,
 } from '../billing';
 import { getTierConfig } from '../subscription';
@@ -82,6 +85,8 @@ async function seedAccount(index: number) {
 async function seedSubscriptionWithQuota(input: {
   accountId: string;
   tier?: 'free' | 'plus' | 'family' | 'pro';
+  status?: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  currentPeriodEnd?: Date | null;
   monthlyLimit?: number;
   usedThisMonth?: number;
   dailyLimit?: number | null;
@@ -96,9 +101,12 @@ async function seedSubscriptionWithQuota(input: {
     .values({
       accountId: input.accountId,
       tier,
-      status: 'active',
+      status: input.status ?? 'active',
       currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
+      currentPeriodEnd:
+        input.currentPeriodEnd === undefined
+          ? new Date('2026-05-01T00:00:00.000Z')
+          : input.currentPeriodEnd,
     })
     .returning();
 
@@ -122,6 +130,7 @@ async function seedSubscriptionWithQuota(input: {
 
 async function seedTopUpCredit(input: {
   subscriptionId: string;
+  profileId?: string | null;
   amount: number;
   remaining?: number;
   expiresAt?: Date;
@@ -131,6 +140,7 @@ async function seedTopUpCredit(input: {
     .insert(topUpCredits)
     .values({
       subscriptionId: input.subscriptionId,
+      profileId: input.profileId ?? null,
       amount: input.amount,
       remaining: input.remaining ?? input.amount,
       purchasedAt: new Date('2026-04-01T00:00:00.000Z'),
@@ -140,10 +150,65 @@ async function seedTopUpCredit(input: {
   return row!;
 }
 
+async function seedProfile(input: {
+  accountId: string;
+  displayName: string;
+  isOwner: boolean;
+}) {
+  const db = createIntegrationDb();
+  const [row] = await db
+    .insert(profiles)
+    .values({
+      accountId: input.accountId,
+      displayName: input.displayName,
+      birthYear: input.isOwner ? 1990 : 2016,
+      isOwner: input.isOwner,
+    })
+    .returning();
+  return row!;
+}
+
+async function seedProfileQuota(input: {
+  subscriptionId: string;
+  profileId: string;
+  role: 'owner' | 'child';
+  monthlyLimit: number;
+  usedThisMonth?: number;
+  dailyLimit?: number | null;
+  usedToday?: number;
+  cycleResetAt?: Date;
+}) {
+  const db = createIntegrationDb();
+  const [row] = await db
+    .insert(profileQuotaUsage)
+    .values({
+      subscriptionId: input.subscriptionId,
+      profileId: input.profileId,
+      role: input.role,
+      monthlyLimit: input.monthlyLimit,
+      usedThisMonth: input.usedThisMonth ?? 0,
+      dailyLimit: input.dailyLimit ?? null,
+      usedToday: input.usedToday ?? 0,
+      cycleResetAt: input.cycleResetAt ?? new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
+  return row!;
+}
+
 async function loadQuotaPool(subscriptionId: string) {
   const db = createIntegrationDb();
   return db.query.quotaPools.findFirst({
     where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+}
+
+async function loadProfileQuota(subscriptionId: string, profileId: string) {
+  const db = createIntegrationDb();
+  return db.query.profileQuotaUsage.findFirst({
+    where: and(
+      eq(profileQuotaUsage.subscriptionId, subscriptionId),
+      eq(profileQuotaUsage.profileId, profileId),
+    ),
   });
 }
 
@@ -190,7 +255,7 @@ describe('Quota metering (integration)', () => {
     const account = await seedAccount(0);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
+      tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 5,
       dailyLimit: null,
@@ -210,15 +275,14 @@ describe('Quota metering (integration)', () => {
   });
 
   it('enforces daily cap', async () => {
-    const freeTier = getTierConfig('free');
     const account = await seedAccount(1);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'free',
-      monthlyLimit: freeTier.monthlyQuota,
+      tier: 'family',
+      monthlyLimit: 100,
       usedThisMonth: 0,
-      dailyLimit: freeTier.dailyLimit,
-      usedToday: freeTier.dailyLimit!,
+      dailyLimit: 2,
+      usedToday: 2,
     });
 
     const result = await decrementQuota(
@@ -231,14 +295,14 @@ describe('Quota metering (integration)', () => {
     expect(result.source).toBe('daily_exceeded');
     expect(result.remainingDaily).toBe(0);
     // Usage counters must NOT have changed
-    expect(pool!.usedToday).toBe(freeTier.dailyLimit);
+    expect(pool!.usedToday).toBe(2);
   });
 
   it('falls back to top-up credits when monthly quota exhausted', async () => {
     const account = await seedAccount(2);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
+      tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 10,
       dailyLimit: null,
@@ -268,7 +332,7 @@ describe('Quota metering (integration)', () => {
     const account = await seedAccount(3);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
+      tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 0,
       usedToday: 0,
@@ -292,7 +356,7 @@ describe('Quota metering (integration)', () => {
     const account = await seedAccount(5);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
+      tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 10, // monthly exhausted — forces top-up path
       dailyLimit: 2,
@@ -337,7 +401,7 @@ describe('Quota metering (integration)', () => {
     const account = await seedAccount(6);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
+      tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 10, // monthly exhausted — forces top-up path
       dailyLimit: null,
@@ -390,7 +454,7 @@ describe('Quota metering (integration)', () => {
     const account = await seedAccount(7);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
+      tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 5,
       usedToday: 2,
@@ -416,14 +480,13 @@ describe('Quota metering (integration)', () => {
   // exhausted) AND a top-up is available. If the pool snapshot were re-read
   // outside the tx with usedToday=0 the test would instead return top_up.
   it('[BREAK CR-2026-05-19-M11] daily-cap discrimination uses in-transaction pool snapshot (cron-race safety)', async () => {
-    const freeTier = getTierConfig('free');
-    const dailyLimit = freeTier.dailyLimit!;
-    const monthlyLimit = freeTier.monthlyQuota;
+    const dailyLimit = 2;
+    const monthlyLimit = 10;
 
     const account = await seedAccount(0); // reuse slot 0 — cleaned in beforeEach
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'free',
+      tier: 'family',
       monthlyLimit,
       usedThisMonth: monthlyLimit, // monthly exhausted
       dailyLimit,
@@ -457,7 +520,7 @@ describe('Quota metering (integration)', () => {
     const account = await seedAccount(4);
     const seeded = await seedSubscriptionWithQuota({
       accountId: account.id,
-      tier: 'plus',
+      tier: 'family',
       monthlyLimit: 1,
       usedThisMonth: 0,
       dailyLimit: null,
@@ -480,5 +543,258 @@ describe('Quota metering (integration)', () => {
     // Verify the quota pool was only decremented once
     const pool = await loadQuotaPool(seeded.subscription.id);
     expect(pool!.usedThisMonth).toBe(1);
+  });
+
+  describe('per-profile quota model', () => {
+    it('requires a profileId for Free and Plus metering', async () => {
+      const account = await seedAccount(0);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+      });
+
+      await expect(
+        decrementQuota(createIntegrationDb(), seeded.subscription.id),
+      ).rejects.toBeInstanceOf(MeteringError);
+      await expect(
+        decrementQuota(createIntegrationDb(), seeded.subscription.id),
+      ).rejects.toMatchObject({ code: 'PROFILE_ID_REQUIRED' });
+    });
+
+    it('decrements owner and child rows independently', async () => {
+      const plusTier = getTierConfig('plus');
+      const account = await seedAccount(1);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+      });
+      const owner = await seedProfile({
+        accountId: account.id,
+        displayName: 'Owner',
+        isOwner: true,
+      });
+      const child = await seedProfile({
+        accountId: account.id,
+        displayName: 'Child',
+        isOwner: false,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: owner.id,
+        role: 'owner',
+        monthlyLimit: plusTier.ownerMonthlyQuota!,
+        dailyLimit: plusTier.ownerDailyQuota,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: child.id,
+        role: 'child',
+        monthlyLimit: plusTier.childMonthlyQuota!,
+        usedThisMonth: 3,
+        dailyLimit: plusTier.childDailyQuota,
+        usedToday: 2,
+      });
+
+      const ownerResult = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        owner.id,
+      );
+      const childResult = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        child.id,
+      );
+
+      expect(ownerResult).toMatchObject({
+        success: true,
+        source: 'monthly',
+        profileRole: 'owner',
+        remainingMonthly: plusTier.ownerMonthlyQuota! - 1,
+        remainingDaily: null,
+      });
+      expect(childResult).toMatchObject({
+        success: true,
+        source: 'monthly',
+        profileRole: 'child',
+        remainingMonthly: plusTier.childMonthlyQuota! - 4,
+        remainingDaily: plusTier.childDailyQuota! - 3,
+      });
+
+      const ownerQuota = await loadProfileQuota(
+        seeded.subscription.id,
+        owner.id,
+      );
+      const childQuota = await loadProfileQuota(
+        seeded.subscription.id,
+        child.id,
+      );
+      expect(ownerQuota!.usedThisMonth).toBe(1);
+      expect(ownerQuota!.usedToday).toBe(1);
+      expect(childQuota!.usedThisMonth).toBe(4);
+      expect(childQuota!.usedToday).toBe(3);
+    });
+
+    it('spends Plus top-ups only for the owner profile', async () => {
+      const plusTier = getTierConfig('plus');
+      const account = await seedAccount(2);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+      });
+      const owner = await seedProfile({
+        accountId: account.id,
+        displayName: 'Owner',
+        isOwner: true,
+      });
+      const child = await seedProfile({
+        accountId: account.id,
+        displayName: 'Child',
+        isOwner: false,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: owner.id,
+        role: 'owner',
+        monthlyLimit: plusTier.ownerMonthlyQuota!,
+        usedThisMonth: plusTier.ownerMonthlyQuota!,
+        dailyLimit: plusTier.ownerDailyQuota,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: child.id,
+        role: 'child',
+        monthlyLimit: plusTier.childMonthlyQuota!,
+        usedThisMonth: plusTier.childMonthlyQuota!,
+        dailyLimit: plusTier.childDailyQuota,
+      });
+      await seedTopUpCredit({
+        subscriptionId: seeded.subscription.id,
+        profileId: owner.id,
+        amount: 3,
+        remaining: 3,
+      });
+
+      const childResult = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        child.id,
+      );
+      const ownerResult = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        owner.id,
+      );
+
+      expect(childResult).toMatchObject({
+        success: false,
+        source: 'none',
+        profileRole: 'child',
+      });
+      expect(ownerResult).toMatchObject({
+        success: true,
+        source: 'top_up',
+        profileRole: 'owner',
+        remainingTopUp: 2,
+      });
+
+      const topUps = await loadTopUps(seeded.subscription.id);
+      expect(topUps[0]!.remaining).toBe(2);
+      const childQuota = await loadProfileQuota(
+        seeded.subscription.id,
+        child.id,
+      );
+      expect(childQuota!.usedThisMonth).toBe(plusTier.childMonthlyQuota);
+      expect(childQuota!.usedToday).toBe(0);
+    });
+
+    it('lazily provisions a missing child row and retries the decrement', async () => {
+      const plusTier = getTierConfig('plus');
+      const account = await seedAccount(3);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+      });
+      const child = await seedProfile({
+        accountId: account.id,
+        displayName: 'Child',
+        isOwner: false,
+      });
+
+      const result = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        child.id,
+      );
+
+      expect(result).toMatchObject({
+        success: true,
+        source: 'monthly',
+        profileRole: 'child',
+        remainingMonthly: plusTier.childMonthlyQuota! - 1,
+        remainingDaily: plusTier.childDailyQuota! - 1,
+      });
+      const childQuota = await loadProfileQuota(
+        seeded.subscription.id,
+        child.id,
+      );
+      expect(childQuota).toMatchObject({
+        role: 'child',
+        monthlyLimit: plusTier.childMonthlyQuota,
+        dailyLimit: plusTier.childDailyQuota,
+        usedThisMonth: 1,
+        usedToday: 1,
+      });
+    });
+
+    it('clamps stale Plus owner rows to Free caps while billing is past due', async () => {
+      const plusTier = getTierConfig('plus');
+      const freeTier = getTierConfig('free');
+      const account = await seedAccount(4);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+        status: 'past_due',
+      });
+      const owner = await seedProfile({
+        accountId: account.id,
+        displayName: 'Owner',
+        isOwner: true,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: owner.id,
+        role: 'owner',
+        monthlyLimit: plusTier.ownerMonthlyQuota!,
+        usedThisMonth: 99,
+        dailyLimit: plusTier.ownerDailyQuota,
+        usedToday: 0,
+      });
+
+      const result = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        owner.id,
+      );
+
+      expect(result).toMatchObject({
+        success: true,
+        source: 'monthly',
+        profileRole: 'owner',
+        monthlyLimit: freeTier.ownerMonthlyQuota,
+        remainingMonthly: 0,
+        remainingDaily: freeTier.ownerDailyQuota! - 1,
+      });
+      const ownerQuota = await loadProfileQuota(
+        seeded.subscription.id,
+        owner.id,
+      );
+      expect(ownerQuota).toMatchObject({
+        monthlyLimit: freeTier.ownerMonthlyQuota,
+        dailyLimit: freeTier.ownerDailyQuota,
+        usedThisMonth: 100,
+        usedToday: 1,
+      });
+    });
   });
 });

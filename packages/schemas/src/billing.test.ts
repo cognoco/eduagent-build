@@ -65,6 +65,8 @@ describe('subscriptionStatusSchema', () => {
 
 const validSubscription = {
   tier: 'free',
+  effectiveAccessTier: 'free',
+  billingAccess: 'current',
   status: 'active',
   trialEndsAt: null,
   currentPeriodEnd: ISO,
@@ -81,6 +83,8 @@ describe('subscriptionSchema', () => {
   it('accepts a valid free subscription', () => {
     const parsed = subscriptionSchema.parse(validSubscription);
     expect(parsed.tier).toBe('free');
+    expect(parsed.effectiveAccessTier).toBe('free');
+    expect(parsed.billingAccess).toBe('current');
     expect(parsed.trialEndsAt).toBeNull();
   });
 
@@ -445,6 +449,8 @@ describe('subscriptionStatusResponseSchema', () => {
     const parsed = subscriptionStatusResponseSchema.parse({
       status: {
         tier: 'plus',
+        effectiveAccessTier: 'plus',
+        billingAccess: 'current',
         status: 'active',
         monthlyLimit: 700,
         usedThisMonth: 50,
@@ -453,6 +459,8 @@ describe('subscriptionStatusResponseSchema', () => {
       },
     });
     expect(parsed.status.tier).toBe('plus');
+    expect(parsed.status.effectiveAccessTier).toBe('plus');
+    expect(parsed.status.billingAccess).toBe('current');
     expect(parsed.status.dailyLimit).toBeNull();
   });
 
@@ -562,7 +570,11 @@ describe('quotaExceededSchema', () => {
     message: 'You have exceeded your monthly quota',
     details: {
       tier: 'free',
+      effectiveAccessTier: 'free',
+      quotaModel: 'per-profile',
+      profileRole: 'child',
       reason: 'monthly',
+      resetsAt: ISO,
       monthlyLimit: 100,
       usedThisMonth: 100,
       dailyLimit: null,
@@ -576,6 +588,10 @@ describe('quotaExceededSchema', () => {
     const parsed = quotaExceededSchema.parse(validQuotaExceeded);
     expect(parsed.code).toBe('QUOTA_EXCEEDED');
     expect(parsed.details.reason).toBe('monthly');
+    expect(parsed.details.effectiveAccessTier).toBe('free');
+    expect(parsed.details.quotaModel).toBe('per-profile');
+    expect(parsed.details.profileRole).toBe('child');
+    expect(parsed.details.resetsAt).toBe(ISO);
   });
 
   it('accepts daily reason', () => {

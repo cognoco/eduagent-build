@@ -43,7 +43,12 @@ import {
   createPendingConsentState,
   createGrantedConsentState,
 } from './consent';
-import { getSubscriptionByAccountId, canAddProfile } from './billing';
+import {
+  canAddProfile,
+  ensureFreeSubscription,
+  getSubscriptionByAccountId,
+  provisionProfileQuotaUsage,
+} from './billing';
 
 export class ProfileLimitError extends Error {
   constructor() {
@@ -399,8 +404,8 @@ export async function createProfileWithLimitCheck(
     const isFirstProfile = profileCount === 0;
 
     // Enforce per-tier profile limits. First profile creation is always allowed.
+    let subscription = await getSubscriptionByAccountId(txDb, accountId);
     if (!isFirstProfile) {
-      const subscription = await getSubscriptionByAccountId(txDb, accountId);
       if (!subscription || !(await canAddProfile(txDb, subscription.id))) {
         throw new ProfileLimitError();
       }
@@ -457,13 +462,23 @@ export async function createProfileWithLimitCheck(
       }
     }
 
-    return createProfile(
+    const created = await createProfile(
       txDb,
       accountId,
       input,
       isFirstProfile,
       parentProfileId,
     );
+
+    subscription ??= await ensureFreeSubscription(txDb, accountId);
+    await provisionProfileQuotaUsage(
+      txDb,
+      subscription.id,
+      created.id,
+      created.isOwner ? 'owner' : 'child',
+    );
+
+    return created;
   });
 }
 

@@ -29,6 +29,7 @@ import {
   type QuotaPoolRow,
   type WebhookSubscriptionUpdate,
 } from './types';
+import { reconcileQuotaStateForSubscription } from './quota-reconcile';
 
 const logger = createLogger();
 
@@ -119,6 +120,7 @@ export async function createSubscription(
     usedToday: 0,
     cycleResetAt,
   });
+  await reconcileQuotaStateForSubscription(db, subRow.id, now);
 
   return mapSubscriptionRow(subRow);
 }
@@ -297,6 +299,10 @@ export async function updateSubscriptionFromWebhook(
       }
       throw new Error('Subscription webhook update did not return a row');
     }
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      updated.id,
+    );
     return { ...mapSubscriptionRow(updated), webhookApplied: true };
   });
 }
@@ -452,6 +458,7 @@ export async function ensureFreeSubscription(
         cycleResetAt,
       })
       .onConflictDoNothing({ target: quotaPools.subscriptionId });
+    await reconcileQuotaStateForSubscription(db, inserted.id, now);
     return mapSubscriptionRow(inserted);
   }
 
@@ -738,6 +745,10 @@ export async function activateSubscriptionFromCheckout(
               'Divergent-sub quota pool update did not return a row',
             );
 
+          await reconcileQuotaStateForSubscription(
+            tx as unknown as Database,
+            existing.id,
+          );
           return row;
         });
         await safeSend(
@@ -822,6 +833,10 @@ export async function activateSubscriptionFromCheckout(
 
     if (!quotaPool) throw new Error('Quota pool update did not return a row');
 
+    await reconcileQuotaStateForSubscription(
+      tx as unknown as Database,
+      existing.id,
+    );
     return row;
   });
 

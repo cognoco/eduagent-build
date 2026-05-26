@@ -1,4 +1,8 @@
-import { getTierConfig, isValidTransition } from './subscription';
+import {
+  getTierConfig,
+  isValidTransition,
+  resolveEffectiveAccessTier,
+} from './subscription';
 
 // ---------------------------------------------------------------------------
 // getTierConfig
@@ -10,8 +14,14 @@ describe('getTierConfig', () => {
 
     expect(config.monthlyQuota).toBe(100);
     expect(config.dailyLimit).toBe(10);
-    expect(config.maxProfiles).toBe(1);
-    expect(config.premiumModelProfiles).toBe(0);
+    expect(config.maxProfiles).toBe(2);
+    expect(config).toMatchObject({
+      quotaModel: 'per-profile',
+      ownerMonthlyQuota: 100,
+      ownerDailyQuota: 10,
+      childMonthlyQuota: 100,
+      childDailyQuota: 10,
+    });
     expect(config.llmTier).toBe('flash');
     expect(config.priceMonthly).toBe(0);
     expect(config.priceYearly).toBe(0);
@@ -24,8 +34,14 @@ describe('getTierConfig', () => {
 
     expect(config.monthlyQuota).toBe(700);
     expect(config.dailyLimit).toBeNull();
-    expect(config.maxProfiles).toBe(1);
-    expect(config.premiumModelProfiles).toBe(1);
+    expect(config.maxProfiles).toBe(2);
+    expect(config).toMatchObject({
+      quotaModel: 'per-profile',
+      ownerMonthlyQuota: 700,
+      ownerDailyQuota: null,
+      childMonthlyQuota: 100,
+      childDailyQuota: 10,
+    });
     expect(config.llmTier).toBe('standard');
     expect(config.priceMonthly).toBe(18.99);
     expect(config.priceYearly).toBe(168);
@@ -38,7 +54,13 @@ describe('getTierConfig', () => {
 
     expect(config.monthlyQuota).toBe(1500);
     expect(config.maxProfiles).toBe(4);
-    expect(config.premiumModelProfiles).toBe(0);
+    expect(config).toMatchObject({
+      quotaModel: 'shared-pool',
+      ownerMonthlyQuota: null,
+      ownerDailyQuota: null,
+      childMonthlyQuota: null,
+      childDailyQuota: null,
+    });
     expect(config.llmTier).toBe('standard');
     expect(config.priceMonthly).toBe(28.99);
     expect(config.priceYearly).toBe(252);
@@ -51,12 +73,83 @@ describe('getTierConfig', () => {
 
     expect(config.monthlyQuota).toBe(3000);
     expect(config.maxProfiles).toBe(6);
-    expect(config.premiumModelProfiles).toBe(2);
+    expect(config).toMatchObject({
+      quotaModel: 'shared-pool',
+      ownerMonthlyQuota: null,
+      ownerDailyQuota: null,
+      childMonthlyQuota: null,
+      childDailyQuota: null,
+    });
     expect(config.llmTier).toBe('standard');
     expect(config.priceMonthly).toBe(48.99);
     expect(config.priceYearly).toBe(432);
     expect(config.topUpPrice).toBe(5);
     expect(config.topUpAmount).toBe(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveEffectiveAccessTier
+// ---------------------------------------------------------------------------
+
+describe('resolveEffectiveAccessTier', () => {
+  const baseSubscription = {
+    tier: 'plus' as const,
+    status: 'active' as const,
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+  };
+  const now = new Date('2026-05-26T12:00:00.000Z');
+
+  it('keeps active paid subscriptions on their paid tier', () => {
+    expect(resolveEffectiveAccessTier(baseSubscription, now)).toEqual({
+      effectiveAccessTier: 'plus',
+      billingAccess: 'current',
+    });
+  });
+
+  it('falls past-due paid subscriptions back to effective Free', () => {
+    expect(
+      resolveEffectiveAccessTier(
+        { ...baseSubscription, status: 'past_due' },
+        now,
+      ),
+    ).toEqual({
+      effectiveAccessTier: 'free',
+      billingAccess: 'free_fallback',
+    });
+  });
+
+  it('keeps cancelled subscriptions entitled until currentPeriodEnd passes', () => {
+    expect(
+      resolveEffectiveAccessTier(
+        {
+          ...baseSubscription,
+          status: 'cancelled',
+          currentPeriodEnd: '2026-05-27T00:00:00.000Z',
+        },
+        now,
+      ),
+    ).toEqual({
+      effectiveAccessTier: 'plus',
+      billingAccess: 'current',
+    });
+  });
+
+  it('falls cancelled subscriptions back to Free after the access window', () => {
+    expect(
+      resolveEffectiveAccessTier(
+        {
+          ...baseSubscription,
+          status: 'cancelled',
+          currentPeriodEnd: '2026-05-25T00:00:00.000Z',
+        },
+        now,
+      ),
+    ).toEqual({
+      effectiveAccessTier: 'free',
+      billingAccess: 'free_fallback',
+    });
   });
 });
 

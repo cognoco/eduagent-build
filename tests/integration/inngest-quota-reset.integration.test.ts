@@ -5,8 +5,14 @@
  * Daily and monthly reset logic stays real.
  */
 
-import { eq } from 'drizzle-orm';
-import { accounts, quotaPools, subscriptions } from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
+import {
+  accounts,
+  profileQuotaUsage,
+  profiles,
+  quotaPools,
+  subscriptions,
+} from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { quotaReset } from '../../apps/api/src/inngest/functions/quota-reset';
@@ -68,10 +74,70 @@ async function seedSubscriptionWithQuota(input: {
   };
 }
 
+async function seedProfile(input: {
+  accountId: string;
+  displayName: string;
+  isOwner: boolean;
+}) {
+  const db = createIntegrationDb();
+  const [profile] = await db
+    .insert(profiles)
+    .values({
+      accountId: input.accountId,
+      displayName: input.displayName,
+      birthYear: input.isOwner ? 1990 : 2016,
+      isOwner: input.isOwner,
+    })
+    .returning();
+
+  return profile!;
+}
+
+async function seedProfileQuotaUsage(input: {
+  subscriptionId: string;
+  profileId: string;
+  role: 'owner' | 'child';
+  monthlyLimit: number;
+  usedThisMonth: number;
+  dailyLimit: number | null;
+  usedToday: number;
+  cycleResetAt: Date;
+}) {
+  const db = createIntegrationDb();
+  const [row] = await db
+    .insert(profileQuotaUsage)
+    .values({
+      subscriptionId: input.subscriptionId,
+      profileId: input.profileId,
+      role: input.role,
+      monthlyLimit: input.monthlyLimit,
+      usedThisMonth: input.usedThisMonth,
+      dailyLimit: input.dailyLimit,
+      usedToday: input.usedToday,
+      cycleResetAt: input.cycleResetAt,
+    })
+    .returning();
+
+  return row!;
+}
+
 async function loadQuotaPool(id: string) {
   const db = createIntegrationDb();
   return db.query.quotaPools.findFirst({
     where: eq(quotaPools.id, id),
+  });
+}
+
+async function loadProfileQuotaUsage(
+  subscriptionId: string,
+  profileId: string,
+) {
+  const db = createIntegrationDb();
+  return db.query.profileQuotaUsage.findFirst({
+    where: and(
+      eq(profileQuotaUsage.subscriptionId, subscriptionId),
+      eq(profileQuotaUsage.profileId, profileId),
+    ),
   });
 }
 
@@ -149,6 +215,68 @@ describe('Integration: quota-reset Inngest function', () => {
       cycleResetAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     });
 
+    const freeOwnerProfile = await seedProfile({
+      accountId: freeAccount.id,
+      displayName: 'Free Owner',
+      isOwner: true,
+    });
+    const freeChildProfile = await seedProfile({
+      accountId: freeAccount.id,
+      displayName: 'Free Child',
+      isOwner: false,
+    });
+    await seedProfileQuotaUsage({
+      subscriptionId: freePool.subscription.id,
+      profileId: freeOwnerProfile.id,
+      role: 'owner',
+      monthlyLimit: freeTier.ownerMonthlyQuota!,
+      usedThisMonth: 20,
+      dailyLimit: freeTier.ownerDailyQuota,
+      usedToday: 4,
+      cycleResetAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+    await seedProfileQuotaUsage({
+      subscriptionId: freePool.subscription.id,
+      profileId: freeChildProfile.id,
+      role: 'child',
+      monthlyLimit: freeTier.childMonthlyQuota!,
+      usedThisMonth: 7,
+      dailyLimit: freeTier.childDailyQuota,
+      usedToday: 5,
+      cycleResetAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    });
+
+    const plusOwnerProfile = await seedProfile({
+      accountId: plusAccount.id,
+      displayName: 'Plus Owner',
+      isOwner: true,
+    });
+    const plusChildProfile = await seedProfile({
+      accountId: plusAccount.id,
+      displayName: 'Plus Child',
+      isOwner: false,
+    });
+    await seedProfileQuotaUsage({
+      subscriptionId: plusPool.subscription.id,
+      profileId: plusOwnerProfile.id,
+      role: 'owner',
+      monthlyLimit: plusTier.ownerMonthlyQuota!,
+      usedThisMonth: 120,
+      dailyLimit: plusTier.ownerDailyQuota,
+      usedToday: 6,
+      cycleResetAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    await seedProfileQuotaUsage({
+      subscriptionId: plusPool.subscription.id,
+      profileId: plusChildProfile.id,
+      role: 'child',
+      monthlyLimit: plusTier.childMonthlyQuota!,
+      usedThisMonth: 50,
+      dailyLimit: plusTier.childDailyQuota,
+      usedToday: 8,
+      cycleResetAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    });
+
     const { result, executionOrder } = await executeQuotaReset();
 
     expect(executionOrder).toEqual(['reset-daily-and-cycles']);
@@ -184,5 +312,44 @@ describe('Integration: quota-reset Inngest function', () => {
     expect(reloadedFamilyPool!.usedToday).toBe(0);
     expect(reloadedFamilyPool!.usedThisMonth).toBe(33);
     expect(reloadedFamilyPool!.monthlyLimit).toBe(familyTier.monthlyQuota);
+
+    const reloadedFreeOwner = await loadProfileQuotaUsage(
+      freePool.subscription.id,
+      freeOwnerProfile.id,
+    );
+    expect(reloadedFreeOwner!.usedToday).toBe(0);
+    expect(reloadedFreeOwner!.usedThisMonth).toBe(20);
+    expect(reloadedFreeOwner!.monthlyLimit).toBe(freeTier.ownerMonthlyQuota);
+    expect(reloadedFreeOwner!.dailyLimit).toBe(freeTier.ownerDailyQuota);
+
+    const reloadedFreeChild = await loadProfileQuotaUsage(
+      freePool.subscription.id,
+      freeChildProfile.id,
+    );
+    expect(reloadedFreeChild!.usedToday).toBe(0);
+    expect(reloadedFreeChild!.usedThisMonth).toBe(7);
+    expect(reloadedFreeChild!.monthlyLimit).toBe(freeTier.childMonthlyQuota);
+    expect(reloadedFreeChild!.dailyLimit).toBe(freeTier.childDailyQuota);
+
+    const reloadedPlusOwner = await loadProfileQuotaUsage(
+      plusPool.subscription.id,
+      plusOwnerProfile.id,
+    );
+    expect(reloadedPlusOwner!.usedToday).toBe(0);
+    expect(reloadedPlusOwner!.usedThisMonth).toBe(0);
+    expect(reloadedPlusOwner!.monthlyLimit).toBe(plusTier.ownerMonthlyQuota);
+    expect(reloadedPlusOwner!.dailyLimit).toBe(plusTier.ownerDailyQuota);
+    expect(reloadedPlusOwner!.cycleResetAt.getTime()).toBeGreaterThan(
+      plusPool.quotaPool.cycleResetAt.getTime(),
+    );
+
+    const reloadedPlusChild = await loadProfileQuotaUsage(
+      plusPool.subscription.id,
+      plusChildProfile.id,
+    );
+    expect(reloadedPlusChild!.usedToday).toBe(0);
+    expect(reloadedPlusChild!.usedThisMonth).toBe(50);
+    expect(reloadedPlusChild!.monthlyLimit).toBe(plusTier.childMonthlyQuota);
+    expect(reloadedPlusChild!.dailyLimit).toBe(plusTier.childDailyQuota);
   });
 });

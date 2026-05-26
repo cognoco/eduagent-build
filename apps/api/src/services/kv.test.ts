@@ -63,6 +63,8 @@ function createMockKV({ getResult = null as string | null } = {}): KVNamespace {
 const sampleStatus: CachedSubscriptionStatus = {
   subscriptionId: 'sub-123',
   tier: 'plus',
+  effectiveAccessTier: 'plus',
+  billingAccess: 'current',
   status: 'active',
   monthlyLimit: 500,
   usedThisMonth: 42,
@@ -112,6 +114,8 @@ describe('readSubscriptionStatus', () => {
     const result = await readSubscriptionStatus(kv, 'acc-123');
 
     expect(result!.tier).toBe('plus');
+    expect(result!.effectiveAccessTier).toBe('plus');
+    expect(result!.billingAccess).toBe('current');
     expect(result!.status).toBe('active');
     expect(typeof result!.monthlyLimit).toBe('number');
     expect(typeof result!.usedThisMonth).toBe('number');
@@ -133,6 +137,8 @@ describe('readSubscriptionStatus', () => {
 
     // Should default dailyLimit to null and usedToday to 0
     expect(result).not.toBeNull();
+    expect(result!.effectiveAccessTier).toBe('plus');
+    expect(result!.billingAccess).toBe('current');
     expect(result!.dailyLimit).toBeNull();
     expect(result!.usedToday).toBe(0);
   });
@@ -141,6 +147,8 @@ describe('readSubscriptionStatus', () => {
     const freeStatus: CachedSubscriptionStatus = {
       subscriptionId: 'sub-free',
       tier: 'free',
+      effectiveAccessTier: 'free',
+      billingAccess: 'current',
       status: 'active',
       monthlyLimit: 100,
       usedThisMonth: 30,

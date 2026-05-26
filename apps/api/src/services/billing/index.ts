@@ -40,8 +40,28 @@ export {
 } from './trial';
 
 // Quota decrement / increment (hot path)
-export type { DecrementResult } from './metering';
-export { decrementQuota, incrementQuota, safeRefundQuota } from './metering';
+export type { DecrementResult, MeteringErrorCode } from './metering';
+export {
+  MeteringError,
+  decrementQuota,
+  incrementQuota,
+  safeRefundQuota,
+} from './metering';
+
+export { getEffectiveAccessForSubscription } from './access';
+export type {
+  ProfileQuotaUsageSnapshot,
+  ProfileQuotaRole,
+} from './quota-provision';
+export {
+  getOrProvisionProfileQuotaUsage,
+  provisionProfileQuotaUsage,
+  resolveProfileQuotaRole,
+} from './quota-provision';
+export {
+  reconcileQuotaStateForEffectiveTier,
+  reconcileQuotaStateForSubscription,
+} from './quota-reconcile';
 
 // Top-up credit management
 export type { TopUpCreditRow } from './top-up';

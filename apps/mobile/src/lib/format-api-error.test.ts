@@ -30,7 +30,11 @@ beforeAll(async () => {
 });
 const QUOTA_DETAILS = {
   tier: 'free' as const,
+  effectiveAccessTier: 'free' as const,
+  quotaModel: 'per-profile' as const,
+  profileRole: 'owner' as const,
   reason: 'monthly' as const,
+  resetsAt: '2026-05-27T01:00:00.000Z',
   monthlyLimit: 100,
   usedThisMonth: 100,
   dailyLimit: 10,

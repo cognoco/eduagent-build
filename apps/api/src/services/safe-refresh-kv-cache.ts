@@ -13,7 +13,11 @@
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
-import { getSubscriptionByAccountId, getQuotaPool } from './billing';
+import {
+  getEffectiveAccessForSubscription,
+  getSubscriptionByAccountId,
+  getQuotaPool,
+} from './billing';
 import { writeSubscriptionStatus, type CachedSubscriptionStatus } from './kv';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
@@ -47,10 +51,13 @@ export async function safeRefreshKvCache(
     if (!sub) return;
 
     const quota = await getQuotaPool(db, sub.id);
+    const access = await getEffectiveAccessForSubscription(db, sub.id);
 
     const cached: CachedSubscriptionStatus = {
       subscriptionId: sub.id,
       tier: sub.tier,
+      effectiveAccessTier: access?.effectiveAccessTier ?? sub.tier,
+      billingAccess: access?.billingAccess ?? 'current',
       status: sub.status,
       monthlyLimit: quota?.monthlyLimit ?? 0,
       usedThisMonth: quota?.usedThisMonth ?? 0,

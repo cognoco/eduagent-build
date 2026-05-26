@@ -775,7 +775,11 @@ describe('useSessionStreaming', () => {
     it('handles QuotaExceededError with structured card', async () => {
       const quotaDetails = {
         tier: 'free' as const,
+        effectiveAccessTier: 'free' as const,
+        quotaModel: 'per-profile' as const,
+        profileRole: 'child' as const,
         reason: 'daily' as const,
+        resetsAt: '2026-05-27T01:00:00.000Z',
         dailyLimit: 10,
         monthlyLimit: 100,
         usedToday: 10,
