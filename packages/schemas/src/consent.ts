@@ -22,6 +22,19 @@ export const consentRequestSchema = z
 
 export type ConsentRequest = z.infer<typeof consentRequestSchema>;
 
+// [WI-374] Resend is bound to the consent request, not a client-supplied
+// recipient. The resend payload carries NO email — the server reuses the
+// stored parentEmail — so a masked/arbitrary address can never be sent on
+// resend. `.strict()` makes a stray `parentEmail` key a validation error.
+export const consentResendSchema = z
+  .object({
+    childProfileId: z.string().uuid(),
+    consentType: consentTypeSchema.default('GDPR'),
+  })
+  .strict();
+
+export type ConsentResendRequest = z.infer<typeof consentResendSchema>;
+
 export const consentRespondRequestSchema = z
   .object({
     token: z.string(),
