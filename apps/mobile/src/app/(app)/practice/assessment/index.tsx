@@ -369,7 +369,7 @@ export default function AssessmentScreen() {
     ? classifiedLastError.category === 'quota'
       ? {
           primaryAction: {
-            label: t('subscription.upgradePlan'),
+            label: t('session.quota.upgradePlan'),
             testID: 'assessment-error-upgrade',
             onPress: () => router.push('/(app)/subscription'),
           },
