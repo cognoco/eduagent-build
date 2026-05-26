@@ -71,12 +71,11 @@ export async function reconcileQuotaStateForEffectiveTier(
       })
       .onConflictDoUpdate({
         target: quotaPools.subscriptionId,
+        // Existing shared pools are mid-cycle state; only the limits change here.
+        // Cycle resets are handled by the quota reset cron.
         set: {
           monthlyLimit: config.monthlyQuota,
-          usedThisMonth: 0,
           dailyLimit: config.dailyLimit,
-          usedToday: 0,
-          cycleResetAt: nextMonthlyReset(now),
           updatedAt: now,
         },
       });

@@ -148,6 +148,7 @@ async function seedSubscriptionWithQuota(input: {
 
 async function seedTopUpCredit(input: {
   subscriptionId: string;
+  profileId?: string | null;
   amount: number;
   remaining?: number;
   purchasedAt: Date;
@@ -159,6 +160,7 @@ async function seedTopUpCredit(input: {
     .insert(topUpCredits)
     .values({
       subscriptionId: input.subscriptionId,
+      profileId: input.profileId ?? null,
       amount: input.amount,
       remaining: input.remaining ?? input.amount,
       purchasedAt: input.purchasedAt,
@@ -316,6 +318,7 @@ describe('Integration: billing service', () => {
     expect(result).toEqual({
       success: true,
       source: 'monthly',
+      quotaModel: 'shared-pool',
       remainingMonthly: 1487,
       remainingTopUp: 0,
       remainingDaily: null,
@@ -366,6 +369,7 @@ describe('Integration: billing service', () => {
     expect(result).toEqual({
       success: true,
       source: 'top_up',
+      quotaModel: 'shared-pool',
       remainingMonthly: 0,
       remainingTopUp: 4,
       remainingDaily: null,
@@ -431,6 +435,7 @@ describe('Integration: billing service', () => {
       accountId: account.id,
       tier: 'plus',
     });
+    const ownerProfile = await seedOwnerProfile(account.id, 'Top Up Owner');
     const now = new Date('2026-04-12T12:00:00.000Z');
 
     const first = await purchaseTopUpCredits(
@@ -439,6 +444,7 @@ describe('Integration: billing service', () => {
       500,
       now,
       'rc_txn_real_001',
+      ownerProfile.id,
     );
     const duplicate = await purchaseTopUpCredits(
       createIntegrationDb(),
@@ -446,6 +452,7 @@ describe('Integration: billing service', () => {
       500,
       now,
       'rc_txn_real_001',
+      ownerProfile.id,
     );
 
     const topUps = await loadTopUps(seeded.subscription.id);
@@ -453,12 +460,14 @@ describe('Integration: billing service', () => {
       createIntegrationDb(),
       seeded.subscription.id,
       new Date('2026-04-13T00:00:00.000Z'),
+      ownerProfile.id,
     );
 
     expect(first).not.toBeNull();
     expect(first!.remaining).toBe(500);
     expect(duplicate).toBeNull();
     expect(topUps).toHaveLength(1);
+    expect(topUps[0]!.profileId).toBe(ownerProfile.id);
     expect(topUps[0]!.revenuecatTransactionId).toBe('rc_txn_real_001');
     expect(remainingCredits).toBe(500);
   });
