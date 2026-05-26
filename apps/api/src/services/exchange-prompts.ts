@@ -1183,9 +1183,18 @@ export function buildSystemPrompt(
 
   // Challenge Round prompt block — state → prompt mapping (canonical).
   // See docs/plans/2026-05-18-challenge-round-into-note.md Task 7 Step 3.
-  if (context.challengeRoundRuntimeEnabled === true) {
-    const cr = context.challengeRound;
-    const challengeEligible = context.challengeEligible ?? false;
+  //
+  // Phase 0 kill switch (docs/plans/2026-05-18-challenge-round-targets.md):
+  // every CR prompt branch is gated by `challengeRuntimeEnabled`, sourced
+  // from the typed `CHALLENGE_ROUND_RUNTIME_ENABLED` env flag at the route
+  // boundary. While the flag is off, the LLM never sees offer/active/
+  // drafting copy — so even if state somehow drifted to a CR state in
+  // metadata, no prompt block is emitted. The flag flips in Doppler only
+  // after Phase 5 read-side hardening lands.
+  const cr = context.challengeRound;
+  const challengeEligible = context.challengeEligible ?? false;
+  const challengeRuntimeEnabled = context.challengeRuntimeEnabled === true;
+  if (challengeRuntimeEnabled) {
     if (cr?.state === 'offered' || (!cr && challengeEligible)) {
       sections.push(challengeOfferPrompt);
     } else if (cr?.state === 'accepted' || cr?.state === 'active') {
@@ -1200,6 +1209,7 @@ export function buildSystemPrompt(
     }
   }
   // complete | declined | aborted | (undefined && !eligible) → no challenge block
+  // flag off → no challenge block regardless of state
 
   sections.push(
     'FINAL OUTPUT FILTER:\n' +

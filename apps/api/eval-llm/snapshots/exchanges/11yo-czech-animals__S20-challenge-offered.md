@@ -55,7 +55,7 @@
       "status": "strong"
     },
     "challengeEligible": true,
-    "challengeRoundRuntimeEnabled": true
+    "challengeRuntimeEnabled": true
   }
 }
 ```

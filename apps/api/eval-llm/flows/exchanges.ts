@@ -376,7 +376,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       exchangeCount: 5,
       retentionStatus: { status: 'strong' },
       challengeEligible: true,
-      challengeRoundRuntimeEnabled: true,
+      challengeRuntimeEnabled: true,
     },
     appliesTo: () => true,
   },
@@ -391,7 +391,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 6,
       retentionStatus: { status: 'strong' },
-      challengeRoundRuntimeEnabled: true,
+      challengeRuntimeEnabled: true,
       currentUserMessageEventId: '550e8400-e29b-41d4-a716-446655440010',
       challengeRound: {
         state: 'active',
@@ -415,7 +415,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 9,
       retentionStatus: { status: 'strong' },
-      challengeRoundRuntimeEnabled: true,
+      challengeRuntimeEnabled: true,
       challengeRound: {
         state: 'drafting',
         questionIndex: 3,

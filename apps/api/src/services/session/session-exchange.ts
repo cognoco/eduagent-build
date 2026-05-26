@@ -879,7 +879,7 @@ async function applyChallengeRoundRuntimeSignals(
     currentUserMessage?: CurrentUserMessageReference;
   },
 ): Promise<ChallengeRoundRuntimeOutcome> {
-  if (context.challengeRoundRuntimeEnabled !== true) return {};
+  if (context.challengeRuntimeEnabled !== true) return {};
   if (!session.topicId) return {};
 
   const current = context.challengeRound;
@@ -2378,7 +2378,7 @@ export async function prepareExchangeContext(
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak,
     challengeEligible: challengeReadiness.eligible,
-    challengeRoundRuntimeEnabled,
+    challengeRuntimeEnabled: challengeRoundRuntimeEnabled,
     challengeRound,
     currentUserMessageEventId: options?.currentUserMessageEventId,
   };
