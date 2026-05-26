@@ -1275,6 +1275,9 @@ export function prepareTopicExpansion(
   bookTitle: string,
   bookDescription: string | null,
 ): BookTopicGenerationResult {
+  const existingActiveTopicCount = existingTopics.filter(
+    (topic) => !topic.skipped,
+  ).length;
   const existingTitleKeys = new Set(
     existingTopics
       .filter((topic) => !topic.skipped)
@@ -1282,6 +1285,8 @@ export function prepareTopicExpansion(
   );
   const seenTitleKeys = new Set(existingTitleKeys);
   const expansionTopics: GeneratedBookTopic[] = [];
+  const repairedActiveTopicCount = () =>
+    existingActiveTopicCount + expansionTopics.length;
 
   const addTopic = (topic: GeneratedBookTopic) => {
     if (expansionTopics.length >= MAX_GENERATED_BOOK_TOPICS) return;
@@ -1297,13 +1302,13 @@ export function prepareTopicExpansion(
   for (const topic of generated.topics) addTopic(topic);
 
   const fallback = buildFallbackBookTopics(bookTitle, bookDescription ?? '');
-  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
+  if (repairedActiveTopicCount() < MIN_GENERATED_BOOK_TOPICS) {
     for (const topic of fallback.topics) addTopic(topic);
   }
 
-  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
+  if (repairedActiveTopicCount() < MIN_GENERATED_BOOK_TOPICS) {
     throw new Error(
-      `Book topic expansion produced only ${expansionTopics.length} unique topics`,
+      `Book topic expansion produced only ${repairedActiveTopicCount()} total active topics`,
     );
   }
 

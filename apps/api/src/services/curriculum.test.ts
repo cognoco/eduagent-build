@@ -22,6 +22,7 @@ import {
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
   releaseBookGenerationClaimIfEmpty,
+  prepareTopicExpansion,
   deleteTopicIfSafe,
   deleteBook,
 } from './curriculum';
@@ -2051,6 +2052,52 @@ describe('releaseBookGenerationClaimIfEmpty', () => {
     expect(whereText).toContain('curriculum_topics.skipped = false');
     expect(whereText).toContain('curricula.version = (');
     expect(whereText).toContain('max(latest_curricula.version)');
+  });
+});
+
+describe('prepareTopicExpansion', () => {
+  it('[WI-142] accepts fallback overlap when the repaired book reaches the minimum topic count', () => {
+    const existingTopics = [
+      { title: 'Start with Ancient Egypt' },
+      { title: 'Key ideas in Ancient Egypt' },
+    ];
+    const generated: BookTopicGenerationResult = {
+      topics: [
+        {
+          title: 'Start with Ancient Egypt',
+          description: 'Duplicate of an existing fallback topic.',
+          chapter: 'Getting started',
+          sortOrder: 1,
+          estimatedMinutes: 15,
+        },
+        {
+          title: 'Key ideas in Ancient Egypt',
+          description: 'Duplicate of an existing fallback topic.',
+          chapter: 'Getting started',
+          sortOrder: 2,
+          estimatedMinutes: 20,
+        },
+      ],
+      connections: [],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    expect(result.topics).toHaveLength(4);
+    expect(result.topics.map((topic) => topic.title)).toEqual([
+      'Important words for Ancient Egypt',
+      'Examples of Ancient Egypt',
+      'Practice with Ancient Egypt',
+      'Review Ancient Egypt',
+    ]);
+    expect(existingTopics.length + result.topics.length).toBeGreaterThanOrEqual(
+      5,
+    );
   });
 });
 
