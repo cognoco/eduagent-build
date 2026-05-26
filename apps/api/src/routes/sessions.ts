@@ -85,6 +85,7 @@ import {
 } from '../services/idempotency-marker';
 import { CircuitOpenError } from '../services/llm';
 import {
+  isChallengeRoundRuntimeEnabled,
   isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
@@ -144,6 +145,7 @@ type SessionRouteEnv = {
     CLERK_JWKS_URL?: string;
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
+    CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
     IDEMPOTENCY_KV?: KVNamespace;
@@ -455,6 +457,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const memoryFactsRelevanceEnabled =
         memoryFactsReadEnabled &&
         isMemoryFactsRelevanceEnabled(c.env.MEMORY_FACTS_RELEVANCE_RETRIEVAL);
+      const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
+        c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
+      );
 
       try {
         const result = await processMessage(
@@ -471,6 +476,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             clientId,
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
+            challengeRoundRuntimeEnabled,
           },
         );
         await markPersisted({
@@ -636,6 +642,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const memoryFactsRelevanceEnabled =
         memoryFactsReadEnabled &&
         isMemoryFactsRelevanceEnabled(c.env.MEMORY_FACTS_RELEVANCE_RETRIEVAL);
+      const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
+        c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
+      );
 
       try {
         const { stream, onComplete } = await streamMessage(
@@ -652,6 +661,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             clientId,
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
+            challengeRoundRuntimeEnabled,
           },
         );
 
@@ -720,6 +730,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     clientId,
                     memoryFactsReadEnabled,
                     memoryFactsRelevanceEnabled,
+                    challengeRoundRuntimeEnabled,
                   },
                 );
                 const eventType = chunkCount === 0 ? 'chunk' : 'replace';
@@ -737,6 +748,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     expectedResponseMinutes:
                       fallback.expectedResponseMinutes ?? 0,
                     aiEventId: fallback.aiEventId,
+                    challengeRound: fallback.challengeRound,
+                    challengeOffer: fallback.challengeOffer,
+                    draftedNote: fallback.draftedNote,
                   }),
                 });
                 await markPersisted({
@@ -946,6 +960,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 // [#419] Propagate the server-side readyToFinish flag so the
                 // streaming path parity with processMessage (non-streaming).
                 readyToFinish: result.readyToFinish ?? undefined,
+                challengeRound: result.challengeRound,
+                challengeOffer: result.challengeOffer,
+                draftedNote: result.draftedNote,
               }),
             });
             await markPersisted({
@@ -1071,6 +1088,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 clientId,
                 memoryFactsReadEnabled,
                 memoryFactsRelevanceEnabled,
+                challengeRoundRuntimeEnabled,
               },
             );
             return streamSSEUtf8(c, async (sseStream) => {
@@ -1088,6 +1106,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   expectedResponseMinutes:
                     fallback.expectedResponseMinutes ?? 0,
                   aiEventId: fallback.aiEventId,
+                  challengeRound: fallback.challengeRound,
+                  challengeOffer: fallback.challengeOffer,
+                  draftedNote: fallback.draftedNote,
                 }),
               });
               await markPersisted({

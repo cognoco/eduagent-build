@@ -4,6 +4,7 @@
 
 import { eq, and, desc, inArray, lt, sql, gte, ne } from 'drizzle-orm';
 import {
+  assessments,
   learningSessions,
   sessionEvents,
   sessionSummaries,
@@ -13,9 +14,12 @@ import {
   vocabulary,
   subjects,
   createScopedRepository,
+  generateUUIDv7,
   type Database,
 } from '@eduagent/database';
 import type {
+  ChallengeRoundEvaluationItem,
+  ChallengeRoundNoteDraftHint,
   ConversationLanguage,
   LearningSession,
   LlmResponseEnvelope,
@@ -92,6 +96,7 @@ import {
 import {
   getSession,
   MAX_EXCHANGES_PER_SESSION,
+  persistSessionMetadata,
   SessionExchangeLimitError,
 } from './session-crud';
 import { createLogger } from '../logger';
@@ -111,6 +116,15 @@ import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from '../curriculum-topic-ownership';
+import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
+import {
+  decideMasteryAndReview,
+  summarizeEvaluation,
+  validateEvaluationEventIds,
+  type MasteryDecision,
+} from '../challenge-round/evaluation';
+import { validateNoteDraft } from '../challenge-round/note-draft';
+import { transitionChallengeState } from '../challenge-round/state';
 import { evaluateChallengeReadiness } from '../challenge-round/trigger';
 
 /**
@@ -387,6 +401,118 @@ export interface ExchangeBehavioralMetrics {
   teachBackAssessment?: NonNullable<
     NonNullable<LlmResponseEnvelope['signals']>['teach_back_assessment']
   >;
+  /** Challenge Round state after server-side runtime transitions on this turn. */
+  challengeRound?: ChallengeRoundSessionState;
+  /** Challenge Round outcome counts persisted on the AI response metadata. */
+  challengeRoundVerdict?: ChallengeRoundVerdict;
+  /** Learner-reviewed note draft payload surfaced by the runtime guard. */
+  draftedNote?: DraftedChallengeNote;
+}
+
+export interface ChallengeRoundVerdict {
+  solidCount: number;
+  partialCount: number;
+  missingCount: number;
+  misconceptionCount: number;
+}
+
+export interface DraftedChallengeNote {
+  id: string;
+  body: string | null;
+  sourceAnswerEventIds: string[];
+  fallbackPrompt?: string;
+}
+
+interface ChallengeRoundRuntimeStateResult {
+  challengeRound: ChallengeRoundSessionState | undefined;
+  shouldPersist: boolean;
+}
+
+interface ChallengeRoundRuntimeSignalInput {
+  runtimeEnabled: boolean;
+  challengeRound: ChallengeRoundSessionState | undefined;
+  topicId: string | null | undefined;
+  challengeEligible: boolean;
+  challengeRoundOffer: boolean | undefined;
+  challengeRoundEvaluation: ChallengeRoundEvaluationItem[];
+}
+
+interface ChallengeRoundRuntimeOutcome {
+  challengeRound?: ChallengeRoundSessionState;
+  challengeOffer?: { pitch: string };
+  draftedNote?: DraftedChallengeNote;
+  challengeRoundVerdict?: ChallengeRoundVerdict;
+}
+
+interface CurrentUserMessageReference {
+  id: string;
+  content: string;
+}
+
+export function resolveChallengeRoundRuntimeStartState(input: {
+  runtimeEnabled: boolean;
+  challengeRound: ChallengeRoundSessionState | undefined;
+}): ChallengeRoundRuntimeStateResult {
+  if (!input.runtimeEnabled || input.challengeRound?.state !== 'accepted') {
+    return {
+      challengeRound: input.challengeRound,
+      shouldPersist: false,
+    };
+  }
+
+  return {
+    challengeRound: transitionChallengeState(input.challengeRound, {
+      type: 'start',
+      totalQuestions: MAX_CHALLENGE_QUESTIONS,
+    }),
+    shouldPersist: true,
+  };
+}
+
+export function resolveChallengeRoundRuntimeSignalState(
+  input: ChallengeRoundRuntimeSignalInput,
+): ChallengeRoundRuntimeStateResult {
+  if (!input.runtimeEnabled) {
+    return {
+      challengeRound: input.challengeRound,
+      shouldPersist: false,
+    };
+  }
+
+  if (
+    input.challengeRoundOffer === true &&
+    input.challengeEligible &&
+    input.topicId &&
+    (!input.challengeRound ||
+      input.challengeRound.state === 'complete' ||
+      input.challengeRound.state === 'aborted')
+  ) {
+    return {
+      challengeRound: transitionChallengeState(input.challengeRound, {
+        type: 'offer',
+        topicId: input.topicId,
+      }),
+      shouldPersist: true,
+    };
+  }
+
+  if (
+    input.challengeRound?.state === 'active' &&
+    input.challengeRoundEvaluation.length > 0
+  ) {
+    return {
+      challengeRound: transitionChallengeState(input.challengeRound, {
+        type: 'answer_complete',
+        evaluation: input.challengeRoundEvaluation,
+      }),
+      shouldPersist: true,
+    };
+  }
+
+  return {
+    challengeRound: input.challengeRound,
+    shouldPersist: false,
+  };
 }
 
 function mapRetrievalScoreToDepth(score: number): 'low' | 'mid' | 'high' {
@@ -441,6 +567,419 @@ async function applyContinuationScore(
   delete nextMetadata['continuationOpenerStartedExchange'];
   nextMetadata['continuationDepth'] = mapRetrievalScoreToDepth(retrievalScore);
   await updateSessionMetadata(db, profileId, sessionId, nextMetadata);
+}
+
+async function persistChallengeRoundState(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  challengeRound: ChallengeRoundSessionState | undefined,
+): Promise<void> {
+  const updated = await persistSessionMetadata(db, profileId, sessionId, {
+    challengeRound,
+  });
+  if (!updated) {
+    throw new Error('Session not found while persisting Challenge Round state');
+  }
+}
+
+function verdictFromEvaluations(
+  evaluations: ChallengeRoundEvaluationItem[],
+): ChallengeRoundVerdict {
+  const summary = summarizeEvaluation(evaluations);
+  return {
+    solidCount: summary.solid,
+    partialCount: summary.partial,
+    missingCount: summary.missing,
+    misconceptionCount: summary.misconception,
+  };
+}
+
+function buildFallbackDraft(
+  decision: MasteryDecision,
+): DraftedChallengeNote | undefined {
+  if (decision.solidAnswerQuotes.length === 0) {
+    return undefined;
+  }
+
+  return {
+    id: generateUUIDv7(),
+    body: null,
+    sourceAnswerEventIds: [],
+    fallbackPrompt:
+      'Write a short note in your own words from the parts you can explain clearly.',
+  };
+}
+
+function buildValidatedDraft(
+  noteDraft: ChallengeRoundNoteDraftHint | null | undefined,
+  decision: MasteryDecision,
+  evaluations: ChallengeRoundEvaluationItem[],
+): DraftedChallengeNote | undefined {
+  const solidEventIds = new Set(
+    evaluations
+      .filter((item) => item.result === 'solid')
+      .map((item) => item.answerEventId),
+  );
+  const solidAnswerEventIds = Array.from(solidEventIds);
+  if (!noteDraft) {
+    return solidAnswerEventIds.length > 0
+      ? {
+          id: generateUUIDv7(),
+          body: null,
+          sourceAnswerEventIds: solidAnswerEventIds,
+          fallbackPrompt:
+            'Write a short note in your own words from the parts you can explain clearly.',
+        }
+      : buildFallbackDraft(decision);
+  }
+
+  const draftSourceIds = noteDraft.source_answer_event_ids.filter((id) =>
+    solidEventIds.has(id),
+  );
+  const allSourcesAreSolid =
+    draftSourceIds.length === noteDraft.source_answer_event_ids.length &&
+    draftSourceIds.length > 0;
+  const validation = validateNoteDraft(
+    noteDraft.content,
+    decision.solidAnswerQuotes,
+    decision.solidAnswerQuotes,
+  );
+
+  if (!allSourcesAreSolid || !validation.ok) {
+    return {
+      id: generateUUIDv7(),
+      body: null,
+      sourceAnswerEventIds: solidAnswerEventIds,
+      fallbackPrompt:
+        'Write a short note in your own words from the parts you can explain clearly.',
+    };
+  }
+
+  return {
+    id: generateUUIDv7(),
+    body: noteDraft.content,
+    sourceAnswerEventIds: draftSourceIds,
+  };
+}
+
+async function persistChallengeRoundMasteryEvidence(
+  db: Database,
+  profileId: string,
+  session: LearningSession,
+  topicId: string,
+  now: Date,
+): Promise<void> {
+  if (!session.subjectId) {
+    throw new Error('Challenge Round mastery requires a subject-bound session');
+  }
+  const ownedTopic = await findOwnedCurriculumTopic(db, {
+    profileId,
+    topicId,
+    subjectId: session.subjectId,
+  });
+  if (!ownedTopic) {
+    throw new Error('Challenge Round topic is not owned by this profile');
+  }
+
+  await db.insert(assessments).values({
+    profileId,
+    subjectId: session.subjectId,
+    topicId,
+    sessionId: session.id,
+    verificationDepth: 'transfer',
+    status: 'passed',
+    masteryScore: 1,
+    qualityRating: 5,
+    exchangeHistory: [],
+    masteryChallengeVerifiedAt: now,
+  });
+}
+
+async function persistChallengeRoundReviewTargets(
+  db: Database,
+  profileId: string,
+  session: LearningSession,
+  topicId: string,
+  decision: MasteryDecision,
+  now: Date,
+): Promise<void> {
+  if (!session.subjectId || decision.reviewTargets.length === 0) return;
+  const ownedTopic = await findOwnedCurriculumTopic(db, {
+    profileId,
+    topicId,
+    subjectId: session.subjectId,
+  });
+  if (!ownedTopic) {
+    throw new Error('Challenge Round review target topic is not owned');
+  }
+
+  const pendingExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const repo = createScopedRepository(db, profileId);
+  const existingRows = await repo.needsDeepeningTopics.findMany(
+    and(
+      eq(needsDeepeningTopics.subjectId, session.subjectId),
+      eq(needsDeepeningTopics.topicId, topicId),
+      eq(needsDeepeningTopics.source, 'challenge_round'),
+      inArray(needsDeepeningTopics.status, ['active', 'pending_review']),
+    ),
+  );
+
+  const existingByConcept = new Map<string, (typeof existingRows)[number]>();
+  for (const row of existingRows.sort(
+    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+  )) {
+    const concept = row.concept;
+    if (concept && !existingByConcept.has(concept)) {
+      existingByConcept.set(concept, row);
+    }
+  }
+  const targetsByConcept = new Map(
+    decision.reviewTargets.map((target) => [target.concept, target]),
+  );
+
+  for (const target of targetsByConcept.values()) {
+    const existing = existingByConcept.get(target.concept);
+    if (existing) {
+      await db
+        .update(needsDeepeningTopics)
+        .set({
+          misconception: target.misconception,
+          correction: target.correction,
+          ...(existing.status === 'pending_review' ? { pendingExpiresAt } : {}),
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(needsDeepeningTopics.id, existing.id),
+            eq(needsDeepeningTopics.profileId, profileId),
+            eq(needsDeepeningTopics.topicId, topicId),
+          ),
+        );
+      continue;
+    }
+
+    await db.insert(needsDeepeningTopics).values({
+      profileId,
+      subjectId: session.subjectId,
+      topicId,
+      status: 'pending_review',
+      source: 'challenge_round',
+      concept: target.concept,
+      misconception: target.misconception,
+      correction: target.correction,
+      pendingExpiresAt,
+      updatedAt: now,
+    });
+  }
+}
+
+async function finalizeChallengeRoundIfReady(
+  db: Database,
+  profileId: string,
+  session: LearningSession,
+  challengeRound: ChallengeRoundSessionState | undefined,
+  noteDraft: ChallengeRoundNoteDraftHint | null | undefined,
+): Promise<ChallengeRoundRuntimeOutcome | null> {
+  if (challengeRound?.state !== 'drafting') return null;
+  const topicId = challengeRound.topicId ?? session.topicId;
+  if (!topicId) return null;
+
+  const evaluations = challengeRound.evaluations;
+  const decision = decideMasteryAndReview(evaluations);
+  const now = new Date();
+
+  if (decision.markMasteryVerified) {
+    await persistChallengeRoundMasteryEvidence(
+      db,
+      profileId,
+      session,
+      topicId,
+      now,
+    );
+  } else {
+    await persistChallengeRoundReviewTargets(
+      db,
+      profileId,
+      session,
+      topicId,
+      decision,
+      now,
+    );
+  }
+
+  const draftedNote = buildValidatedDraft(noteDraft, decision, evaluations);
+  const draftReady = transitionChallengeState(challengeRound, {
+    type: 'draft_ready',
+  });
+  const complete = transitionChallengeState(draftReady, { type: 'complete' });
+  await persistChallengeRoundState(db, profileId, session.id, complete);
+
+  return {
+    challengeRound: complete,
+    challengeRoundVerdict: verdictFromEvaluations(evaluations),
+    ...(draftedNote ? { draftedNote } : {}),
+  };
+}
+
+async function validateChallengeRoundEvaluationItems(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  evaluations: ChallengeRoundEvaluationItem[],
+  currentUserMessage?: CurrentUserMessageReference,
+): Promise<ChallengeRoundEvaluationItem[]> {
+  if (!currentUserMessage) {
+    return validateEvaluationEventIds(db, profileId, sessionId, evaluations);
+  }
+
+  const persistedEvaluations = evaluations.filter(
+    (item) => item.answerEventId !== currentUserMessage.id,
+  );
+  const validatedPersisted =
+    persistedEvaluations.length > 0
+      ? await validateEvaluationEventIds(
+          db,
+          profileId,
+          sessionId,
+          persistedEvaluations,
+        )
+      : [];
+  let persistedIndex = 0;
+
+  return evaluations.map((item) => {
+    if (item.answerEventId === currentUserMessage.id) {
+      return {
+        ...item,
+        learnerQuote: currentUserMessage.content,
+      };
+    }
+
+    const validated = validatedPersisted[persistedIndex];
+    persistedIndex += 1;
+    if (!validated) {
+      throw new Error(
+        `Challenge Round evaluation validation lost item for answerEventId ${item.answerEventId}`,
+      );
+    }
+    return validated;
+  });
+}
+
+async function applyChallengeRoundRuntimeSignals(
+  db: Database,
+  profileId: string,
+  session: LearningSession,
+  context: ExchangeContext,
+  payload: {
+    response: string;
+    challengeRoundOffer?: boolean;
+    challengeRoundEvaluation?: ChallengeRoundEvaluationItem[];
+    noteDraft?: ChallengeRoundNoteDraftHint | null;
+    currentUserMessage?: CurrentUserMessageReference;
+  },
+): Promise<ChallengeRoundRuntimeOutcome> {
+  if (context.challengeRuntimeEnabled !== true) return {};
+  if (!session.topicId) return {};
+
+  const current = context.challengeRound;
+  if (current?.state === 'drafting') {
+    return (
+      (await finalizeChallengeRoundIfReady(
+        db,
+        profileId,
+        session,
+        current,
+        payload.noteDraft,
+      )) ?? {}
+    );
+  }
+
+  if (current?.state === 'active' && payload.challengeRoundEvaluation?.length) {
+    let validatedEvaluation: ChallengeRoundEvaluationItem[];
+    try {
+      validatedEvaluation = await validateChallengeRoundEvaluationItems(
+        db,
+        profileId,
+        session.id,
+        payload.challengeRoundEvaluation,
+        payload.currentUserMessage,
+      );
+    } catch (err) {
+      logger.warn('[session-exchange] Challenge Round evaluation rejected', {
+        event: 'challenge_round.evaluation_rejected',
+        profileId,
+        sessionId: session.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      captureException(err, {
+        profileId,
+        extra: {
+          surface: 'session-exchange.challenge-round.evaluation',
+          sessionId: session.id,
+        },
+      });
+      return { challengeRound: current };
+    }
+
+    const result = resolveChallengeRoundRuntimeSignalState({
+      runtimeEnabled: true,
+      challengeRound: current,
+      topicId: session.topicId,
+      challengeEligible: context.challengeEligible === true,
+      challengeRoundOffer: false,
+      challengeRoundEvaluation: validatedEvaluation,
+    });
+
+    if (!result.shouldPersist) return { challengeRound: current };
+    const finalized = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      result.challengeRound,
+      payload.noteDraft,
+    );
+    if (finalized) return finalized;
+
+    await persistChallengeRoundState(
+      db,
+      profileId,
+      session.id,
+      result.challengeRound,
+    );
+    return {
+      ...(result.challengeRound
+        ? { challengeRound: result.challengeRound }
+        : {}),
+    };
+  }
+
+  const result = resolveChallengeRoundRuntimeSignalState({
+    runtimeEnabled: true,
+    challengeRound: current,
+    topicId: session.topicId,
+    challengeEligible: context.challengeEligible === true,
+    challengeRoundOffer: payload.challengeRoundOffer,
+    challengeRoundEvaluation: [],
+  });
+
+  if (!result.shouldPersist) {
+    return current ? { challengeRound: current } : {};
+  }
+
+  await persistChallengeRoundState(
+    db,
+    profileId,
+    session.id,
+    result.challengeRound,
+  );
+
+  return {
+    ...(result.challengeRound ? { challengeRound: result.challengeRound } : {}),
+    ...(result.challengeRound?.state === 'offered'
+      ? { challengeOffer: { pitch: payload.response } }
+      : {}),
+  };
 }
 
 const MAX_REVIEW_CALIBRATION_ATTEMPTS = 2;
@@ -876,6 +1415,8 @@ export async function prepareExchangeContext(
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
+    challengeRoundRuntimeEnabled?: boolean;
+    currentUserMessageEventId?: string;
   },
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -1436,9 +1977,24 @@ export async function prepareExchangeContext(
   const parsedChallengeRound = challengeRoundSessionStateSchema.safeParse(
     sessionMeta['challengeRound'],
   );
-  const challengeRound = parsedChallengeRound.success
+  let challengeRound = parsedChallengeRound.success
     ? parsedChallengeRound.data
     : undefined;
+  const challengeRoundRuntimeEnabled =
+    options?.challengeRoundRuntimeEnabled === true;
+  const challengeRoundStart = resolveChallengeRoundRuntimeStartState({
+    runtimeEnabled: challengeRoundRuntimeEnabled,
+    challengeRound,
+  });
+  if (challengeRoundStart.shouldPersist) {
+    await persistChallengeRoundState(
+      db,
+      profileId,
+      sessionId,
+      challengeRoundStart.challengeRound,
+    );
+    challengeRound = challengeRoundStart.challengeRound;
+  }
   const correctStreak = computeCorrectStreak(events, effectiveRung);
   const challengeCorrectStreak = computeCorrectStreak(events, currentRung);
   const challengeQuotaRemainingTurns = options?.quotaRemainingTurns;
@@ -1822,7 +2378,9 @@ export async function prepareExchangeContext(
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak,
     challengeEligible: challengeReadiness.eligible,
+    challengeRuntimeEnabled: challengeRoundRuntimeEnabled,
     challengeRound,
+    currentUserMessageEventId: options?.currentUserMessageEventId,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -1838,6 +2396,7 @@ export async function persistExchangeResult(
   effectiveRung: EscalationRung,
   behavioral?: Partial<ExchangeBehavioralMetrics>,
   clientId?: string,
+  userEventId?: string,
 ): Promise<{
   exchangeCount: number;
   aiEventId?: string;
@@ -1904,6 +2463,15 @@ export async function persistExchangeResult(
       ...(behavioral.llmFallbackUsed !== undefined && {
         llmFallbackUsed: behavioral.llmFallbackUsed,
       }),
+      ...(behavioral.challengeRound !== undefined && {
+        challengeRound: behavioral.challengeRound,
+      }),
+      ...(behavioral.challengeRoundVerdict !== undefined && {
+        challengeRoundVerdict: behavioral.challengeRoundVerdict,
+      }),
+      ...(behavioral.draftedNote !== undefined && {
+        draftedNote: behavioral.draftedNote,
+      }),
     }),
     // Bug #348: persist envelope.signals.{evaluate_assessment,teach_back_assessment}
     // verbatim (snake_case wire shape) so parseEvaluateAssessment /
@@ -1937,6 +2505,7 @@ export async function persistExchangeResult(
         .insert(sessionEvents)
         .values({
           sessionId,
+          ...(userEventId ? { id: userEventId } : {}),
           profileId,
           subjectId: session.subjectId,
           eventType: 'user_message' as const,
@@ -2017,6 +2586,7 @@ export async function persistExchangeResult(
           .values([
             {
               sessionId,
+              ...(userEventId ? { id: userEventId } : {}),
               profileId,
               subjectId: session.subjectId,
               eventType: 'user_message' as const,
@@ -2187,6 +2757,7 @@ export async function processMessage(
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
+    challengeRoundRuntimeEnabled?: boolean;
   },
 ): Promise<{
   response: string;
@@ -2217,15 +2788,23 @@ export async function processMessage(
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
   confidence?: 'low' | 'medium' | 'high';
+  challengeRound?: ChallengeRoundSessionState;
+  challengeOffer?: { pitch: string };
+  draftedNote?: DraftedChallengeNote;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
   await checkExchangeLimit(db, profileId, sessionId);
 
+  const currentUserMessageEventId =
+    options?.challengeRoundRuntimeEnabled === true
+      ? generateUUIDv7()
+      : undefined;
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
     await prepareExchangeContext(db, profileId, sessionId, input.message, {
       ...options,
       homeworkMode: input.homeworkMode,
+      currentUserMessageEventId,
     });
 
   await maybeDispatchReviewCalibration(
@@ -2281,6 +2860,22 @@ export async function processMessage(
     throw err;
   }
 
+  const challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
+    db,
+    profileId,
+    session,
+    context,
+    {
+      response: result.response,
+      challengeRoundOffer: result.challengeRoundOffer,
+      challengeRoundEvaluation: result.challengeRoundEvaluation ?? [],
+      noteDraft: result.noteDraft,
+      currentUserMessage: currentUserMessageEventId
+        ? { id: currentUserMessageEventId, content: input.message }
+        : undefined,
+    },
+  );
+
   // Compute time-to-answer: ms between last AI response and now.
   // [BUG-391] Defensive cast: neon-serverless returns Date objects for
   // timestamp columns, but belt-and-braces — ensure we always call .getTime()
@@ -2328,8 +2923,12 @@ export async function processMessage(
       // aiMetadata.signals so parseEvaluate/TeachBackAssessment can read them.
       evaluateAssessment: result.evaluateAssessment,
       teachBackAssessment: result.teachBackAssessment,
+      challengeRound: challengeRoundRuntime.challengeRound,
+      challengeRoundVerdict: challengeRoundRuntime.challengeRoundVerdict,
+      draftedNote: challengeRoundRuntime.draftedNote,
     },
     options?.clientId,
+    currentUserMessageEventId,
   );
 
   if (persisted.persistedUserMessage) {
@@ -2374,6 +2973,9 @@ export async function processMessage(
     notePrompt: result.notePrompt || undefined,
     notePromptPostSession: result.notePromptPostSession || undefined,
     confidence: result.confidence,
+    challengeRound: challengeRoundRuntime.challengeRound,
+    challengeOffer: challengeRoundRuntime.challengeOffer,
+    draftedNote: challengeRoundRuntime.draftedNote,
   };
 }
 
@@ -2396,6 +2998,7 @@ export async function streamMessage(
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
+    challengeRoundRuntimeEnabled?: boolean;
   },
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -2428,16 +3031,24 @@ export async function streamMessage(
      *  MUST emit a `fallback` SSE frame and skip persisting the exchange so
      *  the raw envelope never reaches ai_response.content. */
     fallback?: ExchangeFallback;
+    challengeRound?: ChallengeRoundSessionState;
+    challengeOffer?: { pitch: string };
+    draftedNote?: DraftedChallengeNote;
   }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
   await checkExchangeLimit(db, profileId, sessionId);
 
+  const currentUserMessageEventId =
+    options?.challengeRoundRuntimeEnabled === true
+      ? generateUUIDv7()
+      : undefined;
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
     await prepareExchangeContext(db, profileId, sessionId, input.message, {
       ...options,
       homeworkMode: input.homeworkMode,
+      currentUserMessageEventId,
     });
 
   await maybeDispatchReviewCalibration(
@@ -2603,6 +3214,21 @@ export async function streamMessage(
         sourceSafe.response,
         context,
       );
+      const challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
+        db,
+        profileId,
+        session,
+        context,
+        {
+          response: sourceSafe.response,
+          challengeRoundOffer: parsed.challengeRoundOffer,
+          challengeRoundEvaluation: parsed.challengeRoundEvaluation,
+          noteDraft: parsed.noteDraft,
+          currentUserMessage: currentUserMessageEventId
+            ? { id: currentUserMessageEventId, content: input.message }
+            : undefined,
+        },
+      );
       const persisted = await persistExchangeResult(
         db,
         profileId,
@@ -2636,8 +3262,12 @@ export async function streamMessage(
           // the parsed envelope onto aiMetadata.signals.
           evaluateAssessment: parsed.evaluateAssessment,
           teachBackAssessment: parsed.teachBackAssessment,
+          challengeRound: challengeRoundRuntime.challengeRound,
+          challengeRoundVerdict: challengeRoundRuntime.challengeRoundVerdict,
+          draftedNote: challengeRoundRuntime.draftedNote,
         },
         options?.clientId,
+        currentUserMessageEventId,
       );
       if (persisted.persistedUserMessage) {
         await maybeDispatchTopicProbeExtraction(
@@ -2679,6 +3309,9 @@ export async function streamMessage(
         sourceAudit: sourceSafe.sourceAudit,
         sourceReplacement,
         readyToFinish,
+        challengeRound: challengeRoundRuntime.challengeRound,
+        challengeOffer: challengeRoundRuntime.challengeOffer,
+        draftedNote: challengeRoundRuntime.draftedNote,
       };
     },
   };

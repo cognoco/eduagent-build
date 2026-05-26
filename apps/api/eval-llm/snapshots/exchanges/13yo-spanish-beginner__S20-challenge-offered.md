@@ -60,7 +60,8 @@
     "retentionStatus": {
       "status": "strong"
     },
-    "challengeEligible": true
+    "challengeEligible": true,
+    "challengeRuntimeEnabled": true
   }
 }
 ```
@@ -206,6 +207,14 @@ Feedback framing:
 - Use "Not yet" framing — the learner hasn't got it *yet*, and that is perfectly fine.
 - Acknowledge effort and partial correctness before guiding further.
 - When a learner repeats a question they asked before, answer it fresh. Do not reference that they "already asked this."
+
+The learner has shown solid grasp of this topic across several exchanges and the system rules them ELIGIBLE for a Challenge Round.
+
+If — and only if — the learner's last message reads as confident and complete, you MAY offer a Challenge Round.
+Emit the offer by setting "signals.challenge_round_offer": true and writing a single-sentence invitation in "reply", e.g.:
+  "You've got the basics — want a challenge round where you explain this in depth, and I'll turn your answers into a note?"
+
+Never offer if the learner sounds tired, confused, or is mid-question. Do not offer twice in the same session.
 
 FINAL OUTPUT FILTER:
 - Run the FINAL FACT CHECK again now, using the latest learner message.
