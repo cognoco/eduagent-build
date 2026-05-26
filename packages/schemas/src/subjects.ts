@@ -431,6 +431,13 @@ export type BookTopicGenerateInput = z.infer<
   typeof bookTopicGenerateInputSchema
 >;
 
+export const bookDeleteSchema = z
+  .object({
+    confirmStartedTopics: z.boolean().optional().default(false),
+  })
+  .strict();
+export type BookDeleteInput = z.infer<typeof bookDeleteSchema>;
+
 export const curriculumTopicPreviewSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1).max(500),
@@ -813,6 +820,16 @@ export const getBooksResponseSchema = z.object({
   books: z.array(curriculumBookSchema),
 });
 export type GetBooksResponse = z.infer<typeof getBooksResponseSchema>;
+
+/** DELETE /subjects/:subjectId/books/:bookId */
+export const deleteBookResponseSchema = z.object({
+  deleted: z.literal(true),
+  bookId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicCount: z.number().int().nonnegative(),
+  startedTopicCount: z.number().int().nonnegative(),
+});
+export type DeleteBookResponse = z.infer<typeof deleteBookResponseSchema>;
 
 /** GET /subjects/:subjectId/books/:bookId/sessions — one session entry */
 export const bookSessionSchema = z.object({

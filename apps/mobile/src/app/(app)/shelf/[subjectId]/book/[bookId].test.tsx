@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import BookScreen from './[bookId]';
@@ -34,6 +34,7 @@ let mockSearchParams = () => ({
 
 const mockBookRefetch = jest.fn();
 const mockGenerateMutate = jest.fn();
+const mockDeleteBookMutateAsync = jest.fn();
 
 const mockUseBookWithTopics = jest.fn();
 const mockUseGenerateBookTopics = jest.fn();
@@ -50,6 +51,10 @@ jest.mock('../../../../../hooks/use-books', () => ({
   useBookWithTopics: () => mockUseBookWithTopics(),
   useBooks: () => mockUseBooks(),
   useGenerateBookTopics: () => mockUseGenerateBookTopics(),
+  useDeleteBook: () => ({
+    mutateAsync: mockDeleteBookMutateAsync,
+    isPending: false,
+  }),
 }));
 
 jest.mock('../../../../../hooks/use-book-sessions', () => ({
@@ -216,6 +221,7 @@ function makeRetentionQuery(overrides: Partial<any> = {}) {
 describe('BookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     mockCanGoBack.mockReturnValue(true);
     mockSearchParams = () => ({
       subjectId: 'sub-1',
@@ -226,6 +232,13 @@ describe('BookScreen', () => {
     mockUseGenerateBookTopics.mockReturnValue({
       mutate: mockGenerateMutate,
       isPending: false,
+    });
+    mockDeleteBookMutateAsync.mockResolvedValue({
+      deleted: true,
+      bookId: 'book-1',
+      subjectId: 'sub-1',
+      topicCount: 2,
+      startedTopicCount: 0,
     });
     mockUseBooks.mockReturnValue({
       data: [
@@ -1353,6 +1366,127 @@ describe('BookScreen', () => {
       pathname: '/(app)/progress/saved',
       params: { subjectId: 'sub-1' },
     });
+  });
+
+  it('asks for confirmation before deleting an unstarted book', async () => {
+    const { getByTestId } = render(<BookScreen />);
+
+    fireEvent.press(getByTestId('book-delete-button'));
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Delete book?',
+      expect.stringContaining('re-add it later'),
+      expect.any(Array),
+      { cancelable: true },
+    );
+
+    const buttons = (Alert.alert as jest.Mock).mock.calls[0]?.[2] as Array<{
+      text?: string;
+      onPress?: () => void | Promise<void>;
+      style?: string;
+    }>;
+    const deleteButton = buttons.find((button) => button.text === 'Delete');
+    expect(deleteButton?.style).toBe('destructive');
+
+    await act(async () => {
+      await deleteButton?.onPress?.();
+    });
+
+    expect(mockDeleteBookMutateAsync).toHaveBeenCalledWith({
+      confirmStartedTopics: false,
+    });
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 'sub-1' },
+      });
+    });
+  });
+
+  it('warns that started topics and learning history will be deleted before confirming', async () => {
+    mockDeleteBookMutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('This book has started topics.'), {
+          status: 409,
+          details: {
+            reason: 'started_topics',
+            bookId: 'book-1',
+            subjectId: 'sub-1',
+            topicCount: 5,
+            startedTopicCount: 2,
+          },
+        }),
+      )
+      .mockResolvedValueOnce({
+        deleted: true,
+        bookId: 'book-1',
+        subjectId: 'sub-1',
+        topicCount: 5,
+        startedTopicCount: 2,
+      });
+
+    const { getByTestId } = render(<BookScreen />);
+
+    fireEvent.press(getByTestId('book-delete-button'));
+
+    const firstButtons = (Alert.alert as jest.Mock).mock
+      .calls[0]?.[2] as Array<{
+      text?: string;
+      onPress?: () => void | Promise<void>;
+    }>;
+
+    await act(async () => {
+      await firstButtons
+        .find((button) => button.text === 'Delete')
+        ?.onPress?.();
+    });
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledTimes(2);
+    });
+    expect(Alert.alert).toHaveBeenLastCalledWith(
+      'Delete started topics?',
+      expect.stringContaining('2 started topics'),
+      expect.any(Array),
+      { cancelable: true },
+    );
+
+    const secondButtons = (Alert.alert as jest.Mock).mock
+      .calls[1]?.[2] as Array<{
+      text?: string;
+      onPress?: () => void | Promise<void>;
+      style?: string;
+    }>;
+    const deleteEverythingButton = secondButtons.find(
+      (button) => button.text === 'Delete everything',
+    );
+    expect(deleteEverythingButton?.style).toBe('destructive');
+
+    await act(async () => {
+      await deleteEverythingButton?.onPress?.();
+    });
+
+    expect(mockDeleteBookMutateAsync).toHaveBeenLastCalledWith({
+      confirmStartedTopics: true,
+    });
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 'sub-1' },
+      });
+    });
+  });
+
+  it('hides deletion in read-only mode', () => {
+    mockSearchParams = () => ({
+      subjectId: 'sub-1',
+      bookId: 'book-1',
+      readOnly: 'true',
+    });
+
+    const { queryByTestId } = render(<BookScreen />);
+
+    expect(queryByTestId('book-delete-button')).toBeNull();
   });
 
   it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', () => {

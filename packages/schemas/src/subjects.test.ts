@@ -39,6 +39,8 @@ import {
   topicSuggestionSchema,
   getCurriculumResponseSchema,
   getBooksResponseSchema,
+  bookDeleteSchema,
+  deleteBookResponseSchema,
   bookSessionSchema,
   getBookSessionsResponseSchema,
   subjectSessionSchema,
@@ -792,6 +794,51 @@ describe('getBooksResponseSchema', () => {
   it('accepts empty books array', () => {
     const parsed = getBooksResponseSchema.parse({ books: [] });
     expect(parsed.books).toEqual([]);
+  });
+});
+
+describe('bookDeleteSchema', () => {
+  it('defaults confirmation to false', () => {
+    const parsed = bookDeleteSchema.parse({});
+    expect(parsed.confirmStartedTopics).toBe(false);
+  });
+
+  it('accepts explicit confirmation for started topics', () => {
+    const parsed = bookDeleteSchema.parse({ confirmStartedTopics: true });
+    expect(parsed.confirmStartedTopics).toBe(true);
+  });
+
+  it('rejects unknown keys', () => {
+    const result = bookDeleteSchema.safeParse({
+      confirmStartedTopics: true,
+      x: 1,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('deleteBookResponseSchema', () => {
+  it('accepts the successful delete summary', () => {
+    const parsed = deleteBookResponseSchema.parse({
+      deleted: true,
+      bookId: UUID,
+      subjectId: UUID2,
+      topicCount: 4,
+      startedTopicCount: 0,
+    });
+    expect(parsed.deleted).toBe(true);
+    expect(parsed.topicCount).toBe(4);
+  });
+
+  it('rejects negative counts', () => {
+    const result = deleteBookResponseSchema.safeParse({
+      deleted: true,
+      bookId: UUID,
+      subjectId: UUID2,
+      topicCount: -1,
+      startedTopicCount: 0,
+    });
+    expect(result.success).toBe(false);
   });
 });
 

@@ -110,6 +110,13 @@ jest.mock(
       claimBookForGeneration: jest.fn().mockResolvedValue(null),
       releaseBookGenerationClaimIfEmpty: jest.fn().mockResolvedValue(undefined),
       moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
+      deleteBook: jest.fn().mockResolvedValue({
+        deleted: true,
+        bookId: mockBook.id,
+        subjectId: mockBook.subjectId,
+        topicCount: 0,
+        startedTopicCount: 0,
+      }),
       // expandExistingBookTopics is the extracted orchestration service.
       // We stub it here so the route test isolates the route's dispatch
       // contract (forwarding inputs + returning the persisted shape).
@@ -240,6 +247,7 @@ import {
   getBookWithTopics,
   claimBookForGeneration,
   releaseBookGenerationClaimIfEmpty,
+  deleteBook,
 } from '../services/curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES } from '@eduagent/schemas';
@@ -257,6 +265,7 @@ const mockReleaseBookGenerationClaimIfEmpty =
   releaseBookGenerationClaimIfEmpty as jest.MockedFunction<
     typeof releaseBookGenerationClaimIfEmpty
   >;
+const mockDeleteBook = deleteBook as jest.MockedFunction<typeof deleteBook>;
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -430,6 +439,108 @@ describe('book routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  // ---- DELETE /v1/subjects/:subjectId/books/:bookId ----
+
+  describe('DELETE /v1/subjects/:subjectId/books/:bookId', () => {
+    it('deletes a book with no started topics', async () => {
+      mockDeleteBook.mockResolvedValueOnce({
+        deleted: true,
+        bookId: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        topicCount: 3,
+        startedTopicCount: 0,
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
+        {
+          method: 'DELETE',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        deleted: true,
+        bookId: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        topicCount: 3,
+        startedTopicCount: 0,
+      });
+      expect(mockDeleteBook).toHaveBeenCalledWith(
+        undefined,
+        'test-profile-id',
+        SUBJECT_ID,
+        BOOK_ID,
+        { confirmStartedTopics: false },
+      );
+    });
+
+    it('requires explicit confirmation when the book has started topics', async () => {
+      mockDeleteBook.mockResolvedValueOnce({
+        deleted: false,
+        reason: 'started_topics',
+        bookId: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        topicCount: 7,
+        startedTopicCount: 2,
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
+        {
+          method: 'DELETE',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toMatchObject({
+        code: ERROR_CODES.CONFLICT,
+        details: {
+          reason: 'started_topics',
+          bookId: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          topicCount: 7,
+          startedTopicCount: 2,
+        },
+      });
+    });
+
+    it('passes confirmation through when deleting a book with started topics', async () => {
+      mockDeleteBook.mockResolvedValueOnce({
+        deleted: true,
+        bookId: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        topicCount: 7,
+        startedTopicCount: 2,
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
+        {
+          method: 'DELETE',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ confirmStartedTopics: true }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockDeleteBook).toHaveBeenCalledWith(
+        undefined,
+        'test-profile-id',
+        SUBJECT_ID,
+        BOOK_ID,
+        { confirmStartedTopics: true },
+      );
     });
   });
 
@@ -680,5 +791,18 @@ describe('[WI-139 / DS-050] books proxy-mode guard', () => {
       },
     );
     expect(res.status).toBe(403);
+  });
+
+  it('DELETE /subjects/:subjectId/books/:bookId returns 403 when caller is in proxy mode', async () => {
+    const res = await makeProxyApp().request(
+      `/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+    );
+    expect(res.status).toBe(403);
+    expect(mockDeleteBook).not.toHaveBeenCalled();
   });
 });

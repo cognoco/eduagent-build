@@ -9,6 +9,8 @@ import type {
   CurriculumBook,
   BookWithTopics,
   BookTopicGenerateInput,
+  BookDeleteInput,
+  DeleteBookResponse,
   GetAllProfileBooksResponse,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
@@ -102,6 +104,12 @@ interface GenerateBookTopicsVars {
   subjectId: string;
   bookId: string;
   input: BookTopicGenerateInput | undefined;
+}
+
+interface DeleteBookVars {
+  subjectId: string;
+  bookId: string;
+  input: BookDeleteInput;
 }
 
 export function useGenerateBookTopics(
@@ -201,4 +209,89 @@ export function useGenerateBookTopics(
     Error,
     BookTopicGenerateInput | undefined
   >;
+}
+
+export function useDeleteBook(
+  subjectId: string | undefined,
+  bookId: string | undefined,
+): UseMutationResult<DeleteBookResponse, Error, BookDeleteInput> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+  const queryClient = useQueryClient();
+
+  const internalMutation = useMutation<
+    DeleteBookResponse,
+    Error,
+    DeleteBookVars
+  >({
+    mutationFn: async ({
+      subjectId: sid,
+      bookId: bid,
+      input,
+    }: DeleteBookVars): Promise<DeleteBookResponse> => {
+      const res = await client.subjects[':subjectId'].books[':bookId'].$delete({
+        param: { subjectId: sid, bookId: bid },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as DeleteBookResponse;
+    },
+    onSuccess: (_data, variables) => {
+      const { subjectId: sid, bookId: bid } = variables;
+      const pid = activeProfile?.id;
+      void queryClient.invalidateQueries({
+        queryKey: ['books', sid, pid],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['book', sid, bid, pid],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['library', 'books', pid],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['curriculum', sid, pid],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['book-sessions', sid, bid, pid],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['book-notes', sid, bid, pid],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['retention'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    },
+  });
+
+  const publicMutation = internalMutation as unknown as UseMutationResult<
+    DeleteBookResponse,
+    Error,
+    BookDeleteInput
+  >;
+  return {
+    ...publicMutation,
+    mutate: (
+      input: BookDeleteInput,
+      options?: Parameters<typeof publicMutation.mutate>[1],
+    ) => {
+      if (!subjectId || !bookId) return;
+      internalMutation.mutate(
+        { subjectId, bookId, input },
+        options as Parameters<typeof internalMutation.mutate>[1],
+      );
+    },
+    mutateAsync: async (
+      input: BookDeleteInput,
+      options?: Parameters<typeof publicMutation.mutateAsync>[1],
+    ) => {
+      if (!subjectId || !bookId) {
+        throw new Error(
+          'Cannot delete book: subjectId and bookId are required',
+        );
+      }
+      return internalMutation.mutateAsync(
+        { subjectId, bookId, input },
+        options as Parameters<typeof internalMutation.mutateAsync>[1],
+      );
+    },
+  } as UseMutationResult<DeleteBookResponse, Error, BookDeleteInput>;
 }

@@ -316,9 +316,21 @@ export function useApiClient(): ApiClient {
         }
 
         if (res.status === 409) {
-          throw new ConflictError(
+          const conflict = new ConflictError(
             apiMessage ?? 'Request conflicts with current state',
-          );
+          ) as ConflictError & {
+            status?: number;
+            code?: string;
+            details?: unknown;
+            bodyText?: string;
+          };
+          conflict.status = res.status;
+          if (code) conflict.code = code;
+          if (parsed?.details !== undefined) {
+            conflict.details = parsed.details;
+          }
+          if (errBody) conflict.bodyText = errBody;
+          throw conflict;
         }
 
         if (res.status === 410) {

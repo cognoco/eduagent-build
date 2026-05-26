@@ -13,6 +13,7 @@ import {
   useBooks,
   useBookWithTopics,
   useGenerateBookTopics,
+  useDeleteBook,
 } from './use-books';
 
 const mockFetch = jest.fn();
@@ -495,6 +496,133 @@ describe('useGenerateBookTopics', () => {
       expect.objectContaining({
         queryKey: ['curriculum', 'subject-1', 'test-profile-id'],
       }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useDeleteBook
+// ---------------------------------------------------------------------------
+
+describe('useDeleteBook', () => {
+  it('calls DELETE for the selected book', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          deleted: true,
+          bookId: 'book-1',
+          subjectId: 'subject-1',
+          topicCount: 0,
+          startedTopicCount: 0,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useDeleteBook('subject-1', 'book-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ confirmStartedTopics: false });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const [, init] = mockFetch.mock.calls[0] as [unknown, RequestInit];
+    expect(init.method).toBe('DELETE');
+    expect(init.body).toBe(JSON.stringify({ confirmStartedTopics: false }));
+  });
+
+  it('preserves started-topic conflict details from the API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'CONFLICT',
+          message: 'This book has started topics.',
+          details: {
+            reason: 'started_topics',
+            bookId: 'book-1',
+            subjectId: 'subject-1',
+            topicCount: 5,
+            startedTopicCount: 2,
+          },
+        }),
+        { status: 409 },
+      ),
+    );
+
+    const { result } = renderHook(() => useDeleteBook('subject-1', 'book-1'), {
+      wrapper: createWrapper(),
+    });
+
+    let caught: unknown;
+    await act(async () => {
+      try {
+        await result.current.mutateAsync({ confirmStartedTopics: false });
+      } catch (error) {
+        caught = error;
+      }
+    });
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { status?: number }).status).toBe(409);
+    expect((caught as { details?: unknown }).details).toEqual(
+      expect.objectContaining({
+        reason: 'started_topics',
+        startedTopicCount: 2,
+      }),
+    );
+  });
+
+  it('invalidates shelf, detail, library, and progress data on success', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          deleted: true,
+          bookId: 'book-1',
+          subjectId: 'subject-1',
+          topicCount: 3,
+          startedTopicCount: 0,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useDeleteBook('subject-1', 'book-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ confirmStartedTopics: false });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['books', 'subject-1', 'test-profile-id'],
+      }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['book', 'subject-1', 'book-1', 'test-profile-id'],
+      }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['library', 'books', 'test-profile-id'],
+      }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['progress'] }),
     );
   });
 });
