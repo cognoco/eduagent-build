@@ -304,6 +304,16 @@ export interface ExchangeContext {
   challengeEligible?: boolean;
   /** Current Challenge Round state machine snapshot from session metadata. */
   challengeRound?: import('@eduagent/schemas').ChallengeRoundSessionState;
+  /**
+   * Runtime kill switch for Challenge Round prompt injection and offer
+   * consumption. Sourced from the typed `CHALLENGE_ROUND_RUNTIME_ENABLED`
+   * env flag at the route boundary. When `false` or undefined, the prompt
+   * builder MUST NOT inject any of the three CR prompt blocks (offered,
+   * active, drafting) and downstream consumers MUST ignore LLM offer
+   * signals. Lets Phase 1+ ship dark and flip in Doppler after Phase 5
+   * read-side hardening lands. See docs/plans/2026-05-18-challenge-round-targets.md.
+   */
+  challengeRuntimeEnabled?: boolean;
 }
 
 /** Result of processing a single exchange */
