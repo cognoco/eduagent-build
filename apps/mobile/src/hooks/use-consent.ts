@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import type {
   ConsentRequest,
+  ConsentResendRequest,
   ConsentRequestResult,
   ConsentStatus,
 } from '@eduagent/schemas';
@@ -28,6 +29,41 @@ export function useRequestConsent(): UseMutationResult<
       input: ConsentRequest,
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
+      await assertOk(res);
+      return (await res.json()) as ConsentRequestResult;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = String(query.queryKey[0]);
+          return key === 'profiles' || key === 'consent-status';
+        },
+      });
+    },
+  });
+}
+
+/**
+ * [WI-374] Resends the consent email for an EXISTING request. The payload
+ * carries NO email — the server reuses the stored recipient — so the masked
+ * address shown in the consent-pending UI can never be sent back as the
+ * recipient (WI-261), and the resend cap stays bound to the request rather
+ * than the recipient string (WI-146/262/309). Recipient changes go through
+ * {@link useRequestConsent} (the separately-capped change-recipient path).
+ */
+export function useResendConsent(): UseMutationResult<
+  ConsentRequestResult,
+  Error,
+  ConsentResendRequest
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      input: ConsentResendRequest,
+    ): Promise<ConsentRequestResult> => {
+      const res = await client.consent.resend.$post({ json: input });
       await assertOk(res);
       return (await res.json()) as ConsentRequestResult;
     },
