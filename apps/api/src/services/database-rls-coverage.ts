@@ -72,6 +72,8 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   'progress_summaries',
   'support_messages',
   'weekly_reports',
+  // Added migration 0101 (tier server rework): per-profile quota rows.
+  'profile_quota_usage',
   // Added migration 0072 (practice_activity_events, celebration_events): policies
   // existed since 0072 but were omitted from the manifest (S3-C2 fix).
   'practice_activity_events',
@@ -101,12 +103,16 @@ export const OR_SCOPED_TABLES: readonly string[] = ['family_links'] as const;
  * the integration test to fail. Each entry must document the open tracking item.
  */
 export const EXPLICITLY_EXCLUDED_TABLES: readonly string[] = [
-  // RLS enabled in migration 0027 (notification_preferences) / 0027
-  // (onboarding_drafts) / 0060 (usage_events) / 0080 (challenge_round_cooldowns).
+  // RLS enabled in migration 0027 (notification_preferences, onboarding_drafts,
+  // top_up_credits) / 0060 (usage_events) / 0080 (challenge_round_cooldowns).
   // No USING policy yet — every entry below needs a dedicated migration to
   // add `*_profile_isolation` (or equivalent) before it can move to ALL_RLS_TABLES.
   'notification_preferences',
   'onboarding_drafts',
+  // Account/subscription-scoped. Migration 0101 adds nullable profile_id as
+  // buyer attribution for per-profile top-ups, but Family/Pro shared-pool
+  // top-ups intentionally remain subscription-wide.
+  'top_up_credits',
   'usage_events',
   'challenge_round_cooldowns',
 ] as const;

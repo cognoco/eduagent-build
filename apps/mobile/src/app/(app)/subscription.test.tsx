@@ -15,7 +15,7 @@ import {
 } from '../../test-utils/mock-api-routes';
 import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
-import type { Profile } from '@eduagent/schemas';
+import type { Profile, Subscription } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -189,7 +189,7 @@ jest.mock(
 // Default mock data shapes (real API shapes from @eduagent/schemas)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_SUBSCRIPTION = {
+const DEFAULT_SUBSCRIPTION: Subscription = {
   tier: 'free',
   effectiveAccessTier: 'free',
   billingAccess: 'current',
@@ -204,6 +204,15 @@ const DEFAULT_SUBSCRIPTION = {
   usedToday: 0,
   dailyRemainingQuestions: 10,
 };
+
+function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
+  const tier = overrides.tier ?? DEFAULT_SUBSCRIPTION.tier;
+  return {
+    ...DEFAULT_SUBSCRIPTION,
+    ...overrides,
+    effectiveAccessTier: overrides.effectiveAccessTier ?? tier,
+  };
+}
 
 const DEFAULT_USAGE = {
   monthlyLimit: 100,
@@ -240,7 +249,7 @@ function createWrapper(opts?: { seedCache?: boolean }) {
   if (opts?.seedCache) {
     queryClient.setQueryData(
       ['subscription', mockActiveProfile.id],
-      DEFAULT_SUBSCRIPTION,
+      makeSubscription(),
     );
     queryClient.setQueryData(['usage', mockActiveProfile.id], DEFAULT_USAGE);
   }
@@ -437,7 +446,7 @@ describe('SubscriptionScreen', () => {
     mockFetch.setRoute(
       '/subscription',
       () =>
-        new Response(JSON.stringify({ subscription: DEFAULT_SUBSCRIPTION }), {
+        new Response(JSON.stringify({ subscription: makeSubscription() }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
@@ -634,11 +643,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -688,11 +696,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -717,11 +724,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'pro',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -750,11 +756,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -780,11 +785,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -812,12 +816,11 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
               currentPeriodEnd: '2026-05-18T00:00:00Z',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -843,12 +846,11 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'trial',
               trialEndsAt: '2026-05-10T00:00:00.000Z',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -875,12 +877,11 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'trial',
               trialEndsAt: null,
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -904,11 +905,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -930,11 +930,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'plus',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1006,7 +1005,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
+            subscription: makeSubscription({ tier: 'plus' }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1191,7 +1190,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
+            subscription: makeSubscription({ tier: 'plus' }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1239,7 +1238,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'free' },
+            subscription: makeSubscription({ tier: 'free' }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1349,12 +1348,11 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'free',
                 status: 'trial',
                 trialEndsAt: '2026-05-21T00:00:00.000Z',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1383,12 +1381,11 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'free',
                 status: 'trial',
                 trialEndsAt: '2026-05-21T00:00:00.000Z',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1523,11 +1520,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1575,11 +1571,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'pro',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1625,11 +1620,10 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(
           JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
+            subscription: makeSubscription({
               tier: 'family',
               status: 'active',
-            },
+            }),
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1762,7 +1756,7 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: { ...DEFAULT_SUBSCRIPTION, status: 'expired' },
+              subscription: makeSubscription({ status: 'expired' }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1931,11 +1925,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'plus',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -1986,11 +1979,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'plus',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -2023,11 +2015,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'plus',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -2218,11 +2209,10 @@ describe('SubscriptionScreen', () => {
         () =>
           new Response(
             JSON.stringify({
-              subscription: {
-                ...DEFAULT_SUBSCRIPTION,
+              subscription: makeSubscription({
                 tier: 'family',
                 status: 'active',
-              },
+              }),
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),

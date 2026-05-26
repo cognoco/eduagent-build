@@ -20,6 +20,20 @@ CREATE TABLE IF NOT EXISTS "profile_quota_usage" (
 ALTER TABLE "profile_quota_usage" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 DO $$ BEGIN
+ IF NOT EXISTS (
+  SELECT 1
+  FROM pg_policies
+  WHERE schemaname = 'public'
+    AND tablename = 'profile_quota_usage'
+    AND policyname = 'profile_quota_usage_profile_isolation'
+ ) THEN
+  CREATE POLICY "profile_quota_usage_profile_isolation" ON "profile_quota_usage"
+    USING ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid)
+    WITH CHECK ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid);
+ END IF;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
  ALTER TABLE "profile_quota_usage" ADD CONSTRAINT "profile_quota_usage_subscription_id_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscriptions"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
