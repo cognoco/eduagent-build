@@ -32,6 +32,7 @@ import {
   resendConsent,
   ConsentResendLimitError,
   ConsentRecipientChangeLimitError,
+  ConsentRequestNotFoundError,
 } from './consent';
 
 // ---------------------------------------------------------------------------
@@ -561,6 +562,36 @@ describe('[WI-374] request-keyed resend + capped recipient change (integration)'
     // Recipient stuck at the last accepted change (D); E was rejected.
     expect(row!.parentEmail).toBe('d@example.com');
     expect(row!.recipientChangeCount).toBe(3);
+  });
+
+  it('[CodeRabbit break] a resend does NOT revive a terminal CONSENTED row (no consent-state corruption)', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    // Seed an already-decided (CONSENTED) consent with budget remaining.
+    await db.insert(consentStates).values({
+      profileId: childId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: 'granted@example.com',
+      respondedAt: new Date(),
+      resendCount: 0,
+    });
+
+    // A resend must NOT flip it back to PARENTAL_CONSENT_REQUESTED.
+    await expect(
+      resendConsent(
+        db,
+        { childProfileId: childId, consentType: 'GDPR' },
+        APP_URL,
+      ),
+    ).rejects.toBeInstanceOf(ConsentRequestNotFoundError);
+
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(row!.status).toBe('CONSENTED');
+    expect(row!.resendCount).toBe(0);
   });
 
   it('the first real email after a PENDING (null-recipient) row is the initial request, not a recipient change', async () => {

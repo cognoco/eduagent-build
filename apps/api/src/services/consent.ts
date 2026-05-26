@@ -619,19 +619,29 @@ export async function resendConsent(
       and(
         eq(consentStates.profileId, input.childProfileId),
         eq(consentStates.consentType, input.consentType),
+        // [CodeRabbit] Only an ACTIVE request can be resent. Without this guard
+        // a resend could overwrite a terminal CONSENTED/WITHDRAWN row back to
+        // PARENTAL_CONSENT_REQUESTED (and re-email the parent), corrupting an
+        // already-decided consent. isNotNull(parentEmail) ensures a recipient
+        // exists to resend to.
+        eq(consentStates.status, 'PARENTAL_CONSENT_REQUESTED'),
+        isNotNull(consentStates.parentEmail),
         sql`${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}`,
       ),
     )
     .returning();
 
-  // No row updated → either no request exists (nothing to resend) or the cap
-  // was hit. Disambiguate with a follow-up read (read does not affect the cap
-  // decision, which was atomic above).
+  // No row updated → either no active request exists (nothing to resend) or
+  // the cap was hit. Disambiguate with a follow-up read scoped to the same
+  // active-request predicate (read does not affect the cap decision, which was
+  // atomic above).
   if (!row) {
     const stillExists = await db.query.consentStates.findFirst({
       where: and(
         eq(consentStates.profileId, input.childProfileId),
         eq(consentStates.consentType, input.consentType),
+        eq(consentStates.status, 'PARENTAL_CONSENT_REQUESTED'),
+        isNotNull(consentStates.parentEmail),
       ),
       columns: { id: true },
     });
