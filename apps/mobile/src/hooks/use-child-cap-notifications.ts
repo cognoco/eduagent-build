@@ -17,6 +17,7 @@ import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { useActiveProfileRoleState } from './use-active-profile-role';
 
 function childCapNotificationsQueryKey(profileId: string | undefined) {
   return ['child-cap-notifications', profileId];
@@ -27,6 +28,7 @@ export function useChildCapNotifications(): UseQueryResult<
 > {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRoleState();
 
   return useQuery({
     queryKey: childCapNotificationsQueryKey(activeProfile?.id),
@@ -44,7 +46,7 @@ export function useChildCapNotifications(): UseQueryResult<
         cleanup();
       }
     },
-    enabled: activeProfile?.isOwner === true,
+    enabled: activeProfileRole.role === 'owner',
   });
 }
 
