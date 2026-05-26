@@ -34,7 +34,7 @@ import type {
   BookWithTopics,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -2137,13 +2137,17 @@ describe('deleteTopicIfSafe', () => {
   });
 
   it('[MEDIUM-G sweep] keeps spec §4 and implementation aligned on auto-filed filedFrom values', () => {
-    const spec = readFileSync(
-      join(
-        __dirname,
-        '../../../../docs/specs/2026-05-23-freeform-library-filing.md',
-      ),
-      'utf8',
-    );
+    const specPathCandidates = [
+      '../../../../docs/specs/2026-05-23-freeform-library-filing.md',
+      '../../../../docs/_archive/specs/Done/2026-05-23-freeform-library-filing.md',
+    ];
+    const specPath = specPathCandidates
+      .map((candidate) => join(__dirname, candidate))
+      .find((candidate) => existsSync(candidate));
+
+    expect(specPath).toBeDefined();
+
+    const spec = readFileSync(specPath!, 'utf8');
     const implementation = readFileSync(
       join(__dirname, './curriculum.ts'),
       'utf8',
