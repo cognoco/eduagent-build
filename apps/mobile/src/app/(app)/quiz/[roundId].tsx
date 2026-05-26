@@ -4,33 +4,32 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import type {
-  ClientQuizQuestion,
-  ValidatedQuestionResult,
+import {
+  completedRoundDetailResponseSchema,
+  type CompletedRoundDetailResponse,
 } from '@eduagent/schemas';
 import { useRoundDetail } from '../../../hooks/use-quiz';
 import { useThemeColors } from '../../../lib/theme';
 import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 
-/** The completed-round shape returned by GET /quiz/rounds/:id (status=completed).
- *  Extends the base QuizRoundResponse with grading context the client needs
- *  for the history detail screen. */
-interface CompletedRoundDetail {
-  id: string;
-  activityType: string;
-  activityLabel?: string;
-  theme: string;
-  status: 'completed';
-  score: number;
-  total: number;
-  xpEarned: number;
-  celebrationTier?: string;
-  completedAt?: string;
-  questions: (ClientQuizQuestion & {
-    correctAnswer?: string;
-    acceptedAliases?: string[];
-  })[];
-  results: ValidatedQuestionResult[];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function resolveCompletedRoundDetail(
+  value: unknown,
+): CompletedRoundDetailResponse | null {
+  const parsed = completedRoundDetailResponseSchema.safeParse(value);
+  if (parsed.success && parsed.data.status === 'completed') {
+    return parsed.data;
+  }
+
+  if (!isRecord(value)) return null;
+  if (value['status'] !== 'completed') return null;
+  if (!Array.isArray(value['questions'])) return null;
+  if (!Array.isArray(value['results'])) return null;
+
+  return value as CompletedRoundDetailResponse;
 }
 
 /** Title-case an activity type slug: "guess_who" → "Guess Who" */
@@ -102,10 +101,28 @@ export default function QuizRoundDetailScreen() {
     );
   }
 
-  // [I4] Cast to the completed-round shape — useRoundDetail returns
-  // QuizRoundResponse (the in-progress type), but this screen only renders
-  // completed rounds whose API shape includes grading context.
-  const detail = round as unknown as CompletedRoundDetail;
+  // Reject incomplete, active, abandoned, or unparseable round responses
+  // with the existing error fallback.
+  const detail = resolveCompletedRoundDetail(round);
+  if (detail === null) {
+    return (
+      <View
+        testID="round-detail-error"
+        className="flex-1 items-center justify-center p-6"
+      >
+        <Text className="text-on-surface">{t('quiz.round.couldNotLoad')}</Text>
+        <Pressable
+          testID="round-detail-back"
+          className="mt-4 min-h-[44px] min-w-[44px] items-center justify-center"
+          onPress={() => router.replace(backHref as Href)}
+          accessibilityRole="button"
+          accessibilityLabel={t('quiz.round.goBack')}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+    );
+  }
   const { questions, results } = detail;
 
   return (

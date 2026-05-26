@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import QuizRoundDetailScreen from './[roundId]';
+import type { CompletedRoundDetailResponse } from '@eduagent/schemas';
 
 // i18n mock — returns English values for quiz.round namespace so tests can
 // assert on the same English strings as before the migration.
@@ -56,9 +57,9 @@ jest.mock(
   }),
 );
 
-function buildGuessWhoRound() {
+function buildGuessWhoRound(): CompletedRoundDetailResponse {
   return {
-    id: 'round-1',
+    id: '00000000-0000-4000-8000-000000000281',
     activityType: 'guess_who',
     activityLabel: 'Guess Who',
     theme: 'Pioneers in Technology',
@@ -66,6 +67,7 @@ function buildGuessWhoRound() {
     score: 1,
     total: 2,
     xpEarned: 10,
+    celebrationTier: 'great',
     questions: [
       {
         type: 'guess_who',
@@ -96,18 +98,37 @@ function buildGuessWhoRound() {
       {
         questionIndex: 0,
         correct: true,
+        correctAnswer: 'Nikola Tesla',
         answerGiven: 'Nikola Tesla',
-        timeMs: 5000,
         cluesUsed: 3,
       },
       {
         questionIndex: 1,
         correct: true,
+        correctAnswer: 'George Eastman',
         answerGiven: 'George Eastman',
-        timeMs: 4000,
         cluesUsed: 5,
       },
     ],
+  };
+}
+
+function buildActiveRoundWithoutResults() {
+  return {
+    id: '00000000-0000-4000-8000-000000000282',
+    activityType: 'guess_who',
+    activityLabel: 'Guess Who',
+    theme: 'Active Round',
+    questions: [
+      {
+        type: 'guess_who',
+        clues: ['c1', 'c2', 'c3', 'c4', 'c5'],
+        mcFallbackOptions: ['A', 'B', 'C', 'D'],
+        funFact: 'Trivia.',
+        isLibraryItem: false,
+      },
+    ],
+    total: 1,
   };
 }
 
@@ -203,6 +224,8 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
       const data = buildGuessWhoRound();
       const q0 = data.questions[0];
       if (!q0) throw new Error('fixture invariant: questions[0] exists');
+      if (q0.type !== 'guess_who')
+        throw new Error('fixture invariant: q0 is a guess_who question');
       q0.clues = [longClue, 'short2'];
       mockUseRoundDetail.mockReturnValue({
         data,
@@ -223,6 +246,8 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
       const data = buildGuessWhoRound();
       const q0 = data.questions[0];
       if (!q0) throw new Error('fixture invariant: questions[0] exists');
+      if (q0.type !== 'guess_who')
+        throw new Error('fixture invariant: q0 is a guess_who question');
       q0.clues = [];
       mockUseRoundDetail.mockReturnValue({
         data,
@@ -240,5 +265,100 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
       // prompt fallback.
       screen.getByText('Guess Who');
     });
+  });
+});
+
+describe('QuizRoundDetailScreen — round-detail shape regression', () => {
+  beforeEach(() => {
+    mockUseRoundDetail.mockReset();
+  });
+
+  it('renders a completed round with graded results', () => {
+    mockUseRoundDetail.mockReturnValue({
+      data: buildGuessWhoRound(),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<QuizRoundDetailScreen />);
+
+    screen.getByTestId('round-detail-screen');
+    screen.getByText('Pioneers in Technology');
+    screen.getByText('Guess Who · 1/2');
+    screen.getByTestId('round-detail-question-0');
+    screen.getByText('Correct answer: Nikola Tesla');
+  });
+
+  it('renders a completed round with an empty results array without crashing', () => {
+    const data = { ...buildGuessWhoRound(), score: 0, results: [] };
+    mockUseRoundDetail.mockReturnValue({
+      data,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    expect(() => render(<QuizRoundDetailScreen />)).not.toThrow();
+    screen.getByTestId('round-detail-screen');
+    screen.getByTestId('round-detail-question-0');
+  });
+
+  it('renders the error fallback for an active round response without results instead of throwing', () => {
+    mockUseRoundDetail.mockReturnValue({
+      data: buildActiveRoundWithoutResults(),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    expect(() => render(<QuizRoundDetailScreen />)).not.toThrow();
+    screen.getByTestId('round-detail-error');
+    expect(screen.queryByTestId('round-detail-screen')).toBeNull();
+  });
+
+  it('renders the error fallback for abandoned or non-completed round details', () => {
+    mockUseRoundDetail.mockReturnValue({
+      data: {
+        ...buildGuessWhoRound(),
+        id: '00000000-0000-4000-8000-000000000283',
+        status: 'abandoned',
+        results: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    expect(() => render(<QuizRoundDetailScreen />)).not.toThrow();
+    screen.getByTestId('round-detail-error');
+    expect(screen.queryByTestId('round-detail-screen')).toBeNull();
+  });
+
+  it('keeps the loading timeout state wired', () => {
+    mockUseRoundDetail.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<QuizRoundDetailScreen />);
+
+    screen.getByTestId('round-detail-loading');
+  });
+
+  it('keeps the hook error state wired to the existing fallback', () => {
+    mockUseRoundDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: jest.fn(),
+    });
+
+    render(<QuizRoundDetailScreen />);
+
+    screen.getByTestId('round-detail-error');
+    screen.getByText('Could not load round details');
   });
 });
