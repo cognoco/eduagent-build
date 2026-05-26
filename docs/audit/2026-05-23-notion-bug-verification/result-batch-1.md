@@ -42,18 +42,18 @@ HEAD: `343b0502f`
 - **Notion sync action:** Move to Resolved (current code on `codex/h1-progress-contract-migration`).
 
 ### #485 — [CR-2026-05-21-080] `routeAndCall` does not wire `responseFormat:'json'` into Anthropic provider
-- **Verdict:** STILL_OPEN
-- **File(s):** `apps/api/src/services/llm/router.ts:719-727` (config build); `apps/api/src/services/llm/providers/anthropic.ts` (no `responseFormat` usage).
-- **Evidence:** `router.ts:726` passes `responseFormat: 'json'` into the config. Grep across `apps/api/src/services/llm/providers/anthropic.ts` for `responseFormat` or `response_format` returns no matches; only `gemini.ts:146` and `openai.ts:121,174` honor the flag. So calls routed to Anthropic silently ignore the JSON-mode request, matching the reported bug. No validation/assertion exists in `routeAndCall` either.
+- **Verdict:** ALREADY_FIXED
+- **File(s):** `apps/api/src/services/llm/providers/anthropic.ts:82-151, 189-205`; `apps/api/src/services/llm/providers/anthropic.test.ts:73-159`
+- **Evidence:** `toAnthropicFormat(messages, responseFormat)` now appends a JSON-only directive when `responseFormat === 'json'`, and both `chat()` and `chatStream()` pass `config.responseFormat` through that formatter before issuing the Anthropic request. The provider test suite asserts both directive injection and fetch-payload wiring, covering the exact gap this bug reported.
 - **Confidence:** HIGH
-- **Notion sync action:** Leave Open.
+- **Notion sync action:** Move to Resolved.
 
 ### #519 — [CR-2026-05-21-114] `handleAddProfile` silently no-ops while subscription loads
-- **Verdict:** STILL_OPEN
-- **File(s):** `apps/mobile/src/app/profiles.tsx:100-104`
-- **Evidence:** `if (!subscription) { return; }` is still the first statement of `handleAddProfile`. The comment "Query still loading — don't block with a false 'Upgrade required'" justifies the early-return but no spinner / disabled state / toast is wired — exactly the dead-button UX silent-fallback the bug describes.
+- **Verdict:** ALREADY_FIXED
+- **File(s):** `apps/mobile/src/app/profiles.tsx:100-102`; `apps/mobile/src/app/profiles.test.tsx`
+- **Evidence:** `handleAddProfile` now unconditionally calls `router.push('/create-profile')`; the subscription-loading early return is gone. The profiles test suite now covers family tier, free tier, and the explicit `subscription.data === null` loading case so the add button cannot regress back into a dead tap while billing state hydrates.
 - **Confidence:** HIGH
-- **Notion sync action:** Leave Open.
+- **Notion sync action:** Move to Resolved.
 
 ### #572 — [CR-2026-05-21-167] `bookmarks.sessionId/eventId` are raw UUIDs with no profile-side ownership guard
 - **Verdict:** NEEDS_REVIEW
@@ -63,18 +63,18 @@ HEAD: `343b0502f`
 - **Notion sync action:** Investigate further — consider downgrading to a defense-in-depth task and either (a) add the proposed scoped-repo `bookmarks.insert` to forward-only ratchet, or (b) close as "not exploitable today, future-proofing only."
 
 ### #599 — [SUBJECT-16] App-language sync skips newly active profile after switch
-- **Verdict:** STILL_OPEN
-- **File(s):** `apps/mobile/src/hooks/use-mentor-language-sync.ts:11-27`
-- **Evidence:** `lastSyncedRef` is `useRef<string | null>(null)` at line 11 (still language-only, not `(profileId, language)`). Line 20 `if (parsed.data === lastSyncedRef.current) return;` returns without checking `activeProfile.id`. The `useEffect` deps array includes `activeProfile` so it does re-run, but the early-return path means profile B with `conversationLanguage: 'en'` is skipped when `lastSyncedRef.current === 'nb'`. Exactly the reported bug.
+- **Verdict:** ALREADY_FIXED
+- **File(s):** `apps/mobile/src/hooks/use-mentor-language-sync.ts:7-38`; `apps/mobile/src/hooks/use-mentor-language-sync.test.ts:114-127`
+- **Evidence:** `lastSyncedRef` is now keyed by `{ profileId, language }`, and the guard only suppresses a sync when both match the current active profile. The dedicated `[B-599]` test switches from profile A to profile B without changing app language and asserts that the second sync still fires.
 - **Confidence:** HIGH
-- **Notion sync action:** Leave Open.
+- **Notion sync action:** Move to Resolved.
 
 ### #612 — [DICT-06] Dictation review timeout can be overridden by late response
-- **Verdict:** STILL_OPEN
-- **File(s):** `apps/mobile/src/app/(app)/dictation/complete.tsx:33-43, 62-72`
-- **Evidence:** Lines 36-43: `setTimeout(() => { setReviewTimedOut(true); }, 20_000)` sets only the boolean — it does NOT set `reviewCancelledRef.current = true`. `reviewCancelledRef` is set true only on screen blur (line 69) and on user-driven Skip (line 318). A late successful response after the 20s timeout will therefore pass the `if (reviewCancelledRef.current) return;` checks at lines 203 and 212 and navigate. Matches the bug body exactly.
+- **Verdict:** ALREADY_FIXED
+- **File(s):** `apps/mobile/src/app/(app)/dictation/complete.tsx:33-49, 69-76, 211-245`; `apps/mobile/src/app/(app)/dictation/complete.test.tsx:432-517`
+- **Evidence:** The 20-second timeout callback now sets `reviewCancelledRef.current = true`, increments `latestReviewAttemptRef`, and only then flips `reviewTimedOut`, so any late response is rejected by the post-await guards before navigation or alert UI can fire. The `[BUG-612]` regression tests cover both the timeout banner and the late-success suppression path.
 - **Confidence:** HIGH
-- **Notion sync action:** Leave Open.
+- **Notion sync action:** Move to Resolved.
 
 ---
 
@@ -86,10 +86,10 @@ HEAD: `343b0502f`
 | #188 | M6-HIGH (jest.mock) | PARTIALLY_FIXED | HIGH |
 | #388 | CR-2026-05-19-M4 | STILL_OPEN | HIGH |
 | #421 | CR-2026-05-21-016 | ALREADY_FIXED | HIGH |
-| #485 | CR-2026-05-21-080 | STILL_OPEN | HIGH |
-| #519 | CR-2026-05-21-114 | STILL_OPEN | HIGH |
+| #485 | CR-2026-05-21-080 | ALREADY_FIXED | HIGH |
+| #519 | CR-2026-05-21-114 | ALREADY_FIXED | HIGH |
 | #572 | CR-2026-05-21-167 | NEEDS_REVIEW | MEDIUM |
-| #599 | SUBJECT-16 | STILL_OPEN | HIGH |
-| #612 | DICT-06 | STILL_OPEN | HIGH |
+| #599 | SUBJECT-16 | ALREADY_FIXED | HIGH |
+| #612 | DICT-06 | ALREADY_FIXED | HIGH |
 
-**Headline:** Only **1 / 9** bugs (#421) is cleanly fixed and ready to move to Resolved. **5 / 9** are clearly still open. **#188** shows real burn-down progress (228 → 147 mocks) but remains open. **#63** and **#572** need human/runtime judgment beyond code-grep.
+**Headline:** **5 / 9** bugs (#421, #485, #519, #599, #612) are cleanly fixed and ready to move to Resolved. **#388** is clearly still open. **#188** shows real burn-down progress (228 → 147 mocks) but remains open. **#63** and **#572** still need human/runtime judgment beyond code-grep.
