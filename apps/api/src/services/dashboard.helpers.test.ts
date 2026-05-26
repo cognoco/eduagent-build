@@ -3,6 +3,8 @@ import {
   calculateGuidedRatio,
   calculateRetentionTrend,
   calculateTrend,
+} from './progress-helpers';
+import {
   generateChildSummary,
   getStartOfWeek,
   sortSubjectsByActivityPriority,
