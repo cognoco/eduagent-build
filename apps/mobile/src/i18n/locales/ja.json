@@ -322,11 +322,6 @@
       "addChildAccessLabel": "お子様のプロフィールを追加",
       "yourChild": "あなたのお子様",
       "openFamilyPreferencesAccessLabel": "ファミリー設定を開く",
-      "upgradeRequiredTitle": "アップグレードが必要です",
-      "upgradeRequiredMessage": "お子様のプロフィールを追加するには、ファミリーまたはプロのサブスクリプションが必要です。",
-      "viewPlans": "プランを見る",
-      "profileLimitTitle": "プロフィールの上限に達しました",
-      "profileLimitMessage": "{{plan}}プランでは、最大{{max}}個のプロフィールをサポートしています。",
       "breakdownSharingTitle": "家族の利用状況を共有",
       "breakdownSharingDescription": "プロフィール別の利用を表示。",
       "breakdownSharingError": "Couldn't update setting. Try again."
@@ -2549,6 +2544,7 @@
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
       "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "quotaUsedAllQuestions": "今使える質問は使い切りました。{{resetAt}}以降にもう一度試すか、もっと使いたいときは保護者に通知できます。",
       "notifyButton": "Notify My Parent",
       "notifyButtonNotified": "Parent notified",
       "notifyButtonAccessibilityNotified": "Parent already notified",
@@ -2570,7 +2566,9 @@
         "askParentTitle": "Ask your parent",
         "askParentBody": "Ask your parent to open the app and subscribe.",
         "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again."
+        "notifyErrorBody": "Please check your connection and try again.",
+        "quotaSentBody": "質問上限に達したことを保護者に知らせました。",
+        "quotaAskParentBody": "詳しくは保護者にアプリを開いてもらってください。"
       }
     },
     "restore": {
@@ -2778,33 +2776,33 @@
     "tierLimits": {
       "free": "1日10問、月100問",
       "plus": "月700問",
-      "family": "月1,500問共有",
-      "pro": "無制限"
+      "family": "月1,500問（全プロフィール共有）",
+      "pro": "月3,000問（全プロフィール共有）"
     },
     "tierFeatures": {
       "free": {
-        "0": "1日10問",
-        "1": "月10問",
-        "2": "基本学習トピック",
-        "3": "進捗管理"
+        "0": "あなたと子ども1人で試せます",
+        "1": "プロフィールごとに月100問、1日10問",
+        "2": "リアルな振り返りと進捗",
+        "3": "基本の学習トピック"
       },
       "plus": {
-        "0": "月700問",
-        "1": "日次制限なし",
-        "2": "全学習トピック",
-        "3": "優先サポート"
+        "0": "大人が自分で使うためのプラン",
+        "1": "月700問、1日の上限なし",
+        "2": "子どもはFreeの上限（月100問、1日10問）を使います",
+        "3": "お子さまの振り返りと進捗"
       },
       "family": {
-        "0": "月1,500問共有",
-        "1": "最大10名まで",
-        "2": "家族進捗概要",
-        "3": "Plusの全機能"
+        "0": "子どもが主に使う家庭向け",
+        "1": "全プロフィールで月1,500問を共有",
+        "2": "子ども3人まで + あなた",
+        "3": "共有プール — 自分の利用を抑えると子どもが多く使えます"
       },
       "pro": {
-        "0": "無制限の質問",
-        "1": "新機能への早期アクセス",
-        "2": "専属サポート",
-        "3": "Familyの全機能"
+        "0": "複数のヘビーユーザーがいる家庭向け",
+        "1": "月3,000問を共有",
+        "2": "子ども5人まで + あなた",
+        "3": "ファミリープランのすべての機能"
       }
     },
     "packagePeriod": {
@@ -2995,7 +2993,7 @@
     },
     "card4": {
       "headline": "Built for families",
-      "supporting": "Parents see what their kids worked on and get conversation starters for the week."
+      "supporting": "Parents see what their kids worked on and get conversation starters. To add a child, open More and tap Add a child."
     },
     "next": "Next",
     "letsStart": "Let's start",

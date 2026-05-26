@@ -326,11 +326,6 @@
       "addChildAccessLabel": "Add a child profile",
       "yourChild": "your child",
       "openFamilyPreferencesAccessLabel": "Open family preferences",
-      "upgradeRequiredTitle": "Upgrade required",
-      "upgradeRequiredMessage": "Adding child profiles requires a Family or Pro subscription.",
-      "viewPlans": "View plans",
-      "profileLimitTitle": "Profile limit reached",
-      "profileLimitMessage": "Your {{plan}} plan supports up to {{max}} profiles.",
       "breakdownSharingTitle": "Share family usage",
       "breakdownSharingDescription": "Show usage per profile.",
       "breakdownSharingError": "Couldn't update setting. Try again."
@@ -2655,6 +2650,7 @@
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
       "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "quotaUsedAllQuestions": "You've used your questions for now. You can try again after {{resetAt}}, or notify your parent if you need more room.",
       "notifyButton": "Notify My Parent",
       "notifyButtonNotified": "Parent notified",
       "notifyButtonAccessibilityNotified": "Parent already notified",
@@ -2676,7 +2672,9 @@
         "askParentTitle": "Ask your parent",
         "askParentBody": "Ask your parent to open the app and subscribe.",
         "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again."
+        "notifyErrorBody": "Please check your connection and try again.",
+        "quotaSentBody": "We let your parent know you hit your question limit.",
+        "quotaAskParentBody": "Ask your parent to open the app for details."
       }
     },
     "restore": {
@@ -2785,32 +2783,32 @@
     "tierLimits": {
       "free": "10 questions/day, 100/month",
       "plus": "700 questions/month",
-      "family": "1,500 questions/month shared",
-      "pro": "Unlimited questions"
+      "family": "1,500 shared questions/month",
+      "pro": "3,000 shared questions/month"
     },
     "tierFeatures": {
       "free": {
-        "0": "10 questions per day",
-        "1": "100 questions per month",
-        "2": "Core learning topics",
-        "3": "Progress tracking"
+        "0": "Try it for you and one child",
+        "1": "100 questions/month, 10/day per profile",
+        "2": "Real Recaps and progress",
+        "3": "Core learning topics"
       },
       "plus": {
-        "0": "700 questions per month",
-        "1": "No daily limit",
-        "2": "All learning topics",
-        "3": "Priority support"
+        "0": "For adults who use it themselves",
+        "1": "700 questions/month, no daily cap",
+        "2": "Child uses Free-tier limits (100/mo, 10/day)",
+        "3": "Recaps and progress for your child"
       },
       "family": {
-        "0": "1,500 shared questions/month",
-        "1": "Up to 5 family members",
-        "2": "Family progress overview",
-        "3": "All Plus features"
+        "0": "For households where the child is the main user",
+        "1": "1,500 shared questions/month across all profiles",
+        "2": "Up to 3 children + you",
+        "3": "Shared pool — use less yourself to give your child more"
       },
       "pro": {
-        "0": "Unlimited questions",
-        "1": "Early access to new features",
-        "2": "Dedicated support",
+        "0": "For power households with multiple heavy users",
+        "1": "3,000 shared questions/month",
+        "2": "Up to 5 children + you",
         "3": "All Family features"
       }
     },
@@ -3002,7 +3000,7 @@
     },
     "card4": {
       "headline": "Built for families",
-      "supporting": "Parents see what their kids worked on and get conversation starters for the week."
+      "supporting": "Parents see what their kids worked on and get conversation starters. To add a child, open More and tap Add a child."
     },
     "next": "Next",
     "letsStart": "Let's start",

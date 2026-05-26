@@ -3,6 +3,7 @@ import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import type { ChildCapNotifyParentInput } from '@eduagent/schemas';
 
 import { platformAlert } from '../../../../lib/platform-alert';
 import * as SecureStore from '../../../../lib/secure-storage';
@@ -10,6 +11,7 @@ import { migrateSecureStoreKey } from '../../../../lib/migrate-secure-store-key'
 import { useThemeColors } from '../../../../lib/theme';
 import { useProfile } from '../../../../lib/profile';
 import { useNotifyParentSubscribe } from '../../../../hooks/use-settings';
+import { useNotifyParentChildCap } from '../../../../hooks/use-child-cap-notifications';
 import { useXpSummary } from '../../../../hooks/use-streaks';
 
 import {
@@ -19,14 +21,38 @@ import {
   formatCooldownLabel,
 } from '../child-paywall-helpers';
 
-export function ChildPaywall(): React.ReactElement {
+function formatResetAt(value: string | undefined): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+type ChildPaywallMode = 'subscription' | 'quota';
+
+interface ChildPaywallProps {
+  mode?: ChildPaywallMode;
+  quotaKind?: ChildCapNotifyParentInput['kind'];
+  resetsAt?: string;
+}
+
+export function ChildPaywall({
+  mode = 'subscription',
+  quotaKind = 'monthly_exceeded',
+  resetsAt,
+}: ChildPaywallProps): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
-  const notifyParent = useNotifyParentSubscribe();
+  const notifyParentSubscribe = useNotifyParentSubscribe();
+  const notifyParentChildCap = useNotifyParentChildCap();
   const { data: xpSummary } = useXpSummary();
   const { t } = useTranslation();
+  const isQuotaMode = mode === 'quota';
 
   const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
   const [cooldownMsRemaining, setCooldownMsRemaining] = useState(0);
@@ -95,10 +121,42 @@ export function ChildPaywall(): React.ReactElement {
   }, [notifiedAt]);
 
   const isNotified = notifiedAt !== null && cooldownMsRemaining > 0;
+  const notifyPending = isQuotaMode
+    ? notifyParentChildCap.isPending
+    : notifyParentSubscribe.isPending;
+  const quotaResetLabel = formatResetAt(resetsAt);
+  const quotaResetsAt = resetsAt ?? new Date().toISOString();
 
   const handleNotify = useCallback(async () => {
     try {
-      const result = await notifyParent.mutateAsync();
+      if (isQuotaMode) {
+        const result = await notifyParentChildCap.mutateAsync({
+          kind: quotaKind,
+          resetsAt: quotaResetsAt,
+        });
+        if (result.sent) {
+          const now = Date.now();
+          setNotifiedAt(now);
+          if (profileId) {
+            void SecureStore.setItemAsync(
+              getNotifyStorageKey(profileId),
+              String(now),
+            ).catch(() => undefined);
+          }
+          platformAlert(
+            t('subscription.childPaywall.alerts.sentTitle'),
+            t('subscription.childPaywall.alerts.quotaSentBody'),
+          );
+        } else {
+          platformAlert(
+            t('subscription.childPaywall.alerts.askParentTitle'),
+            t('subscription.childPaywall.alerts.quotaAskParentBody'),
+          );
+        }
+        return;
+      }
+
+      const result = await notifyParentSubscribe.mutateAsync();
       if (result.rateLimited) {
         // Server says rate-limited — persist the current timestamp as fallback
         const now = Date.now();
@@ -134,7 +192,15 @@ export function ChildPaywall(): React.ReactElement {
         t('subscription.childPaywall.alerts.notifyErrorBody'),
       );
     }
-  }, [notifyParent, profileId]);
+  }, [
+    isQuotaMode,
+    notifyParentChildCap,
+    notifyParentSubscribe,
+    profileId,
+    quotaKind,
+    quotaResetsAt,
+    t,
+  ]);
 
   const topicsLearned = xpSummary?.topicsCompleted ?? 0;
   const totalXp = xpSummary?.totalXp ?? 0;
@@ -173,12 +239,16 @@ export function ChildPaywall(): React.ReactElement {
             : t('subscription.childPaywall.greatStart')}
         </Text>
         <Text className="text-body text-text-secondary mb-8 text-center">
-          {t('subscription.childPaywall.usedAllQuestions')}
+          {isQuotaMode
+            ? t('subscription.childPaywall.quotaUsedAllQuestions', {
+                resetAt: quotaResetLabel,
+              })
+            : t('subscription.childPaywall.usedAllQuestions')}
         </Text>
 
         <Pressable
           onPress={handleNotify}
-          disabled={notifyParent.isPending || isNotified}
+          disabled={notifyPending || isNotified}
           className={`rounded-button py-3.5 px-8 items-center mb-3 w-full ${
             isNotified ? 'bg-muted' : 'bg-primary'
           }`}
@@ -190,7 +260,7 @@ export function ChildPaywall(): React.ReactElement {
               : t('subscription.childPaywall.notifyButtonAccessibilityNotify')
           }
         >
-          {notifyParent.isPending ? (
+          {notifyPending ? (
             <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text

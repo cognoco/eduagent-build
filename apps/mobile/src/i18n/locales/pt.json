@@ -347,11 +347,6 @@
       "addChildAccessLabel": "Adicionar um perfil de criança",
       "yourChild": "seu filho",
       "openFamilyPreferencesAccessLabel": "Abrir preferências da família",
-      "upgradeRequiredTitle": "Upgrade necessário",
-      "upgradeRequiredMessage": "Adicionar perfis de criança requer uma assinatura Família ou Pro.",
-      "viewPlans": "Ver planos",
-      "profileLimitTitle": "Limite de perfis atingido",
-      "profileLimitMessage": "Seu plano {{plan}} suporta até {{max}} perfis.",
       "breakdownSharingTitle": "Compartilhar uso da família",
       "breakdownSharingDescription": "Mostra uso por perfil.",
       "breakdownSharingError": "Couldn't update setting. Try again."
@@ -2574,6 +2569,7 @@
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
       "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "quotaUsedAllQuestions": "Você usou suas perguntas por enquanto. Pode tentar novamente depois de {{resetAt}} ou avisar um responsável se precisar de mais espaço.",
       "notifyButton": "Notify My Parent",
       "notifyButtonNotified": "Parent notified",
       "notifyButtonAccessibilityNotified": "Parent already notified",
@@ -2595,7 +2591,9 @@
         "askParentTitle": "Ask your parent",
         "askParentBody": "Ask your parent to open the app and subscribe.",
         "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again."
+        "notifyErrorBody": "Please check your connection and try again.",
+        "quotaSentBody": "Avisamos um responsável que você atingiu o limite de perguntas.",
+        "quotaAskParentBody": "Peça a um responsável para abrir o app e ver os detalhes."
       }
     },
     "restore": {
@@ -2779,32 +2777,32 @@
       "free": "10 perguntas/dia, 100/mês",
       "plus": "700 perguntas/mês",
       "family": "1.500 perguntas compartilhadas/mês",
-      "pro": "Perguntas ilimitadas"
+      "pro": "3.000 perguntas compartilhadas/mês"
     },
     "tierFeatures": {
       "free": {
-        "0": "10 perguntas por dia",
-        "1": "100 perguntas por mês",
-        "2": "Tópicos básicos de aprendizado",
-        "3": "Rastreamento de progresso"
+        "0": "Teste para você e uma criança",
+        "1": "100 perguntas/mês, 10/dia por perfil",
+        "2": "Resumos reais e progresso",
+        "3": "Tópicos principais de aprendizado"
       },
       "plus": {
-        "0": "700 perguntas por mês",
-        "1": "Sem limite diário",
-        "2": "Todos os tópicos de aprendizado",
-        "3": "Suporte prioritário"
+        "0": "Para adultos que usam por conta própria",
+        "1": "700 perguntas/mês, sem limite diário",
+        "2": "A criança usa os limites do Gratuito (100/mês, 10/dia)",
+        "3": "Resumos e progresso do seu filho"
       },
       "family": {
-        "0": "1.500 perguntas compartilhadas/mês",
-        "1": "Até 5 membros da família",
-        "2": "Visão geral do progresso familiar",
-        "3": "Todos os recursos Plus"
+        "0": "Para famílias em que a criança é a principal usuária",
+        "1": "1.500 perguntas compartilhadas/mês entre todos os perfis",
+        "2": "Até 3 crianças + você",
+        "3": "Cota compartilhada — use menos você mesmo para deixar mais para seu filho"
       },
       "pro": {
-        "0": "Perguntas ilimitadas",
-        "1": "Acesso antecipado a novos recursos",
-        "2": "Suporte dedicado",
-        "3": "Todos os recursos Familiar"
+        "0": "Para famílias com vários usuários intensivos",
+        "1": "3.000 perguntas compartilhadas/mês",
+        "2": "Até 5 crianças + você",
+        "3": "Todos os recursos do plano Familiar"
       }
     },
     "packagePeriod": {
@@ -2995,7 +2993,7 @@
     },
     "card4": {
       "headline": "Built for families",
-      "supporting": "Parents see what their kids worked on and get conversation starters for the week."
+      "supporting": "Parents see what their kids worked on and get conversation starters. To add a child, open More and tap Add a child."
     },
     "next": "Next",
     "letsStart": "Let's start",

@@ -322,11 +322,6 @@
       "addChildAccessLabel": "Legg til en barneprofil",
       "yourChild": "ditt barn",
       "openFamilyPreferencesAccessLabel": "Åpne familieinnstillinger",
-      "upgradeRequiredTitle": "Oppgradering kreves",
-      "upgradeRequiredMessage": "Å legge til barneprofiler krever et Familie- eller Pro-abonnement.",
-      "viewPlans": "Se abonnementer",
-      "profileLimitTitle": "Profilgrense nådd",
-      "profileLimitMessage": "Ditt {{plan}}-abonnement støtter opptil {{max}} profiler.",
       "breakdownSharingTitle": "Del familiebruk",
       "breakdownSharingDescription": "Vis bruk per profil.",
       "breakdownSharingError": "Kunne ikke oppdatere innstillingen. Prøv igjen."
@@ -2549,6 +2544,7 @@
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
       "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "quotaUsedAllQuestions": "Du har brukt spørsmålene dine for nå. Du kan prøve igjen etter {{resetAt}}, eller varsle en foresatt hvis du trenger mer rom.",
       "notifyButton": "Notify My Parent",
       "notifyButtonNotified": "Parent notified",
       "notifyButtonAccessibilityNotified": "Parent already notified",
@@ -2570,7 +2566,9 @@
         "askParentTitle": "Ask your parent",
         "askParentBody": "Ask your parent to open the app and subscribe.",
         "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again."
+        "notifyErrorBody": "Please check your connection and try again.",
+        "quotaSentBody": "Vi ga beskjed til en foresatt om at du har nådd spørsmålsgrensen.",
+        "quotaAskParentBody": "Be en foresatt åpne appen for detaljer."
       }
     },
     "restore": {
@@ -2779,32 +2777,32 @@
       "free": "10 spørsmål/dag, 100/måned",
       "plus": "700 spørsmål/måned",
       "family": "1 500 delte spørsmål/måned",
-      "pro": "Ubegrenset"
+      "pro": "3 000 delte spørsmål/måned"
     },
     "tierFeatures": {
       "free": {
-        "0": "10 spørsmål per dag",
-        "1": "100 spørsmål per måned",
-        "2": "Kjerne-læringsemner",
-        "3": "Fremgangsspøring"
+        "0": "Prøv det for deg og ett barn",
+        "1": "100 spørsmål/måned, 10/dag per profil",
+        "2": "Ekte oppsummeringer og fremgang",
+        "3": "Kjerneemner for læring"
       },
       "plus": {
-        "0": "700 spørsmål per måned",
-        "1": "Ingen daglig grense",
-        "2": "Alle læringsemner",
-        "3": "Prioritert støtte"
+        "0": "For voksne som bruker det selv",
+        "1": "700 spørsmål/måned, ingen daglig grense",
+        "2": "Barnet bruker Free-grensene (100/mnd, 10/dag)",
+        "3": "Oppsummeringer og fremgang for barnet ditt"
       },
       "family": {
-        "0": "1 500 delte spørsmål/måned",
-        "1": "Opptil 5 familiemedlemmer",
-        "2": "Familiefremgangs-oversikt",
-        "3": "Alle Plus-funksjoner"
+        "0": "For familier der barnet er hovedbrukeren",
+        "1": "1 500 delte spørsmål/måned på alle profiler",
+        "2": "Opptil 3 barn + deg",
+        "3": "Delt pott — bruk mindre selv for å gi barnet mer"
       },
       "pro": {
-        "0": "Ubegrenset antall spørsmål",
-        "1": "Tidlig tilgang til nye funksjoner",
-        "2": "Dedikert støtte",
-        "3": "Alle Familie-funksjoner"
+        "0": "For familier med flere aktive storbrukere",
+        "1": "3 000 delte spørsmål/måned",
+        "2": "Opptil 5 barn + deg",
+        "3": "Alle funksjonene i Familie"
       }
     },
     "packagePeriod": {
@@ -2995,7 +2993,7 @@
     },
     "card4": {
       "headline": "Built for families",
-      "supporting": "Parents see what their kids worked on and get conversation starters for the week."
+      "supporting": "Parents see what their kids worked on and get conversation starters. To add a child, open More and tap Add a child."
     },
     "next": "Next",
     "letsStart": "Let's start",
