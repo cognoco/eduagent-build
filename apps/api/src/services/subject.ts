@@ -425,84 +425,17 @@ export async function createSubjectWithStructure(
     };
   }
 
-  try {
-    const learnerAge = await getProfileAge(db, profileId);
+  const learnerAge = await getProfileAge(db, profileId);
 
-    // Dynamic import — book-generation depends on LLM infra which may not
-    // initialize in all environments (integration tests without API keys).
-    const { detectSubjectType } = await import('./book-generation');
-    const structure = await detectSubjectType(subject.name, learnerAge);
-
-    if (structure.type === 'broad') {
-      const usedEmptyStructureFallback = structure.books.length === 0;
-      const fallbackStructure = !usedEmptyStructureFallback
-        ? structure
-        : buildFallbackSubjectStructure(subject.name);
-      if (fallbackStructure.type === 'broad') {
-        const suggestionCount = await persistBroadBookSuggestions(
-          db,
-          subject.id,
-          fallbackStructure.books,
-        );
-        return {
-          subject,
-          structureType: 'broad',
-          bookCount: 0,
-          suggestionCount,
-          ...(usedEmptyStructureFallback ? { classificationFailed: true } : {}),
-        };
-      }
-
-      await persistNarrowTopics(
-        db,
-        subject.id,
-        fallbackStructure.topics,
-        subject.name,
-      );
-      return {
-        subject,
-        structureType: 'narrow',
-        topicCount: fallbackStructure.topics.length,
-        classificationFailed: true,
-      };
-    }
-
-    // Narrow subject — persist the LLM-generated topics as curriculum topics
-    const narrowFallbackStructure =
-      structure.topics.length === 0
-        ? buildFallbackSubjectStructure(subject.name)
-        : null;
-    if (narrowFallbackStructure?.type === 'broad') {
-      const suggestionCount = await persistBroadBookSuggestions(
-        db,
-        subject.id,
-        narrowFallbackStructure.books,
-      );
-      return {
-        subject,
-        structureType: 'broad',
-        bookCount: 0,
-        suggestionCount,
-        classificationFailed: true,
-      };
-    }
-    const topics =
-      structure.topics.length > 0
-        ? structure.topics
-        : narrowFallbackStructure?.type === 'narrow'
-          ? narrowFallbackStructure.topics
-          : [];
-    if (topics.length > 0) {
-      await persistNarrowTopics(db, subject.id, topics, subject.name);
-    }
-
-    return {
-      subject,
-      structureType: 'narrow',
-      topicCount: topics.length,
-      ...(structure.topics.length === 0 ? { classificationFailed: true } : {}),
-    };
-  } catch (error) {
+  // Dynamic import — book-generation depends on LLM infra which may not
+  // initialize in all environments (integration tests without API keys).
+  const { detectSubjectType } = await import('./book-generation');
+  let classificationFailed = false;
+  const detectedStructure = await detectSubjectType(
+    subject.name,
+    learnerAge,
+  ).catch(async (error) => {
+    classificationFailed = true;
     logger.warn(
       '[createSubjectWithStructure] Falling back to deterministic subject structure',
       {
@@ -512,14 +445,56 @@ export async function createSubjectWithStructure(
         error: error instanceof Error ? error.message : String(error),
       },
     );
+
+    return buildFallbackSubjectStructure(subject.name);
+  });
+
+  if (detectedStructure.type === 'broad') {
+    const usedEmptyStructureFallback = detectedStructure.books.length === 0;
+    const fallbackStructure = !usedEmptyStructureFallback
+      ? detectedStructure
+      : buildFallbackSubjectStructure(subject.name);
+    if (fallbackStructure.type === 'broad') {
+      const suggestionCount = await persistBroadBookSuggestions(
+        db,
+        subject.id,
+        fallbackStructure.books,
+      );
+      return {
+        subject,
+        structureType: 'broad',
+        bookCount: 0,
+        suggestionCount,
+        ...(usedEmptyStructureFallback || classificationFailed
+          ? { classificationFailed: true }
+          : {}),
+      };
+    }
+
+    await persistNarrowTopics(
+      db,
+      subject.id,
+      fallbackStructure.topics,
+      subject.name,
+    );
+    return {
+      subject,
+      structureType: 'narrow',
+      topicCount: fallbackStructure.topics.length,
+      classificationFailed: true,
+    };
   }
 
-  const fallbackStructure = buildFallbackSubjectStructure(subject.name);
-  if (fallbackStructure.type === 'broad') {
+  // Narrow subject — persist the LLM-generated topics as curriculum topics
+  const narrowFallbackStructure =
+    detectedStructure.topics.length === 0
+      ? buildFallbackSubjectStructure(subject.name)
+      : null;
+  if (narrowFallbackStructure?.type === 'broad') {
     const suggestionCount = await persistBroadBookSuggestions(
       db,
       subject.id,
-      fallbackStructure.books,
+      narrowFallbackStructure.books,
     );
     return {
       subject,
@@ -529,18 +504,23 @@ export async function createSubjectWithStructure(
       classificationFailed: true,
     };
   }
+  const topics =
+    detectedStructure.topics.length > 0
+      ? detectedStructure.topics
+      : narrowFallbackStructure?.type === 'narrow'
+        ? narrowFallbackStructure.topics
+        : [];
+  if (topics.length > 0) {
+    await persistNarrowTopics(db, subject.id, topics, subject.name);
+  }
 
-  await persistNarrowTopics(
-    db,
-    subject.id,
-    fallbackStructure.topics,
-    subject.name,
-  );
   return {
     subject,
     structureType: 'narrow',
-    topicCount: fallbackStructure.topics.length,
-    classificationFailed: true,
+    topicCount: topics.length,
+    ...(detectedStructure.topics.length === 0 || classificationFailed
+      ? { classificationFailed: true }
+      : {}),
   };
 }
 

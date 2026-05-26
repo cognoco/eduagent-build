@@ -19,6 +19,7 @@ jest.mock(
 );
 
 import { Hono } from 'hono';
+import { ERROR_CODES } from '@eduagent/schemas';
 import { maintenanceRoutes } from './maintenance';
 
 type TestEnv = {
@@ -176,6 +177,33 @@ describe('maintenanceRoutes', () => {
     ]);
   });
 
+  it('[WI-158] reports memory facts backfill dispatch failure as not queued', async () => {
+    mockInngestTransport.setSendError(new Error('transport down'));
+    const app = createTestApp({
+      ENVIRONMENT: 'staging',
+      MAINTENANCE_SECRET: 'secret',
+    });
+
+    const res = await app.request('/maintenance/memory-facts-backfill', {
+      method: 'POST',
+      headers: { 'X-Maintenance-Secret': 'secret' },
+    });
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({
+      queued: false,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: 'Failed to queue maintenance backfill',
+    });
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      requestPath: '/maintenance/memory-facts-backfill',
+      extra: {
+        surface: 'maintenance.memory-facts-backfill',
+        environment: 'staging',
+      },
+    });
+  });
+
   it('rejects self progress backfill without the maintenance secret', async () => {
     const app = createTestApp({ MAINTENANCE_SECRET: 'secret' });
 
@@ -215,5 +243,35 @@ describe('maintenanceRoutes', () => {
         },
       },
     ]);
+  });
+
+  it('[WI-158] reports self progress backfill dispatch failure as not queued', async () => {
+    mockInngestTransport.setSendError(new Error('transport down'));
+    const app = createTestApp({
+      ENVIRONMENT: 'staging',
+      MAINTENANCE_SECRET: 'secret',
+    });
+
+    const res = await app.request(
+      '/maintenance/progress-self-reports-backfill',
+      {
+        method: 'POST',
+        headers: { 'X-Maintenance-Secret': 'secret' },
+      },
+    );
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({
+      queued: false,
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: 'Failed to queue maintenance backfill',
+    });
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      requestPath: '/maintenance/progress-self-reports-backfill',
+      extra: {
+        surface: 'maintenance.progress-self-reports-backfill',
+        environment: 'staging',
+      },
+    });
   });
 });

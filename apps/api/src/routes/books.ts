@@ -39,6 +39,14 @@ import { getProfileAge } from '../services/profile';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 
+const BOOK_GENERATION_STALE_MS = 15 * 60 * 1000;
+
+function isStaleBookGenerationClaim(updatedAt: string): boolean {
+  const updatedAtMs = Date.parse(updatedAt);
+  if (Number.isNaN(updatedAtMs)) return false;
+  return Date.now() - updatedAtMs >= BOOK_GENERATION_STALE_MS;
+}
+
 type BooksRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
   Variables: {
@@ -178,6 +186,14 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             (topic) => !topic.skipped,
           ).length;
           if (existing.book.topicsGenerated && activeTopicCount === 0) {
+            if (isStaleBookGenerationClaim(existing.book.updatedAt)) {
+              await releaseBookGenerationClaimIfEmpty(
+                db,
+                subjectId,
+                bookId,
+                profileId,
+              );
+            }
             return apiError(
               c,
               409,

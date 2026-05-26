@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
-import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
 
 type MaintenanceEnv = {
@@ -59,6 +58,48 @@ async function verifyMaintenanceSecret(c: {
   return constantTimeEqual(provided, expected);
 }
 
+async function sendMaintenanceBackfillOrError(
+  c: {
+    env: MaintenanceEnv['Bindings'];
+    req: { path: string };
+    json: (
+      data: unknown,
+      status?: 200 | 403 | 502,
+    ) => Response | Promise<Response>;
+  },
+  surface: string,
+  eventName: string,
+): Promise<Response> {
+  try {
+    // core-send: maintenance backfill endpoints must report real dispatch status.
+    await inngest.send({
+      name: eventName,
+      data: {
+        requestedAt: new Date().toISOString(),
+        environment: c.env.ENVIRONMENT ?? 'unknown',
+      },
+    });
+  } catch (error) {
+    captureException(error, {
+      requestPath: c.req.path,
+      extra: {
+        surface,
+        environment: c.env.ENVIRONMENT ?? 'unknown',
+      },
+    });
+    return c.json(
+      {
+        queued: false,
+        code: ERROR_CODES.INTERNAL_ERROR,
+        message: 'Failed to queue maintenance backfill',
+      },
+      502,
+    );
+  }
+
+  return c.json({ queued: true });
+}
+
 export const maintenanceRoutes = new Hono<MaintenanceEnv>()
   .post('/maintenance/sentry-smoke', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
@@ -99,19 +140,11 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       );
     }
 
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'admin/memory-facts-backfill.requested',
-          data: {
-            requestedAt: new Date().toISOString(),
-            environment: c.env.ENVIRONMENT ?? 'unknown',
-          },
-        }),
+    return sendMaintenanceBackfillOrError(
+      c,
       'maintenance.memory-facts-backfill',
+      'admin/memory-facts-backfill.requested',
     );
-
-    return c.json({ queued: true });
   })
   .post('/maintenance/progress-self-reports-backfill', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
@@ -124,17 +157,9 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       );
     }
 
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'admin/progress-self-reports-backfill.requested',
-          data: {
-            requestedAt: new Date().toISOString(),
-            environment: c.env.ENVIRONMENT ?? 'unknown',
-          },
-        }),
+    return sendMaintenanceBackfillOrError(
+      c,
       'maintenance.progress-self-reports-backfill',
+      'admin/progress-self-reports-backfill.requested',
     );
-
-    return c.json({ queued: true });
   });

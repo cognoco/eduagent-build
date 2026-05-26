@@ -716,6 +716,27 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     );
   });
 
+  it('[WI-256] propagates unexpected setup errors instead of reporting fallback success', async () => {
+    getProfileAgeSpy.mockRejectedValueOnce(new Error('profile DB offline'));
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'History',
+    });
+    const db = {
+      insert: jest.fn(() => ({
+        values: jest.fn(() => ({
+          returning: jest.fn().mockResolvedValue([subjectRow]),
+        })),
+      })),
+    } as unknown as Database;
+
+    await expect(
+      createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
+    ).rejects.toThrow('profile DB offline');
+    expect(detectSubjectTypeSpy).not.toHaveBeenCalled();
+  });
+
   it('treats an empty broad classification as fallback-generated suggestions', async () => {
     detectSubjectTypeSpy.mockResolvedValueOnce({
       type: 'broad',
