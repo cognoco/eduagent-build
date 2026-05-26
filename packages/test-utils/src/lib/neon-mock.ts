@@ -41,11 +41,12 @@
  * for `createMockDb` imports in non-`*.test.*` files).
  */
 export function createMockDb(): unknown {
-  // [CR-2026-05-21-183] Defence-in-depth: fail loudly if this helper is
-  // somehow imported from a non-test runtime context. The static guard test
-  // (`neon-mock.guard.test.ts`) catches new import sites at PR time; this
-  // runtime check catches dynamic imports the grep can't see.
-  assertCalledFromTestContext();
+  // [CR-2026-05-21-183] Production-misuse protection lives entirely in the
+  // static workspace-grep guard (`neon-mock.guard.test.ts`). An earlier
+  // runtime check via `globalThis.jest` was removed because many call sites
+  // invoke `createMockDb()` at module top-level, where the `jest` global is
+  // not yet installed in every Jest worker configuration — the runtime check
+  // false-positived across ~40 API suites in CI.
 
   // Recursive chain stub: any property access returns a jest.fn()
   // that resolves to an empty array by default.
@@ -88,29 +89,4 @@ export function createMockDb(): unknown {
     selectDistinct: chainFn(),
     execute: jest.fn().mockResolvedValue([]),
   };
-}
-
-/**
- * Best-effort detection that the caller is running inside a Jest test
- * (not application runtime). Throws a loud error otherwise so a stray
- * production import surfaces immediately instead of silently returning
- * an empty-result Proxy in prod.
- *
- * Detection is via the `jest` global, which is only defined inside the
- * Jest worker process. The same `jest` global is referenced in this file
- * (jest.fn / jest.Mock), so non-test runtime would already fail at the
- * first jest.fn() call — this check makes the failure mode explicit
- * with a useful message.
- */
-function assertCalledFromTestContext(): void {
-  const hasJestGlobal =
-    typeof (globalThis as { jest?: unknown }).jest !== 'undefined';
-  if (!hasJestGlobal) {
-    throw new Error(
-      '[createMockDb] called outside Jest test context. ' +
-        'This helper is for unit tests only — it returns a forbidden-by-default ' +
-        'mock that silently resolves every query to empty results. ' +
-        'See packages/test-utils/src/lib/neon-mock.ts header for usage rules.',
-    );
-  }
 }

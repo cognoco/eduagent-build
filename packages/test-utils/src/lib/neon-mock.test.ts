@@ -52,15 +52,8 @@ describe('createMockDb default (forbidden-by-default) behavior', () => {
   });
 });
 
-describe('[CR-2026-05-21-183] createMockDb runtime test-context guard', () => {
-  it('throws a loud error when invoked outside a Jest worker', () => {
-    // Simulate non-test runtime by temporarily removing the `jest` global.
-    const originalJest = (globalThis as { jest?: unknown }).jest;
-    try {
-      delete (globalThis as { jest?: unknown }).jest;
-      expect(() => createMockDb()).toThrow(/outside Jest test context/);
-    } finally {
-      (globalThis as { jest?: unknown }).jest = originalJest;
-    }
-  });
-});
+// [CR-2026-05-21-183] Runtime test-context guard removed — production-misuse
+// protection lives entirely in `neon-mock.guard.test.ts` (static workspace grep).
+// The runtime `globalThis.jest` check false-positived in CI because many call
+// sites invoke createMockDb() at module top-level where the jest global isn't
+// guaranteed across all worker configurations.
