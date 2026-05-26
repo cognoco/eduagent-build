@@ -2,6 +2,7 @@ import {
   isMemoryFactsDedupEnabled,
   isMemoryFactsRelevanceEnabled,
   isProfileInDedupRollout,
+  isChallengeRoundRuntimeEnabled,
   isTopicIntentMatcherEnabled,
   validateEnv,
   validateProductionBindings,
@@ -36,6 +37,7 @@ describe('validateProductionKeys', () => {
     MAX_DEDUP_LLM_CALLS_PER_SESSION: '10',
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '0',
     MATCHER_ENABLED: 'false',
+    CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
   });
@@ -501,6 +503,24 @@ describe('validateEnv', () => {
     expect(isTopicIntentMatcherEnabled(undefined)).toBe(false);
     expect(isTopicIntentMatcherEnabled('yes')).toBe(false);
   });
+
+  it('CHALLENGE_ROUND_RUNTIME_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.CHALLENGE_ROUND_RUNTIME_ENABLED).toBe('false');
+    expect(
+      isChallengeRoundRuntimeEnabled(env.CHALLENGE_ROUND_RUNTIME_ENABLED),
+    ).toBe(false);
+  });
+
+  it('isChallengeRoundRuntimeEnabled returns true only for "true"', () => {
+    expect(isChallengeRoundRuntimeEnabled('true')).toBe(true);
+    expect(isChallengeRoundRuntimeEnabled('false')).toBe(false);
+    expect(isChallengeRoundRuntimeEnabled(undefined)).toBe(false);
+    expect(isChallengeRoundRuntimeEnabled('yes')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -564,9 +584,9 @@ describe('validateProductionBindings', () => {
     MAX_DEDUP_LLM_CALLS_PER_SESSION: 10,
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
+    CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
-    CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
   };
 
   const fakeKv = {} as unknown;

@@ -986,6 +986,62 @@ describe('useStreamMessage', () => {
     });
   });
 
+  it('forwards typed challenge round done fields into onDone', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+    const challengeRound = {
+      state: 'active',
+      startedAt: '2026-05-26T10:00:00.000Z',
+      questionIndex: 1,
+      totalQuestions: 3,
+      offerCount: 1,
+      topicId: '11111111-1111-4111-8111-111111111111',
+      declinedDontAskAgain: false,
+      evaluations: [],
+    };
+    const draftedNote = {
+      id: 'draft-1',
+      body: 'My challenge note',
+      sourceAnswerEventIds: ['answer-event-1'],
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'Done' };
+        yield {
+          type: 'done',
+          exchangeCount: 3,
+          escalationRung: 2,
+          challengeRound,
+          challengeOffer: { pitch: 'Want a harder round?' },
+          draftedNote,
+        };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    const onDone = jest.fn();
+
+    await act(async () => {
+      await result.current.stream('Hello', jest.fn(), onDone, 'session-1');
+    });
+
+    expect(onDone).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exchangeCount: 3,
+        escalationRung: 2,
+        challengeRound,
+        challengeOffer: { pitch: 'Want a harder round?' },
+        draftedNote,
+      }),
+    );
+  });
+
   it('queues overlapping stream calls instead of completing the second silently', async () => {
     const { streamSSEViaXHR } = require('../lib/sse') as {
       streamSSEViaXHR: jest.Mock;

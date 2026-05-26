@@ -405,6 +405,44 @@ describe('AppLayout', () => {
     jest.useRealTimers();
   });
 
+  it('[BUG] falls through to welcome when the intro SecureStore probe hangs', async () => {
+    jest.useFakeTimers();
+    const SecureStoreMock = require('../../lib/secure-storage');
+    const introKey = 'intro_seen_v1_user_test_1';
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user_test_1',
+    });
+    const getPreviewStateSpy = jest
+      .spyOn(require('../../lib/preview-onboarding-state'), 'getPreviewState')
+      .mockResolvedValue(null);
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === introKey
+          ? new Promise((resolve) => setTimeout(() => resolve(null), 60_000))
+          : Promise.resolve(null),
+    );
+
+    try {
+      renderLayout();
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByTestId('intro-state-loading')).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(2500);
+      });
+      await Promise.resolve();
+
+      expect(screen.getByTestId('redirect').props.href).toBe('/(app)/welcome');
+    } finally {
+      getPreviewStateSpy.mockRestore();
+    }
+  });
+
   it('renders guardian tab shell for accounts with linked children', async () => {
     renderLayout();
 
@@ -900,6 +938,91 @@ describe('AppLayout', () => {
     // await: probe-state effect must resolve before the consent gate renders.
     await screen.findByTestId('consent-pending-gate');
     expect(screen.getByText('Checking automatically…'));
+  });
+
+  it('[WI-374/WI-261] resend posts to /consent/resend with NO email — the masked address is never sent back', async () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          isOwner: false,
+          consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        isOwner: false,
+        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    // my-status returns the MASKED address (what the real endpoint does).
+    const MASKED = 'p***t@example.com';
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+            parentEmail: MASKED,
+            consentType: 'GDPR',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/consent/resend',
+      () =>
+        new Response(
+          JSON.stringify({
+            message: 'Consent request sent to parent',
+            consentType: 'GDPR',
+            emailStatus: 'sent',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    renderLayout();
+
+    const resendBtn = await screen.findByTestId('consent-resend');
+    mockFetch.mockClear();
+    fireEvent.press(resendBtn);
+
+    // A resend call lands on /consent/resend.
+    await waitFor(() => {
+      const hitResend = mockFetch.mock.calls.some(([input]) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : (input as Request).url;
+        return url.includes('/consent/resend');
+      });
+      expect(hitResend).toBe(true);
+    });
+
+    // No call carried the masked address, and no call hit /consent/request.
+    for (const [input, init] of mockFetch.mock.calls) {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : (input as Request).url;
+      const body = String((init as RequestInit | undefined)?.body ?? '');
+      expect(body).not.toContain(MASKED);
+      expect(body).not.toContain('parentEmail');
+      if (url.includes('/consent/')) {
+        expect(url).not.toContain('/consent/request');
+      }
+    }
   });
 
   // Permission setup gate is JIT-disabled — permissions are requested at

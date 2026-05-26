@@ -1199,6 +1199,11 @@ export function buildSystemPrompt(
       sections.push(challengeOfferPrompt);
     } else if (cr?.state === 'accepted' || cr?.state === 'active') {
       sections.push(challengeRoundActivePrompt);
+      if (cr.state === 'active' && context.currentUserMessageEventId) {
+        sections.push(
+          `CURRENT CHALLENGE ANSWER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.`,
+        );
+      }
     } else if (cr?.state === 'drafting') {
       sections.push(challengeRoundDraftingPrompt);
     }

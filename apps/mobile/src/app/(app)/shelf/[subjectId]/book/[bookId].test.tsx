@@ -103,27 +103,6 @@ jest.mock('../../../../../hooks/use-move-topic', () => ({
 }));
 
 jest.mock(
-  '../../../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
-  () => ({
-    useThemeColors: () => ({
-      accent: '#00bfa5',
-      primary: '#0d9488',
-      success: '#22c55e',
-      danger: '#ef4444',
-      textSecondary: '#888',
-      textInverse: '#fff',
-      surface: '#fff',
-    }),
-  }),
-);
-
-jest.mock('../../../../../lib/format-api-error', () => ({
-  ...jest.requireActual('../../../../../lib/format-api-error'),
-  formatApiError: (error: unknown) =>
-    error instanceof Error ? error.message : 'Unknown error',
-}));
-
-jest.mock(
   '../../../../../components/common' /* gc1-allow: native-boundary; animations use reanimated worklets/SVG modules in JSDOM */,
   () => ({
     BookPageFlipAnimation: () => null,

@@ -260,6 +260,26 @@ export const topicProgressSchema = z.object({
   struggleStatus: struggleStatusSchema,
   masteryScore: z.number().min(0).max(1).nullable(),
   masteryChallengeVerifiedAt: isoDateField.nullable().optional(),
+  /**
+   * Server-resolved Challenge Round verification state for the learner-visible
+   * surface (mobile topic screen + child dashboard). Computed via
+   * `resolveMasteryVerificationState` in
+   * `apps/api/src/services/challenge-round/verification.ts`. Mobile MUST read
+   * this field instead of treating `masteryChallengeVerifiedAt` as a boolean.
+   *
+   * - `'unverified'` — no Challenge Round has ever passed for this topic.
+   * - `'fresh'` — verified and no later weak-spot evidence has accumulated.
+   * - `'stale'` — verified, but a `needs_deepening_topics` row with
+   *   `status IN ('pending_review', 'active')` was created after the
+   *   verification timestamp.
+   *
+   * See docs/plans/2026-05-18-challenge-round-targets.md "Required
+   * Enablement Gate".
+   */
+  masteryVerificationState: z
+    .enum(['unverified', 'fresh', 'stale'])
+    .nullable()
+    .optional(),
   summaryExcerpt: z.string().nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']).nullable(),
   totalSessions: z.number().int().min(0),

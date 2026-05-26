@@ -25,7 +25,15 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
-import { createGrantedConsentState, revokeConsent } from './consent';
+import {
+  createGrantedConsentState,
+  revokeConsent,
+  requestConsent,
+  resendConsent,
+  ConsentResendLimitError,
+  ConsentRecipientChangeLimitError,
+  ConsentRequestNotFoundError,
+} from './consent';
 
 // ---------------------------------------------------------------------------
 // DB setup
@@ -404,5 +412,280 @@ describe('revokeConsent nudge-suppression (integration)', () => {
       where: eq(nudges.toProfileId, childId),
     });
     expect(after[0]!.readAt).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-374] Resend/recipient-change caps are request-keyed (integration)
+// ---------------------------------------------------------------------------
+//
+// The security break test for WI-374. Proves against a real Postgres that:
+//   1. Resend is capped per request (MAX_CONSENT_RESENDS) and reuses the
+//      stored email — the stored recipient never changes on resend.
+//   2. Rotating the recipient is SEPARATELY capped (MAX_RECIPIENT_CHANGES), so
+//      an abuser can no longer reset the resend cap indefinitely by rotating
+//      the recipient string (the pre-fix behaviour: changing the email reset
+//      resendCount to 0 with no cap on changes → unbounded consent-email
+//      bombing of arbitrary addresses).
+//
+// Email delivery is intentionally NOT exercised: calling requestConsent /
+// resendConsent WITHOUT emailOptions makes sendEmail return `no_api_key`,
+// which returns early WITHOUT rolling back the counter — so the cap logic is
+// driven purely by DB state and no external Resend call is made.
+// ---------------------------------------------------------------------------
+
+const WI374_PREFIX = 'integration-consent-wi374';
+const WI374_EMAIL = `${WI374_PREFIX}@integration.test`;
+const WI374_CLERK = `${WI374_PREFIX}-clerk`;
+const APP_URL = 'https://api.integration.test';
+
+async function cleanupWi374() {
+  const db = createIntegrationDb();
+  const accs = await db.query.accounts.findMany({
+    where: inArray(accounts.email, [WI374_EMAIL]),
+  });
+  if (accs.length > 0) {
+    await db.delete(accounts).where(
+      inArray(
+        accounts.id,
+        accs.map((a: typeof accounts.$inferSelect) => a.id),
+      ),
+    );
+  }
+}
+
+describe('[WI-374] request-keyed resend + capped recipient change (integration)', () => {
+  beforeEach(cleanupWi374);
+  afterAll(cleanupWi374);
+
+  async function seedChild(db: ReturnType<typeof createIntegrationDb>) {
+    const [account] = await db
+      .insert(accounts)
+      .values({ clerkUserId: WI374_CLERK, email: WI374_EMAIL })
+      .returning();
+    const [child] = await db
+      .insert(profiles)
+      .values({
+        accountId: account!.id,
+        displayName: 'WI374 Child',
+        birthYear: 2014,
+        isOwner: false,
+      })
+      .returning();
+    return child!.id;
+  }
+
+  it('resend is capped per request and reuses the stored email (never changes the recipient)', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    // Initial request (no emailOptions → no_api_key, row persists).
+    await requestConsent(
+      db,
+      {
+        childProfileId: childId,
+        parentEmail: 'real-parent@example.com',
+        consentType: 'GDPR',
+      },
+      APP_URL,
+    );
+
+    // MAX_CONSENT_RESENDS (3) resends succeed; each reuses the stored email.
+    for (let i = 0; i < 3; i++) {
+      await resendConsent(
+        db,
+        { childProfileId: childId, consentType: 'GDPR' },
+        APP_URL,
+      );
+    }
+
+    // The 4th resend exceeds the cap.
+    await expect(
+      resendConsent(
+        db,
+        { childProfileId: childId, consentType: 'GDPR' },
+        APP_URL,
+      ),
+    ).rejects.toBeInstanceOf(ConsentResendLimitError);
+
+    // Stored recipient is unchanged and the counter is pinned at the cap.
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(row!.parentEmail).toBe('real-parent@example.com');
+    expect(row!.resendCount).toBe(3);
+    expect(row!.recipientChangeCount).toBe(0);
+  });
+
+  it('[BREAK] rotating the recipient is bounded by MAX_RECIPIENT_CHANGES — rotation cannot reset the resend cap indefinitely', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    // Initial request to recipient A.
+    await requestConsent(
+      db,
+      {
+        childProfileId: childId,
+        parentEmail: 'a@example.com',
+        consentType: 'GDPR',
+      },
+      APP_URL,
+    );
+
+    // Three legitimate recipient changes succeed (A→B→C→D). Each resets the
+    // resend budget but consumes one of the MAX_RECIPIENT_CHANGES (3) slots.
+    for (const email of ['b@example.com', 'c@example.com', 'd@example.com']) {
+      await requestConsent(
+        db,
+        { childProfileId: childId, parentEmail: email, consentType: 'GDPR' },
+        APP_URL,
+      );
+    }
+
+    // The 4th rotation is rejected — pre-fix this would have reset the resend
+    // cap again (unbounded). Now it is capped.
+    await expect(
+      requestConsent(
+        db,
+        {
+          childProfileId: childId,
+          parentEmail: 'e@example.com',
+          consentType: 'GDPR',
+        },
+        APP_URL,
+      ),
+    ).rejects.toBeInstanceOf(ConsentRecipientChangeLimitError);
+
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    // Recipient stuck at the last accepted change (D); E was rejected.
+    expect(row!.parentEmail).toBe('d@example.com');
+    expect(row!.recipientChangeCount).toBe(3);
+  });
+
+  it('[CodeRabbit break] a resend does NOT revive a terminal CONSENTED row (no consent-state corruption)', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    // Seed an already-decided (CONSENTED) consent with budget remaining.
+    await db.insert(consentStates).values({
+      profileId: childId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: 'granted@example.com',
+      respondedAt: new Date(),
+      resendCount: 0,
+    });
+
+    // A resend must NOT flip it back to PARENTAL_CONSENT_REQUESTED.
+    await expect(
+      resendConsent(
+        db,
+        { childProfileId: childId, consentType: 'GDPR' },
+        APP_URL,
+      ),
+    ).rejects.toBeInstanceOf(ConsentRequestNotFoundError);
+
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(row!.status).toBe('CONSENTED');
+    expect(row!.resendCount).toBe(0);
+  });
+
+  it('the first real email after a PENDING (null-recipient) row is the initial request, not a recipient change', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    // Self-register flow seeds a PENDING row with no recipient yet.
+    await db.insert(consentStates).values({
+      profileId: childId,
+      consentType: 'GDPR',
+      status: 'PENDING',
+    });
+
+    // First real send assigns the recipient — must NOT burn a change slot.
+    await requestConsent(
+      db,
+      {
+        childProfileId: childId,
+        parentEmail: 'first@example.com',
+        consentType: 'GDPR',
+      },
+      APP_URL,
+    );
+
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(row!.parentEmail).toBe('first@example.com');
+    expect(row!.recipientChangeCount).toBe(0);
+
+    // The full MAX_RECIPIENT_CHANGES budget (3) is still available afterwards.
+    for (const email of ['b@example.com', 'c@example.com', 'd@example.com']) {
+      await requestConsent(
+        db,
+        { childProfileId: childId, parentEmail: email, consentType: 'GDPR' },
+        APP_URL,
+      );
+    }
+    await expect(
+      requestConsent(
+        db,
+        {
+          childProfileId: childId,
+          parentEmail: 'e@example.com',
+          consentType: 'GDPR',
+        },
+        APP_URL,
+      ),
+    ).rejects.toBeInstanceOf(ConsentRecipientChangeLimitError);
+  });
+
+  it('a single legitimate "wrong email" correction still works (AC3)', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    await requestConsent(
+      db,
+      {
+        childProfileId: childId,
+        parentEmail: 'typo@example.com',
+        consentType: 'GDPR',
+      },
+      APP_URL,
+    );
+
+    // Correct the typo once — allowed, and the corrected address gets a fresh
+    // resend budget.
+    await requestConsent(
+      db,
+      {
+        childProfileId: childId,
+        parentEmail: 'correct@example.com',
+        consentType: 'GDPR',
+      },
+      APP_URL,
+    );
+
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(row!.parentEmail).toBe('correct@example.com');
+    expect(row!.recipientChangeCount).toBe(1);
+    expect(row!.resendCount).toBe(0);
+
+    // And the corrected address can still be resent to.
+    await resendConsent(
+      db,
+      { childProfileId: childId, consentType: 'GDPR' },
+      APP_URL,
+    );
+    const after = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(after!.parentEmail).toBe('correct@example.com');
+    expect(after!.resendCount).toBe(1);
   });
 });

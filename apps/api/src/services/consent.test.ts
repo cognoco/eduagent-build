@@ -7,6 +7,7 @@ import {
   createGrantedConsentState,
   createPendingConsentState,
   requestConsent,
+  resendConsent,
   processConsentResponse,
   getConsentStatus,
   isConsentRevocationGenerationCurrent,
@@ -17,6 +18,8 @@ import {
   EmailDeliveryError,
   ConsentTokenExpiredError,
   ConsentRecordNotFoundError,
+  ConsentResendLimitError,
+  ConsentRequestNotFoundError,
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -441,6 +444,138 @@ describe('requestConsent', () => {
     );
 
     expect(result.consentState.consentType).toBe('COPPA');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resendConsent [WI-374] — resend reuses the STORED email, never a client value
+// ---------------------------------------------------------------------------
+
+describe('resendConsent [WI-374]', () => {
+  const CHILD_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('reuses the stored parent email server-side and never accepts a client email', async () => {
+    const row = mockConsentRow({ parentEmail: 'stored-parent@example.com' });
+    const db = createMockDb({ findFirstResult: row });
+
+    const result = await resendConsent(
+      db,
+      { childProfileId: CHILD_ID, consentType: 'GDPR' },
+      'https://api.mentomate.com',
+      EMAIL_OPTIONS,
+    );
+
+    expect(result.emailDelivered).toBe(true);
+    // The resend went out to the STORED recipient — not a client-supplied or
+    // masked address (the input shape has no email field at all).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0]!;
+    const body = String(init?.body);
+    expect(body).toContain('stored-parent@example.com');
+    expect(body).not.toContain('***');
+  });
+
+  it('issues an UPDATE (never an INSERT) so a resend cannot create a new request', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+
+    await resendConsent(
+      db,
+      { childProfileId: CHILD_ID, consentType: 'GDPR' },
+      'https://api.mentomate.com',
+      EMAIL_OPTIONS,
+    );
+
+    expect(db.update).toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('throws ConsentRequestNotFoundError when there is no request to resend', async () => {
+    // update matches nothing AND no row exists on the disambiguating read.
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(
+      resendConsent(
+        db,
+        { childProfileId: CHILD_ID, consentType: 'GDPR' },
+        'https://api.mentomate.com',
+        EMAIL_OPTIONS,
+      ),
+    ).rejects.toThrow(ConsentRequestNotFoundError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('throws ConsentResendLimitError when the cap is reached (row exists, update matched nothing)', async () => {
+    // Bespoke mock: the atomic capped UPDATE matches nothing (returning []),
+    // but the disambiguating read finds the row → cap was hit, not missing.
+    const existingRow = mockConsentRow();
+    const db = {
+      query: {
+        consentStates: {
+          findFirst: jest.fn().mockResolvedValue(existingRow),
+        },
+        profiles: {
+          findFirst: jest.fn().mockResolvedValue({ displayName: 'Test Child' }),
+        },
+      },
+      insert: jest.fn(),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+    } as unknown as Database;
+
+    await expect(
+      resendConsent(
+        db,
+        { childProfileId: CHILD_ID, consentType: 'GDPR' },
+        'https://api.mentomate.com',
+        EMAIL_OPTIONS,
+      ),
+    ).rejects.toThrow(ConsentResendLimitError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('throws EmailDeliveryError and rolls back the resend counter when delivery fails', async () => {
+    fetchMock.mockResolvedValueOnce(
+      createFetchResponse({ ok: false, status: 503 }),
+    );
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+
+    await expect(
+      resendConsent(
+        db,
+        { childProfileId: CHILD_ID, consentType: 'GDPR' },
+        'https://api.mentomate.com',
+        EMAIL_OPTIONS,
+      ),
+    ).rejects.toThrow(EmailDeliveryError);
+
+    // Two updates: the atomic increment, then the rollback decrement.
+    expect((db.update as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(
+      2,
+    );
+  });
+
+  it('returns emailDelivered false (no rollback) when the API key is missing', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+
+    const result = await resendConsent(
+      db,
+      { childProfileId: CHILD_ID, consentType: 'GDPR' },
+      'https://api.mentomate.com',
+      // no EMAIL_OPTIONS → no_api_key
+    );
+
+    expect(result.emailDelivered).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Only the initial atomic increment — no rollback for a config issue.
+    expect((db.update as jest.Mock).mock.calls.length).toBe(1);
   });
 });
 

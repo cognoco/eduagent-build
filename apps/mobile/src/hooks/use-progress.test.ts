@@ -25,13 +25,16 @@ import {
 } from './use-progress';
 import { queryKeys } from '../lib/query-keys';
 
-jest.mock('../lib/app-context' /* gc1-allow: progress hooks need deterministic mode state without AppContextProvider */, () => ({
-  useAppContext: () => ({
-    mode: null,
-    setMode: jest.fn(),
-    familyCapable: false,
+jest.mock(
+  '../lib/app-context' /* gc1-allow: progress hooks need deterministic mode state without AppContextProvider */,
+  () => ({
+    useAppContext: () => ({
+      mode: null,
+      setMode: jest.fn(),
+      familyCapable: false,
+    }),
   }),
-}));
+);
 
 // [CR-2026-05-19-H27] Mock the external Sentry boundary so the break test
 // below can assert captureException was called (not console.warn).
@@ -539,7 +542,12 @@ describe('useChildWeeklyReports — silent-403 escalation [CR-2026-05-19-H27]', 
 });
 
 describe('useRefreshProgressSnapshot', () => {
-  it('posts to refresh and invalidates progress/dashboard caches', async () => {
+  it('posts to refresh and dispatches snapshot-cache invalidation', async () => {
+    // This test asserts the mutation wires onSuccess to the helper.
+    // The helper's actual cache-invalidation effect (mode-agnostic predicate
+    // matching, profile scoping, dashboard breadth) is verified end-to-end
+    // by the `invalidateProgressSnapshotQueries` tests below using primed
+    // cache entries against the real registry shapes.
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -562,15 +570,12 @@ describe('useRefreshProgressSnapshot', () => {
     });
 
     expect(getMockFetchUrl()).toContain('/progress/refresh');
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['progress', 'inventory', 'test-profile-id'],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['progress', 'history', 'test-profile-id'],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['progress', 'milestones', 'test-profile-id'],
-    });
+    // PR 10: snapshot kinds (inventory/history/milestones) now dispatch via
+    // a predicate, not an inline key. Dashboard stays as a broad prefix
+    // pending its own narrowing PR.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ predicate: expect.any(Function) }),
+    );
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['dashboard'],
     });
@@ -578,24 +583,148 @@ describe('useRefreshProgressSnapshot', () => {
 });
 
 describe('invalidateProgressSnapshotQueries', () => {
-  it('invalidates progress-facing queries for the active profile', () => {
+  // Workflow tests (PR 10): the helper used to invalidate inline literals
+  // like `['progress', 'inventory', profileId]` that did not match the real
+  // registry shape `['progress', mode, 'inventory', profileId, ...]` — so
+  // every snapshot-refresh invalidation was silently a no-op. The tests now
+  // prime cache entries using the real `queryKeys` factories and assert the
+  // post-call invalidation state, so a regression to the broken behaviour
+  // fails loudly.
+  it('invalidates inventory/history/milestones for the active profile across modes', () => {
     createWrapper();
-    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const studyInventory = queryKeys.progress.inventory('study', 'profile-A');
+    const familyInventory = queryKeys.progress.inventory('family', 'profile-A');
+    const studyHistory = queryKeys.progress.history(
+      'study',
+      'profile-A',
+      undefined,
+    );
+    const studyMilestonesLimit5 = queryKeys.progress.milestones(
+      'study',
+      'profile-A',
+      5,
+    );
+    const studyMilestonesLimit10 = queryKeys.progress.milestones(
+      'study',
+      'profile-A',
+      10,
+    );
 
-    invalidateProgressSnapshotQueries(queryClient, 'test-profile-id');
+    queryClient.setQueryData(studyInventory, { profileId: 'profile-A' });
+    queryClient.setQueryData(familyInventory, { profileId: 'profile-A' });
+    queryClient.setQueryData(studyHistory, { dataPoints: [] });
+    queryClient.setQueryData(studyMilestonesLimit5, { milestones: [] });
+    queryClient.setQueryData(studyMilestonesLimit10, { milestones: [] });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['progress', 'inventory', 'test-profile-id'],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['progress', 'history', 'test-profile-id'],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['progress', 'milestones', 'test-profile-id'],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['dashboard'],
-    });
+    invalidateProgressSnapshotQueries(queryClient, 'profile-A');
+
+    expect(queryClient.getQueryState(studyInventory)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(familyInventory)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(studyHistory)?.isInvalidated).toBe(true);
+    expect(
+      queryClient.getQueryState(studyMilestonesLimit5)?.isInvalidated,
+    ).toBe(true);
+    expect(
+      queryClient.getQueryState(studyMilestonesLimit10)?.isInvalidated,
+    ).toBe(true);
+  });
+
+  it('does NOT invalidate snapshot queries for a different profile (shared-device safety)', () => {
+    createWrapper();
+    const profileAInventory = queryKeys.progress.inventory(
+      'study',
+      'profile-A',
+    );
+    const profileBInventory = queryKeys.progress.inventory(
+      'study',
+      'profile-B',
+    );
+    const profileBHistory = queryKeys.progress.history(
+      'study',
+      'profile-B',
+      undefined,
+    );
+    const profileBMilestones = queryKeys.progress.milestones(
+      'study',
+      'profile-B',
+      5,
+    );
+
+    queryClient.setQueryData(profileAInventory, { profileId: 'profile-A' });
+    queryClient.setQueryData(profileBInventory, { profileId: 'profile-B' });
+    queryClient.setQueryData(profileBHistory, { dataPoints: [] });
+    queryClient.setQueryData(profileBMilestones, { milestones: [] });
+
+    invalidateProgressSnapshotQueries(queryClient, 'profile-A');
+
+    expect(queryClient.getQueryState(profileAInventory)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(profileBInventory)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileBHistory)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileBMilestones)?.isInvalidated).toBe(
+      false,
+    );
+  });
+
+  it('does NOT invalidate non-snapshot progress queries (overview/subject/etc.)', () => {
+    // The helper's contract is snapshot queries only (inventory/history/
+    // milestones). Overview, subject progress, continue suggestion, and
+    // resume-target queries must be left untouched — they belong to mutation
+    // paths in other hooks (assessment, quiz, subject) and refreshing the
+    // snapshot does not invalidate live progress.
+    createWrapper();
+    const overviewKey = queryKeys.progress.overview('study', 'profile-A');
+    const subjectKey = queryKeys.progress.subject(
+      'study',
+      'sub-1',
+      'profile-A',
+    );
+    const continueKey = queryKeys.progress.continue('study', 'profile-A');
+
+    queryClient.setQueryData(overviewKey, { subjects: [] });
+    queryClient.setQueryData(subjectKey, { subjectId: 'sub-1' });
+    queryClient.setQueryData(continueKey, { suggestion: null });
+
+    invalidateProgressSnapshotQueries(queryClient, 'profile-A');
+
+    expect(queryClient.getQueryState(overviewKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(subjectKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(continueKey)?.isInvalidated).toBe(false);
+  });
+
+  it('invalidates dashboard queries broadly (intentional — PR-10 deferred)', () => {
+    // The dashboard prefix invalidation is intentionally broad — parent
+    // refresh must make every child surface stale (detail, sessions,
+    // inventory, history, reports, memory). PR-10 deferred narrowing this
+    // pending a workflow test that enumerates the full dashboard surface
+    // set; see the hint in invalidateProgressSnapshotQueries.
+    createWrapper();
+    const childDetail = queryKeys.dashboard.childDetail('family', 'child-1');
+    const childSessions = queryKeys.dashboard.childSessions(
+      'family',
+      'child-1',
+    );
+    const childInventory = queryKeys.dashboard.childInventory(
+      'family',
+      'child-1',
+    );
+
+    queryClient.setQueryData(childDetail, { profileId: 'child-1' });
+    queryClient.setQueryData(childSessions, { sessions: [] });
+    queryClient.setQueryData(childInventory, { profileId: 'child-1' });
+
+    invalidateProgressSnapshotQueries(queryClient, 'profile-A');
+
+    expect(queryClient.getQueryState(childDetail)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(childSessions)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(childInventory)?.isInvalidated).toBe(true);
   });
 });
 

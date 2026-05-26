@@ -1662,34 +1662,3 @@ export function buildDemoDashboard(): DemoDashboardData {
     ],
   };
 }
-
-// ---------------------------------------------------------------------------
-// Re-export shims — PR-2 surface-ownership-boundaries
-// Functions have moved to better-fitting homes. These shims keep all existing
-// internal consumers compiling without a sweep in this PR. Remove once call
-// sites are updated.
-// ---------------------------------------------------------------------------
-
-export {
-  calculateTrend,
-  calculateRetentionTrend,
-  calculateGuidedRatio,
-  buildProgressGuidance,
-} from './progress-helpers';
-
-export {
-  countGuidedMetrics,
-  countGuidedMetricsBatch,
-} from './session/session-analytics';
-export type { GuidedMetrics } from './session/session-analytics';
-
-export {
-  getProfileSessions,
-  getSessionMetadata,
-  formatSessionDisplayTitle,
-  parseEngagementSignal,
-} from './session/session-crud';
-export type {
-  ChildSession,
-  ChildSessionDrillScore,
-} from './session/session-crud';

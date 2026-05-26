@@ -26,14 +26,16 @@ import { like } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
   buildChildProgressSummariesBatch,
-  countGuidedMetrics,
-  countGuidedMetricsBatch,
   getChildDetail,
   getChildSessionDetail,
   getChildSessions,
   getChildSubjectTopics,
   getChildrenForParent,
 } from './dashboard';
+import {
+  countGuidedMetrics,
+  countGuidedMetricsBatch,
+} from './session/session-analytics';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 

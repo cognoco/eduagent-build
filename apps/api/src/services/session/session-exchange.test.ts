@@ -4,12 +4,20 @@ import {
   computeCorrectStreak,
   resolveExchangeLlmRouting,
   resolveChallengeRoundLlmRoutingRung,
+  resolveChallengeRoundRuntimeSignalState,
+  resolveChallengeRoundRuntimeStartState,
   checkExchangeLimit,
   resolveReadyToFinish,
   type ExchangeHistoryEvent,
 } from './session-exchange';
 import type { processMessage, streamMessage } from './session-exchange';
-import { ConflictError, MAX_EXCHANGES_PER_SESSION } from '@eduagent/schemas';
+import {
+  ConflictError,
+  MAX_EXCHANGES_PER_SESSION,
+  type ChallengeRoundEvaluationItem,
+  type ChallengeRoundSessionState,
+} from '@eduagent/schemas';
+import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
 import { SessionExchangeLimitError } from './session-crud';
 
@@ -467,6 +475,162 @@ describe('resolveChallengeRoundLlmRoutingRung', () => {
 
   it('keeps normal routing when no Challenge Round is in progress', () => {
     expect(resolveChallengeRoundLlmRoutingRung(2, undefined)).toBe(2);
+  });
+});
+
+describe('Challenge Round runtime state decisions', () => {
+  const topicId = '550e8400-e29b-41d4-a716-446655440000';
+  const answerEventId = '550e8400-e29b-41d4-a716-446655440010';
+  const evaluation: ChallengeRoundEvaluationItem = {
+    concept: 'inputs and energy',
+    result: 'solid',
+    evidence: 'The learner connected inputs to energy.',
+    answerEventId,
+    learnerQuote: 'Cells use inputs to make energy.',
+  };
+
+  it('starts an accepted round before the first Challenge Round question when runtime is enabled', () => {
+    const accepted: ChallengeRoundSessionState = {
+      state: 'accepted',
+      offerCount: 1,
+      topicId,
+      declinedDontAskAgain: false,
+      evaluations: [],
+    };
+
+    const result = resolveChallengeRoundRuntimeStartState({
+      runtimeEnabled: true,
+      challengeRound: accepted,
+    });
+
+    expect(result.shouldPersist).toBe(true);
+    expect(result.challengeRound).toEqual(
+      expect.objectContaining({
+        state: 'active',
+        questionIndex: 0,
+        totalQuestions: MAX_CHALLENGE_QUESTIONS,
+        topicId,
+      }),
+    );
+  });
+
+  it('does not start an accepted round while the runtime flag is disabled', () => {
+    const accepted: ChallengeRoundSessionState = {
+      state: 'accepted',
+      offerCount: 1,
+      topicId,
+      declinedDontAskAgain: false,
+      evaluations: [],
+    };
+
+    const result = resolveChallengeRoundRuntimeStartState({
+      runtimeEnabled: false,
+      challengeRound: accepted,
+    });
+
+    expect(result.shouldPersist).toBe(false);
+    expect(result.challengeRound).toBe(accepted);
+  });
+
+  it('creates an offered state only when the offer signal passes the server gate', () => {
+    const result = resolveChallengeRoundRuntimeSignalState({
+      runtimeEnabled: true,
+      challengeRound: undefined,
+      topicId,
+      challengeEligible: true,
+      challengeRoundOffer: true,
+      challengeRoundEvaluation: [],
+    });
+
+    expect(result.shouldPersist).toBe(true);
+    expect(result.challengeRound).toEqual(
+      expect.objectContaining({
+        state: 'offered',
+        topicId,
+        offerCount: 1,
+      }),
+    );
+  });
+
+  it('ignores offer signals while the runtime flag is disabled', () => {
+    const result = resolveChallengeRoundRuntimeSignalState({
+      runtimeEnabled: false,
+      challengeRound: undefined,
+      topicId,
+      challengeEligible: true,
+      challengeRoundOffer: true,
+      challengeRoundEvaluation: [],
+    });
+
+    expect(result.shouldPersist).toBe(false);
+    expect(result.challengeRound).toBeUndefined();
+  });
+
+  it('ignores offer signals when challenge readiness rejected the turn', () => {
+    const result = resolveChallengeRoundRuntimeSignalState({
+      runtimeEnabled: true,
+      challengeRound: undefined,
+      topicId,
+      challengeEligible: false,
+      challengeRoundOffer: true,
+      challengeRoundEvaluation: [],
+    });
+
+    expect(result.shouldPersist).toBe(false);
+    expect(result.challengeRound).toBeUndefined();
+  });
+
+  it('appends active-round evaluations and moves to drafting at the question cap', () => {
+    const active: ChallengeRoundSessionState = {
+      state: 'active',
+      offerCount: 1,
+      topicId,
+      declinedDontAskAgain: false,
+      questionIndex: MAX_CHALLENGE_QUESTIONS - 1,
+      totalQuestions: MAX_CHALLENGE_QUESTIONS,
+      evaluations: [],
+    };
+
+    const result = resolveChallengeRoundRuntimeSignalState({
+      runtimeEnabled: true,
+      challengeRound: active,
+      topicId,
+      challengeEligible: false,
+      challengeRoundOffer: false,
+      challengeRoundEvaluation: [evaluation],
+    });
+
+    expect(result.shouldPersist).toBe(true);
+    expect(result.challengeRound).toEqual(
+      expect.objectContaining({
+        state: 'drafting',
+        evaluations: [evaluation],
+      }),
+    );
+  });
+
+  it('does not advance an active round on an empty evaluation array', () => {
+    const active: ChallengeRoundSessionState = {
+      state: 'active',
+      offerCount: 1,
+      topicId,
+      declinedDontAskAgain: false,
+      questionIndex: MAX_CHALLENGE_QUESTIONS - 1,
+      totalQuestions: MAX_CHALLENGE_QUESTIONS,
+      evaluations: [],
+    };
+
+    const result = resolveChallengeRoundRuntimeSignalState({
+      runtimeEnabled: true,
+      challengeRound: active,
+      topicId,
+      challengeEligible: false,
+      challengeRoundOffer: false,
+      challengeRoundEvaluation: [],
+    });
+
+    expect(result.shouldPersist).toBe(false);
+    expect(result.challengeRound).toBe(active);
   });
 });
 

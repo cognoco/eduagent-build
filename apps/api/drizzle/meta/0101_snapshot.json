@@ -1,5 +1,5 @@
 {
-  "id": "eafac091-4210-4d9c-b460-d0e5c5c9b9f3",
+  "id": "f02e6182-71d1-4987-bc6e-5cced64033e9",
   "prevId": "44598904-49b4-4157-9f06-1c321a3bda15",
   "version": "7",
   "dialect": "postgresql",
@@ -629,166 +629,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.profile_quota_usage": {
-      "name": "profile_quota_usage",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "monthly_limit": {
-          "name": "monthly_limit",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "used_this_month": {
-          "name": "used_this_month",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "daily_limit": {
-          "name": "daily_limit",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "used_today": {
-          "name": "used_today",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "cycle_reset_at": {
-          "name": "cycle_reset_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "profile_quota_usage_sub_profile_idx": {
-          "name": "profile_quota_usage_sub_profile_idx",
-          "columns": [
-            {
-              "expression": "subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "profile_quota_usage_subscription_idx": {
-          "name": "profile_quota_usage_subscription_idx",
-          "columns": [
-            {
-              "expression": "subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "profile_quota_usage_subscription_id_subscriptions_id_fk": {
-          "name": "profile_quota_usage_subscription_id_subscriptions_id_fk",
-          "tableFrom": "profile_quota_usage",
-          "tableTo": "subscriptions",
-          "columnsFrom": ["subscription_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "profile_quota_usage_profile_id_profiles_id_fk": {
-          "name": "profile_quota_usage_profile_id_profiles_id_fk",
-          "tableFrom": "profile_quota_usage",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "profile_quota_usage_role_valid": {
-          "name": "profile_quota_usage_role_valid",
-          "value": "\"profile_quota_usage\".\"role\" IN ('owner', 'child')"
-        },
-        "profile_quota_usage_monthly_limit_non_negative": {
-          "name": "profile_quota_usage_monthly_limit_non_negative",
-          "value": "\"profile_quota_usage\".\"monthly_limit\" >= 0"
-        },
-        "profile_quota_usage_daily_limit_non_negative": {
-          "name": "profile_quota_usage_daily_limit_non_negative",
-          "value": "\"profile_quota_usage\".\"daily_limit\" IS NULL OR \"profile_quota_usage\".\"daily_limit\" >= 0"
-        },
-        "profile_quota_usage_month_non_negative": {
-          "name": "profile_quota_usage_month_non_negative",
-          "value": "\"profile_quota_usage\".\"used_this_month\" >= 0"
-        },
-        "profile_quota_usage_today_non_negative": {
-          "name": "profile_quota_usage_today_non_negative",
-          "value": "\"profile_quota_usage\".\"used_today\" >= 0"
-        }
-      },
-      "isRLSEnabled": true
-    },
     "public.quota_pools": {
       "name": "quota_pools",
       "schema": "",
@@ -1090,12 +930,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "amount": {
           "name": "amount",
           "type": "integer",
@@ -1151,33 +985,6 @@
           "method": "btree",
           "with": {}
         },
-        "top_up_credits_sub_profile_expires_idx": {
-          "name": "top_up_credits_sub_profile_expires_idx",
-          "columns": [
-            {
-              "expression": "subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "top_up_credits_rc_txn_id_idx": {
           "name": "top_up_credits_rc_txn_id_idx",
           "columns": [
@@ -1200,15 +1007,6 @@
           "tableFrom": "top_up_credits",
           "tableTo": "subscriptions",
           "columnsFrom": ["subscription_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "top_up_credits_profile_id_profiles_id_fk": {
-          "name": "top_up_credits_profile_id_profiles_id_fk",
-          "tableFrom": "top_up_credits",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -1957,6 +1755,13 @@
         },
         "resend_count": {
           "name": "resend_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "recipient_change_count": {
+          "name": "recipient_change_count",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
