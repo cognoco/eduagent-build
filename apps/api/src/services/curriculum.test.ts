@@ -1182,6 +1182,7 @@ describe('persistBookTopics', () => {
           skipped: boolean;
         }>
       | undefined,
+    simulateTopicSortOrderConflicts = false,
     insertedTopicRows = [] as Array<{
       id: string;
       sortOrder: number;
@@ -1209,9 +1210,16 @@ describe('persistBookTopics', () => {
         }),
       );
 
-    // Build rows for the transaction's topic query
-    const generatedRows =
-      insertedTopicRows.length > 0
+    let generatedRowsFromInsert:
+      | Array<ReturnType<typeof mockTopicRow>>
+      | undefined;
+
+    const buildGeneratedRows = () => {
+      if (generatedRowsFromInsert) {
+        return generatedRowsFromInsert;
+      }
+
+      return insertedTopicRows.length > 0
         ? insertedTopicRows.map((row, index) => ({
             ...mockTopicRow({
               id: row.id,
@@ -1231,7 +1239,12 @@ describe('persistBookTopics', () => {
             chapter: topic.chapter,
             skipped: false,
           }));
-    const insertedRows = [...existingTopics, ...generatedRows];
+    };
+
+    const buildInsertedRows = () => [
+      ...existingTopics,
+      ...buildGeneratedRows(),
+    ];
 
     // For getBookWithTopics after persist — need a fresh set of query mocks
     const postPersistBookRow = bookExists
@@ -1254,8 +1267,52 @@ describe('persistBookTopics', () => {
     const topicsFindMany = jest
       .fn()
       .mockResolvedValueOnce(existingTopics) // existing check in persistBookTopics
-      .mockResolvedValueOnce(insertedRows) // transaction re-read
-      .mockResolvedValueOnce(insertedRows); // getBookWithTopics
+      .mockImplementationOnce(async () => buildInsertedRows()) // transaction re-read
+      .mockImplementationOnce(async () => buildInsertedRows()); // getBookWithTopics
+
+    const insertValues = jest.fn((values: unknown) => {
+      const rows = Array.isArray(values) ? values : [values];
+      if (
+        rows.every(
+          (
+            row,
+          ): row is {
+            title: string;
+            sortOrder: number;
+            bookId: string;
+          } =>
+            typeof row === 'object' &&
+            row !== null &&
+            'title' in row &&
+            'sortOrder' in row &&
+            'bookId' in row,
+        )
+      ) {
+        const occupiedSortOrders = new Set(
+          existingTopics.map((topic) => topic.sortOrder),
+        );
+        generatedRowsFromInsert = rows
+          .filter(
+            (row) =>
+              !simulateTopicSortOrderConflicts ||
+              !occupiedSortOrders.has(row.sortOrder),
+          )
+          .map((row, index) => ({
+            ...mockTopicRow({
+              id: `inserted-topic-${index}`,
+              sortOrder: row.sortOrder,
+              title: row.title,
+            }),
+            bookId: row.bookId,
+            skipped: false,
+          }));
+      }
+
+      return {
+        returning: jest.fn().mockResolvedValue([]),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      };
+    });
 
     const db = {
       query: {
@@ -1282,10 +1339,7 @@ describe('persistBookTopics', () => {
         }),
       }),
       insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
-        }),
+        values: insertValues,
       }),
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
@@ -1361,6 +1415,33 @@ describe('persistBookTopics', () => {
             skipped: true,
           },
         ],
+      });
+
+      const result = await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections,
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(result.book.topicsGenerated).toBe(true);
+      expect(result.topics.filter((topic) => !topic.skipped)).toHaveLength(
+        sampleTopics.length,
+      );
+    });
+
+    it('[WI-142] avoids sort-order conflicts when repairing skipped-only rows', async () => {
+      const db = createPersistMockDb({
+        simulateTopicSortOrderConflicts: true,
+        existingTopicRows: sampleTopics.map((topic) => ({
+          id: `skipped-topic-${topic.sortOrder}`,
+          title: `Discarded ${topic.title}`,
+          sortOrder: topic.sortOrder,
+          skipped: true,
+        })),
       });
 
       const result = await persistBookTopics(

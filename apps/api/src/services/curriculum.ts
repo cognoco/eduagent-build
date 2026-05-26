@@ -1528,14 +1528,27 @@ export async function persistBookTopics(
     );
   }
 
+  const hasOnlySkippedExistingTopics =
+    existingTopics.length > 0 && existingActiveTopics.length === 0;
+  const maxExistingSortOrder =
+    existingTopics.length > 0
+      ? Math.max(...existingTopics.map((topic) => topic.sortOrder))
+      : 0;
+  const topicsToInsert = hasOnlySkippedExistingTopics
+    ? topics.map((topic, index) => ({
+        ...topic,
+        sortOrder: maxExistingSortOrder + index + 1,
+      }))
+    : topics;
+
   // Wrap topic + connection inserts + flag update in a transaction
   // so a partial failure doesn't leave a half-generated book.
   await db.transaction(async (tx) => {
-    if (topics.length > 0) {
+    if (topicsToInsert.length > 0) {
       await tx
         .insert(curriculumTopics)
         .values(
-          topics.map((topic) => ({
+          topicsToInsert.map((topic) => ({
             curriculumId: curriculum.id,
             title: topic.title,
             description: topic.description,
@@ -1557,13 +1570,22 @@ export async function persistBookTopics(
       orderBy: asc(curriculumTopics.sortOrder),
     });
 
+    const activeInsertedTopicRows = insertedTopicRows.filter(
+      (topic) => !topic.skipped,
+    );
+    if (activeInsertedTopicRows.length < MIN_GENERATED_BOOK_TOPICS) {
+      throw new Error(
+        `Generated book topics persisted only ${activeInsertedTopicRows.length} active topics`,
+      );
+    }
+
     // Map DB rows by sortOrder for stable resolution (titles may collide)
     const topicIdBySortOrder = new Map(
       insertedTopicRows.map((topic) => [topic.sortOrder, topic.id]),
     );
     // Map LLM-generated titles to their sortOrder (first occurrence wins)
     const sortOrderByTitle = new Map<string, number>();
-    for (const topic of topics) {
+    for (const topic of topicsToInsert) {
       const titleKey = normalizeTopicTitle(topic.title);
       if (!sortOrderByTitle.has(titleKey)) {
         sortOrderByTitle.set(titleKey, topic.sortOrder);
