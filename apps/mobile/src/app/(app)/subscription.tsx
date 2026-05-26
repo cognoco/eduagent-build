@@ -10,17 +10,12 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import * as SecureStore from '../../lib/secure-storage';
-import { migrateSecureStoreKey } from '../../lib/migrate-secure-store-key';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import type {
   PurchasesPackage,
   PurchasesOffering,
-  CustomerInfo,
-  PurchasesError,
 } from 'react-native-purchases';
-import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { subscriptionResponseSchema } from '@eduagent/schemas';
@@ -29,8 +24,7 @@ import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 
-import { TimeoutLoader, UsageMeter } from '../../components/common';
-import { TrackedView } from '../../components/common/TrackedView';
+import { TimeoutLoader } from '../../components/common';
 import {
   useSubscription,
   useUsage,
@@ -38,7 +32,6 @@ import {
   useJoinByokWaitlist,
   useRemoveFamilyProfile,
   fetchUsageData,
-  type SubscriptionTier,
 } from '../../hooks/use-subscription';
 import {
   useOfferings,
@@ -46,593 +39,35 @@ import {
   usePurchase,
   useRestorePurchases,
 } from '../../hooks/use-revenuecat';
-import { useNotifyParentSubscribe } from '../../hooks/use-settings';
-import { useXpSummary } from '../../hooks/use-streaks';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { track } from '../../lib/analytics';
-import type { Translate, TranslateKey } from '../../i18n';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/**
- * Static tier features for display when RevenueCat offerings are unavailable.
- *
- * BUG-899: Only Free and Plus are surfaced to end-users. Family/Pro tiers
- * exist server-side but their store SKUs are not approved for public listing
- * (see `pricing_dual_cap.md`). Showing them as upgrade options creates
- * marketing/legal exposure and contradicts approved pricing.
- */
-// Feature key indices per tier — resolved via t() in component using subscriptionScreen.tierFeatures.*
-const TIER_FEATURE_INDICES: Array<{
-  tier: SubscriptionTier;
-  count: number;
-}> = [
-  { tier: 'free', count: 4 },
-  { tier: 'plus', count: 4 },
-];
-
-/**
- * [BUG-917] When the user is already on the Family tier, append a Family
- * card to the comparison so they can see their entitlements next to lower
- * tiers. The card is read-only (no purchase action) since Family is sold
- * through a separate channel — this preserves BUG-899 (no upsell to public
- * users) while fixing the visibility gap for Family customers.
- */
-const FAMILY_TIER_ENTRY: { tier: SubscriptionTier; count: number } = {
-  tier: 'family',
-  count: 4,
-};
-
-/**
- * [BUG-917] Same fix for Pro tier: when the user is already on Pro, append a
- * Pro card so they can see their entitlements alongside Free/Plus. Pro is not
- * sold through the public store, so the card is read-only (same reasoning as
- * FAMILY_TIER_ENTRY above).
- */
-const PRO_TIER_ENTRY: { tier: SubscriptionTier; count: number } = {
-  tier: 'pro',
-  count: 4,
-};
-
-const TIER_LABEL_KEYS: Record<SubscriptionTier, TranslateKey> = {
-  free: 'subscriptionScreen.tierLabels.free',
-  plus: 'subscriptionScreen.tierLabels.plus',
-  family: 'subscriptionScreen.tierLabels.family',
-  pro: 'subscriptionScreen.tierLabels.pro',
-};
-
-const TIER_LIMIT_KEYS: Record<SubscriptionTier, TranslateKey> = {
-  free: 'subscriptionScreen.tierLimits.free',
-  plus: 'subscriptionScreen.tierLimits.plus',
-  family: 'subscriptionScreen.tierLimits.family',
-  pro: 'subscriptionScreen.tierLimits.pro',
-};
-
-function getTiersToCompare(
-  currentTier: SubscriptionTier,
-): Array<{ tier: SubscriptionTier; count: number }> {
-  if (currentTier === 'family') {
-    return [...TIER_FEATURE_INDICES, FAMILY_TIER_ENTRY];
-  }
-  if (currentTier === 'pro') {
-    return [...TIER_FEATURE_INDICES, PRO_TIER_ENTRY];
-  }
-  return TIER_FEATURE_INDICES;
-}
-
-function getTierLabel(tier: SubscriptionTier, t: Translate): string {
-  return t(TIER_LABEL_KEYS[tier]);
-}
-
-function getTierLimit(tier: SubscriptionTier, t: Translate): string {
-  return t(TIER_LIMIT_KEYS[tier]);
-}
-
-function getTierFeatureLabel(
-  tier: SubscriptionTier,
-  index: number,
-  t: Translate,
-): string {
-  return t(`subscriptionScreen.tierFeatures.${tier}.${index}` as TranslateKey);
-}
-
-function childCountBucket(count: number): '0' | '1' | '2-3' | '4+' {
-  if (count <= 0) return '0';
-  if (count === 1) return '1';
-  if (count <= 3) return '2-3';
-  return '4+';
-}
-
-/** Map RevenueCat PACKAGE_TYPE to i18n key suffixes for subscriptionScreen.packagePeriod.* */
-const PACKAGE_PERIOD_KEY: Partial<Record<PACKAGE_TYPE, TranslateKey>> = {
-  [PACKAGE_TYPE.MONTHLY]: 'subscriptionScreen.packagePeriod.monthly',
-  [PACKAGE_TYPE.ANNUAL]: 'subscriptionScreen.packagePeriod.annual',
-  [PACKAGE_TYPE.SIX_MONTH]: 'subscriptionScreen.packagePeriod.sixMonth',
-  [PACKAGE_TYPE.THREE_MONTH]: 'subscriptionScreen.packagePeriod.threeMonth',
-  [PACKAGE_TYPE.TWO_MONTH]: 'subscriptionScreen.packagePeriod.twoMonth',
-  [PACKAGE_TYPE.WEEKLY]: 'subscriptionScreen.packagePeriod.weekly',
-  [PACKAGE_TYPE.LIFETIME]: 'subscriptionScreen.packagePeriod.lifetime',
-};
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getPackagePeriodLabel(pkg: PurchasesPackage, t: Translate): string {
-  const key = PACKAGE_PERIOD_KEY[pkg.packageType];
-  return key ? t(key) : pkg.identifier;
-}
-
-function isTopUpPackage(pkg: PurchasesPackage): boolean {
-  return (
-    pkg.packageType === PACKAGE_TYPE.CUSTOM &&
-    pkg.product.identifier.includes('topup')
-  );
-}
-
-/**
- * Checks whether a RevenueCat error represents a user-initiated cancellation.
- * User cancellations are not real errors — the user simply dismissed the
- * native payment sheet.
- */
-function isPurchaseCancelledError(error: unknown): boolean {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as PurchasesError).code ===
-      PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR
-  ) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * Checks whether a RevenueCat error indicates the product has already been
- * purchased (e.g. user already owns this entitlement on another device).
- * When this occurs, the user should restore rather than re-purchase.
- */
-function isProductAlreadyPurchasedError(error: unknown): boolean {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as PurchasesError).code ===
-      PURCHASES_ERROR_CODE.PRODUCT_ALREADY_PURCHASED_ERROR
-  ) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * Checks whether a RevenueCat error is a network error.
- */
-function isNetworkError(error: unknown): boolean {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    ((error as PurchasesError).code === PURCHASES_ERROR_CODE.NETWORK_ERROR ||
-      (error as PurchasesError).code ===
-        PURCHASES_ERROR_CODE.OFFLINE_CONNECTION_ERROR)
-  ) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * Returns the active entitlement identifier (e.g. "pro", "plus") from
- * CustomerInfo, or null if no entitlement is active.
- */
-function getActiveEntitlement(
-  customerInfo: CustomerInfo | null | undefined,
-): string | null {
-  if (!customerInfo) return null;
-  const activeEntitlements = customerInfo.entitlements.active;
-  const keys = Object.keys(activeEntitlements);
-  if (keys.length === 0) return null;
-  // Return the first active entitlement — for a single-entitlement setup
-  return keys[0] ?? null;
-}
-
-/**
- * Opens the platform-specific subscription management page.
- */
-async function openSubscriptionManagement(): Promise<void> {
-  if (Platform.OS === 'ios') {
-    await Linking.openURL('https://apps.apple.com/account/subscriptions');
-  } else {
-    await Linking.openURL(
-      'https://play.google.com/store/account/subscriptions',
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// PackageOption — displays a single purchasable package
-// ---------------------------------------------------------------------------
-
-interface PackageOptionProps {
-  pkg: PurchasesPackage;
-  isCurrentPlan: boolean;
-  onSelect: (pkg: PurchasesPackage) => void;
-  isPurchasing: boolean;
-}
-
-function PackageOption({
-  pkg,
-  isCurrentPlan,
-  onSelect,
-  isPurchasing,
-}: PackageOptionProps): React.ReactElement {
-  const { t } = useTranslation();
-  return (
-    <Pressable
-      onPress={() => !isCurrentPlan && onSelect(pkg)}
-      disabled={isCurrentPlan || isPurchasing}
-      className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
-        isCurrentPlan ? 'border border-primary' : ''
-      }`}
-      accessibilityLabel={
-        isCurrentPlan
-          ? t(
-              'subscriptionScreen.packageOption.currentPlanAccessibilityLabel',
-              {
-                title: pkg.product.title,
-                price: pkg.product.priceString,
-              },
-            )
-          : t(
-              'subscriptionScreen.packageOption.subscribePlanAccessibilityLabel',
-              {
-                title: pkg.product.title,
-                price: pkg.product.priceString,
-              },
-            )
-      }
-      accessibilityRole="button"
-      testID={`package-option-${pkg.identifier}`}
-    >
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1 mr-2">
-          <Text className="text-body font-semibold text-text-primary">
-            {pkg.product.title}
-          </Text>
-          <Text className="text-caption text-text-secondary mt-0.5">
-            {pkg.product.priceString} /{' '}
-            {getPackagePeriodLabel(pkg, t).toLowerCase()}
-          </Text>
-          {pkg.product.description ? (
-            <Text className="text-caption text-text-secondary mt-0.5">
-              {pkg.product.description}
-            </Text>
-          ) : null}
-        </View>
-        {isCurrentPlan ? (
-          <Text className="text-caption font-semibold text-primary">
-            {t('subscriptionScreen.packageOption.currentPlanLabel')}
-          </Text>
-        ) : (
-          <Text className="text-caption font-semibold text-primary">
-            {isPurchasing
-              ? t('subscriptionScreen.packageOption.processingLabel')
-              : t('subscriptionScreen.packageOption.subscribeLabel')}
-          </Text>
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ChildPaywall — shown when a child profile's subscription has expired
-// ---------------------------------------------------------------------------
-
-const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-// BUG-399: Account-scoped key — BYOK waitlist is per-account email, not per-profile.
-const BYOK_JOINED_KEY = 'byok-waitlist-joined';
-
-// Key renamed from colon to dash delimiter — colons caused SecureStore
-// crashes on some Android devices. See migrate-secure-store-key.ts.
-function getNotifyStorageKey(profileId: string): string {
-  return `child-paywall-notified-at-${profileId}`;
-}
-
-/** @deprecated Old colon-delimited key — used only for migration. */
-function getLegacyNotifyStorageKey(profileId: string): string {
-  return `child-paywall-notified-at:${profileId}`;
-}
-
-function computeCooldownMsRemaining(notifiedAtMs: number): number {
-  const elapsed = Date.now() - notifiedAtMs;
-  return Math.max(0, NOTIFY_COOLDOWN_MS - elapsed);
-}
-
-function formatCooldownLabel(msRemaining: number, t: Translate): string {
-  if (msRemaining <= 0)
-    return t('subscriptionScreen.childPaywall.cooldownZero');
-
-  if (msRemaining >= 60 * 60 * 1000) {
-    const hours = Math.ceil(msRemaining / (60 * 60 * 1000));
-    return t('subscriptionScreen.childPaywall.cooldownHours', {
-      count: hours,
-    });
-  }
-
-  if (msRemaining >= 60_000) {
-    const minutes = Math.ceil(msRemaining / 60_000);
-    return t('subscriptionScreen.childPaywall.cooldownMinutes', {
-      count: minutes,
-    });
-  }
-
-  const seconds = Math.ceil(msRemaining / 1000);
-  return t('subscriptionScreen.childPaywall.cooldownSeconds', {
-    count: seconds,
-  });
-}
-
-function ChildPaywall(): React.ReactElement {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const colors = useThemeColors();
-  const { activeProfile } = useProfile();
-  const notifyParent = useNotifyParentSubscribe();
-  const { data: xpSummary } = useXpSummary();
-  const { t } = useTranslation();
-
-  const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
-  const [cooldownMsRemaining, setCooldownMsRemaining] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const profileId = activeProfile?.id ?? '';
-
-  // BM-07: migration and restore must run sequentially — the restore reads
-  // the new key that migration writes.  A single effect chains them to avoid
-  // a race where restore fires before migration finishes writing.
-  useEffect(() => {
-    if (!profileId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        // Step 1: migrate legacy key → new key (no-ops if already migrated)
-        await migrateSecureStoreKey(
-          getLegacyNotifyStorageKey(profileId),
-          getNotifyStorageKey(profileId),
-        );
-        if (cancelled) return;
-        // Step 2: restore persisted notified timestamp
-        const value = await SecureStore.getItemAsync(
-          getNotifyStorageKey(profileId),
-        );
-        if (cancelled) return;
-        if (!value) return;
-        const ts = Number(value);
-        if (Number.isNaN(ts)) return;
-        const remaining = computeCooldownMsRemaining(ts);
-        if (remaining > 0) {
-          setNotifiedAt(ts);
-          setCooldownMsRemaining(remaining);
-        }
-      } catch {
-        /* SecureStore unavailable */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId]);
-
-  // Update countdown more frequently near expiry so the button re-enables on time.
-  useEffect(() => {
-    if (notifiedAt === null) return;
-
-    const update = () => {
-      const remaining = computeCooldownMsRemaining(notifiedAt);
-      setCooldownMsRemaining(remaining);
-      if (remaining <= 0) {
-        setNotifiedAt(null);
-        timerRef.current = null;
-        return;
-      }
-
-      const nextTick = remaining <= 60_000 ? 1000 : 60_000;
-      timerRef.current = setTimeout(update, nextTick);
-    };
-
-    update();
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [notifiedAt]);
-
-  const isNotified = notifiedAt !== null && cooldownMsRemaining > 0;
-
-  const handleNotify = useCallback(async () => {
-    try {
-      const result = await notifyParent.mutateAsync();
-      if (result.rateLimited) {
-        // Server says rate-limited — persist the current timestamp as fallback
-        const now = Date.now();
-        setNotifiedAt(now);
-        if (profileId) {
-          void SecureStore.setItemAsync(
-            getNotifyStorageKey(profileId),
-            String(now),
-          ).catch(() => undefined);
-        }
-      } else if (result.sent) {
-        const now = Date.now();
-        setNotifiedAt(now);
-        if (profileId) {
-          void SecureStore.setItemAsync(
-            getNotifyStorageKey(profileId),
-            String(now),
-          ).catch(() => undefined);
-        }
-        platformAlert(
-          t('subscription.childPaywall.alerts.sentTitle'),
-          t('subscription.childPaywall.alerts.sentBody'),
-        );
-      } else {
-        platformAlert(
-          t('subscription.childPaywall.alerts.askParentTitle'),
-          t('subscription.childPaywall.alerts.askParentBody'),
-        );
-      }
-    } catch {
-      platformAlert(
-        t('subscription.childPaywall.alerts.notifyErrorTitle'),
-        t('subscription.childPaywall.alerts.notifyErrorBody'),
-      );
-    }
-  }, [notifyParent, profileId]);
-
-  const topicsLearned = xpSummary?.topicsCompleted ?? 0;
-  const totalXp = xpSummary?.totalXp ?? 0;
-
-  return (
-    <View
-      className="flex-1 bg-background"
-      style={{ paddingTop: insets.top }}
-      testID="child-paywall"
-    >
-      <View className="px-5 pt-4 pb-2 flex-row items-center">
-        <Pressable
-          onPress={() => router.replace('/(app)/more')}
-          className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
-          accessibilityLabel={t(
-            'subscription.childPaywall.backAccessibilityLabel',
-          )}
-          accessibilityRole="button"
-        >
-          <Text className="text-primary text-body font-semibold">
-            {t('subscription.childPaywall.back')}
-          </Text>
-        </Pressable>
-      </View>
-
-      <View className="flex-1 px-5 items-center justify-center">
-        <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
-          {t('subscription.childPaywall.headline')}
-        </Text>
-        <Text className="text-body text-text-secondary mb-2 text-center">
-          {topicsLearned > 0 || totalXp > 0
-            ? t('subscription.childPaywall.xpStats', {
-                count: topicsLearned,
-                xp: totalXp,
-              })
-            : t('subscription.childPaywall.greatStart')}
-        </Text>
-        <Text className="text-body text-text-secondary mb-8 text-center">
-          {t('subscription.childPaywall.usedAllQuestions')}
-        </Text>
-
-        <Pressable
-          onPress={handleNotify}
-          disabled={notifyParent.isPending || isNotified}
-          className={`rounded-button py-3.5 px-8 items-center mb-3 w-full ${
-            isNotified ? 'bg-muted' : 'bg-primary'
-          }`}
-          testID="notify-parent-button"
-          accessibilityRole="button"
-          accessibilityLabel={
-            isNotified
-              ? t('subscription.childPaywall.notifyButtonAccessibilityNotified')
-              : t('subscription.childPaywall.notifyButtonAccessibilityNotify')
-          }
-        >
-          {notifyParent.isPending ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <Text
-              className={`text-body font-semibold ${
-                isNotified ? 'text-text-secondary' : 'text-text-inverse'
-              }`}
-            >
-              {isNotified
-                ? t('subscription.childPaywall.notifyButtonNotified')
-                : t('subscription.childPaywall.notifyButton')}
-            </Text>
-          )}
-        </Pressable>
-
-        {isNotified && (
-          <Text
-            className="text-body-sm text-text-secondary text-center mb-3"
-            testID="notify-countdown"
-          >
-            {t('subscription.childPaywall.cooldownReminder', {
-              label: formatCooldownLabel(cooldownMsRemaining, t),
-            })}
-          </Text>
-        )}
-
-        {isNotified ? (
-          <Text
-            className="text-body-sm text-text-secondary text-center mb-4"
-            testID="notified-explore-text"
-          >
-            {t('subscription.childPaywall.notifiedExploreText')}
-          </Text>
-        ) : (
-          <Text className="text-body-sm text-text-secondary text-center mb-4">
-            {t('subscription.childPaywall.waitText')}
-          </Text>
-        )}
-
-        <Pressable
-          onPress={() => router.push('/(app)/library')}
-          className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
-          testID="browse-library-button"
-          accessibilityRole="button"
-          accessibilityLabel={t(
-            'subscription.childPaywall.browseLibraryAccessibilityLabel',
-          )}
-        >
-          <Text className="text-body font-semibold text-primary">
-            {t('subscription.childPaywall.browseLibrary')}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push('/(app)/progress')}
-          className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
-          testID="see-progress-button"
-          accessibilityRole="button"
-          accessibilityLabel={t(
-            'subscription.childPaywall.seeProgressAccessibilityLabel',
-          )}
-        >
-          <Text className="text-body font-semibold text-primary">
-            {t('subscription.childPaywall.seeProgress')}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push('/(app)/home')}
-          className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
-          testID="go-home-button"
-          accessibilityRole="button"
-          accessibilityLabel={t(
-            'subscription.childPaywall.goHomeAccessibilityLabel',
-          )}
-        >
-          <Text className="text-body font-semibold text-primary">
-            {t('subscription.childPaywall.goHome')}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
+import {
+  getTiersToCompare,
+  getTierLabel,
+  getTierLimit,
+  getTierFeatureLabel,
+  childCountBucket,
+} from './_subscription/tier-helpers';
+import {
+  isTopUpPackage,
+  isPurchaseCancelledError,
+  isProductAlreadyPurchasedError,
+  isNetworkError,
+  getActiveEntitlement,
+  openSubscriptionManagement,
+} from './_subscription/purchase-errors';
+import { PackageOption } from './_subscription/_components/PackageOption';
+import { ChildPaywall } from './_subscription/_components/ChildPaywall';
+import { SubscriptionHeader } from './_subscription/_components/SubscriptionHeader';
+import { SubscriptionUsageCard } from './_subscription/_components/SubscriptionUsageCard';
+import {
+  deriveTierState,
+  deriveOfferingsState,
+  deriveChildPaywallGate,
+} from './_subscription/_view-models/subscription-derived-state';
+import { useMountedRef } from './_subscription/_hooks/use-mounted-ref';
+import { usePurchaseConfirmationPoll } from './_subscription/_hooks/use-purchase-confirmation-poll';
+import { useByokJoinedFlag } from './_subscription/_hooks/use-byok-joined-flag';
 
 // ---------------------------------------------------------------------------
 // Main Subscription Screen
@@ -713,23 +148,7 @@ function SubscriptionContent(): React.ReactElement | null {
   }, [isOwnerProfile, linkedChildCount, usage]);
 
   // BUG-399: Persistent "already joined" flag for BYOK waitlist
-  const [byokJoined, setByokJoined] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const stored = await SecureStore.getItemAsync(BYOK_JOINED_KEY);
-        if (!cancelled && stored === 'true') {
-          setByokJoined(true);
-        }
-      } catch {
-        // SecureStore may throw on web or restricted environments
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { byokJoined, markJoined: markByokJoined } = useByokJoinedFlag();
 
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
@@ -751,36 +170,35 @@ function SubscriptionContent(): React.ReactElement | null {
   // Track mount state so the top-up polling loop can bail out if the user
   // navigates away mid-poll (prevents setState-on-unmounted warnings and
   // unnecessary query invalidations).
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  const mountedRef = useMountedRef();
+  // Polling hook used by handleRestore / handlePurchase / handleTopUp to wait
+  // for webhook-confirmed state changes after a store-side purchase.
+  const poll = usePurchaseConfirmationPoll();
 
   // Non-owner profiles that do NOT need the child paywall redirect to home.
   // We compute this early so the useEffect runs unconditionally (React hooks
   // rules require all hooks before any conditional early-returns below).
   // The effect is a no-op when data is still loading or the paywall should show.
-  const isChildEarly = activeProfile ? !isOwnerProfile : false;
-  const subHasLoadErrorEarly =
-    (subError && !subscription) || (usageError && !usage);
-  const trialOrExpiredEarly =
-    !subHasLoadErrorEarly &&
-    (subscription?.status === 'expired' ||
-      subscription?.status === 'cancelled' ||
-      (!subscription && !subLoading));
-  const quotaExhaustedEarly =
-    !subHasLoadErrorEarly && usage?.warningLevel === 'exceeded';
-  const showPaywall =
-    isChildEarly && (trialOrExpiredEarly || quotaExhaustedEarly);
+  const childGate = deriveChildPaywallGate({
+    isOwnerProfile,
+    hasActiveProfile: Boolean(activeProfile),
+    subscriptionStatus: subscription?.status,
+    subscriptionIsLoading: subLoading,
+    usageWarningLevel: usage?.warningLevel,
+    subscriptionLoadError: Boolean(subError),
+    usageLoadError: Boolean(usageError),
+    hasSubscriptionData: Boolean(subscription),
+    hasUsageData: Boolean(usage),
+  });
+  const { isChild, hasLoadError, trialOrExpired, quotaExhausted, showPaywall } =
+    childGate;
   useEffect(() => {
     // Redirect children who don't need the paywall (active sub or load error)
     // away from the owner-only management UI.
-    if (isChildEarly && !subLoading && !usageLoading && !showPaywall) {
+    if (isChild && !subLoading && !usageLoading && !showPaywall) {
       router.replace('/');
     }
-  }, [isChildEarly, subLoading, usageLoading, showPaywall, router]);
+  }, [isChild, subLoading, usageLoading, showPaywall, router]);
 
   // RevenueCat hooks
   const {
@@ -818,24 +236,11 @@ function SubscriptionContent(): React.ReactElement | null {
     // BUG-397: RevenueCat's CustomerInfo is a local snapshot — the webhook
     // may not have processed yet, so poll the API (same pattern as top-up)
     // waiting for a paid subscription tier.
-    if (!mountedRef.current) {
-      topUpInFlightRef.current = false;
-      return;
-    }
     setRestorePolling(true);
 
-    const maxAttempts = 15; // ~30 s at 2 s intervals
-    const pollIntervalMs = 2000;
-    let confirmed = false;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (!mountedRef.current) break;
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-      if (!mountedRef.current) break;
-      try {
-        const freshSub = await queryClient.fetchQuery<{
-          tier: string;
-        }>({
+    const restoreOutcome = await poll.run({
+      fetchProbe: () =>
+        queryClient.fetchQuery<{ tier: string }>({
           queryKey: ['subscription', activeProfile?.id],
           staleTime: 0,
           queryFn: async () => {
@@ -844,24 +249,22 @@ function SubscriptionContent(): React.ReactElement | null {
             const data = subscriptionResponseSchema.parse(await okRes.json());
             return data.subscription;
           },
-        });
-        if (freshSub && freshSub.tier !== 'free') {
-          confirmed = true;
-          break;
-        }
-      } catch {
-        // Network error during poll — continue to next attempt
-        continue;
-      }
-    }
+        }),
+      isConfirmed: (sub) => sub.tier !== 'free',
+    });
 
-    if (!mountedRef.current) {
+    if (restoreOutcome === 'unmounted') {
+      // TODO(follow-up): investigate whether handleRestore should be touching
+      // topUpInFlightRef at all — the original pre-refactor code cleared the
+      // top-up in-flight flag from inside the restore handler, which looks
+      // like a copy-paste from handleTopUp. Preserved verbatim to keep the
+      // refactor mechanical; flag for a separate audit.
       topUpInFlightRef.current = false;
       return;
     }
     setRestorePolling(false);
 
-    if (confirmed) {
+    if (restoreOutcome === 'confirmed') {
       await refetchUsage();
       platformAlert(
         t('subscription.alerts.restoredTitle'),
@@ -937,21 +340,11 @@ function SubscriptionContent(): React.ReactElement | null {
 
       // Purchase succeeded on the store side — poll the API until the webhook
       // confirms the new subscription tier (PR-FIX-07: was unrendered _purchasePolling)
-      if (!mountedRef.current) return;
       setPurchasePolling(true);
 
-      const maxAttempts = 15; // ~30 s at 2 s intervals
-      const pollIntervalMs = 2000;
-      let confirmed = false;
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!mountedRef.current) break;
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-        if (!mountedRef.current) break;
-        try {
-          const freshSub = await queryClient.fetchQuery<{
-            tier: string;
-          }>({
+      const purchaseOutcome = await poll.run({
+        fetchProbe: () =>
+          queryClient.fetchQuery<{ tier: string }>({
             queryKey: ['subscription', activeProfile?.id],
             staleTime: 0,
             queryFn: async () => {
@@ -960,23 +353,19 @@ function SubscriptionContent(): React.ReactElement | null {
               const data = subscriptionResponseSchema.parse(await okRes.json());
               return data.subscription;
             },
-          });
-          if (freshSub && freshSub.tier !== 'free') {
-            confirmed = true;
-            break;
-          }
-        } catch {
-          // Network error during poll — continue to next attempt
-          continue;
-        }
-      }
+          }),
+        isConfirmed: (sub) => sub.tier !== 'free',
+      });
 
-      if (!mountedRef.current) return;
+      if (purchaseOutcome === 'unmounted') return;
       setPurchasePolling(false);
 
+      // CRITICAL: refetchSub + refetchUsage fire UNCONDITIONALLY here (matches
+      // pre-refactor behavior) — before the alert branch. Do NOT move this
+      // into the confirmed branch.
       await Promise.all([refetchSub(), refetchUsage()]);
 
-      if (confirmed) {
+      if (purchaseOutcome === 'confirmed') {
         platformAlert(
           t('subscription.alerts.successTitle'),
           t('subscription.alerts.successBody'),
@@ -1113,53 +502,26 @@ function SubscriptionContent(): React.ReactElement | null {
     setTopUpPurchasing(false);
     setTopUpPolling(true);
     setPollMessage('Confirming your purchase...');
-    const messageTimer = setTimeout(() => {
-      if (mountedRef.current) {
-        setPollMessage(
-          'Still confirming \u2014 this can take up to 30 seconds. Your purchase is safe.',
-        );
-      }
-    }, 10_000);
-
     const baseCredits = usage?.topUpCreditsRemaining ?? 0;
-    const maxAttempts = 15; // ~30 seconds with 2s interval
-    const pollIntervalMs = 2000;
-    let confirmed = false;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (!mountedRef.current) break;
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-      if (!mountedRef.current) break;
-      // Use fetchQuery with staleTime: 0 to force a fresh network fetch and
-      // await the response directly — eliminates the 500ms sleep race where
-      // getQueryData could read a stale entry before invalidation propagated.
-      let freshUsage: { topUpCreditsRemaining: number } | undefined;
-      try {
-        freshUsage = await queryClient.fetchQuery<{
-          topUpCreditsRemaining: number;
-        }>({
+    const topUpOutcome = await poll.run({
+      fetchProbe: () =>
+        queryClient.fetchQuery<{ topUpCreditsRemaining: number }>({
           queryKey: ['usage', activeProfile?.id],
           staleTime: 0,
           queryFn: () => fetchUsageData(client),
-        });
-      } catch {
-        // Network error during poll — continue to next attempt
-        continue;
-      }
-      if (!mountedRef.current) break;
-      if (freshUsage && freshUsage.topUpCreditsRemaining > baseCredits) {
-        confirmed = true;
-        break;
-      }
-    }
+        }),
+      isConfirmed: (u) => u.topUpCreditsRemaining > baseCredits,
+      onSlowPoll: () =>
+        setPollMessage(
+          'Still confirming \u2014 this can take up to 30 seconds. Your purchase is safe.',
+        ),
+    });
 
-    clearTimeout(messageTimer);
-
-    if (!mountedRef.current) return;
+    if (topUpOutcome === 'unmounted') return;
     topUpInFlightRef.current = false;
     setTopUpPolling(false);
 
-    if (confirmed) {
+    if (topUpOutcome === 'confirmed') {
       platformAlert(
         t('subscription.alerts.topUpTitle'),
         t('subscription.alerts.topUpBody'),
@@ -1248,10 +610,7 @@ function SubscriptionContent(): React.ReactElement | null {
   const handleByokSubmit = useCallback(async () => {
     try {
       await byokWaitlist.mutateAsync();
-      setByokJoined(true);
-      void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(
-        () => undefined,
-      );
+      markByokJoined();
       platformAlert(
         t('subscription.byokWaitlist.alerts.successTitle'),
         t('subscription.byokWaitlist.alerts.successBody'),
@@ -1262,17 +621,11 @@ function SubscriptionContent(): React.ReactElement | null {
         t('subscription.byokWaitlist.alerts.errorBody'),
       );
     }
-  }, [byokWaitlist]);
+  }, [byokWaitlist, markByokJoined, t]);
 
   // ---------------------------------------------------------------------------
   // Child profile gate — child sees the child-friendly paywall
   // ---------------------------------------------------------------------------
-
-  // Reuse variables computed early for the child-redirect useEffect above.
-  const isChild = isChildEarly;
-  const hasLoadError = subHasLoadErrorEarly;
-  const trialOrExpired = trialOrExpiredEarly;
-  const quotaExhausted = quotaExhaustedEarly;
 
   if (isChild && (trialOrExpired || quotaExhausted)) {
     return <ChildPaywall />;
@@ -1286,25 +639,24 @@ function SubscriptionContent(): React.ReactElement | null {
   // Derive API-side subscription state for display
   // ---------------------------------------------------------------------------
 
-  const tier = subscription?.tier ?? 'free';
-  const status = subscription?.status ?? 'active';
-  const isPaidTier = tier !== 'free';
-  const canManageBilling =
-    isPaidTier ||
-    hasActiveSubscription ||
-    (status === 'trial' && Platform.OS === 'web');
-  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+  const tierState = deriveTierState({
+    tier: subscription?.tier,
+    status: subscription?.status,
+    cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd,
+    hasActiveSubscription,
+    platformOS: Platform.OS,
+  });
+  const { tier, status, isPaidTier, canManageBilling, cancelAtPeriodEnd } =
+    tierState;
 
   // Get the current offering's available packages
   const currentOffering: PurchasesOffering | null = offerings?.current ?? null;
-  const availablePackages = currentOffering?.availablePackages ?? [];
-  const subscriptionPackages = availablePackages.filter(
-    (pkg) => !isTopUpPackage(pkg),
-  );
-  const storePurchaseUnavailable =
-    Platform.OS === 'web' &&
-    subscriptionPackages.length === 0 &&
-    !offeringsLoading;
+  const offeringsState = deriveOfferingsState({
+    currentOffering,
+    offeringsLoading,
+    platformOS: Platform.OS,
+  });
+  const { subscriptionPackages, storePurchaseUnavailable } = offeringsState;
 
   return (
     <View
@@ -1312,19 +664,7 @@ function SubscriptionContent(): React.ReactElement | null {
       style={{ paddingTop: insets.top }}
       testID="subscription-screen"
     >
-      <View className="px-5 pt-4 pb-2 flex-row items-center">
-        <Pressable
-          onPress={() => router.replace('/(app)/more')}
-          className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Text className="text-primary text-body font-semibold">Back</Text>
-        </Pressable>
-        <Text className="text-h2 font-bold text-text-primary">
-          Subscription
-        </Text>
-      </View>
+      <SubscriptionHeader />
 
       {isLoading ? (
         // BUG-767: Bare ActivityIndicator left users stuck forever if any of
@@ -1542,112 +882,11 @@ function SubscriptionContent(): React.ReactElement | null {
 
           {/* Usage meter */}
           {usage && (
-            <View className="mt-4">
-              <TrackedView
-                eventName="subscription_breakdown_viewed"
-                dwellMs={2000}
-                properties={breakdownAnalytics}
-                testID="subscription-usage-tracker"
-              >
-                <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-                  Usage this month
-                </Text>
-                <View className="bg-surface rounded-card px-4 py-3.5">
-                  <UsageMeter
-                    used={usage.usedThisMonth}
-                    limit={usage.monthlyLimit}
-                    warningLevel={usage.warningLevel}
-                  />
-                  {/* BUG-395: Show daily usage for free-tier users who have a daily cap */}
-                  {usage.dailyLimit != null && (
-                    <View className="mt-2" testID="daily-usage">
-                      <Text className="text-caption text-text-secondary">
-                        Today: {usage.usedToday} / {usage.dailyLimit} daily
-                        questions
-                      </Text>
-                    </View>
-                  )}
-                  {usage.topUpCreditsRemaining > 0 && (
-                    <Text className="text-caption text-text-secondary mt-2">
-                      + {usage.topUpCreditsRemaining} top-up credits remaining
-                    </Text>
-                  )}
-                  {usage.byProfile && usage.byProfile.length > 0 ? (
-                    <View className="border-t border-border mt-3 pt-3">
-                      {usage.byProfile.map((row) => (
-                        <View
-                          key={row.profile_id}
-                          className="flex-row items-center justify-between py-1"
-                          testID={`usage-profile-${row.profile_id}`}
-                        >
-                          <Text className="text-caption text-text-secondary">
-                            {row.is_self && canUseOwnerBillingGates
-                              ? 'Your share'
-                              : row.is_self
-                                ? 'Your usage'
-                                : row.name}
-                          </Text>
-                          <Text className="text-caption font-semibold text-text-primary">
-                            {row.used} questions
-                          </Text>
-                        </View>
-                      ))}
-                      {usage.familyAggregate ? (
-                        <View
-                          className="flex-row items-center justify-between py-1"
-                          testID="usage-family-aggregate"
-                        >
-                          <Text className="text-caption text-text-secondary">
-                            Family aggregate
-                          </Text>
-                          <Text className="text-caption font-semibold text-text-primary">
-                            {usage.familyAggregate.used} /{' '}
-                            {usage.familyAggregate.limit}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  ) : null}
-                  <Text className="text-caption text-text-secondary mt-1">
-                    Quota resets{' '}
-                    {usage.resetsAtLabel ??
-                      new Date(usage.cycleResetAt).toLocaleDateString(
-                        undefined,
-                        {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        },
-                      )}
-                  </Text>
-                  {usage.renewsAtLabel ? (
-                    <Text className="text-caption text-text-secondary mt-1">
-                      Subscription renews {usage.renewsAtLabel}
-                    </Text>
-                  ) : null}
-                </View>
-                {/* BUG-395: Show daily quota for free-tier users */}
-                {usage.dailyLimit != null && (
-                  <View
-                    className="bg-surface rounded-card px-4 py-3.5 mt-2"
-                    testID="daily-usage-card"
-                  >
-                    <UsageMeter
-                      used={usage.usedToday}
-                      limit={usage.dailyLimit}
-                      warningLevel={
-                        usage.usedToday >= usage.dailyLimit
-                          ? 'exceeded'
-                          : 'none'
-                      }
-                    />
-                    <Text className="text-caption text-text-secondary mt-1">
-                      Daily limit — resets at midnight
-                    </Text>
-                  </View>
-                )}
-              </TrackedView>
-            </View>
+            <SubscriptionUsageCard
+              usage={usage}
+              canUseOwnerBillingGates={canUseOwnerBillingGates}
+              breakdownAnalytics={breakdownAnalytics}
+            />
           )}
 
           {familySubscription && (
