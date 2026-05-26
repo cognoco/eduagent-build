@@ -1,6 +1,6 @@
 # i18n Phase 2 — UI Strings Hygiene
 
-**Status:** Draft
+**Status:** Draft (adversarial-review pass 2026-05-26; findings CR-1, H-1..H-4, M-1..M-4 folded in)
 **Date:** 2026-05-26
 **Owner:** zuzana.kopecna@zwizzly.com
 **Related:** `docs/specs/2026-05-26-i18n-phase1-llm-language-threading.md` (lands first, in a separate PR)
@@ -72,7 +72,7 @@ Imported by `check-i18n-orphan-keys.ts`. Type-checked by the existing TS build. 
 
 ### 2. AST upgrade — `scripts/check-i18n-orphan-keys.ts`
 
-Replace the line-by-line regex scanner with a `ts-morph` `Project.getSourceFiles()` walk over `apps/mobile/src/**/*.{ts,tsx}` (excluding `.test.ts`/`.test.tsx`/`test-utils/mock-i18n.*`, matching the current exclusion set).
+Replace the line-by-line regex scanner with a `ts-morph` `Project.getSourceFiles()` walk over `apps/mobile/src/**/*.{ts,tsx}`. **Preserve the existing exclusion set verbatim** (`check-i18n-orphan-keys.ts:94-100`): `.test.ts`, `.test.tsx`, `.spec.ts`, `.spec.tsx`, and any path containing `test-utils${path.sep}mock-i18n.` (the mock helper documents `t()` in JSDoc, which the regex falsely matched as call sites). **[fix M-3]** Cross-package scan is intentionally limited to `apps/mobile/src` — confirmed no `useTranslation` / `i18next` consumers exist anywhere under `packages/` or `apps/api/` (grep, 2026-05-26).
 
 For each source file:
 
@@ -83,28 +83,31 @@ For each source file:
    const useT = useTranslation;
    const { t: msg } = useTranslation();
    ```
-   Build a per-file `Set<string>` of identifiers bound to the `t` slot of any `useTranslation()` call. Always contains the bare `'t'` (the convention), plus any rename targets. This set lives at scope level — we don't try to track block-scope shadowing; if any function in the file destructures `t: translate`, every `translate(...)` call in the file is treated as a t-call.
+   Build a per-file `Set<string>` of identifiers bound to the `t` slot of any `useTranslation()` call, plus any rename targets. This set lives at scope level — we don't try to track block-scope shadowing; if any function in the file destructures `t: translate`, every `translate(...)` call in the file is treated as a t-call.
+
+   **[fix H-4 — disambiguation]** The bare identifier `'t'` is treated as a t-call **regardless of whether the file imports `useTranslation`**. Rationale: catches wrapper-hook indirection (`function useT() { const { t } = useTranslation(); return t; }`) where the consuming file never sees `useTranslation` directly. Accepted noise: any function literally named `t` in any file is read as a t-call; first-arg type filtering (StringLiteral / TemplateExpression vs anything else) routes non-string args into the dynamic-call-sites report rather than producing false orphans. Today's codebase has no `const t = …` non-i18n bindings (grep, 2026-05-26); if one appears it can be allow-listed via a per-file `// i18n-not-t: <identifier>` directive read by the walker.
 
 2. **Walk every `CallExpression`** whose callee identifier is in the per-file set:
    - First argument is `StringLiteral` or `NoSubstitutionTemplateLiteral` → record as a **static key**.
-   - First argument is `TemplateExpression` → extract the literal prefix (everything before the first `${`). If the prefix is non-empty, record as a **prefix marker** ending in `.*`. If the prefix is empty (`t(\`${x}\`)`), record as a **fully-dynamic call site** with `{file, line}`.
+   - First argument is `TemplateExpression` → extract the literal prefix (everything before the first `${`) AND the literal suffix (everything after the LAST `${…}`). Record as a **prefix marker** `{prefix, suffix}`. If the prefix is empty (`t(\`${x}…\`)`) AND the suffix is empty, record as a **fully-dynamic call site** with `{file, line}`. **[fix H-2]**
+     - Additionally, **fail the orphan checker** if the extracted prefix contains fewer than 2 dot-segments (e.g. `dictation.` is OK; `dictation` or `` is not), unless the call site carries an on-line `// i18n-allow-short-prefix: <reason>` comment. Rationale: a single-segment prefix marks every key under that top-level namespace as kept, silently disabling unused-key detection for that whole subtree. The escape comment forces a deliberate decision.
    - First argument is anything else (`Identifier`, `CallExpression`, etc.) → record as a **fully-dynamic call site** with `{file, line}`.
 
 3. **Detect colon-prefix and namespace-argument misuse**, unchanged from today (these are still bugs — the i18n init registers only the default `translation` namespace).
 
 After walking, the script holds:
 - `staticKeys: Set<string>` — every literal key referenced statically.
-- `prefixMarkers: Set<string>` — every `prefix.*` extracted from template literals.
+- `prefixMarkers: Array<{prefix: string, suffix: string}>` — every prefix/suffix pair extracted from template literals. **[fix H-1, H-2]**
 - `dynamicCallSites: Array<{file, line, snippet}>` — every call where the key cannot be inferred at all.
 
 **Forward orphan check** (existing behaviour, now AST-accurate):
-For each static key, verify it exists in `en.json` (or under a `_one`/`_other`/etc. plural suffix). Report orphans.
+For each static key, verify it exists in `en.json` (or under a `_one`/`_other`/etc. plural suffix per `PLURAL_SUFFIXES` in the existing script). Report orphans.
 
 **New: reverse orphan / unused-key check.** Triggered by `--report-unused` flag:
 For each key in `en.json`, mark it **kept** if any of:
-- The key is in `staticKeys`.
-- The key matches some `prefix.*` in `prefixMarkers`.
-- The key matches some entry in `KEEP_PATTERNS` (`scripts/i18n-keep.ts`).
+- The key is in `staticKeys`. **[fix M-2]** A static reference `t('foo')` also keeps `foo`, `foo_zero`, `foo_one`, `foo_two`, `foo_few`, `foo_many`, `foo_other` alive — the i18next pluralisation contract is symmetric. Without this, every pluralised key flags 5 of 6 variants as orphan on the first sweep.
+- The key matches some prefix-marker: starts with `prefix` AND ends with `suffix`, where `*` between them is any string including dots (i.e. multi-segment). Example: marker `{prefix: 'onboarding.languageSetup.levels.', suffix: '.label'}` matches `onboarding.languageSetup.levels.b1.label` and `…levels.advanced.label`. Marker `{prefix: 'errors.', suffix: ''}` matches `errors.quotaExhausted` and `errors.network.timeout`. **[fix H-1]**
+- The key matches some entry in `KEEP_PATTERNS` (`scripts/i18n-keep.ts`). Glob `*` semantics identical to prefix-marker matching above.
 
 Unkept keys are reported as unused.
 
@@ -146,7 +149,13 @@ For each unused key: confirm it is genuinely dead (`git log -S "key.name" --all`
 pnpm translate
 ```
 
-`scripts/translate.ts:39` (`TARGET_LANGUAGES`) handles all six. The script's existing "extra_key" validation removes keys from the target locales that no longer exist in `en.json`. Six locale files updated in one pass.
+**[fix CR-1]** `pnpm translate` invokes **`scripts/translate-gemini.ts`** (see `package.json:52` — `"translate": "doppler run -- pnpm exec tsx scripts/translate-gemini.ts"`). The older `scripts/translate.ts` (Anthropic-backed) is no longer the active path. `TARGET_LANGUAGES` lives at `scripts/translate-gemini.ts:7` and is the same six-locale set.
+
+The cascade mechanics are stronger than a plain "extra_key validation removes them":
+- **Deletions-only short-circuit** (`scripts/translate-gemini.ts:314-330`): when the sweep removes keys without adding any, the script prunes them locally and writes the file — **no LLM round-trip**. The sweep cascade is effectively free.
+- **Mixed deletions + additions** (`translate-gemini.ts:364-375`): the diff-mode merge step deletes every key not present in `en.json` after merging the LLM's translated additions back in. Same end state, one LLM call per language for the additions only.
+
+Six locale files updated in one pass either way.
 
 Verify:
 
@@ -154,7 +163,18 @@ Verify:
 pnpm tsx scripts/check-i18n-staleness.ts   # expect: "All translation files are up to date"
 ```
 
-**Step 3c — flip to blocking.** Once the diagnostic pass exits zero, change `check-i18n-orphan-keys.ts` so `--report-unused` is **on by default** (not a flag). Any unused key in a future PR fails CI. Update `scripts/check-i18n-staleness.ts` invocation in pre-commit / CI to call the orphan checker alongside it.
+**Step 3c — flip to blocking.** Once the diagnostic pass exits zero, change `check-i18n-orphan-keys.ts` so `--report-unused` is **on by default** (not a flag). Any unused key in a future PR fails CI.
+
+**[fix H-3]** Wire the upgraded checker into the right triggers — the staleness trigger is the wrong shape for the new check. The reverse-orphan case (a `t()` call site was deleted but the en.json key wasn't) is by definition a TSX-only change with no `en.json` edit, so mirroring the staleness gate at `.husky/pre-commit:70-72` (which only fires when `en.json` is staged) would miss the bug it exists for.
+
+- **Pre-commit** (`.husky/pre-commit`): add a separate block that runs `pnpm exec tsx scripts/check-i18n-orphan-keys.ts` when ANY of these are staged:
+  - `apps/mobile/src/**/*.{ts,tsx}` (catches deleted call sites)
+  - `apps/mobile/src/i18n/locales/en.json` (catches added/renamed keys)
+  - `scripts/i18n-keep.ts` (catches allow-list edits)
+
+  Independent of the existing en.json-gated staleness block.
+
+- **CI** (`.github/workflows/ci.yml:137`): already runs the orphan checker on every PR — once `--report-unused` is default-on, no further change needed.
 
 ### 4. Document the 7-UI / 10-conversation asymmetry
 
@@ -198,24 +218,34 @@ The `CLAUDE.md` "Cross-runtime File Sync" section already documents that
 ## File Map
 
 **New:**
-- `scripts/i18n-keep.ts` — `KEEP_PATTERNS` with inline reasons.
+- `scripts/i18n-keep.ts` — `KEEP_PATTERNS` with inline reasons. **[fix M-1]** Each entry validated by a Zod schema in the same file that requires `reason` to contain at least one `path:line` token.
+- `scripts/check-i18n-keep-rot.ts` — **[fix M-1]** resolves each `KEEP_PATTERNS` reason's `path:line` cite; fails on file-not-found or insufficient line count. Forward-only.
 - `scripts/check-i18n-orphan-keys.test.ts` — fixtures covering:
   - Multi-line `t(\n  'key'\n)` (closes regex blind spot).
   - Renamed `const { t: translate } = useTranslation()` (alias resolution).
   - Bare `const { t } = useTranslation()` (control).
-  - Template-literal prefix `t(\`errors.${code}\`)` (prefix-marker extraction).
+  - Bare `t(...)` call in a file with NO `useTranslation` import (wrapper-hook indirection — **[fix H-4]** must be treated as t-call).
+  - Template-literal prefix only: `t(\`errors.${code}\`)` → marker `{prefix: 'errors.', suffix: ''}` (multi-segment match).
+  - Template-literal prefix AND suffix: `t(\`onboarding.languageSetup.levels.${level}.label\`)` → marker `{prefix: 'onboarding.languageSetup.levels.', suffix: '.label'}` (**[fix H-1]** keeps `…levels.b1.label` alive, not arbitrary `…levels.b1.foo`).
+  - Mid-path variable: `t(\`dictation.${a}.pace.${p}\`)` → emits **fewer than 2 dot-segments in prefix** → **fails the checker** unless `// i18n-allow-short-prefix:` escape comment on the same line (**[fix H-2]**).
+  - Pluralised key: static `t('count')` keeps `count_one`, `count_other`, etc. alive in the unused-key pass (**[fix M-2]**).
   - Fully-dynamic `t(getKey())` (dynamic-call-sites report, not orphan).
-  - `KEEP_PATTERNS` glob matching.
+  - `KEEP_PATTERNS` glob matching, including multi-segment `*`.
 
 **Edited:**
-- `scripts/check-i18n-orphan-keys.ts` — full rewrite to `ts-morph`; preserves the colon-prefix and `useTranslation('ns')` misuse checks; adds `--report-unused` (step 3a) then makes it default-on (step 3c).
+- `scripts/check-i18n-orphan-keys.ts` — full rewrite to `ts-morph`; preserves the colon-prefix and `useTranslation('ns')` misuse checks AND the plural-suffix acceptance (`PLURAL_SUFFIXES` at the existing `check-i18n-orphan-keys.ts:71`); adds `--report-unused` (step 3a) then makes it default-on (step 3c). Exclusion set mirrored verbatim from current file (`check-i18n-orphan-keys.ts:94-100`).
 - `apps/mobile/src/i18n/locales/en.json` — keys removed per step 3a triage.
-- `apps/mobile/src/i18n/locales/{de,es,ja,nb,pl,pt}.json` — cascade-removed via `pnpm translate`.
-- `CLAUDE.md` — new "Languages" section.
+- `apps/mobile/src/i18n/locales/{de,es,ja,nb,pl,pt}.json` — cascade-removed via `pnpm translate` (which runs `scripts/translate-gemini.ts`, not `translate.ts` — **[fix CR-1]**).
+- `.husky/pre-commit` — **[fix H-3]** new block invoking `check-i18n-orphan-keys.ts` when any `apps/mobile/src/**/*.{ts,tsx}` OR `en.json` OR `scripts/i18n-keep.ts` is staged. Independent of the existing en.json-gated staleness block.
+- `CLAUDE.md` — new "Languages" section. **[L-2 deferred — see note below]**
 - `AGENTS.md` — mirror of the new section.
 - `package.json` if needed — add `ts-morph` to `devDependencies` (used only by scripts; not pulled into the app bundle).
 
-**Audit step:** before step 3a, run the diagnostic pass and capture its output verbatim in the PR description. Reviewers see exactly which keys were deleted and exactly which fully-dynamic call sites were triaged.
+**[L-2 — deferred to taste]** The "Languages" section as written below is ~30 lines and pushes weight into the always-loaded CLAUDE.md. If you'd rather, keep CLAUDE.md to the 4-row table + a one-line pointer (`See docs/architecture.md → "Languages" for the add-a-language checklist.`) and move the "Adding a language requires" block into `docs/architecture.md`. Not blocking; the spec ships the full block by default.
+
+**Audit step:** before step 3a, run the diagnostic pass and capture its output verbatim in the PR description. Reviewers see exactly which keys were deleted and exactly which fully-dynamic call sites were triaged. **[fix L-1]** Include a one-line key-count delta — `Before: N keys, After: M keys, Removed: K keys` — at the top of the PR description so the sweep's magnitude is visible without scrolling the diagnostic dump.
+
+**[fix M-4 — coordination]** The sweep PR rewrites all seven locale files in one commit. Announce in the team channel before opening, hold through one merge-window, and if an upstream merge during that window adds new keys, rebase and re-run `pnpm translate` before merging — otherwise the conflict resolution happens key-by-key in nested JSON, which is miserable.
 
 ## Failure Modes
 
@@ -223,7 +253,7 @@ The `CLAUDE.md` "Cross-runtime File Sync" section already documents that
 |---|---|---|---|
 | Fully-dynamic `t(\`${ns}.bar\`)` produces empty prefix | Static analyser cannot infer prefix | Naively, every key under any namespace would be flagged unused | Empty-prefix template literals are routed into the **fully-dynamic call sites** report, not the prefix-markers set; they do not influence unused-key detection until a human adds a keep-pattern or refactors |
 | Renamed `t` alias not caught by AST walker | `const { t: translate } = useTranslation()` and similar | Every `translate(...)` call's keys silently flagged orphan; first-run "unused" report wildly over-reports | Test fixture in `check-i18n-orphan-keys.test.ts` exercises the rename pattern — CI fails the AST upgrade PR if alias resolution regresses |
-| `KEEP_PATTERNS` entry rots (call site removed but pattern stays) | Feature deletion leaves a stale allowlist entry | Some keys stay alive in `en.json` even though no code references them | Step 3c blocking ratchet still passes (the keys ARE allowlisted), but the `reason` field cites a file:line that no longer exists — periodic grep audit catches it. Acceptable drift; not a runtime bug. |
+| `KEEP_PATTERNS` entry rots (call site removed but pattern stays) | Feature deletion leaves a stale allowlist entry | Some keys stay alive in `en.json` even though no code references them | **[fix M-1]** Detection path: `scripts/check-i18n-keep-rot.ts` (new, runs in the same pre-commit/CI lane as `check-i18n-orphan-keys.ts`) parses each `KEEP_PATTERNS` `reason` for a `<path>:<line>` token, asserts the file exists AND has at least that many lines. Reason missing a file:line cite is rejected by a Zod schema in `i18n-keep.ts` itself. The script is forward-only: existing entries pass; new or edited entries must have a live cite. Acceptable drift bounded by the next edit, not by a vague periodic audit. |
 | `pnpm translate` deletes a key the LLM needs to keep | A key that looks unused but is reached via a runtime `t(getKey())` not yet in `KEEP_PATTERNS` | Literal `key.name` rendered to user | Add a covering pattern to `KEEP_PATTERNS`, restore the key from git history, re-run `pnpm translate`. Diagnostic pass (step 3a) is the firewall — by triaging dynamic call sites before deletion, this should not happen. |
 | Adding `ts-morph` triggers `nx reset` cache invalidation issues | NX cache picks up new devDependency | Phantom typecheck/eslint failures during local dev | Run `pnpm exec nx reset` per the existing `feedback_nx_reset_before_commit` rule |
 
@@ -238,8 +268,10 @@ Reversible. The destructive operation is deletion of keys from JSON files; recov
 ## Validation
 
 - `pnpm exec nx run-many -t typecheck` passes (the AST upgrade compiles).
-- `pnpm exec nx run-many -t test` passes (existing tests + new orphan-checker tests).
-- `pnpm tsx scripts/check-i18n-orphan-keys.ts` exits 0 (no forward orphans, no unused keys after sweep, no namespace misuse).
+- `pnpm exec nx run-many -t test` passes (existing tests + new orphan-checker tests + new `check-i18n-keep-rot` test).
+- `pnpm tsx scripts/check-i18n-orphan-keys.ts` exits 0 (no forward orphans, no unused keys after sweep, no namespace misuse, no short-prefix dynamic call sites without escape comment).
+- `pnpm tsx scripts/check-i18n-keep-rot.ts` exits 0 (every `KEEP_PATTERNS` entry's `reason` cite resolves to a real file:line).
 - `pnpm tsx scripts/check-i18n-staleness.ts` exits 0 ("All translation files are up to date").
+- Pre-commit gate: stage a TSX file with a deleted `t()` call and an unrelated change → confirm pre-commit fails with the unused-key error (regression test for the **[fix H-3]** trigger wiring).
 - Manual: launch the app in each of the 7 UI locales, walk through onboarding + a session, confirm no literal `key.name` strings render anywhere.
-- Manual: confirm the unused-key sweep is captured in the PR description with the verbatim diagnostic output and rationale per deleted key cluster.
+- Manual: confirm the unused-key sweep is captured in the PR description with (a) the `Before/After/Removed` count header (**[fix L-1]**), (b) the verbatim diagnostic output, (c) rationale per deleted key cluster.
