@@ -4,10 +4,13 @@
 // ---------------------------------------------------------------------------
 
 import { z } from 'zod';
-import type {
-  BillingAccess,
-  SubscriptionTier,
-  SubscriptionStatus,
+import {
+  billingAccessSchema,
+  subscriptionStatusSchema,
+  subscriptionTierSchema,
+  type BillingAccess,
+  type SubscriptionTier,
+  type SubscriptionStatus,
 } from '@eduagent/schemas';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
@@ -28,10 +31,10 @@ export interface CachedSubscriptionStatus {
 
 const cachedSubscriptionStatusSchema = z.object({
   subscriptionId: z.string(),
-  tier: z.string(),
-  effectiveAccessTier: z.string().optional(),
-  billingAccess: z.enum(['current', 'free_fallback']).optional(),
-  status: z.string(),
+  tier: subscriptionTierSchema,
+  effectiveAccessTier: subscriptionTierSchema.optional(),
+  billingAccess: billingAccessSchema.optional(),
+  status: subscriptionStatusSchema,
   monthlyLimit: z.number(),
   usedThisMonth: z.number(),
   dailyLimit: z.number().nullable().optional(),

@@ -108,6 +108,27 @@ describe('resolveEffectiveAccessTier', () => {
     });
   });
 
+  it('keeps free tier on free/current regardless of status', () => {
+    expect(
+      resolveEffectiveAccessTier(
+        { ...baseSubscription, tier: 'free', status: 'expired' },
+        now,
+      ),
+    ).toEqual({
+      effectiveAccessTier: 'free',
+      billingAccess: 'current',
+    });
+  });
+
+  it('keeps paid trial subscriptions on their paid tier', () => {
+    expect(
+      resolveEffectiveAccessTier({ ...baseSubscription, status: 'trial' }, now),
+    ).toEqual({
+      effectiveAccessTier: 'plus',
+      billingAccess: 'current',
+    });
+  });
+
   it('falls past-due paid subscriptions back to effective Free', () => {
     expect(
       resolveEffectiveAccessTier(

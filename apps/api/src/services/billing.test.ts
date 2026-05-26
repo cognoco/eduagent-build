@@ -148,6 +148,7 @@ function mockTopUpRow(
   overrides?: Partial<{
     id: string;
     subscriptionId: string;
+    profileId: string | null;
     remaining: number;
     expiresAt: Date;
     purchasedAt: Date;
@@ -156,6 +157,7 @@ function mockTopUpRow(
   return {
     id: overrides?.id ?? 'tu-1',
     subscriptionId: overrides?.subscriptionId ?? subscriptionId,
+    profileId: overrides?.profileId ?? null,
     amount: 500,
     remaining: overrides?.remaining ?? 500,
     purchasedAt: overrides?.purchasedAt ?? NOW,
@@ -348,6 +350,15 @@ describe('createSubscription', () => {
 
     // db.insert called twice: once for subscription, once for quota pool
     expect(db.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates subscription and quota state inside one transaction', async () => {
+    const row = mockSubscriptionRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await createSubscription(db, accountId, 'plus', 500);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
   it('passes stripe IDs when provided', async () => {
@@ -880,6 +891,21 @@ describe('ensureFreeSubscription', () => {
     expect(result.tier).toBe('free');
     expect(result.status).toBe('active');
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('provisions the winning free subscription inside one transaction', async () => {
+    const created = mockSubscriptionRow({
+      tier: 'free',
+      status: 'active',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: undefined,
+      insertReturning: [created],
+    });
+
+    await ensureFreeSubscription(db, accountId);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1438,9 +1464,14 @@ describe('purchaseTopUpCredits', () => {
 
   it('creates top-up credits for plus tier', async () => {
     const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
-    const topUpRow = mockTopUpRow({ remaining: 500 });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
+    const topUpRow = mockTopUpRow({
+      profileId: owner.id,
+      remaining: 500,
+    });
     const db = createMockDb({
       subscriptionFindFirst: sub,
+      profileFindFirst: owner,
       insertReturning: [topUpRow],
     });
 
@@ -1449,7 +1480,42 @@ describe('purchaseTopUpCredits', () => {
     expect(result).not.toBeNull();
     expect(result!.amount).toBe(500);
     expect(result!.remaining).toBe(500);
+    expect(result!.profileId).toBe(owner.id);
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('returns null for per-profile top-ups when no owner profile exists', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: undefined,
+    });
+
+    const result = await purchaseTopUpCredits(db, subscriptionId, 500);
+
+    expect(result).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects per-profile top-ups for non-owner profile ids', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: owner,
+    });
+
+    const result = await purchaseTopUpCredits(
+      db,
+      subscriptionId,
+      500,
+      NOW,
+      undefined,
+      'child-profile',
+    );
+
+    expect(result).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   it('creates top-up credits for family tier', async () => {
@@ -1862,7 +1928,7 @@ function createFamilyMockDb({
   });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
 
-  return {
+  const db = {
     query: {
       subscriptions: {
         findFirst: jest.fn().mockResolvedValue(subscriptionFindFirst),
@@ -1895,7 +1961,12 @@ function createFamilyMockDb({
         where: jest.fn().mockResolvedValue(selectResult),
       }),
     }),
-  } as unknown as Database;
+  };
+  (db as unknown as { transaction: jest.Mock }).transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+
+  return db as unknown as Database;
 }
 
 // ---------------------------------------------------------------------------
@@ -2556,6 +2627,7 @@ describe('decrementQuota — race with top-up expiry [4C.2]', () => {
 describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
   it('returns null on duplicate transactionId (ON CONFLICT DO NOTHING)', async () => {
     const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
 
     // INSERT returns empty array when ON CONFLICT DO NOTHING fires
     const insertValues = jest.fn().mockReturnValue({
@@ -2569,7 +2641,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
         subscriptions: { findFirst: jest.fn().mockResolvedValue(sub) },
         quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
         topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(owner) },
       },
       insert: jest.fn().mockReturnValue({ values: insertValues }),
       update: jest.fn().mockReturnValue({
@@ -2600,7 +2672,8 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
 
   it('succeeds on first call with transactionId', async () => {
     const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
-    const topUpRow = mockTopUpRow({ remaining: 500 });
+    const owner = mockProfileRow({ id: 'owner-profile', accountId });
+    const topUpRow = mockTopUpRow({ profileId: owner.id, remaining: 500 });
 
     const insertValues = jest.fn().mockReturnValue({
       onConflictDoNothing: jest.fn().mockReturnValue({
@@ -2613,7 +2686,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
         subscriptions: { findFirst: jest.fn().mockResolvedValue(sub) },
         quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
         topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(owner) },
       },
       insert: jest.fn().mockReturnValue({ values: insertValues }),
       update: jest.fn().mockReturnValue({

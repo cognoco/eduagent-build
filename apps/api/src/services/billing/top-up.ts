@@ -2,7 +2,7 @@
 // Billing — Top-up credit management (Story 5.3)
 // ---------------------------------------------------------------------------
 
-import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import {
   profiles,
   topUpCredits,
@@ -127,15 +127,18 @@ export async function purchaseTopUpCredits(
 
   const quotaModel = getTierConfig(sub.tier).quotaModel;
   let buyerProfileId: string | null = profileId ?? null;
-  if (quotaModel === 'per-profile' && !buyerProfileId) {
+  if (quotaModel === 'per-profile') {
     const owner = await db.query.profiles.findFirst({
       where: and(
         eq(profiles.accountId, sub.accountId),
         eq(profiles.isOwner, true),
+        isNull(profiles.archivedAt),
       ),
       columns: { id: true },
     });
-    buyerProfileId = owner?.id ?? null;
+    if (!owner) return null;
+    if (buyerProfileId && buyerProfileId !== owner.id) return null;
+    buyerProfileId = owner.id;
   }
 
   const expiresAt = new Date(now);

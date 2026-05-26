@@ -161,4 +161,18 @@ describe('readSubscriptionStatus', () => {
     expect(result!.dailyLimit).toBe(10);
     expect(result!.usedToday).toBe(5);
   });
+
+  it.each([
+    ['tier', { tier: 'enterprise' }],
+    ['effectiveAccessTier', { effectiveAccessTier: 'enterprise' }],
+    ['status', { status: 'weird' }],
+  ])('treats cache rows with invalid %s as misses', async (_field, patch) => {
+    const kv = createMockKV({
+      getResult: JSON.stringify({ ...sampleStatus, ...patch }),
+    });
+
+    const result = await readSubscriptionStatus(kv, 'acc-123');
+
+    expect(result).toBeNull();
+  });
 });

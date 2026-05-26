@@ -2170,6 +2170,9 @@ describe('SubscriptionScreen', () => {
   // -------------------------------------------------------------------------
 
   describe('V1 navigation contract gates', () => {
+    const v1OwnerProfileId = '550e8400-e29b-41d4-a716-446655440001';
+    const v1ChildProfileId = '550e8400-e29b-41d4-a716-446655440002';
+
     function withV1Flag(fn: () => Promise<void> | void) {
       const flags = require('../../lib/feature-flags') as {
         FEATURE_FLAGS: { MODE_NAV_V1_ENABLED: boolean };
@@ -2251,11 +2254,15 @@ describe('SubscriptionScreen', () => {
                 maxProfiles: 4,
                 members: opts?.members ?? [
                   {
-                    profileId: 'profile-1',
+                    profileId: v1OwnerProfileId,
                     displayName: 'Alex',
                     isOwner: true,
                   },
-                  { profileId: 'p2', displayName: 'Kid', isOwner: false },
+                  {
+                    profileId: v1ChildProfileId,
+                    displayName: 'Kid',
+                    isOwner: false,
+                  },
                 ],
               },
             }),
@@ -2270,14 +2277,14 @@ describe('SubscriptionScreen', () => {
         setupFamilyTier({
           byProfile: [
             {
-              profile_id: 'profile-1',
+              profile_id: v1OwnerProfileId,
               name: 'Alex',
               used: 42,
               usedToday: 3,
               is_self: true,
             },
             {
-              profile_id: 'p2',
+              profile_id: v1ChildProfileId,
               name: 'Kid',
               used: 17,
               usedToday: 1,
@@ -2289,7 +2296,7 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('usage-profile-profile-1');
+          screen.getByTestId(`usage-profile-${v1OwnerProfileId}`);
         });
         screen.getByText('Your share');
         expect(screen.queryByText('Your usage')).toBeNull();
@@ -2306,7 +2313,7 @@ describe('SubscriptionScreen', () => {
         setupFamilyTier({
           byProfile: [
             {
-              profile_id: 'profile-1',
+              profile_id: v1OwnerProfileId,
               name: 'Alex',
               used: 42,
               usedToday: 3,
@@ -2318,7 +2325,7 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('usage-profile-profile-1');
+          screen.getByTestId(`usage-profile-${v1OwnerProfileId}`);
         });
         screen.getByText('Your usage');
         expect(screen.queryByText('Your share')).toBeNull();
@@ -2333,7 +2340,7 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('remove-family-member-p2');
+          screen.getByTestId(`remove-family-member-${v1ChildProfileId}`);
         });
       });
     });
@@ -2349,9 +2356,11 @@ describe('SubscriptionScreen', () => {
         render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          screen.getByTestId('family-member-p2');
+          screen.getByTestId(`family-member-${v1ChildProfileId}`);
         });
-        expect(screen.queryByTestId('remove-family-member-p2')).toBeNull();
+        expect(
+          screen.queryByTestId(`remove-family-member-${v1ChildProfileId}`),
+        ).toBeNull();
       });
     });
   });

@@ -524,6 +524,14 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscription.tier;
     const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
+    if (quotaModel === 'per-profile' && !activeProfileId) {
+      return apiError(
+        c,
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        'Profile required for per-profile quota status.',
+      );
+    }
     const profileQuota =
       quotaModel === 'per-profile' && activeProfileId
         ? await getOrProvisionProfileQuotaUsage(
@@ -788,6 +796,14 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       access?.effectiveAccessTier ?? subscription.tier;
     const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
     const activeProfileId = c.get('profileId');
+    if (quotaModel === 'per-profile' && !activeProfileId) {
+      return apiError(
+        c,
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        'Profile required for per-profile quota status.',
+      );
+    }
     const profileQuota =
       quotaModel === 'per-profile' && activeProfileId
         ? await getOrProvisionProfileQuotaUsage(

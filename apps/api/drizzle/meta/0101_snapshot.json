@@ -766,6 +766,18 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "profile_quota_usage_role_valid": {
+          "name": "profile_quota_usage_role_valid",
+          "value": "\"profile_quota_usage\".\"role\" IN ('owner', 'child')"
+        },
+        "profile_quota_usage_monthly_limit_non_negative": {
+          "name": "profile_quota_usage_monthly_limit_non_negative",
+          "value": "\"profile_quota_usage\".\"monthly_limit\" >= 0"
+        },
+        "profile_quota_usage_daily_limit_non_negative": {
+          "name": "profile_quota_usage_daily_limit_non_negative",
+          "value": "\"profile_quota_usage\".\"daily_limit\" IS NULL OR \"profile_quota_usage\".\"daily_limit\" >= 0"
+        },
         "profile_quota_usage_month_non_negative": {
           "name": "profile_quota_usage_month_non_negative",
           "value": "\"profile_quota_usage\".\"used_this_month\" >= 0"
@@ -775,7 +787,7 @@
           "value": "\"profile_quota_usage\".\"used_today\" >= 0"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.quota_pools": {
       "name": "quota_pools",

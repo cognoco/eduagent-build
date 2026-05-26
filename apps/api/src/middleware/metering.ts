@@ -101,6 +101,8 @@ export type MeteringEnv = {
     quotaDecrementSource: 'monthly' | 'top_up';
     /** Set when quotaDecrementSource === 'top_up'. */
     quotaDecrementTopUpCreditId?: string;
+    /** Quota model that funded the decrement; refund paths must not re-resolve it. */
+    quotaDecrementQuotaModel?: 'per-profile' | 'shared-pool';
     /** Remaining billable turns after the current decrement. */
     quotaRemainingTurns?: number;
     /** Remaining-turn ratio against the user's currently enforced cap. */
@@ -785,6 +787,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       'quotaDecrementSource',
       decrement.source === 'top_up' ? 'top_up' : 'monthly',
     );
+    c.set('quotaDecrementQuotaModel', decrement.quotaModel ?? quotaModel);
     if (decrement.topUpCreditId) {
       c.set('quotaDecrementTopUpCreditId', decrement.topUpCreditId);
     }
@@ -852,6 +855,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
           route: `metering.${c.req.method}.${c.req.path}`,
           profileId,
           source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+          quotaModel: decrement.quotaModel ?? quotaModel,
           topUpCreditId: decrement.topUpCreditId,
         });
         c.set('quotaRefunded', true);
@@ -893,6 +897,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         profileId,
         // [CR-2026-05-19-C6] Refund to the same pool the decrement consumed.
         source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+        quotaModel: decrement.quotaModel ?? quotaModel,
         topUpCreditId: decrement.topUpCreditId,
       });
       c.set('quotaRefunded', true);

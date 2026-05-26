@@ -18,6 +18,15 @@ const mockDbInsert = jest.fn().mockReturnValue({
 const mockProfileFindFirst = jest.fn().mockResolvedValue(undefined);
 const mockFamilyLinksFindFirst = jest.fn().mockResolvedValue(undefined);
 const mockConsentStateFindFirst = jest.fn().mockResolvedValue(undefined);
+const mockFindOwnerProfile = jest.fn().mockResolvedValue({
+  id: 'test-profile-id',
+  birthYear: 1985,
+  location: 'NO',
+  consentStatus: 'CONSENTED',
+  hasPremiumLlm: false,
+  conversationLanguage: null,
+  isOwner: true,
+});
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -69,15 +78,7 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   ) as typeof import('../services/profile');
   return {
     ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: 1985,
-      location: 'NO',
-      consentStatus: 'CONSENTED',
-      hasPremiumLlm: false,
-      conversationLanguage: null,
-      isOwner: true,
-    }),
+    findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
   };
 });
 
@@ -323,6 +324,15 @@ beforeEach(() => {
   mockRemoveProfileFromSubscription.mockResolvedValue(null);
   mockGetFamilyPoolStatus.mockResolvedValue(null);
   mockGetUsageBreakdownForProfile.mockResolvedValue(null);
+  mockFindOwnerProfile.mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: 1985,
+    location: 'NO',
+    consentStatus: 'CONSENTED',
+    hasPremiumLlm: false,
+    conversationLanguage: null,
+    isOwner: true,
+  });
   mockProfileFindFirst.mockResolvedValue(undefined);
   mockFamilyLinksFindFirst.mockResolvedValue(undefined);
   mockConsentStateFindFirst.mockResolvedValue(undefined);
@@ -726,7 +736,6 @@ describe('billing routes', () => {
       mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
         mockProfileQuota({ usedThisMonth: 450 }),
       );
-      mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
       mockGetUsageBreakdownForProfile.mockResolvedValue({
         byProfile: [],
         familyAggregate: null,
@@ -748,7 +757,30 @@ describe('billing routes', () => {
       expect(body.usage.usedThisMonth).toBe(450);
       expect(body.usage.remainingQuestions).toBe(50);
       expect(body.usage.warningLevel).toBe('soft');
+      expect(mockGetOrProvisionProfileQuotaUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+        { tier: 'plus' },
+      );
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
       expect(mockGetUsageBreakdownForProfile).not.toHaveBeenCalled();
+    });
+
+    it('does not fall back to shared-pool reads when per-profile usage has no active profile', async () => {
+      mockFindOwnerProfile.mockResolvedValueOnce(null);
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
+
+      const res = await app.request(
+        '/v1/usage',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
     it('returns child-visible usage from their profile breakdown', async () => {
@@ -898,7 +930,6 @@ describe('billing routes', () => {
 
     it('returns DB-backed status when no KV namespace', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
-      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
 
       const res = await app.request(
         '/v1/subscription/status',
@@ -1017,7 +1048,6 @@ describe('billing routes', () => {
       const kvError = new Error('KV namespace unavailable');
       mockReadSubscriptionStatus.mockRejectedValueOnce(kvError);
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
-      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
 
       const res = await app.request(
         '/v1/subscription/status',
@@ -1033,6 +1063,13 @@ describe('billing routes', () => {
       expect(body.status.status).toBe('active');
       expect(body.status.monthlyLimit).toBe(500);
       expect(body.status.usedThisMonth).toBe(42);
+      expect(mockGetOrProvisionProfileQuotaUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+        { tier: 'plus' },
+      );
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
 
       // Silent recovery is banned — the error must be captured.
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -1046,6 +1083,22 @@ describe('billing routes', () => {
           }),
         }),
       );
+    });
+
+    it('does not fall back to shared-pool reads when per-profile status has no active profile', async () => {
+      mockFindOwnerProfile.mockResolvedValueOnce(null);
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+
+      const res = await app.request(
+        '/v1/subscription/status',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
   });
 

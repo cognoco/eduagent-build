@@ -280,7 +280,6 @@ describe('Integration: billing lifecycle routes', () => {
     await seedSubscription(account.id, {
       tier: 'plus',
       status: 'active',
-      monthlyLimit: 500,
       usedThisMonth: 42,
       dailyLimit: null,
       usedToday: 15,
@@ -409,7 +408,6 @@ describe('Integration: billing lifecycle routes', () => {
     await seedSubscription(account.id, {
       tier: 'plus',
       status: 'active',
-      monthlyLimit: 500,
       usedThisMonth: 120,
       dailyLimit: null,
       usedToday: 8,

@@ -1198,6 +1198,95 @@ describe('metering middleware', () => {
   // -----------------------------------------------------------------------
 
   describe('LLM routes with quota exceeded', () => {
+    it('enforces free fallback quota for past-due paid subscriptions', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'plus' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          effectiveAccessTier: 'free',
+          billingAccess: 'free_fallback',
+        }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          monthlyLimit: 100,
+          usedThisMonth: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        }),
+      );
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        code: 'QUOTA_EXCEEDED',
+        details: {
+          tier: 'plus',
+          effectiveAccessTier: 'free',
+          quotaModel: 'per-profile',
+          profileRole: 'owner',
+          reason: 'monthly',
+        },
+      });
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    it('allows requests within free fallback quota', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'plus' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          effectiveAccessTier: 'free',
+          billingAccess: 'free_fallback',
+        }),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          monthlyLimit: 100,
+          usedThisMonth: 10,
+          dailyLimit: 10,
+          usedToday: 1,
+        }),
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 89,
+        remainingTopUp: 0,
+        remainingDaily: 8,
+        quotaModel: 'per-profile',
+      });
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+      );
+    });
+
     it('returns 402 when monthly quota is exhausted and decrement fails', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' }),

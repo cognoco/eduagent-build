@@ -28,6 +28,8 @@ import {
 
 const logger = createLogger();
 
+type QuotaModel = 'per-profile' | 'shared-pool';
+
 /**
  * Emits a structured event on quota ownership mismatch so we can query how
  * often a stale or hostile profileId was sent for a subscription that does
@@ -69,6 +71,7 @@ async function emitOwnershipMismatchEvent(input: {
 export interface DecrementResult {
   success: boolean;
   source: 'monthly' | 'top_up' | 'none' | 'daily_exceeded' | 'profile_mismatch';
+  quotaModel?: QuotaModel;
   remainingMonthly: number;
   remainingTopUp: number;
   remainingDaily: number | null;
@@ -202,7 +205,8 @@ export async function decrementQuota(
 ): Promise<DecrementResult> {
   const access = await getEffectiveAccessForSubscription(db, subscriptionId);
   if (!access) {
-    return decrementPoolQuota(db, subscriptionId, profileId);
+    const result = await decrementPoolQuota(db, subscriptionId, profileId);
+    return { ...result, quotaModel: 'shared-pool' };
   }
 
   const tier = access.effectiveAccessTier;
@@ -213,10 +217,17 @@ export async function decrementQuota(
         tier,
       });
     }
-    return decrementProfileQuota(db, subscriptionId, profileId, tier);
+    const result = await decrementProfileQuota(
+      db,
+      subscriptionId,
+      profileId,
+      tier,
+    );
+    return { ...result, quotaModel: 'per-profile' };
   }
 
-  return decrementPoolQuota(db, subscriptionId, profileId);
+  const result = await decrementPoolQuota(db, subscriptionId, profileId);
+  return { ...result, quotaModel: 'shared-pool' };
 }
 
 async function decrementPoolQuota(
@@ -790,6 +801,7 @@ export interface IncrementResult {
 export interface IncrementQuotaOptions {
   source?: 'monthly' | 'top_up';
   topUpCreditId?: string;
+  quotaModel?: QuotaModel;
 }
 
 export async function incrementQuota(
@@ -798,6 +810,20 @@ export async function incrementQuota(
   profileId?: string,
   options?: IncrementQuotaOptions,
 ): Promise<IncrementResult> {
+  if (options?.quotaModel === 'per-profile') {
+    if (!profileId) {
+      throw new MeteringError('PROFILE_ID_REQUIRED', {
+        subscriptionId,
+        quotaModel: options.quotaModel,
+      });
+    }
+    return incrementProfileQuota(db, subscriptionId, profileId, options);
+  }
+
+  if (options?.quotaModel === 'shared-pool') {
+    return incrementPoolQuota(db, subscriptionId, profileId, options);
+  }
+
   const access = await getEffectiveAccessForSubscription(db, subscriptionId);
   if (
     access &&
@@ -1014,6 +1040,8 @@ export async function safeRefundQuota(
      * legacy callers — they fall back to a monthly refund.
      */
     source?: 'monthly' | 'top_up';
+    /** Set from the original decrement so refunds don't drift if tier state changes mid-request. */
+    quotaModel?: QuotaModel;
     /** Required when source === 'top_up'. From `DecrementResult.topUpCreditId`. */
     topUpCreditId?: string;
   },
@@ -1021,6 +1049,7 @@ export async function safeRefundQuota(
   try {
     const result = await incrementQuota(db, subscriptionId, context.profileId, {
       source: context.source,
+      quotaModel: context.quotaModel,
       topUpCreditId: context.topUpCreditId,
     });
     if (!result.success) {

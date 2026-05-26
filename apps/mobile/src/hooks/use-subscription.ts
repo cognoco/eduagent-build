@@ -11,8 +11,13 @@ import type {
   Subscription,
   Usage,
   FamilySubscription,
+  SubscriptionStatusResponse,
 } from '@eduagent/schemas';
-import { subscriptionResponseSchema } from '@eduagent/schemas';
+import {
+  subscriptionResponseSchema,
+  subscriptionStatusResponseSchema,
+  usageResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { NotFoundError } from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
@@ -59,7 +64,7 @@ export async function fetchUsageData(
 ): Promise<UsageData> {
   const res = await client.usage.$get({}, { init: { signal } });
   await assertOk(res);
-  const data = await res.json();
+  const data = usageResponseSchema.parse(await res.json());
   return data.usage;
 }
 
@@ -150,12 +155,7 @@ export function useFamilySubscription(
 }
 
 /** Lightweight subscription status for header badges — KV-backed (fast). */
-export interface SubscriptionStatusData {
-  tier: SubscriptionTier;
-  status: SubscriptionStatus;
-  monthlyLimit: number;
-  usedThisMonth: number;
-}
+export type SubscriptionStatusData = SubscriptionStatusResponse['status'];
 
 export function useSubscriptionStatus(options?: {
   enabled?: boolean;
@@ -173,7 +173,7 @@ export function useSubscriptionStatus(options?: {
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await res.json();
+        const data = subscriptionStatusResponseSchema.parse(await res.json());
         return data.status;
       } finally {
         cleanup();

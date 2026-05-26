@@ -153,6 +153,18 @@ export const profileQuotaUsage = pgTable(
     ),
     index('profile_quota_usage_subscription_idx').on(table.subscriptionId),
     check(
+      'profile_quota_usage_role_valid',
+      sql`${table.role} IN ('owner', 'child')`,
+    ),
+    check(
+      'profile_quota_usage_monthly_limit_non_negative',
+      sql`${table.monthlyLimit} >= 0`,
+    ),
+    check(
+      'profile_quota_usage_daily_limit_non_negative',
+      sql`${table.dailyLimit} IS NULL OR ${table.dailyLimit} >= 0`,
+    ),
+    check(
       'profile_quota_usage_month_non_negative',
       sql`${table.usedThisMonth} >= 0`,
     ),
@@ -161,7 +173,7 @@ export const profileQuotaUsage = pgTable(
       sql`${table.usedToday} >= 0`,
     ),
   ],
-);
+).enableRLS();
 
 export const usageEvents = pgTable(
   'usage_events',

@@ -445,23 +445,41 @@ describe('usageResponseSchema', () => {
 });
 
 describe('subscriptionStatusResponseSchema', () => {
+  const validStatusResponse = {
+    status: {
+      tier: 'plus',
+      effectiveAccessTier: 'plus',
+      billingAccess: 'current',
+      status: 'active',
+      monthlyLimit: 700,
+      usedThisMonth: 50,
+      dailyLimit: null,
+      usedToday: 5,
+    },
+  };
+
   it('accepts valid status response', () => {
-    const parsed = subscriptionStatusResponseSchema.parse({
-      status: {
-        tier: 'plus',
-        effectiveAccessTier: 'plus',
-        billingAccess: 'current',
-        status: 'active',
-        monthlyLimit: 700,
-        usedThisMonth: 50,
-        dailyLimit: null,
-        usedToday: 5,
-      },
-    });
+    const parsed = subscriptionStatusResponseSchema.parse(validStatusResponse);
     expect(parsed.status.tier).toBe('plus');
     expect(parsed.status.effectiveAccessTier).toBe('plus');
     expect(parsed.status.billingAccess).toBe('current');
     expect(parsed.status.dailyLimit).toBeNull();
+  });
+
+  it.each([
+    ['effectiveAccessTier', { effectiveAccessTier: 'enterprise' }],
+    ['billingAccess', { billingAccess: 'trial' }],
+    ['missing effectiveAccessTier', {}, ['effectiveAccessTier']],
+    ['missing billingAccess', {}, ['billingAccess']],
+  ])('rejects invalid %s in status response', (_label, patch, omit = []) => {
+    const status = { ...validStatusResponse.status, ...patch };
+    for (const key of omit as string[]) {
+      delete (status as Record<string, unknown>)[key];
+    }
+
+    const result = subscriptionStatusResponseSchema.safeParse({ status });
+
+    expect(result.success).toBe(false);
   });
 
   it('rejects invalid tier in status', () => {
@@ -600,6 +618,28 @@ describe('quotaExceededSchema', () => {
       details: { ...validQuotaExceeded.details, reason: 'daily' },
     });
     expect(parsed.details.reason).toBe('daily');
+  });
+
+  it.each([
+    ['effectiveAccessTier', { effectiveAccessTier: 'enterprise' }],
+    ['quotaModel', { quotaModel: 'global' }],
+    ['profileRole', { profileRole: 'guardian' }],
+    ['resetsAt', { resetsAt: 'not-a-date' }],
+    ['missing effectiveAccessTier', {}, ['effectiveAccessTier']],
+    ['missing quotaModel', {}, ['quotaModel']],
+    ['missing resetsAt', {}, ['resetsAt']],
+  ])('rejects invalid %s in quota details', (_label, patch, omit = []) => {
+    const details = { ...validQuotaExceeded.details, ...patch };
+    for (const key of omit as string[]) {
+      delete (details as Record<string, unknown>)[key];
+    }
+
+    const result = quotaExceededSchema.safeParse({
+      ...validQuotaExceeded,
+      details,
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('rejects wrong code literal', () => {

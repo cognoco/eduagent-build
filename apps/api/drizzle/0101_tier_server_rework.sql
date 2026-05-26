@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS "profile_quota_usage" (
   "cycle_reset_at" timestamp with time zone NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  CONSTRAINT "profile_quota_usage_role_valid" CHECK ("role" IN ('owner', 'child')),
+  CONSTRAINT "profile_quota_usage_monthly_limit_non_negative" CHECK ("monthly_limit" >= 0),
+  CONSTRAINT "profile_quota_usage_daily_limit_non_negative" CHECK ("daily_limit" IS NULL OR "daily_limit" >= 0),
   CONSTRAINT "profile_quota_usage_month_non_negative" CHECK ("used_this_month" >= 0),
   CONSTRAINT "profile_quota_usage_today_non_negative" CHECK ("used_today" >= 0)
 );

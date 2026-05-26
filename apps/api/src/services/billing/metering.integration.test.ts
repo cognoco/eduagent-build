@@ -24,8 +24,8 @@ import { resolve } from 'path';
 import {
   decrementQuota,
   incrementQuota,
-  MeteringError,
   type DecrementResult,
+  reconcileQuotaStateForEffectiveTier,
 } from '../billing';
 import { getTierConfig } from '../subscription';
 
@@ -447,6 +447,56 @@ describe('Quota metering (integration)', () => {
     expect(topUps[0]!.remaining).toBe(5);
   });
 
+  it('[BREAK] refund uses the quota model from the original decrement', async () => {
+    const account = await seedAccount(6);
+    const seeded = await seedSubscriptionWithQuota({
+      accountId: account.id,
+      tier: 'family',
+      monthlyLimit: 10,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 3,
+    });
+    const topUp = await seedTopUpCredit({
+      subscriptionId: seeded.subscription.id,
+      amount: 5,
+      remaining: 5,
+    });
+
+    const decrement = await decrementQuota(
+      createIntegrationDb(),
+      seeded.subscription.id,
+    );
+    expect(decrement).toMatchObject({
+      success: true,
+      source: 'top_up',
+      quotaModel: 'shared-pool',
+      topUpCreditId: topUp.id,
+    });
+
+    await createIntegrationDb()
+      .update(subscriptions)
+      .set({ tier: 'plus', updatedAt: new Date() })
+      .where(eq(subscriptions.id, seeded.subscription.id));
+
+    await incrementQuota(
+      createIntegrationDb(),
+      seeded.subscription.id,
+      undefined,
+      {
+        source: decrement.source,
+        topUpCreditId: decrement.topUpCreditId,
+        quotaModel: decrement.quotaModel,
+      },
+    );
+
+    const pool = await loadQuotaPool(seeded.subscription.id);
+    const topUps = await loadTopUps(seeded.subscription.id);
+    expect(pool!.usedThisMonth).toBe(10);
+    expect(pool!.usedToday).toBe(3);
+    expect(topUps[0]!.remaining).toBe(5);
+  });
+
   // [REGRESSION / CR-2026-05-19-C6] Legacy callers that omit `source` still
   // refund the monthly pool (back-compat) — they were the only refund path
   // before the fix and shouldn't break.
@@ -546,19 +596,48 @@ describe('Quota metering (integration)', () => {
   });
 
   describe('per-profile quota model', () => {
-    it('requires a profileId for Free and Plus metering', async () => {
+    it.each(['free', 'plus'] as const)(
+      'requires a profileId for %s metering',
+      async (tier) => {
+        const account = await seedAccount(0);
+        const seeded = await seedSubscriptionWithQuota({
+          accountId: account.id,
+          tier,
+        });
+
+        await expect(
+          decrementQuota(createIntegrationDb(), seeded.subscription.id),
+        ).rejects.toMatchObject({ code: 'PROFILE_ID_REQUIRED' });
+      },
+    );
+
+    it('resets stale shared-pool usage when a subscription re-enters that model', async () => {
       const account = await seedAccount(0);
       const seeded = await seedSubscriptionWithQuota({
         accountId: account.id,
-        tier: 'plus',
+        tier: 'family',
+        monthlyLimit: 1,
+        usedThisMonth: 1,
+        dailyLimit: 5,
+        usedToday: 4,
       });
+      const now = new Date('2026-06-01T00:00:00.000Z');
 
-      await expect(
-        decrementQuota(createIntegrationDb(), seeded.subscription.id),
-      ).rejects.toBeInstanceOf(MeteringError);
-      await expect(
-        decrementQuota(createIntegrationDb(), seeded.subscription.id),
-      ).rejects.toMatchObject({ code: 'PROFILE_ID_REQUIRED' });
+      await reconcileQuotaStateForEffectiveTier(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        'family',
+        now,
+      );
+
+      const pool = await loadQuotaPool(seeded.subscription.id);
+      expect(pool).toMatchObject({
+        monthlyLimit: getTierConfig('family').monthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: getTierConfig('family').dailyLimit,
+        usedToday: 0,
+      });
+      expect(pool!.cycleResetAt).toEqual(new Date('2026-07-01T00:00:00.000Z'));
     });
 
     it('decrements owner and child rows independently', async () => {
@@ -750,6 +829,7 @@ describe('Quota metering (integration)', () => {
     it('clamps stale Plus owner rows to Free caps while billing is past due', async () => {
       const plusTier = getTierConfig('plus');
       const freeTier = getTierConfig('free');
+      const staleUsedThisMonth = freeTier.ownerMonthlyQuota! - 1;
       const account = await seedAccount(4);
       const seeded = await seedSubscriptionWithQuota({
         accountId: account.id,
@@ -766,7 +846,7 @@ describe('Quota metering (integration)', () => {
         profileId: owner.id,
         role: 'owner',
         monthlyLimit: plusTier.ownerMonthlyQuota!,
-        usedThisMonth: 99,
+        usedThisMonth: staleUsedThisMonth,
         dailyLimit: plusTier.ownerDailyQuota,
         usedToday: 0,
       });
@@ -792,7 +872,7 @@ describe('Quota metering (integration)', () => {
       expect(ownerQuota).toMatchObject({
         monthlyLimit: freeTier.ownerMonthlyQuota,
         dailyLimit: freeTier.ownerDailyQuota,
-        usedThisMonth: 100,
+        usedThisMonth: freeTier.ownerMonthlyQuota,
         usedToday: 1,
       });
     });

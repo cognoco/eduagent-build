@@ -73,7 +73,10 @@ export async function reconcileQuotaStateForEffectiveTier(
         target: quotaPools.subscriptionId,
         set: {
           monthlyLimit: config.monthlyQuota,
+          usedThisMonth: 0,
           dailyLimit: config.dailyLimit,
+          usedToday: 0,
+          cycleResetAt: nextMonthlyReset(now),
           updatedAt: now,
         },
       });
