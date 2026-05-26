@@ -384,6 +384,24 @@ describe('ProfilesScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/create-profile');
   });
 
+  it('[BUG-519] still navigates to create-profile while subscription is loading', () => {
+    mockUseSubscription.mockReturnValue({ data: null });
+    mockUseFamilySubscription.mockReturnValue({ data: null });
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profiles-add-button'));
+
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/create-profile');
+  });
+
   it('shows loading indicator while loading', () => {
     useProfile.mockReturnValue({
       profiles: [],
