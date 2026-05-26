@@ -306,6 +306,25 @@ export default [
           ],
         },
       ],
+      // G5 gap closed — BUG-676: ban value imports of @eduagent/database in
+      // route files. Uses @typescript-eslint/no-restricted-imports (not the
+      // base rule) because `allowTypeImports: true` lets `import type { Database }`
+      // through — routes legitimately need the Database type for Hono Variables
+      // typing. Runtime imports of schema tables (e.g. `webhookIdempotencyKeys`)
+      // must live in services/* where createScopedRepository can enforce scoping.
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@eduagent/database',
+              message:
+                'Route files must not import @eduagent/database values. Move schema table access to services/*. Type-only imports (`import type { Database }`) remain allowed. See CLAUDE.md.',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
     },
   },
   // -------------------------------------------------------------------------

@@ -57,7 +57,9 @@ const { clearTransitionState } = require('../../lib/auth-transition');
 const { clearPendingAuthRedirect } = require('../../lib/pending-auth-redirect');
 const {
   markSessionExpired,
+  markSessionRevoked,
   clearSessionExpiredNotice,
+  clearSessionRevokedNotice,
 } = require('../../lib/auth-expiry');
 
 describe('SignInScreen', () => {
@@ -82,6 +84,7 @@ describe('SignInScreen', () => {
     clearTransitionState();
     clearPendingAuthRedirect();
     clearSessionExpiredNotice();
+    clearSessionRevokedNotice();
     delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,
@@ -806,6 +809,47 @@ describe('SignInScreen', () => {
     });
   });
 
+  // [BUG-779/780] Discriminated banner testIDs let the mentor-audit smoke
+  // assert which forced-signout cause produced the banner. The expired and
+  // revoked notices are independent — setting one must not produce the
+  // other's testID.
+  it('renders the session-expired banner with the session-expired-banner testID', async () => {
+    markSessionExpired();
+
+    render(<SignInScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-expired-banner')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('session-revoked-banner')).toBeNull();
+  });
+
+  it('renders the session-revoked banner with the session-revoked-banner testID', async () => {
+    markSessionRevoked();
+
+    render(<SignInScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-revoked-banner')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('session-expired-banner')).toBeNull();
+  });
+
+  it('prefers the revoked banner when both notices are set', async () => {
+    // A server-side revoke is a stronger signal than a client-side expiry —
+    // when both are set the revoke wins so the user sees the more accurate
+    // cause and the audit smoke gets the deterministic testID.
+    markSessionExpired();
+    markSessionRevoked();
+
+    render(<SignInScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-revoked-banner')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('session-expired-banner')).toBeNull();
+  });
+
   // ---------------------------------------------------------------------------
   // SSO sign-in
   // ---------------------------------------------------------------------------
@@ -1177,6 +1221,48 @@ describe('SignInScreen', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [CR-2026-05-21-111] Cancel sign-in clears stranded pending SSO state so a
+  // subsequent provider tap starts from a clean slate (no stale redirect, no
+  // stale pendingSessionActivationId).
+  // ---------------------------------------------------------------------------
+
+  describe('[CR-2026-05-21-111] Cancel sign-in after failed OAuth activation', () => {
+    it('shows a Cancel button alongside Try Again in the OAuth retry UI, and Cancel clears pending state', async () => {
+      Object.defineProperty(Platform, 'OS', {
+        value: 'android',
+        configurable: true,
+        writable: true,
+      });
+      // SSO succeeds, but setActive throws — this is the path that calls
+      // setPendingSessionActivationId + setActivationFailureContext('oauth')
+      // inside activateSession (sign-in.tsx:606-613).
+      mockStartSSOFlow.mockResolvedValue({
+        createdSessionId: 'sess_google_failing',
+      });
+      mockSetActive.mockRejectedValueOnce(new Error('clerk activation boom'));
+
+      render(<SignInScreen />);
+      fireEvent.press(screen.getByTestId('google-sso-button'));
+
+      // Wait for the retry button to appear (proves pendingSessionActivationId
+      // is set and the screen rendered the OAuth-retry branch).
+      await waitFor(() => {
+        screen.getByTestId('sign-in-oauth-retry');
+      });
+      // The new Cancel button must be visible alongside Retry.
+      screen.getByTestId('sign-in-oauth-cancel');
+
+      // Tap Cancel: the retry UI block should be torn down (since both
+      // pendingSessionActivationId and activationFailureContext are cleared).
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('sign-in-oauth-cancel'));
+      });
+      expect(screen.queryByTestId('sign-in-oauth-retry')).toBeNull();
+      expect(screen.queryByTestId('sign-in-oauth-cancel')).toBeNull();
     });
   });
 });

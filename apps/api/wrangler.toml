@@ -84,12 +84,23 @@ ENVIRONMENT = "development"
 # =============================================================================
 # KV Namespaces (Zwizzly account)
 # These are edge caches for subscription and coaching data.
-# Namespace IDs are from the Zwizzly Cloudflare account.
+#
+# [FCR-2026-05-23-L14.F8] KV namespace IDs are infrastructure identifiers that
+# reveal production KV topology when committed in plaintext. They are NOT
+# committed here. The placeholders below (e.g. __SUBSCRIPTION_KV_DEV__) are
+# substituted at deploy time by `scripts/render-wrangler-kv.mjs` using values
+# from these Doppler-managed GitHub Actions secrets:
+#   CF_KV_SUBSCRIPTION_ID_DEV / _STG / _PRD
+#   CF_KV_COACHING_ID_DEV    / _STG / _PRD
+# For local `wrangler dev`, run `pnpm env:sync` then
+# `node scripts/render-wrangler-kv.mjs` (Doppler `dev` exposes the *_DEV vars).
+# CI guard: `node scripts/render-wrangler-kv.mjs --check` fails if a real
+# 32-hex KV namespace ID slips back into the committed file.
 # =============================================================================
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "3510a1174e454e66a169a519c9c996f7"
+id = "__SUBSCRIPTION_KV_DEV__"
 # TODO [CFG-4]: Create a dedicated dev-preview KV namespace in Cloudflare dashboard
 # (Workers & Pages → KV → Create → "SUBSCRIPTION_KV_preview") and add:
 #   preview_id = "<new-namespace-id>"
@@ -97,7 +108,7 @@ id = "3510a1174e454e66a169a519c9c996f7"
 
 [[kv_namespaces]]
 binding = "COACHING_KV"
-id = "db6f91e2639e44ce931f63f858593f3c"
+id = "__COACHING_KV_DEV__"
 # TODO [CFG-4]: Same — create "COACHING_KV_preview" namespace and add preview_id.
 
 # TODO [BUG-12]: Create "IDEMPOTENCY_KV" namespace in the Zwizzly Cloudflare
@@ -135,11 +146,11 @@ EMAIL_FROM = "staging-noreply@mentomate.com"
 
 [[env.staging.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "8cbb6e486dc64f80acb0214b7fc84e25"
+id = "__SUBSCRIPTION_KV_STG__"
 
 [[env.staging.kv_namespaces]]
 binding = "COACHING_KV"
-id = "cbed5036c909416487c3b9362da521d0"
+id = "__COACHING_KV_STG__"
 
 # TODO [BUG-12]: Add IDEMPOTENCY_KV staging binding once the namespace is
 # created. Pre-launch posture: dedup is OFF, the missing binding fires an
@@ -172,11 +183,11 @@ EMAIL_FROM = "noreply@mentomate.com"
 
 [[env.production.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "cde9f81f19a34022b6dc6951928a0511"
+id = "__SUBSCRIPTION_KV_PRD__"
 
 [[env.production.kv_namespaces]]
 binding = "COACHING_KV"
-id = "76b36f4748fe4d77b27387a5bebf4be6"
+id = "__COACHING_KV_PRD__"
 
 # TODO [BUG-12]: Add IDEMPOTENCY_KV production binding before any traffic that
 # would re-trigger billing/consent side-effects on replay. If production must

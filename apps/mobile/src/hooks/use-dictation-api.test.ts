@@ -116,6 +116,27 @@ describe('usePrepareHomework', () => {
 
     expect(result.current.error?.message).toBe('Network error');
   });
+
+  // [FCR-2026-05-23-L6.L5] Without a timeout guard, a hung API call wedges
+  // the dictation screen indefinitely. Assert the mutation passes an
+  // AbortSignal to fetch so the timeout actually fires.
+  it('passes an AbortSignal to fetch so a hung API does not wedge the screen', async () => {
+    const { result } = renderHook(() => usePrepareHomework(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({ text: 'Hello world.' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeDefined();
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
 });
 
 describe('useGenerateDictation', () => {

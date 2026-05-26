@@ -19,11 +19,13 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile, type Profile } from '../lib/profile';
 import { useNavigationContract } from '../hooks/use-navigation-contract';
 import { useActiveProfileRole } from '../hooks/use-active-profile-role';
+import { useUpdateProfileAppContext } from '../hooks/use-profiles';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { Button } from '../components/common/Button';
@@ -86,6 +88,7 @@ export default function CreateProfileScreen() {
   const { activeProfile, profiles, switchProfile } = useProfile();
   const navigationContract = useNavigationContract();
   const activeProfileRole = useActiveProfileRole();
+  const updateAppContext = useUpdateProfileAppContext();
 
   // BUG-239: Detect whether the current user is a parent adding a child.
   // When an account owner (parent) who already has a profile creates another
@@ -102,6 +105,14 @@ export default function CreateProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // [ACCOUNT-01] Capture Study/Family intent on first profile setup.
+  // Persisted via PATCH /profiles/:id/app-context immediately after creation.
+  // null = not chosen yet (gates submit for the first-profile flow).
+  // Skipped entirely for "adding a child" (intent is implicit), for the
+  // proxy/non-owner gate paths (those never reach POST anyway), and for
+  // adolescent first-profile users (the API rejects family mode for non-adult
+  // owners; forcing them through the picker would be a dead end).
+  const [intent, setIntent] = useState<'study' | 'family' | null>(null);
 
   // [BUG-UX-PROFILE-TIMEOUT] Hard 30s UI timeout: if the profile-creation POST
   // hasn't resolved, surface an inline error and restore the form so the user
@@ -145,10 +156,27 @@ export default function CreateProfileScreen() {
     [error],
   );
 
+  // [ACCOUNT-01] First-profile setup is the *only* path where the Study/Family
+  // intent picker appears. Adding a child has implicit intent (the parent is
+  // already on a family-shape account), and once profiles exist the per-profile
+  // app-context can be flipped from More → Account / the mode switcher.
+  const isFirstProfileSetup = !isAddingChild && profiles.length === 0;
+  // Only adult owners can pick 'family' — `familyCapable` in app-context.tsx
+  // requires `computeAgeBracket === 'adult'`. We still SHOW the picker so
+  // adolescent first-profile users get an explanation, but the family option
+  // is disabled with a hint. Birth date must be set before we can show the
+  // picker (we need the age bracket).
+  const isAdultBirthDate =
+    birthDate !== null &&
+    computeAgeBracket(birthDate.getFullYear()) === 'adult';
+  const showIntentPicker = isFirstProfileSetup && birthDate !== null;
+  const intentRequired = showIntentPicker && isAdultBirthDate;
+
   const canSubmit =
     displayName.trim().length >= 1 &&
     displayName.trim().length <= 50 &&
     birthDate !== null &&
+    (!intentRequired || intent !== null) &&
     !loading;
 
   const onSubmit = useCallback(async () => {
@@ -182,6 +210,33 @@ export default function CreateProfileScreen() {
       await assertOk(res);
       const result = (await res.json()) as { profile: Profile };
 
+      // [ACCOUNT-01] Persist Study/Family intent immediately after creation.
+      // The profile is created with defaultAppContext=null; setting it now
+      // means future sign-ins land the user in the correct mode the moment
+      // they add a child (family-mode UI activates as soon as
+      // familyCapable === true, which requires hasFamilyLinks === true).
+      // Picking 'study' is the default — no PATCH needed for that branch.
+      // Wrapped in a non-throwing try so a flaky PATCH never blocks the
+      // profile-created success path; the user can change mode later from
+      // More → Account.
+      let intentPersistedProfile: Profile | null = null;
+      if (isFirstProfileSetup && intent === 'family' && isAdultBirthDate) {
+        try {
+          intentPersistedProfile = await updateAppContext.mutateAsync({
+            profileId: result.profile.id,
+            defaultAppContext: 'family',
+          });
+        } catch (intentErr) {
+          if (__DEV__) {
+            console.warn(
+              '[ACCOUNT-01] Failed to persist family intent on first profile setup; user can change later from More → Account.',
+              intentErr,
+            );
+          }
+        }
+      }
+      const createdProfile = intentPersistedProfile ?? result.profile;
+
       // BUG-264: Optimistically add the new profile to the query cache BEFORE
       // invalidating. Without this, invalidateQueries triggers a refetch with
       // stale data (empty array for first-time users), causing activeProfile to
@@ -192,9 +247,9 @@ export default function CreateProfileScreen() {
           predicate: (query) => String(query.queryKey[0]) === 'profiles',
         },
         (old) =>
-          old && !old.some((profile) => profile.id === result.profile.id)
-            ? [...old, result.profile]
-            : (old ?? [result.profile]),
+          old && !old.some((profile) => profile.id === createdProfile.id)
+            ? [...old, createdProfile]
+            : (old ?? [createdProfile]),
       );
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
@@ -293,6 +348,10 @@ export default function CreateProfileScreen() {
     switchProfile,
     router,
     handleClose,
+    intent,
+    isFirstProfileSetup,
+    isAdultBirthDate,
+    updateAppContext,
   ]);
 
   // [BUG-375] Auth gate — deep-link entry must not show create-profile form to
@@ -515,6 +574,75 @@ export default function CreateProfileScreen() {
             onChange={onDateChange}
             testID="date-picker"
           />
+        )}
+
+        {/* [ACCOUNT-01] Intent picker — first-profile setup only.
+            Hidden when adding a child (implicit family intent), hidden until
+            the user has picked a birth date (we need the age bracket to know
+            whether family mode is even reachable), and hidden once any
+            profile exists (use the More → Account mode switcher instead). */}
+        {showIntentPicker && (
+          <View className="mt-2 mb-2" testID="create-profile-intent-picker">
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              How will you use MentoMate?
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-2">
+              {isAdultBirthDate
+                ? 'You can change this any time from More → Account.'
+                : 'You are set up as a learner. Adults can switch to Family mode once they add a child.'}
+            </Text>
+            <Pressable
+              onPress={() => {
+                setIntent('study');
+                if (error) setError('');
+              }}
+              className={
+                intent === 'study'
+                  ? 'bg-primary/15 border border-primary rounded-input px-4 py-3 mb-2'
+                  : 'bg-surface rounded-input px-4 py-3 mb-2'
+              }
+              accessibilityRole="radio"
+              accessibilityState={{ selected: intent === 'study' }}
+              testID="create-profile-intent-study"
+            >
+              <Text className="text-text-primary text-body font-semibold">
+                Just for me (Study)
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-1">
+                Personal learning. You will land on the learner home.
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (!isAdultBirthDate) return;
+                setIntent('family');
+                if (error) setError('');
+              }}
+              disabled={!isAdultBirthDate}
+              className={
+                intent === 'family'
+                  ? 'bg-primary/15 border border-primary rounded-input px-4 py-3 mb-2'
+                  : isAdultBirthDate
+                    ? 'bg-surface rounded-input px-4 py-3 mb-2'
+                    : 'bg-surface opacity-50 rounded-input px-4 py-3 mb-2'
+              }
+              accessibilityRole="radio"
+              accessibilityState={{
+                selected: intent === 'family',
+                disabled: !isAdultBirthDate,
+              }}
+              testID="create-profile-intent-family"
+            >
+              <Text className="text-text-primary text-body font-semibold">
+                For my family (Family)
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-1">
+                {isAdultBirthDate
+                  ? 'Mentor children alongside your own learning. Family mode activates after you add a child.'
+                  : 'Available for adult account owners only.'}
+              </Text>
+            </Pressable>
+          </View>
         )}
 
         {/* Spacer before submit — persona is auto-detected from birth date */}

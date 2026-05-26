@@ -30,6 +30,9 @@ const mockSwitchProfile = jest.fn(async () => ({ success: true }));
 // profile context. Must be set to true only for proxy-mode test cases.
 let mockIsExplicitProxyMode = false;
 let mockContractHomeScreen: 'LearnerHome' | 'FamilyHome' = 'LearnerHome';
+// [HOME-07] Surface a Family setup CTA on the learner home for adult owners
+// who can add a child but have not linked one yet. Tests opt in via this flag.
+let mockShowAddChild = false;
 
 const mockNavContract = () => ({
   home: {
@@ -43,6 +46,7 @@ const mockNavContract = () => ({
     showFamilyChildActivity: false,
     showFamilyHome: mockContractHomeScreen === 'FamilyHome',
     showLearningActions: !mockIsExplicitProxyMode,
+    showAddChild: mockShowAddChild,
   },
   canEnter: () => true,
   isSurfaced: () => true,
@@ -340,6 +344,7 @@ describe('LearnerScreen', () => {
     mockSwitchProfile.mockResolvedValue({ success: true });
     mockIsExplicitProxyMode = false;
     mockContractHomeScreen = 'LearnerHome';
+    mockShowAddChild = false;
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false, gcTime: 0 },
@@ -402,6 +407,39 @@ describe('LearnerScreen', () => {
       pathname: '/(app)/my-notes',
       params: { returnTo: 'learner-home' },
     });
+  });
+
+  // [HOME-07] Adult owner without linked children must see a Family setup
+  // entry on the learner home. Routes to More so the existing handleAddChild
+  // flow owns subscription/quota gating.
+  it('shows Family setup CTA when adult owner can add child and has no children', async () => {
+    mockShowAddChild = true;
+    mockLinkedChildren = [];
+    renderLearner();
+
+    await waitFor(() => screen.getByTestId('home-family-setup-cta-button'));
+    fireEvent.press(screen.getByTestId('home-family-setup-cta-button'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more');
+  });
+
+  it('hides Family setup CTA when owner already has linked children', async () => {
+    mockShowAddChild = true;
+    mockLinkedChildren = [
+      { id: 'child-id', displayName: 'Emma', isOwner: false },
+    ];
+    renderLearner();
+
+    await waitFor(() => screen.getByTestId('learner-screen'));
+    expect(screen.queryByTestId('home-family-setup-cta-button')).toBeNull();
+  });
+
+  it('hides Family setup CTA when gates.showAddChild is false', async () => {
+    mockShowAddChild = false;
+    mockLinkedChildren = [];
+    renderLearner();
+
+    await waitFor(() => screen.getByTestId('learner-screen'));
+    expect(screen.queryByTestId('home-family-setup-cta-button')).toBeNull();
   });
 
   it('keeps home actions available when the subject list fails to load', async () => {

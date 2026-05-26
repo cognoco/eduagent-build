@@ -17,6 +17,9 @@ import {
   appContextSchema,
   pronounsSchema,
   profileSchema,
+  publicProfileSchema,
+  profileResponseSchema,
+  profileListResponseSchema,
   onboardingPronounsPatchSchema,
   onboardingLanguagePatchSchema,
   profileUpdateSchema,
@@ -210,6 +213,59 @@ describe('interestsArraySchema forward-compat', () => {
     expect(() =>
       interestEntrySchema.parse({ label: 'chess', context: 'mixed' }),
     ).toThrow();
+  });
+});
+
+describe('[CR-2026-05-21-181] publicProfileSchema omits accountId', () => {
+  // The mobile client must never see accountId on a profile payload — it is a
+  // stable identifier that would let a client correlate sibling profiles on a
+  // family plan back to a single account holder. The internal shape keeps
+  // accountId for server-side use (billing, family-link queries); the public
+  // shape (used by every /profiles* route response envelope) strips it.
+
+  it('publicProfileSchema does NOT include accountId in its shape', () => {
+    const keys = Object.keys(publicProfileSchema.shape);
+    expect(keys).not.toContain('accountId');
+  });
+
+  it('publicProfileSchema preserves every other field from the internal shape', () => {
+    const internalKeys = new Set(Object.keys(profileSchema.shape));
+    internalKeys.delete('accountId');
+    const publicKeys = new Set(Object.keys(publicProfileSchema.shape));
+    expect(publicKeys).toEqual(internalKeys);
+  });
+
+  it('profileResponseSchema (route envelope) wraps the public shape, not the internal one', () => {
+    const inner = profileResponseSchema.shape.profile;
+    expect(Object.keys(inner.shape)).not.toContain('accountId');
+  });
+
+  it('profileListResponseSchema (route envelope) wraps the public shape, not the internal one', () => {
+    const arr = profileListResponseSchema.shape.profiles;
+    // ZodArray exposes .element
+    expect(Object.keys(arr.element.shape)).not.toContain('accountId');
+  });
+
+  it('publicProfileSchema STRIPS accountId on parse rather than rejecting (defence in depth)', () => {
+    // If a server-side code path accidentally hands a full row to the public
+    // schema, the parse strips accountId silently instead of throwing — the
+    // route still responds, the client just never sees the field. The strict
+    // contract is "accountId is not in the output," not "accountId in the
+    // input is an error."
+    const parsed = publicProfileSchema.parse({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      accountId: '660e8400-e29b-41d4-a716-446655440000',
+      displayName: 'Alex',
+      avatarUrl: null,
+      birthYear: 2013,
+      location: null,
+      isOwner: true,
+      consentStatus: null,
+      linkCreatedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    expect(parsed).not.toHaveProperty('accountId');
   });
 });
 

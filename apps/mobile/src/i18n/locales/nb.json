@@ -102,6 +102,15 @@
       "backToSignIn": "Tilbake til pålogging"
     }
   },
+  "guards": {
+    "requireFamilyContext": {
+      "title": "Dette er en familievisning",
+      "body": "Læreprofilene til barn er bare synlige i familiemodus.",
+      "switchError": "Vi klarte ikke å bytte til familiemodus. Prøv igjen, eller kontakt kundestøtte hvis dette fortsetter.",
+      "switchCta": "Bytt til familiemodus",
+      "backToHome": "Tilbake til hjem"
+    }
+  },
   "home": {
     "loadingTimeoutMessage": "Tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen.",
     "retryLoadingLabel": "Prøv å laste på nytt",
@@ -140,7 +149,12 @@
       },
       "proxySessionSummariesTitle": "Øktoppsummeringer finnes i foreldrevisningen",
       "proxySessionSummariesBody": "Notatene til {{name}} forblir private, men du kan se foreldrevennlige øktoppsummeringer fra profilen.",
-      "proxySessionSummariesCta": "Se øktoppsummeringene til {{name}}"
+      "proxySessionSummariesCta": "Se øktoppsummeringene til {{name}}",
+      "familySetup": {
+        "title": "Set up Family",
+        "subtitle": "Add a child profile so they can learn with their own mentor",
+        "cta": "Set up Family"
+      }
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -1047,6 +1061,9 @@
       "missingMessage": "Vi kunne ikke laste dette emnet. Gå til biblioteket for å velge et.",
       "goToLibrary": "Gå til bibliotek",
       "successPrompt": "Gå tilbake til biblioteket ditt når du er klar.",
+      "successMessage": "Bra jobbet — du husker dette godt! Gå tilbake til biblioteket ditt når du er klar.",
+      "partialResult": "God innsats! Tenk på nøkkelbegrepene og prøv å forklare igjen. Hva er det som skiller seg ut mest for deg?",
+      "needsReview": "Nesten der — litt mer øvelse vil feste dette. La oss finne en bedre tilnærming for deg.",
       "dontRemember": "Jeg husker ikke",
       "stillStuck": "Sitter fortsatt fast",
       "errorTitle": "Noe gikk galt",
@@ -2162,6 +2179,45 @@
         "gettingComfortable": "Blir tryggere",
         "nearlyMastered": "Nesten mestret",
         "mastered": "Mestret"
+      }
+    },
+    "metricTooltips": {
+      "infoDotLabel": "Mer informasjon om {{title}}",
+      "timeOnApp": {
+        "title": "Tid i appen",
+        "body": "Hvor lenge barnet ditt brukte appen i denne økten, målt i ekte minutter."
+      },
+      "sessionsThisWeek": {
+        "title": "Økter denne uken",
+        "body": "Antall læringssamtaler barnet ditt hadde med mentoren denne uken."
+      },
+      "engagementTrend": {
+        "title": "Aktivitetstrend",
+        "body": "Om barnet ditt bruker mentoren mer, mindre eller omtrent like mye som i den siste tiden."
+      },
+      "exchangeDelta": {
+        "title": "Meldinger denne uken",
+        "body": "Hvor mange meldinger som ble utvekslet denne uken sammenlignet med forrige uke. Et enkelt signal om læringsaktivitet."
+      },
+      "guidedRatio": {
+        "title": "Veiledet øving",
+        "body": "Andelen mentorsvar der barnet ditt trengte et utarbeidet eksempel eller mer veiledning i stedet for et lett dytt."
+      },
+      "streakXp": {
+        "title": "Rekke og XP",
+        "body": "Motivasjonssignaler fra jevnlig øving og fullført læringsarbeid. Det er ikke karakterer."
+      },
+      "understanding": {
+        "title": "Forståelse",
+        "body": "Hvor godt barnet ditt forstår dette emnet, basert på svarene og samtalene med mentoren."
+      },
+      "reviewStatus": {
+        "title": "Hukommelsessjekk",
+        "body": "Om barnet ditt fortsatt husker det de har lært. Basert på fordelt repetisjon, slik at emner kommer tilbake med økende intervaller."
+      },
+      "milestone": {
+        "title": "Milepæler",
+        "body": "Milepæler markerer ekte prestasjoner, som første økter, utforskede emner og lærte ord."
       }
     },
     "weeklyReport": {

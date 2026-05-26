@@ -7,8 +7,9 @@
 
 import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
-import { type Database, webhookIdempotencyKeys } from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import { apiError } from '../errors';
+import { claimWebhookId } from '../services/webhook-idempotency';
 import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
 import { safeSend } from '../services/safe-non-core';
@@ -23,38 +24,6 @@ const logger = createLogger();
 // so different webhook providers cannot collide on overlapping ID schemes.
 // ---------------------------------------------------------------------------
 const RESEND_WEBHOOK_SOURCE = 'resend';
-
-/**
- * Attempt to atomically claim a webhook id. Returns:
- *   - 'claimed'   — first delivery; processing should proceed
- *   - 'replay'    — another concurrent / earlier delivery already claimed
- *   - 'unavailable' — DB call failed; the caller decides the fallback
- *
- * Uses `INSERT ... ON CONFLICT DO NOTHING RETURNING webhook_id`. Postgres
- * evaluates the unique constraint atomically: two concurrent inserts with the
- * same (source, webhook_id) cannot both return a row.
- */
-export async function claimWebhookId(
-  db: Database,
-  source: string,
-  webhookId: string,
-): Promise<'claimed' | 'replay' | 'unavailable'> {
-  try {
-    const rows = await db
-      .insert(webhookIdempotencyKeys)
-      .values({ source, webhookId })
-      .onConflictDoNothing({
-        target: [
-          webhookIdempotencyKeys.source,
-          webhookIdempotencyKeys.webhookId,
-        ],
-      })
-      .returning({ webhookId: webhookIdempotencyKeys.webhookId });
-    return rows.length === 0 ? 'replay' : 'claimed';
-  } catch {
-    return 'unavailable';
-  }
-}
 
 // ---------------------------------------------------------------------------
 // [CCR-PR120-M7] Svix-id replay deduplication

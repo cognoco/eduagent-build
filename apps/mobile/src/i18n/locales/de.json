@@ -102,6 +102,15 @@
       "backToSignIn": "Zurück zur Anmeldung"
     }
   },
+  "guards": {
+    "requireFamilyContext": {
+      "title": "Das ist eine Familienansicht",
+      "body": "Lernprofile von Kindern sind nur im Familienmodus sichtbar.",
+      "switchError": "Wir konnten nicht in den Familienmodus wechseln. Bitte versuche es erneut oder wende dich an den Support, falls das Problem weiterhin besteht.",
+      "switchCta": "In den Familienmodus wechseln",
+      "backToHome": "Zurück zur Startseite"
+    }
+  },
   "home": {
     "loadingTimeoutMessage": "Dauert länger als erwartet. Bitte überprüfe deine Verbindung und versuche es erneut.",
     "retryLoadingLabel": "Laden wiederholen",
@@ -140,6 +149,11 @@
           "title": "Etwas Neues lernen",
           "subtitle": "Starte ein Thema oder erstelle ein Fach"
         }
+      },
+      "familySetup": {
+        "title": "Set up Family",
+        "subtitle": "Add a child profile so they can learn with their own mentor",
+        "cta": "Set up Family"
       }
     },
     "notices": {
@@ -1047,6 +1061,9 @@
       "missingMessage": "Wir konnten dieses Thema nicht laden. Gehe zur Bibliothek, um eines auszuwählen.",
       "goToLibrary": "Zur Bibliothek",
       "successPrompt": "Gehe zurück zu deiner Bibliothek, wann immer du bereit bist.",
+      "successMessage": "Super gemacht — du hast dir das wirklich gut gemerkt! Gehe zurück zu deiner Bibliothek, wann immer du bereit bist.",
+      "partialResult": "Guter Einsatz! Denke an die wichtigsten Konzepte und versuche es nochmal zu erklären. Was fällt dir als Erstes auf?",
+      "needsReview": "Fast geschafft — ein bisschen mehr Übung und du hast es drauf. Lass uns einen besseren Ansatz für dich finden.",
       "dontRemember": "Ich erinnere mich nicht",
       "stillStuck": "Hängst du fest?",
       "errorTitle": "Etwas ist schiefgelaufen",
@@ -2162,6 +2179,45 @@
         "gettingComfortable": "Wird sicherer",
         "nearlyMastered": "Fast gemeistert",
         "mastered": "Gemeistert"
+      }
+    },
+    "metricTooltips": {
+      "infoDotLabel": "Mehr Informationen zu {{title}}",
+      "timeOnApp": {
+        "title": "Zeit in der App",
+        "body": "Wie lange dein Kind in dieser Sitzung in der App verbracht hat, gemessen in echten Minuten."
+      },
+      "sessionsThisWeek": {
+        "title": "Sitzungen diese Woche",
+        "body": "Die Anzahl der Lernunterhaltungen, die dein Kind diese Woche mit dem Mentor geführt hat."
+      },
+      "engagementTrend": {
+        "title": "Aktivitätstrend",
+        "body": "Ob dein Kind den Mentor häufiger, seltener oder ähnlich nutzt wie in den letzten Wochen."
+      },
+      "exchangeDelta": {
+        "title": "Nachrichten diese Woche",
+        "body": "Wie viele Nachrichten diese Woche im Vergleich zur Vorwoche ausgetauscht wurden. Ein einfaches Signal für die Lernaktivität."
+      },
+      "guidedRatio": {
+        "title": "Geführtes Üben",
+        "body": "Der Anteil der Mentor-Antworten, bei denen dein Kind ein ausgearbeitetes Beispiel oder mehr Anleitung statt nur einen kleinen Anstoß brauchte."
+      },
+      "streakXp": {
+        "title": "Serie und XP",
+        "body": "Motivationssignale aus regelmäßigem Üben und abgeschlossener Lernarbeit. Es sind keine Noten."
+      },
+      "understanding": {
+        "title": "Verständnis",
+        "body": "Wie gut dein Kind dieses Thema versteht, basierend auf seinen Antworten und Gesprächen mit dem Mentor."
+      },
+      "reviewStatus": {
+        "title": "Gedächtnis-Check",
+        "body": "Ob dein Kind sich noch an das Gelernte erinnert. Basierend auf verteilter Wiederholung, sodass Themen in wachsenden Abständen wiederkommen."
+      },
+      "milestone": {
+        "title": "Meilensteine",
+        "body": "Meilensteine markieren echte Erfolge, wie erste Sitzungen, erforschte Themen und gelernte Vokabeln."
       }
     },
     "weeklyReport": {

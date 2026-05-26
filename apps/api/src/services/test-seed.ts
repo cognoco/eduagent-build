@@ -4322,7 +4322,20 @@ async function seedMentorAuditSessionRevoked(
 /** MFA TOTP — attach a TOTP factor via Clerk Backend
  *  `POST /users/{id}/totp`. Returns the shared secret in `SeedResult.ids` so
  *  the Playwright helper can generate the rolling code via `otplib` at
- *  sign-in time. Backup-code + SMS factor paths are out of scope (plan §10). */
+ *  sign-in time. Backup-code + SMS factor paths are out of scope (plan §10).
+ *
+ *  [BUG-781] Clerk environments that have authenticator-app MFA disabled
+ *  respond `405 Method Not Allowed` to the attach call. Treat that as a
+ *  recoverable environment-config gap rather than a seed-time failure: log
+ *  the degradation, return an empty totpSecret, and surface a structured
+ *  `mfaDisabledReason` in SeedResult.ids so the smoke spec / harness can
+ *  skip the MFA assertion with a clear cause. The rest of the audit run
+ *  must not be blocked by a single environment config flip.
+ *
+ *  Operator action required to fully enable this scenario in staging:
+ *  Clerk Dashboard → User & Authentication → Multi-factor →
+ *  enable "Authenticator application". Until then, this seeder degrades
+ *  gracefully and the smoke skips. */
 async function seedMentorAuditMfaTotp(
   db: Database,
   email: string,
@@ -4331,10 +4344,13 @@ async function seedMentorAuditMfaTotp(
   const base = await seedOnboardingComplete(db, email, env);
 
   let totpSecret = '';
+  let mfaDisabledReason = '';
   if (env.CLERK_SECRET_KEY) {
     const clerkUserId = await findClerkUserIdForAccount(db, base.accountId);
     if (clerkUserId) {
-      totpSecret = await attachClerkTotpFactor(clerkUserId, env);
+      const attachResult = await attachClerkTotpFactor(clerkUserId, env);
+      totpSecret = attachResult.secret;
+      mfaDisabledReason = attachResult.disabledReason;
     }
   }
 
@@ -4344,6 +4360,11 @@ async function seedMentorAuditMfaTotp(
     ids: {
       ...base.ids,
       totpSecret,
+      // Empty string when MFA attach succeeded (or was skipped because no
+      // CLERK_SECRET_KEY). Non-empty when the Clerk environment rejected
+      // the attach with a structured 405 / 422 — the spec can read this to
+      // decide whether to skip or fail.
+      mfaDisabledReason,
     },
   };
 }
@@ -4399,12 +4420,21 @@ async function revokeNewestClerkSession(
 
 /** Attaches a TOTP factor to the given Clerk user. Returns the shared secret
  *  the Playwright helper feeds to `otplib.authenticator.generate()` at
- *  sign-in. */
-async function attachClerkTotpFactor(
+ *  sign-in, plus a `disabledReason` string the seeder uses to mark the
+ *  result as "MFA unavailable in this environment" without throwing.
+ *
+ *  [BUG-781] Returns a structured result instead of throwing on every error.
+ *  A 405 (Method Not Allowed) means the Clerk environment has authenticator-
+ *  app MFA disabled at the dashboard level — that is an operator-config gap,
+ *  not a code defect, and must not block the rest of the audit registry.
+ *  A 422 with an `authenticator_app_disabled` error code is treated the same
+ *  way; Clerk has used both shapes historically. Other error statuses (4xx
+ *  auth errors, 5xx, network) still throw so unexpected breakage is loud. */
+export async function attachClerkTotpFactor(
   clerkUserId: string,
   env: SeedEnv,
-): Promise<string> {
-  if (!env.CLERK_SECRET_KEY) return '';
+): Promise<{ secret: string; disabledReason: string }> {
+  if (!env.CLERK_SECRET_KEY) return { secret: '', disabledReason: '' };
 
   const res = await fetch(
     `${CLERK_API_BASE}/users/${encodeURIComponent(clerkUserId)}/totp`,
@@ -4413,12 +4443,53 @@ async function attachClerkTotpFactor(
       headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
     },
   );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Clerk TOTP attach failed (${res.status}): ${body}`);
+  if (res.ok) {
+    const payload = (await res.json()) as { secret?: string };
+    return { secret: payload.secret ?? '', disabledReason: '' };
   }
-  const payload = (await res.json()) as { secret?: string };
-  return payload.secret ?? '';
+
+  // Read body once — Response body streams are single-use (CLAUDE.md rule).
+  const body = await res.text();
+
+  // 405 = Clerk environment has authenticator-app MFA disabled. The attach
+  // endpoint is registered but not allowed. Surface as a graceful skip so
+  // the rest of the audit run still completes.
+  if (res.status === 405) {
+    return {
+      secret: '',
+      disabledReason:
+        'clerk_authenticator_app_disabled (status=405) — enable Authenticator application in Clerk Dashboard → User & Authentication → Multi-factor',
+    };
+  }
+
+  // 422 with an authenticator-app-specific error code is the modern Clerk
+  // shape for the same dashboard-config gap.
+  if (res.status === 422) {
+    let isAuthenticatorAppDisabled = false;
+    try {
+      const parsed = JSON.parse(body) as {
+        errors?: Array<{ code?: string }>;
+      };
+      isAuthenticatorAppDisabled =
+        parsed.errors?.some(
+          (e) =>
+            e.code === 'authenticator_app_disabled' ||
+            e.code === 'mfa_authenticator_app_disabled',
+        ) ?? false;
+    } catch {
+      // Fall through to throw below — a 422 without a parseable body shape
+      // is a different bug worth surfacing loudly.
+    }
+    if (isAuthenticatorAppDisabled) {
+      return {
+        secret: '',
+        disabledReason:
+          'clerk_authenticator_app_disabled (status=422) — enable Authenticator application in Clerk Dashboard → User & Authentication → Multi-factor',
+      };
+    }
+  }
+
+  throw new Error(`Clerk TOTP attach failed (${res.status}): ${body}`);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,26 +1,34 @@
 # Flow L1: Book Detail
-# Validates: library tab -> v3 shelf expansion -> book-row tap -> book detail -> back navigation.
-# Tags: pr-blocking, learning
+# Validates: library tab -> tap shelf row -> shelf screen -> book card tap ->
+#            book detail -> back navigation.
+# Tags: nightly, learning (re-promote to pr-blocking after 2x green on WHPX
+#       Pixel API 34 — see Notion bug 3658bce9-1f7c-81fc-8afa-d9ade3fefbeb)
 #
 # Journey: UX Journey 1 (Library & Content Discovery)
 # Epics: Epic 7 (Library)
 # Prerequisite: Seeded learner with an active curriculum book (scenario: learning-active)
 #
+# Routing note (Library v3 push refactor, 2026-05-19):
+#   Library no longer expands shelves inline. Tapping a shelf-row-header
+#   calls handleShelfPress (library.tsx:333) which pushes /shelf/[subjectId].
+#   On the shelf screen, books render as BookCard (testID `book-card-${bookId}`),
+#   NOT inline `book-row-${bookId}`. Tapping a BookCard pushes
+#   /shelf/[subjectId]/book/[bookId] (shelf/[subjectId]/index.tsx:388-393).
+#
 # testIDs verified against:
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-library)
 #   - apps/mobile/src/app/(app)/library.tsx (shelves-list)
 #   - apps/mobile/src/components/library/ShelfRow.tsx (shelf-row-header-${subjectId})
-#   - apps/mobile/src/components/library/BookRow.tsx (book-row-${bookId})
 #   - apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx (shelf-screen, shelf-back)
-#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (book-screen, book-back,
-#     book-notes-section, book-start-learning)
+#   - apps/mobile/src/components/library/BookCard.tsx (book-card-${bookId})
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (book-screen,
+#     book-back, book-notes-section, book-start-learning)
 appId: com.mentomate.app
 tags:
   - nightly
   - learning
-# DEMOTED 2026-05-19: flow expects `book-row-${BOOK_ID}` inline after tapping
-# the shelf header, but Library now pushes to `/shelf/[subjectId]` where books
-# render as `book-card-${BOOK_ID}` (BookCard component). Needs flow rewrite.
+# DEMOTED 2026-05-19: flow re-routed to push-to-shelf model. Awaiting 2x green
+# WHPX Pixel API 34 verification before re-tagging to pr-blocking.
 ---
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
@@ -43,24 +51,25 @@ tags:
 
 - takeScreenshot: book-01-library
 
-# Expand the subject shelf by tapping the shelf row header.
-# In Library v3, shelves are inline expandable rows — there is no separate
-# ShelvesTab.tsx. shelf-row-header-${SUBJECT_ID} is the Pressable in ShelfRow.tsx.
+# Tap the subject shelf header — pushes /shelf/[subjectId] (no inline expansion).
 - tapOn:
     id: "shelf-row-header-${SUBJECT_ID}"
 
-# After expanding, the book row for BOOK_ID must be visible inline.
-# book-row-${BOOK_ID} is the Pressable testID in BookRow.tsx.
+# Wait for the pushed shelf screen.
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 15000
+
+# On the shelf screen, books render as BookCard with testID book-card-${bookId}.
 - assertVisible:
-    id: "book-row-${BOOK_ID}"
+    id: "book-card-${BOOK_ID}"
 
-- takeScreenshot: book-02-shelf-expanded
+- takeScreenshot: book-02-shelf-screen
 
-# Tap the book row — triggers handleBookPress which does a two-push pattern:
-# push shelf/[subjectId] then push shelf/[subjectId]/book/[bookId].
-# We land on book-screen directly.
+# Tap the book card — BookCard onPress pushes /shelf/[subjectId]/book/[bookId].
 - tapOn:
-    id: "book-row-${BOOK_ID}"
+    id: "book-card-${BOOK_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -84,8 +93,7 @@ tags:
 
 - takeScreenshot: book-04-scrolled
 
-# Navigate back: book-back goes to shelf-screen (the two-push pattern means
-# back lands on shelf first, then another back to library).
+# Navigate back: book-back pops to the shelf screen.
 - tapOn:
     id: "book-back"
 
@@ -93,17 +101,11 @@ tags:
     visible:
       id: "shelf-screen"
     timeout: 10000
-    optional: true  # justified: two-push navigation means book-back may land on shelf-screen first; runFlow when: block handles the conditional tap
 
-- runFlow:
-    when:
-      visible:
-        id: "shelf-screen"
-    commands:
-      - tapOn:
-          id: "shelf-back"
+# From shelf screen, tap shelf-back to return to the library index.
+- tapOn:
+    id: "shelf-back"
 
-# After backing through shelf, the library shelves-list must be visible again.
 - extendedWaitUntil:
     visible:
       id: "shelves-list"

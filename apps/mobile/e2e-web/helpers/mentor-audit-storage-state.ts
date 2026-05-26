@@ -19,8 +19,19 @@ import { authStateDir } from './runtime';
  *   prompt with `otplib.authenticator.generate(seedResult.ids.totpSecret)`.
  *
  * The mutators take a base storage-state JSON path (produced by the normal
- * sign-in flow) and write a derived JSON the smoke spec consumes via
- * Playwright's `use.storageState`.
+ * sign-in flow) and return a derived JSON file path the smoke spec consumes
+ * via Playwright's `use.storageState`.
+ *
+ * **[BUG-779/780] Banner-state init script.** Cookie / Clerk-token mutations
+ * alone do not surface the sign-in banner — the production app reads
+ * `mentomate_session_expired_at` / `mentomate_session_revoked_at` from
+ * `sessionStorage`, NOT cookies. Playwright's storage-state only persists
+ * cookies + localStorage, so the mutator additionally returns a small
+ * `sessionStorageInit` snippet the spec installs via `addInitScript()` before
+ * the first navigation. This deterministically primes the banner state in
+ * the same atomic step that mutates the auth token — without it, the spec
+ * would have to rely on triggering a real 401 round-trip first, which races
+ * with the redirect to /sign-in and silently lands on the home shell.
  */
 
 type MutatorName = 'session-expired' | 'session-revoked' | 'mfa-totp';
@@ -44,6 +55,18 @@ interface StorageStateOrigin {
 interface StorageStateJson {
   cookies: StorageStateCookie[];
   origins: StorageStateOrigin[];
+}
+
+export interface MentorAuditStorageStateResult {
+  /** Path to the derived Playwright storage-state JSON. Spec passes this to
+   *  `browser.newContext({ storageState })`. */
+  storageStatePath: string;
+  /** Optional init script the spec must install via
+   *  `context.addInitScript(sessionStorageInit)` before the first
+   *  `page.goto(...)`. Seeds sessionStorage markers that the in-app
+   *  `peekSessionExpiredNotice()` / `peekSessionRevokedNotice()` checks read
+   *  on mount — without this the sign-in screen does not render the banner. */
+  sessionStorageInit?: string;
 }
 
 async function readJson(file: string): Promise<StorageStateJson> {
@@ -79,35 +102,63 @@ function expireSessionCookie(state: StorageStateJson): StorageStateJson {
 }
 
 /**
+ * Returns the init-script source that seeds the named sessionStorage marker
+ * to `Date.now()` so the in-app peek reads it as a fresh notice. Keys are
+ * duplicated from `apps/mobile/src/lib/auth-expiry.ts` (`AUTH_EXPIRY_STORAGE_KEYS`)
+ * — the e2e-web bundle has no path back into mobile source at runtime, so
+ * the literal lives here and the production module is the cross-check.
+ */
+function bannerInitScript(reason: 'expired' | 'revoked'): string {
+  const key =
+    reason === 'expired'
+      ? 'mentomate_session_expired_at'
+      : 'mentomate_session_revoked_at';
+  // Single-quoted JS string — Playwright runs this before any page script.
+  return `try { window.sessionStorage.setItem(${JSON.stringify(
+    key,
+  )}, String(Date.now())); } catch (_) {}`;
+}
+
+/**
  * Apply the named mutator to the base storage-state file and write the
  * mutated derivative. Returns the derived file path so the spec can pass it
- * to `test.use({ storageState })`.
+ * to `browser.newContext({ storageState })`, plus an optional init script
+ * the spec must install on the context so the in-app banner state is primed
+ * before the first navigation.
  */
 export async function applyMentorAuditStorageStateMutator(opts: {
   mutator: MutatorName;
   baseStorageStatePath: string;
   scenarioKey: string;
-}): Promise<string> {
+}): Promise<MentorAuditStorageStateResult> {
   const baseState = await readJson(opts.baseStorageStatePath);
   const derivedPath = path.join(authStateDir, `${opts.scenarioKey}.json`);
 
   switch (opts.mutator) {
     case 'session-expired': {
       await writeJson(derivedPath, expireSessionCookie(baseState));
-      return derivedPath;
+      return {
+        storageStatePath: derivedPath,
+        sessionStorageInit: bannerInitScript('expired'),
+      };
     }
     case 'session-revoked':
       // The Clerk Backend revoke has already happened in the seeder; the
       // storage state is still the captured signed-in one. We write it
-      // verbatim so the spec can `use({ storageState })` it uniformly.
+      // verbatim so the spec can `use({ storageState })` it uniformly, and
+      // additionally seed the revoked banner marker via init script.
       await writeJson(derivedPath, baseState);
-      return derivedPath;
+      return {
+        storageStatePath: derivedPath,
+        sessionStorageInit: bannerInitScript('revoked'),
+      };
     case 'mfa-totp':
       // Same — the captured storage state already represents the post-TOTP
       // authenticated session. Written under the scenario key so the spec
-      // doesn't need to know which base state was used.
+      // doesn't need to know which base state was used. No banner init —
+      // the MFA flow lands on the in-app shell, not the sign-in banner.
       await writeJson(derivedPath, baseState);
-      return derivedPath;
+      return { storageStatePath: derivedPath };
     default: {
       const exhaustive: never = opts.mutator;
       throw new Error(`Unknown mentor-audit mutator: ${String(exhaustive)}`);

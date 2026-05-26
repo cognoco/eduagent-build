@@ -109,14 +109,29 @@ export async function createProfileViaRoute(input: {
 
   expect(res.status).toBe(201);
   const body = await res.json();
-  return body.profile as {
+  const apiProfile = body.profile as {
     id: string;
-    accountId: string;
     displayName: string;
     birthYear: number;
     isOwner: boolean;
     consentStatus: string | null;
   };
+  // [CR-2026-05-21-181] publicProfileSchema intentionally strips accountId
+  // from API responses (cross-profile correlation guard). Integration tests
+  // still need accountId for direct DB setup of related rows (subscriptions,
+  // child profiles, etc.), so we resolve it from the DB after creation —
+  // never re-introducing accountId into the wire response.
+  const db = createIntegrationDb();
+  const row = await db.query.profiles.findFirst({
+    where: eq(profiles.id, apiProfile.id),
+    columns: { accountId: true },
+  });
+  if (!row) {
+    throw new Error(
+      `createProfileViaRoute: profile ${apiProfile.id} not found in DB after create`,
+    );
+  }
+  return { ...apiProfile, accountId: row.accountId };
 }
 
 export async function setSubscriptionTierForProfile(

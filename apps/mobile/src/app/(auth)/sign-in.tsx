@@ -36,13 +36,16 @@ import {
 } from '../../lib/auth-transition';
 import {
   clearSessionExpiredNotice,
+  clearSessionRevokedNotice,
   peekSessionExpiredNotice,
+  peekSessionRevokedNotice,
 } from '../../lib/auth-expiry';
 import {
   readWebSearchParam,
   toInternalAppRedirectPath,
 } from '../../lib/normalize-redirect-path';
 import {
+  clearPendingAuthRedirect,
   peekPendingAuthRedirect,
   rememberPendingAuthRedirect,
 } from '../../lib/pending-auth-redirect';
@@ -241,6 +244,14 @@ export default function SignInScreen() {
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  // [BUG-780] Discriminator for the forced-signout banner shown at mount.
+  // `expired` is set by markSessionExpired() (client-side 401 / token expiry);
+  // `revoked` is set by markSessionRevoked() (server-side session revoke).
+  // `null` means the current `error` text is from a user-triggered failure,
+  // not a forced sign-out, and the standard error testID applies.
+  const [forcedSignOutReason, setForcedSignOutReason] = useState<
+    'expired' | 'revoked' | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [isReturningUser, setIsReturningUser] = useState<boolean | null>(null);
@@ -385,12 +396,26 @@ export default function SignInScreen() {
 
   const clearSessionExpiredMessage = useCallback(() => {
     clearSessionExpiredNotice();
+    clearSessionRevokedNotice();
     setError('');
+    setForcedSignOutReason(null);
   }, []);
 
   useEffect(() => {
+    // [BUG-780] Revoked takes precedence over expired when both are set —
+    // a server-side revoke is a stronger signal than a client-side expiry,
+    // and the banners are mutually exclusive at the UI layer.
+    if (peekSessionRevokedNotice()) {
+      clearVerificationFlow();
+      setForcedSignOutReason('revoked');
+      setError(
+        'Your session was signed out from another device. Sign in again to continue.',
+      );
+      return;
+    }
     if (peekSessionExpiredNotice()) {
       clearVerificationFlow();
+      setForcedSignOutReason('expired');
       setError('Your session expired. Sign in again to continue learning.');
     }
   }, [clearVerificationFlow]);
@@ -777,6 +802,21 @@ export default function SignInScreen() {
     pendingSessionActivationId,
     setActive,
   ]);
+
+  // [CR-2026-05-21-111] Cancel an in-progress (failed-activation) SSO attempt.
+  // Without this the persisted redirect from rememberPendingAuthRedirect and
+  // the pendingSessionActivationId / activationFailureContext state survive a
+  // provider swap — the user could tap "Continue with Apple" after a failed
+  // Google activation and be sent back to the stale Google redirect target
+  // once Apple completes. Clearing all three returns the screen to a clean
+  // first-attempt state.
+  const cancelPendingSSOActivation = useCallback(() => {
+    setPendingSessionActivationId(null);
+    setActivationFailureContext(null);
+    clearPendingAuthRedirect();
+    requestedRedirectRef.current = '/(app)/home';
+    setError('');
+  }, []);
 
   const onSignInPress = useCallback(async () => {
     if (!isLoaded || !canSubmit || !signIn) return;
@@ -1238,6 +1278,19 @@ export default function SignInScreen() {
               <View
                 className="bg-danger/10 rounded-card px-4 py-3 mb-4"
                 accessibilityRole="alert"
+                // [BUG-779/780] Discriminated testID lets the mentor-audit
+                // smoke + tests assert which forced-signout cause produced
+                // the banner without depending on copy strings. Falls back
+                // to a generic sign-in-error testID for user-triggered
+                // failures (wrong password, network, etc.) so existing
+                // tests that look for the banner generically still pass.
+                testID={
+                  forcedSignOutReason === 'expired'
+                    ? 'session-expired-banner'
+                    : forcedSignOutReason === 'revoked'
+                      ? 'session-revoked-banner'
+                      : 'sign-in-error'
+                }
               >
                 <Text className="text-danger text-body-sm">{error}</Text>
               </View>
@@ -1277,6 +1330,22 @@ export default function SignInScreen() {
                   disabled={loading || oauthLoading !== null}
                   testID="sign-in-oauth-retry"
                 />
+                {/* [CR-2026-05-21-111] Cancel sign-in: without this the user
+                    is stuck — a different OAuth provider tap reuses the
+                    persisted redirect from rememberPendingAuthRedirect and
+                    leaves pendingSessionActivationId pointing at the failed
+                    session. Cancel clears both so the next sign-in attempt
+                    starts from a clean slate. */}
+                <View className="mt-2">
+                  <Button
+                    variant="tertiary"
+                    size="small"
+                    label="Cancel sign-in"
+                    onPress={cancelPendingSSOActivation}
+                    disabled={loading}
+                    testID="sign-in-oauth-cancel"
+                  />
+                </View>
               </View>
             ) : null}
 

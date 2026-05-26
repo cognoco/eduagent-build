@@ -1,0 +1,702 @@
+// ---------------------------------------------------------------------------
+// RevenueCat Webhook Handler — service module
+// ---------------------------------------------------------------------------
+// [FCR-2026-05-23-L5.M2] Extracted from routes/revenuecat-webhook.ts to
+// enforce the route/service boundary (eslint G1/G5, CLAUDE.md §"Non-Negotiable
+// Engineering Rules"). The route file now owns ONLY:
+//   1. Bearer-token validation (timing-safe HMAC compare)
+//   2. Zod payload parsing
+//   3. account-resolution + idempotency gate + SANDBOX-in-prod guard +
+//      ensureFreeSubscription
+//   4. event-type dispatch to the service-side handlers below
+//   5. HTTP response
+// All entitlement mutations, KV-cache refreshes, top-up credit grants and
+// Inngest dispatches live here so they can be unit-tested without the HTTP
+// shell and reused by other callers (e.g. an Inngest replay tool).
+// ---------------------------------------------------------------------------
+
+import type { Database } from '@eduagent/database';
+import type { SubscriptionStatus } from '@eduagent/schemas';
+// NOTE: Import via the barrel (`../billing`) — NOT via `./index` — so the
+// existing webhook test suite (which mocks `../services/billing`) intercepts
+// these calls. See parallel comment in stripe-webhook-handler.ts.
+import {
+  getSubscriptionByAccountId,
+  updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
+  activateSubscriptionFromRevenuecat,
+  transitionToExtendedTrialFromRevenuecatEvent,
+  purchaseTopUpCredits,
+  type AppliedSubscriptionRow,
+} from '../billing';
+import { findAccountByClerkId } from '../account';
+import { getTierConfig } from '../subscription';
+import { safeRefreshKvCache } from '../safe-refresh-kv-cache';
+import { captureException } from '../sentry';
+import { createLogger } from '../logger';
+import { safeSend } from '../safe-non-core';
+import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../trial';
+import { inngest } from '../../inngest/client';
+
+const logger = createLogger();
+
+// ---------------------------------------------------------------------------
+// Inbound event shape (kept in sync with revenuecatWebhookSchema in the route)
+// ---------------------------------------------------------------------------
+//
+// We intentionally do NOT import the Zod schema here — the route owns parsing
+// (route-level validation is required so a malformed payload returns 400 at
+// the HTTP boundary). The handler receives the already-validated `event` and
+// uses this inferred type to stay type-safe without depending on the route.
+export interface RevenueCatEvent {
+  id: string;
+  type: string;
+  app_user_id: string;
+  original_app_user_id?: string;
+  product_id?: string;
+  entitlement_ids?: string[];
+  period_type?: string;
+  purchased_at_ms?: number;
+  expiration_at_ms?: number;
+  store?: string;
+  environment?: string;
+  is_family_share?: boolean;
+  transferred_from?: string[];
+  transferred_to?: string[];
+  new_product_id?: string;
+  cancel_reason?: string;
+  grace_period_expiration_at_ms?: number;
+  transaction_id?: string;
+  store_transaction_id?: string;
+  /** BD-01: Event timestamp for ordering-based idempotency. */
+  event_timestamp_ms?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Product ID mapping
+// ---------------------------------------------------------------------------
+
+const PRODUCT_TIER_MAP: Record<string, 'plus' | 'family' | 'pro'> = {
+  // iOS products
+  'com.eduagent.plus.monthly': 'plus',
+  'com.eduagent.plus.yearly': 'plus',
+  'com.eduagent.family.monthly': 'family',
+  'com.eduagent.family.yearly': 'family',
+  'com.eduagent.pro.monthly': 'pro',
+  'com.eduagent.pro.yearly': 'pro',
+  // Android products (same naming convention)
+  'com.eduagent.plus.monthly.android': 'plus',
+  'com.eduagent.plus.yearly.android': 'plus',
+  'com.eduagent.family.monthly.android': 'family',
+  'com.eduagent.family.yearly.android': 'family',
+  'com.eduagent.pro.monthly.android': 'pro',
+  'com.eduagent.pro.yearly.android': 'pro',
+};
+
+/**
+ * Maps consumable product IDs to the number of top-up credits granted.
+ */
+const CONSUMABLE_PRODUCT_CREDITS: Record<string, number> = {
+  'com.eduagent.topup.500': 500,
+  'com.eduagent.topup.500.android': 500,
+};
+
+/**
+ * Returns the credit amount for a consumable product ID, or null if not a top-up product.
+ */
+export function getTopUpCreditsForProduct(
+  productId: string | undefined,
+): number | null {
+  if (!productId) return null;
+  return CONSUMABLE_PRODUCT_CREDITS[productId] ?? null;
+}
+
+/**
+ * Extracts the tier from a product ID using the product-to-tier map.
+ * [BUG-444] The regex fallback was removed — it granted entitlement for ANY
+ * product matching `com.eduagent.<tier>.*` prefix, including future trial-only,
+ * marketing, or test products not in the authoritative PRODUCT_TIER_MAP.
+ * Unknown product_ids now hit the Sentry escalation path in callers.
+ */
+export function extractTierFromProductId(
+  productId: string | undefined,
+): ('plus' | 'family' | 'pro') | null {
+  if (!productId) return null;
+
+  // Authoritative lookup only — no regex fallback.
+  // Unknown products must be added to PRODUCT_TIER_MAP explicitly.
+  return PRODUCT_TIER_MAP[productId] ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function shouldRefreshRevenuecatKv(
+  updated: AppliedSubscriptionRow | null,
+  eventId: string,
+): updated is AppliedSubscriptionRow {
+  return (
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastRevenuecatEventId === eventId)
+  );
+}
+
+/**
+ * Resolves a RevenueCat app_user_id to an internal account ID.
+ * RevenueCat app_user_id is set to the Clerk user ID via Purchases.logIn().
+ *
+ * Exported because the route uses it once (during account-rejection) BEFORE
+ * dispatching to the event-specific handlers, so the resolution result is
+ * available across both pre- and post-dispatch paths.
+ */
+export async function resolveAccountId(
+  db: Database,
+  appUserId: string,
+): Promise<string | null> {
+  // RevenueCat anonymous IDs start with $ — skip them
+  if (appUserId.startsWith('$')) return null;
+
+  const account = await findAccountByClerkId(db, appUserId);
+  return account?.id ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Event handlers
+// ---------------------------------------------------------------------------
+
+export async function handleInitialPurchase(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return;
+
+  const tier = extractTierFromProductId(event.product_id);
+  if (!tier) {
+    // [FIX-API-REVENUECAT] Unknown product_id — capture to Sentry so new
+    // products added to RevenueCat but not to PRODUCT_TIER_MAP are surfaced
+    // immediately rather than silently dropping the purchase event.
+    captureException(
+      new Error('Unknown RevenueCat product_id in INITIAL_PURCHASE'),
+      {
+        extra: { productId: event.product_id, eventId: event.id },
+      },
+    );
+    return;
+  }
+
+  // RevenueCat sets period_type to "TRIAL" for introductory offer / free trial
+  const isTrial = event.period_type === 'TRIAL';
+
+  const sub = await activateSubscriptionFromRevenuecat(
+    db,
+    accountId,
+    tier,
+    event.id,
+    {
+      currentPeriodStart: event.purchased_at_ms
+        ? new Date(event.purchased_at_ms).toISOString()
+        : undefined,
+      currentPeriodEnd: event.expiration_at_ms
+        ? new Date(event.expiration_at_ms).toISOString()
+        : undefined,
+      revenuecatOriginalAppUserId: event.original_app_user_id,
+      isTrial,
+      trialEndsAt:
+        isTrial && event.expiration_at_ms
+          ? new Date(event.expiration_at_ms).toISOString()
+          : undefined,
+      eventTimestampMs: event.event_timestamp_ms,
+    },
+  );
+
+  await safeRefreshKvCache(
+    kv,
+    db,
+    sub.accountId,
+    'revenuecat.webhook.handleInitialPurchase',
+    {
+      eventId: event.id,
+    },
+  );
+}
+
+export async function handleRenewal(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return;
+
+  const eventTier = extractTierFromProductId(event.product_id);
+
+  // Read existing subscription to detect tier changes and preserve trialEndsAt.
+  // [BUG-453] Only pass tier to the update when it actually changed — RC can
+  // send RENEWAL for a different product, silently changing tier without going
+  // through PRODUCT_CHANGE.
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const tierChanged = eventTier !== null && existingSub?.tier !== eventTier;
+
+  // [BUG-453] RENEWAL during a trial period (period_type === 'TRIAL') must NOT
+  // clear trialEndsAt — the trial is still active. Only wipe it on conversion
+  // (period_type !== 'TRIAL').
+  const isTrial = event.period_type === 'TRIAL';
+
+  const renewalUpdates = {
+    eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
+    status: 'active' as const,
+    // Only include tier when the event actually signals a different product tier.
+    // Omitting the key entirely prevents any DB write to the tier column.
+    ...(tierChanged && eventTier ? { tier: eventTier } : {}),
+    currentPeriodStart: event.purchased_at_ms
+      ? new Date(event.purchased_at_ms).toISOString()
+      : undefined,
+    currentPeriodEnd: event.expiration_at_ms
+      ? new Date(event.expiration_at_ms).toISOString()
+      : undefined,
+    cancelledAt: null,
+    // Preserve trialEndsAt during trial-period renewals by omitting it;
+    // clear it on conversion to active (period_type !== 'TRIAL').
+    ...(isTrial ? {} : { trialEndsAt: null }),
+  };
+
+  // Only update quota pool when the tier actually changed.
+  const updated =
+    tierChanged && eventTier
+      ? await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+          db,
+          accountId,
+          renewalUpdates,
+          {
+            monthlyQuota: getTierConfig(eventTier).monthlyQuota,
+            dailyLimit: getTierConfig(eventTier).dailyLimit,
+          },
+        )
+      : await updateSubscriptionFromRevenuecatWebhook(
+          db,
+          accountId,
+          renewalUpdates,
+        );
+
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleRenewal',
+      {
+        eventId: event.id,
+      },
+    );
+  }
+}
+
+export async function handleCancellation(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return;
+
+  // [BUG-445] If the sub was already past_due when the user cancelled, DO NOT
+  // flip it back to 'active' — that would erase the payment-failure signal.
+  // Only promote to 'active' when the current status is active or trial (still
+  // entitled). past_due stays past_due; cancelledAt records the intent.
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const targetStatus: SubscriptionStatus =
+    existingSub?.status === 'past_due' ? 'past_due' : 'active';
+
+  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
+    eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
+    // Keep the entitlement active (or past_due) until period end so mobile can
+    // render the correct "Cancelling" state from cancelledAt + status.
+    status: targetStatus,
+    cancelledAt: new Date().toISOString(),
+  });
+
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleCancellation',
+      {
+        eventId: event.id,
+      },
+    );
+  }
+}
+
+export async function handleExpiration(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return;
+
+  // Check if this is a trial expiration — use period_type from the event
+  // as the authoritative signal (safe regardless of webhook delivery order).
+  // Fallback to DB status only when period_type is absent.
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const isTrialExpiration =
+    event.period_type === 'TRIAL' ||
+    (event.period_type == null && existingSub?.status === 'trial');
+
+  if (isTrialExpiration && existingSub) {
+    // Trial expiration triggers the reverse trial soft landing:
+    // Days 15-28: extended access at 450 questions/month (15/day)
+    // The daily trial-expiry Inngest function handles Day 29+ transition to free.
+    const updated = await transitionToExtendedTrialFromRevenuecatEvent(
+      db,
+      existingSub.id,
+      EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
+      event.id,
+      event.event_timestamp_ms,
+    );
+
+    if (shouldRefreshRevenuecatKv(updated, event.id)) {
+      await safeRefreshKvCache(
+        kv,
+        db,
+        accountId,
+        'revenuecat.webhook.handleExpiration.trial',
+        {
+          eventId: event.id,
+        },
+      );
+    }
+    return;
+  }
+
+  // Non-trial expiration: downgrade to free tier immediately
+  const freeConfig = getTierConfig('free');
+  const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+    db,
+    accountId,
+    {
+      eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
+      status: 'expired',
+      tier: 'free',
+      cancelledAt: new Date().toISOString(),
+    },
+    {
+      monthlyQuota: freeConfig.monthlyQuota,
+      dailyLimit: freeConfig.dailyLimit,
+    },
+  );
+
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleExpiration',
+      {
+        eventId: event.id,
+      },
+    );
+  }
+}
+
+export async function handleBillingIssue(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return;
+
+  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
+    eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
+    status: 'past_due',
+  });
+
+  const shouldDispatchBillingIssue =
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastRevenuecatEventId === event.id);
+
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleBillingIssue',
+      {
+        eventId: event.id,
+      },
+    );
+  }
+
+  if (!updated) return;
+
+  if (shouldDispatchBillingIssue) {
+    // core-send: payment-failed alert - billing observability cannot be silent.
+    // A swallowed dispatch leaves the failed payment unobserved by alerting.
+    await inngest.send({
+      id: `revenuecat-payment-failed:${event.id}`,
+      name: 'app/payment.failed',
+      data: {
+        subscriptionId: updated.id,
+        accountId: updated.accountId,
+        source: 'revenuecat',
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+}
+
+export async function handleSubscriberAlias(
+  db: Database,
+  _kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  // SUBSCRIBER_ALIAS: RevenueCat merged two subscriber records.
+  // [BUG-728 / SEC-12] Routed through the structured logger so the Clerk
+  // user IDs land as JSON `context` fields the log pipeline can index and
+  // redact uniformly, rather than as raw console.info args that bypass the
+  // pipeline's PII handling.
+  logger.info('[revenuecat] SUBSCRIBER_ALIAS event', {
+    appUserId: event.app_user_id,
+    transferredFrom: event.transferred_from,
+    transferredTo: event.transferred_to,
+  });
+
+  // [BUG-449] Full merge implementation deferred — escalation + event dispatch
+  // unblock visibility. TODO(BUG-449): full merge implementation deferred —
+  // escalation + event dispatch unblock visibility.
+  //
+  // When transferred_from has an existing subscription, credits/entitlements
+  // on that app_user_id are NOT yet migrated to the new identity. Surface
+  // this via Sentry (high severity) and dispatch an Inngest event so a future
+  // migration worker can consume it without data loss.
+  const transferredFrom = event.transferred_from ?? [];
+  if (transferredFrom.length > 0) {
+    // Resolve the transferred_from app_user_id(s) to check for existing subs
+    for (const fromUserId of transferredFrom) {
+      // Skip anonymous IDs — these are the normal alias case (anon→identified)
+      // where no subscription can be held on the anon side.
+      if (fromUserId.startsWith('$')) continue;
+
+      const fromAccount = await findAccountByClerkId(db, fromUserId);
+      if (!fromAccount) continue;
+
+      const fromSub = await getSubscriptionByAccountId(db, fromAccount.id);
+      if (!fromSub) continue;
+
+      // A subscription exists on the transferred_from identity — this is the
+      // revenue-loss scenario. Escalate immediately.
+      captureException(
+        new Error(
+          'SUBSCRIBER_ALIAS: transferred_from has active subscription — merge not implemented',
+        ),
+        {
+          extra: {
+            tag: 'revenuecat.alias.unhandled',
+            severity: 'high',
+            eventId: event.id,
+            fromAppUserId: fromUserId,
+            toAppUserId: event.app_user_id,
+            fromSubscriptionId: fromSub.id,
+            fromSubscriptionTier: fromSub.tier,
+            fromSubscriptionStatus: fromSub.status,
+          },
+        },
+      );
+
+      // Dispatch alias_received so a future migration worker can consume it.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/billing.alias_received',
+            data: {
+              eventId: event.id,
+              fromAppUserId: fromUserId,
+              toAppUserId: event.app_user_id,
+              fromAccountId: fromAccount.id,
+              fromSubscriptionId: fromSub.id,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'revenuecat.alias_received',
+        { eventId: event.id, fromAppUserId: fromUserId },
+      );
+    }
+  }
+}
+
+export async function handleProductChange(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return;
+
+  const newTier = extractTierFromProductId(event.new_product_id);
+  if (!newTier) {
+    // [FIX-API-REVENUECAT] Unknown new_product_id — capture to Sentry so product
+    // map mismatches surface before they cause silent subscription-change drops.
+    captureException(
+      new Error('Unknown RevenueCat new_product_id in PRODUCT_CHANGE'),
+      {
+        extra: { newProductId: event.new_product_id, eventId: event.id },
+      },
+    );
+    return;
+  }
+
+  const tierConfig = getTierConfig(newTier);
+  const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+    db,
+    accountId,
+    {
+      eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
+      tier: newTier,
+      status: 'active',
+    },
+    {
+      monthlyQuota: tierConfig.monthlyQuota,
+      dailyLimit: tierConfig.dailyLimit,
+    },
+  );
+
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleProductChange',
+      {
+        eventId: event.id,
+      },
+    );
+  }
+}
+
+export async function handleNonRenewingPurchase(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<{ status: number; body: Record<string, unknown> } | null> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return null;
+
+  const credits = getTopUpCreditsForProduct(event.product_id);
+  if (credits === null) return null;
+
+  // Resolve the transaction ID for idempotency (prefer store_transaction_id)
+  const transactionId =
+    event.store_transaction_id ?? event.transaction_id ?? null;
+
+  // [BUG-451] Malformed payload (no transaction ID) → 200 so RevenueCat does
+  // NOT retry. Returning 400 guarantees ~3 days of retry spam because RC
+  // treats any non-2xx as transient. The payload is permanently malformed
+  // (both fields absent simultaneously is a provider-side bug, not a
+  // transient outage), so we ack, skip, and capture to Sentry for ops review.
+  if (!transactionId) {
+    logger.error('[revenuecat] NON_RENEWING_PURCHASE missing transaction ID', {
+      eventId: event.id,
+      productId: event.product_id,
+    });
+    captureException(
+      new Error('RevenueCat NON_RENEWING_PURCHASE missing transaction ID'),
+      {
+        extra: {
+          eventId: event.id,
+          productId: event.product_id,
+          category: 'revenuecat.malformed_payload',
+        },
+      },
+    );
+    return {
+      status: 200,
+      body: { received: true, skipped: 'missing_transaction_id' },
+    };
+  }
+
+  // Look up the account's subscription to verify tier eligibility
+  const sub = await getSubscriptionByAccountId(db, accountId);
+  if (!sub || sub.tier === 'free') {
+    return {
+      status: 403,
+      body: {
+        received: true,
+        error: 'Top-ups are not available on the free tier',
+      },
+    };
+  }
+
+  // BS-02: Atomic idempotent credit grant — purchaseTopUpCredits uses
+  // INSERT ... ON CONFLICT DO NOTHING on the unique revenuecatTransactionId
+  // index. Returns null when credit was already granted (duplicate txn).
+  const granted = await purchaseTopUpCredits(
+    db,
+    sub.id,
+    credits,
+    new Date(),
+    transactionId,
+  );
+
+  if (!granted) {
+    // [A-22] Distinguish intentional idempotency skip from silent failure.
+    // Log with eventId + transactionId so ops can query how often this fires.
+    logger.info(
+      '[revenuecat] NON_RENEWING_PURCHASE duplicate skipped — credits already granted',
+      { eventId: event.id, transactionId, accountId },
+    );
+    return null;
+  }
+
+  await safeRefreshKvCache(
+    kv,
+    db,
+    accountId,
+    'revenuecat.webhook.handleNonRenewingPurchase',
+    {
+      eventId: event.id,
+      transactionId,
+    },
+  );
+
+  return null;
+}
+
+export async function handleUncancellation(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatEvent,
+): Promise<void> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return;
+
+  const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
+    eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
+    status: 'active',
+    cancelledAt: null,
+  });
+
+  if (shouldRefreshRevenuecatKv(updated, event.id)) {
+    await safeRefreshKvCache(
+      kv,
+      db,
+      updated.accountId,
+      'revenuecat.webhook.handleUncancellation',
+      {
+        eventId: event.id,
+      },
+    );
+  }
+}

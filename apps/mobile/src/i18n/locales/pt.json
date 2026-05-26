@@ -102,6 +102,15 @@
       "backToSignIn": "Voltar para o login"
     }
   },
+  "guards": {
+    "requireFamilyContext": {
+      "title": "Esta é uma visualização familiar",
+      "body": "Os perfis de aprendizagem dos filhos só são visíveis no modo Família.",
+      "switchError": "Não foi possível alternar para o modo Família. Tente novamente ou entre em contato com o suporte se o problema continuar.",
+      "switchCta": "Mudar para o modo Família",
+      "backToHome": "Voltar ao início"
+    }
+  },
   "home": {
     "loadingTimeoutMessage": "Demorando mais que o esperado. Verifique sua conexão e tente novamente.",
     "retryLoadingLabel": "Tentar carregar novamente",
@@ -140,7 +149,12 @@
       },
       "proxySessionSummariesTitle": "Os resumos das sessões ficam na visão dos pais",
       "proxySessionSummariesBody": "As notas de {{name}} continuam privadas, mas você pode ver resumos de sessão seguros para os pais no perfil.",
-      "proxySessionSummariesCta": "Ver resumos de sessão de {{name}}"
+      "proxySessionSummariesCta": "Ver resumos de sessão de {{name}}",
+      "familySetup": {
+        "title": "Set up Family",
+        "subtitle": "Add a child profile so they can learn with their own mentor",
+        "cta": "Set up Family"
+      }
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -1072,6 +1086,9 @@
       "missingMessage": "Não conseguimos carregar este tópico. Vá para a biblioteca para escolher um.",
       "goToLibrary": "Ir para a Biblioteca",
       "successPrompt": "Volte para sua Biblioteca quando estiver pronto.",
+      "successMessage": "Ótimo trabalho — sua memória sobre isso está ótima! Volte para sua Biblioteca quando estiver pronto.",
+      "partialResult": "Bom esforço! Pense nos conceitos principais e tente explicar novamente. O que mais se destaca para você?",
+      "needsReview": "Quase lá — um pouco mais de prática vai fixar isso. Vamos encontrar uma abordagem melhor para você.",
       "dontRemember": "Não me lembro",
       "stillStuck": "Ainda com dificuldade",
       "errorTitle": "Algo deu errado",
@@ -2187,6 +2204,45 @@
         "gettingComfortable": "Ganhando confiança",
         "nearlyMastered": "Quase dominado",
         "mastered": "Dominado"
+      }
+    },
+    "metricTooltips": {
+      "infoDotLabel": "Mais informações sobre {{title}}",
+      "timeOnApp": {
+        "title": "Tempo no app",
+        "body": "Quanto tempo seu filho passou no app durante esta sessão, medido em minutos reais."
+      },
+      "sessionsThisWeek": {
+        "title": "Sessões nesta semana",
+        "body": "O número de conversas de aprendizagem que seu filho teve com o mentor nesta semana."
+      },
+      "engagementTrend": {
+        "title": "Tendência de atividade",
+        "body": "Se seu filho está usando o mentor mais, menos ou aproximadamente o mesmo em comparação com a atividade recente."
+      },
+      "exchangeDelta": {
+        "title": "Trocas nesta semana",
+        "body": "Quantas trocas de mensagens aconteceram nesta semana em comparação com a semana passada. É um sinal leve de atividade de aprendizagem."
+      },
+      "guidedRatio": {
+        "title": "Prática guiada",
+        "body": "A proporção de respostas do mentor em que seu filho precisou de um exemplo desenvolvido ou de uma orientação mais forte em vez de apenas um empurrãozinho."
+      },
+      "streakXp": {
+        "title": "Sequência e XP",
+        "body": "Sinais de motivação a partir da prática regular e do trabalho de aprendizagem concluído. Não são notas."
+      },
+      "understanding": {
+        "title": "Compreensão",
+        "body": "Quão bem seu filho compreende este tópico, com base nas respostas e conversas com o mentor."
+      },
+      "reviewStatus": {
+        "title": "Verificação de memória",
+        "body": "Se seu filho ainda se lembra do que aprendeu. Baseado em repetição espaçada, então os tópicos voltam em intervalos crescentes."
+      },
+      "milestone": {
+        "title": "Marcos",
+        "body": "Os marcos representam conquistas reais, como primeiras sessões, tópicos explorados e vocabulário aprendido."
       }
     },
     "weeklyReport": {

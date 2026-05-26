@@ -2,6 +2,8 @@
  * Parent-facing vocabulary canon for progress and recap surfaces.
  */
 
+import type { TFunction } from 'i18next';
+
 export interface ParentRetentionInfo {
   label: string;
   colorKey: 'retentionStrong' | 'retentionFading' | 'retentionWeak';
@@ -11,6 +13,92 @@ type ParentMetricTooltip = {
   title: string;
   body: string;
 };
+
+export type ParentMetricKey =
+  | 'time-on-app'
+  | 'sessions-this-week'
+  | 'engagement-trend'
+  | 'exchange-delta'
+  | 'guided-ratio'
+  | 'streak-xp'
+  | 'understanding'
+  | 'review-status'
+  | 'milestone';
+
+const PARENT_METRIC_KEYS: readonly ParentMetricKey[] = [
+  'time-on-app',
+  'sessions-this-week',
+  'engagement-trend',
+  'exchange-delta',
+  'guided-ratio',
+  'streak-xp',
+  'understanding',
+  'review-status',
+  'milestone',
+];
+
+// Maps a tooltip metric key to its full i18n keys under
+// `parentView.metricTooltips.<suffix>.{title,body}`. Keeping the full literal
+// strings (rather than building them via template literals at call time)
+// satisfies i18next's static key union — dynamic templates aren't inferable.
+// `as const` preserves the literal-string types through the Record so each
+// .title/.body remains assignable to i18next's typed key union.
+const METRIC_TOOLTIP_I18N_KEYS = {
+  'time-on-app': {
+    title: 'parentView.metricTooltips.timeOnApp.title',
+    body: 'parentView.metricTooltips.timeOnApp.body',
+  },
+  'sessions-this-week': {
+    title: 'parentView.metricTooltips.sessionsThisWeek.title',
+    body: 'parentView.metricTooltips.sessionsThisWeek.body',
+  },
+  'engagement-trend': {
+    title: 'parentView.metricTooltips.engagementTrend.title',
+    body: 'parentView.metricTooltips.engagementTrend.body',
+  },
+  'exchange-delta': {
+    title: 'parentView.metricTooltips.exchangeDelta.title',
+    body: 'parentView.metricTooltips.exchangeDelta.body',
+  },
+  'guided-ratio': {
+    title: 'parentView.metricTooltips.guidedRatio.title',
+    body: 'parentView.metricTooltips.guidedRatio.body',
+  },
+  'streak-xp': {
+    title: 'parentView.metricTooltips.streakXp.title',
+    body: 'parentView.metricTooltips.streakXp.body',
+  },
+  understanding: {
+    title: 'parentView.metricTooltips.understanding.title',
+    body: 'parentView.metricTooltips.understanding.body',
+  },
+  'review-status': {
+    title: 'parentView.metricTooltips.reviewStatus.title',
+    body: 'parentView.metricTooltips.reviewStatus.body',
+  },
+  milestone: {
+    title: 'parentView.metricTooltips.milestone.title',
+    body: 'parentView.metricTooltips.milestone.body',
+  },
+} as const satisfies Record<ParentMetricKey, { title: string; body: string }>;
+
+/**
+ * Returns the localized title + body for a parent-facing metric tooltip, or
+ * null when the key is unknown. Callers must hold a `t` from `useTranslation`.
+ */
+export function getParentMetricTooltip(
+  t: TFunction,
+  metricKey: string,
+): ParentMetricTooltip | null {
+  if (!(PARENT_METRIC_KEYS as readonly string[]).includes(metricKey)) {
+    return null;
+  }
+  const keys = METRIC_TOOLTIP_I18N_KEYS[metricKey as ParentMetricKey];
+  return {
+    title: t(keys.title),
+    body: t(keys.body),
+  };
+}
 
 export type UnderstandingLabelKey =
   | 'parentView.topic.understandingLevels.justStarting'
@@ -78,42 +166,3 @@ export function getReconciliationLine(
   }
   return null;
 }
-
-export const PARENT_METRIC_TOOLTIPS: Record<string, ParentMetricTooltip> = {
-  'time-on-app': {
-    title: 'Time on app',
-    body: 'How long your child spent in the app during this session, measured in real-world minutes.',
-  },
-  'sessions-this-week': {
-    title: 'Sessions this week',
-    body: 'The number of learning conversations your child had with the mentor this week.',
-  },
-  'engagement-trend': {
-    title: 'Engagement trend',
-    body: 'Whether your child is using the mentor more, less, or about the same compared with recent activity.',
-  },
-  'exchange-delta': {
-    title: 'Exchanges this week',
-    body: 'How many message turns happened this week compared with last week. It is a lightweight signal for learning activity.',
-  },
-  'guided-ratio': {
-    title: 'Guided practice',
-    body: 'The share of mentor replies where your child needed a worked example or stronger guidance instead of light prompting.',
-  },
-  'streak-xp': {
-    title: 'Streak and XP',
-    body: 'Motivation signals from regular practice and completed learning work. They are not grades.',
-  },
-  understanding: {
-    title: 'Understanding',
-    body: 'How well your child understands this topic, based on their answers and conversations with the mentor.',
-  },
-  'review-status': {
-    title: 'Memory check',
-    body: 'Whether your child still remembers what they learned. Based on spaced review, so topics come back at increasing intervals.',
-  },
-  milestone: {
-    title: 'Milestones',
-    body: 'Milestones mark real achievements, like first sessions, topics explored, and vocabulary learned.',
-  },
-};

@@ -27,20 +27,31 @@ describe('askGateDecisionEventSchema', () => {
     }
   });
 
-  it('accepts an empty object (all fields are optional)', () => {
+  it('[CR-2026-05-21-175] rejects an empty object — every field is required', () => {
+    // Senders in apps/api/src/routes/sessions.ts always supply every field
+    // (derived from `result` / `transcript`). A dispatcher that drops a field
+    // is a contract violation and must surface as schema_drift, not silently
+    // log 'unknown' for every observability dimension.
     const result = askGateDecisionEventSchema.safeParse({});
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
-  it('accepts partial payload with only some fields present', () => {
+  it('[CR-2026-05-21-175] rejects a partial payload missing required fields', () => {
     const result = askGateDecisionEventSchema.safeParse({
       sessionId: 'session-xyz',
       meaningful: false,
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.meaningful).toBe(false);
-      expect(result.data.exchangeCount).toBeUndefined();
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      // Make sure the failure flags ALL the missing fields, not just one.
+      const missingPaths = new Set(
+        result.error.issues.map((issue) => issue.path.join('.')),
+      );
+      expect(missingPaths.has('reason')).toBe(true);
+      expect(missingPaths.has('method')).toBe(true);
+      expect(missingPaths.has('exchangeCount')).toBe(true);
+      expect(missingPaths.has('learnerWordCount')).toBe(true);
+      expect(missingPaths.has('topicCount')).toBe(true);
     }
   });
 
@@ -83,18 +94,21 @@ describe('askGateTimeoutEventSchema', () => {
     }
   });
 
-  it('accepts an empty object (all fields are optional)', () => {
+  it('[CR-2026-05-21-175] rejects an empty object — both fields are required', () => {
     const result = askGateTimeoutEventSchema.safeParse({});
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
-  it('accepts partial payload with only sessionId', () => {
+  it('[CR-2026-05-21-175] rejects a partial payload missing exchangeCount', () => {
     const result = askGateTimeoutEventSchema.safeParse({
       sessionId: 'session-only',
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.exchangeCount).toBeUndefined();
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const missingPaths = new Set(
+        result.error.issues.map((issue) => issue.path.join('.')),
+      );
+      expect(missingPaths.has('exchangeCount')).toBe(true);
     }
   });
 

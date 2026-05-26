@@ -753,3 +753,117 @@ describe('mentor-audit seed pack returns required IDs', () => {
     expect(profileRows.filter((row) => row.isOwner === false)).toHaveLength(3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [BUG-781] attachClerkTotpFactor — graceful degradation when the target
+// Clerk environment has authenticator-app MFA disabled.
+// ---------------------------------------------------------------------------
+
+describe('[BUG-781] attachClerkTotpFactor graceful degrade', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('returns a non-empty disabledReason and empty secret on Clerk 405', async () => {
+    const { attachClerkTotpFactor } = await import('./test-seed');
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 405,
+      text: async () => 'Method Not Allowed',
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await attachClerkTotpFactor('user_test', {
+      CLERK_SECRET_KEY: 'sk_test',
+    });
+
+    expect(result.secret).toBe('');
+    expect(result.disabledReason).toContain('clerk_authenticator_app_disabled');
+    expect(result.disabledReason).toContain('405');
+    // Operator-action breadcrumb must be present in the reason string so the
+    // smoke spec / harness output points the maintainer at the Clerk
+    // dashboard rather than the seed code.
+    expect(result.disabledReason).toMatch(/Clerk Dashboard/i);
+  });
+
+  it('returns a non-empty disabledReason on Clerk 422 with authenticator_app_disabled code', async () => {
+    const { attachClerkTotpFactor } = await import('./test-seed');
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      text: async () =>
+        JSON.stringify({
+          errors: [{ code: 'authenticator_app_disabled' }],
+        }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await attachClerkTotpFactor('user_test', {
+      CLERK_SECRET_KEY: 'sk_test',
+    });
+
+    expect(result.secret).toBe('');
+    expect(result.disabledReason).toContain('422');
+  });
+
+  it('still throws on unexpected non-405/422 errors so real bugs are loud', async () => {
+    const { attachClerkTotpFactor } = await import('./test-seed');
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => 'Internal Server Error',
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      attachClerkTotpFactor('user_test', { CLERK_SECRET_KEY: 'sk_test' }),
+    ).rejects.toThrow(/Clerk TOTP attach failed \(500\)/);
+  });
+
+  it('still throws on Clerk 422 with a different error code (real validation bug)', async () => {
+    const { attachClerkTotpFactor } = await import('./test-seed');
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      text: async () =>
+        JSON.stringify({
+          errors: [{ code: 'invalid_request_body' }],
+        }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      attachClerkTotpFactor('user_test', { CLERK_SECRET_KEY: 'sk_test' }),
+    ).rejects.toThrow(/Clerk TOTP attach failed \(422\)/);
+  });
+
+  it('returns the parsed secret on success', async () => {
+    const { attachClerkTotpFactor } = await import('./test-seed');
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ secret: 'JBSWY3DPEHPK3PXP' }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await attachClerkTotpFactor('user_test', {
+      CLERK_SECRET_KEY: 'sk_test',
+    });
+
+    expect(result.secret).toBe('JBSWY3DPEHPK3PXP');
+    expect(result.disabledReason).toBe('');
+  });
+
+  it('returns empty fields with no fetch call when CLERK_SECRET_KEY is missing', async () => {
+    const { attachClerkTotpFactor } = await import('./test-seed');
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await attachClerkTotpFactor('user_test', {});
+
+    expect(result.secret).toBe('');
+    expect(result.disabledReason).toBe('');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

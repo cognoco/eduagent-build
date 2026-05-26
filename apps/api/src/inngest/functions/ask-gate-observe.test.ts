@@ -161,10 +161,17 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     expect(entry?.context).not.toHaveProperty('reason');
   });
 
-  it('handles empty payload gracefully (all fields optional)', async () => {
+  it('[CR-2026-05-21-175 / BUG-580] empty payload escalates as schema_drift (every field is now required)', async () => {
+    // Pre-fix: every field on askGateDecisionEventSchema was optional, so an
+    // empty payload silently parsed and the observer logged 'unknown' for
+    // every dimension — defeating the purpose of the observe terminus.
+    // Post-fix: missing required fields are schema_drift, surface to Sentry.
     const result = await invoke(askGateDecisionObserve, {});
-    expect(result).toMatchObject({ status: 'logged', sessionId: null });
-    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'schema_error' });
+    const entry = lastJsonLine(consoleErrorSpy);
+    expect(entry?.message).toBe('ask.gate_decision.schema_drift');
+    expect(entry?.level).toBe('error');
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 
   it('[BREAK] returns schema_error and logs schema_drift on type-mismatched payload', async () => {
@@ -291,9 +298,13 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
     });
   });
 
-  it('handles empty payload gracefully (all fields optional)', async () => {
+  it('[CR-2026-05-21-175 / BUG-580] empty payload escalates as schema_drift (every field is now required)', async () => {
     const result = await invoke(askGateTimeoutObserve, {});
-    expect(result).toMatchObject({ status: 'logged', sessionId: null });
+    expect(result).toEqual({ status: 'schema_error' });
+    const entry = lastJsonLine(consoleErrorSpy);
+    expect(entry?.message).toBe('ask.gate_timeout.schema_drift');
+    expect(entry?.level).toBe('error');
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 
   it('[BREAK] returns schema_error and logs schema_drift on type-mismatched payload', async () => {

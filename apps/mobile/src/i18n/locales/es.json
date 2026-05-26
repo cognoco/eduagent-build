@@ -102,6 +102,15 @@
       "backToSignIn": "Volver a inicio de sesión"
     }
   },
+  "guards": {
+    "requireFamilyContext": {
+      "title": "Esta es una vista familiar",
+      "body": "Los perfiles de aprendizaje de los hijos solo son visibles en modo Familia.",
+      "switchError": "No pudimos cambiar al modo Familia. Inténtalo de nuevo o contacta con soporte si esto continúa.",
+      "switchCta": "Cambiar al modo Familia",
+      "backToHome": "Volver al inicio"
+    }
+  },
   "home": {
     "loadingTimeoutMessage": "Tardando más de lo esperado. Revisa tu conexión e inténtalo de nuevo.",
     "retryLoadingLabel": "Reintentar carga",
@@ -140,7 +149,12 @@
       },
       "proxySessionSummariesTitle": "Los resúmenes de sesión están en tu vista de padre",
       "proxySessionSummariesBody": "Las notas de {{name}} siguen siendo privadas, pero puedes ver resúmenes de sesión para padres desde su perfil.",
-      "proxySessionSummariesCta": "Ver los resúmenes de sesión de {{name}}"
+      "proxySessionSummariesCta": "Ver los resúmenes de sesión de {{name}}",
+      "familySetup": {
+        "title": "Set up Family",
+        "subtitle": "Add a child profile so they can learn with their own mentor",
+        "cta": "Set up Family"
+      }
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -1047,6 +1061,9 @@
       "missingMessage": "No pudimos cargar este tema. Ve a la biblioteca para elegir uno.",
       "goToLibrary": "Ir a la Biblioteca",
       "successPrompt": "Vuelve a tu Biblioteca cuando estés listo.",
+      "successMessage": "¡Buen trabajo — tu memoria de esto es sólida! Vuelve a tu Biblioteca cuando estés listo.",
+      "partialResult": "¡Buen esfuerzo! Piensa en los conceptos clave e intenta explicarlo de nuevo. ¿Qué es lo que más te llama la atención?",
+      "needsReview": "¡Casi! Un poco más de práctica y lo tendrás. Busquemos un mejor enfoque para ti.",
       "dontRemember": "No me acuerdo",
       "stillStuck": "Sigo atascado",
       "errorTitle": "Algo salió mal",
@@ -2162,6 +2179,45 @@
         "gettingComfortable": "Ganando confianza",
         "nearlyMastered": "Casi dominado",
         "mastered": "Dominado"
+      }
+    },
+    "metricTooltips": {
+      "infoDotLabel": "Más información sobre {{title}}",
+      "timeOnApp": {
+        "title": "Tiempo en la app",
+        "body": "Cuánto tiempo pasó tu hijo en la app durante esta sesión, medido en minutos reales."
+      },
+      "sessionsThisWeek": {
+        "title": "Sesiones esta semana",
+        "body": "El número de conversaciones de aprendizaje que tu hijo tuvo con el mentor esta semana."
+      },
+      "engagementTrend": {
+        "title": "Tendencia de actividad",
+        "body": "Si tu hijo está usando el mentor más, menos o más o menos lo mismo en comparación con la actividad reciente."
+      },
+      "exchangeDelta": {
+        "title": "Intercambios esta semana",
+        "body": "Cuántos turnos de mensajes hubo esta semana comparado con la semana pasada. Es una señal ligera de actividad de aprendizaje."
+      },
+      "guidedRatio": {
+        "title": "Práctica guiada",
+        "body": "La proporción de respuestas del mentor en las que tu hijo necesitó un ejemplo desarrollado o más orientación en lugar de un pequeño empujón."
+      },
+      "streakXp": {
+        "title": "Racha y XP",
+        "body": "Señales de motivación de la práctica regular y del trabajo de aprendizaje completado. No son calificaciones."
+      },
+      "understanding": {
+        "title": "Comprensión",
+        "body": "Qué tan bien comprende tu hijo este tema, según sus respuestas y conversaciones con el mentor."
+      },
+      "reviewStatus": {
+        "title": "Revisión de memoria",
+        "body": "Si tu hijo aún recuerda lo aprendido. Basado en repetición espaciada, así los temas vuelven a intervalos crecientes."
+      },
+      "milestone": {
+        "title": "Logros",
+        "body": "Los logros marcan éxitos reales, como las primeras sesiones, los temas explorados y el vocabulario aprendido."
       }
     },
     "weeklyReport": {

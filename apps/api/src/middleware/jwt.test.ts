@@ -687,3 +687,151 @@ describe('verifyJWT', () => {
     ).rejects.toThrow('signature verification failed');
   });
 });
+
+// ---------------------------------------------------------------------------
+// [CR-2026-05-21-095] algorithm allowlist — break tests for alg confusion
+// ---------------------------------------------------------------------------
+//
+// These are the negative-path / "break" tests that prove the allowlist guard
+// in resolveAlg() actually rejects the algorithms the bug report flagged:
+//
+//   - alg "none" must be rejected (classic JWT-none bypass).
+//   - alg HS256/HS384/HS512 must be rejected (downgrade from asymmetric to
+//     symmetric where the RSA public key would be used as the HMAC secret).
+//   - The header alg must match the JWK alg — otherwise an attacker could
+//     present a header claiming RS256 for a key the IdP marked RS384, and the
+//     legacy hardcoded RS256 verifier would silently downcast the hash.
+//
+// Removing the resolveAlg() guard or restoring the old hardcoded
+// `RSASSA-PKCS1-v1_5 / SHA-256` import path makes the first two assertions
+// pass (verification falls through), proving these tests are load-bearing.
+// ---------------------------------------------------------------------------
+
+describe('verifyJWT algorithm allowlist (CR-2026-05-21-095)', () => {
+  it('rejects alg "none" without attempting signature verification', async () => {
+    // alg=none — the classic JWT-none attack. Real attackers sometimes still
+    // append a junk signature segment so 3-segment parsers don't trip; the
+    // allowlist must reject the header alg even when a (meaningless)
+    // signature is present.
+    const token = buildUnsignedFakeToken(
+      { alg: 'none', kid: 'test-key-1' },
+      { sub: 'attacker', iat: Math.floor(Date.now() / 1000) },
+    );
+
+    await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
+      /alg "none" is not permitted/,
+    );
+  });
+
+  it.each(['HS256', 'HS384', 'HS512'])(
+    'rejects symmetric alg "%s" (alg-downgrade defence)',
+    async (alg) => {
+      // Attacker-controlled header claims HMAC. With the old hardcoded
+      // verifier (or no allowlist), the RSA public-key bytes would be used as
+      // the HMAC secret — and an attacker who can read the public key can
+      // forge tokens. The allowlist must reject every HS* before importKey is
+      // called.
+      const token = buildUnsignedFakeToken(
+        { alg, kid: 'test-key-1' },
+        { sub: 'attacker', iat: Math.floor(Date.now() / 1000) },
+      );
+
+      await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
+        new RegExp(`alg "${alg}" is not in the allowlist`),
+      );
+    },
+  );
+
+  it('rejects header alg that disagrees with the JWK alg (downgrade signal)', async () => {
+    // JWK is bound to RS256, but header claims RS384. With the old hardcoded
+    // RS256 verifier this would silently downcast SHA-384 → SHA-256, breaking
+    // the contract the IdP advertised when it published this key. The
+    // resolveAlg() guard rejects the mismatch up front.
+    const token = buildUnsignedFakeToken(
+      { alg: 'RS384', kid: 'test-key-1' },
+      { sub: 'user-1', iat: Math.floor(Date.now() / 1000) },
+    );
+
+    await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
+      /header alg "RS384" does not match JWK alg "RS256"/,
+    );
+  });
+
+  it('rejects header alg missing entirely', async () => {
+    const token = buildUnsignedFakeToken(
+      { kid: 'test-key-1' },
+      { sub: 'user-1', iat: Math.floor(Date.now() / 1000) },
+    );
+
+    await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
+      /missing alg in header/,
+    );
+  });
+
+  it('rejects alg outside the allowlist (e.g. RS1, ES1, made-up)', async () => {
+    const token = buildUnsignedFakeToken(
+      { alg: 'RS1', kid: 'test-key-1' },
+      { sub: 'user-1', iat: Math.floor(Date.now() / 1000) },
+    );
+
+    await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
+      /alg "RS1" is not in the allowlist/,
+    );
+  });
+
+  it('accepts RS384 when the JWK is also bound to RS384 (positive path for non-RS256)', async () => {
+    // Generate a real RS384 key pair, export it as JWK with alg=RS384, and
+    // sign a token whose header.alg=RS384. The allowlist must permit this
+    // and verifyJWT must succeed — proves the fix is not just "reject
+    // everything that isn't RS256".
+    const keyPair = await crypto.subtle.generateKey(
+      {
+        name: 'RSASSA-PKCS1-v1_5',
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: 'SHA-384',
+      },
+      true,
+      ['sign', 'verify'],
+    );
+
+    const exported = (await crypto.subtle.exportKey(
+      'jwk',
+      keyPair.publicKey,
+    )) as JsonWebKey;
+    const publicJwk = {
+      ...exported,
+      kty: exported.kty as string,
+      kid: 'test-rs384-key',
+      alg: 'RS384',
+    };
+
+    const headerB64 = toBase64Url({ alg: 'RS384', kid: 'test-rs384-key' });
+    const payloadB64 = toBase64Url({
+      sub: 'user-rs384',
+      iss: 'https://clerk.dev',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 60,
+    });
+    const signingInput = `${headerB64}.${payloadB64}`;
+    const data = new TextEncoder().encode(signingInput);
+    const signatureBuffer = await crypto.subtle.sign(
+      'RSASSA-PKCS1-v1_5',
+      keyPair.privateKey,
+      data,
+    );
+    const bytes = new Uint8Array(signatureBuffer);
+    let binary = '';
+    for (const b of bytes) {
+      binary += String.fromCharCode(b);
+    }
+    const signatureB64 = btoa(binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const token = `${signingInput}.${signatureB64}`;
+
+    const payload = await verifyJWT(token, publicJwk);
+    expect(payload.sub).toBe('user-rs384');
+  });
+});

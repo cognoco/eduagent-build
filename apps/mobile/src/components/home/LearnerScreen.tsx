@@ -20,7 +20,7 @@ import { useDashboard } from '../../hooks/use-dashboard';
 import { isInGracePeriod } from '../../lib/consent-grace';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
-import { useProfile } from '../../lib/profile';
+import { useHasLinkedChildren, useProfile } from '../../lib/profile';
 import {
   LEARNER_HOME_RETURN_TO,
   pushLearningResumeTarget,
@@ -124,10 +124,19 @@ export function LearnerScreen({
   const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { switchProfile } = useProfile();
+  const hasLinkedChildren = useHasLinkedChildren();
   const ensureStudyMode = useEnsureStudyMode();
   const navigationHome = useNavigationHomeContract();
   const navigationContract = navigationHome.contract;
   const navigationProxy = navigationHome.proxy;
+  // [HOME-07] Adult owner without children has no Family setup entry on Home.
+  // Surface a Family setup CTA on the learner home when the contract permits
+  // adding a child (gates.showAddChild already encodes: isAdultOwner &&
+  // ownerRole && !isParentProxy &&, in V1, subscriptionReady) and no children
+  // are linked yet. Route to /(app)/more so the existing handleAddChild flow
+  // owns subscription/quota gating — never duplicate that logic here.
+  const showFamilySetupCta =
+    navigationContract.gates.showAddChild && !hasLinkedChildren;
   const screenLoadingMotion = resolveLoadingMotionPreset({
     surface: 'screen',
     contentDensity: 'sparse',
@@ -726,6 +735,43 @@ export function LearnerScreen({
             )
           ) : null}
         </View>
+
+        {showFamilySetupCta && (
+          <View className="px-5 mt-4" testID="home-family-setup-cta">
+            <Pressable
+              onPress={() => router.push('/(app)/more' as Href)}
+              className="rounded-2xl border border-primary/40 bg-primary-soft px-4 py-4 flex-row items-center"
+              style={{ gap: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.learner.familySetup.cta')}
+              testID="home-family-setup-cta-button"
+            >
+              <View className="w-10 h-10 rounded-2xl bg-surface-elevated items-center justify-center">
+                <Ionicons
+                  name="people-outline"
+                  size={21}
+                  color={colors.primary}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-body font-bold text-text-primary">
+                  {t('home.learner.familySetup.title')}
+                </Text>
+                <Text
+                  className="text-body-sm text-text-secondary mt-0.5"
+                  numberOfLines={2}
+                >
+                  {t('home.learner.familySetup.subtitle')}
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+          </View>
+        )}
 
         {navigationProxy.active && (
           <View testID="intent-proxy-placeholder" className="px-5 mt-4">

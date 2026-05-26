@@ -217,6 +217,22 @@ jobs:
           DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
         run: node packages/database/scripts/verify-db-target.mjs
 
+      - name: Render Cloudflare KV namespace IDs into wrangler.toml
+        # [FCR-2026-05-23-L14.F8] KV namespace IDs are NOT committed in
+        # plaintext. render-wrangler-kv.mjs substitutes the __<BINDING>_<ENV>__
+        # placeholders in wrangler.toml with values from these Doppler-managed
+        # GitHub Actions secrets. A missing required env var hard-fails this
+        # step so a stale/empty deploy cannot silently bind the wrong KV.
+        working-directory: apps/api
+        env:
+          CF_KV_SUBSCRIPTION_ID_DEV: ${{ secrets.CF_KV_SUBSCRIPTION_ID_DEV }}
+          CF_KV_SUBSCRIPTION_ID_STG: ${{ secrets.CF_KV_SUBSCRIPTION_ID_STG }}
+          CF_KV_SUBSCRIPTION_ID_PRD: ${{ secrets.CF_KV_SUBSCRIPTION_ID_PRD }}
+          CF_KV_COACHING_ID_DEV: ${{ secrets.CF_KV_COACHING_ID_DEV }}
+          CF_KV_COACHING_ID_STG: ${{ secrets.CF_KV_COACHING_ID_STG }}
+          CF_KV_COACHING_ID_PRD: ${{ secrets.CF_KV_COACHING_ID_PRD }}
+        run: node scripts/render-wrangler-kv.mjs wrangler.toml
+
       - name: Verify Cloudflare KV bindings before migrations
         working-directory: apps/api
         run: |

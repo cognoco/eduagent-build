@@ -267,6 +267,10 @@ describe('CreateProfileScreen', () => {
         '2010-06-15',
       );
 
+      // [ACCOUNT-01] Birth year 2010 → adolescent bracket; intent picker is
+      // shown but intent is NOT required for non-adults (the API rejects
+      // family mode for non-adult owners). Submit should be enabled without
+      // an intent tap.
       const button = screen.getByTestId('create-profile-submit');
       expect(
         button.props.accessibilityState?.disabled ?? button.props.disabled,
@@ -306,6 +310,10 @@ describe('CreateProfileScreen', () => {
     await act(() => {
       datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
     });
+
+    // [ACCOUNT-01] Adult + profiles=[] → Study/Family intent picker required
+    // before submit is enabled. Pick 'Study' (default for solo learner).
+    fireEvent.press(screen.getByTestId('create-profile-intent-study'));
 
     fireEvent.press(screen.getByTestId('create-profile-submit'));
 
@@ -352,6 +360,9 @@ describe('CreateProfileScreen', () => {
     await act(() => {
       datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
     });
+
+    // [ACCOUNT-01] Adult + first-profile → intent required.
+    fireEvent.press(screen.getByTestId('create-profile-intent-study'));
 
     fireEvent.press(screen.getByTestId('create-profile-submit'));
 
@@ -595,6 +606,8 @@ describe('CreateProfileScreen', () => {
       await act(async () => {
         datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
       });
+      // [ACCOUNT-01] First-profile + adult requires intent before submit.
+      fireEvent.press(screen.getByTestId('create-profile-intent-study'));
       fireEvent.press(screen.getByTestId('create-profile-submit'));
     }
 
@@ -865,6 +878,9 @@ describe('CreateProfileScreen', () => {
         datePickerOnChange?.({ type: 'set' }, new Date(2005, 5, 15)); // June 15 (0-based)
       });
 
+      // [ACCOUNT-01] Adult + first-profile → intent picker required.
+      fireEvent.press(screen.getByTestId('create-profile-intent-study'));
+
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       await waitFor(() => {
@@ -939,6 +955,167 @@ describe('CreateProfileScreen', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
 
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [ACCOUNT-01] First-profile setup captures Study/Family intent
+  // ---------------------------------------------------------------------------
+
+  describe('[ACCOUNT-01] Study/Family intent capture', () => {
+    it('does NOT show the intent picker when adding a child (parent flow)', () => {
+      mockUseProfile.mockReturnValue({
+        switchProfile: mockSwitchProfile,
+        activeProfile: { id: 'parent-1', isOwner: true },
+        profiles: [{ id: 'parent-1', isOwner: true }],
+      });
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      // Pick a birth date so the picker would otherwise show.
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+      });
+      expect(screen.queryByTestId('create-profile-intent-picker')).toBeNull();
+    });
+
+    it('does NOT show the intent picker before a birth date is set', () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      expect(screen.queryByTestId('create-profile-intent-picker')).toBeNull();
+    });
+
+    it('shows the intent picker for an adult first-profile setup', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      screen.getByTestId('create-profile-intent-picker');
+      screen.getByTestId('create-profile-intent-study');
+      screen.getByTestId('create-profile-intent-family');
+    });
+
+    it('blocks submit until an intent is chosen (adult first-profile)', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      // Submit should be disabled until an intent is picked.
+      const buttonBefore = screen.getByTestId('create-profile-submit');
+      expect(
+        buttonBefore.props.accessibilityState?.disabled ??
+          buttonBefore.props.disabled,
+      ).toBeTruthy();
+      fireEvent.press(screen.getByTestId('create-profile-intent-study'));
+      const buttonAfter = screen.getByTestId('create-profile-submit');
+      expect(
+        buttonAfter.props.accessibilityState?.disabled ??
+          buttonAfter.props.disabled,
+      ).toBeFalsy();
+    });
+
+    it('does NOT require intent for adolescent birth date (family disabled anyway)', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Kid');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+      });
+      // Picker is visible but submit is enabled without picking.
+      screen.getByTestId('create-profile-intent-picker');
+      const button = screen.getByTestId('create-profile-submit');
+      expect(
+        button.props.accessibilityState?.disabled ?? button.props.disabled,
+      ).toBeFalsy();
+    });
+
+    it('PATCHes app-context to "family" after creation when Family intent picked', async () => {
+      const newProfile = {
+        id: 'adult-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      const patchedProfile = { ...newProfile, defaultAppContext: 'family' };
+      // 1st call = POST /profiles, 2nd call = PATCH /profiles/:id/app-context
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: newProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: patchedProfile }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-intent-family'));
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      const patchCall = mockFetch.mock.calls[1];
+      const patchUrl = String(patchCall?.[0]);
+      const patchInit = patchCall?.[1] as RequestInit | undefined;
+      expect(patchUrl).toContain('/profiles/adult-id/app-context');
+      expect(patchInit?.method).toBe('PATCH');
+      const patchBody = JSON.parse(String(patchInit?.body)) as Record<
+        string,
+        unknown
+      >;
+      expect(patchBody.defaultAppContext).toBe('family');
+    });
+
+    it('does NOT PATCH app-context when Study intent picked', async () => {
+      const newProfile = {
+        id: 'study-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-intent-study'));
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      });
+      // Study is the default — no PATCH expected.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 });

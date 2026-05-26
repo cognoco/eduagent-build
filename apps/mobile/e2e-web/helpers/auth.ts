@@ -304,6 +304,19 @@ export async function signIn(
         });
       }
     }
+
+    // Bug 36c8bce9-1f7c-8196-a766-c9bc9ce12aad (J03 parent setup): the
+    // 'app-shell' branch above returns early as soon as ANY tablist is visible
+    // at the landing URL. That accepts the wrong shell when an owner-with-
+    // children account lands on My Learning instead of parent-home, then the
+    // storage state is captured pointing at the wrong screen and downstream
+    // J03 specs fail mysteriously waiting for parent-home-screen.
+    //
+    // Enforce that the caller's contractual landingTestId is actually rendered
+    // before we declare sign-in ready. Failure here surfaces the contract
+    // mismatch at setup time with a clear diagnostic instead of letting the
+    // mislabelled storage state propagate to every parent-shell spec.
+    await expect(landing).toBeVisible({ timeout: 60_000 });
   } finally {
     page.off('pageerror', onPageError);
     page.off('console', onConsole);

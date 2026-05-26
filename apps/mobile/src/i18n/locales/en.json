@@ -102,6 +102,15 @@
       "backToSignIn": "Back to sign in"
     }
   },
+  "guards": {
+    "requireFamilyContext": {
+      "title": "This is a family view",
+      "body": "Child learning profiles are only visible in Family mode.",
+      "switchError": "We couldn't switch to Family mode. Try again, or contact support if this keeps happening.",
+      "switchCta": "Switch to Family mode",
+      "backToHome": "Back to Home"
+    }
+  },
   "home": {
     "loadingTimeoutMessage": "Taking longer than expected. Please check your connection and try again.",
     "retryLoadingLabel": "Retry loading",
@@ -140,6 +149,11 @@
           "title": "Learn something new",
           "subtitle": "Start a topic or build a subject"
         }
+      },
+      "familySetup": {
+        "title": "Set up Family",
+        "subtitle": "Add a child profile so they can learn with their own mentor",
+        "cta": "Set up Family"
       }
     },
     "notices": {
@@ -1117,6 +1131,9 @@
       "missingMessage": "We couldn't load this topic. Head to the library to pick one.",
       "goToLibrary": "Go to Library",
       "successPrompt": "Head back to your Library whenever you're ready.",
+      "successMessage": "Great work — your memory of this is solid! Head back to your Library whenever you're ready.",
+      "partialResult": "Good effort! Think about the key concepts and try explaining again. What stands out most to you?",
+      "needsReview": "Almost there — a little more practice will lock this in. Let's find a better approach for you.",
       "dontRemember": "I don't remember",
       "stillStuck": "Still stuck",
       "errorTitle": "Something went wrong",
@@ -2239,6 +2256,45 @@
         "gettingComfortable": "Getting comfortable",
         "nearlyMastered": "Nearly mastered",
         "mastered": "Mastered"
+      }
+    },
+    "metricTooltips": {
+      "infoDotLabel": "More info about {{title}}",
+      "timeOnApp": {
+        "title": "Time on app",
+        "body": "How long your child spent in the app during this session, measured in real-world minutes."
+      },
+      "sessionsThisWeek": {
+        "title": "Sessions this week",
+        "body": "The number of learning conversations your child had with the mentor this week."
+      },
+      "engagementTrend": {
+        "title": "Engagement trend",
+        "body": "Whether your child is using the mentor more, less, or about the same compared with recent activity."
+      },
+      "exchangeDelta": {
+        "title": "Exchanges this week",
+        "body": "How many message turns happened this week compared with last week. It is a lightweight signal for learning activity."
+      },
+      "guidedRatio": {
+        "title": "Guided practice",
+        "body": "The share of mentor replies where your child needed a worked example or stronger guidance instead of light prompting."
+      },
+      "streakXp": {
+        "title": "Streak and XP",
+        "body": "Motivation signals from regular practice and completed learning work. They are not grades."
+      },
+      "understanding": {
+        "title": "Understanding",
+        "body": "How well your child understands this topic, based on their answers and conversations with the mentor."
+      },
+      "reviewStatus": {
+        "title": "Memory check",
+        "body": "Whether your child still remembers what they learned. Based on spaced review, so topics come back at increasing intervals."
+      },
+      "milestone": {
+        "title": "Milestones",
+        "body": "Milestones mark real achievements, like first sessions, topics explored, and vocabulary learned."
       }
     },
     "weeklyReport": {
