@@ -1839,59 +1839,67 @@ function SubscriptionContent(): React.ReactElement | null {
             </View>
           )}
 
-          {/* Restore purchases — required by App Store 3.1.1 */}
-          <View className="mt-4">
-            <Pressable
-              onPress={handleRestore}
-              disabled={restore.isPending || restorePolling}
-              className="bg-surface rounded-card px-4 py-3.5"
-              accessibilityLabel={t('subscription.restore.accessibilityLabel')}
-              accessibilityRole="button"
-              testID="restore-purchases-button"
-            >
-              <View className="flex-row items-center justify-center">
-                {restore.isPending || restorePolling ? (
-                  <View className="flex-row items-center">
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.primary}
-                      testID="restore-loading"
-                    />
-                    <Text className="text-body font-semibold text-primary ml-2">
-                      {restorePolling
-                        ? t('subscription.restore.verifying')
-                        : t('subscription.restore.restoring')}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text className="text-body font-semibold text-primary">
-                    {t('subscription.restore.button')}
-                  </Text>
-                )}
-              </View>
-            </Pressable>
-            {restorePolling && (
+          {/* Restore purchases — required by App Store 3.1.1.
+              [BUG-606] Hidden on web: `handleRestore` calls the RevenueCat
+              native SDK (`Purchases.restorePurchases()`), which is not
+              available in the web bundle and would throw at runtime when
+              tapped from a browser. Native iOS/Android only. */}
+          {Platform.OS !== 'web' && (
+            <View className="mt-4">
               <Pressable
-                onPress={() => {
-                  setRestorePolling(false);
-                  platformAlert(
-                    t('subscription.restore.cancelledTitle'),
-                    t('subscription.restore.cancelledBody'),
-                  );
-                }}
-                className="mt-2 items-center py-2"
-                accessibilityRole="button"
+                onPress={handleRestore}
+                disabled={restore.isPending || restorePolling}
+                className="bg-surface rounded-card px-4 py-3.5"
                 accessibilityLabel={t(
-                  'subscription.restore.cancelAccessibilityLabel',
+                  'subscription.restore.accessibilityLabel',
                 )}
-                testID="restore-polling-cancel"
+                accessibilityRole="button"
+                testID="restore-purchases-button"
               >
-                <Text className="text-body-sm text-primary font-semibold">
-                  Check later
-                </Text>
+                <View className="flex-row items-center justify-center">
+                  {restore.isPending || restorePolling ? (
+                    <View className="flex-row items-center">
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.primary}
+                        testID="restore-loading"
+                      />
+                      <Text className="text-body font-semibold text-primary ml-2">
+                        {restorePolling
+                          ? t('subscription.restore.verifying')
+                          : t('subscription.restore.restoring')}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text className="text-body font-semibold text-primary">
+                      {t('subscription.restore.button')}
+                    </Text>
+                  )}
+                </View>
               </Pressable>
-            )}
-          </View>
+              {restorePolling && (
+                <Pressable
+                  onPress={() => {
+                    setRestorePolling(false);
+                    platformAlert(
+                      t('subscription.restore.cancelledTitle'),
+                      t('subscription.restore.cancelledBody'),
+                    );
+                  }}
+                  className="mt-2 items-center py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel={t(
+                    'subscription.restore.cancelAccessibilityLabel',
+                  )}
+                  testID="restore-polling-cancel"
+                >
+                  <Text className="text-body-sm text-primary font-semibold">
+                    Check later
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* Top-up */}
           {isPaidTier && (

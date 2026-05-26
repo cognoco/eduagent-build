@@ -11,6 +11,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://mentomate-api-prd.zwizzly.workers.dev",
         "EXPO_PUBLIC_ENABLE_MODE_NAV": "true",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": "true",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },

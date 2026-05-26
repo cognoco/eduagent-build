@@ -40,6 +40,61 @@ export class ForbiddenError extends Error {
   }
 }
 
+/**
+ * [BUG-694] Typed error for 401 responses thrown by the API-client boundary.
+ *
+ * Previously the mobile client threw a bare `Error('Session expired — signing
+ * out')` / `Error('Auth token not ready')` on 401, which discarded the HTTP
+ * status, the server-supplied `code` (e.g. `UNAUTHORIZED`), and the raw
+ * response body. Per the UX Resilience Rules ("Classify errors at the API
+ * client boundary, not per-screen"), 401s should be a typed class carrying
+ * the structured signal so callers (logging, format-api-error, retry logic)
+ * never need to string-match the message.
+ *
+ * Note: 401 with `code === 'EMAIL_NOT_AVAILABLE' | 'EMAIL_NOT_VERIFIED'`
+ * still throws `ForbiddenError` (existing contract / [BUG-1016]) — those
+ * are account-verification states, not session-expiry, and screens already
+ * branch on `ForbiddenError.apiCode`. `UnauthorizedError` covers the
+ * remaining 401 surfaces: expired token, no token yet, generic UNAUTHORIZED.
+ */
+export class UnauthorizedError extends Error {
+  readonly errorCode = 'UNAUTHORIZED' as const;
+  readonly status = 401 as const;
+  /** Server-supplied error code from the response body (e.g. `UNAUTHORIZED`) when present. */
+  readonly apiCode: string | undefined;
+  /**
+   * Distinguishes the two 401 sub-cases the client cares about:
+   *  - `'session-expired'`: a token WAS sent and the server rejected it →
+   *    the auth-expired callback fires and the user is signed out.
+   *  - `'token-not-ready'`: no token was attached (Clerk hadn't minted a JWT
+   *    yet after setActive) → the caller (e.g. TanStack Query) should retry.
+   */
+  readonly reason: 'session-expired' | 'token-not-ready';
+  /** Raw response body (text). Empty string when the server sent no body. */
+  readonly responseBody: string;
+
+  constructor(
+    reason: 'session-expired' | 'token-not-ready',
+    options: {
+      message?: string;
+      apiCode?: string;
+      responseBody?: string;
+    } = {},
+  ) {
+    const message =
+      options.message ??
+      (reason === 'session-expired'
+        ? 'Session expired — signing out'
+        : 'Auth token not ready');
+    super(message);
+    this.name = 'UnauthorizedError';
+    this.reason = reason;
+    this.apiCode = options.apiCode;
+    this.responseBody = options.responseBody ?? '';
+    Object.setPrototypeOf(this, UnauthorizedError.prototype);
+  }
+}
+
 export const CONFLICT_ERROR_NAME = 'ConflictError' as const;
 export class ConflictError extends Error {
   readonly errorCode = 'CONFLICT' as const;

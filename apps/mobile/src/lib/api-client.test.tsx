@@ -21,6 +21,7 @@ import {
 } from './api-client';
 import {
   ForbiddenError,
+  UnauthorizedError,
   UpstreamError,
   QuotaExceededError,
 } from './api-errors';
@@ -332,5 +333,60 @@ describe('useApiClient 401 account-verification classification [BUG-1016]', () =
     await client.v1.health.$get().catch(() => undefined);
 
     expect(onAuthExpired).toHaveBeenCalledTimes(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-694] 401 must throw a typed UnauthorizedError that preserves the
+  // HTTP status, the server-supplied error code, and the raw response body.
+  // Previously a bare `Error('Session expired — signing out')` was thrown,
+  // discarding all structured signal — callers had to string-match the
+  // message to detect 401. The typed error implements the UX Resilience
+  // Rule "Classify errors at the API client boundary, not per-screen."
+  // -------------------------------------------------------------------------
+
+  it('[BUG-694 / break-test] session-expired 401 throws UnauthorizedError with status, apiCode, and responseBody preserved', async () => {
+    setOnAuthExpired(jest.fn());
+    const body = JSON.stringify({
+      code: 'UNAUTHORIZED',
+      message: 'Invalid or expired token',
+    });
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(body, {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UnauthorizedError);
+    const unauth = err as UnauthorizedError;
+    expect(unauth.status).toBe(401);
+    expect(unauth.reason).toBe('session-expired');
+    expect(unauth.apiCode).toBe('UNAUTHORIZED');
+    expect(unauth.message).toBe('Invalid or expired token');
+    expect(unauth.responseBody).toBe(body);
+  });
+
+  it('[BUG-694 / break-test] no-token 401 throws UnauthorizedError with reason="token-not-ready"', async () => {
+    mockGetToken.mockReset();
+    mockGetToken.mockResolvedValue(null);
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response('', {
+          status: 401,
+        }),
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UnauthorizedError);
+    const unauth = err as UnauthorizedError;
+    expect(unauth.reason).toBe('token-not-ready');
+    expect(unauth.status).toBe(401);
+    expect(unauth.responseBody).toBe('');
   });
 });
