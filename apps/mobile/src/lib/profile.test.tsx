@@ -95,6 +95,7 @@ describe('ProfileProvider', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     queryClient?.clear();
   });
 
@@ -126,6 +127,37 @@ describe('ProfileProvider', () => {
     jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('deleted-id');
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.activeProfile?.id).toBe('owner-id');
+    expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
+      'mentomate_active_profile_id',
+      'owner-id',
+    );
+  });
+
+  it('[BREAK] falls back to owner when active-profile SecureStore restore hangs', async () => {
+    jest.useFakeTimers();
+    jest.mocked(ExpoSecureStore.getItemAsync).mockImplementation((key: string) =>
+      key === 'mentomate_active_profile_id'
+        ? new Promise(() => {
+            /* deliberately never resolves */
+          })
+        : Promise.resolve(null),
+    );
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.isLoading).toBe(true);
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
     });
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
