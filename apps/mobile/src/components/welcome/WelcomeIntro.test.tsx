@@ -15,7 +15,7 @@ const translations: Record<string, string> = {
     "Tell it once — your interests, how you learn, what's hard — and it carries that forward.",
   'welcomeIntro.card4.headline': 'Built for families',
   'welcomeIntro.card4.supporting':
-    'Parents see what their kids worked on and get conversation starters for the week.',
+    'Parents see what their kids worked on and get conversation starters. To add a child, open More and tap Add a child.',
   'welcomeIntro.next': 'Next',
   'welcomeIntro.letsStart': "Let's start",
   'welcomeIntro.a11y.previous': 'Previous card',
@@ -91,6 +91,15 @@ describe('<WelcomeIntro />', () => {
     fireEvent.press(screen.getByTestId('welcome-next-button'));
     expect(screen.getByTestId('welcome-start-button')).toBeTruthy();
     expect(screen.queryByTestId('welcome-next-button')).toBeNull();
+  });
+
+  it('explains that child profiles are added from More on the family card', () => {
+    render(<WelcomeIntro onComplete={jest.fn()} />);
+    fireEvent.press(screen.getByTestId('welcome-next-button'));
+    fireEvent.press(screen.getByTestId('welcome-next-button'));
+    fireEvent.press(screen.getByTestId('welcome-next-button'));
+
+    expect(screen.getByText(/More.*Add a child/i)).toBeTruthy();
   });
 
   it('calls onComplete when the "Let\'s start" CTA on card 4 is tapped', () => {
