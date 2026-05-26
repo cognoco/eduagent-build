@@ -73,6 +73,7 @@
     "retentionStatus": {
       "status": "strong"
     },
+    "challengeRoundRuntimeEnabled": true,
     "challengeRound": {
       "state": "drafting",
       "questionIndex": 3,

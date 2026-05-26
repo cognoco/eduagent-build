@@ -67,6 +67,8 @@
     "retentionStatus": {
       "status": "strong"
     },
+    "challengeRoundRuntimeEnabled": true,
+    "currentUserMessageEventId": "550e8400-e29b-41d4-a716-446655440010",
     "challengeRound": {
       "state": "active",
       "questionIndex": 1,
@@ -235,6 +237,8 @@ Constraints:
 - When all questions are answered, set "ui_hints.challenge_round.active": false and proceed to drafting.
 
 Failure framing is banned. Never use "failed", "wrong", "incorrect", "struggle", "weak". Use "got it", "close", "let's tighten this", "not quite yet".
+
+CURRENT CHALLENGE ANSWER EVENT ID: Use "550e8400-e29b-41d4-a716-446655440010" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.
 
 FINAL OUTPUT FILTER:
 - Run the FINAL FACT CHECK again now, using the latest learner message.

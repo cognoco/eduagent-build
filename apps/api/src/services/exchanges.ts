@@ -302,8 +302,12 @@ export interface ExchangeContext {
   sourceEvidence?: ExchangeSourceEvidence[];
   /** True when evaluateChallengeReadiness allows offering a Challenge Round on this turn. */
   challengeEligible?: boolean;
+  /** Dark-launch gate for Challenge Round prompts and state transitions. */
+  challengeRoundRuntimeEnabled?: boolean;
   /** Current Challenge Round state machine snapshot from session metadata. */
   challengeRound?: import('@eduagent/schemas').ChallengeRoundSessionState;
+  /** Server-generated id to use when evaluating the current learner answer. */
+  currentUserMessageEventId?: string;
 }
 
 /** Result of processing a single exchange */

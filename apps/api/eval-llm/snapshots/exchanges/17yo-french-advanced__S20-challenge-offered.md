@@ -60,7 +60,8 @@
     "retentionStatus": {
       "status": "strong"
     },
-    "challengeEligible": true
+    "challengeEligible": true,
+    "challengeRoundRuntimeEnabled": true
   }
 }
 ```

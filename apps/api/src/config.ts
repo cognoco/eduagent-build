@@ -101,6 +101,10 @@ const envSchema = z.object({
   // for first deploy; flip through Doppler after staging soak.
   MATCHER_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Challenge Round runtime wiring. Keep dark until runtime + read-side rollout
+  // gates pass; flipped through Doppler only after Phase 5 validation.
+  CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Prelaunch override for the IDEMPOTENCY_KV production deploy gate.
   // The idempotency middleware gates replay dedup on the IDEMPOTENCY_KV
   // KV binding; if the binding is absent the middleware silently falls
@@ -156,6 +160,12 @@ export function isProfileInDedupRollout(
 }
 
 export function isTopicIntentMatcherEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
+export function isChallengeRoundRuntimeEnabled(
   value: string | undefined,
 ): boolean {
   return value === 'true';

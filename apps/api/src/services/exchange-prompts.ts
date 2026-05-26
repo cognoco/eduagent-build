@@ -1183,14 +1183,21 @@ export function buildSystemPrompt(
 
   // Challenge Round prompt block — state → prompt mapping (canonical).
   // See docs/plans/2026-05-18-challenge-round-into-note.md Task 7 Step 3.
-  const cr = context.challengeRound;
-  const challengeEligible = context.challengeEligible ?? false;
-  if (cr?.state === 'offered' || (!cr && challengeEligible)) {
-    sections.push(challengeOfferPrompt);
-  } else if (cr?.state === 'accepted' || cr?.state === 'active') {
-    sections.push(challengeRoundActivePrompt);
-  } else if (cr?.state === 'drafting') {
-    sections.push(challengeRoundDraftingPrompt);
+  if (context.challengeRoundRuntimeEnabled === true) {
+    const cr = context.challengeRound;
+    const challengeEligible = context.challengeEligible ?? false;
+    if (cr?.state === 'offered' || (!cr && challengeEligible)) {
+      sections.push(challengeOfferPrompt);
+    } else if (cr?.state === 'accepted' || cr?.state === 'active') {
+      sections.push(challengeRoundActivePrompt);
+      if (cr.state === 'active' && context.currentUserMessageEventId) {
+        sections.push(
+          `CURRENT CHALLENGE ANSWER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.`,
+        );
+      }
+    } else if (cr?.state === 'drafting') {
+      sections.push(challengeRoundDraftingPrompt);
+    }
   }
   // complete | declined | aborted | (undefined && !eligible) → no challenge block
 
