@@ -2385,7 +2385,9 @@ describe('SaveWizard — Back and Cancel navigation', () => {
 // the parent wasn't expecting. This helper builds the platformAlert prompt
 // used to confirm the destination by name; these tests pin its behavior
 // across all family-size shapes.
-const { buildSwitchProfileConfirmation } = require('./_layout');
+const {
+  buildSwitchProfileConfirmation,
+} = require('./_lib/consent-gate-helpers');
 
 // Minimal t() for unit tests — appends interpolated values so assertions like
 // toContain('Alex') pass even though we don't have real translation templates.

@@ -266,7 +266,7 @@ Explicitly keep these out of this plan's execution scope for now:
 
 | Route | Current size | Why separate |
 |---|---:|---|
-| `apps/mobile/src/app/(app)/_layout.tsx` | 2652 LOC | Auth/navigation/consent/profile shell. Needs an app-shell decomposition plan, not a learning-route cleanup. |
+| `apps/mobile/src/app/(app)/_layout.tsx` | 2652 LOC | Auth/navigation/consent/profile shell. Tracked in docs/plans/2026-05-26-app-shell-layout-decomposition.md. |
 | `apps/mobile/src/app/(app)/subscription.tsx` | 2047 LOC | Billing and entitlement UX. High-risk enough to isolate from learning-flow refactors. |
 | `apps/mobile/src/app/(app)/progress/index.tsx` | 1431 LOC | Progress dashboard domain. Worth tracking, but lower priority than session-adjacent routes. |
 
