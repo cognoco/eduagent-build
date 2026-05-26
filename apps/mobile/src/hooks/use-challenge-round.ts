@@ -2,9 +2,9 @@
 // useChallengeRound - orchestrates the challenge-round accept/decline/abort
 // lifecycle and note saving.
 //
-// Routes /challenge-round/* are not yet registered in AppType (added in the
-// API layer task). This hook uses raw fetch with auth headers rather than the
-// typed Hono client so it compiles before the route types land.
+// This hook uses raw fetch with auth headers because the Challenge Round route
+// response is consumed as a narrow UI state transition rather than broader
+// server state.
 //
 // HIGH-3/ROUTING-4: Challenge Round state is consumed only from the typed SSE
 // `done` payload after the server parses and gates the full envelope. If the
@@ -15,6 +15,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
+import type { ChallengeRoundSessionState } from '@eduagent/schemas';
 import { useCreateNote } from './use-notes';
 import { useProfile } from '../lib/profile';
 import { getApiUrl } from '../lib/api';
@@ -43,11 +44,25 @@ async function postJson<T>(
   return res.json() as Promise<T>;
 }
 
+type ChallengeRoundRouteResponse = {
+  challengeRound?: ChallengeRoundSessionState;
+};
+
+function requireChallengeIds(opts: {
+  sessionId: string | null | undefined;
+  topicId: string | undefined;
+}): { sessionId: string; topicId: string } {
+  if (!opts.sessionId || !opts.topicId) {
+    throw new Error('Challenge Round requires an active session and topic.');
+  }
+  return { sessionId: opts.sessionId, topicId: opts.topicId };
+}
+
 export function useChallengeRound(opts: {
-  sessionId: string;
-  topicId: string;
-  subjectId: string;
-  bookId: string;
+  sessionId: string | null | undefined;
+  topicId: string | undefined;
+  subjectId: string | undefined;
+  bookId?: string | undefined;
 }) {
   const { getToken } = useAuth();
   const { activeProfile } = useProfile();
@@ -55,10 +70,11 @@ export function useChallengeRound(opts: {
 
   const accept = useMutation({
     mutationFn: async () => {
+      const ids = requireChallengeIds(opts);
       const token = await getToken();
-      return postJson<Record<string, unknown>>(
+      return postJson<ChallengeRoundRouteResponse>(
         `${getApiUrl()}/v1/challenge-round/accept`,
-        { sessionId: opts.sessionId, topicId: opts.topicId },
+        ids,
         token,
         activeProfile?.id,
       );
@@ -67,10 +83,11 @@ export function useChallengeRound(opts: {
 
   const decline = useMutation({
     mutationFn: async (dontAskAgain: boolean) => {
+      const ids = requireChallengeIds(opts);
       const token = await getToken();
-      return postJson<Record<string, unknown>>(
+      return postJson<ChallengeRoundRouteResponse>(
         `${getApiUrl()}/v1/challenge-round/decline`,
-        { sessionId: opts.sessionId, topicId: opts.topicId, dontAskAgain },
+        { ...ids, dontAskAgain },
         token,
         activeProfile?.id,
       );
@@ -79,10 +96,11 @@ export function useChallengeRound(opts: {
 
   const abort = useMutation({
     mutationFn: async () => {
+      const ids = requireChallengeIds(opts);
       const token = await getToken();
-      return postJson<Record<string, unknown>>(
+      return postJson<ChallengeRoundRouteResponse>(
         `${getApiUrl()}/v1/challenge-round/abort`,
-        { sessionId: opts.sessionId, topicId: opts.topicId },
+        ids,
         token,
         activeProfile?.id,
       );
@@ -90,15 +108,23 @@ export function useChallengeRound(opts: {
   });
 
   return {
-    accept: () => accept.mutateAsync(),
-    decline: (dontAskAgain = false) => decline.mutateAsync(dontAskAgain),
-    abort: () => abort.mutateAsync(),
-    saveNote: (content: string) =>
-      createNote.mutateAsync({
-        topicId: opts.topicId,
-        sessionId: opts.sessionId,
+    accept: () => {
+      return accept.mutateAsync();
+    },
+    decline: (dontAskAgain = false) => {
+      return decline.mutateAsync(dontAskAgain);
+    },
+    abort: () => {
+      return abort.mutateAsync();
+    },
+    saveNote: (content: string) => {
+      const ids = requireChallengeIds(opts);
+      return createNote.mutateAsync({
+        topicId: ids.topicId,
+        sessionId: ids.sessionId,
         content,
-      }),
+      });
+    },
     skipNote: () => Promise.resolve(),
   };
 }

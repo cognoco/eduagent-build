@@ -26,6 +26,22 @@ describe('DraftedNoteReview', () => {
     screen.getByText('Photosynthesis converts light into energy.');
   });
 
+  it('renders a write-your-own composer when the server sends a guard fallback', () => {
+    render(
+      <DraftedNoteReview
+        {...defaultProps}
+        initialContent={null}
+        fallbackPrompt="Write this one in your own words."
+      />,
+    );
+
+    screen.getByTestId('drafted-note-review');
+    screen.getByTestId('drafted-note-input');
+    screen.getByTestId('drafted-note-fallback-prompt');
+    screen.getByText('Write this one in your own words.');
+    expect(screen.queryByTestId('drafted-note-preview')).toBeNull();
+  });
+
   it('shows the draft title from i18n', () => {
     render(<DraftedNoteReview {...defaultProps} />);
     screen.getByText("Here's what you know now");

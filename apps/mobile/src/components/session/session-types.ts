@@ -267,15 +267,18 @@ export function isReconnectableSessionError(error: unknown): boolean {
 
 export function getContextualQuickChips(
   message: ChatMessage | undefined,
+  opts: { challengeRoundInFlight?: boolean } = {},
 ): ContextualQuickChipId[] {
   if (!message) return [];
 
   const questionLike = /\?(\s|$)/.test(message.content);
-  if (questionLike) {
-    return ['too_hard', 'explain_differently', 'hint'];
-  }
+  const chips: ContextualQuickChipId[] = questionLike
+    ? ['too_hard', 'explain_differently', 'hint']
+    : ['know_this', 'explain_differently', 'too_easy', 'example'];
 
-  return ['know_this', 'explain_differently', 'too_easy', 'example'];
+  return opts.challengeRoundInFlight
+    ? chips.filter((chip) => chip !== 'too_easy')
+    : chips;
 }
 
 // ─── Conversation Stage ─────────────────────────────────────────────────────
