@@ -35,6 +35,7 @@ import {
   isAcceptedSummaryStatus,
   isMeaningfulCompletedSession,
 } from './topic-completion';
+import { resolveMasteryVerificationState } from './challenge-round/verification';
 import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
@@ -305,6 +306,15 @@ export async function getTopicProgress(
   const latestAssessment = topicAssessments.sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   )[0];
+  // Phase 5: take the most-recent non-null Challenge Round verification stamp.
+  // Mastery rows accumulate; `progress.ts already reads the latest
+  // masteryChallengeVerifiedAt` (plan line 383). Iterating once over the
+  // already-fetched list is cheaper than a second query.
+  const latestVerifiedAt = topicAssessments.reduce<Date | null>((acc, row) => {
+    const stamp = row.masteryChallengeVerifiedAt;
+    if (stamp == null) return acc;
+    return acc == null || stamp.getTime() > acc.getTime() ? stamp : acc;
+  }, null);
 
   // Count sessions for this topic. Only sessions with at least 1 real exchange
   // count — ghost sessions (created but abandoned with 0 exchanges) must not
@@ -402,6 +412,15 @@ export async function getTopicProgress(
     masteryScore: latestAssessment?.masteryScore
       ? Number(latestAssessment.masteryScore)
       : null,
+    // Phase 5: server-resolved verification state. Raw
+    // `masteryChallengeVerifiedAt` is intentionally NOT included on the wire
+    // anymore — mobile reads `masteryVerificationState` instead so the
+    // pending-review counter-evidence is always considered. The schema slot
+    // is kept for back-compat but is left undefined.
+    masteryVerificationState: resolveMasteryVerificationState({
+      verifiedAt: latestVerifiedAt,
+      newWeakSpotRows: deepeningTopics,
+    }),
     summaryExcerpt: summaryRow?.content?.slice(0, 200) ?? null,
     xpStatus: (latestXp?.status as 'pending' | 'verified' | 'decayed') ?? null,
     totalSessions: topicSessions.length,
@@ -1213,6 +1232,16 @@ export async function getTopicProgressBatch(
       (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
     );
     const latestAssessment = topicAssessments[0];
+    // Phase 5: mirror the singular-getter logic — latest non-null CR
+    // verification stamp drives `masteryVerificationState`.
+    const latestVerifiedAt = topicAssessments.reduce<Date | null>(
+      (acc, row) => {
+        const stamp = row.masteryChallengeVerifiedAt;
+        if (stamp == null) return acc;
+        return acc == null || stamp.getTime() > acc.getTime() ? stamp : acc;
+      },
+      null,
+    );
 
     const topicSessions = sessionsByTopic.get(topic.id) ?? [];
 
@@ -1284,6 +1313,10 @@ export async function getTopicProgressBatch(
       masteryScore: latestAssessment?.masteryScore
         ? Number(latestAssessment.masteryScore)
         : null,
+      masteryVerificationState: resolveMasteryVerificationState({
+        verifiedAt: latestVerifiedAt,
+        newWeakSpotRows: deepeningTopics,
+      }),
       summaryExcerpt: summaryRow?.content?.slice(0, 200) ?? null,
       xpStatus:
         (latestXp?.status as 'pending' | 'verified' | 'decayed') ?? null,
