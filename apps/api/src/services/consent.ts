@@ -1007,6 +1007,8 @@ export async function getChildNameByToken(
     where: eq(consentStates.consentToken, token),
   });
   if (!consent) return null;
+  if (consent.respondedAt) return null;
+  if (consent.expiresAt && new Date() > consent.expiresAt) return null;
 
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, consent.profileId),

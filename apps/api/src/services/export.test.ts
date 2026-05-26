@@ -332,6 +332,131 @@ describe('generateExport', () => {
     expect(userRow!['content']).toBe('What is gravity?');
   });
 
+  it('[WI-213] projects raw envelope JSON in legacy sessionEmbedding rows before export', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const rawEnvelope = JSON.stringify({
+      reply: 'Embedding-visible tutoring prose.',
+      signals: { ready_to_finish: true },
+      ui_hints: { fluency_drill: { active: false } },
+    });
+    const embeddingRows = [
+      {
+        id: 'emb-1',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        content: rawEnvelope,
+        createdAt: NOW,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEmbeddings: embeddingRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    expect(result.sessionEmbeddings).toHaveLength(1);
+    const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
+    expect(embedding!['content']).toBe('Embedding-visible tutoring prose.');
+    expect(embedding!['content']).not.toContain('"signals"');
+    expect(embedding!['content']).not.toContain('"ui_hints"');
+  });
+
+  it('[WI-213] projects embedded raw envelopes inside legacy full-transcript sessionEmbedding content', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const rawEnvelope = JSON.stringify({
+      reply: 'Visible mentor reply.',
+      signals: { partial_progress: true },
+      ui_hints: { note_prompt: { show: false } },
+    });
+    const embeddingRows = [
+      {
+        id: 'emb-1',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        content: `What is photosynthesis?\n\n${rawEnvelope}\n\nWhy does chlorophyll matter?`,
+        createdAt: NOW,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEmbeddings: embeddingRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
+    expect(embedding!['content']).toBe(
+      'What is photosynthesis?\n\nVisible mentor reply.\n\nWhy does chlorophyll matter?',
+    );
+    expect(embedding!['content']).not.toContain('"signals"');
+    expect(embedding!['content']).not.toContain('"ui_hints"');
+    expect(embedding!['content']).not.toContain('"reply"');
+  });
+
+  it('[WI-213] projects embedded raw envelopes when a legacy transcript starts with non-envelope JSON', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const learnerJson = JSON.stringify({ student: 'asked in JSON' });
+    const rawEnvelope = JSON.stringify({
+      reply: 'Visible reply.',
+      signals: { partial_progress: true },
+      private_sources: { reason: 'internal source-pack detail' },
+    });
+    const embeddingRows = [
+      {
+        id: 'emb-1',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        content: `${learnerJson}\n\n${rawEnvelope}`,
+        createdAt: NOW,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEmbeddings: embeddingRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
+    expect(embedding!['content']).toBe(`${learnerJson}\n\nVisible reply.`);
+    expect(embedding!['content']).not.toContain('"signals"');
+    expect(embedding!['content']).not.toContain('"private_sources"');
+  });
+
+  it('[WI-213] preserves embedded JSON examples that are not strict envelopes', async () => {
+    const profileRow = mockProfileRow('p1', 'Alice');
+    const jsonExample = JSON.stringify({
+      reply: 'Keep this field in the export.',
+      signals: { example: true },
+      extra: 'This makes the object arbitrary content, not an envelope.',
+    });
+    const embeddingRows = [
+      {
+        id: 'emb-1',
+        profileId: 'p1',
+        sessionId: 'ses-1',
+        content: `Please explain this JSON:\n\n${jsonExample}`,
+        createdAt: NOW,
+      },
+    ];
+
+    const db = createMockDb({
+      profiles: [profileRow],
+      sessionEmbeddings: embeddingRows,
+    });
+
+    const result = await generateExport(db, 'account-1');
+
+    const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
+    expect(embedding!['content']).toBe(
+      `Please explain this JSON:\n\n${jsonExample}`,
+    );
+  });
+
   // [BUG-413] Break tests: Drizzle / neon-serverless returns raw Date objects.
   // Without serializeDates, the export payload carries Date objects in rows
   // that were cast as `Record<string, unknown>[]`.  These are NOT ISO strings

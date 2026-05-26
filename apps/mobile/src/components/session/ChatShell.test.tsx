@@ -1005,6 +1005,76 @@ describe('ChatShell', () => {
         'Screen reader is on. Voice input is not available. Use text input below.',
       );
     });
+
+    it('[WI-302] speaks the projected visible reply when assistant content is a raw envelope', async () => {
+      const envelope = JSON.stringify({
+        reply: 'Visible answer only.',
+        signals: { partial_progress: true },
+        ui_hints: { note_prompt: { show: false } },
+      });
+
+      renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'assistant', content: envelope }],
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockSpeak).toHaveBeenCalledWith('Visible answer only.');
+      expect(mockSpeak).not.toHaveBeenCalledWith(
+        expect.stringContaining('"signals"'),
+      );
+      expect(mockSpeak).not.toHaveBeenCalledWith(
+        expect.stringContaining('"ui_hints"'),
+      );
+    });
+
+    it('[WI-302] speaks the projected visible reply when the envelope includes private schema fields', async () => {
+      const envelope = JSON.stringify({
+        reply: 'Visible answer only.',
+        signals: { partial_progress: true },
+        ui_hints: { note_prompt: { show: false } },
+        private_sources: { reason: 'internal source-pack detail' },
+        confidence: 'low',
+      });
+
+      renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'assistant', content: envelope }],
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockSpeak).toHaveBeenCalledWith('Visible answer only.');
+      expect(mockSpeak).not.toHaveBeenCalledWith(
+        expect.stringContaining('"private_sources"'),
+      );
+      expect(mockSpeak).not.toHaveBeenCalledWith(
+        expect.stringContaining('"confidence"'),
+      );
+    });
+
+    it('[WI-302] does not speak when envelope projection leaves no visible reply', async () => {
+      const envelope = JSON.stringify({
+        reply: '   ',
+        signals: { partial_progress: true },
+      });
+
+      renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'assistant', content: envelope }],
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockSpeak).not.toHaveBeenCalled();
+    });
   });
 
   describe('mic permission refresh', () => {
