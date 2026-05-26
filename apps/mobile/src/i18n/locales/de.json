@@ -1858,6 +1858,10 @@
       "saveErrorMessage": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
       "somethingElse": "Etwas anderes",
       "customPlaceholder": "z.B. they/them"
+    },
+    "index": {
+      "redirectTitle": "Zuerst personalisieren wir ein paar Grundlagen",
+      "redirectBody": "Wir beginnen mit den Pronomen, damit sich die nächsten Schritte von Anfang an richtig anfühlen."
     }
   },
   "parentView": {
@@ -1933,6 +1937,8 @@
       "couldNotLoadSessions": "Sitzungen konnten nicht geladen werden",
       "refreshChildProfile": "Kinderprofil aktualisieren",
       "refresh": "Aktualisieren",
+      "startSession": "Sitzung starten",
+      "goToCurriculum": "Zum Lehrplan",
       "viewSessionFrom": "Sitzung ansehen von",
       "mentorMemoryTitle": "Was der Mentor über {{name}} weiß",
       "mentorMemoryTitleFallback": "Mentor-Gedächtnis",

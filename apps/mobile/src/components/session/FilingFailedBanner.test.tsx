@@ -3,6 +3,14 @@ import { ConflictError, RateLimitedError } from '@eduagent/schemas';
 
 import { FilingFailedBanner } from './FilingFailedBanner';
 
+const mockPush = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
 // lib/sentry wraps @sentry/react-native, which is
 // globally mocked in test-setup.ts (Sentry.init, captureException, etc.).
 // Using the real wrapper keeps the re-export and age-gate logic live.
@@ -57,6 +65,14 @@ describe('FilingFailedBanner', () => {
     // Pressable in the test renderer surfaces disabled state via accessibilityState,
     // which the component sets explicitly alongside the native disabled prop.
     expect(button.props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it('keeps an escape hatch visible when retries are exhausted', () => {
+    render(<FilingFailedBanner session={makeSession('filing_failed', 3)} />);
+
+    fireEvent.press(screen.getByTestId('filing-go-home-button'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('calls retry mutation and shows ConflictError inline message on conflict', async () => {

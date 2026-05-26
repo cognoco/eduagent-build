@@ -1,6 +1,6 @@
-import { Redirect, Stack } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { ExplainedRedirect } from '../../../components/common/ExplainedRedirect';
 import { useThemeColors } from '../../../lib/theme';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
@@ -20,17 +20,14 @@ export default function SessionLayout(): React.JSX.Element {
 
   if (blocked) {
     return (
-      <>
-        <Redirect href="/(app)/home" />
-        <View
-          className="flex-1 bg-background items-center justify-center px-6"
-          testID="session-proxy-fallback"
-        >
-          <Text className="text-body text-text-secondary text-center">
-            {t('proxy.readOnly.hint')}
-          </Text>
-        </View>
-      </>
+      <ExplainedRedirect
+        href="/(app)/home"
+        title={t('proxy.readOnly.title')}
+        message={t('proxy.readOnly.hint')}
+        ctaLabel={t('proxy.readOnly.switchProfileCta')}
+        testID="session-proxy-fallback"
+        ctaTestID="session-proxy-switch-profile"
+      />
     );
   }
 

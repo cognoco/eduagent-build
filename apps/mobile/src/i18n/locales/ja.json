@@ -1858,6 +1858,10 @@
       "saveErrorMessage": "問題が発生しました。もう一度お試しください。",
       "somethingElse": "その他",
       "customPlaceholder": "例：they/them"
+    },
+    "index": {
+      "redirectTitle": "まずは基本をいくつかあなた向けに整えましょう",
+      "redirectBody": "最初からしっくり進められるように、まず代名詞から始めます。"
     }
   },
   "parentView": {
@@ -1933,6 +1937,8 @@
       "couldNotLoadSessions": "セッションを読み込めませんでした",
       "refreshChildProfile": "お子様のプロフィールを更新",
       "refresh": "更新",
+      "startSession": "セッションを始める",
+      "goToCurriculum": "カリキュラムへ",
       "viewSessionFrom": "からのセッションを表示",
       "mentorMemoryTitle": "{{name}}についてメンターが知っていること",
       "mentorMemoryTitleFallback": "メンターの記憶",

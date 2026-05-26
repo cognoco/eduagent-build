@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { ChildSession } from '@eduagent/schemas';
+import { ErrorFallback } from '../common';
+import { EmptyStateCard } from '../common/EmptyStateCard';
 import { useProfile } from '../../lib/profile';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
@@ -43,6 +45,29 @@ export function RecentSessionsList({
     activeProfileRole === 'impersonated-child' || !isActiveProfile
       ? profileId
       : undefined;
+  const emptyAction = isActiveProfile
+    ? {
+        label: t('parentView.index.startSession', {
+          defaultValue: 'Start a session',
+        }),
+        onPress: () => router.push('/(app)/session'),
+      }
+    : {
+        label: t('parentView.index.goToCurriculum', {
+          defaultValue: 'Go to curriculum',
+        }),
+        onPress: () =>
+          router.push({
+            pathname: '/(app)/child/[profileId]/curriculum',
+            params: { profileId },
+          }),
+      };
+  const errorEscapeAction = isActiveProfile
+    ? {
+        label: t('common.goHome'),
+        onPress: () => router.push('/(app)/home'),
+      }
+    : emptyAction;
 
   return (
     <View className="mt-6" testID="recent-sessions-list">
@@ -61,22 +86,22 @@ export function RecentSessionsList({
           </View>
         </>
       ) : sessionsQuery.isError ? (
-        <View className="py-4 items-center" testID="recent-sessions-error">
-          <Text className="text-body text-text-secondary text-center mb-3">
-            {t('parentView.index.couldNotLoadSessions')}
-          </Text>
-          <Pressable
-            onPress={() => void sessionsQuery.refetch()}
-            className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
-            accessibilityRole="button"
-            accessibilityLabel={t('parentView.index.refreshChildProfile')}
-            testID="recent-sessions-retry"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('parentView.index.refresh')}
-            </Text>
-          </Pressable>
-        </View>
+        <ErrorFallback
+          variant="card"
+          title={t('parentView.index.recentSessions')}
+          message={t('parentView.index.couldNotLoadSessions')}
+          primaryAction={{
+            label: t('parentView.index.refresh'),
+            onPress: () => void sessionsQuery.refetch(),
+            testID: 'recent-sessions-retry',
+          }}
+          secondaryAction={{
+            label: errorEscapeAction.label,
+            onPress: errorEscapeAction.onPress,
+            testID: 'recent-sessions-go-home',
+          }}
+          testID="recent-sessions-error"
+        />
       ) : sessions.length > 0 ? (
         sessions.slice(0, 5).map((session) => (
           <Pressable
@@ -128,16 +153,20 @@ export function RecentSessionsList({
           </Pressable>
         ))
       ) : (
-        <View className="mx-4 mt-4 rounded-xl bg-surface p-6">
-          <Text className="text-text-secondary text-center text-base">
-            {t('parentView.index.noSessionsYet', {
-              name:
-                activeProfile?.id === profileId
-                  ? activeProfile.displayName
-                  : t('parentView.index.yourChild'),
-            })}
-          </Text>
-        </View>
+        <EmptyStateCard
+          title={t('parentView.index.noSessionsYet', {
+            name:
+              activeProfile?.id === profileId
+                ? activeProfile.displayName
+                : t('parentView.index.yourChild'),
+          })}
+          message={t('progress.recentFocus.empty')}
+          primaryAction={{
+            ...emptyAction,
+            testID: 'recent-sessions-empty-action',
+          }}
+          testID="recent-sessions-empty-state"
+        />
       )}
     </View>
   );

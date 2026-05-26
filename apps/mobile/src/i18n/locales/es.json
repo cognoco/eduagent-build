@@ -1858,6 +1858,10 @@
       "saveErrorMessage": "Algo salió mal. Inténtalo de nuevo.",
       "somethingElse": "Otro",
       "customPlaceholder": "p. ej., elle/elles"
+    },
+    "index": {
+      "redirectTitle": "Primero, personalicemos un par de aspectos básicos",
+      "redirectBody": "Empezaremos con los pronombres para que los siguientes pasos se sientan bien desde el principio."
     }
   },
   "parentView": {
@@ -1933,6 +1937,8 @@
       "couldNotLoadSessions": "No se pudieron cargar las sesiones",
       "refreshChildProfile": "Actualizar perfil del niño",
       "refresh": "Actualizar",
+      "startSession": "Iniciar una sesión",
+      "goToCurriculum": "Ir al plan de estudios",
       "viewSessionFrom": "Ver sesión de",
       "mentorMemoryTitle": "Lo que el mentor sabe sobre {{name}}",
       "mentorMemoryTitleFallback": "Memoria del mentor",

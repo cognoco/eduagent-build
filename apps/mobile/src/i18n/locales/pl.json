@@ -1883,6 +1883,10 @@
       "saveErrorMessage": "Coś poszło nie tak. Spróbuj ponownie.",
       "somethingElse": "Coś innego",
       "customPlaceholder": "np. ono/jego"
+    },
+    "index": {
+      "redirectTitle": "Najpierw dopasujmy kilka podstaw",
+      "redirectBody": "Zaczniemy od zaimków, żeby kolejne kroki od początku były lepiej dopasowane."
     }
   },
   "parentView": {
@@ -1958,6 +1962,8 @@
       "couldNotLoadSessions": "Nie można załadować sesji",
       "refreshChildProfile": "Odśwież profil dziecka",
       "refresh": "Odśwież",
+      "startSession": "Rozpocznij sesję",
+      "goToCurriculum": "Przejdź do programu nauki",
       "viewSessionFrom": "Zobacz sesję z",
       "mentorMemoryTitle": "Co mentor wie o {{name}}",
       "mentorMemoryTitleFallback": "Pamięć mentora",

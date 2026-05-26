@@ -1883,6 +1883,10 @@
       "saveErrorMessage": "Algo deu errado. Tente novamente.",
       "somethingElse": "Outro",
       "customPlaceholder": "ex: ele/dele"
+    },
+    "index": {
+      "redirectTitle": "Primeiro, vamos personalizar alguns pontos básicos",
+      "redirectBody": "Vamos começar pelos pronomes para que os próximos passos façam sentido desde o início."
     }
   },
   "parentView": {
@@ -1958,6 +1962,8 @@
       "couldNotLoadSessions": "Não foi possível carregar as sessões",
       "refreshChildProfile": "Atualizar perfil da criança",
       "refresh": "Atualizar",
+      "startSession": "Iniciar uma sessão",
+      "goToCurriculum": "Ir para o currículo",
       "viewSessionFrom": "Ver sessão de",
       "mentorMemoryTitle": "O que o mentor sabe sobre {{name}}",
       "mentorMemoryTitleFallback": "Memória do mentor",
