@@ -10,6 +10,7 @@ import { ProfileContext, type ProfileContextValue } from '../lib/profile';
 import {
   checkConsentRequirement,
   useRequestConsent,
+  useResendConsent,
   useChildConsentStatus,
   useRevokeConsent,
   useRestoreConsent,
@@ -146,6 +147,80 @@ describe('useRequestConsent', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useResendConsent [WI-374]', () => {
+  // Extract { url, body } from a fetch mock call regardless of whether the RPC
+  // client passes (url, init) or a Request object. [CodeRabbit] When the first
+  // arg is a Request, the payload may live on the Request itself (not init.body),
+  // so read the Request body too — otherwise the "no parentEmail leaked"
+  // assertion could pass vacuously.
+  async function readFetchCall(
+    call: unknown[],
+  ): Promise<{ url: string; body: string }> {
+    const first = call[0];
+    const init = call[1] as RequestInit | undefined;
+    const initBody = String(init?.body ?? '');
+    if (typeof first === 'string') {
+      return { url: first, body: initBody };
+    }
+    if (first instanceof URL) {
+      return { url: first.toString(), body: initBody };
+    }
+    const req = first as Request;
+    let reqBody = '';
+    try {
+      reqBody = await req.clone().text();
+    } catch {
+      // body already consumed or not readable — fall back to init.body
+    }
+    return { url: req.url, body: reqBody || initBody };
+  }
+
+  it('[WI-261] POSTs /consent/resend with NO parentEmail (masked email can never be sent)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Consent request sent to parent',
+          consentType: 'GDPR',
+          emailStatus: 'sent',
+        }),
+        { status: 201 },
+      ),
+    );
+
+    const { result } = renderHook(() => useResendConsent(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        consentType: 'GDPR',
+      });
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const { url, body } = await readFetchCall(mockFetch.mock.calls[0]!);
+    expect(url).toContain('/consent/resend');
+    expect(body).not.toContain('parentEmail');
+    expect(body).toContain('550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('type rejects passing a parentEmail on resend', () => {
+    const { result } = renderHook(() => useResendConsent(), {
+      wrapper: createWrapper(),
+    });
+    // Compile-time guard: the resend mutation input has no parentEmail field.
+    void (() =>
+      result.current.mutate({
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        consentType: 'GDPR',
+        // @ts-expect-error parentEmail is not part of the resend input shape
+        parentEmail: 'j***@gmail.com',
+      }));
+    expect(result.current).toBeDefined();
   });
 });
 

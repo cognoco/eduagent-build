@@ -22,6 +22,7 @@ import { GateContent } from '../../../components/common';
 import {
   useConsentStatus,
   useRequestConsent,
+  useResendConsent,
 } from '../../../hooks/use-consent';
 import { getConsentPendingCopy } from '../../../lib/consent-copy';
 import { PreviewSubjectBrowser } from './PreviewSubjectBrowser';
@@ -59,6 +60,11 @@ export function ConsentPendingGate(): React.ReactElement {
     }
   };
   const { data: consentData } = useConsentStatus();
+  // [WI-374] Two distinct mutations: a plain resend (reuses the stored email
+  // server-side, no email on the wire) and the request/change-recipient path
+  // (carries a real email). They must not share one mutation — that coupling
+  // is what let the masked email be resent (WI-261).
+  const resendConsentMutation = useResendConsent();
   const resendMutation = useRequestConsent();
   const ageBracket = activeProfile?.birthYear
     ? computeAgeBracket(activeProfile.birthYear)
@@ -106,14 +112,16 @@ export function ConsentPendingGate(): React.ReactElement {
   }, [emailWasSent, refreshConsentGate]);
 
   const onResend = () => {
-    if (!activeProfile || !consentData?.parentEmail || !consentData.consentType)
-      return;
+    // [WI-374] A plain resend carries NO email — the server reuses the stored
+    // recipient. We deliberately do not forward consentData.parentEmail (which
+    // is the MASKED address from the status endpoint); sending it back would
+    // corrupt the stored request and reset the resend cap (WI-261).
+    if (!activeProfile || !consentData?.consentType) return;
     setResendFeedback(null);
     setResendErrorMsg('');
-    resendMutation.mutate(
+    resendConsentMutation.mutate(
       {
         childProfileId: activeProfile.id,
-        parentEmail: consentData.parentEmail,
         consentType: consentData.consentType,
       },
       {
@@ -330,7 +338,7 @@ export function ConsentPendingGate(): React.ReactElement {
         {parentEmail && consentData?.consentType && !changingEmail && (
           <Pressable
             onPress={onResend}
-            disabled={resendMutation.isPending}
+            disabled={resendConsentMutation.isPending}
             className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
             testID="consent-resend"
             accessibilityRole="button"
@@ -338,7 +346,7 @@ export function ConsentPendingGate(): React.ReactElement {
               'tabs.consentPending.resendApprovalEmailLabel',
             )}
           >
-            {resendMutation.isPending ? (
+            {resendConsentMutation.isPending ? (
               <ActivityIndicator color={colors.accent} />
             ) : (
               <Text className="text-body font-semibold text-primary">

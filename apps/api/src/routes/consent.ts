@@ -2,6 +2,7 @@
 import { zValidator } from '@hono/zod-validator';
 import {
   consentRequestSchema,
+  consentResendSchema,
   consentRespondRequestSchema,
   consentRequestResultSchema,
   consentRespondResultSchema,
@@ -18,12 +19,15 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { getProfile } from '../services/profile';
 import {
   requestConsent,
+  resendConsent,
   processConsentResponse,
   getProfileConsentState,
   getChildConsentForParent,
   revokeConsent,
   restoreConsent,
   ConsentResendLimitError,
+  ConsentRecipientChangeLimitError,
+  ConsentRequestNotFoundError,
   EmailDeliveryError,
   ConsentTokenNotFoundError,
   ConsentAlreadyProcessedError,
@@ -205,7 +209,13 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           account.id,
         );
       } catch (error) {
-        if (error instanceof ConsentResendLimitError) {
+        // [WI-374] Both the resend cap (same email) and the recipient-change
+        // cap (rotating email) surface as 429 — rotating the recipient can no
+        // longer be used to reset the resend cap and bomb arbitrary addresses.
+        if (
+          error instanceof ConsentResendLimitError ||
+          error instanceof ConsentRecipientChangeLimitError
+        ) {
           return apiError(c, 429, ERROR_CODES.RATE_LIMITED, error.message);
         }
         if (error instanceof EmailDeliveryError) {
@@ -233,6 +243,85 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         consentRequestResultSchema.parse({
           message: 'Consent request sent to parent',
           consentType: input.consentType,
+          emailStatus: result.emailDelivered ? 'sent' : 'failed',
+        }),
+        201,
+      );
+    },
+  )
+  // [WI-374] Resend is a distinct endpoint from request/change-recipient. Its
+  // schema carries NO email (strict), so the client cannot send a masked or
+  // arbitrary address on resend — the server reuses the stored recipient and
+  // the resend cap stays bound to the request.
+  .post(
+    '/consent/resend',
+    zValidator('json', consentResendSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = requireAccount(c.get('account'));
+      const input = c.req.valid('json');
+
+      const childProfile = await getProfile(
+        db,
+        input.childProfileId,
+        account.id,
+      );
+      if (!childProfile) {
+        return forbidden(
+          c,
+          'Not authorized to request consent for this profile',
+        );
+      }
+
+      const apiOrigin = c.env.API_ORIGIN;
+      if (!apiOrigin) {
+        throw new Error('API_ORIGIN env var is required');
+      }
+
+      let result;
+      try {
+        result = await resendConsent(
+          db,
+          input,
+          apiOrigin,
+          {
+            resendApiKey: c.env.RESEND_API_KEY,
+            emailFrom: c.env.EMAIL_FROM,
+          },
+          account.id,
+        );
+      } catch (error) {
+        if (error instanceof ConsentResendLimitError) {
+          return apiError(c, 429, ERROR_CODES.RATE_LIMITED, error.message);
+        }
+        if (error instanceof ConsentRequestNotFoundError) {
+          return notFound(c, error.message);
+        }
+        if (error instanceof EmailDeliveryError) {
+          return apiError(c, 502, ERROR_CODES.INTERNAL_ERROR, error.message);
+        }
+        throw error;
+      }
+
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/consent.requested',
+            data: {
+              profileId: result.consentState.profileId,
+              consentType: result.consentState.consentType,
+              requestedAt: result.consentState.requestedAt,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'consent.requested',
+        { profileId: result.consentState.profileId },
+      );
+
+      return c.json(
+        consentRequestResultSchema.parse({
+          message: 'Consent request sent to parent',
+          consentType: result.consentState.consentType,
           emailStatus: result.emailDelivered ? 'sent' : 'failed',
         }),
         201,

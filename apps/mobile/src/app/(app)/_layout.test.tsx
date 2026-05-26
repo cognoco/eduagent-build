@@ -940,6 +940,91 @@ describe('AppLayout', () => {
     expect(screen.getByText('Checking automatically…'));
   });
 
+  it('[WI-374/WI-261] resend posts to /consent/resend with NO email — the masked address is never sent back', async () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          isOwner: false,
+          consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        isOwner: false,
+        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    // my-status returns the MASKED address (what the real endpoint does).
+    const MASKED = 'p***t@example.com';
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+            parentEmail: MASKED,
+            consentType: 'GDPR',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/consent/resend',
+      () =>
+        new Response(
+          JSON.stringify({
+            message: 'Consent request sent to parent',
+            consentType: 'GDPR',
+            emailStatus: 'sent',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    renderLayout();
+
+    const resendBtn = await screen.findByTestId('consent-resend');
+    mockFetch.mockClear();
+    fireEvent.press(resendBtn);
+
+    // A resend call lands on /consent/resend.
+    await waitFor(() => {
+      const hitResend = mockFetch.mock.calls.some(([input]) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : (input as Request).url;
+        return url.includes('/consent/resend');
+      });
+      expect(hitResend).toBe(true);
+    });
+
+    // No call carried the masked address, and no call hit /consent/request.
+    for (const [input, init] of mockFetch.mock.calls) {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : (input as Request).url;
+      const body = String((init as RequestInit | undefined)?.body ?? '');
+      expect(body).not.toContain(MASKED);
+      expect(body).not.toContain('parentEmail');
+      if (url.includes('/consent/')) {
+        expect(url).not.toContain('/consent/request');
+      }
+    }
+  });
+
   // Permission setup gate is JIT-disabled — permissions are requested at
   // feature entry (mic on first voice tap, camera on homework screen,
   // notifications after session value), never via an upfront screen at app

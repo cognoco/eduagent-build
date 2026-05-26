@@ -245,6 +245,13 @@ export const consentStates = pgTable(
     respondedAt: timestamp('responded_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     resendCount: integer('resend_count').notNull().default(0),
+    // [WI-374] Separately-capped count of recipient changes. The resend cap
+    // (resendCount) is request-keyed; changing the recipient email is a
+    // distinct action with its own cap so rotating the recipient cannot reset
+    // the resend cap to bomb arbitrary addresses.
+    recipientChangeCount: integer('recipient_change_count')
+      .notNull()
+      .default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
