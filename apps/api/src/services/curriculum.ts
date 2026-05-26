@@ -1489,9 +1489,10 @@ export async function persistBookTopics(
       }
     }
 
-    // Idempotent only when active topics already exist. Skipped-only rows are
-    // not a generated book and must continue into the initial insert path.
-    if (existingActiveTopics.length > 0) {
+    // Idempotent only when a complete active topic set already exists.
+    // Partial or skipped-only rows are not a generated book and must continue
+    // into the insert path so the post-transaction count guard can validate it.
+    if (existingActiveTopics.length >= MIN_GENERATED_BOOK_TOPICS) {
       await db
         .update(curriculumBooks)
         .set({
@@ -1528,13 +1529,14 @@ export async function persistBookTopics(
     );
   }
 
-  const hasOnlySkippedExistingTopics =
-    existingTopics.length > 0 && existingActiveTopics.length === 0;
+  const shouldAppendGeneratedTopics =
+    existingTopics.length > 0 &&
+    existingActiveTopics.length < MIN_GENERATED_BOOK_TOPICS;
   const maxExistingSortOrder =
     existingTopics.length > 0
       ? Math.max(...existingTopics.map((topic) => topic.sortOrder))
       : 0;
-  const topicsToInsert = hasOnlySkippedExistingTopics
+  const topicsToInsert = shouldAppendGeneratedTopics
     ? topics.map((topic, index) => ({
         ...topic,
         sortOrder: maxExistingSortOrder + index + 1,

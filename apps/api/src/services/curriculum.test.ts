@@ -1377,7 +1377,9 @@ describe('persistBookTopics', () => {
 
   describe('idempotency', () => {
     it('returns existing data without inserting when topics already exist', async () => {
-      const db = createPersistMockDb({ existingTopicCount: 2 });
+      const db = createPersistMockDb({
+        existingTopicCount: sampleTopics.length,
+      });
 
       const result = await persistBookTopics(
         db,
@@ -1460,6 +1462,35 @@ describe('persistBookTopics', () => {
       );
     });
 
+    it('[WI-142] appends generated topics when existing active rows are partial', async () => {
+      const db = createPersistMockDb({
+        simulateTopicSortOrderConflicts: true,
+        existingTopicRows: [
+          {
+            id: 'partial-topic-1',
+            title: 'Partial stale topic',
+            sortOrder: 1,
+            skipped: false,
+          },
+        ],
+      });
+
+      const result = await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections,
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(result.book.topicsGenerated).toBe(true);
+      expect(result.topics.filter((topic) => !topic.skipped)).toHaveLength(
+        sampleTopics.length + 1,
+      );
+    });
+
     it('calling twice with same data does not duplicate topics', async () => {
       // First call: no existing topics — enters the transaction path
       const db = createPersistMockDb({ existingTopicCount: 0 });
@@ -1477,7 +1508,9 @@ describe('persistBookTopics', () => {
 
       // Second call: topics now exist — takes the idempotent path
       // Reset the mock DB to simulate topics already existing
-      const db2 = createPersistMockDb({ existingTopicCount: 2 });
+      const db2 = createPersistMockDb({
+        existingTopicCount: sampleTopics.length,
+      });
       await persistBookTopics(
         db2,
         PROFILE_ID,
