@@ -16,7 +16,7 @@ import {
 } from '../../hooks/use-notification-response-handler';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
-import { evaluateSentryForProfile } from '../../lib/sentry';
+import { evaluateSentryForProfile, Sentry } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
 import { signOutWithCleanup } from '../../lib/sign-out';
 import { toInternalAppRedirectPath } from '../../lib/normalize-redirect-path';
@@ -105,6 +105,7 @@ const HIDDEN_TAB_ROUTES = [
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
+const INTRO_PROBE_TIMEOUT_MS = 2_500;
 
 const iconMap: Record<
   string,
@@ -317,16 +318,29 @@ export default function AppLayout() {
     if (!userId) {
       // No signed-in user → no intro decision to make. Stay 'loading' so the
       // sign-in redirect runs first; the effect re-fires once userId hydrates.
+      setIntroProbeState('loading');
       return;
     }
     let cancelled = false;
+    setIntroProbeState('loading');
+    const timeout = setTimeout(() => {
+      if (cancelled) return;
+      Sentry.addBreadcrumb({
+        category: 'intro',
+        level: 'warning',
+        message: 'intro SecureStore read timed out',
+      });
+      setIntroProbeState(hasSeenIntro(userId, null) ? 'seen' : 'unseen');
+    }, INTRO_PROBE_TIMEOUT_MS);
     void SecureStore.getItemAsync(introSecureStoreKey(userId))
       .then((value) => {
         if (cancelled) return;
+        clearTimeout(timeout);
         setIntroProbeState(hasSeenIntro(userId, value) ? 'seen' : 'unseen');
       })
       .catch(() => {
         if (cancelled) return;
+        clearTimeout(timeout);
         // Treat read failure as 'unseen' — at worst the user sees the intro
         // one extra time, then markIntroSeenSync writes again successfully
         // (spec: Failure Modes row 2). Falls through to the in-memory cache
@@ -335,6 +349,7 @@ export default function AppLayout() {
       });
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, [userId]);
 

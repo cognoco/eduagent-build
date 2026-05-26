@@ -639,15 +639,34 @@ export function invalidateProgressSnapshotQueries(
   queryClient: QueryClient,
   activeProfileId: string | undefined,
 ): void {
+  // PR 10 — mode-agnostic, profile-scoped invalidation of snapshot queries.
+  //
+  // The previous inline keys `['progress', 'inventory'|'history'|'milestones',
+  // activeProfileId]` were silently a no-op in production: React Query's
+  // prefix match requires position-by-position equality, but real registry
+  // keys have the shape `['progress', mode, kind, profileId, ...]` (slot 1
+  // is the navigation mode, not the snapshot kind). Predicate matching lets
+  // us cover both 'study' and 'family' cached snapshots without depending on
+  // the caller knowing the active mode.
+  //
+  // Profile scope is preserved: the predicate matches only keys whose
+  // `profileId` slot equals `activeProfileId`, so a shared-device parent
+  // refresh does not invalidate another profile's cache.
   void queryClient.invalidateQueries({
-    queryKey: ['progress', 'inventory', activeProfileId],
+    predicate: (query) => {
+      const k = query.queryKey;
+      if (k[0] !== 'progress') return false;
+      const kind = k[2];
+      if (kind !== 'inventory' && kind !== 'history' && kind !== 'milestones') {
+        return false;
+      }
+      return k[3] === activeProfileId;
+    },
   });
-  void queryClient.invalidateQueries({
-    queryKey: ['progress', 'history', activeProfileId],
-  });
-  void queryClient.invalidateQueries({
-    queryKey: ['progress', 'milestones', activeProfileId],
-  });
+  // PR-10 deferred: broad ['dashboard'] — snapshot refresh by a parent must
+  // make every child-view (detail, sessions, inventory, history, reports,
+  // memory, ...) stale. A workflow test enumerating the full dashboard
+  // surface set per the registry is required before narrowing.
   void queryClient.invalidateQueries({
     queryKey: ['dashboard'],
   });
