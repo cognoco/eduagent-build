@@ -392,8 +392,14 @@ export default function TopicDetailScreen() {
       .filter((t): t is CurriculumTopic => t !== undefined && t.id !== topicId);
   }, [topicId, bookWithTopics]);
 
-  // Signal 2: Challenge-round mastery verification
-  const isChallengeVerified = !!topicProgress?.masteryChallengeVerifiedAt;
+  // Signal 2: Challenge-round mastery verification.
+  // Phase 5: read the server-resolved state, not the raw timestamp. `'fresh'`
+  // means verified AND no later weak-spot evidence has accumulated; `'stale'`
+  // means a pending_review/active needs_deepening row was created after
+  // verification and the badge should NOT be shown. See
+  // docs/plans/2026-05-18-challenge-round-targets.md Phase 5.
+  const isChallengeVerified =
+    topicProgress?.masteryVerificationState === 'fresh';
 
   // Signal 3: Practiced-often hint (failureCount >= 3 on retention card)
   const showPracticedOftenHint = (retentionCard?.failureCount ?? 0) >= 3;
