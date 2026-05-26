@@ -198,6 +198,51 @@ describe('parseSSEStream', () => {
     });
   });
 
+  it('parses typed challenge round fields from done events', async () => {
+    const challengeRound = {
+      state: 'active',
+      startedAt: '2026-05-26T10:00:00.000Z',
+      questionIndex: 1,
+      totalQuestions: 3,
+      offerCount: 1,
+      topicId: '11111111-1111-4111-8111-111111111111',
+      declinedDontAskAgain: false,
+      evaluations: [],
+    };
+    const draftedNote = {
+      id: 'draft-1',
+      body: null,
+      sourceAnswerEventIds: ['answer-event-1'],
+      fallbackPrompt: 'Write this one in your own words.',
+    };
+    const stream = createMockStream([
+      `data: ${JSON.stringify({
+        type: 'done',
+        exchangeCount: 4,
+        escalationRung: 2,
+        challengeRound,
+        challengeOffer: { pitch: 'Want a harder round?' },
+        draftedNote,
+      })}\n\n`,
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      {
+        type: 'done',
+        exchangeCount: 4,
+        escalationRung: 2,
+        challengeRound,
+        challengeOffer: { pitch: 'Want a harder round?' },
+        draftedNote,
+      },
+    ]);
+  });
+
   it('parses fallback events from SSE stream', async () => {
     const stream = createMockStream([
       'data: {"type":"fallback","reason":"empty_reply","fallbackText":"Try again"}\n\n',

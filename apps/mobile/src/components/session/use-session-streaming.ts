@@ -4,8 +4,13 @@ import type {
   PendingCelebration,
   HomeworkCaptureSource,
   HomeworkProblem,
+  ChallengeRoundSessionState,
 } from '@eduagent/schemas';
-import type { FluencyDrillEvent } from '../../lib/sse';
+import type {
+  ChallengeRoundOfferEvent,
+  DraftedChallengeNoteEvent,
+  FluencyDrillEvent,
+} from '../../lib/sse';
 import type { ChatMessage } from './ChatShell';
 import type {
   useStreamMessage,
@@ -134,6 +139,15 @@ export interface UseSessionStreamingOptions {
   setFluencyDrill: React.Dispatch<
     React.SetStateAction<FluencyDrillEvent | null>
   >;
+  setChallengeRound: React.Dispatch<
+    React.SetStateAction<ChallengeRoundSessionState | null>
+  >;
+  setChallengeOffer: React.Dispatch<
+    React.SetStateAction<ChallengeRoundOfferEvent | null>
+  >;
+  setDraftedNote: React.Dispatch<
+    React.SetStateAction<DraftedChallengeNoteEvent | null>
+  >;
   /** F6: setter to track the last AI message ID that had confidence=low */
   setLowConfidenceMessageId: React.Dispatch<
     React.SetStateAction<string | null>
@@ -226,6 +240,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     setResponseHistory,
     setHomeworkProblemsState,
     setFluencyDrill,
+    setChallengeRound,
+    setChallengeOffer,
+    setDraftedNote,
     setLowConfidenceMessageId,
     homeworkProblemsState,
     currentProblemIndex,
@@ -874,6 +891,16 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
               setFluencyDrill(result.fluencyDrill);
             }
 
+            if (result.challengeRound) {
+              setChallengeRound(result.challengeRound);
+            }
+            if (result.challengeOffer) {
+              setChallengeOffer(result.challengeOffer);
+            }
+            if (result.draftedNote) {
+              setDraftedNote(result.draftedNote);
+            }
+
             // F6: Surface low-confidence indicator below the AI message
             // 'medium' and 'high' (and absent, treated as 'medium') show nothing.
             if (result.confidence === 'low') {
@@ -1088,6 +1115,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       scheduleSilencePrompt,
       setExchangeCount,
       setEscalationRung,
+      setChallengeOffer,
+      setChallengeRound,
+      setDraftedNote,
       setFluencyDrill,
       setHomeworkProblemsState,
       setIsStreaming,

@@ -15,6 +15,7 @@
 import {
   maybeReplayResponseSchema,
   quotaExceededSchema,
+  type ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
   BadRequestError,
@@ -63,6 +64,17 @@ export interface FluencyDrillEvent {
   score?: { correct: number; total: number };
 }
 
+export interface ChallengeRoundOfferEvent {
+  pitch: string;
+}
+
+export interface DraftedChallengeNoteEvent {
+  id: string;
+  body: string | null;
+  sourceAnswerEventIds: string[];
+  fallbackPrompt?: string;
+}
+
 export interface StreamDoneEvent {
   type: 'done';
   exchangeCount: number;
@@ -78,6 +90,12 @@ export interface StreamDoneEvent {
   notePromptPostSession?: boolean;
   /** Fluency drill start/end annotation for language sessions. */
   fluencyDrill?: FluencyDrillEvent;
+  /** Challenge Round state snapshot after the server has parsed and gated the exchange. */
+  challengeRound?: ChallengeRoundSessionState;
+  /** Server-gated Challenge Round offer. Mobile never parses raw envelope JSON. */
+  challengeOffer?: ChallengeRoundOfferEvent;
+  /** Server-validated draft or fallback composer prompt for learner-owned notes. */
+  draftedNote?: DraftedChallengeNoteEvent;
   /** F6: LLM self-reported confidence. Absent or 'medium'/'high' = no indicator. Only 'low' shows a UI prompt. */
   confidence?: 'low' | 'medium' | 'high';
 }

@@ -15,6 +15,7 @@ import type {
   HomeworkProblem,
   InputMode,
   PendingCelebration,
+  ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
   ChatShell,
@@ -57,6 +58,7 @@ import { useCelebration } from '../../../hooks/use-celebration';
 import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
 import { useCurriculum } from '../../../hooks/use-curriculum';
 import { useMilestoneTracker } from '../../../hooks/use-milestone-tracker';
+import { useChallengeRound } from '../../../hooks/use-challenge-round';
 import {
   useApiClient,
   NotFoundError,
@@ -77,6 +79,9 @@ import {
   useSessionStreaming,
   type ContinueMessageOptions,
 } from '../../../components/session/use-session-streaming';
+import { ChallengeOfferCard } from '../../../components/session/ChallengeOfferCard';
+import { ChallengeRoundBanner } from '../../../components/session/ChallengeRoundBanner';
+import { DraftedNoteReview } from '../../../components/session/DraftedNoteReview';
 import { useSubjectClassification } from '../../../components/session/use-subject-classification';
 import { useSessionActions } from '../../../components/session/use-session-actions';
 import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeTooltip';
@@ -108,6 +113,21 @@ import {
   getLearnerTurnCount,
 } from './_view-models/session-derived-state';
 import { getSessionRouteParams } from './_view-models/session-route-params';
+import type {
+  ChallengeRoundOfferEvent,
+  DraftedChallengeNoteEvent,
+} from '../../../lib/sse';
+
+function isChallengeRoundInFlight(
+  round: ChallengeRoundSessionState | null,
+): boolean {
+  return (
+    round?.state === 'offered' ||
+    round?.state === 'accepted' ||
+    round?.state === 'active' ||
+    round?.state === 'drafting'
+  );
+}
 
 export default function SessionScreen() {
   return (
@@ -370,6 +390,12 @@ function SessionScreenInner() {
   const [fluencyDrill, setFluencyDrill] = useState<FluencyDrillEvent | null>(
     null,
   );
+  const [challengeRound, setChallengeRound] =
+    useState<ChallengeRoundSessionState | null>(null);
+  const [challengeOffer, setChallengeOffer] =
+    useState<ChallengeRoundOfferEvent | null>(null);
+  const [draftedNote, setDraftedNote] =
+    useState<DraftedChallengeNoteEvent | null>(null);
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
@@ -398,6 +424,7 @@ function SessionScreenInner() {
     options?: ContinueMessageOptions;
     outboxEntryId?: string;
   } | null>(null);
+  const challengeActionInFlightRef = useRef(false);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const activeSession = useSession(activeSessionId ?? '');
@@ -512,6 +539,9 @@ function SessionScreenInner() {
       setConfirmationToast(null);
       setNotePromptOffered(false);
       setShowNoteInput(false);
+      setChallengeRound(null);
+      setChallengeOffer(null);
+      setDraftedNote(null);
       setShowFilingPrompt(false);
       setFilingDismissed(false);
       setQuotaError(null);
@@ -599,6 +629,11 @@ function SessionScreenInner() {
   const classifySubject = useClassifySubject();
   const resolveSubject = useResolveSubject();
   const createNote = useCreateNote(noteSubjectId, undefined);
+  const challengeRoundActions = useChallengeRound({
+    sessionId: activeSessionId,
+    topicId: noteTopicId || topicId || undefined,
+    subjectId: noteSubjectId || effectiveSubjectId || undefined,
+  });
   const filing = useFiling();
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
@@ -606,6 +641,13 @@ function SessionScreenInner() {
   const activeHomeworkProblem = homeworkProblemsState[currentProblemIndex];
   const sessionExpired =
     !!routeSessionId && transcript.error instanceof NotFoundError;
+
+  useEffect(() => {
+    const round = activeSession.data?.metadata?.challengeRound;
+    if (round) {
+      setChallengeRound(round);
+    }
+  }, [activeSession.data?.metadata?.challengeRound]);
 
   const showConfirmation = useCallback((message: string) => {
     setConfirmationToast(message);
@@ -690,6 +732,9 @@ function SessionScreenInner() {
     setResponseHistory,
     setHomeworkProblemsState,
     setFluencyDrill,
+    setChallengeRound,
+    setChallengeOffer,
+    setDraftedNote,
     setLowConfidenceMessageId,
     homeworkProblemsState,
     currentProblemIndex,
@@ -924,6 +969,74 @@ function SessionScreenInner() {
     returnTo: returnTo ?? undefined,
   });
 
+  const applyChallengeRouteResponse = useCallback(
+    (response: { challengeRound?: ChallengeRoundSessionState } | undefined) => {
+      if (response?.challengeRound) {
+        setChallengeRound(response.challengeRound);
+      }
+      setChallengeOffer(null);
+    },
+    [],
+  );
+
+  const runChallengeAction = useCallback(
+    async (
+      action: () => Promise<{ challengeRound?: ChallengeRoundSessionState }>,
+      title: string,
+    ) => {
+      if (challengeActionInFlightRef.current) return;
+      challengeActionInFlightRef.current = true;
+      try {
+        const response = await action();
+        applyChallengeRouteResponse(response);
+      } catch {
+        platformAlert(title, 'Please try again.');
+      } finally {
+        challengeActionInFlightRef.current = false;
+      }
+    },
+    [applyChallengeRouteResponse],
+  );
+
+  const handleAcceptChallengeRound = useCallback(() => {
+    void runChallengeAction(
+      () => challengeRoundActions.accept(),
+      "Couldn't start the challenge round",
+    );
+  }, [challengeRoundActions, runChallengeAction]);
+
+  const handleDeclineChallengeRound = useCallback(
+    (dontAskAgain: boolean) => {
+      void runChallengeAction(
+        () => challengeRoundActions.decline(dontAskAgain),
+        "Couldn't update the challenge round",
+      );
+    },
+    [challengeRoundActions, runChallengeAction],
+  );
+
+  const handleSaveDraftedNote = useCallback(
+    async (content: string) => {
+      if (challengeActionInFlightRef.current) return;
+      challengeActionInFlightRef.current = true;
+      try {
+        await challengeRoundActions.saveNote(content);
+        setDraftedNote(null);
+        showConfirmation('Note saved.');
+      } catch {
+        platformAlert("Couldn't save the note", 'Please try again.');
+      } finally {
+        challengeActionInFlightRef.current = false;
+      }
+    },
+    [challengeRoundActions, showConfirmation],
+  );
+
+  const handleSkipDraftedNote = useCallback(() => {
+    setDraftedNote(null);
+    void challengeRoundActions.skipNote();
+  }, [challengeRoundActions]);
+
   const latestAiMessageId = useMemo(
     () => getLatestAiMessageId({ messages, isStreaming }),
     [messages, isStreaming],
@@ -1006,6 +1119,35 @@ function SessionScreenInner() {
       onDismissScore={() => setFluencyDrill(null)}
     />
   ) : null;
+  const challengeRoundInFlight = isChallengeRoundInFlight(challengeRound);
+  const challengeBanner =
+    challengeRound?.state === 'active' ? (
+      <ChallengeRoundBanner
+        questionIndex={challengeRound.questionIndex ?? 0}
+        totalQuestions={challengeRound.totalQuestions ?? 3}
+      />
+    ) : null;
+  const challengeOfferCard = challengeOffer ? (
+    <View className="mb-3">
+      <ChallengeOfferCard
+        pitch={challengeOffer.pitch}
+        onAccept={handleAcceptChallengeRound}
+        onDecline={() => handleDeclineChallengeRound(false)}
+        onDontAskAgain={() => handleDeclineChallengeRound(true)}
+      />
+    </View>
+  ) : null;
+  const draftedNoteReview = draftedNote ? (
+    <View className="mb-3">
+      <DraftedNoteReview
+        key={draftedNote.id}
+        initialContent={draftedNote.body}
+        fallbackPrompt={draftedNote.fallbackPrompt}
+        onSave={handleSaveDraftedNote}
+        onSkip={handleSkipDraftedNote}
+      />
+    </View>
+  ) : null;
 
   const sessionAccessory = (
     <SessionAccessory
@@ -1050,6 +1192,7 @@ function SessionScreenInner() {
         quotaError,
         isOwner: navigationContract.gates.sessionIsOwner,
         stage: conversationStage,
+        challengeRoundInFlight,
         handleQuickChip,
         handleMessageFeedback,
         onToggleBookmark: handleToggleBookmark,
@@ -1103,6 +1246,7 @@ function SessionScreenInner() {
         footerScrollSignal={`${showFilingPrompt}-${filingDismissed}`}
         inputAccessory={
           <>
+            {challengeBanner}
             {drillStrip}
             {sessionAccessory}
           </>
@@ -1115,6 +1259,8 @@ function SessionScreenInner() {
         textToSpeechLanguage={languageVoiceLocale}
         footer={
           <>
+            {challengeOfferCard}
+            {draftedNoteReview}
             <BookmarkNudgeTooltip
               aiResponseCount={aiResponseCount}
               isFirstSession={isFirstSession}
