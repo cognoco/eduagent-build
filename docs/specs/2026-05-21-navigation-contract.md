@@ -1,12 +1,19 @@
 # Navigation Contract - Reconciled V1
 
-**Status:** PR 1 ✅ PR 2 ✅ PR 4 ✅ — PRs 3, 5, 6 pending.
+**Status:** All 6 PRs delivered (verified 2026-05-26 against `main`). Pending amendment from [`docs/specs/2026-05-25-tier-access-rework.md`](./2026-05-25-tier-access-rework.md) — that rework moves tier gating out of the contract and re-opens Family Hub on every tier, which invalidates the `familyPlanOwner` check at `apps/mobile/src/lib/navigation-contract.ts:250` and the intent-screen decision in this spec.
 **Date:** 2026-05-21
 **Reconciled:** 2026-05-22
+**Last verified against code:** 2026-05-26
 **Product source:** `docs/specs/2026-05-19-study-and-family-mode-navigation-FULL.md`
 **Implementation baseline:** existing Mode Nav V0 in mobile code
 
 This document reconciles the narrower navigation-contract draft with the FULL Study/Family navigation spec and with the code inspection performed on 2026-05-22.
+
+> **What in this document is still live policy vs historical.**
+>
+> - **Live policy (authoritative):** the "Hard Constraint — Preserve 5-Tab Mode" section, the target `study`/`family` tab shape, the `ProfileContext` / `NavigationContract` shape, the boundary allowlist categories enforced by `apps/mobile/src/lib/navigation-contract-usage-guard.test.ts`. CLAUDE.md → "Profile Shapes" cites this spec as the source of truth for the target state; the guard test pins its canonical boundary set against this spec.
+> - **Historical (delivered):** the "Scope Split" section (PR 1 → PR 6) describes how the work was sequenced. All six PRs landed; PR 5 and PR 6 were absorbed into the Phase 6 completion plan and adjacent work. See the per-PR notes in "Scope Split" for the absorption mapping and commit references.
+> - **Queued amendment:** tier-access rework (link in Status above) will edit the gates/intent-screen sections once it lands. Do not archive this spec until that amendment is folded in **and** `MODE_NAV_V0_ENABLED` retires (the hard-constraint section dies with V0).
 
 ## Related documents
 
@@ -544,34 +551,57 @@ Use a typed allowlist during migration. The allowlist should shrink as each PR m
 - Make mobile mode derive from profile data.
 - Add optimistic rollback and stale-response handling.
 
-### PR 3 - Shell And Home Migration
+### PR 3 - Shell And Home Migration ✅ delivered
 
 - Replace tab visibility in `_layout.tsx` with the contract.
 - Move mode switcher to app chrome.
 - Remove final-shape dependency on `own-learning` tab.
 - Keep V0 flag fallback only if needed for rollout.
 
-### PR 4 - Recaps
+Server-backed `profiles.default_app_context` + `hasFamilyLinks` shipped via migration `apps/api/drizzle/0089_ancient_naoko.sql`; mobile derives mode from profile data via `apps/mobile/src/hooks/use-navigation-contract.ts`. `own-learning.tsx` retained as a V0-fallback route only (see `V0_FALLBACK_FILES` in `navigation-contract-usage-guard.test.ts`).
+
+### PR 4 - Recaps ✅ delivered
 
 - Add Recaps schema/API/service/mobile tab.
 - Reuse existing parent recap storage fields.
 - Add all-children and child-filtered feed.
 - Add back fallback to Recaps.
 
-### PR 5 - Progress, More, Deep Guards
+### PR 5 - Progress, More, Deep Guards ✅ delivered (absorbed into Phase 6 completion plan)
 
 - Migrate Progress self-vs-children scope.
 - Migrate More/account/privacy gates.
 - Migrate deep-route guards to `canEnter()`.
 - Add child curriculum route from Family surfaces.
 
-### PR 6 - Proxy And Cross-Context Cleanup
+Absorbed into [`docs/_archive/plans/done/2026-05-24-navigation-contract-phase-6-completion-plan.md`](../_archive/plans/done/2026-05-24-navigation-contract-phase-6-completion-plan.md) as its PR 3 (More + Progress) and PR 4 (deep-route guards + child curriculum). Commit refs:
+
+- More gates: `2c07944a4 refactor(mobile): route More-screen gates through navigation contract for V0+V1`
+- Progress refactor: `d8b288011 refactor(mobile): extract progress screen components and view-models`; `b6a2e3e93 fix(mobile): show child pills without own-profile pill in Family Progress`
+- Deep-route guards: `76bbf06c3 feat(mobile): migrate RequireFamilyContext to navigation contract (Phase 6 PR4)`; `0562d5b69 feat(mobile): Phase-6 nav-contract migration — saved, vocabulary, session-summary, mentor-memory`
+- Child curriculum route: `f7d636e36 feat(apps/mobile): child curriculum screen + bridge CTA in topic detail`; `c860d931e feat(apps/mobile): nav-contract child curriculum gating + parent-bridge child provenance`
+
+### PR 6 - Proxy And Cross-Context Cleanup ✅ delivered (absorbed into Phase 6 + WI-371)
 
 - Remove normal user paths into proxy.
 - Keep proxy only for explicit retained internal/test paths until separately deleted.
 - Add Learn-this-too bridge.
 - Update notification taps and back-stack replacement rules.
 - Empty the allowlist and fully arm the ratchet.
+
+Absorbed into Phase 6 completion plan PR 5 (final guard simplification) and WI-371 (proxy-mode hardening). The "empty allowlist" intent was rejected in favour of three semantic buckets — see `apps/mobile/src/lib/navigation-contract-usage-guard.test.ts`:
+
+- `BOUNDARY_FILES` (9 entries, permanent) — files that own raw owner/proxy/mode reads on behalf of the rest of the app, pinned against `CANONICAL_BOUNDARY_FILES`.
+- `V0_FALLBACK_FILES` (7 entries) — die together when `MODE_NAV_V0_ENABLED` retires.
+- `NON_NAV_DOMAIN_FILES` (10 entries, permanent) — `isOwner` reads that classify a domain entity (account, family-member row, child target), explicitly carved out as "must NOT be migrated to the contract."
+
+Each entry pins exact expected finding counts; the ratchet fails in both directions (decrease → narrow the exception; increase → migrate or justify).
+
+Commit refs:
+
+- Learn-this-too bridge: `5a42278ae feat(apps/mobile): learn-this-too gate, camera auto-permission, OCR garble filter, proxy-mode docs`; `1d952851a feat(apps/mobile): parent-bridge Add-to-My-Learning UI — button, provenance, clone hook, recap detail screen`
+- Proxy cleanup: `9242c4dd8 fix(mobile): proxy-mode read-only guards across 11 screens [WI-371]`; `de02b9608 refactor(mobile): replace isExplicitProxyMode with navigationContract.isParentProxy [WI-371]`; `3460f3c5b fix(mobile): proxy-mode hardening — consent guard, camera, lang-setup, create-profile`
+- Mode-write boundary + usage guard: `e8b042655 refactor(mobile): extract useEnsureStudyMode/useEnterFamilyMode + harden usage guard (Phase 6)`; `7bac83d10 fix(apps/mobile): nav-contract family-capability fix, setMode callbacks, mode-switch guard`
 
 ---
 
