@@ -23,6 +23,7 @@ import {
   generateBookTopicsWithFallback,
   releaseBookGenerationClaimIfEmpty,
   deleteTopicIfSafe,
+  deleteBook,
 } from './curriculum';
 import type {
   CurriculumInput,
@@ -1454,6 +1455,158 @@ describe('persistBookTopics', () => {
         ),
       ).rejects.toThrow('Book not found');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteBook
+// ---------------------------------------------------------------------------
+
+describe('deleteBook', () => {
+  function createDeleteBookMockDb(
+    options: {
+      subject?: ReturnType<typeof mockSubjectRow> | null;
+      book?: {
+        id: string;
+        subjectId: string;
+        title: string;
+        description: string | null;
+        emoji: string | null;
+        sortOrder: number;
+        topicsGenerated: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+      } | null;
+      topics?: Array<{ id: string }>;
+      startedRows?: Array<{ topicId: string | null }>;
+    } = {},
+  ) {
+    const subject = 'subject' in options ? options.subject : mockSubjectRow();
+    const book =
+      'book' in options
+        ? options.book
+        : {
+            id: BOOK_ID,
+            subjectId: SUBJECT_ID,
+            title: 'Algebra',
+            description: null,
+            emoji: '📘',
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: NOW,
+            updatedAt: NOW,
+          };
+    const topics = options.topics ?? [
+      { id: 'topic-1' },
+      { id: 'topic-2' },
+      { id: 'topic-3' },
+    ];
+    const startedRows = options.startedRows ?? [];
+    const deleteWhere = jest.fn().mockResolvedValue(undefined);
+    const db = {
+      query: {
+        subjects: {
+          findFirst: jest.fn().mockResolvedValue(subject),
+        },
+        curriculumBooks: {
+          findFirst: jest.fn().mockResolvedValue(book),
+        },
+        curriculumTopics: {
+          findMany: jest.fn().mockResolvedValue(topics),
+        },
+      },
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(startedRows),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: deleteWhere,
+      }),
+    } as unknown as Database;
+
+    return { db, deleteWhere };
+  }
+
+  it('deletes a book when none of its topics have started sessions', async () => {
+    const { db, deleteWhere } = createDeleteBookMockDb();
+
+    const result = await deleteBook(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, {
+      confirmStartedTopics: false,
+    });
+
+    expect(result).toEqual({
+      deleted: true,
+      bookId: BOOK_ID,
+      subjectId: SUBJECT_ID,
+      topicCount: 3,
+      startedTopicCount: 0,
+    });
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(deleteWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires confirmation and does not delete when started topics exist', async () => {
+    const { db } = createDeleteBookMockDb({
+      startedRows: [{ topicId: 'topic-1' }, { topicId: 'topic-1' }],
+    });
+
+    const result = await deleteBook(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, {
+      confirmStartedTopics: false,
+    });
+
+    expect(result).toEqual({
+      deleted: false,
+      reason: 'started_topics',
+      bookId: BOOK_ID,
+      subjectId: SUBJECT_ID,
+      topicCount: 3,
+      startedTopicCount: 1,
+    });
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes and reports started topic count when explicitly confirmed', async () => {
+    const { db } = createDeleteBookMockDb({
+      startedRows: [
+        { topicId: 'topic-1' },
+        { topicId: 'topic-1' },
+        { topicId: 'topic-2' },
+      ],
+    });
+
+    const result = await deleteBook(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, {
+      confirmStartedTopics: true,
+    });
+
+    expect(result).toEqual({
+      deleted: true,
+      bookId: BOOK_ID,
+      subjectId: SUBJECT_ID,
+      topicCount: 3,
+      startedTopicCount: 2,
+    });
+    expect(db.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when the subject is not owned by the profile', async () => {
+    const { db } = createDeleteBookMockDb({ subject: null });
+
+    await expect(
+      deleteBook(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, {
+        confirmStartedTopics: false,
+      }),
+    ).rejects.toThrow('Subject not found');
+  });
+
+  it('throws when the book does not belong to the subject', async () => {
+    const { db } = createDeleteBookMockDb({ book: null });
+
+    await expect(
+      deleteBook(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, {
+        confirmStartedTopics: false,
+      }),
+    ).rejects.toThrow('Book not found');
   });
 });
 

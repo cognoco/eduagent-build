@@ -21,6 +21,7 @@ import {
   MAX_GENERATED_BOOK_TOPICS,
   MIN_GENERATED_BOOK_TOPICS,
   type BookProgressStatus,
+  type DeleteBookResponse,
   type BookTopicGenerationResult,
   type BookWithTopics,
   type CefrLevel,
@@ -944,6 +945,108 @@ export async function getBooks(
       completedTopicCount: progress.completedTopicCount,
     };
   });
+}
+
+export type DeleteBookResult =
+  | DeleteBookResponse
+  | {
+      deleted: false;
+      reason: 'started_topics';
+      bookId: string;
+      subjectId: string;
+      topicCount: number;
+      startedTopicCount: number;
+    };
+
+async function countStartedBookTopics(
+  db: Database,
+  profileId: string,
+  topicIds: string[],
+): Promise<number> {
+  if (topicIds.length === 0) {
+    return 0;
+  }
+
+  const startedRows = await db
+    .select({ topicId: learningSessions.topicId })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        inArray(learningSessions.topicId, topicIds),
+        gte(learningSessions.exchangeCount, 1),
+      ),
+    );
+
+  const startedTopicIds = new Set<string>();
+  for (const row of startedRows) {
+    if (row.topicId) {
+      startedTopicIds.add(row.topicId);
+    }
+  }
+  return startedTopicIds.size;
+}
+
+export async function deleteBook(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+  options: { confirmStartedTopics?: boolean } = {},
+): Promise<DeleteBookResult> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  const book = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.id, bookId),
+      eq(curriculumBooks.subjectId, subjectId),
+    ),
+  });
+  if (!book) {
+    throw new NotFoundError('Book');
+  }
+
+  const topicRows = await db.query.curriculumTopics.findMany({
+    where: eq(curriculumTopics.bookId, bookId),
+  });
+  const topicIds = topicRows.map((topic) => topic.id);
+  const startedTopicCount = await countStartedBookTopics(
+    db,
+    profileId,
+    topicIds,
+  );
+
+  if (startedTopicCount > 0 && !options.confirmStartedTopics) {
+    return {
+      deleted: false,
+      reason: 'started_topics',
+      bookId,
+      subjectId,
+      topicCount: topicIds.length,
+      startedTopicCount,
+    };
+  }
+
+  await db
+    .delete(curriculumBooks)
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+      ),
+    );
+
+  return {
+    deleted: true,
+    bookId,
+    subjectId,
+    topicCount: topicIds.length,
+    startedTopicCount,
+  };
 }
 
 /**

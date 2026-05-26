@@ -33,6 +33,7 @@ import { showNoteContextMenu } from '../../../../../components/library/NoteConte
 import {
   useBookWithTopics,
   useBooks,
+  useDeleteBook,
   useGenerateBookTopics,
 } from '../../../../../hooks/use-books';
 import {
@@ -201,6 +202,46 @@ type GenerationPhase = 'idle' | 'slow' | 'timed_out';
 
 const SLOW_THRESHOLD_MS = 30_000;
 const TIMEOUT_THRESHOLD_MS = 60_000;
+
+interface StartedTopicsDeleteDetails {
+  reason: 'started_topics';
+  topicCount: number;
+  startedTopicCount: number;
+}
+
+function getStartedTopicsDeleteDetails(
+  error: unknown,
+): StartedTopicsDeleteDetails | null {
+  const details = (error as { details?: unknown } | null)?.details;
+  if (!details || typeof details !== 'object') {
+    return null;
+  }
+  const record = details as Record<string, unknown>;
+  if (record.reason !== 'started_topics') {
+    return null;
+  }
+  const topicCount = record.topicCount;
+  const startedTopicCount = record.startedTopicCount;
+  if (
+    typeof topicCount !== 'number' ||
+    typeof startedTopicCount !== 'number' ||
+    !Number.isInteger(topicCount) ||
+    !Number.isInteger(startedTopicCount) ||
+    topicCount < 0 ||
+    startedTopicCount < 0
+  ) {
+    return null;
+  }
+  return {
+    reason: 'started_topics',
+    topicCount,
+    startedTopicCount,
+  };
+}
+
+function formatStartedTopicCount(count: number): string {
+  return count === 1 ? '1 started topic' : `${count} started topics`;
+}
 // ---------------------------------------------------------------------------
 // Book Screen
 // ---------------------------------------------------------------------------
@@ -235,6 +276,7 @@ export default function BookScreen() {
   const sessionsQuery = useBookSessions(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
+  const deleteBookMutation = useDeleteBook(subjectId, bookId);
   const startFirstCurriculumSession = useStartFirstCurriculumSession(subjectId);
   const curriculumQuery = useCurriculum(subjectId);
   const hasCurriculum = (curriculumQuery.data?.topics?.length ?? 0) > 0;
@@ -278,6 +320,80 @@ export default function BookScreen() {
       params: { subjectId },
     } as Href);
   }, [router, subjectId]);
+
+  const handleBookDeleted = useCallback(() => {
+    if (subjectId) {
+      router.replace({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as Href);
+      return;
+    }
+    goBackOrReplace(router, '/(app)/library' as Href);
+  }, [router, subjectId]);
+
+  const deleteBookWithConfirmation = useCallback(
+    async (confirmStartedTopics: boolean) => {
+      if (!subjectId || !bookId || isReadOnly) return;
+      try {
+        await deleteBookMutation.mutateAsync({ confirmStartedTopics });
+        handleBookDeleted();
+      } catch (error) {
+        const startedTopicDetails = getStartedTopicsDeleteDetails(error);
+        if (!confirmStartedTopics && startedTopicDetails) {
+          const startedLabel = formatStartedTopicCount(
+            startedTopicDetails.startedTopicCount,
+          );
+          platformAlert(
+            'Delete started topics?',
+            `This book has ${startedLabel}. Deleting it will also delete those topics, their learning history, progress, and notes.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete everything',
+                style: 'destructive',
+                onPress: () => {
+                  void deleteBookWithConfirmation(true);
+                },
+              },
+            ],
+            { cancelable: true },
+          );
+          return;
+        }
+
+        platformAlert('Could not delete book', formatApiError(error));
+      }
+    },
+    [bookId, deleteBookMutation, handleBookDeleted, isReadOnly, subjectId],
+  );
+
+  const handleDeleteBookPress = useCallback(() => {
+    if (!subjectId || !bookId || isReadOnly || deleteBookMutation.isPending) {
+      return;
+    }
+    platformAlert(
+      'Delete book?',
+      'You can re-add it later. If any topics have been started, you will be asked before those topics and their learning history are deleted too.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void deleteBookWithConfirmation(false);
+          },
+        },
+      ],
+      { cancelable: true },
+    );
+  }, [
+    bookId,
+    deleteBookMutation.isPending,
+    deleteBookWithConfirmation,
+    isReadOnly,
+    subjectId,
+  ]);
 
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
@@ -1407,6 +1523,27 @@ export default function BookScreen() {
             <Ionicons name="arrow-back" size={24} color={themeColors.accent} />
           </Pressable>
           <View className="flex-1" />
+          {!isReadOnly ? (
+            <Pressable
+              onPress={handleDeleteBookPress}
+              disabled={deleteBookMutation.isPending}
+              className="p-2 me-1"
+              accessibilityRole="button"
+              accessibilityLabel="Delete book"
+              accessibilityState={{ disabled: deleteBookMutation.isPending }}
+              testID="book-delete-button"
+            >
+              <Ionicons
+                name="trash-outline"
+                size={22}
+                color={
+                  deleteBookMutation.isPending
+                    ? withOpacity(themeColors.danger, 0.45)
+                    : themeColors.danger
+                }
+              />
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={handleSubjectBookmarksPress}
             className="p-2 -me-2"

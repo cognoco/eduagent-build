@@ -5,6 +5,8 @@ import type { Database } from '@eduagent/database';
 import {
   bookTopicGenerateInputSchema,
   bookWithTopicsSchema,
+  bookDeleteSchema,
+  deleteBookResponseSchema,
   getAllProfileBooksResponseSchema,
   getBooksResponseSchema,
   getBookSessionsResponseSchema,
@@ -28,6 +30,7 @@ import {
   moveTopicToBook,
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
+  deleteBook,
 } from '../services/curriculum';
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
@@ -97,6 +100,39 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           return notFound(c, 'Book not found');
         }
         return c.json(bookWithTopicsSchema.parse(book));
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
+    },
+  )
+  .delete(
+    '/subjects/:subjectId/books/:bookId',
+    zValidator('param', bookParamSchema),
+    zValidator('json', bookDeleteSchema),
+    async (c) => {
+      assertNotProxyMode(c);
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId, bookId } = c.req.valid('param');
+      const { confirmStartedTopics } = c.req.valid('json');
+
+      try {
+        const result = await deleteBook(db, profileId, subjectId, bookId, {
+          confirmStartedTopics,
+        });
+        if (!result.deleted) {
+          return apiError(
+            c,
+            409,
+            ERROR_CODES.CONFLICT,
+            'This book has started topics. Confirm deletion to delete the book, its topics, and the learning history for those topics.',
+            result,
+          );
+        }
+        return c.json(deleteBookResponseSchema.parse(result));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
