@@ -48,6 +48,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
       subscriptionId: 'subscription_id',
       usedToday: 'used_today',
     },
+    profileQuotaUsage: {
+      cycleResetAt: 'profile_cycle_reset_at',
+      id: 'profile_quota_usage_id',
+      subscriptionId: 'profile_subscription_id',
+      usedToday: 'profile_used_today',
+    },
     subscriptions: {
       id: 'id',
     },
