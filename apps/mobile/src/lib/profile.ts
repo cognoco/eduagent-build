@@ -234,7 +234,10 @@ export function ProfileProvider({
   children: ReactNode;
 }): ReactNode {
   const profilesQuery = useProfiles();
-  const profiles = useMemo(() => profilesQuery.data ?? [], [profilesQuery.data]);
+  const profiles = useMemo(
+    () => profilesQuery.data ?? [],
+    [profilesQuery.data],
+  );
   const isProfilesLoading = profilesQuery.isLoading;
   const isProfilesFetching = profilesQuery.isFetching;
   // A stale-while-refetch failure should not eject a signed-in user from the

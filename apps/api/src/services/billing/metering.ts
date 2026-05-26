@@ -30,6 +30,32 @@ const logger = createLogger();
 
 type QuotaModel = 'per-profile' | 'shared-pool';
 
+async function emitChildQuotaExhaustedEvent(input: {
+  subscriptionId: string;
+  profileId: string;
+  kind: 'daily_exceeded' | 'monthly_exceeded';
+  resetsAt: string;
+}): Promise<void> {
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/billing.profile_quota.exhausted',
+        data: {
+          subscriptionId: input.subscriptionId,
+          profileId: input.profileId,
+          kind: input.kind,
+          resetsAt: input.resetsAt,
+          occurredAt: new Date().toISOString(),
+        },
+      }),
+    'billing.profile_quota.exhausted',
+    {
+      subscriptionId: input.subscriptionId,
+      profileId: input.profileId,
+    },
+  );
+}
+
 /**
  * Emits a structured event on quota ownership mismatch so we can query how
  * often a stale or hostile profileId was sent for a subscription that does
@@ -507,7 +533,7 @@ async function decrementProfileQuota(
     };
   }
 
-  return db.transaction(async (tx) =>
+  const result = await db.transaction(async (tx) =>
     attemptProfileDecrementInTx(
       tx as unknown as Database,
       subscriptionId,
@@ -516,6 +542,24 @@ async function decrementProfileQuota(
       true,
     ),
   );
+
+  if (
+    result.profileRole === 'child' &&
+    result.resetsAt &&
+    (result.source === 'daily_exceeded' || result.source === 'none')
+  ) {
+    await emitChildQuotaExhaustedEvent({
+      subscriptionId,
+      profileId,
+      kind:
+        result.source === 'daily_exceeded'
+          ? 'daily_exceeded'
+          : 'monthly_exceeded',
+      resetsAt: result.resetsAt,
+    });
+  }
+
+  return result;
 }
 
 async function clampProfileQuotaLimits(

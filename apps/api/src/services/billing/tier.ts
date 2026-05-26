@@ -97,6 +97,7 @@ export async function handleTierChange(
       tx as unknown as Database,
       subscriptionId,
       now,
+      { resetExpiredSharedPoolUsage: false },
     );
   });
 

@@ -6,9 +6,9 @@ import { tokens } from '../../lib/design-tokens';
 
 const mockNotifyParentMutate = jest.fn();
 jest.mock(
-  '../../hooks/use-settings' /* gc1-allow: quota card notify mutation is outside SessionMessageActions stage-gating contract */,
+  '../../hooks/use-child-cap-notifications' /* gc1-allow: quota card notify mutation is outside SessionMessageActions stage-gating contract */,
   () => ({
-    useNotifyParentSubscribe: () => ({
+    useNotifyParentChildCap: () => ({
       mutate: mockNotifyParentMutate,
       isPending: false,
     }),

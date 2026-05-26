@@ -72,6 +72,7 @@ import { dashboardRoutes } from './routes/dashboard';
 import { recapsRoutes } from './routes/recaps';
 import { noticesRoutes } from './routes/notices';
 import { nudgeRoutes } from './routes/nudges';
+import { notificationsRoutes } from './routes/notifications';
 import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
 import { testSeedRoutes } from './routes/test-seed';
@@ -272,6 +273,7 @@ const routes = api
   .route('/', recapsRoutes)
   .route('/', noticesRoutes)
   .route('/', nudgeRoutes)
+  .route('/', notificationsRoutes)
   .route('/', billingRoutes)
   .route('/', stripeWebhookRoute)
   .route('/', revenuecatWebhookRoute)

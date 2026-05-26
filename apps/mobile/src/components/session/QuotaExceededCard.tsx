@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { QuotaExceededDetails } from '../../lib/api-client';
-import { useNotifyParentSubscribe } from '../../hooks/use-settings';
+import { useNotifyParentChildCap } from '../../hooks/use-child-cap-notifications';
 
 export interface QuotaExceededCardProps {
   details: QuotaExceededDetails;
@@ -21,7 +21,7 @@ export function QuotaExceededCard({
 }: QuotaExceededCardProps): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
-  const notifyParent = useNotifyParentSubscribe();
+  const notifyParent = useNotifyParentChildCap();
   const [notifyState, setNotifyState] = useState<
     'idle' | 'sending' | 'sent' | 'failed'
   >('idle');
@@ -114,10 +114,16 @@ export function QuotaExceededCard({
             onPress={() => {
               if (notifyState !== 'idle' && notifyState !== 'failed') return;
               setNotifyState('sending');
-              notifyParent.mutate(undefined, {
-                onSuccess: () => setNotifyState('sent'),
-                onError: () => setNotifyState('failed'),
-              });
+              notifyParent.mutate(
+                {
+                  kind: isDailyLimit ? 'daily_exceeded' : 'monthly_exceeded',
+                  resetsAt: details.resetsAt,
+                },
+                {
+                  onSuccess: () => setNotifyState('sent'),
+                  onError: () => setNotifyState('failed'),
+                },
+              );
             }}
             disabled={notifyState === 'sending' || notifyState === 'sent'}
             className={`rounded-button py-3 items-center min-h-[44px] justify-center mb-2 ${

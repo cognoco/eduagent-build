@@ -113,3 +113,45 @@ export const nudgeMarkReadResponseSchema = z.object({
   success: z.literal(true),
   count: z.number().int().nonnegative(),
 });
+
+export const childCapNotificationKindSchema = z.enum([
+  'daily_exceeded',
+  'monthly_exceeded',
+]);
+export type ChildCapNotificationKind = z.infer<
+  typeof childCapNotificationKindSchema
+>;
+
+export const childCapNotificationSchema = z.object({
+  id: z.string().uuid(),
+  ownerProfileId: z.string().uuid(),
+  childProfileId: z.string().uuid(),
+  childDisplayName: z.string(),
+  kind: childCapNotificationKindSchema,
+  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  resetsAt: isoDateField,
+  createdAt: isoDateField,
+});
+export type ChildCapNotification = z.infer<typeof childCapNotificationSchema>;
+
+export const childCapNotificationsResponseSchema = z.object({
+  notifications: z.array(childCapNotificationSchema),
+});
+
+export const childCapNotificationDismissResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+export const childCapNotifyParentInputSchema = z
+  .object({
+    kind: childCapNotificationKindSchema,
+    resetsAt: isoDateField,
+  })
+  .strict();
+export type ChildCapNotifyParentInput = z.infer<
+  typeof childCapNotifyParentInputSchema
+>;
+
+export const childCapNotifyParentResponseSchema = z.object({
+  sent: z.boolean(),
+});

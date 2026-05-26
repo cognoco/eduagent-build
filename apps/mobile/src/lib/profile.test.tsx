@@ -140,13 +140,15 @@ describe('ProfileProvider', () => {
 
   it('[BREAK] falls back to owner when active-profile SecureStore restore hangs', async () => {
     jest.useFakeTimers();
-    jest.mocked(ExpoSecureStore.getItemAsync).mockImplementation((key: string) =>
-      key === 'mentomate_active_profile_id'
-        ? new Promise(() => {
-            /* deliberately never resolves */
-          })
-        : Promise.resolve(null),
-    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) =>
+        key === 'mentomate_active_profile_id'
+          ? new Promise(() => {
+              /* deliberately never resolves */
+            })
+          : Promise.resolve(null),
+      );
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
     });

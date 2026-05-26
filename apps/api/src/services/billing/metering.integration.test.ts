@@ -28,6 +28,7 @@ import {
   reconcileQuotaStateForEffectiveTier,
 } from '../billing';
 import { getTierConfig } from '../subscription';
+import { inngest } from '../../inngest/client';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection, same pattern as tests/integration/helpers.ts
@@ -240,10 +241,15 @@ async function cleanupTestAccounts() {
 
 beforeEach(async () => {
   await cleanupTestAccounts();
+  jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
 });
 
 afterAll(async () => {
   await cleanupTestAccounts();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 // ---------------------------------------------------------------------------
@@ -875,6 +881,149 @@ describe('Quota metering (integration)', () => {
         usedThisMonth: freeTier.ownerMonthlyQuota,
         usedToday: 1,
       });
+    });
+
+    it('[PR3] emits a quota-specific parent notification event when a child exhausts the daily cap', async () => {
+      const plusTier = getTierConfig('plus');
+      const account = await seedAccount(5);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+      });
+      const child = await seedProfile({
+        accountId: account.id,
+        displayName: 'Child',
+        isOwner: false,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: child.id,
+        role: 'child',
+        monthlyLimit: plusTier.childMonthlyQuota!,
+        usedThisMonth: 3,
+        dailyLimit: plusTier.childDailyQuota,
+        usedToday: plusTier.childDailyQuota!,
+      });
+
+      const result = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        child.id,
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        source: 'daily_exceeded',
+        profileRole: 'child',
+      });
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/billing.profile_quota.exhausted',
+        data: expect.objectContaining({
+          subscriptionId: seeded.subscription.id,
+          profileId: child.id,
+          kind: 'daily_exceeded',
+          resetsAt: expect.any(String),
+          occurredAt: expect.any(String),
+        }),
+      });
+    });
+
+    it('[PR3] emits monthly_exceeded when a child exhausts the monthly cap without using owner top-ups', async () => {
+      const plusTier = getTierConfig('plus');
+      const account = await seedAccount(5);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+      });
+      const owner = await seedProfile({
+        accountId: account.id,
+        displayName: 'Owner',
+        isOwner: true,
+      });
+      const child = await seedProfile({
+        accountId: account.id,
+        displayName: 'Child',
+        isOwner: false,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: child.id,
+        role: 'child',
+        monthlyLimit: plusTier.childMonthlyQuota!,
+        usedThisMonth: plusTier.childMonthlyQuota!,
+        dailyLimit: plusTier.childDailyQuota,
+        usedToday: 0,
+      });
+      await seedTopUpCredit({
+        subscriptionId: seeded.subscription.id,
+        profileId: owner.id,
+        amount: 3,
+        remaining: 3,
+      });
+
+      const result = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        child.id,
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        source: 'none',
+        profileRole: 'child',
+      });
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/billing.profile_quota.exhausted',
+        data: expect.objectContaining({
+          subscriptionId: seeded.subscription.id,
+          profileId: child.id,
+          kind: 'monthly_exceeded',
+          resetsAt: '2026-05-01T00:00:00.000Z',
+          occurredAt: expect.any(String),
+        }),
+      });
+      const topUps = await loadTopUps(seeded.subscription.id);
+      expect(topUps[0]!.remaining).toBe(3);
+    });
+
+    it('[PR3] does not notify a parent when the owner exhausts Plus quota', async () => {
+      const plusTier = getTierConfig('plus');
+      const account = await seedAccount(5);
+      const seeded = await seedSubscriptionWithQuota({
+        accountId: account.id,
+        tier: 'plus',
+      });
+      const owner = await seedProfile({
+        accountId: account.id,
+        displayName: 'Owner',
+        isOwner: true,
+      });
+      await seedProfileQuota({
+        subscriptionId: seeded.subscription.id,
+        profileId: owner.id,
+        role: 'owner',
+        monthlyLimit: plusTier.ownerMonthlyQuota!,
+        usedThisMonth: plusTier.ownerMonthlyQuota!,
+        dailyLimit: plusTier.ownerDailyQuota,
+        usedToday: 0,
+      });
+
+      const result = await decrementQuota(
+        createIntegrationDb(),
+        seeded.subscription.id,
+        owner.id,
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        source: 'none',
+        profileRole: 'owner',
+      });
+      expect(inngest.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/billing.profile_quota.exhausted',
+        }),
+      );
     });
   });
 });

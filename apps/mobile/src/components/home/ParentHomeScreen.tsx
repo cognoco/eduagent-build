@@ -12,11 +12,20 @@ import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { isAdultOwner } from '@eduagent/schemas';
-import type { DashboardChild, DashboardData, Profile } from '@eduagent/schemas';
+import type {
+  ChildCapNotification,
+  DashboardChild,
+  DashboardData,
+  Profile,
+} from '@eduagent/schemas';
 import { isInGracePeriod } from '../../lib/consent-grace';
 import type { Translate } from '../../i18n';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
+import {
+  useChildCapNotifications,
+  useDismissChildCapNotification,
+} from '../../hooks/use-child-cap-notifications';
 import { useDashboard } from '../../hooks/use-dashboard';
 import {
   useFamilySubscription,
@@ -59,6 +68,83 @@ function findDashboardChild(
 function firstNameOf(name: string): string {
   const trimmed = name.trim();
   return trimmed.split(/\s+/)[0] ?? trimmed;
+}
+
+function formatChildCapResetAt(resetsAt: string): string {
+  const date = new Date(resetsAt);
+  if (Number.isNaN(date.getTime())) return resetsAt;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+function ChildCapNotificationBanner({
+  notification,
+  onDismiss,
+  isDismissing,
+  t,
+}: {
+  notification: ChildCapNotification;
+  onDismiss: (notificationId: string) => void;
+  isDismissing: boolean;
+  t: Translate;
+}): React.ReactElement {
+  const colors = useThemeColors();
+  const messageKey =
+    notification.kind === 'daily_exceeded'
+      ? 'quota.parent.childCapHit.dailyMessage'
+      : 'quota.parent.childCapHit.monthlyMessage';
+  const resetAt = formatChildCapResetAt(notification.resetsAt);
+
+  return (
+    <View
+      className="bg-surface rounded-card px-4 py-3"
+      style={{
+        borderColor: colors.warning + '33',
+        borderWidth: 1,
+      }}
+      testID={`parent-home-child-cap-notification-${notification.id}`}
+    >
+      <View className="flex-row items-start">
+        <View
+          className="w-9 h-9 rounded-full bg-warning-soft items-center justify-center me-3"
+          accessibilityElementsHidden
+        >
+          <Ionicons
+            name="alert-circle-outline"
+            size={20}
+            color={colors.warning}
+          />
+        </View>
+        <View className="flex-1">
+          <Text className="text-body-sm font-semibold text-text-primary">
+            {t('quota.parent.childCapHit.title', {
+              childName: notification.childDisplayName,
+            })}
+          </Text>
+          <Text
+            className="text-caption text-text-secondary mt-1"
+            testID={`parent-home-child-cap-notification-message-${notification.id}`}
+          >
+            {t(messageKey, { resetAt })}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => onDismiss(notification.id)}
+          disabled={isDismissing}
+          className="ms-3 px-2 py-1 rounded-button"
+          accessibilityRole="button"
+          accessibilityLabel={t('quota.parent.childCapHit.dismiss')}
+          testID={`parent-home-child-cap-notification-dismiss-${notification.id}`}
+        >
+          <Text className="text-caption font-semibold text-text-secondary">
+            {t('quota.parent.childCapHit.dismiss')}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 function formatActivityLabel(
@@ -798,6 +884,8 @@ export function ParentHomeScreen({
   const { data: familyData } = useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
+  const childCapNotifications = useChildCapNotifications();
+  const dismissChildCapNotification = useDismissChildCapNotification();
   const [sheetChildId, setSheetChildId] = useState<string | null>(null);
   const childrenInGracePeriod = useMemo((): ChildInGracePeriod[] => {
     return (dashboard?.children ?? []).flatMap((child) => {
@@ -970,6 +1058,22 @@ export function ParentHomeScreen({
             <WithdrawalCountdownBanner
               childrenInGracePeriod={childrenInGracePeriod}
             />
+          </View>
+        ) : null}
+
+        {(childCapNotifications.data ?? []).length > 0 ? (
+          <View className="mt-3" style={{ gap: 8 }}>
+            {(childCapNotifications.data ?? []).map((notification) => (
+              <ChildCapNotificationBanner
+                key={notification.id}
+                notification={notification}
+                onDismiss={(notificationId) =>
+                  dismissChildCapNotification.mutate(notificationId)
+                }
+                isDismissing={dismissChildCapNotification.isPending}
+                t={t}
+              />
+            ))}
           </View>
         ) : null}
 
