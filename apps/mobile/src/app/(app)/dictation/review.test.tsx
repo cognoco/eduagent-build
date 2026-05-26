@@ -170,6 +170,15 @@ describe('DictationReviewScreen', () => {
       );
       expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
     });
+
+    it('disables Done accessibly while the result save is pending', () => {
+      mockRecordIsPending = true;
+      const { getByTestId } = render(<DictationReviewScreen />);
+
+      expect(
+        getByTestId('review-done').props.accessibilityState?.disabled,
+      ).toBe(true);
+    });
   });
 
   describe('remediation flow (with mistakes)', () => {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -76,6 +76,15 @@ function parseWebBirthDate(value: string): Date | null {
   return parsed;
 }
 
+function isAbortError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'name' in err &&
+    (err as { name?: unknown }).name === 'AbortError'
+  );
+}
+
 export default function CreateProfileScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -105,6 +114,8 @@ export default function CreateProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const inFlightRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
   // [ACCOUNT-01] Capture Study/Family intent on first profile setup.
   // Persisted via PATCH /profiles/:id/app-context immediately after creation.
   // null = not chosen yet (gates submit for the first-profile flow).
@@ -121,6 +132,12 @@ export default function CreateProfileScreen() {
     if (!loading) return undefined;
     const PROFILE_CREATE_TIMEOUT_MS = 30_000;
     const timer = setTimeout(() => {
+      const controller = abortRef.current;
+      controller?.abort();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        inFlightRef.current = false;
+      }
       setLoading(false);
       setError(
         'Creating your profile is taking too long. Check your connection and try again.',
@@ -128,6 +145,12 @@ export default function CreateProfileScreen() {
     }, PROFILE_CREATE_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [loading]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
@@ -183,6 +206,7 @@ export default function CreateProfileScreen() {
     if (activeProfileRole !== 'owner' || navigationContract.isParentProxy)
       return;
     if (!canSubmit || !birthDate) return;
+    if (inFlightRef.current) return;
 
     const trimmedName = displayName.trim();
     if (trimmedName.length > 50) {
@@ -191,6 +215,9 @@ export default function CreateProfileScreen() {
     }
 
     setError('');
+    inFlightRef.current = true;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
 
     try {
@@ -206,7 +233,10 @@ export default function CreateProfileScreen() {
         birthDay: birthDate.getDate(),
       };
 
-      const res = await client.profiles.$post({ json: body });
+      const res = await client.profiles.$post(
+        { json: body },
+        { init: { signal: controller.signal } },
+      );
       await assertOk(res);
       const result = (await res.json()) as { profile: Profile };
 
@@ -300,6 +330,9 @@ export default function CreateProfileScreen() {
         );
       }
     } catch (err: unknown) {
+      if (isAbortError(err)) {
+        return;
+      }
       // [BUG-947] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.
       // The route returns 402 with an actionable "upgrade to Family or Pro"
       // message; without this branch the generic UpstreamError path renders it
@@ -334,7 +367,11 @@ export default function CreateProfileScreen() {
         setError(formatApiError(err));
       }
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        inFlightRef.current = false;
+        setLoading(false);
+      }
     }
   }, [
     activeProfileRole,
