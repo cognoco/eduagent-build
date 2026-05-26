@@ -1,288 +1,213 @@
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent } from '@testing-library/react-native';
+import { type RoutedMockFetch } from '../../../test-utils/mock-api-routes';
+import {
+  renderScreen,
+  cleanupScreen,
+  createTestProfile,
+} from '../../../test-utils/screen-render';
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
+// ─── Boundary mocks (external runtime only) ────────────────────────────
+
+jest.mock(
+  'react-i18next' /* gc1-allow: i18n boundary — returns en.json strings */,
+  () => require('../../../test-utils/mock-i18n').i18nMock,
+);
+
+jest.mock(
+  'expo-localization' /* gc1-allow: native-boundary — used by i18n init */,
+  () => ({
+    getLocales: () => [{ languageTag: 'en-US', languageCode: 'en' }],
+  }),
+);
 
 const mockPush = jest.fn();
 
-jest.mock('expo-router', () => ({
+jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-jest.mock('@expo/vector-icons/Ionicons', () => {
-  const { Text } = require('react-native');
-  return function MockIonicons({ name }: { name: string }) {
-    return <Text testID={`icon-${name}`}>{name}</Text>;
-  };
-});
-
 jest.mock(
-  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
-  () => ({
-    useThemeColors: () => ({
-      textSecondary: '#6b7280',
-      primary: '#6366f1',
-    }),
-  }),
-);
-
-let mockActiveProfile: {
-  id: string;
-  displayName: string;
-  isOwner: boolean;
-  pronouns?: string | null;
-} = {
-  id: 'profile-1',
-  displayName: 'Alex',
-  isOwner: true,
-};
-
-jest.mock(
-  '../../../lib/profile' /* gc1-allow: profile context requires full provider tree */,
-  () => ({
-    ...jest.requireActual('../../../lib/profile'),
-    useProfile: () => ({
-      activeProfile: mockActiveProfile,
-    }),
-  }),
-);
-
-let mockRole: 'owner' | 'child' | 'impersonated-child' | null = 'owner';
-
-jest.mock(
-  '../../../hooks/use-active-profile-role' /* gc1-allow: depends on profile + parentProxy context */,
-  () => ({
-    useActiveProfileRole: () => mockRole,
-  }),
-);
-
-jest.mock(
-  '../../../hooks/use-navigation-contract' /* gc1-allow: depends on profile + parentProxy context */,
-  () => ({
-    useNavigationContract: () => ({
-      gates: {
-        showAccountSecurity: mockRole === 'owner',
-        showBilling: mockRole === 'owner',
-      },
-    }),
-  }),
-);
-
-let mockSubscriptionData: { tier: string } | undefined = { tier: 'plus' };
-
-jest.mock(
-  '../../../hooks/use-subscription' /* gc1-allow: fetches from API network boundary */,
-  () => ({
-    useSubscription: () => ({ data: mockSubscriptionData }),
-  }),
-);
-
-// i18n
-jest.mock(
-  '../../../i18n' /* gc1-allow: language store is app-global native persistence */,
-  () => ({
-    i18next: { language: 'en' },
-    LANGUAGE_LABELS: {
-      en: { native: 'English', english: 'English' },
-      nb: { native: 'Norsk', english: 'Norwegian' },
-    },
-    SUPPORTED_LANGUAGES: ['en', 'nb'],
-    setStoredLanguage: jest.fn().mockResolvedValue(undefined),
-  }),
-);
-
-// Feature flags
-jest.mock(
-  '../../../lib/feature-flags' /* gc1-allow: screen test pins app-wide feature flag branch */,
-  () => ({
-    FEATURE_FLAGS: { I18N_ENABLED: false },
-  }),
-);
-
-const mockPlatformAlert = jest.fn();
-jest.mock(
-  '../../../lib/platform-alert' /* gc1-allow: wraps native Alert */,
-  () => ({
-    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-  }),
-);
-
-// AccountSecurity component — renders if visible prop is true
-jest.mock(
-  '../../../components/account-security' /* gc1-allow: component depends on Clerk hooks and native biometrics */,
-  () => ({
-    AccountSecurity: ({ visible }: { visible: boolean }) => {
-      const { View, Text } = require('react-native');
-      if (!visible) return null;
-      return (
-        <View testID="account-security-section">
-          <Text>Account security</Text>
-        </View>
-      );
-    },
-  }),
-);
-
-// SettingsRow and SectionHeader — pass-through stubs
-jest.mock(
-  '../../../components/more/settings-rows' /* gc1-allow: uses NativeWind className requiring native runtime */,
+  '@expo/vector-icons/Ionicons' /* gc1-allow: native-boundary — bundles native font asset */,
   () => {
-    const { Pressable, Text, View } = require('react-native');
-    return {
-      SectionHeader: ({ children }: { children: React.ReactNode }) => (
-        <View>
-          <Text>{children}</Text>
-        </View>
-      ),
-      SettingsRow: ({
-        label,
-        value,
-        onPress,
-        testID,
-      }: {
-        label: string;
-        value?: string;
-        onPress?: () => void;
-        testID?: string;
-      }) => (
-        <Pressable onPress={onPress} testID={testID ?? `row-${label}`}>
-          <Text>{label}</Text>
-          {value ? <Text>{value}</Text> : null}
-        </Pressable>
-      ),
+    const { Text } = require('react-native');
+    return function MockIonicons({ name }: { name: string }) {
+      return <Text testID={`icon-${name}`}>{name}</Text>;
     };
   },
 );
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/clerk-expo' /* gc1-allow: external auth provider */, () => ({
   useUser: () => ({
     user: {
       fullName: 'Alex Test',
       firstName: 'Alex',
       primaryEmailAddress: { emailAddress: 'alex@example.com' },
+      // passwordEnabled drives AccountSecurity's branch: when true the
+      // password-row testID renders, which the owner-visibility test asserts.
+      passwordEnabled: true,
+      externalAccounts: [],
     },
   }),
+  useAuth: () => ({ signOut: jest.fn() }),
 }));
 
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      children,
-    );
-  };
-}
+// Route the Hono RPC client through a shared mock fetch so real hooks
+// (useSubscription, useNavigationContract, etc.) actually run.
+let mockFetch: RoutedMockFetch;
+
+jest.mock(
+  '../../../lib/api-client' /* gc1-allow: transport-boundary — routed mock fetch drives real hooks */,
+  () => {
+    const actual = jest.requireActual('../../../lib/api-client');
+    const {
+      createRoutedMockFetch,
+    } = require('../../../test-utils/mock-api-routes');
+    const { hc } = require('hono/client');
+    mockFetch = createRoutedMockFetch();
+    return {
+      ...actual,
+      useApiClient: () => hc('http://localhost', { fetch: mockFetch }),
+    };
+  },
+);
 
 const AccountScreen = require('./account').default as React.ComponentType;
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+// ─── Test fixtures ──────────────────────────────────────────────────────
+
+const ownerProfile = createTestProfile({
+  id: 'profile-owner',
+  accountId: 'account-1',
+  displayName: 'Alex',
+  isOwner: true,
+});
+
+const childProfile = createTestProfile({
+  id: 'profile-child',
+  accountId: 'account-family',
+  displayName: 'Sam',
+  isOwner: false,
+});
+
+function subscriptionResponse(tier: 'plus' | 'free' = 'plus') {
+  return {
+    subscription: {
+      tier,
+      status: 'active',
+      trialEndsAt: null,
+      currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+      cancelAtPeriodEnd: false,
+      monthlyLimit: 700,
+      usedThisMonth: 0,
+      remainingQuestions: 700,
+      dailyLimit: null,
+      usedToday: 0,
+      dailyRemainingQuestions: null,
+    },
+  };
+}
+
+const defaultRoutes = {
+  '/subscription': subscriptionResponse('plus'),
+};
+
+// ─── Tests ──────────────────────────────────────────────────────────────
 
 describe('AccountScreen', () => {
-  beforeEach(() => {
+  let active: ReturnType<typeof renderScreen> | null = null;
+
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
     jest.clearAllMocks();
-    mockRole = 'owner';
-    mockActiveProfile = {
-      id: 'profile-1',
-      displayName: 'Alex',
-      isOwner: true,
-    };
-    mockSubscriptionData = { tier: 'plus' };
   });
 
   it('renders profile and security rows for owner', () => {
-    const { getByTestId } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: ownerProfile,
+      routes: defaultRoutes,
     });
-    getByTestId('more-account-scroll');
-    getByTestId('more-row-profile');
-    // AccountSecurity is visible for owners
-    getByTestId('account-security-section');
+    active.result.getByTestId('more-account-scroll');
+    active.result.getByTestId('more-row-profile');
+    // Real AccountSecurity (visible for owners): with passwordEnabled=true
+    // the change-password row testID is present. For non-owners the entire
+    // AccountSecurity tree is gated out — see the hide test below.
+    active.result.getByTestId('change-password-row');
   });
 
   it('navigates to /profiles when profile row is pressed', () => {
-    const { getByTestId } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: ownerProfile,
+      routes: defaultRoutes,
     });
-    fireEvent.press(getByTestId('more-row-profile'));
+    fireEvent.press(active.result.getByTestId('more-row-profile'));
     expect(mockPush).toHaveBeenCalledWith('/profiles');
   });
 
   it('shows subscription row for owner role', () => {
-    const { getByTestId } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: ownerProfile,
+      routes: defaultRoutes,
     });
-    getByTestId('more-row-subscription');
+    active.result.getByTestId('more-row-subscription');
   });
 
   it('navigates to subscription screen when subscription row pressed', () => {
-    const { getByTestId } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: ownerProfile,
+      routes: defaultRoutes,
     });
-    fireEvent.press(getByTestId('more-row-subscription'));
+    fireEvent.press(active.result.getByTestId('more-row-subscription'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
   });
 
   it('hides subscription row for non-owner (child) role', () => {
-    mockRole = 'child';
-    mockActiveProfile = {
-      id: 'profile-2',
-      displayName: 'Sam',
-      isOwner: false,
-    };
-    const { queryByTestId } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: childProfile,
+      routes: defaultRoutes,
     });
     // Subscription row should NOT be visible
-    expect(queryByTestId('more-row-subscription')).toBeNull();
+    expect(active.result.queryByTestId('more-row-subscription')).toBeNull();
   });
 
   it('hides account security section and billing row for non-owner', () => {
-    mockRole = 'child';
-    mockActiveProfile = {
-      id: 'profile-2',
-      displayName: 'Sam',
-      isOwner: false,
-    };
-    const { queryByTestId } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: childProfile,
+      routes: defaultRoutes,
     });
-    expect(queryByTestId('account-security-section')).toBeNull();
+    // Account security tree is fully suppressed for non-owners — neither the
+    // password row nor any of its rendered testIDs exist.
+    expect(active.result.queryByTestId('change-password-row')).toBeNull();
     // Break test: billing must also be hidden for non-owners (child on parent account).
     // A child seeing billing UI would be a CRITICAL security/UX violation.
-    expect(queryByTestId('more-row-subscription')).toBeNull();
+    expect(active.result.queryByTestId('more-row-subscription')).toBeNull();
   });
 
   it('displays displayName from activeProfile', () => {
-    mockActiveProfile = {
-      id: 'profile-1',
-      displayName: 'Jordan',
-      isOwner: true,
-    };
-    const { getByText } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: createTestProfile({
+        id: 'profile-owner',
+        accountId: 'account-1',
+        displayName: 'Jordan',
+        isOwner: true,
+      }),
+      routes: defaultRoutes,
     });
-    getByText('Jordan');
+    active.result.getByText('Jordan');
   });
 
   it('falls back to Clerk user fullName when displayName is undefined', () => {
-    mockActiveProfile = {
-      id: 'profile-1',
-      displayName: undefined as unknown as string,
-      isOwner: true,
-    };
-    const { getByText } = render(<AccountScreen />, {
-      wrapper: createWrapper(),
+    active = renderScreen(<AccountScreen />, {
+      profile: createTestProfile({
+        id: 'profile-owner',
+        accountId: 'account-1',
+        displayName: undefined as unknown as string,
+        isOwner: true,
+      }),
+      routes: defaultRoutes,
     });
     // Clerk mock returns fullName='Alex Test'
-    getByText('Alex Test');
+    active.result.getByText('Alex Test');
   });
 });

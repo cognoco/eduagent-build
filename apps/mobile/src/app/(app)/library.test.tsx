@@ -85,7 +85,6 @@ const mockUseOverallProgress = jest.fn();
 const mockUseAllBooks = jest.fn();
 const mockUseLibrarySearch = jest.fn();
 const mockUpdateSubjectMutateAsync = jest.fn();
-const mockUseActiveProfileRole = jest.fn(() => 'owner');
 const mockUseFailedFreeformLibraryFilingSessions = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -111,12 +110,11 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../hooks/use-active-profile-role' /* gc1-allow: screen tests isolate role state */,
-  () => ({
-    useActiveProfileRole: () => mockUseActiveProfileRole(),
-  }),
-);
+// use-active-profile-role: real hook used. It reads useProfile() (mocked
+// below) and useParentProxy() (reads isExplicitProxyMode from the mocked
+// useProfile shape, defaulting to undefined → false). The tests only ever
+// exercise the 'owner' branch via { isOwner: true } profiles, so the real
+// resolver returns 'owner' as expected.
 
 jest.mock(
   '../../hooks/use-all-books' /* gc1-allow: hook boundary mocked to isolate shelf rendering */,
@@ -125,15 +123,9 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../components/progress' /* gc1-allow: progress component subtree is outside library screen contract */,
-  () => ({
-    RetentionSignal: ({ status }: { status: string }) => {
-      const { Text } = require('react-native');
-      return <Text>{status}</Text>;
-    },
-  }),
-);
+// components/progress: RetentionSignal is not imported by library.tsx —
+// removing the previously-stale mock here. The barrel re-export was a
+// dead-mock leftover from an earlier shelf-card design.
 
 jest.mock(
   '../../components/common' /* gc1-allow: Reanimated worklets and SVG animations cannot run in JSDOM */,
@@ -177,33 +169,9 @@ jest.mock(
 
 // navigation: real module is pure functions wrapping expo-router (already mocked)
 
-jest.mock(
-  '../../lib/theme' /* gc1-allow: theme hooks require native ColorScheme unavailable in JSDOM */,
-  () => ({
-    useTheme: () => ({ colorScheme: 'light' }),
-    useThemeColors: () => ({
-      accent: '#2563eb',
-      border: '#e5e7eb',
-      primary: '#2563eb',
-      textPrimary: '#111827',
-      textSecondary: '#6b7280',
-      surfaceElevated: '#f9fafb',
-      warning: '#f59e0b',
-    }),
-    useSubjectTint: () => ({
-      solid: '#0f766e',
-      soft: 'rgba(15,118,110,0.14)',
-    }),
-  }),
-);
-
-jest.mock(
-  '../../lib/format-api-error' /* gc1-allow: i18n-backed formatter imports native localization */,
-  () => ({
-    formatApiError: (error: unknown) =>
-      error instanceof Error ? error.message : 'Something went wrong',
-  }),
-);
+// lib/theme: real hooks used. useTheme() reads ThemeContext (default
+// colorScheme: 'light') and useThemeColors() pulls colors from the static
+// design-tokens module — pure data, no native ColorScheme dependency.
 
 jest.mock(
   '../../lib/api-client' /* gc1-allow: API client hook wraps Clerk useAuth external boundary */,
@@ -282,32 +250,9 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../components/library/LibrarySearchBar' /* gc1-allow: search bar implementation is covered separately */,
-  () => ({
-    LibrarySearchBar: ({
-      value,
-      onChangeText,
-      placeholder,
-    }: {
-      value: string;
-      onChangeText: (text: string) => void;
-      placeholder?: string;
-    }) => {
-      const { View, TextInput } = require('react-native');
-      return (
-        <View>
-          <TextInput
-            testID="library-search-input"
-            value={value}
-            onChangeText={onChangeText}
-            placeholder={placeholder}
-          />
-        </View>
-      );
-    },
-  }),
-);
+// components/library/LibrarySearchBar: real component used. It is a plain
+// TextInput + Ionicons + Pressable composition reading useThemeColors() —
+// no native runtime dependency the test environment cannot provide.
 
 const mockUseProfile = jest.fn(() => ({
   activeProfile: { id: 'profile-1', isOwner: true },

@@ -7,15 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  Text,
-  UIManager,
-  View,
-  useColorScheme,
-} from 'react-native';
+import { Platform, UIManager, View, useColorScheme } from 'react-native';
 import * as SecureStore from '../lib/secure-storage';
 import { platformAlert } from '../lib/platform-alert';
 import { Stack } from 'expo-router';
@@ -39,8 +31,8 @@ import {
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useAuth } from '@clerk/clerk-expo';
 import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
-import { tokens } from '../lib/design-tokens';
 import type { ColorScheme } from '../lib/design-tokens';
+import { ClerkGate } from '../components/ClerkGate';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { AppContextProvider } from '../lib/app-context';
 import {
@@ -330,151 +322,6 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
       </Stack>
     </View>
   );
-}
-
-/**
- * Replaces <ClerkLoaded> to avoid a white gap between splash dismissal and
- * Clerk initialization. ClerkLoaded renders NOTHING until Clerk is ready;
- * this component shows a themed spinner during the gap and signals readiness
- * back to the root layout so the splash doesn't dismiss prematurely.
- *
- * @internal Exported for co-located unit tests only. Do not import from outside
- * this file. Expo Router only picks up the default export as a route.
- */
-export function ClerkGate({
-  children,
-  onReady,
-  timedOut,
-  onRetry,
-  onContinueOffline,
-}: {
-  children: React.ReactNode;
-  onReady: () => void;
-  timedOut: boolean;
-  /** Re-mounts ClerkProvider so Clerk can attempt initialization again. */
-  onRetry: () => void;
-  /** Lets the user proceed without a Clerk session (offline / degraded network). */
-  onContinueOffline: () => void;
-}) {
-  const { isLoaded } = useAuth();
-  // [L] ThemeContext is not yet mounted at this point (ClerkGate renders above
-  // it in the tree). Read the system color scheme directly so dark-mode users
-  // see a dark timeout screen instead of the default light palette.
-  const systemScheme = useColorScheme();
-  const gateColors =
-    systemScheme === 'dark' ? tokens.dark.colors : tokens.light.colors;
-
-  useEffect(() => {
-    if (isLoaded) onReady();
-  }, [isLoaded, onReady]);
-
-  if (!isLoaded) {
-    if (timedOut) {
-      return (
-        <View
-          testID="clerk-timeout-screen"
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 24,
-            backgroundColor: gateColors.background,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: '600',
-              marginBottom: 8,
-              textAlign: 'center',
-              color: gateColors.textPrimary,
-            }}
-          >
-            Taking longer than expected
-          </Text>
-          <Text
-            style={{
-              fontSize: 14,
-              color: gateColors.muted,
-              textAlign: 'center',
-              marginBottom: 24,
-            }}
-          >
-            Please check your internet connection and try again.
-          </Text>
-          {/* Primary action: force Clerk to re-initialise by remounting ClerkProvider */}
-          <Pressable
-            testID="clerk-retry-button"
-            onPress={onRetry}
-            style={{
-              backgroundColor: gateColors.primary,
-              borderRadius: 12,
-              paddingVertical: 14,
-              paddingHorizontal: 32,
-              marginBottom: 12,
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Try again"
-          >
-            <Text
-              style={{
-                color: gateColors.textInverse,
-                fontWeight: '600',
-                fontSize: 16,
-              }}
-            >
-              Try again
-            </Text>
-          </Pressable>
-          {/* Secondary action: continue without auth for offline / degraded network */}
-          <Pressable
-            testID="clerk-offline-button"
-            onPress={onContinueOffline}
-            style={{ paddingVertical: 10, paddingHorizontal: 16 }}
-            accessibilityRole="button"
-            accessibilityLabel="Continue without account"
-          >
-            <Text
-              style={{
-                color: gateColors.muted,
-                fontSize: 14,
-                textDecorationLine: 'underline',
-              }}
-            >
-              Continue without account
-            </Text>
-          </Pressable>
-        </View>
-      );
-    }
-    return (
-      <View
-        testID="clerk-loading-screen"
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 24,
-          backgroundColor: gateColors.background,
-        }}
-      >
-        <ActivityIndicator size="large" color={gateColors.primary} />
-        <Text
-          style={{
-            marginTop: 16,
-            color: gateColors.textPrimary,
-            fontSize: 16,
-            fontWeight: '600',
-            textAlign: 'center',
-          }}
-        >
-          Connecting securely...
-        </Text>
-      </View>
-    );
-  }
-
-  return children as React.ReactElement;
 }
 
 /** Thin error boundary so AnimatedSplash crashes don't block the app. */

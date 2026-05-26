@@ -162,39 +162,63 @@ const mockGetPracticeActivitySummary = jest
   .mockResolvedValue(emptyPracticeActivitySummary);
 
 jest.mock(
-  '../../services/monthly-report' /* gc1-allow: external-boundary — generateReportHighlights calls LLM */,
-  () => ({
-    generateMonthlyReportData: (...args: unknown[]) =>
-      mockGenerateMonthlyReportData(...args),
-    generateReportHighlights: (...args: unknown[]) =>
-      mockGenerateReportHighlights(...args),
-  }),
+  '../../services/monthly-report' /* gc1-allow: pattern-a conversion — generateReportHighlights calls LLM (external boundary) */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/monthly-report',
+    ) as typeof import('../../services/monthly-report');
+    return {
+      ...actual,
+      generateMonthlyReportData: (...args: unknown[]) =>
+        mockGenerateMonthlyReportData(...args),
+      generateReportHighlights: (...args: unknown[]) =>
+        mockGenerateReportHighlights(...args),
+    };
+  },
 );
 
 jest.mock(
-  '../../services/practice-activity-summary' /* gc1-allow: unit test boundary */,
-  () => ({
-    getPracticeActivitySummary: (...args: unknown[]) =>
-      mockGetPracticeActivitySummary(...args),
-  }),
+  '../../services/practice-activity-summary' /* gc1-allow: pattern-a conversion — DB-dependent aggregate; integration sibling covers real path */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/practice-activity-summary',
+    ) as typeof import('../../services/practice-activity-summary');
+    return {
+      ...actual,
+      getPracticeActivitySummary: (...args: unknown[]) =>
+        mockGetPracticeActivitySummary(...args),
+    };
+  },
 );
 
 jest.mock(
-  '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
-  () => ({
-    listEligibleSelfReportProfileIds: (...args: unknown[]) =>
-      mockListEligibleSelfReportProfileIds(...args),
-  }),
+  '../../services/solo-progress-reports' /* gc1-allow: pattern-a conversion — DB-dependent eligibility query */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/solo-progress-reports',
+    ) as typeof import('../../services/solo-progress-reports');
+    return {
+      ...actual,
+      listEligibleSelfReportProfileIds: (...args: unknown[]) =>
+        mockListEligibleSelfReportProfileIds(...args),
+    };
+  },
 );
 
 const mockGetSnapshotsInRange = jest.fn().mockResolvedValue([]);
 
 jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: external-boundary — DB-dependent */,
-  () => ({
-    getSnapshotsInRange: (...args: unknown[]) =>
-      mockGetSnapshotsInRange(...args),
-  }),
+  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion — drives CURRENT/PREVIOUS snapshot pair via mockResolvedValueOnce ordering; integration sibling covers real DB path */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/snapshot-aggregation',
+    ) as typeof import('../../services/snapshot-aggregation');
+    return {
+      ...actual,
+      getSnapshotsInRange: (...args: unknown[]) =>
+        mockGetSnapshotsInRange(...args),
+    };
+  },
 );
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
@@ -209,17 +233,23 @@ const mockFormatMonthlyProgressEmail = jest.fn(
 );
 
 jest.mock(
-  '../../services/notifications' /* gc1-allow: external-boundary — push/email delivery */,
-  () => ({
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    formatMonthlyProgressEmail: (
-      to: string,
-      body: string,
-      struggleLines: ChildStruggleLine[],
-    ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
-  }),
+  '../../services/notifications' /* gc1-allow: pattern-a conversion — push/email delivery is the external boundary; integration sibling exercises real Expo/Resend pipeline */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+      formatMonthlyProgressEmail: (
+        to: string,
+        body: string,
+        struggleLines: ChildStruggleLine[],
+      ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
+    };
+  },
 );
 
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
@@ -227,29 +257,46 @@ jest.mock(
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 
 jest.mock(
-  '../../services/settings' /* gc1-allow: external-boundary — DB-dependent */,
-  () => ({
-    getRecentNotificationCount: (...args: unknown[]) =>
-      mockGetRecentNotificationCount(...args),
-  }),
+  '../../services/settings' /* gc1-allow: pattern-a conversion — bypasses 24h dedup gate without seeding notificationLog; dedup behaviour itself covered by integration sibling */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/settings',
+    ) as typeof import('../../services/settings');
+    return {
+      ...actual,
+      getRecentNotificationCount: (...args: unknown[]) =>
+        mockGetRecentNotificationCount(...args),
+    };
+  },
 );
 
 const mockCaptureException = jest.fn();
 
 jest.mock(
-  '../../services/sentry' /* gc1-allow: external-boundary — observability */,
-  () => ({
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  }),
+  '../../services/sentry' /* gc1-allow: pattern-a conversion — Sentry SDK external boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
 );
 
 jest.mock(
-  '../helpers' /* gc1-allow: external-boundary — DB connection factory */,
-  () => ({
-    getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
-    getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
-    resetDatabaseUrl: jest.fn(),
-  }),
+  '../helpers' /* gc1-allow: pattern-a conversion — getStepDatabase must return the shared mockMonthlyReportDb (no real Neon WS connection in unit test env) */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
+      getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
+    };
+  },
 );
 
 import {

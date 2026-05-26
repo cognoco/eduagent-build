@@ -16,82 +16,92 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit test — real Neon DB unavailable; db injected via middleware chain
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/account',
-  ) as typeof import('../services/account');
-  return {
-    ...actual,
-    findOrCreateAccount: jest.fn().mockResolvedValue({
-      id: 'test-account-id',
-      clerkUserId: 'user_test',
-      email: 'test@example.com',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
-  };
-});
+jest.mock(
+  '../services/account' /* gc1-allow: real findOrCreateAccount executes INSERT...ON CONFLICT upsert + trial-subscription provisioning against Neon; DB module is itself mocked in this unit test, so the real impl cannot run */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/account',
+    ) as typeof import('../services/account');
+    return {
+      ...actual,
+      findOrCreateAccount: jest.fn().mockResolvedValue({
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+    };
+  },
+);
 
-// Mock session service (to prevent actual session operations)
-jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/session',
-  ) as typeof import('../services/session');
-  return {
-    ...actual,
-    // processMessage/streamMessage/evaluateSessionDepth call LLM
-    processMessage: jest
-      .fn()
-      .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
-    getSession: jest.fn().mockResolvedValue({
-      id: 'a0000000-0000-4000-a000-000000000001',
-      status: 'active',
-      sessionType: 'homework',
-    }),
-    streamMessage: jest.fn(),
-    startSession: jest.fn(),
-    closeSession: jest.fn(),
-    flagContent: jest.fn(),
-    getSessionSummary: jest.fn(),
-    submitSummary: jest.fn(),
-    // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
-    // metering coverage on POST /sessions/:id/evaluate-depth.
-    getSessionTranscript: jest.fn().mockResolvedValue({
-      session: {
-        sessionId: 'a0000000-0000-4000-a000-000000000001',
-        subjectId: 'subject-1',
-        topicId: null,
-        sessionType: 'learning',
-        inputMode: 'text',
-        verificationType: null,
-        startedAt: new Date().toISOString(),
-        exchangeCount: 0,
-        milestonesReached: [],
-        wallClockSeconds: null,
-      },
-      exchanges: [],
-    }),
-    evaluateSessionDepth: jest.fn().mockResolvedValue({
-      meaningful: false,
-      reason: 'mock',
-      method: 'heuristic_shallow',
-      topics: [],
-    }),
-    // Other session service exports referenced by the route module — return
-    // permissive defaults so the route module loads without TypeError.
-    getSessionCompletionContext: jest.fn(),
-    recordSystemPrompt: jest.fn(),
-    recordSessionEvent: jest.fn(),
-    skipSummary: jest.fn(),
-    syncHomeworkState: jest.fn(),
-    setSessionInputMode: jest.fn(),
-    getResumeNudgeCandidate: jest.fn(),
-  };
-});
+// Mock session service: processMessage / streamMessage / evaluateSessionDepth
+// transitively call routeAndCall (LLM external boundary); getSession /
+// getSessionTranscript hit Neon directly. DB is mocked in this unit test, so
+// the real impls cannot run. Other exports (getSessionCompletionContext etc)
+// are stubbed with permissive defaults so the route module loads.
+jest.mock(
+  '../services/session' /* gc1-allow: routes through LLM (routeAndCall) for processMessage/streamMessage/evaluateSessionDepth and real Neon for session reads */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/session',
+    ) as typeof import('../services/session');
+    return {
+      ...actual,
+      // processMessage/streamMessage/evaluateSessionDepth call LLM
+      processMessage: jest
+        .fn()
+        .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
+      getSession: jest.fn().mockResolvedValue({
+        id: 'a0000000-0000-4000-a000-000000000001',
+        status: 'active',
+        sessionType: 'homework',
+      }),
+      streamMessage: jest.fn(),
+      startSession: jest.fn(),
+      closeSession: jest.fn(),
+      flagContent: jest.fn(),
+      getSessionSummary: jest.fn(),
+      submitSummary: jest.fn(),
+      // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
+      // metering coverage on POST /sessions/:id/evaluate-depth.
+      getSessionTranscript: jest.fn().mockResolvedValue({
+        session: {
+          sessionId: 'a0000000-0000-4000-a000-000000000001',
+          subjectId: 'subject-1',
+          topicId: null,
+          sessionType: 'learning',
+          inputMode: 'text',
+          verificationType: null,
+          startedAt: new Date().toISOString(),
+          exchangeCount: 0,
+          milestonesReached: [],
+          wallClockSeconds: null,
+        },
+        exchanges: [],
+      }),
+      evaluateSessionDepth: jest.fn().mockResolvedValue({
+        meaningful: false,
+        reason: 'mock',
+        method: 'heuristic_shallow',
+        topics: [],
+      }),
+      // Other session service exports referenced by the route module — return
+      // permissive defaults so the route module loads without TypeError.
+      getSessionCompletionContext: jest.fn(),
+      recordSystemPrompt: jest.fn(),
+      recordSessionEvent: jest.fn(),
+      skipSummary: jest.fn(),
+      syncHomeworkState: jest.fn(),
+      setSessionInputMode: jest.fn(),
+      getResumeNudgeCandidate: jest.fn(),
+    };
+  },
+);
 
 // Mock recall bridge service so we can exercise the route without an LLM call.
 jest.mock(
-  '../services/recall-bridge' /* gc1-allow: pattern-a conversion */,
+  '../services/recall-bridge' /* gc1-allow: generateRecallBridge calls routeAndCall (LLM external boundary) */,
   () => {
     const actual = jest.requireActual(
       '../services/recall-bridge',
@@ -110,47 +120,60 @@ jest.mock(
   },
 );
 
-// Mock profile service
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: 2010,
-      location: 'EU',
-      consentStatus: 'CONSENTED',
-      hasPremiumLlm: false,
-      conversationLanguage: null,
-      isOwner: true,
-    }),
-    getProfile: jest.fn().mockResolvedValue(null),
-    getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
-    // [BUG-653] Used by the evaluate-depth route to age-tag the LLM call.
-    getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
-  };
-});
+// Mock profile service: findOwnerProfile/getProfile/getProfileAgeBracket all
+// query Neon for profile rows + family_links. DB is mocked in this unit test,
+// so the real impls cannot run. The mock also doubles as the test fixture:
+// individual tests override findOwnerProfile / getProfile per-case via
+// jest.requireMock to drive owner-vs-child-vs-missing branches in metering.
+jest.mock(
+  '../services/profile' /* gc1-allow: hits real Neon + acts as test fixture for owner/child/missing-profile branches */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/profile',
+    ) as typeof import('../services/profile');
+    return {
+      ...actual,
+      findOwnerProfile: jest.fn().mockResolvedValue({
+        id: 'test-profile-id',
+        birthYear: 2010,
+        location: 'EU',
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        conversationLanguage: null,
+        isOwner: true,
+      }),
+      getProfile: jest.fn().mockResolvedValue(null),
+      getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
+      // [BUG-653] Used by the evaluate-depth route to age-tag the LLM call.
+      getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
+    };
+  },
+);
 
-// Mock subject service for route coverage
-jest.mock('../services/subject' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/subject',
-  ) as typeof import('../services/subject');
-  return {
-    ...actual,
-    listSubjects: jest.fn().mockResolvedValue([]),
-    getSubject: jest.fn().mockResolvedValue({
-      id: 'subject-1',
-      profileId: 'test-profile-id',
-      name: 'Mathematics',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
-  };
-});
+// Mock subject service: listSubjects / getSubject run drizzle queries +
+// db.transaction() against Neon. DB is mocked in this unit test, so the real
+// impls cannot run. Needed because the GET /v1/subjects passthrough test
+// loads the routes module and would otherwise throw on the mocked db chain.
+jest.mock(
+  '../services/subject' /* gc1-allow: hits real Neon (drizzle select + transaction) which is mocked in this unit test */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/subject',
+    ) as typeof import('../services/subject');
+    return {
+      ...actual,
+      listSubjects: jest.fn().mockResolvedValue([]),
+      getSubject: jest.fn().mockResolvedValue({
+        id: 'subject-1',
+        profileId: 'test-profile-id',
+        name: 'Mathematics',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+    };
+  },
+);
 
 // [BUG-93] Mock subject-resolve so the LLM-backed handler can return a
 // deterministic result without hitting routeAndCall. The metering
@@ -179,24 +202,27 @@ const mockDecrementQuota = jest.fn();
 const mockSafeRefundQuota = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/billing',
-  ) as typeof import('../services/billing');
-  return {
-    ...actual,
-    ensureFreeSubscription: (...args: unknown[]) =>
-      mockEnsureFreeSubscription(...args),
-    getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
-    decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
-    safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
-    getTopUpCreditsRemaining: (...args: unknown[]) =>
-      mockGetTopUpCreditsRemaining(...args),
-    createSubscription: jest.fn(),
-    getSubscriptionByAccountId: jest.fn(),
-    linkStripeCustomer: jest.fn(),
-  };
-});
+jest.mock(
+  '../services/billing' /* gc1-allow: ensureFreeSubscription/getQuotaPool/decrementQuota/safeRefundQuota/getTopUpCreditsRemaining are the assertion mechanism — the metering middleware's contract is "did decrementQuota fire with these args?", which requires spies on these exports. Per-tier behavior is covered end-to-end by services/billing/metering.integration.test.ts */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing',
+    ) as typeof import('../services/billing');
+    return {
+      ...actual,
+      ensureFreeSubscription: (...args: unknown[]) =>
+        mockEnsureFreeSubscription(...args),
+      getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
+      decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
+      safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
+      getTopUpCreditsRemaining: (...args: unknown[]) =>
+        mockGetTopUpCreditsRemaining(...args),
+      createSubscription: jest.fn(),
+      getSubscriptionByAccountId: jest.fn(),
+      linkStripeCustomer: jest.fn(),
+    };
+  },
+);
 
 // KV: use in-memory fake that exercises real services/kv Zod parsing.
 

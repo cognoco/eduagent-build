@@ -14,20 +14,6 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 
 // ---------------------------------------------------------------------------
-// Sentry mock — observe captureException for schema-drift assertions
-// ---------------------------------------------------------------------------
-
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/sentry',
-  ) as typeof import('../services/sentry');
-  return {
-    ...actual,
-    captureException: jest.fn(),
-  };
-});
-
-// ---------------------------------------------------------------------------
 // Database mock
 // ---------------------------------------------------------------------------
 
@@ -215,19 +201,6 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../inngest/client',
-  ) as typeof import('../inngest/client');
-  return {
-    ...actual,
-    inngest: {
-      send: jest.fn().mockResolvedValue(undefined),
-      createFunction: jest.fn().mockReturnValue(jest.fn()),
-    },
-  };
-});
-
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -235,9 +208,14 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { SchemaDriftError } from '@eduagent/schemas';
-import { captureException } from '../services/sentry';
+import * as sentryService from '../services/sentry';
 
-const mockCaptureException = captureException as jest.Mock;
+// jest.spyOn on the real Sentry wrapper — no jest.mock(), no internal-mock
+// debt. Sentry SDK no-ops without a DSN (see services/sentry.ts comment), so
+// the real captureException is safe to invoke in tests; the spy lets us
+// assert "the route handler did NOT redundantly capture" without stubbing
+// the module.
+const mockCaptureException = jest.spyOn(sentryService, 'captureException');
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });

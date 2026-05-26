@@ -18,6 +18,10 @@ import {
 } from '../../../test-utils/mock-api-routes';
 import SessionScreen from './index';
 
+// Real session-recovery module; tests spy on readSessionRecoveryMarker as
+// needed via jest.spyOn().
+import * as sessionRecoveryModule from '../../../lib/session-recovery';
+
 // ---------------------------------------------------------------------------
 // Fetch boundary mock — API-calling hooks run against this
 // ---------------------------------------------------------------------------
@@ -449,14 +453,10 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../lib/session-recovery' /* gc1-allow: unit test boundary */,
-  () => ({
-    clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-    readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
-    writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-  }),
-);
+// session-recovery uses the real implementation — it just wraps SecureStore
+// (already mocked in-memory below), so the empty-store default returns null
+// naturally. Individual tests use jest.spyOn() on readSessionRecoveryMarker
+// when they need to inject a marker (see hydrates-milestone-tracker test).
 
 const secureStore: Record<string, string> = {};
 jest.mock(
@@ -469,25 +469,25 @@ jest.mock(
       secureStore[key] = value;
       return Promise.resolve();
     }),
+    deleteItemAsync: jest.fn((key: string) => {
+      delete secureStore[key];
+      return Promise.resolve();
+    }),
     // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
     // but the module mock must export it or callers get "not a function".
     sanitizeSecureStoreKey: (raw: string) =>
       raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
   }),
 );
-
-const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
-  require('../../../lib/session-recovery') as {
-    readSessionRecoveryMarker: jest.Mock;
-  };
-
-jest.mock(
-  '../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
-  () => ({
-    formatApiError: (error: unknown) =>
-      error instanceof Error ? error.message : 'Unknown error',
-  }),
+const mockReadSessionRecoveryMarker = jest.spyOn(
+  sessionRecoveryModule,
+  'readSessionRecoveryMarker',
 );
+
+// format-api-error uses real implementation. i18n is initialized globally in
+// test-setup.ts, and no test asserts on specific error-display copy from this
+// formatter — it's only invoked on stream failure paths where the produced
+// text is rendered, not inspected.
 
 jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
   ...jest.requireActual('../../../lib/profile'),
