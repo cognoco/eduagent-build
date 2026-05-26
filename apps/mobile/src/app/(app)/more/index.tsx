@@ -42,7 +42,7 @@ export default function MoreScreen() {
   const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: subscription } = useSubscription();
-  const { data: familyData } = useFamilySubscription(
+  useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
   const {
@@ -55,45 +55,7 @@ export default function MoreScreen() {
 
   const handleAddChild = useCallback(() => {
     if (!subscription) {
-      // Subscription query still loading — surface a non-blocking notice
-      // rather than asserting an upgrade gate the user might not actually hit.
       platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
-      return;
-    }
-    const tier = subscription.tier;
-    // Whitelist: only family/pro may add children. Blocks free and plus.
-    if (tier !== 'family' && tier !== 'pro') {
-      platformAlert(
-        t('more.family.upgradeRequiredTitle'),
-        t('more.family.upgradeRequiredMessage'),
-        [
-          {
-            text: t('more.family.viewPlans'),
-            onPress: () => router.push('/(app)/subscription'),
-          },
-          { text: t('common.cancel'), style: 'cancel' },
-        ],
-      );
-      return;
-    }
-
-    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      platformAlert(
-        t('more.family.profileLimitTitle'),
-        t('more.family.profileLimitMessage', {
-          plan: tier === 'pro' ? 'Pro' : 'Family',
-          max: familyData.maxProfiles,
-        }),
-        tier === 'family'
-          ? [
-              {
-                text: t('more.family.viewPlans'),
-                onPress: () => router.push('/(app)/subscription'),
-              },
-              { text: t('common.cancel'), style: 'cancel' },
-            ]
-          : [{ text: t('common.ok') }],
-      );
       return;
     }
 
@@ -101,7 +63,7 @@ export default function MoreScreen() {
       pathname: '/create-profile',
       params: { for: 'child' },
     } as never);
-  }, [subscription, familyData, router, t]);
+  }, [subscription, router, t]);
 
   const linkedChildren =
     navigationContract.gates.showRemoveFamilyMember && activeProfile

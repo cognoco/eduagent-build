@@ -237,7 +237,12 @@ describe('mode tab helpers', () => {
       isParentProxy: false,
       appContext: 'family',
       role: 'owner',
-      subscription: { status: 'ready', tier: 'family' },
+      subscription: {
+        status: 'ready',
+        tier: 'family',
+        effectiveAccessTier: 'family',
+        billingAccess: 'current',
+      },
       flags: { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
     });
 
@@ -388,6 +393,8 @@ describe('AppLayout', () => {
           JSON.stringify({
             status: {
               tier: 'family',
+              effectiveAccessTier: 'family',
+              billingAccess: 'current',
               status: 'active',
               monthlyLimit: 700,
               usedThisMonth: 0,
@@ -1400,6 +1407,8 @@ describe('AppLayout welcome intro gate — routing order', () => {
           JSON.stringify({
             status: {
               tier: 'family',
+              effectiveAccessTier: 'family',
+              billingAccess: 'current',
               status: 'active',
               monthlyLimit: 700,
               usedThisMonth: 0,
