@@ -72,6 +72,14 @@ I18N_EN_CHANGED=$(git diff --cached --name-only --diff-filter=d \
 if [ -n "$I18N_EN_CHANGED" ]; then
   echo "pre-commit: running check:i18n (en.json changed)..."
   pnpm exec tsx scripts/check-i18n-staleness.ts || exit 1
+  # No-clinical-copy ratchet (Phase 5 of Challenge Round runtime). Banned
+  # tone words (failed/wrong/struggle/weak/etc.) in learner-visible strings
+  # must be reframed positively. Existing offenses are grandfathered in
+  # scripts/no-clinical-copy-baseline.json — only NEW offenses fail. Run
+  # with --accept to update the baseline when a new entry is genuinely
+  # technical-error copy.
+  echo "pre-commit: running check:no-clinical-copy (en.json changed)..."
+  pnpm exec tsx scripts/check-no-clinical-copy.ts || exit 1
 fi
 
 # GC1 ratchet (pre-commit mirror of CI): block staged test files that add a
