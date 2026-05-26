@@ -643,7 +643,8 @@ describe('AppLayout', () => {
     expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fquiz');
   });
 
-  it('renders nothing while Clerk auth is still loading', () => {
+  it('[BUG] shows a retryable fallback when app-shell Clerk auth loading hangs', async () => {
+    jest.useFakeTimers();
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: false,
       isSignedIn: undefined,
@@ -651,9 +652,16 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    // Should render nothing — no redirect, no tabs, no flash
+    screen.getByTestId('app-auth-loading');
     expect(screen.queryByTestId('redirect')).toBeNull();
     expect(screen.queryByTestId('tabs')).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(12_500);
+    });
+
+    screen.getByTestId('app-auth-loading-timeout');
+    expect(screen.queryByTestId('app-auth-loading')).toBeNull();
   });
 
   it('shows profile loading spinner while profiles load after auth', () => {

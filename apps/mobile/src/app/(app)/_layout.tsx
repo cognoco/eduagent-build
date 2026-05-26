@@ -105,6 +105,7 @@ const HIDDEN_TAB_ROUTES = [
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
+const APP_AUTH_LOAD_TIMEOUT_MS = 12_000;
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
 const INTRO_PROBE_TIMEOUT_MS = 2_500;
 
@@ -186,6 +187,28 @@ export default function AppLayout() {
     const t = setTimeout(() => setPendingRedirectTimedOut(true), 15_000);
     return () => clearTimeout(t);
   }, [isPendingRedirectSpinning]);
+
+  // If Clerk's app-shell auth hydration stalls after session activation, do
+  // not strand the user on an unlabelled spinner. This is rare but observable
+  // in preview APKs after sign-in/OTA handoff.
+  const [authLoadTimedOut, setAuthLoadTimedOut] = React.useState(false);
+  React.useEffect(() => {
+    if (isLoaded) {
+      setAuthLoadTimedOut(false);
+      return;
+    }
+    if (authLoadTimedOut) return;
+
+    const t = setTimeout(() => {
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        level: 'warning',
+        message: 'app shell Clerk auth load timed out',
+      });
+      setAuthLoadTimedOut(true);
+    }, APP_AUTH_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [authLoadTimedOut, isLoaded]);
 
   // [M15] Timeout for isProfileLoading spinner
   const [profileLoadTimedOut, setProfileLoadTimedOut] = React.useState(false);
@@ -407,12 +430,45 @@ export default function AppLayout() {
     setWizardDone(true);
   }, []);
 
-  if (!isLoaded)
+  if (!isLoaded) {
+    if (authLoadTimedOut) {
+      return (
+        <View className="flex-1 bg-background">
+          <ErrorFallback
+            variant="centered"
+            title="Still signing you in"
+            message="The secure sign-in handoff is taking longer than expected. Try again, or sign out and sign in again."
+            primaryAction={{
+              label: t('common.retry'),
+              onPress: () => setAuthLoadTimedOut(false),
+              testID: 'app-auth-loading-timeout-retry',
+            }}
+            secondaryAction={{
+              label: t('common.signOut'),
+              onPress: () => {
+                void signOutWithCleanup({
+                  clerkSignOut,
+                  queryClient,
+                  profileIds: profiles.map((p) => p.id),
+                  clerkUserId: userId ?? undefined,
+                });
+              },
+              testID: 'app-auth-loading-timeout-signout',
+            }}
+            testID="app-auth-loading-timeout"
+          />
+        </View>
+      );
+    }
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="app-auth-loading"
+      >
         <ActivityIndicator size="large" />
       </View>
     );
+  }
   if (!isSignedIn) {
     if (__DEV__)
       console.warn(
