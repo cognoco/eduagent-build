@@ -1,3 +1,5 @@
+// uppercase-allowed: PARENT PREVIEW chrome label — preserved from the inline
+// definition that used to live in (app)/_layout.tsx.
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
