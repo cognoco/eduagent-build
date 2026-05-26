@@ -27,6 +27,7 @@ import type {
   ConsentType,
   ConsentStatus,
   ConsentRequest,
+  ConsentResendRequest,
 } from '@eduagent/schemas';
 import {
   sendEmail,
@@ -102,6 +103,30 @@ export class ConsentRecordNotFoundError extends Error {
   constructor() {
     super('No consent record found for this profile');
     this.name = 'ConsentRecordNotFoundError';
+  }
+}
+
+/**
+ * [WI-374] Thrown when the recipient-change cap is reached. Changing the
+ * recipient email is a distinct, separately-capped action from resending, so
+ * rotating the recipient cannot be used to reset the resend cap and bomb
+ * arbitrary addresses. Route layer maps to 429.
+ */
+export class ConsentRecipientChangeLimitError extends Error {
+  constructor() {
+    super('Maximum consent recipient-change limit reached');
+    this.name = 'ConsentRecipientChangeLimitError';
+  }
+}
+
+/**
+ * [WI-374] Thrown when a resend is requested but no consent request exists for
+ * the profile/type (nothing to resend). Route layer maps to 404.
+ */
+export class ConsentRequestNotFoundError extends Error {
+  constructor() {
+    super('No pending consent request to resend');
+    this.name = 'ConsentRequestNotFoundError';
   }
 }
 
@@ -345,6 +370,17 @@ export async function createGrantedConsentState(
 const MAX_CONSENT_RESENDS = 3;
 
 /**
+ * [WI-374] Maximum number of recipient-email changes per consent request.
+ * Changing the recipient resets the resend budget (legitimate "I typed the
+ * wrong email" correction), so it MUST be separately capped — otherwise an
+ * abuser rotates the recipient to reset the resend cap indefinitely and bombs
+ * arbitrary addresses. The total email ceiling per request is therefore
+ * bounded: 1 initial + MAX_CONSENT_RESENDS resends + MAX_RECIPIENT_CHANGES ×
+ * (1 + MAX_CONSENT_RESENDS).
+ */
+const MAX_RECIPIENT_CHANGES = 3;
+
+/**
  * Creates a consent request and sends a notification email to the parent.
  */
 export interface ConsentRequestResult {
@@ -382,12 +418,35 @@ export async function requestConsent(
   // Token expires in 7 days (PRD line 414)
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  // Atomic upsert with resend limit enforced in the UPDATE WHERE clause.
-  // This avoids the TOCTOU race where two concurrent requests both read
-  // resendCount=2, both pass the check, and both increment to 3.
+  // [WI-374] Pre-read the existing request to classify this call as a
+  // resend-to-same-email vs a recipient change. This only drives error
+  // classification and which counter to roll back on email failure — the caps
+  // themselves are enforced atomically in the setWhere below (race-safe), so a
+  // stale read here can never let a request exceed a cap.
+  const existing = await db.query.consentStates.findFirst({
+    where: and(
+      eq(consentStates.profileId, input.childProfileId),
+      eq(consentStates.consentType, input.consentType),
+    ),
+    columns: { parentEmail: true },
+  });
+  // A null stored recipient means no email has been assigned yet (e.g. a
+  // PENDING row from createPendingConsentState). The first real email is the
+  // INITIAL request, NOT a recipient change — it must not consume a
+  // recipient-change slot.
+  const isRecipientChange =
+    existing != null &&
+    existing.parentEmail != null &&
+    existing.parentEmail !== input.parentEmail;
+
+  // Atomic upsert with both caps enforced in the UPDATE WHERE clause.
+  // This avoids the TOCTOU race where two concurrent requests both read a
+  // counter, both pass the check, and both increment past the cap.
   //
-  // When the parent email changes, the resend counter resets to 0 — the limit
-  // is per-recipient, so switching to a different email should always be allowed.
+  // [WI-374] The resend cap is request-keyed (same email → resendCount + 1).
+  // Changing the recipient resets the resend budget but is SEPARATELY capped
+  // via recipientChangeCount, so rotating the recipient cannot reset the
+  // resend cap to bomb arbitrary addresses.
   const [row] = await db
     .insert(consentStates)
     .values({
@@ -398,6 +457,7 @@ export async function requestConsent(
       consentToken: token,
       expiresAt,
       resendCount: 0,
+      recipientChangeCount: 0,
     })
     .onConflictDoUpdate({
       target: [consentStates.profileId, consentStates.consentType],
@@ -407,18 +467,28 @@ export async function requestConsent(
         consentToken: token,
         expiresAt,
         resendCount: sql`CASE WHEN ${consentStates.parentEmail} IS NOT DISTINCT FROM ${input.parentEmail} THEN ${consentStates.resendCount} + 1 ELSE 0 END`,
+        // Only a change BETWEEN two real recipients consumes a change slot. A
+        // null→email first assignment (IS NULL) is the initial request.
+        recipientChangeCount: sql`CASE WHEN ${consentStates.parentEmail} IS NOT NULL AND ${consentStates.parentEmail} IS DISTINCT FROM ${input.parentEmail} THEN ${consentStates.recipientChangeCount} + 1 ELSE ${consentStates.recipientChangeCount} END`,
         requestedAt: sql`now()`,
         respondedAt: null,
         updatedAt: sql`now()`,
       },
-      setWhere: sql`${consentStates.resendCount} < ${MAX_CONSENT_RESENDS} OR ${consentStates.parentEmail} IS DISTINCT FROM ${input.parentEmail}`,
+      // Three branches: (1) same recipient → resend cap; (2) no recipient yet
+      // (NULL) → always allowed, this is the initial assignment; (3) real
+      // recipient change → recipient-change cap. Caps are enforced here
+      // atomically so concurrent requests cannot exceed them.
+      setWhere: sql`(${consentStates.parentEmail} IS NOT DISTINCT FROM ${input.parentEmail} AND ${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}) OR ${consentStates.parentEmail} IS NULL OR (${consentStates.parentEmail} IS NOT NULL AND ${consentStates.parentEmail} IS DISTINCT FROM ${input.parentEmail} AND ${consentStates.recipientChangeCount} < ${MAX_RECIPIENT_CHANGES})`,
     })
     .returning();
 
   // If no row returned, the conflict existed but the setWhere prevented the
-  // update — meaning the resend limit was reached for the same email.
+  // update — a cap was reached. Classify by intent: a same-email resend hit
+  // the resend cap; a recipient change hit the recipient-change cap.
   if (!row) {
-    throw new ConsentResendLimitError();
+    throw isRecipientChange
+      ? new ConsentRecipientChangeLimitError()
+      : new ConsentResendLimitError();
   }
 
   // Look up child's display name for personalized email
@@ -450,8 +520,166 @@ export async function requestConsent(
       };
     }
 
+    // Roll back the counter that was just incremented — don't burn attempts
+    // when email fails. A recipient change incremented recipientChangeCount
+    // (and reset resendCount to 0); a same-email resend incremented
+    // resendCount. GREATEST avoids negative values on initial insert.
+    try {
+      await db
+        .update(consentStates)
+        .set(
+          isRecipientChange
+            ? {
+                recipientChangeCount: sql`GREATEST(${consentStates.recipientChangeCount} - 1, 0)`,
+                updatedAt: sql`now()`,
+              }
+            : {
+                resendCount: sql`GREATEST(${consentStates.resendCount} - 1, 0)`,
+                updatedAt: sql`now()`,
+              },
+        )
+        .where(eq(consentStates.id, row.id));
+    } catch (rollbackError) {
+      // If rollback fails we still throw the delivery error — losing one
+      // counter slot is better than silently claiming the email was sent.
+      logger.warn('[consent] Failed to rollback resend counter', {
+        error:
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError),
+      });
+    }
+    throw new EmailDeliveryError(emailResult.reason ?? undefined);
+  }
+
+  return {
+    consentState: mapConsentRow(row),
+    emailDelivered: true,
+  };
+}
+
+/**
+ * [WI-374] Resends the consent email for an EXISTING request, reusing the
+ * stored parent email server-side. The caller never supplies an email, so a
+ * masked or arbitrary address can never be sent on resend (WI-261), and the
+ * resend cap is bound to the request (childProfileId + consentType), not the
+ * recipient string — rotating the recipient cannot reset it (WI-146/262/309).
+ *
+ * Distinct from {@link requestConsent}, which handles the initial request and
+ * the (separately-capped) recipient change.
+ */
+export async function resendConsent(
+  db: Database,
+  input: ConsentResendRequest,
+  appUrl: string,
+  emailOptions?: EmailOptions,
+  accountId?: string,
+): Promise<ConsentRequestResult> {
+  // Verify childProfileId belongs to the calling account when accountId is
+  // provided. Defense-in-depth: the route layer also enforces this.
+  if (accountId) {
+    const [owner] = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(
+        and(
+          eq(profiles.id, input.childProfileId),
+          eq(profiles.accountId, accountId),
+        ),
+      );
+    if (!owner) {
+      throw new Error('Child profile not found');
+    }
+  }
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // Atomic conditional UPDATE: increment resendCount and enforce the cap in
+  // the WHERE clause (race-safe). No INSERT — a resend requires an existing
+  // request. The stored parentEmail is left untouched and reused below.
+  const [row] = await db
+    .update(consentStates)
+    .set({
+      status: 'PARENTAL_CONSENT_REQUESTED',
+      consentToken: token,
+      expiresAt,
+      resendCount: sql`${consentStates.resendCount} + 1`,
+      requestedAt: sql`now()`,
+      respondedAt: null,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(consentStates.profileId, input.childProfileId),
+        eq(consentStates.consentType, input.consentType),
+        sql`${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}`,
+      ),
+    )
+    .returning();
+
+  // No row updated → either no request exists (nothing to resend) or the cap
+  // was hit. Disambiguate with a follow-up read (read does not affect the cap
+  // decision, which was atomic above).
+  if (!row) {
+    const stillExists = await db.query.consentStates.findFirst({
+      where: and(
+        eq(consentStates.profileId, input.childProfileId),
+        eq(consentStates.consentType, input.consentType),
+      ),
+      columns: { id: true },
+    });
+    throw stillExists
+      ? new ConsentResendLimitError()
+      : new ConsentRequestNotFoundError();
+  }
+
+  // Reuse the STORED recipient — never a client-supplied value (AC1/WI-261).
+  const storedEmail = row.parentEmail;
+  if (!storedEmail) {
+    // A request row with no recipient on record cannot be resent. Roll back
+    // the burned attempt and surface as "nothing to resend".
+    try {
+      await db
+        .update(consentStates)
+        .set({
+          resendCount: sql`GREATEST(${consentStates.resendCount} - 1, 0)`,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(consentStates.id, row.id));
+    } catch {
+      // best-effort rollback
+    }
+    throw new ConsentRequestNotFoundError();
+  }
+
+  const childProfile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, input.childProfileId),
+    columns: { displayName: true },
+  });
+  const childName = childProfile?.displayName ?? 'your child';
+
+  const tokenUrl = `${appUrl}/v1/consent-page?token=${token}`;
+
+  const emailResult = await sendEmail(
+    formatConsentRequestEmail(
+      storedEmail,
+      childName,
+      row.consentType,
+      tokenUrl,
+    ),
+    emailOptions,
+  );
+
+  if (!emailResult.sent) {
+    if (emailResult.reason === 'no_api_key') {
+      return {
+        consentState: mapConsentRow(row),
+        emailDelivered: false,
+      };
+    }
+
     // Roll back the resend counter — don't burn attempts when email fails.
-    // Use GREATEST to avoid negative values on initial insert (resendCount=0).
     try {
       await db
         .update(consentStates)
@@ -461,8 +689,6 @@ export async function requestConsent(
         })
         .where(eq(consentStates.id, row.id));
     } catch (rollbackError) {
-      // If rollback fails we still throw the delivery error — losing one
-      // counter slot is better than silently claiming the email was sent.
       logger.warn('[consent] Failed to rollback resend counter', {
         error:
           rollbackError instanceof Error

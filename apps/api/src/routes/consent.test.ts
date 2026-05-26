@@ -149,6 +149,20 @@ jest.mock('../services/consent' /* gc1-allow: pattern-a conversion */, () => {
       },
       emailDelivered: true,
     }),
+    // [WI-374] resend reuses the stored email server-side; the route never
+    // forwards a client-supplied address.
+    resendConsent: jest.fn().mockResolvedValue({
+      consentState: {
+        id: 'consent-1',
+        profileId: '550e8400-e29b-41d4-a716-446655440000',
+        consentType: 'GDPR',
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+        requestedAt: new Date().toISOString(),
+        respondedAt: null,
+      },
+      emailDelivered: true,
+    }),
     processConsentResponse: jest
       .fn()
       .mockImplementation((_db: unknown, _token: string, approved: boolean) =>
@@ -418,6 +432,226 @@ describe('consent routes', () => {
           body: JSON.stringify({
             childProfileId: '550e8400-e29b-41d4-a716-446655440000',
             parentEmail: 'parent@example.com',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+    });
+
+    it('[WI-374] returns 429 when the recipient-change cap is reached (rotation cannot reset the resend cap)', async () => {
+      const { requestConsent: mockRequestConsent } = jest.requireMock(
+        '../services/consent',
+      ) as { requestConsent: jest.Mock };
+      const { ConsentRecipientChangeLimitError: ChangeLimitClass } =
+        jest.requireActual('../services/consent') as {
+          ConsentRecipientChangeLimitError: new () => Error;
+        };
+      mockRequestConsent.mockRejectedValueOnce(new ChangeLimitClass());
+
+      const res = await app.request(
+        '/v1/consent/request',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            parentEmail: 'rotated@example.com',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(429);
+      const body = await res.json();
+      expect(body.code).toBe('RATE_LIMITED');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/consent/resend [WI-374]
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/consent/resend [WI-374]', () => {
+    it('returns 201 and never forwards a client email (resend carries no email)', async () => {
+      const { resendConsent: mockResendConsent } = jest.requireMock(
+        '../services/consent',
+      ) as { resendConsent: jest.Mock };
+      mockResendConsent.mockClear();
+
+      const res = await app.request(
+        '/v1/consent/resend',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.message).toBe('Consent request sent to parent');
+      expect(body.emailStatus).toBe('sent');
+
+      // The service was invoked with the request-keyed input only — no email.
+      expect(mockResendConsent).toHaveBeenCalledTimes(1);
+      const passedInput = mockResendConsent.mock.calls[0][1] as Record<
+        string,
+        unknown
+      >;
+      expect(passedInput).not.toHaveProperty('parentEmail');
+      expect(passedInput.childProfileId).toBe(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+    });
+
+    it('[WI-261 break] returns 400 when a parentEmail is included (strict schema)', async () => {
+      const res = await app.request(
+        '/v1/consent/resend',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            consentType: 'GDPR',
+            parentEmail: 'j***@gmail.com',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('dispatches app/consent.requested on success', async () => {
+      const { inngest: mockInngest } = jest.requireMock(
+        '../inngest/client',
+      ) as { inngest: { send: jest.Mock } };
+      mockInngest.send.mockClear();
+
+      const res = await app.request(
+        '/v1/consent/resend',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(201);
+      expect(mockInngest.send).toHaveBeenCalledWith({
+        name: 'app/consent.requested',
+        data: expect.objectContaining({
+          profileId: '550e8400-e29b-41d4-a716-446655440000',
+          consentType: 'GDPR',
+          requestedAt: expect.any(String),
+        }),
+      });
+    });
+
+    it('returns 429 when the resend cap is reached', async () => {
+      const { resendConsent: mockResendConsent } = jest.requireMock(
+        '../services/consent',
+      ) as { resendConsent: jest.Mock };
+      const { ConsentResendLimitError: ResendLimitClass } = jest.requireActual(
+        '../services/consent',
+      ) as {
+        ConsentResendLimitError: new () => Error;
+      };
+      mockResendConsent.mockRejectedValueOnce(new ResendLimitClass());
+
+      const res = await app.request(
+        '/v1/consent/resend',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(429);
+      const body = await res.json();
+      expect(body.code).toBe('RATE_LIMITED');
+    });
+
+    it('returns 404 when there is no request to resend', async () => {
+      const { resendConsent: mockResendConsent } = jest.requireMock(
+        '../services/consent',
+      ) as { resendConsent: jest.Mock };
+      const { ConsentRequestNotFoundError: NotFoundClass } = jest.requireActual(
+        '../services/consent',
+      ) as {
+        ConsentRequestNotFoundError: new () => Error;
+      };
+      mockResendConsent.mockRejectedValueOnce(new NotFoundClass());
+
+      const res = await app.request(
+        '/v1/consent/resend',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 502 when email delivery fails', async () => {
+      const { resendConsent: mockResendConsent } = jest.requireMock(
+        '../services/consent',
+      ) as { resendConsent: jest.Mock };
+      const { EmailDeliveryError: EmailDeliveryErrorClass } =
+        jest.requireActual('../services/consent') as {
+          EmailDeliveryError: new (reason?: string) => Error;
+        };
+      mockResendConsent.mockRejectedValueOnce(
+        new EmailDeliveryErrorClass('http_503'),
+      );
+
+      const res = await app.request(
+        '/v1/consent/resend',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(502);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/consent/resend',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
             consentType: 'GDPR',
           }),
         },
