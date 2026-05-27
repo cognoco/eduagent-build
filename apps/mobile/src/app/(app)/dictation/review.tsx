@@ -68,6 +68,7 @@ export default function DictationReviewScreen(): React.ReactElement {
       // [CRIT-2] Navigate only after successful save — guarded per CLAUDE.md
       router.replace('/(app)/practice' as Href);
     } catch (err) {
+      savingRef.current = false;
       // [CRIT-2] Show user-visible feedback on failure — bare catch {} is forbidden.
       // Pattern matches complete.tsx [ASSUMP-F11].
       console.warn('[dictation] review result recording failed:', err);
@@ -86,8 +87,6 @@ export default function DictationReviewScreen(): React.ReactElement {
           onPress: () => router.replace('/(app)/practice' as Href),
         },
       ]);
-    } finally {
-      savingRef.current = false;
     }
   };
 

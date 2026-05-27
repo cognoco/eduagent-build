@@ -776,6 +776,71 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
     });
 
+    it('keeps the retry timeout active when a stale first response resolves after retry starts', async () => {
+      const staleProfile = {
+        id: 'stale-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      let firstSignal: AbortSignal | undefined;
+      let secondSignal: AbortSignal | undefined;
+      let resolveFirst: ((response: Response) => void) | undefined = undefined;
+      mockFetch
+        .mockImplementationOnce((_input: RequestInfo, init?: RequestInit) => {
+          firstSignal = init?.signal ?? undefined;
+          return new Promise<Response>((resolve) => {
+            resolveFirst = resolve;
+          });
+        })
+        .mockImplementationOnce((_input: RequestInfo, init?: RequestInit) => {
+          secondSignal = init?.signal ?? undefined;
+          return new Promise(() => undefined);
+        });
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(firstSignal?.aborted).toBe(true);
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+
+      await act(async () => {
+        resolveFirst?.(
+          new Response(JSON.stringify({ profile: staleProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(secondSignal?.aborted).toBe(true);
+      screen.getByTestId('create-profile-error');
+      expect(
+        screen.getByTestId('create-profile-submit').props.accessibilityState
+          ?.disabled,
+      ).toBe(false);
+    });
+
     it('keeps duplicate-submit lock active after the POST resolves while success work finishes', async () => {
       const newProfile = {
         id: 'slow-success-id',

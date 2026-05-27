@@ -184,6 +184,25 @@ describe('DictationReviewScreen', () => {
       expect(mockRecordMutateAsync).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps Done locked after a successful save while navigation is pending', async () => {
+      mockRecordMutateAsync.mockResolvedValue(undefined);
+      const { getByTestId } = render(<DictationReviewScreen />);
+      const done = getByTestId('review-done');
+
+      await act(async () => {
+        fireEvent.press(done);
+        await Promise.resolve();
+      });
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+
+      await act(async () => {
+        fireEvent.press(done);
+        await Promise.resolve();
+      });
+
+      expect(mockRecordMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
     it('disables Done accessibly while the result save is pending', () => {
       mockRecordIsPending = true;
       const { getByTestId } = render(<DictationReviewScreen />);

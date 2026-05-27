@@ -238,10 +238,14 @@ export default function CreateProfileScreen() {
       );
       await assertOk(res);
       const result = (await res.json()) as { profile: Profile };
-      setCreatePostPending(false);
-      if (requestSeqRef.current !== requestSeq || controller.signal.aborted) {
+      if (
+        abortRef.current !== controller ||
+        requestSeqRef.current !== requestSeq ||
+        controller.signal.aborted
+      ) {
         return;
       }
+      setCreatePostPending(false);
 
       // [ACCOUNT-01] Persist Study/Family intent immediately after creation.
       // The profile is created with defaultAppContext=null; setting it now
