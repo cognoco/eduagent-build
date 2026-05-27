@@ -20,7 +20,7 @@ import {
   type SwitchProfileOptions,
 } from '../lib/profile';
 import { useAppContext } from '../lib/app-context';
-import { goBackOrReplace } from '../lib/navigation';
+import { childProfileHref, goBackOrReplace } from '../lib/navigation';
 import { useThemeColors } from '../lib/theme';
 import {
   useSubscription,
@@ -198,10 +198,7 @@ export default function ProfilesScreen() {
       if (router.canDismiss?.()) {
         router.dismiss();
       }
-      router.push({
-        pathname: '/(app)/child/[profileId]',
-        params: { profileId: profile.id, mode: 'settings' },
-      });
+      router.push(childProfileHref(profile.id, 'settings'));
       return;
     }
 

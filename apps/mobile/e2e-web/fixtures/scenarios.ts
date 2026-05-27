@@ -16,7 +16,7 @@ export const authScenarios = {
     email: buildSeedEmail('owner-with-children'),
     storageStatePath: path.join(authStateDir, 'owner-with-children.json'),
     landingPath: '/home',
-    landingTestId: 'parent-home-screen',
+    landingTestId: 'learner-screen',
   },
 } as const;
 

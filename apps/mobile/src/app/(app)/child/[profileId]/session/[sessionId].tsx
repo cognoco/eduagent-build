@@ -15,6 +15,7 @@ import {
   useChildSessionDetail,
 } from '../../../../../hooks/use-dashboard';
 import {
+  childProfileHref,
   goBackOrReplace,
   homeHrefForReturnTo,
 } from '../../../../../lib/navigation';
@@ -75,10 +76,7 @@ export default function SessionDetailScreen() {
     returnTo != null
       ? homeHrefForReturnTo(returnTo, returnId)
       : profileId
-        ? ({
-            pathname: '/(app)/child/[profileId]',
-            params: { profileId },
-          } as Href)
+        ? childProfileHref(profileId)
         : ('/(app)/home' as Href);
   const handleBack = () => goBackOrReplace(router, backFallbackHref);
 

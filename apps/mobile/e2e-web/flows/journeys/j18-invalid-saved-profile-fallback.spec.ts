@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { enterFamilyHome } from '../../helpers/parent-home';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
 
@@ -22,9 +23,7 @@ test('J-18 invalid saved profile falls back to the owner profile', async ({
   });
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
-    timeout: 60_000,
-  });
+  await enterFamilyHome(page, { timeout: 60_000 });
   await expect
     .poll(
       () =>
