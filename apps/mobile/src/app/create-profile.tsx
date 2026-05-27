@@ -416,6 +416,11 @@ export default function CreateProfileScreen() {
     displayName,
     birthDate,
     isParentAddingChild,
+    // i18n Phase 1 — onSubmit branches on isAddingChild and reads i18n.language
+    // to build the create-profile payload. Without these in deps, a route or
+    // language change between mount and submit would send the stale value.
+    isAddingChild,
+    i18n.language,
     client,
     queryClient,
     switchProfile,

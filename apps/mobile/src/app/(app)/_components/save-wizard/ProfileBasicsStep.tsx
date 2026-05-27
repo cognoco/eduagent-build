@@ -196,6 +196,9 @@ export function ProfileBasicsStep({
     childBirthYear,
     previewState,
     onComplete,
+    // i18n Phase 1 — owner POST reads this; without it in deps, a language
+    // change between mount and submit would send the stale locale.
+    ownerConversationLanguage,
   ]);
 
   return (
