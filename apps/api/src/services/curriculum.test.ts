@@ -2290,6 +2290,86 @@ describe('prepareTopicExpansion', () => {
     ]);
   });
 
+  it('[WI-142] creates fresh fallback topics when skipped rows occupy every deterministic fallback title', () => {
+    const skippedFallbackTitles = [
+      'Start with Ancient Egypt',
+      'Key ideas in Ancient Egypt',
+      'Important words for Ancient Egypt',
+      'Examples of Ancient Egypt',
+      'Practice with Ancient Egypt',
+      'Review Ancient Egypt',
+    ];
+    const existingTopics = skippedFallbackTitles.map((title) => ({
+      title,
+      skipped: true,
+    }));
+    const generated: BookTopicGenerationResult = {
+      topics: [],
+      connections: [],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    expect(result.topics).toHaveLength(5);
+    expect(result.topics.map((topic) => topic.title)).not.toEqual(
+      expect.arrayContaining(skippedFallbackTitles),
+    );
+  });
+
+  it('[WI-142] preserves generated connections between new and existing active topics', () => {
+    const existingTopics = [{ title: 'Timeline of Egypt', skipped: false }];
+    const generated: BookTopicGenerationResult = {
+      topics: [
+        {
+          title: 'Old Kingdom',
+          description: 'Age of pyramid-builders.',
+          chapter: 'Story',
+          sortOrder: 1,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'Middle Kingdom',
+          description: 'Reunification and stability.',
+          chapter: 'Story',
+          sortOrder: 2,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'New Kingdom',
+          description: 'The age of empire.',
+          chapter: 'Story',
+          sortOrder: 3,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'Daily Life',
+          description: 'How ordinary people lived.',
+          chapter: 'Society',
+          sortOrder: 4,
+          estimatedMinutes: 25,
+        },
+      ],
+      connections: [{ topicA: 'Old Kingdom', topicB: 'Timeline of Egypt' }],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    expect(result.connections).toContainEqual({
+      topicA: 'Old Kingdom',
+      topicB: 'Timeline of Egypt',
+    });
+  });
+
   it('[WI-142] accepts fallback overlap when the repaired book reaches the minimum topic count', () => {
     const existingTopics = [
       { title: 'Start with Ancient Egypt' },

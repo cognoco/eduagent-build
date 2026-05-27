@@ -1269,6 +1269,82 @@ export function normalizeTopicTitle(title: string): string {
   return title.trim().toLowerCase();
 }
 
+function buildConflictRepairBookTopics(
+  bookTitle: string,
+  bookDescription: string | null,
+): GeneratedBookTopic[] {
+  const title = bookTitle.trim() || 'this book';
+  const context =
+    bookDescription?.trim() || `Learn the essentials of ${title}.`;
+  const topicTemplates = [
+    {
+      title: `Fresh questions about ${title}`,
+      description: `Ask useful questions that open a new path into ${title}.`,
+      chapter: 'Getting started',
+      estimatedMinutes: 15,
+    },
+    {
+      title: `New examples of ${title}`,
+      description: 'Use different examples to make the ideas concrete.',
+      chapter: 'Core understanding',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Practice plan for ${title}`,
+      description: 'Turn the next study step into a short, focused plan.',
+      chapter: 'Practice',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Common mix-ups in ${title}`,
+      description: 'Spot confusing ideas and learn how to tell them apart.',
+      chapter: 'Core understanding',
+      estimatedMinutes: 15,
+    },
+    {
+      title: `Mini project on ${title}`,
+      description: 'Apply the topic in a small project or explanation.',
+      chapter: 'Practice',
+      estimatedMinutes: 25,
+    },
+    {
+      title: `Review challenge for ${title}`,
+      description: 'Check what stuck and what needs another pass.',
+      chapter: 'Review',
+      estimatedMinutes: 10,
+    },
+    {
+      title: `Compare ideas in ${title}`,
+      description: 'Compare related ideas and explain the differences.',
+      chapter: 'Core understanding',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Explain ${title} simply`,
+      description: 'Practice a clear explanation in plain language.',
+      chapter: 'Review',
+      estimatedMinutes: 15,
+    },
+    {
+      title: `Apply ${title}`,
+      description: 'Use the topic in a realistic example or problem.',
+      chapter: 'Practice',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Reflect on ${title}`,
+      description: context,
+      chapter: 'Review',
+      estimatedMinutes: 10,
+    },
+  ];
+
+  return topicTemplates.map((topic, index) => ({
+    ...topic,
+    sortOrder: index + 1,
+  }));
+}
+
 export function prepareTopicExpansion(
   generated: BookTopicGenerationResult,
   existingTopics: Array<{ title: string; skipped?: boolean }>,
@@ -1278,6 +1354,11 @@ export function prepareTopicExpansion(
   const existingActiveTopicCount = existingTopics.filter(
     (topic) => !topic.skipped,
   ).length;
+  const existingActiveTitleKeys = new Set(
+    existingTopics
+      .filter((topic) => !topic.skipped)
+      .map((topic) => normalizeTopicTitle(topic.title)),
+  );
   const existingTitleKeys = new Set(
     existingTopics.map((topic) => normalizeTopicTitle(topic.title)),
   );
@@ -1305,6 +1386,16 @@ export function prepareTopicExpansion(
   }
 
   if (repairedActiveTopicCount() < MIN_GENERATED_BOOK_TOPICS) {
+    for (const topic of buildConflictRepairBookTopics(
+      bookTitle,
+      bookDescription,
+    )) {
+      if (repairedActiveTopicCount() >= MIN_GENERATED_BOOK_TOPICS) break;
+      addTopic(topic);
+    }
+  }
+
+  if (repairedActiveTopicCount() < MIN_GENERATED_BOOK_TOPICS) {
     throw new Error(
       `Book topic expansion produced only ${repairedActiveTopicCount()} total active topics`,
     );
@@ -1313,12 +1404,20 @@ export function prepareTopicExpansion(
   const expansionTitleKeys = new Set(
     expansionTopics.map((topic) => normalizeTopicTitle(topic.title)),
   );
+  const activeTitleKeys = new Set([
+    ...existingActiveTitleKeys,
+    ...expansionTitleKeys,
+  ]);
   const seenConnectionKeys = new Set<string>();
   const connections = [...generated.connections, ...fallback.connections]
     .filter((connection) => {
       const topicA = normalizeTopicTitle(connection.topicA);
       const topicB = normalizeTopicTitle(connection.topicB);
-      return expansionTitleKeys.has(topicA) && expansionTitleKeys.has(topicB);
+      return (
+        activeTitleKeys.has(topicA) &&
+        activeTitleKeys.has(topicB) &&
+        (expansionTitleKeys.has(topicA) || expansionTitleKeys.has(topicB))
+      );
     })
     .filter((connection) => {
       const topicA = normalizeTopicTitle(connection.topicA);

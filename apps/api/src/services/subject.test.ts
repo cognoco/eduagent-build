@@ -734,6 +734,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     await expect(
       createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
     ).rejects.toThrow('profile DB offline');
+    expect(db.insert).not.toHaveBeenCalled();
     expect(detectSubjectTypeSpy).not.toHaveBeenCalled();
   });
 

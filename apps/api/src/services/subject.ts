@@ -407,6 +407,16 @@ export async function createSubjectWithStructure(
     };
   }
 
+  const explicitlyConfiguredLanguage =
+    input.pedagogyMode === 'four_strands' && input.languageCode;
+  const classificationPrereqs = explicitlyConfiguredLanguage
+    ? null
+    : {
+        learnerAge: await getProfileAge(db, profileId),
+        detectSubjectType: (await import('./book-generation'))
+          .detectSubjectType,
+      };
+
   const subject = await createSubject(db, profileId, input);
 
   if (subject.pedagogyMode === 'four_strands' && subject.languageCode) {
@@ -425,11 +435,13 @@ export async function createSubjectWithStructure(
     };
   }
 
-  const learnerAge = await getProfileAge(db, profileId);
+  if (!classificationPrereqs) {
+    throw new Error(
+      'Subject classification prerequisites were not initialized',
+    );
+  }
 
-  // Dynamic import — book-generation depends on LLM infra which may not
-  // initialize in all environments (integration tests without API keys).
-  const { detectSubjectType } = await import('./book-generation');
+  const { learnerAge, detectSubjectType } = classificationPrereqs;
   let classificationFailed = false;
   const detectedStructure = await detectSubjectType(
     subject.name,

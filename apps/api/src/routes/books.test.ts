@@ -71,7 +71,7 @@ const mockBook = {
   sortOrder: 1,
   topicsGenerated: false,
   createdAt: '2026-04-04T00:00:00.000Z',
-  updatedAt: '2026-04-04T00:00:00.000Z',
+  updatedAt: new Date().toISOString(),
 };
 
 const mockBookWithTopics = {
@@ -86,6 +86,58 @@ const mockBookWithTopics = {
       sortOrder: 1,
       relevance: 'core',
       estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440011',
+      curriculumId: 'curr-1',
+      title: 'Old Kingdom',
+      description: 'The age of pyramid builders',
+      chapter: 'The Story',
+      sortOrder: 2,
+      relevance: 'core',
+      estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440012',
+      curriculumId: 'curr-1',
+      title: 'Middle Kingdom',
+      description: 'Reunification and stability',
+      chapter: 'The Story',
+      sortOrder: 3,
+      relevance: 'core',
+      estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440013',
+      curriculumId: 'curr-1',
+      title: 'New Kingdom',
+      description: 'The age of empire',
+      chapter: 'The Story',
+      sortOrder: 4,
+      relevance: 'core',
+      estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440014',
+      curriculumId: 'curr-1',
+      title: 'Daily Life',
+      description: 'How ordinary people lived',
+      chapter: 'Society',
+      sortOrder: 5,
+      relevance: 'core',
+      estimatedMinutes: 25,
       bookId: mockBook.id,
       skipped: false,
       source: 'generated',
@@ -414,7 +466,7 @@ describe('book routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.book.title).toBe('Ancient Egypt');
-      expect(body.topics).toHaveLength(1);
+      expect(body.topics).toHaveLength(5);
       expect(body.topics[0].chapter).toBe('The Story');
       expect(body.status).toBe('NOT_STARTED');
     });
@@ -779,7 +831,10 @@ describe('book routes', () => {
 
     it('expands an already-generated thin book when requested', async () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
-      mockGetBookWithTopics.mockResolvedValueOnce(mockBookWithTopics as never);
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        topics: [mockBookWithTopics.topics[0]],
+      } as never);
 
       const { expandExistingBookTopics } = jest.requireMock(
         '../services/curriculum',
@@ -814,7 +869,10 @@ describe('book routes', () => {
       expect(profileIdArg).toBe('test-profile-id');
       expect(subjectIdArg).toBe(SUBJECT_ID);
       expect(bookIdArg).toBe(BOOK_ID);
-      expect(existingArg).toBe(mockBookWithTopics);
+      expect(existingArg).toEqual({
+        ...mockBookWithTopics,
+        topics: [mockBookWithTopics.topics[0]],
+      });
       expect(priorArg).toBeUndefined();
       expect(depsArg).toEqual(
         expect.objectContaining({
