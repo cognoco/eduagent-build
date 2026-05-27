@@ -39,6 +39,7 @@ import { buildFallbackBookTopics } from '../services/book-generation-fallbacks';
 import { getProfileAge } from '../services/profile';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
+import { safeSend } from '../services/safe-non-core';
 
 type BooksRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -158,26 +159,25 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         // Pre-generation is an optimization, so dispatch failure must not
         // block the response — but it MUST be observable so we can see if
         // the optimization silently stops working.
-        inngest
-          .send({
-            name: 'app/book.topics-generated',
-            data: {
-              subjectId,
-              bookId,
-              profileId,
-              timestamp: new Date().toISOString(),
-            },
-          })
-          .catch((err) => {
-            captureException(err, {
-              profileId,
-              extra: {
-                event: 'app/book.topics-generated',
+        void safeSend(
+          () =>
+            inngest.send({
+              name: 'app/book.topics-generated',
+              data: {
                 subjectId,
                 bookId,
+                profileId,
+                timestamp: new Date().toISOString(),
               },
-            });
-          });
+            }),
+          'books.generate-topics.topics-generated',
+          {
+            profileId,
+            subjectId,
+            bookId,
+            event: 'app/book.topics-generated',
+          },
+        );
       };
 
       try {
