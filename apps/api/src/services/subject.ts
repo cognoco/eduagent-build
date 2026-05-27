@@ -407,25 +407,14 @@ export async function createSubjectWithStructure(
     };
   }
 
-  const explicitlyConfiguredLanguage =
-    input.pedagogyMode === 'four_strands' && input.languageCode;
-  const classificationPrereqs = explicitlyConfiguredLanguage
-    ? null
-    : {
-        learnerAge: await getProfileAge(db, profileId),
-        detectSubjectType: (await import('./book-generation'))
-          .detectSubjectType,
-      };
-
-  const subject = await createSubject(db, profileId, input);
-
-  if (subject.pedagogyMode === 'four_strands' && subject.languageCode) {
-    const milestones = generateLanguageCurriculum(subject.languageCode, 'A1');
+  if (input.pedagogyMode === 'four_strands' && input.languageCode) {
+    const subject = await createSubject(db, profileId, input);
+    const milestones = generateLanguageCurriculum(input.languageCode, 'A1');
     await regenerateLanguageCurriculum(
       db,
       profileId,
       subject.id,
-      subject.languageCode,
+      input.languageCode,
       'A1',
     );
     return {
@@ -435,13 +424,9 @@ export async function createSubjectWithStructure(
     };
   }
 
-  if (!classificationPrereqs) {
-    throw new Error(
-      'Subject classification prerequisites were not initialized',
-    );
-  }
-
-  const { learnerAge, detectSubjectType } = classificationPrereqs;
+  const learnerAge = await getProfileAge(db, profileId);
+  const { detectSubjectType } = await import('./book-generation');
+  const subject = await createSubject(db, profileId, input);
   let classificationFailed = false;
   const detectedStructure = await detectSubjectType(
     subject.name,

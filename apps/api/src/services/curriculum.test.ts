@@ -23,6 +23,7 @@ import {
   generateBookTopicsWithFallback,
   releaseBookGenerationClaimIfEmpty,
   isStaleBookGenerationClaim,
+  repairIncompleteBookGenerationClaim,
   prepareTopicExpansion,
   deleteTopicIfSafe,
   deleteBook,
@@ -2264,6 +2265,58 @@ describe('isStaleBookGenerationClaim', () => {
     expect(isStaleBookGenerationClaim('2026-05-27T09:45:00.001Z')).toBe(false);
     expect(isStaleBookGenerationClaim('not-a-date')).toBe(true);
 
+    jest.useRealTimers();
+  });
+});
+
+describe('repairIncompleteBookGenerationClaim', () => {
+  it('[WI-142 review] classifies fresh incomplete generated books as in progress', async () => {
+    jest.useFakeTimers().setSystemTime(NOW);
+
+    const result = await repairIncompleteBookGenerationClaim(
+      {} as Database,
+      PROFILE_ID,
+      SUBJECT_ID,
+      'book-1',
+      {
+        book: {
+          id: 'book-1',
+          subjectId: SUBJECT_ID,
+          title: 'Ancient Egypt',
+          description: 'Explore pyramids and pharaohs',
+          emoji: null,
+          sortOrder: 1,
+          topicsGenerated: true,
+          createdAt: NOW.toISOString(),
+          updatedAt: NOW.toISOString(),
+        },
+        topics: [
+          {
+            id: 'topic-1',
+            title: 'Pyramids',
+            description: 'Why pyramids mattered',
+            chapter: 'The Story',
+            sortOrder: 1,
+            relevance: 'core',
+            estimatedMinutes: 20,
+            bookId: 'book-1',
+            skipped: false,
+            source: 'generated',
+          },
+        ],
+        connections: [],
+        status: 'NOT_STARTED',
+        completedTopicCount: 0,
+        completedTopicIds: [],
+      } as BookWithTopics,
+      undefined,
+      {
+        generateBookTopics: jest.fn(),
+        captureException: jest.fn(),
+      },
+    );
+
+    expect(result.status).toBe('in_progress');
     jest.useRealTimers();
   });
 });

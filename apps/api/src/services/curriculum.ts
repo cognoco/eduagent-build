@@ -50,6 +50,7 @@ import {
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 import { buildFallbackBookTopics } from './book-generation-fallbacks';
+import { getProfileAge } from './profile';
 
 const logger = createLogger();
 import { regenerateLanguageCurriculum } from './language-curriculum';
@@ -1277,6 +1278,58 @@ export function isStaleBookGenerationClaim(updatedAt: string): boolean {
   return Date.now() - updatedAtMs >= BOOK_GENERATION_STALE_MS;
 }
 
+type IncompleteBookGenerationClaimRepairResult =
+  | { status: 'not_incomplete' }
+  | { status: 'in_progress' }
+  | { status: 'repaired'; book: BookWithTopics };
+
+export async function repairIncompleteBookGenerationClaim(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+  existing: BookWithTopics,
+  priorKnowledge: string | undefined,
+  deps: {
+    generateBookTopics: (
+      bookTitle: string,
+      bookDescription: string,
+      learnerAge: number,
+      context?: string,
+    ) => Promise<BookTopicGenerationResult>;
+    captureException: (
+      error: unknown,
+      context?: { profileId?: string; extra?: Record<string, unknown> },
+    ) => void;
+  },
+): Promise<IncompleteBookGenerationClaimRepairResult> {
+  const activeTopicCount = existing.topics.filter(
+    (topic) => !topic.skipped,
+  ).length;
+  if (
+    !existing.book.topicsGenerated ||
+    activeTopicCount >= MIN_GENERATED_BOOK_TOPICS
+  ) {
+    return { status: 'not_incomplete' };
+  }
+
+  if (!isStaleBookGenerationClaim(existing.book.updatedAt)) {
+    return { status: 'in_progress' };
+  }
+
+  const learnerAge = await getProfileAge(db, profileId);
+  const book = await expandExistingBookTopics(
+    db,
+    profileId,
+    subjectId,
+    bookId,
+    existing,
+    priorKnowledge,
+    { learnerAge, ...deps },
+  );
+  return { status: 'repaired', book };
+}
+
 function buildConflictRepairBookTopics(
   bookTitle: string,
   bookDescription: string | null,
@@ -1684,12 +1737,12 @@ export async function persistBookTopics(
       orderBy: asc(curriculumTopics.sortOrder),
     });
 
-    const activeInsertedTopicRows = insertedTopicRows.filter(
+    const activePostInsertTopicRows = insertedTopicRows.filter(
       (topic) => !topic.skipped,
     );
-    if (activeInsertedTopicRows.length < MIN_GENERATED_BOOK_TOPICS) {
+    if (activePostInsertTopicRows.length < MIN_GENERATED_BOOK_TOPICS) {
       throw new Error(
-        `Generated book topics persisted only ${activeInsertedTopicRows.length} active topics`,
+        `Generated book topics persisted only ${activePostInsertTopicRows.length} active topics`,
       );
     }
 

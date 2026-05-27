@@ -27,7 +27,7 @@ import {
   persistBookTopics,
   claimBookForGeneration,
   releaseBookGenerationClaimIfEmpty,
-  isStaleBookGenerationClaim,
+  repairIncompleteBookGenerationClaim,
   moveTopicToBook,
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
@@ -175,26 +175,22 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           if (!existing) {
             return notFound(c, 'Book not found');
           }
-          const activeTopicCount = existing.topics.filter(
-            (topic) => !topic.skipped,
-          ).length;
-          if (
-            existing.book.topicsGenerated &&
-            activeTopicCount < MIN_GENERATED_BOOK_TOPICS
-          ) {
-            if (isStaleBookGenerationClaim(existing.book.updatedAt)) {
-              const learnerAge = await getProfileAge(db, profileId);
-              const expanded = await expandExistingBookTopics(
-                db,
-                profileId,
-                subjectId,
-                bookId,
-                existing,
-                priorKnowledge,
-                { learnerAge, generateBookTopics, captureException },
-              );
-              return c.json(bookWithTopicsSchema.parse(expanded));
-            }
+          const incompleteClaimRepair =
+            await repairIncompleteBookGenerationClaim(
+              db,
+              profileId,
+              subjectId,
+              bookId,
+              existing,
+              priorKnowledge,
+              { generateBookTopics, captureException },
+            );
+          if (incompleteClaimRepair.status === 'repaired') {
+            return c.json(
+              bookWithTopicsSchema.parse(incompleteClaimRepair.book),
+            );
+          }
+          if (incompleteClaimRepair.status === 'in_progress') {
             return apiError(
               c,
               409,
@@ -202,6 +198,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
               'Book topic generation is still in progress. Please retry shortly.',
             );
           }
+          const activeTopicCount = existing.topics.filter(
+            (topic) => !topic.skipped,
+          ).length;
           if (expandExisting && activeTopicCount < MIN_GENERATED_BOOK_TOPICS) {
             const learnerAge = await getProfileAge(db, profileId);
             const expanded = await expandExistingBookTopics(
