@@ -202,7 +202,11 @@ export default defineConfig({
       // `solo-learner` / `owner-with-children` storage states so a single
       // mentor-audit failure can't poison the rest of the suite.
       name: 'mentor-audit-registry-smoke',
-      testMatch: /flows[\\/]mentor-audit[\\/]registry-smoke\.spec\.ts/,
+      // Matches every spec under flows/mentor-audit/ — `registry-smoke.spec.ts`
+      // (landing assertions) and `bridge-backstack.spec.ts` (BRIDGE-04 backstack
+      // contract). New mentor-audit specs added here in future inherit the
+      // same opt-in invocation rules.
+      testMatch: /flows[\\/]mentor-audit[\\/].+\.spec\.ts/,
       fullyParallel: false,
     },
   ],
