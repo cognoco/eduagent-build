@@ -19,7 +19,10 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
-import { computeAgeBracket } from '@eduagent/schemas';
+import {
+  computeAgeBracket,
+  conversationLanguageSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile, type Profile } from '../lib/profile';
@@ -77,7 +80,7 @@ function parseWebBirthDate(value: string): Date | null {
 }
 
 export default function CreateProfileScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ for?: 'child' }>();
@@ -231,6 +234,16 @@ export default function CreateProfileScreen() {
     setLoading(true);
 
     try {
+      // i18n Phase 1 — Signup-time fix. Self-create: forward the device UI
+      // language so the first LLM card uses the learner's locale instead of
+      // the DB default 'en'. Parent-creates-child: OMIT the field — the
+      // parent's UI locale does not reliably predict the child's language
+      // (cross-language families exist). DB default 'en' applies until the
+      // child first signs in on their own device, when useMentorLanguageSync
+      // overwrites the row to match the child's UI choice.
+      const parsedConversationLanguage = !isAddingChild
+        ? conversationLanguageSchema.safeParse(i18n.language)
+        : null;
       const body = {
         displayName: trimmedName,
         // birthDate is non-null here (guarded above) — read birth fields from
@@ -241,6 +254,9 @@ export default function CreateProfileScreen() {
         birthYear: birthDate.getFullYear(),
         birthMonth: birthDate.getMonth() + 1, // getMonth() is 0-based
         birthDay: birthDate.getDate(),
+        ...(parsedConversationLanguage?.success
+          ? { conversationLanguage: parsedConversationLanguage.data }
+          : {}),
       };
 
       const res = await client.profiles.$post(
