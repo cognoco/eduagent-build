@@ -114,8 +114,10 @@ jest.mock(
 );
 
 // Track helper from analytics shouldn't be invoked by the routing tests, but
-// import-time evaluation requires it to be defined.
+// import-time evaluation requires it to be defined. Pattern A — preserve the
+// rest of the analytics surface so any future indirect consumer doesn't trip.
 jest.mock('../lib/analytics', () => ({
+  ...jest.requireActual('../lib/analytics'),
   track: jest.fn(),
 }));
 

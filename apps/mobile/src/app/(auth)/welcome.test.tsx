@@ -59,7 +59,11 @@ jest.mock(
   }),
 );
 
+// Pattern A — preserve the real analytics surface (other exports like
+// `emitHomeworkOcrGateEvent` may be referenced by sibling imports during
+// module evaluation) while spying on `track`.
 jest.mock('../../lib/analytics', () => ({
+  ...jest.requireActual('../../lib/analytics'),
   track: (...args: unknown[]) => mockTrack(...args),
 }));
 
