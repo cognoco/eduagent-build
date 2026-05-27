@@ -62,10 +62,13 @@ Add or document a stable mentor audit registry. Use names that describe the test
 | `mentor-audit-session-revoked` | New seeder: after sign-in, call Clerk Backend `POST /sessions/{id}/revoke`. Tests the **revoked-token-refresh** path (different code path from cookie corruption). Combined coverage of both seeds is required for AUTH-11. |
 | `mentor-audit-mfa-totp` | New Clerk-backed seeder. Calls Clerk Backend `POST /users/{id}/totp` to attach a TOTP factor, returns the shared secret in `SeedResult.ids.totpSecret`. Playwright helper generates the rolling code via `otplib` at sign-in time. Backup-code and SMS factor paths are **out of scope** — file a follow-up if AUTH-05 requires them. |
 | `mentor-audit-quota-owner-daily` | New seeder built from `daily-limit-reached`. Constrained to Study/free tier (Family/Pro have no daily cap). |
+| `mentor-audit-family-owner-daily-quota-with-child` | New seeder. Free-tier owner with `defaultAppContext: family`, 1 linked consented child holding a subject/topic/session, owner daily quota exhausted. Proves child-review surfaces still work while adult Study/billable actions are quota-blocked. Covers BILLING-07 + BRIDGE-03. Distinct from `mentor-audit-quota-owner-daily`, which has no linked child. |
 | `mentor-audit-quota-family-monthly` | New seeder: `subscription-family-active` with `quotaPools.usedThisMonth` driven over the monthly cap. Tests family-pool-exhausted owner state. |
+| `mentor-audit-family-pool-members` | New seeder. Active Family-tier subscription, owner + 2-3 linked consented children, shared monthly quota pool partially used (~40-60% of cap), stable `subscriptionId` + child profile IDs returned. Covers BILLING-08. Distinct from `mentor-audit-family-at-profile-limit` (which sits at the add-child cap) — this seed is a semantic "family in normal mid-month use" seed, not a gating-boundary seed. |
 | `mentor-audit-paywall-child-notify` | New seeder built from `trial-expired-child`. Tests the child paywall → notify-parent path independently from owner billing states. |
 | `mentor-audit-rich-child-history` | New composite scenario. **Requires Task 0 (extract reusable insert helpers) to land first.** |
 | `mentor-audit-resumable-session` | New scenario: deterministic in-progress `learning_sessions` row + enough `session_events` for the resume card to render. No LLM calls during seeding. |
+| `mentor-audit-bridge-backstack` | New scenario. Reuses `parent-multi-child` DB state (Family owner + child with topic that is NOT yet in the adult's Library). Adds a dedicated Playwright probe that performs **Add to my learning** from the child topic/session/recap, opens the adult copy, then backs out and asserts the user lands back on the Family child/recap context — not proxy/child active-profile state. Covers BRIDGE-04. |
 
 Each registry entry must expose:
 
@@ -280,6 +283,51 @@ Seed contract — three separate seeders:
 
 Audit-side assertions (which states the app gates, whether non-owner child profiles can read billing) are scoped to the audit re-run rows, not the seed contract.
 
+### 11b. Family Owner With Daily Quota Exhausted + Linked Child
+
+Covers BILLING-07 and BRIDGE-03.
+
+Requirement: A free-tier owner with `defaultAppContext: 'family'`, one linked consented child holding real learning state, and the owner's daily quota fully consumed. The split lets Chrome prove that child-review surfaces (Recaps, child topic detail, child session) remain reachable while adult Study/billable actions hit the quota gate.
+
+Seed contract:
+
+- Owner: `isOwner: true`, free/Study tier, `defaultAppContext: 'family'`, onboarding complete.
+- Child: 1 linked profile, `consentStates.status: 'CONSENTED'`, `family_links` row present, at least one subject + topic + session under the child's profile ID.
+- Quota: `quotaPools.usedToday` driven at or above the Study daily cap (`subscription.ts:33-49`). Monthly bucket left below cap so the failure attributable to the daily gate.
+- `SeedResult.ids` returns `ownerProfileId`, `childProfileId`, `childSubjectId`, `childTopicId`, `childSessionId`.
+
+Why a new seed (not a tweak to `mentor-audit-quota-owner-daily`):
+
+- The existing daily-quota seed has the quota state but no linked child, so it cannot exercise the Family Mentor context at all. Composing on the fly in Playwright would duplicate child-link insertion logic that already lives in the seed layer and would diverge from the test-seed cleanup contract.
+
+Implementation notes:
+
+- Compose `daily-limit-reached` quota plumbing with `parent-multi-child`-style child/subject/topic/session insertion (use the Task 0 extracted helpers — do not inline inserts).
+- Both V0 and V1 nav-contract flag positions must be executed against this seed per the audit's flag matrix.
+
+### 11c. Family Pool Members Mid-Use
+
+Covers BILLING-08.
+
+Requirement: An active Family-tier subscription with the owner plus 2-3 linked consented children sharing a partially-used monthly quota pool. This is the "normal mid-month Family in use" semantic seed — not a gating-boundary seed.
+
+Seed contract:
+
+- Owner: `isOwner: true`, `tier: 'family'`, active `subscriptionId` exposed in `SeedResult.ids`.
+- Children: 2 or 3 linked profiles, all `CONSENTED`, `family_links` rows present, stable `childProfileIds` array returned in registry order.
+- Subscription: `subscription-family-active` shape.
+- Quota: `quotaPools.usedThisMonth` set to ~40-60% of `getTierConfig('family').monthlyQuota` (single numeric constant in the seed; document the exact value beside the seeder).
+- `SeedResult.ids` returns `ownerProfileId`, `subscriptionId`, `childProfileIds: string[]`, and `quotaUsedThisMonth: number` so audit assertions can express percentages without re-reading the tier config.
+
+Why a new seed (not a reuse of `mentor-audit-family-at-profile-limit`):
+
+- `mentor-audit-family-at-profile-limit` exists to exercise the add-child cap branch and pins the count at `maxProfiles`. BILLING-08 is about the pool-sharing readout in steady state; coupling it to the add-child gate would make the seed brittle to any future cap change and conflate two unrelated audit concerns.
+
+Implementation notes:
+
+- Build from `subscription-family-active`. Insert exactly the number of children specified (2 or 3 — pick one and pin it; document the choice).
+- Quota helper must be deterministic — no `Date.now()`-based usage values.
+
 ### 12. Child With Rich Learning History
 
 Requirement: Create one linked child with enough learning history to exercise parent-native review surfaces.
@@ -312,6 +360,29 @@ Implementation notes:
 
 - Use a deterministic session row with status/state matching the app's resume query.
 - Include enough session events for the UI to render a meaningful resume card.
+
+### 14. Bridge Backstack
+
+Covers BRIDGE-04.
+
+Requirement: A Family owner viewing a child topic/session/recap can perform **Add to my learning**, open the adult copy, then back out and land on the same Family child/recap context they came from — not on the proxy/child active-profile state and not on the adult Library root.
+
+Seed contract:
+
+- DB state: reuses `parent-multi-child` (Family owner + at least one child with a subject/topic/session/recap). No new DB columns or rows beyond what `parent-multi-child` already inserts.
+- Precondition the seed must guarantee: at least one child topic that does **not** yet exist in the adult owner's Library. If `parent-multi-child` accidentally copies the topic to the owner, this seed extends it to delete that adult-side copy before returning.
+- `SeedResult.ids` returns `ownerProfileId`, `childProfileId`, `childSubjectId`, `childTopicId`, `childSessionId`, `childRecapId` — the IDs the Playwright probe needs to deep-link to each entry surface.
+
+Why a new entry (not just reusing `parent-multi-child` directly):
+
+- `parent-multi-child` is a DB-state seed. BRIDGE-04 is a backstack/navigation contract that DB state alone cannot exercise — the gap is the dedicated browser probe and the assertion that `router.back()` does not fall through to `Tabs` first-route (see `CLAUDE.md` → "Repo-Specific Guardrails" on cross-tab `router.push` chain rules).
+- A named registry entry pins the contract so future child-topic / Library refactors that quietly change the back-target are caught by the registry-smoke project, not lost in `parent-multi-child`'s general use.
+
+Implementation notes:
+
+- New Playwright probe under `apps/mobile/e2e-web/`. Three entry surfaces — child topic, child session, child recap — each with the same shape: open entry → tap **Add to my learning** → confirm adult copy renders → `router.back()` → assert testID of the original Family child/recap context, and assert `activeProfileId === ownerProfileId` (not the child's).
+- Both V0 and V1 nav-contract flag positions must be executed against this seed per the audit's flag matrix. The V1 guardian shell collapses `own-learning` + `library` into `recaps`, so the back-target testID differs by flag — the registry constants must encode both.
+- If the adult copy already exists when the probe runs (idempotent reseeding leaves it behind), the seeder must clean it up before returning rather than skipping the **Add to my learning** action.
 
 ## Implementation Tasks
 

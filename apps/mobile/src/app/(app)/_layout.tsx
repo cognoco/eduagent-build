@@ -612,7 +612,16 @@ export default function AppLayout() {
       </View>
     );
   }
-  if (userId && introProbeState === 'unseen' && shouldRunAppShellGates) {
+  // hasSeenIntro check covers the post-completion render: markIntroSeenSync
+  // flips an in-memory flag synchronously, but the probe useEffect depends
+  // only on [userId] so introProbeState stays 'unseen' after welcome → home
+  // navigation. Without this check the gate bounces the user back to /welcome.
+  if (
+    userId &&
+    introProbeState === 'unseen' &&
+    !hasSeenIntro(userId, null) &&
+    shouldRunAppShellGates
+  ) {
     return <Redirect href="/(app)/welcome" />;
   }
 
