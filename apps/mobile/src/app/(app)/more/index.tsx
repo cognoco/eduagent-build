@@ -55,6 +55,15 @@ export default function MoreScreen() {
 
   const handleAddChild = useCallback(() => {
     if (!subscription) {
+      if (navigationContract.gates.showAddChild) {
+        router.push({
+          pathname: '/create-profile',
+          params: { for: 'child' },
+        } as never);
+        return;
+      }
+      // Subscription query still loading and the navigation gate is not ready
+      // either — surface a non-blocking notice rather than guessing the tier.
       platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
       return;
     }
@@ -63,7 +72,7 @@ export default function MoreScreen() {
       pathname: '/create-profile',
       params: { for: 'child' },
     } as never);
-  }, [subscription, router, t]);
+  }, [subscription, navigationContract.gates.showAddChild, router, t]);
 
   const linkedChildren =
     navigationContract.gates.showRemoveFamilyMember && activeProfile

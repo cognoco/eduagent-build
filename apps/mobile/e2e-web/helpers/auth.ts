@@ -157,7 +157,9 @@ function decodeJwtPayload(token: string): { sub?: string } | null {
   }
 }
 
-async function markWelcomeIntroSeenFromSession(page: Page): Promise<boolean> {
+export async function markWelcomeIntroSeenFromSession(
+  page: Page,
+): Promise<boolean> {
   const cookies = await page.context().cookies();
   const sessionCookie = cookies.find((cookie) => cookie.name === '__session');
   const userId = sessionCookie
@@ -302,6 +304,18 @@ export async function signIn(
         await page.waitForURL((url) => url.pathname === options.landingPath, {
           timeout: 60_000,
         });
+      }
+    }
+
+    if (!(await landing.isVisible().catch(() => false))) {
+      const finalPostApproval = page.getByTestId('post-approval-continue');
+      if (
+        await finalPostApproval
+          .waitFor({ state: 'visible', timeout: 2_000 })
+          .then(() => true)
+          .catch(() => false)
+      ) {
+        await pressableClick(finalPostApproval);
       }
     }
 

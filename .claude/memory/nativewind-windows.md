@@ -7,7 +7,7 @@ type: reference
 # NativeWind 4.2.1 on Windows — Patches Required
 
 ## Problem
-`react-native-css-interop@0.2.1` has 3 Windows-specific bugs that prevent NativeWind styles from rendering on Android (via Expo Go or dev build).
+`react-native-css-interop@0.2.1` has Windows-specific bugs that prevent NativeWind styles from rendering on Android (via Expo Go or dev build) and can block clean Expo web exports.
 
 ## Patch — DURABLE via `pnpm patchedDependencies`
 
@@ -35,6 +35,11 @@ Config: `package.json` → `pnpm.patchedDependencies` → auto-applied on every 
 forceWriteFileSystem: process.platform === 'win32'
 ```
 Bypasses virtual module system (Map key path mismatches on Windows).
+
+### Fix 6: `dist/metro/index.js` — pre-create `web.css`
+
+**Bug:** Clean Windows web exports can fail with `Failed to get the SHA-1 for ... react-native-css-interop/.cache/web.css` because NativeWind creates placeholders for native cache files before Metro crawls, but not for the web cache file.
+**Fix:** Add `fs.writeFileSync(platformPath("web"), "")` before the existing native placeholder writes in the pnpm patch.
 
 ## Launch Sequence (Android Emulator + Expo Go)
 ```bash

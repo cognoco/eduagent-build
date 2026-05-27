@@ -255,6 +255,8 @@ export function resolveNavigationContract(
   );
   const familyCapable = isFamilyCapable(context.activeProfile);
   const ownerRole = isOwnerRole(context.role);
+  const addChildOwnerRole =
+    ownerRole || (context.role === null && isAdultOwner(context.activeProfile));
   const subscriptionReady = context.subscription.status === 'ready';
   const familyHubEligible = isFamilyHubEligible(context);
   const legacyV0ModeNavActive =
@@ -321,7 +323,7 @@ export function resolveNavigationContract(
   const ownerNotProxy = ownerRole && !context.isParentProxy;
   const addChildGate = isV1
     ? isAdultOwner(context.activeProfile) &&
-      ownerRole &&
+      addChildOwnerRole &&
       !context.isParentProxy &&
       subscriptionReady &&
       context.activeProfile !== null

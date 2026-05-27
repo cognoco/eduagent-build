@@ -108,6 +108,23 @@ describe('subscriptionSchema', () => {
     expect(parsed.dailyRemainingQuestions).toBeNull();
   });
 
+  it('defaults legacy subscription access fields to the current tier', () => {
+    const {
+      effectiveAccessTier: _effectiveAccessTier,
+      billingAccess: _billingAccess,
+      ...legacySubscription
+    } = {
+      ...validSubscription,
+      tier: 'plus',
+      status: 'trial',
+    };
+
+    const parsed = subscriptionSchema.parse(legacySubscription);
+
+    expect(parsed.effectiveAccessTier).toBe('plus');
+    expect(parsed.billingAccess).toBe('current');
+  });
+
   it('rejects invalid tier enum', () => {
     const result = subscriptionSchema.safeParse({
       ...validSubscription,
@@ -466,16 +483,27 @@ describe('subscriptionStatusResponseSchema', () => {
     expect(parsed.status.dailyLimit).toBeNull();
   });
 
+  it('defaults legacy status response access fields to the current tier', () => {
+    const parsed = subscriptionStatusResponseSchema.parse({
+      status: {
+        tier: 'family',
+        status: 'active',
+        monthlyLimit: 2000,
+        usedThisMonth: 12,
+        dailyLimit: null,
+        usedToday: 0,
+      },
+    });
+
+    expect(parsed.status.effectiveAccessTier).toBe('family');
+    expect(parsed.status.billingAccess).toBe('current');
+  });
+
   it.each([
     ['effectiveAccessTier', { effectiveAccessTier: 'enterprise' }],
     ['billingAccess', { billingAccess: 'trial' }],
-    ['missing effectiveAccessTier', {}, ['effectiveAccessTier']],
-    ['missing billingAccess', {}, ['billingAccess']],
-  ])('rejects invalid %s in status response', (_label, patch, omit = []) => {
+  ])('rejects invalid %s in status response', (_label, patch) => {
     const status = { ...validStatusResponse.status, ...patch };
-    for (const key of omit as string[]) {
-      delete (status as Record<string, unknown>)[key];
-    }
 
     const result = subscriptionStatusResponseSchema.safeParse({ status });
 

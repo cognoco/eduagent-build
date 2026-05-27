@@ -29,21 +29,27 @@ export const subscriptionStatusSchema = z.enum([
 ]);
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 
-export const subscriptionSchema = z.object({
-  tier: subscriptionTierSchema,
-  effectiveAccessTier: subscriptionTierSchema,
-  billingAccess: billingAccessSchema,
-  status: subscriptionStatusSchema,
-  trialEndsAt: isoDateField.nullable(),
-  currentPeriodEnd: isoDateField.nullable(),
-  cancelAtPeriodEnd: z.boolean(),
-  monthlyLimit: z.number().int(),
-  usedThisMonth: z.number().int(),
-  remainingQuestions: z.number().int(),
-  dailyLimit: z.number().int().nullable(),
-  usedToday: z.number().int(),
-  dailyRemainingQuestions: z.number().int().nullable(),
-});
+export const subscriptionSchema = z
+  .object({
+    tier: subscriptionTierSchema,
+    effectiveAccessTier: subscriptionTierSchema.optional(),
+    billingAccess: billingAccessSchema.optional(),
+    status: subscriptionStatusSchema,
+    trialEndsAt: isoDateField.nullable(),
+    currentPeriodEnd: isoDateField.nullable(),
+    cancelAtPeriodEnd: z.boolean(),
+    monthlyLimit: z.number().int(),
+    usedThisMonth: z.number().int(),
+    remainingQuestions: z.number().int(),
+    dailyLimit: z.number().int().nullable(),
+    usedToday: z.number().int(),
+    dailyRemainingQuestions: z.number().int().nullable(),
+  })
+  .transform((subscription) => ({
+    ...subscription,
+    effectiveAccessTier: subscription.effectiveAccessTier ?? subscription.tier,
+    billingAccess: subscription.billingAccess ?? 'current',
+  }));
 export type Subscription = z.infer<typeof subscriptionSchema>;
 
 export const checkoutRequestSchema = z
@@ -177,16 +183,22 @@ export const usageResponseSchema = z.object({
 export type UsageResponse = z.infer<typeof usageResponseSchema>;
 
 export const subscriptionStatusResponseSchema = z.object({
-  status: z.object({
-    tier: subscriptionTierSchema,
-    effectiveAccessTier: subscriptionTierSchema,
-    billingAccess: billingAccessSchema,
-    status: subscriptionStatusSchema,
-    monthlyLimit: z.number().int(),
-    usedThisMonth: z.number().int(),
-    dailyLimit: z.number().int().nullable(),
-    usedToday: z.number().int(),
-  }),
+  status: z
+    .object({
+      tier: subscriptionTierSchema,
+      effectiveAccessTier: subscriptionTierSchema.optional(),
+      billingAccess: billingAccessSchema.optional(),
+      status: subscriptionStatusSchema,
+      monthlyLimit: z.number().int(),
+      usedThisMonth: z.number().int(),
+      dailyLimit: z.number().int().nullable(),
+      usedToday: z.number().int(),
+    })
+    .transform((status) => ({
+      ...status,
+      effectiveAccessTier: status.effectiveAccessTier ?? status.tier,
+      billingAccess: status.billingAccess ?? 'current',
+    })),
 });
 export type SubscriptionStatusResponse = z.infer<
   typeof subscriptionStatusResponseSchema

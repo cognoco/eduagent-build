@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import { createReadStream } from 'node:fs';
+import { createReadStream, mkdirSync } from 'node:fs';
 import { access, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { statSync } from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
@@ -11,6 +11,7 @@ const projectRoot = process.cwd();
 const distDir = path.join(projectRoot, 'dist');
 const port = Number(process.env.PLAYWRIGHT_WEB_PORT ?? '19006');
 const host = '127.0.0.1';
+const metroTempDir = path.join(projectRoot, '.tmp', `e2e-metro-${port}`);
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -27,9 +28,14 @@ const mimeTypes = {
 };
 
 function spawnPnpm(args) {
+  mkdirSync(metroTempDir, { recursive: true });
   return spawn(process.platform === 'win32' ? 'pnpm' : 'pnpm', args, {
     cwd: projectRoot,
-    env: process.env,
+    env: {
+      ...process.env,
+      TEMP: metroTempDir,
+      TMP: metroTempDir,
+    },
     shell: process.platform === 'win32',
     stdio: 'inherit',
   });

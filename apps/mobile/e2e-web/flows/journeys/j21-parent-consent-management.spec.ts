@@ -1,17 +1,46 @@
-import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { waitForAppScreen } from '../../helpers/app-screen';
 import { pressFamilyHomeAction } from '../../helpers/parent-home';
 import { pressableClick } from '../../helpers/pressable';
-import { authStateDir } from '../../helpers/runtime';
-import { readSeedData } from '../../helpers/seed-data';
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
-test.use({ storageState: path.join(authStateDir, 'owner-with-children.json') });
+async function requestConsentAgain(page: Page): Promise<void> {
+  const requestConsent = page.getByTestId('consent-withdrawn-request-cta');
+  const withdrawConsent = page.getByTestId('withdraw-consent-button');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const restoreResponse = page
+      .waitForResponse(
+        (response) =>
+          response.request().method() === 'PUT' &&
+          response.url().includes('/v1/consent/') &&
+          response.url().includes('/restore'),
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
+
+    await pressableClick(requestConsent);
+    const response = await restoreResponse;
+    if (response?.ok()) {
+      await expect(withdrawConsent).toBeVisible({ timeout: 30_000 });
+      return;
+    }
+
+    await page.waitForTimeout(1_000);
+  }
+
+  await expect(withdrawConsent).toBeVisible({ timeout: 1 });
+}
 
 test('J-21 parent manages child consent from child detail', async ({
   page,
 }) => {
-  const seed = await readSeedData('owner-with-children');
+  const seed = await seedAndSignIn(page, {
+    scenario: 'parent-multi-child',
+    alias: 'j21',
+    landingTestId: 'learner-screen',
+    landingPath: '/home',
+  });
   const childProfileId = seed.ids.child1ProfileId;
 
   page.on('dialog', (dialog) => {
@@ -38,28 +67,38 @@ test('J-21 parent manages child consent from child detail', async ({
   await expect(page.getByTestId('consent-section')).toBeVisible({
     timeout: 30_000,
   });
+
   const withdrawConsent = page.getByTestId('withdraw-consent-button');
   const withdrawnState = page.getByTestId('consent-withdrawn-empty-state');
-  const requestConsentAgain = page.getByTestId('consent-withdrawn-request-cta');
   const consentStatusError = page.getByTestId('consent-status-error');
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await pressableClick(withdrawConsent);
+    if (await withdrawConsent.isVisible().catch(() => false)) {
+      await pressableClick(withdrawConsent);
 
-    if (await withdrawnState.isVisible().catch(() => false)) {
-      break;
+      if (await withdrawnState.isVisible().catch(() => false)) {
+        break;
+      }
+
+      if (
+        attempt < 2 &&
+        (await consentStatusError.isVisible().catch(() => false))
+      ) {
+        await page.waitForTimeout(1_000);
+        continue;
+      }
     }
 
-    if (
-      attempt < 2 &&
-      ((await consentStatusError.isVisible().catch(() => false)) ||
-        (await withdrawConsent.isVisible().catch(() => false)))
-    ) {
-      await page.waitForTimeout(1_000);
-      continue;
+    const retry = page.getByTestId('consent-status-retry');
+    if (await retry.isVisible().catch(() => false)) {
+      await pressableClick(retry);
     }
+    await page.waitForTimeout(1_000);
   }
 
   await expect(withdrawnState).toBeVisible({ timeout: 30_000 });
-  await expect(requestConsentAgain).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/sharing paused/i)).toBeVisible();
+  await expect(page.getByText(/account closes in \d+ days/i)).toBeVisible();
+
+  await requestConsentAgain(page);
 });

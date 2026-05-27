@@ -183,6 +183,18 @@ describe('DeleteAccountScreen', () => {
     screen.getByText(/7-day grace period/);
   });
 
+  it('waits for profile ownership to load before applying the owner redirect gate', () => {
+    mockProfileContext = {
+      ...createProfileContext([], null),
+      isLoading: true,
+    };
+
+    render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    screen.getByTestId('delete-account-profile-loading');
+    expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
+  });
+
   it('opens directly into scheduled state when deletion is already pending', async () => {
     mockDeletionStatus = {
       data: {

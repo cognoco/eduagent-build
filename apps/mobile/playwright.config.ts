@@ -80,6 +80,9 @@ export default defineConfig({
     actionTimeout: 15_000,
     baseURL: appBaseUrl,
     headless: process.env.PLAYWRIGHT_HEADED === '1' ? false : true,
+    launchOptions: {
+      args: ['--disable-quic'],
+    },
     navigationTimeout: 120_000,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
@@ -139,6 +142,12 @@ export default defineConfig({
       // same anonymous (no setup dependency) project. Both target /sign-in or
       // /sign-up and don't require a seeded session.
       testMatch: /flows[\\/]auth[\\/](auth-navigation|sign-up-flow)\.spec\.ts/,
+    },
+    {
+      name: 'auth-access',
+      dependencies: ['setup'],
+      testMatch:
+        /flows[\\/]auth[\\/](a02-signup-verification-ui|a03-forgot-password-ui|a05-mfa-verification-ui|a14-slow-auth-spinner)\.spec\.ts/,
     },
     {
       name: 'smoke-learner',

@@ -133,10 +133,12 @@ test.describe('[SUBJECT-17] Pronouns picker', () => {
       timeout: 10_000,
     });
 
-    // Continue is disabled while the custom input is empty (canContinue = false).
-    // Use not.toBeEnabled() — RNW Pressable renders disabled via aria-disabled,
-    // which Playwright's toBeDisabled() may not detect on non-form elements.
-    await expect(page.getByTestId('pronouns-continue')).not.toBeEnabled();
+    // React Native Web Pressable reports disabled via aria-disabled on a div,
+    // so assert the accessibility state directly rather than form-enabledness.
+    await expect(page.getByTestId('pronouns-continue')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
 
     // Type a custom value
     await fillTextInput(page.getByTestId('pronouns-custom-input'), 'ze/zir');

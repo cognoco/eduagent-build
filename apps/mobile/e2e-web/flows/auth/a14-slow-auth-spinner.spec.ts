@@ -38,12 +38,26 @@ import { authStateDir } from '../../helpers/runtime';
 
 test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
+async function clearPersistedQueryCache(page: {
+  addInitScript: (script: () => void) => Promise<void>;
+}): Promise<void> {
+  await page.addInitScript(() => {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith('eduagent-query-cache::')) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  });
+}
+
 test.describe('[AUTH-14] slow auth / stuck-spinner recovery', () => {
   test('profile-loading spinner renders while profile query is in-flight', async ({
     page,
   }) => {
+    await clearPersistedQueryCache(page);
+
     // Intercept the profiles API endpoint and add a 2-second delay.
-    await page.route('**/v1/profiles', async (route) => {
+    await page.route('**/v1/profiles**', async (route) => {
       await new Promise((r) => setTimeout(r, 2_000));
       await route.continue();
     });
@@ -69,8 +83,10 @@ test.describe('[AUTH-14] slow auth / stuck-spinner recovery', () => {
   test('profile-loading-timeout renders recovery options when profile never loads [AUTH-14]', async ({
     page,
   }) => {
+    await clearPersistedQueryCache(page);
+
     // Block the profiles endpoint permanently so isProfileLoading stays true.
-    await page.route('**/v1/profiles', (route) => {
+    await page.route('**/v1/profiles**', (route) => {
       // Never call route.continue() or route.fulfill() — keeps the request
       // pending indefinitely, holding isProfileLoading = true forever.
       // Playwright will abort this when the page closes.
@@ -107,10 +123,12 @@ test.describe('[AUTH-14] slow auth / stuck-spinner recovery', () => {
   test('retry button on profile-loading-timeout clears the timeout state [AUTH-14]', async ({
     page,
   }) => {
+    await clearPersistedQueryCache(page);
+
     // Same setup as above — block profiles, force timeout.
     let abortProfileRoute = false;
 
-    await page.route('**/v1/profiles', (route) => {
+    await page.route('**/v1/profiles**', (route) => {
       if (abortProfileRoute) {
         // Allow the retry call through.
         void route.continue();

@@ -277,6 +277,19 @@ describe('MoreScreen landing', () => {
     });
   });
 
+  it('uses the ready navigation gate to add a child even while the full subscription query hydrates', () => {
+    mockSubscription = null;
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+    fireEvent.press(screen.getByTestId('add-child-link'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+  });
+
   it('hides add-child for non-owner (child on parent account)', () => {
     mockActiveProfile = {
       id: 'profile-2',

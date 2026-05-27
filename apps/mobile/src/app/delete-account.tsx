@@ -37,7 +37,7 @@ export default function DeleteAccountScreen() {
   const { t } = useTranslation();
   const { signOut, userId } = useAuth();
   const queryClient = useQueryClient();
-  const { profiles, activeProfile } = useProfile();
+  const { profiles, activeProfile, isLoading: isProfileLoading } = useProfile();
   const hasLinkedChildren = useHasLinkedChildren();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
@@ -153,6 +153,17 @@ export default function DeleteAccountScreen() {
   // more/privacy.tsx which gates on role === 'owner'. A deep-link or direct
   // push by a non-owner would reach this destructive UI without that gate.
   // Mirror the pattern in own-learning.tsx:33-35.
+  if (isProfileLoading) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="delete-account-profile-loading"
+      >
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   if (activeProfile?.isOwner !== true) {
     return <Redirect href="/(app)/more" />;
   }

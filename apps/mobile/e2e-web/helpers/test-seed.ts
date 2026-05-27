@@ -17,9 +17,10 @@ export interface ResetResponse {
   clerkUsersDeleted: number;
 }
 
-// [BUG-532] Retry config for Cloudflare rate-limit resilience.
-// Cloudflare WAF can return 403 or 429 when rate-limiting seed requests
-// during parallel Playwright workers.
+// [BUG-532] Retry config for external seed-service resilience.
+// Cloudflare WAF can return 403/429 during parallel Playwright workers, and
+// Clerk can transiently return 500 `internal_clerk_error` during user
+// creation/lookup/verification.
 const RETRY_MAX_ATTEMPTS = 6;
 const RETRY_BASE_DELAY_MS = 1_500;
 const RETRYABLE_STATUSES = new Set([403, 429, 502, 503]);
@@ -41,9 +42,14 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isTransientClerkInternalError(detail: string): boolean {
+  return detail.includes('internal_clerk_error');
+}
+
 /**
  * Fetch with exponential backoff for rate-limited requests.
- * Checks response.status BEFORE consuming the body (single-use stream).
+ * Re-wraps non-retryable inspected responses because response bodies are
+ * single-use streams.
  */
 async function fetchWithRetry(
   input: RequestInfo | URL,
@@ -55,11 +61,27 @@ async function fetchWithRetry(
   let lastError = new Error(`${action} failed: no attempts made`);
   for (let attempt = 0; attempt < RETRY_MAX_ATTEMPTS; attempt++) {
     const response = await fetch(input, init);
-    if (response.ok || !RETRYABLE_STATUSES.has(response.status)) {
+    if (response.ok) {
       return response;
     }
-    // Consume the body so the connection is released, but don't throw yet.
+
+    const statusRetryable = RETRYABLE_STATUSES.has(response.status);
+    const shouldInspectBody = statusRetryable || response.status === 500;
+    if (!shouldInspectBody) {
+      return response;
+    }
+
     const detail = await response.text().catch(() => '');
+    const clerkRetryable =
+      response.status === 500 && isTransientClerkInternalError(detail);
+    if (!statusRetryable && !clerkRetryable) {
+      return new Response(detail, {
+        headers: response.headers,
+        status: response.status,
+        statusText: response.statusText,
+      });
+    }
+
     lastError = new Error(`${action} failed (${response.status}): ${detail}`);
     if (attempt < RETRY_MAX_ATTEMPTS - 1) {
       // Exponential backoff with ±20% jitter

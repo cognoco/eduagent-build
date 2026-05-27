@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import type { Profile } from '@eduagent/schemas';
+import { isAdultOwner, type Profile } from '@eduagent/schemas';
 import { BookPageFlipAnimation } from '../common';
 import {
   useMarkQuizDiscoverySurfaced,
@@ -36,6 +36,7 @@ import {
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useEnsureStudyMode } from '../../lib/use-mode-switch';
 import { useNavigationHomeContract } from '../../hooks/use-navigation-contract';
+import { useSubscriptionStatus } from '../../hooks/use-subscription';
 import { getSubjectTint, getSubjectTintMap } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
@@ -130,14 +131,22 @@ export function LearnerScreen({
   const navigationHome = useNavigationHomeContract();
   const navigationContract = navigationHome.contract;
   const navigationProxy = navigationHome.proxy;
+  const { data: subscriptionStatus } = useSubscriptionStatus({
+    enabled: true,
+  });
+  const hasFamilyPlan =
+    subscriptionStatus?.tier === 'family' || subscriptionStatus?.tier === 'pro';
   // [HOME-07] Adult owner without children has no Family setup entry on Home.
   // Surface a Family setup CTA on the learner home when the contract permits
   // adding a child (gates.showAddChild already encodes: isAdultOwner &&
   // ownerRole && !isParentProxy &&, in V1, subscriptionReady) and no children
   // are linked yet. Route to /(app)/more so the existing handleAddChild flow
   // owns subscription/quota gating — never duplicate that logic here.
+  const familySetupFallback =
+    isAdultOwner(activeProfile) && hasFamilyPlan && !navigationProxy.active;
   const showFamilySetupCta =
-    navigationContract.gates.showAddChild && !hasLinkedChildren;
+    (navigationContract.gates.showAddChild || familySetupFallback) &&
+    !hasLinkedChildren;
   const screenLoadingMotion = resolveLoadingMotionPreset({
     surface: 'screen',
     contentDensity: 'sparse',

@@ -104,3 +104,80 @@ export async function waitForAppScreen(
       ` screen retries: ${screenRetryCount}/${maxScreenRetries})`,
   );
 }
+
+export async function ensureFamilyHome(
+  page: Page,
+  options: WaitForAppScreenOptions = {},
+): Promise<Locator> {
+  const timeout = options.timeout ?? 60_000;
+  const deadline = Date.now() + timeout;
+  const parentHome = page.getByTestId('parent-home-screen');
+  const familySwitch = page.getByTestId('mode-switcher-family');
+  const modeSwitchRetry = page.getByTestId('mode-switcher-error-retry');
+  const familyRouteSwitch = page.getByTestId('family-route-switch-cta');
+
+  async function switchToFamily(target: Locator): Promise<Locator | null> {
+    const remaining = Math.max(deadline - Date.now(), 1);
+    const appContextPersisted = page
+      .waitForResponse(
+        (response) =>
+          response.request().method() === 'PATCH' &&
+          response.url().includes('/v1/profiles/') &&
+          response.url().includes('/app-context'),
+        { timeout: Math.min(remaining, 20_000) },
+      )
+      .catch(() => null);
+
+    await pressableClick(target);
+
+    const response = await appContextPersisted;
+    if (!response?.ok()) {
+      return null;
+    }
+
+    return waitForAppScreen(page, 'parent-home-screen', {
+      ...options,
+      timeout: Math.max(deadline - Date.now(), 1),
+    });
+  }
+
+  while (Date.now() < deadline) {
+    if (await parentHome.isVisible().catch(() => false)) {
+      return parentHome;
+    }
+
+    if (await modeSwitchRetry.isVisible().catch(() => false)) {
+      const switched = await switchToFamily(modeSwitchRetry);
+      if (switched) {
+        return switched;
+      }
+      await page.waitForTimeout(500);
+      continue;
+    }
+
+    if (await familySwitch.isVisible().catch(() => false)) {
+      const switched = await switchToFamily(familySwitch);
+      if (switched) {
+        return switched;
+      }
+      await page.waitForTimeout(500);
+      continue;
+    }
+
+    if (await familyRouteSwitch.isVisible().catch(() => false)) {
+      const switched = await switchToFamily(familyRouteSwitch);
+      if (switched) {
+        return switched;
+      }
+      await page.waitForTimeout(500);
+      continue;
+    }
+
+    await page.waitForTimeout(250);
+  }
+
+  return waitForAppScreen(page, 'parent-home-screen', {
+    ...options,
+    timeout: 1,
+  });
+}
