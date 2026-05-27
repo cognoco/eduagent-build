@@ -2381,10 +2381,12 @@ describe('prepareTopicExpansion', () => {
       'Explore pyramids, pharaohs, and daily life.',
     );
 
+    const resultTitles = result.topics.map((topic) => topic.title);
+
     expect(result.topics).toHaveLength(5);
-    expect(result.topics.map((topic) => topic.title)).not.toEqual(
-      expect.arrayContaining(skippedFallbackTitles),
-    );
+    expect(
+      resultTitles.filter((title) => skippedFallbackTitles.includes(title)),
+    ).toEqual([]);
   });
 
   it('[WI-142] preserves generated connections between new and existing active topics', () => {
