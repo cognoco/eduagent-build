@@ -1269,6 +1269,14 @@ export function normalizeTopicTitle(title: string): string {
   return title.trim().toLowerCase();
 }
 
+const BOOK_GENERATION_STALE_MS = 15 * 60 * 1000;
+
+export function isStaleBookGenerationClaim(updatedAt: string): boolean {
+  const updatedAtMs = Date.parse(updatedAt);
+  if (Number.isNaN(updatedAtMs)) return true;
+  return Date.now() - updatedAtMs >= BOOK_GENERATION_STALE_MS;
+}
+
 function buildConflictRepairBookTopics(
   bookTitle: string,
   bookDescription: string | null,

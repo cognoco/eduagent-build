@@ -22,6 +22,7 @@ import {
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
   releaseBookGenerationClaimIfEmpty,
+  isStaleBookGenerationClaim,
   prepareTopicExpansion,
   deleteTopicIfSafe,
   deleteBook,
@@ -2252,6 +2253,18 @@ describe('releaseBookGenerationClaimIfEmpty', () => {
     expect(whereText).toContain('curriculum_topics.skipped = false');
     expect(whereText).toContain('curricula.version = (');
     expect(whereText).toContain('max(latest_curricula.version)');
+  });
+});
+
+describe('isStaleBookGenerationClaim', () => {
+  it('[WI-142 review] treats the book generation staleness policy as curriculum domain logic', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T10:00:00.000Z'));
+
+    expect(isStaleBookGenerationClaim('2026-05-27T09:44:59.999Z')).toBe(true);
+    expect(isStaleBookGenerationClaim('2026-05-27T09:45:00.001Z')).toBe(false);
+    expect(isStaleBookGenerationClaim('not-a-date')).toBe(true);
+
+    jest.useRealTimers();
   });
 });
 
