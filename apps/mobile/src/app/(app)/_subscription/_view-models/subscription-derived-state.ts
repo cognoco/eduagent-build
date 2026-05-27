@@ -73,20 +73,24 @@ export function deriveChildPaywallGate(args: {
   showPaywall: boolean;
 } {
   const isChild = args.hasActiveProfile ? !args.isOwnerProfile : false;
-  const hasLoadError =
-    (args.subscriptionLoadError && !args.hasSubscriptionData) ||
-    (args.usageLoadError && !args.hasUsageData);
+  const hasSubscriptionLoadError =
+    args.subscriptionLoadError && !args.hasSubscriptionData;
+  const hasUsageLoadError = args.usageLoadError && !args.hasUsageData;
+  const quotaExhausted =
+    !hasUsageLoadError && args.usageWarningLevel === 'exceeded';
   const trialOrExpired =
-    !hasLoadError &&
+    !hasSubscriptionLoadError &&
     (args.subscriptionStatus === 'expired' ||
       args.subscriptionStatus === 'cancelled' ||
       (!args.hasSubscriptionData && !args.subscriptionIsLoading));
-  const quotaExhausted = !hasLoadError && args.usageWarningLevel === 'exceeded';
+  const showPaywall = isChild && (trialOrExpired || quotaExhausted);
+  const hasLoadError =
+    hasUsageLoadError || (hasSubscriptionLoadError && !showPaywall);
   return {
     isChild,
     hasLoadError,
     trialOrExpired,
     quotaExhausted,
-    showPaywall: isChild && (trialOrExpired || quotaExhausted),
+    showPaywall,
   };
 }

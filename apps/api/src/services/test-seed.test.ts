@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import { profileQuotaUsage, type Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Test Seed Service — Unit Tests
@@ -15,6 +15,7 @@ import {
   SEED_CLERK_PREFIX,
   type SeedScenario,
 } from './test-seed';
+import { getTierConfig } from './subscription';
 
 // ---------------------------------------------------------------------------
 // Mock DB factory
@@ -157,6 +158,38 @@ describe('seed engagement signals', () => {
         .filter((signal): signal is string => signal != null)
         .filter((signal) => !allowedSignals.has(signal)),
     ).toEqual([]);
+  });
+});
+
+describe('child paywall seed shape', () => {
+  it('seeds exhausted per-profile child quota for the current quota model', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'trial-expired-child',
+      'paywall@example.com',
+    );
+    const freeTier = getTierConfig('free');
+    const insertMock = db.insert as unknown as jest.Mock;
+    const profileQuotaInsertIndex = insertMock.mock.calls.findIndex(
+      ([table]) => table === profileQuotaUsage,
+    );
+    const profileQuotaInsert = insertMock.mock.results[profileQuotaInsertIndex]
+      ?.value as { values: jest.Mock } | undefined;
+
+    expect(profileQuotaInsertIndex).toBeGreaterThanOrEqual(0);
+    expect(profileQuotaInsert?.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: result.ids.subscriptionId,
+        profileId: result.ids.childProfileId,
+        role: 'child',
+        monthlyLimit: freeTier.childMonthlyQuota,
+        usedThisMonth: freeTier.childMonthlyQuota,
+        dailyLimit: freeTier.childDailyQuota,
+        usedToday: freeTier.childDailyQuota,
+        cycleResetAt: expect.any(Date),
+      }),
+    );
   });
 });
 
