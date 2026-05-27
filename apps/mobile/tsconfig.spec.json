@@ -9,6 +9,8 @@
   "files": ["src/test-setup.ts"],
   "include": [
     "jest.config.cjs",
+    "e2e-web/helpers/e2e-defaults.d.ts",
+    "e2e-web/helpers/runtime.ts",
     "test-utils/**/*.ts",
     "test-utils/**/*.tsx",
     "src/**/*.test.ts",

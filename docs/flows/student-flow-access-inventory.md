@@ -126,7 +126,7 @@ Notes:
 | Original ID | Student access | How it should work |
 | --- | --- | --- |
 | BILLING-01 through BILLING-05 | Owner profiles | Subscription details, upgrade, trial/usage state, restore, and manage billing are owner account flows reachable from More -> Account/Profile and the `/subscription` route after owner sign-in. Browser walk on 2026-05-26 validated the active-trial manage-billing surface on web; Restore purchases is native-only and hidden on web, while web shows Manage billing/contact support copy. |
-| BILLING-06 | Child/non-owner students without entitlement | ChildPaywall appears when the student lacks entitlement. It offers notify-parent rather than direct purchase. |
+| BILLING-06 | Child/non-owner students without entitlement | ChildPaywall appears when the student lacks entitlement. It offers notify-parent rather than direct purchase. Verified in the 2026-05-27 focused Playwright rerun via `mentor-audit-paywall-child-notify` using the seeded per-profile child quota path. |
 | BILLING-07 | Adult/student quota path | Daily quota exceeded uses the existing paywall/recovery surface. |
 | BILLING-08 | Family owners | Family pool details are account/family billing information. They may be visible to eligible owners, but they do not change Study ownership of learning data. |
 | BILLING-09, BILLING-10 | Owner profiles | Top-up and BYOK waitlist remain account/billing surfaces where enabled. |

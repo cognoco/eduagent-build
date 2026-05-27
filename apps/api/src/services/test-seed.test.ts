@@ -160,6 +160,24 @@ describe('seed engagement signals', () => {
   });
 });
 
+describe('child paywall seed shape', () => {
+  it('seeds exhausted per-profile child quota for the current quota model', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'test-seed.ts'),
+      'utf8',
+    );
+    const seedTrialExpiredChild = source.match(
+      /async function seedTrialExpiredChild[\s\S]*?return \{/,
+    )?.[0];
+
+    expect(seedTrialExpiredChild).toContain('profileQuotaUsage');
+    expect(seedTrialExpiredChild).toContain('profileId: childProfileId');
+    expect(seedTrialExpiredChild).toContain("role: 'child'");
+    expect(seedTrialExpiredChild).toContain('usedThisMonth: childMonthlyQuota');
+    expect(seedTrialExpiredChild).toContain('usedToday: childDailyQuota');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // SEED_CLERK_PREFIX
 // ---------------------------------------------------------------------------

@@ -231,6 +231,20 @@ describe('deriveChildPaywallGate', () => {
     expect(result.showPaywall).toBe(false);
   });
 
+  it('non-owner + quota exceeded still shows paywall when subscription details are owner-only', () => {
+    const result = deriveChildPaywallGate({
+      ...base,
+      isOwnerProfile: false,
+      subscriptionLoadError: true,
+      hasSubscriptionData: false,
+      subscriptionStatus: undefined,
+      usageWarningLevel: 'exceeded',
+    });
+    expect(result.hasLoadError).toBe(false);
+    expect(result.quotaExhausted).toBe(true);
+    expect(result.showPaywall).toBe(true);
+  });
+
   it('usage load error + no cached usage data → hasLoadError=true, quotaExhausted=false', () => {
     const result = deriveChildPaywallGate({
       ...base,

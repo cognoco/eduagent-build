@@ -29,6 +29,7 @@ import {
   assessments,
   subscriptions,
   quotaPools,
+  profileQuotaUsage,
   familyLinks,
   consentStates,
   streaks,
@@ -1658,6 +1659,12 @@ async function seedTrialExpiredChild(
   env: SeedEnv,
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
+  const childMonthlyQuota = freeTier.childMonthlyQuota;
+  const childDailyQuota = freeTier.childDailyQuota;
+  if (childMonthlyQuota == null || childDailyQuota == null) {
+    throw new Error('Free tier child quota config must include child limits');
+  }
+
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
@@ -1695,6 +1702,18 @@ async function seedTrialExpiredChild(
     displayName: 'Paywall Teen',
     birthYear: 2014,
     isOwner: false,
+  });
+
+  await db.insert(profileQuotaUsage).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    profileId: childProfileId,
+    role: 'child',
+    monthlyLimit: childMonthlyQuota,
+    usedThisMonth: childMonthlyQuota,
+    dailyLimit: childDailyQuota,
+    usedToday: childDailyQuota,
+    cycleResetAt: futureDate(13),
   });
 
   // Family link
