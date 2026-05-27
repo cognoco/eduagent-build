@@ -2256,6 +2256,40 @@ describe('releaseBookGenerationClaimIfEmpty', () => {
 });
 
 describe('prepareTopicExpansion', () => {
+  it('[WI-142] avoids skipped existing titles when building repair topics', () => {
+    const existingTopics = [
+      { title: 'Start with Ancient Egypt', skipped: true },
+    ];
+    const generated: BookTopicGenerationResult = {
+      topics: [
+        {
+          title: 'Start with Ancient Egypt',
+          description: 'Duplicate of a skipped topic row.',
+          chapter: 'Getting started',
+          sortOrder: 1,
+          estimatedMinutes: 15,
+        },
+      ],
+      connections: [],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    expect(result.topics).toHaveLength(5);
+    expect(result.topics.map((topic) => topic.title)).toEqual([
+      'Key ideas in Ancient Egypt',
+      'Important words for Ancient Egypt',
+      'Examples of Ancient Egypt',
+      'Practice with Ancient Egypt',
+      'Review Ancient Egypt',
+    ]);
+  });
+
   it('[WI-142] accepts fallback overlap when the repaired book reaches the minimum topic count', () => {
     const existingTopics = [
       { title: 'Start with Ancient Egypt' },

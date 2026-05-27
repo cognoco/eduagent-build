@@ -1279,9 +1279,7 @@ export function prepareTopicExpansion(
     (topic) => !topic.skipped,
   ).length;
   const existingTitleKeys = new Set(
-    existingTopics
-      .filter((topic) => !topic.skipped)
-      .map((topic) => normalizeTopicTitle(topic.title)),
+    existingTopics.map((topic) => normalizeTopicTitle(topic.title)),
   );
   const seenTitleKeys = new Set(existingTitleKeys);
   const expansionTopics: GeneratedBookTopic[] = [];
