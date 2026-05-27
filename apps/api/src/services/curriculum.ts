@@ -1429,6 +1429,13 @@ export async function persistBookTopics(
             ),
             orderBy: asc(curriculumTopics.sortOrder),
           });
+          const activeTopicRows = topicRows.filter((topic) => !topic.skipped);
+          if (activeTopicRows.length < MIN_GENERATED_BOOK_TOPICS) {
+            throw new Error(
+              `Generated book topics persisted only ${activeTopicRows.length} active topics`,
+            );
+          }
+
           const topicIdByTitle = new Map(
             topicRows.map((topic) => [
               normalizeTopicTitle(topic.title),

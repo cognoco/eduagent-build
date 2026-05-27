@@ -1188,6 +1188,7 @@ describe('persistBookTopics', () => {
       sortOrder: number;
       skipped: boolean;
     }>,
+    simulateTopicTitleConflicts = false,
   } = {}): Database {
     const subjectRow = subjectExists ? mockSubjectRow() : undefined;
     const bookRow = bookExists ? mockBookRow() : undefined;
@@ -1291,11 +1292,16 @@ describe('persistBookTopics', () => {
         const occupiedSortOrders = new Set(
           existingTopics.map((topic) => topic.sortOrder),
         );
+        const occupiedTitleKeys = new Set(
+          existingTopics.map((topic) => topic.title.trim().toLowerCase()),
+        );
         generatedRowsFromInsert = rows
           .filter(
             (row) =>
-              !simulateTopicSortOrderConflicts ||
-              !occupiedSortOrders.has(row.sortOrder),
+              (!simulateTopicSortOrderConflicts ||
+                !occupiedSortOrders.has(row.sortOrder)) &&
+              (!simulateTopicTitleConflicts ||
+                !occupiedTitleKeys.has(row.title.trim().toLowerCase())),
           )
           .map((row, index) => ({
             ...mockTopicRow({
@@ -1489,6 +1495,33 @@ describe('persistBookTopics', () => {
       expect(result.topics.filter((topic) => !topic.skipped)).toHaveLength(
         sampleTopics.length + 1,
       );
+    });
+
+    it('[WI-142] rejects append repair when skipped title conflicts block inserts', async () => {
+      const db = createPersistMockDb({
+        simulateTopicTitleConflicts: true,
+        existingTopicRows: sampleTopics.map((topic) => ({
+          id: `skipped-topic-${topic.sortOrder}`,
+          title: topic.title,
+          sortOrder: topic.sortOrder + 100,
+          skipped: true,
+        })),
+      });
+
+      await expect(
+        persistBookTopics(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+          BOOK_ID,
+          sampleTopics,
+          sampleConnections,
+          { appendToExisting: true },
+        ),
+      ).rejects.toThrow('Generated book topics persisted only 0 active topics');
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(db.update).not.toHaveBeenCalled();
     });
 
     it('calling twice with same data does not duplicate topics', async () => {
