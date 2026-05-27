@@ -641,10 +641,8 @@ describe('CreateProfileScreen', () => {
     });
 
     it('clears the safety timeout when loading flag resets before 30s (cleanup)', async () => {
-      // The timeout watches `loading`. Once loading goes false (POST resolves
-      // or the component unmounts), the timer must be cancelled.
-      // We simulate: submit starts loading, then loading drops before 30s —
-      // advancing past 30s must NOT set the error.
+      // The timeout watches only the create POST. Once the POST resolves or
+      // the component unmounts, the timer must be cancelled.
       const { unmount } = render(<CreateProfileScreen />, {
         wrapper: Wrapper,
       });
@@ -816,6 +814,98 @@ describe('CreateProfileScreen', () => {
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the 30s POST timeout when the POST resolves before slower success work finishes', async () => {
+      const newProfile = {
+        id: 'slow-family-success-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      let resolveCreate: ((response: Response) => void) | undefined = undefined;
+      let resolveAppContext: ((response: Response) => void) | undefined =
+        undefined;
+      let resolveSwitch: (() => void) | undefined = undefined;
+      mockSwitchProfile.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSwitch = resolve;
+          }),
+      );
+      mockFetch
+        .mockImplementationOnce(() => {
+          return new Promise<Response>((resolve) => {
+            resolveCreate = resolve;
+          });
+        })
+        .mockImplementationOnce(() => {
+          return new Promise<Response>((resolve) => {
+            resolveAppContext = resolve;
+          });
+        });
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(async () => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-intent-family'));
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      act(() => {
+        jest.advanceTimersByTime(29_000);
+      });
+
+      await act(async () => {
+        resolveCreate?.(
+          new Response(JSON.stringify({ profile: newProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(1_000);
+      });
+
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+      expect(
+        screen.getByTestId('create-profile-submit').props.accessibilityState
+          ?.disabled,
+      ).toBe(true);
+
+      await act(async () => {
+        resolveAppContext?.(
+          new Response(JSON.stringify({ profile: newProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith(
+          'slow-family-success-id',
+        );
+      });
+      await act(async () => {
+        resolveSwitch?.();
+        await Promise.resolve();
+      });
     });
 
     it('ignores a timed-out create failure that rejects after a retry succeeds', async () => {
