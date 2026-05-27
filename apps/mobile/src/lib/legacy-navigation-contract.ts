@@ -38,10 +38,15 @@ const STUDY_MODE_TABS: ReadonlySet<string> = new Set([
 export type LegacyTabShape = 'guardian' | 'learner';
 
 export type ShellHomeTabPresentation = {
-  titleKey: 'tabs.children' | 'tabs.familyHub' | 'tabs.myLearning';
+  titleKey:
+    | 'tabs.children'
+    | 'tabs.familyHub'
+    | 'tabs.home'
+    | 'tabs.myLearning';
   accessibilityLabelKey:
     | 'tabs.childrenLabel'
     | 'tabs.familyHubLabel'
+    | 'tabs.homeLabel'
     | 'tabs.myLearningLabel';
   iconName: 'Home' | 'School' | 'Users';
 };
@@ -100,6 +105,20 @@ export function resolveHomeTabPresentation(
     return {
       titleKey: 'tabs.familyHub',
       accessibilityLabelKey: 'tabs.familyHubLabel',
+      iconName: 'Home',
+    };
+  }
+
+  // Guardian shape with no app-mode set (or no family capability) shows both
+  // `home` and `own-learning` tabs (see GUARDIAN_TABS). Labelling both as
+  // "My Learning" produces side-by-side duplicate tab titles, so the home
+  // tab uses the generic "Home" label in that case. The proxy/learner/study
+  // paths never expose own-learning alongside home, so "My Learning" on the
+  // home tab remains correct there.
+  if (!isParentProxy && shape === 'guardian' && mode == null) {
+    return {
+      titleKey: 'tabs.home',
+      accessibilityLabelKey: 'tabs.homeLabel',
       iconName: 'Home',
     };
   }

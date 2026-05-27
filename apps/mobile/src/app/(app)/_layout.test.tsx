@@ -1536,6 +1536,50 @@ describe('AppLayout welcome intro gate — routing order', () => {
     expect(screen.queryByTestId('create-profile-gate')).toBeNull();
   });
 
+  // Stale-probe regression: after welcome completes, markIntroSeenSync flips
+  // the in-memory flag synchronously and the welcome route calls
+  // router.replace('/(app)/home'). The probe useEffect depends only on
+  // [userId] so it does NOT re-fire — introProbeState stays 'unseen' in
+  // React state. The gate must consult the in-memory cache via
+  // hasSeenIntro(userId, null); otherwise the gate re-fires
+  // <Redirect href="/(app)/welcome" /> and the user is bounced back to the
+  // intro (observed symptom: welcome runs twice for the same Clerk user, or
+  // the app blanks mid-bounce on the first attempt).
+  it('[BUG] does not bounce back to /welcome after markIntroSeenSync when introProbeState is stale', async () => {
+    const userId = 'user_test_postcomplete_stale';
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+
+    mockUsePathname.mockReturnValue('/home');
+    const view = renderWithState({
+      userId,
+      activeProfile: null,
+      introSeenAt: null,
+    });
+
+    // First render: probe resolves to 'unseen', redirect to /welcome fires.
+    await waitFor(() => {
+      expect(screen.getByTestId('redirect').props.href).toBe('/(app)/welcome');
+    });
+
+    // User completes welcome — in-memory flag flips synchronously, SecureStore
+    // write is in flight (not yet committed; introSeenAt mock stays null).
+    const { markIntroSeenSync } = require('../../lib/intro-state');
+    act(() => {
+      markIntroSeenSync(userId);
+    });
+
+    // Layout re-renders (in production this is triggered by router.replace).
+    view.rerender(<AppLayout />);
+
+    // Gate must consult the in-memory cache and skip the redirect, falling
+    // through to the next gate (CreateProfileGate when no active profile).
+    await waitFor(() => {
+      expect(screen.getByTestId('create-profile-gate')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
   // Scenario B — once the SecureStore probe returns a seen-at timestamp the
   // cascade falls through the intro gate and the next blocking gate (here:
   // withdrawn-consent) renders. Mirrors the spec's "Returning child with
@@ -1736,6 +1780,14 @@ describe('resolveHomeTabPresentation', () => {
       titleKey: 'tabs.myLearning',
       accessibilityLabelKey: 'tabs.myLearningLabel',
       iconName: 'School',
+    });
+  });
+
+  it('uses the Home label for guardians when no app-mode is set so the home tab does not duplicate the own-learning label', () => {
+    expect(resolveHomeTabPresentation('guardian', false, null)).toEqual({
+      titleKey: 'tabs.home',
+      accessibilityLabelKey: 'tabs.homeLabel',
+      iconName: 'Home',
     });
   });
 });
