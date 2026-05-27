@@ -25,6 +25,7 @@ import { useResolveSubject } from '../hooks/use-resolve-subject';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { BookPageFlipAnimation } from '../components/common/BookPageFlipAnimation';
+import { MagicPenAnimation } from '../components/common/MagicPenAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
 import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
@@ -138,6 +139,10 @@ function CreateSubjectScreenAuthenticated() {
       bookId?: string;
       fallbackTopicName?: string;
       rawInput?: string;
+      /** When true, the user is sent to /ready (recap) instead of straight to
+       *  /(app)/session. /ready replays the session params on its CTA. Used
+       *  for first-time users so onboarding ends on a reflection moment. */
+      isFirstSubject?: boolean;
     }) => {
       setResolveState({ phase: 'preparing' });
 
@@ -160,6 +165,20 @@ function CreateSubjectScreenAuthenticated() {
           const okRes = await assertOk(res);
           const data = (await okRes.json()) as { session: LearningSession };
           if (cancelledRef.current) return;
+          if (input.isFirstSubject) {
+            router.replace({
+              pathname: '/ready',
+              params: {
+                subject: input.subjectName,
+                subjectId: input.subjectId,
+                sessionId: data.session.id,
+                ...(data.session.topicId
+                  ? { topicId: data.session.topicId }
+                  : {}),
+              },
+            } as Href);
+            return;
+          }
           router.replace({
             pathname: '/(app)/session',
             params: {
@@ -186,6 +205,20 @@ function CreateSubjectScreenAuthenticated() {
       }
 
       if (cancelledRef.current) return;
+      if (input.isFirstSubject) {
+        router.replace({
+          pathname: '/ready',
+          params: {
+            subject: input.subjectName,
+            subjectId: input.subjectId,
+            ...(input.fallbackTopicName
+              ? { topicName: input.fallbackTopicName }
+              : {}),
+            ...(input.rawInput ? { rawInput: input.rawInput } : {}),
+          },
+        } as Href);
+        return;
+      }
       router.replace({
         pathname: '/(app)/session',
         params: {
@@ -261,6 +294,11 @@ function CreateSubjectScreenAuthenticated() {
       setResolveState({ phase: 'creating' });
       setError('');
       cancelledRef.current = false; // [BUG-692] reset on each new attempt
+      // Snapshot the pre-create subject count so /ready is only shown for the
+      // user's very first subject. Reading after createSubject would race the
+      // subjects query invalidation and could flip a returning user back into
+      // the welcome recap.
+      const isFirstSubject = (existingSubjects?.length ?? 0) === 0;
       try {
         const rawInput =
           rawInputOverride === null
@@ -302,6 +340,7 @@ function CreateSubjectScreenAuthenticated() {
             bookId: result.bookId,
             fallbackTopicName: result.bookTitle ?? rawInput,
             ...(rawInput ? { rawInput } : {}),
+            isFirstSubject,
           });
           return;
         }
@@ -339,6 +378,7 @@ function CreateSubjectScreenAuthenticated() {
           subjectId: result.subject.id,
           subjectName: result.subject.name,
           ...(rawInput ? { rawInput } : {}),
+          isFirstSubject,
         });
       } catch (err: unknown) {
         // [BUG-692] Don't show error alert if user already navigated away.
@@ -362,6 +402,7 @@ function CreateSubjectScreenAuthenticated() {
       returnTo,
       chatTopic,
       transitionToFirstSession,
+      existingSubjects,
     ],
   );
 
@@ -628,10 +669,13 @@ function CreateSubjectScreenAuthenticated() {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="flex-row items-start justify-between mb-6 gap-3">
-          <Text className="text-h2 font-bold text-text-primary flex-1 leading-tight">
-            {t('subject.title')}
-          </Text>
+        <View className="flex-row items-start justify-between mb-2 gap-3">
+          <View className="flex-1 flex-row items-center gap-3">
+            <MagicPenAnimation size={64} testID="create-subject-pen" />
+            <Text className="text-h2 font-bold text-text-primary flex-1 leading-tight">
+              {t('subject.title')}
+            </Text>
+          </View>
           <Button
             variant="tertiary"
             size="small"

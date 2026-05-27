@@ -432,7 +432,7 @@ export default function CreateProfileScreen() {
       >
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-h1 font-bold text-text-primary">
-            {isAddingChild ? 'Add a child' : 'New profile'}
+            {isAddingChild ? 'Tell us about your child' : "Who's the learner?"}
           </Text>
           <Button
             variant="tertiary"
@@ -484,8 +484,8 @@ export default function CreateProfileScreen() {
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
           {isAddingChild
-            ? "We use your child's age to personalise how their mentor talks to them and to comply with privacy laws. Minimum age is 11."
-            : 'We use your age to personalise how your mentor talks to you and to comply with privacy laws. Minimum age is 11.'}
+            ? "So your child's mentor talks to them the right way. Minimum age is 11."
+            : 'So your mentor talks to you the right way. Minimum age is 11.'}
         </Text>
         {Platform.OS === 'web' ? (
           <View className="mb-2" onLayout={onFieldLayout('birthdate')}>
@@ -650,7 +650,7 @@ export default function CreateProfileScreen() {
 
         <Button
           variant="primary"
-          label="Create profile"
+          label={isAddingChild ? 'Add child' : 'Continue'}
           onPress={onSubmit}
           disabled={!canSubmit}
           loading={loading}

@@ -154,7 +154,7 @@ describe('CreateProfileScreen', () => {
     screen.getByTestId('create-profile-submit');
     // Birth date explanatory copy is visible
     expect(
-      screen.getByText(/personalise how your mentor talks to you/),
+      screen.getByText(/your mentor talks to you the right way/),
     ).toBeTruthy();
     // Persona picker buttons are hidden (auto-detected from birth date)
     expect(screen.queryByTestId('persona-teen')).toBeNull();
@@ -176,11 +176,11 @@ describe('CreateProfileScreen', () => {
     it('uses child-referent copy on the explanatory line', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       expect(
-        screen.getByText(/personalise how their mentor talks to them/),
+        screen.getByText(/your child's mentor talks to them the right way/),
       ).toBeTruthy();
-      // Original first-person copy must NOT appear when adding a child
+      // First-person copy must NOT appear when adding a child
       expect(
-        screen.queryByText(/personalise how your mentor talks to you/),
+        screen.queryByText(/your mentor talks to you the right way/),
       ).toBeNull();
     });
 
@@ -189,10 +189,10 @@ describe('CreateProfileScreen', () => {
       screen.getByText(/Minimum age is 11/);
     });
 
-    it('uses "Add a child" as the page title', () => {
+    it('uses "Tell us about your child" as the page title', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
-      screen.getByText('Add a child');
-      expect(screen.queryByText('New profile')).toBeNull();
+      screen.getByText('Tell us about your child');
+      expect(screen.queryByText("Who's the learner?")).toBeNull();
     });
 
     it("uses Child's display name + child-referent placeholder", () => {
@@ -209,13 +209,13 @@ describe('CreateProfileScreen', () => {
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 
-    screen.getByText('Add a child');
+    screen.getByText('Tell us about your child');
     screen.getByText("Child's display name");
     expect(
-      screen.getByText(/personalise how their mentor talks to them/),
+      screen.getByText(/your child's mentor talks to them the right way/),
     ).toBeTruthy();
     expect(
-      screen.queryByText(/personalise how your mentor talks to you/),
+      screen.queryByText(/your mentor talks to you the right way/),
     ).toBeNull();
   });
 

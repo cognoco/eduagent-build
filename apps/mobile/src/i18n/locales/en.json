@@ -1156,8 +1156,8 @@
       "analogyTitle": "Analogy Preference",
       "analogyDescription": "Choose a domain for analogies. The mentor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer."
     },
-    "title": "What do you want to learn?",
-    "prompt": "Choose a starting point or type it in your own words. Your mentor will help shape it into a subject.",
+    "title": "What do you want help with?",
+    "prompt": "A topic from class, an assignment, or something you've been curious about. Type it however you'd say it out loud.",
     "nameLabel": "Type your idea",
     "namePlaceholder": "e.g. Calculus, World History, 'learn about ants'...",
     "resolveTookTooLong": "Check took too long — try again",
@@ -1939,6 +1939,18 @@
     "index": {
       "redirectTitle": "First, let’s personalise a couple of basics",
       "redirectBody": "We’ll start with pronouns so the next steps feel right from the beginning."
+    },
+    "ready": {
+      "title": "You're all set.",
+      "introWithLearner": "For {{learner}}:",
+      "intro": "Here's what's set up:",
+      "rowTone": "Your mentor will talk to you the right way",
+      "rowToneChild": "Your mentor will talk to {{learner}} the right way",
+      "rowSubject": "Starting with {{subject}}",
+      "rowPace": "Pace stays at your speed — never rushed",
+      "reassurance": "Most learners feel the difference in the first session.",
+      "cta": "Let's start",
+      "ctaLabel": "Start your first session"
     }
   },
   "parentView": {
@@ -2409,9 +2421,9 @@
     "createProfile": {
       "signOutFailedTitle": "Could not sign out",
       "signOutFailedMessage": "Please try again",
-      "welcome": "Welcome!",
-      "setupProfile": "Let's set up your profile",
-      "getStarted": "Get started",
+      "welcome": "Turn \"I don't get it\" into \"I've got this.\"",
+      "setupProfile": "Your private mentor. Any subject. Any level.",
+      "getStarted": "Begin",
       "signOutLabel": "Sign out",
       "signOut": "Sign out"
     },
