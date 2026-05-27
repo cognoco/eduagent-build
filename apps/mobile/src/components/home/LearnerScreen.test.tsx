@@ -773,10 +773,7 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/child/[profileId]',
-        params: { profileId: 'child-id' },
-      });
+      expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-id');
     });
   });
 

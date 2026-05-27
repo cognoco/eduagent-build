@@ -154,7 +154,7 @@ describe('CreateProfileScreen', () => {
     screen.getByTestId('create-profile-submit');
     // Birth date explanatory copy is visible
     expect(
-      screen.getByText(/personalise how your mentor talks to you/),
+      screen.getByText(/your mentor talks to you the right way/),
     ).toBeTruthy();
     // Persona picker buttons are hidden (auto-detected from birth date)
     expect(screen.queryByTestId('persona-teen')).toBeNull();
@@ -193,11 +193,11 @@ describe('CreateProfileScreen', () => {
     it('uses child-referent copy on the explanatory line', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       expect(
-        screen.getByText(/personalise how their mentor talks to them/),
+        screen.getByText(/your child's mentor talks to them the right way/),
       ).toBeTruthy();
-      // Original first-person copy must NOT appear when adding a child
+      // First-person copy must NOT appear when adding a child
       expect(
-        screen.queryByText(/personalise how your mentor talks to you/),
+        screen.queryByText(/your mentor talks to you the right way/),
       ).toBeNull();
     });
 
@@ -206,10 +206,10 @@ describe('CreateProfileScreen', () => {
       screen.getByText(/Minimum age is 11/);
     });
 
-    it('uses "Add a child" as the page title', () => {
+    it('uses "Tell us about your child" as the page title', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
-      screen.getByText('Add a child');
-      expect(screen.queryByText('New profile')).toBeNull();
+      screen.getByText('Tell us about your child');
+      expect(screen.queryByText("Who's the learner?")).toBeNull();
     });
 
     it("uses Child's display name + child-referent placeholder", () => {
@@ -226,13 +226,13 @@ describe('CreateProfileScreen', () => {
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 
-    screen.getByText('Add a child');
+    screen.getByText('Tell us about your child');
     screen.getByText("Child's display name");
     expect(
-      screen.getByText(/personalise how their mentor talks to them/),
+      screen.getByText(/your child's mentor talks to them the right way/),
     ).toBeTruthy();
     expect(
-      screen.queryByText(/personalise how your mentor talks to you/),
+      screen.queryByText(/your mentor talks to you the right way/),
     ).toBeNull();
   });
 
@@ -658,10 +658,8 @@ describe('CreateProfileScreen', () => {
     });
 
     it('clears the safety timeout when loading flag resets before 30s (cleanup)', async () => {
-      // The timeout watches `loading`. Once loading goes false (POST resolves
-      // or the component unmounts), the timer must be cancelled.
-      // We simulate: submit starts loading, then loading drops before 30s —
-      // advancing past 30s must NOT set the error.
+      // The timeout watches only the create POST. Once the POST resolves or
+      // the component unmounts, the timer must be cancelled.
       const { unmount } = render(<CreateProfileScreen />, {
         wrapper: Wrapper,
       });
@@ -686,6 +684,395 @@ describe('CreateProfileScreen', () => {
 
       // No uncaught timer fire — the test would throw if setLoading/setError
       // were called on an unmounted component without cleanup.
+    });
+
+    it('aborts the in-flight create before allowing a post-timeout retry to succeed once', async () => {
+      const newProfile = {
+        id: 'retry-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      const abortError = Object.assign(new Error('Aborted'), {
+        name: 'AbortError',
+      });
+      let firstSignal: AbortSignal | undefined;
+      mockFetch
+        .mockImplementationOnce((_input: RequestInfo, init?: RequestInit) => {
+          firstSignal = init?.signal ?? undefined;
+          return new Promise((_resolve, reject) => {
+            firstSignal?.addEventListener('abort', () => reject(abortError));
+          });
+        })
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: newProfile }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(firstSignal).toBeDefined();
+      expect(firstSignal?.aborted).toBe(true);
+      screen.getByTestId('create-profile-error');
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockSwitchProfile).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a timed-out create response that resolves after the form unlocks', async () => {
+      const staleProfile = {
+        id: 'stale-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      const retryProfile = { ...staleProfile, id: 'retry-id' };
+      let firstSignal: AbortSignal | undefined;
+      let resolveFirst: ((response: Response) => void) | undefined = undefined;
+      mockFetch
+        .mockImplementationOnce((_input: RequestInfo, init?: RequestInit) => {
+          firstSignal = init?.signal ?? undefined;
+          return new Promise<Response>((resolve) => {
+            resolveFirst = resolve;
+          });
+        })
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: retryProfile }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(firstSignal?.aborted).toBe(true);
+      await act(async () => {
+        resolveFirst?.(
+          new Response(JSON.stringify({ profile: staleProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+      });
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
+    });
+
+    it('keeps the retry timeout active when a stale first response resolves after retry starts', async () => {
+      const staleProfile = {
+        id: 'stale-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      let firstSignal: AbortSignal | undefined;
+      let secondSignal: AbortSignal | undefined;
+      let resolveFirst: ((response: Response) => void) | undefined = undefined;
+      mockFetch
+        .mockImplementationOnce((_input: RequestInfo, init?: RequestInit) => {
+          firstSignal = init?.signal ?? undefined;
+          return new Promise<Response>((resolve) => {
+            resolveFirst = resolve;
+          });
+        })
+        .mockImplementationOnce((_input: RequestInfo, init?: RequestInit) => {
+          secondSignal = init?.signal ?? undefined;
+          return new Promise(() => undefined);
+        });
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(firstSignal?.aborted).toBe(true);
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+
+      await act(async () => {
+        resolveFirst?.(
+          new Response(JSON.stringify({ profile: staleProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(secondSignal?.aborted).toBe(true);
+      screen.getByTestId('create-profile-error');
+      expect(
+        screen.getByTestId('create-profile-submit').props.accessibilityState
+          ?.disabled,
+      ).toBe(false);
+    });
+
+    it('keeps duplicate-submit lock active after the POST resolves while success work finishes', async () => {
+      const newProfile = {
+        id: 'slow-success-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
+      );
+      mockSwitchProfile.mockReturnValueOnce(new Promise(() => undefined));
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith('slow-success-id');
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+      expect(
+        screen.getByTestId('create-profile-submit').props.accessibilityState
+          ?.disabled,
+      ).toBe(true);
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the 30s POST timeout when the POST resolves before slower success work finishes', async () => {
+      const newProfile = {
+        id: 'slow-family-success-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      let resolveCreate: ((response: Response) => void) | undefined = undefined;
+      let resolveAppContext: ((response: Response) => void) | undefined =
+        undefined;
+      let resolveSwitch: (() => void) | undefined = undefined;
+      mockSwitchProfile.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSwitch = resolve;
+          }),
+      );
+      mockFetch
+        .mockImplementationOnce(() => {
+          return new Promise<Response>((resolve) => {
+            resolveCreate = resolve;
+          });
+        })
+        .mockImplementationOnce(() => {
+          return new Promise<Response>((resolve) => {
+            resolveAppContext = resolve;
+          });
+        });
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(async () => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-intent-family'));
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      act(() => {
+        jest.advanceTimersByTime(29_000);
+      });
+
+      await act(async () => {
+        resolveCreate?.(
+          new Response(JSON.stringify({ profile: newProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(1_000);
+      });
+
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+      expect(
+        screen.getByTestId('create-profile-submit').props.accessibilityState
+          ?.disabled,
+      ).toBe(true);
+
+      await act(async () => {
+        resolveAppContext?.(
+          new Response(JSON.stringify({ profile: newProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith(
+          'slow-family-success-id',
+        );
+      });
+      await act(async () => {
+        resolveSwitch?.();
+        await Promise.resolve();
+      });
+    });
+
+    it('ignores a timed-out create failure that rejects after a retry succeeds', async () => {
+      const retryProfile = {
+        id: 'retry-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      let rejectFirst: ((reason: Error) => void) | undefined = undefined;
+      mockFetch
+        .mockImplementationOnce(() => {
+          return new Promise<Response>((_resolve, reject) => {
+            rejectFirst = reject;
+          });
+        })
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: retryProfile }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+      });
+
+      await act(async () => {
+        rejectFirst?.(new Error('stale network failure'));
+        await Promise.resolve();
+      });
+
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+    });
+
+    it('shows an error for AbortError failures not caused by this request signal', async () => {
+      const abortError = Object.assign(new Error('Unexpected abort'), {
+        name: 'AbortError',
+      });
+      mockFetch.mockRejectedValueOnce(abortError);
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(
+          String(screen.getByTestId('create-profile-error').props.children),
+        ).toContain("can't be reached");
+      });
+    });
+
+    it('ignores a synchronous double-tap while profile creation is already in flight', async () => {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(async () => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-intent-study'));
+
+      const submit = screen.getByTestId('create-profile-submit');
+      act(() => {
+        fireEvent.press(submit);
+        fireEvent.press(submit);
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 

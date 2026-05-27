@@ -1,4 +1,5 @@
 import {
+  childProfileHref,
   FAMILY_HOME_PATH,
   homeHrefForReturnTo,
   goBackOrReplace,
@@ -24,6 +25,18 @@ import type { Router } from 'expo-router';
 describe('navigation constants', () => {
   it('exports FAMILY_HOME_PATH for family-facing navigation', () => {
     expect(FAMILY_HOME_PATH).toBe('/(app)/home');
+  });
+});
+
+describe('childProfileHref', () => {
+  it('builds child profile hrefs with optional mode params', () => {
+    expect(childProfileHref('child-1')).toBe('/(app)/child/child-1');
+    expect(childProfileHref('child-1', 'progress')).toBe(
+      '/(app)/child/child-1?mode=progress',
+    );
+    expect(childProfileHref('child-1', 'settings')).toBe(
+      '/(app)/child/child-1?mode=settings',
+    );
   });
 });
 
@@ -62,10 +75,9 @@ describe('homeHrefForReturnTo', () => {
       pathname: '/(app)/recaps/[recapId]',
       params: { recapId: 'recap-1' },
     });
-    expect(homeHrefForReturnTo(FAMILY_CHILDREN_RETURN_TO, 'child-1')).toEqual({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-1' },
-    });
+    expect(homeHrefForReturnTo(FAMILY_CHILDREN_RETURN_TO, 'child-1')).toBe(
+      '/(app)/child/child-1',
+    );
   });
 
   it('falls back to the family home for any other value', () => {
@@ -251,10 +263,7 @@ describe('pushChildReport [BUG-524]', () => {
     pushChildReport(router, 'child-1', 'report-9');
 
     expect(router.push).toHaveBeenCalledTimes(2);
-    expect(router.push).toHaveBeenNthCalledWith(1, {
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-1' },
-    });
+    expect(router.push).toHaveBeenNthCalledWith(1, '/(app)/child/child-1');
     expect(router.push).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/child/[profileId]/report/[reportId]',
       params: { profileId: 'child-1', reportId: 'report-9' },
@@ -268,10 +277,7 @@ describe('pushChildWeeklyReport [BUG-524]', () => {
     pushChildWeeklyReport(router, 'child-1', 'weekly-7');
 
     expect(router.push).toHaveBeenCalledTimes(2);
-    expect(router.push).toHaveBeenNthCalledWith(1, {
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-1' },
-    });
+    expect(router.push).toHaveBeenNthCalledWith(1, '/(app)/child/child-1');
     expect(router.push).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
       params: { profileId: 'child-1', weeklyReportId: 'weekly-7' },

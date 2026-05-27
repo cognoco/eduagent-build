@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../../lib/profile';
 import { signOutWithCleanup } from '../../../lib/sign-out';
 import { platformAlert } from '../../../lib/platform-alert';
-import { GateContent } from '../../../components/common';
+import { GateContent, LightBulbAnimation } from '../../../components/common';
 
 /**
  * Gate shown when no profile exists yet (first-time user after sign-up).
@@ -59,10 +59,13 @@ export function CreateProfileGate(): React.ReactElement {
       testID="create-profile-gate"
     >
       <GateContent>
-        <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
+        <View className="items-center mb-8">
+          <LightBulbAnimation size={120} testID="create-profile-gate-bulb" />
+        </View>
+        <Text className="text-h1 font-bold text-text-primary mb-3 text-center leading-tight">
           {t('tabs.createProfile.welcome')}
         </Text>
-        <Text className="text-body text-text-secondary text-center mb-8">
+        <Text className="text-body text-text-secondary text-center mb-10">
           {t('tabs.createProfile.setupProfile')}
         </Text>
         <Pressable

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ensureFamilyHome } from '../../helpers/app-screen';
+import { waitForAppScreen } from '../../helpers/app-screen';
+import { pressFamilyHomeAction } from '../../helpers/parent-home';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
@@ -46,16 +47,21 @@ test('J-21 parent manages child consent from child detail', async ({
     void dialog.accept();
   });
 
-  await ensureFamilyHome(page, {
-    timeout: 90_000,
-    screenRetries: 5,
-  });
-
-  await pressableClick(
+  await page.goto('/home', { waitUntil: 'commit' });
+  await pressFamilyHomeAction(
+    page,
     page.getByTestId(`parent-home-child-profile-${childProfileId}`),
+    { timeout: 60_000 },
   );
-  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
-    timeout: 30_000,
+  await waitForAppScreen(page, 'consent-section', {
+    timeout: 60_000,
+    familyRouteRecovery: async () => {
+      await pressFamilyHomeAction(
+        page,
+        page.getByTestId(`parent-home-child-profile-${childProfileId}`),
+        { timeout: 30_000 },
+      );
+    },
   });
 
   await expect(page.getByTestId('consent-section')).toBeVisible({
@@ -63,9 +69,24 @@ test('J-21 parent manages child consent from child detail', async ({
   });
 
   const withdrawConsent = page.getByTestId('withdraw-consent-button');
+  const withdrawnState = page.getByTestId('consent-withdrawn-empty-state');
+  const consentStatusError = page.getByTestId('consent-status-error');
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if (await withdrawConsent.isVisible().catch(() => false)) {
-      break;
+      await pressableClick(withdrawConsent);
+
+      if (await withdrawnState.isVisible().catch(() => false)) {
+        break;
+      }
+
+      if (
+        attempt < 2 &&
+        (await consentStatusError.isVisible().catch(() => false))
+      ) {
+        await page.waitForTimeout(1_000);
+        continue;
+      }
     }
 
     const retry = page.getByTestId('consent-status-retry');
@@ -75,12 +96,7 @@ test('J-21 parent manages child consent from child detail', async ({
     await page.waitForTimeout(1_000);
   }
 
-  await expect(withdrawConsent).toBeVisible({ timeout: 30_000 });
-  await pressableClick(withdrawConsent);
-
-  await expect(page.getByTestId('consent-withdrawn-empty-state')).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(withdrawnState).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/sharing paused/i)).toBeVisible();
   await expect(page.getByText(/account closes in \d+ days/i)).toBeVisible();
 

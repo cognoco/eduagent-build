@@ -366,12 +366,13 @@ describe('CreateSubjectScreen', () => {
 
       await waitFor(() => {
         expect(firstCurriculumCalls).toBe(2);
+        // First-subject onboarding routes through /ready (recap) before the
+        // session; /ready replays the session params on its CTA.
         expect(mockReplace).toHaveBeenCalledWith({
-          pathname: '/(app)/session',
+          pathname: '/ready',
           params: {
-            mode: 'learning',
+            subject: 'Ancient History',
             subjectId: 'subject-history',
-            subjectName: 'Ancient History',
             sessionId: 'session-first',
             topicId: 'topic-first',
           },
@@ -438,12 +439,14 @@ describe('CreateSubjectScreen', () => {
       });
 
       await waitFor(() => {
+        // First-subject onboarding routes to /ready even on the curriculum
+        // fallback path (where sessionId is not yet known). /ready forwards
+        // topicName + rawInput to the session on its CTA.
         expect(mockReplace).toHaveBeenCalledWith({
-          pathname: '/(app)/session',
+          pathname: '/ready',
           params: {
-            mode: 'learning',
+            subject: 'World History',
             subjectId: 'subject-wh',
-            subjectName: 'World History',
             topicName: 'Easter',
             rawInput: 'Easter',
           },
@@ -533,11 +536,10 @@ describe('CreateSubjectScreen', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
+      pathname: '/ready',
       params: {
-        mode: 'learning',
+        subject: 'leaf cutter ants',
         subjectId: 'subject-1',
-        subjectName: 'leaf cutter ants',
         sessionId: 'session-first',
         topicId: 'topic-first',
       },
@@ -632,13 +634,13 @@ describe('CreateSubjectScreen', () => {
       });
     });
 
-    // Should start the first session with the focused book.
+    // First-subject onboarding routes through /ready (recap) before the
+    // focused-book session; /ready replays the session params on its CTA.
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
+      pathname: '/ready',
       params: {
-        mode: 'learning',
+        subject: 'World History',
         subjectId: 'subject-wh',
-        subjectName: 'World History',
         sessionId: 'session-first',
         topicId: 'topic-first',
       },
@@ -871,13 +873,13 @@ describe('CreateSubjectScreen', () => {
       });
     });
 
-    // Should start the first session (focused_book path), not library.
+    // First-subject onboarding routes through /ready (recap) before the
+    // focused-book session; /ready replays the session params on its CTA.
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
+      pathname: '/ready',
       params: {
-        mode: 'learning',
+        subject: 'Botany',
         subjectId: 'subject-botany',
-        subjectName: 'Botany',
         sessionId: 'session-first',
         topicId: 'topic-first',
       },
@@ -1428,12 +1430,13 @@ describe('CreateSubjectScreen', () => {
     fireEvent.press(screen.getByTestId('subject-suggestion-accept'));
 
     await waitFor(() => {
+      // First-subject onboarding routes through /ready (recap) before the
+      // session; /ready replays the session params on its CTA.
       expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
+        pathname: '/ready',
         params: {
-          mode: 'learning',
+          subject: 'Italian',
           subjectId: 'subject-italian',
-          subjectName: 'Italian',
           sessionId: 'session-first',
           topicId: 'topic-first',
         },

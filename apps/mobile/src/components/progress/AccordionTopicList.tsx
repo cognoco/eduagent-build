@@ -2,6 +2,7 @@ import { useRouter, useSegments, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
+import { childProfileHref } from '../../lib/navigation';
 import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
 
 interface AccordionTopicListProps {
@@ -93,10 +94,7 @@ export function AccordionTopicList({
             onPress={(event) => {
               event?.stopPropagation?.();
               if (!isInsideChildStack) {
-                router.push({
-                  pathname: '/(app)/child/[profileId]',
-                  params: { profileId: childProfileId },
-                } as Href);
+                router.push(childProfileHref(childProfileId));
               }
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',

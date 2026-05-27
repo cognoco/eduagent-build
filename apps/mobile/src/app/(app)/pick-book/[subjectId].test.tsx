@@ -590,9 +590,15 @@ describe('PickBookScreen', () => {
 
       const { result } = renderPickBook();
 
-      await waitFor(() => {
-        result.getByTestId('pick-book-suggestion-section-related');
-      });
+      // The screen intentionally sticky-holds its loading state for 800ms, and
+      // full related-suite runs add enough overhead that the default waitFor
+      // timeout can expire before the grouped suggestions render.
+      await waitFor(
+        () => {
+          result.getByTestId('pick-book-suggestion-section-related');
+        },
+        { timeout: 3000 },
+      );
       expect(
         result.queryByTestId('pick-book-suggestion-section-explore'),
       ).toBeNull();

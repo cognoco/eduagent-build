@@ -22,6 +22,7 @@ import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren, useProfile } from '../../lib/profile';
 import {
+  childProfileHref,
   LEARNER_HOME_RETURN_TO,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
@@ -193,10 +194,7 @@ export function LearnerScreen({
     const result = await switchProfile(navigationProxy.parentProfileId);
     if (!result.success) return;
 
-    router.push({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: childProfileId },
-    } as Href);
+    router.push(childProfileHref(childProfileId));
   }, [activeProfile, navigationProxy.parentProfileId, router, switchProfile]);
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
