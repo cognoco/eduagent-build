@@ -7,6 +7,10 @@
 
 **Review log (2026-05-26):** Pass-1 findings folded in — ratchet glob expanded to cover `inngest/` + `routes/`; `post-session-suggestions.ts` added as a confirmed learner-prose call site outside `services/**`; tripwire upgraded from `flow:`-gated warn to mandatory same-PR `flow:` tagging rule; "ambiguous service" deferral resolved by classifying the 10 candidates against code (9 deny, 1 thread — `recall-bridge.ts`); eval-fixture coverage expanded from `session.recap` only to one fixture per learner-prose flow; child-from-parent signup race resolved by omit-and-let-DB-default instead of inheriting parent's locale; `pronouns:` parameter decision recorded.
 
+**Second adversarial review (2026-05-26):** Pass-1 + Pass-2 findings folded in — schema step corrected (`profileCreateSchema`, not `createProfileInputSchema`; `conversationLanguage` already optional at line 67 — step downgraded to a verification); flow-tag set now uses **exact existing tag strings** (mixed dotted/hyphenated) so the runtime tripwire actually matches today's tags; ratchet handles the `quiz/generate-round.ts` wrapper via an explicit `IDENTIFIER_FORWARDING_FILES` allowlist (caller-chain trust); `book-generation.ts:117` and `book-suggestion-generation.ts:109` reclassified — neither passes `flow:` today; `session-recap.ts:358` and `session-highlights.ts:249` rows promoted from "verify" to "add"; mobile call-site paths corrected to the verified `(app)/_components/*` set; DI-via-function-reference invisibility to the ratchet documented; nb-locale integration smoke added to File Map; tripwire emits via `logger.warn` (project structured-logging convention) instead of `console.warn`; `findRouteAndCallSites` references `safe-non-core.guard.test.ts` as the canonical balanced-scan implementation.
+
+**Third adversarial review (2026-05-27):** Three structural defects folded in — **(CRITICAL-A)** the mobile call-site inventory was sourced from `git grep -l createProfile` and was mostly false positives: three of the four `(app)/_components/*Gate.tsx` files only contain the i18n key `tabs.createProfile.*`, they do not POST. Verified via `grep -rn "client.profiles.\$post"` — real call sites are `apps/mobile/src/app/create-profile.tsx:209` and `apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx:104, 135`. List replaced. **(CRITICAL-B)** the ratchet regex `\brouteAndCall\s*\(` does NOT match `routeAndCallForQuiz(` (word boundary on the F-side), and `IDENTIFIER_FORWARDING_FILES` skipped the whole file — leaving the three real caller sites at `generate-round.ts:558, 626, 675` invisible to the ratchet. Replaced with an alternation regex `\b(routeAndCall|routeAndCallForQuiz)\s*\(` plus a per-site (file + line) `WRAPPER_FORWARDER_SITES` allowlist that exempts only the wrapper-internal line, not the whole file. **(HIGH-A)** WIP-coordination section added — the `fix-onboarding` branch is actively editing `create-profile.tsx` and adds a new `apps/mobile/src/app/ready.tsx` reflection screen between profile creation and the first session; spec changes must rebase onto the WIP, not into a competing branch. Rollback step 3 corrected to drop the `createProfileInputSchema` fossil; per-flow snapshot count corrected to "16 new + 1 verify"; comment added that `birthMonth`/`birthDay` are intentionally not persisted.
+
 ## Problem
 
 LLM-generated cards (book suggestions, summaries, monthly reports, progress reports, session recaps, quizzes, homework summaries) render in English regardless of the learner's selected UI language. Reproduces on every non-English locale.
@@ -63,19 +67,19 @@ Every `routeAndCall(` site in `apps/api/src/{services,inngest,routes}/**` is cla
 | File | Sites | Notes |
 |---|---|---|
 | `assessments.ts` | 283, 330, 431 | No `flow:` today — add per HIGH-2 rule. |
-| `book-generation.ts` | 117 | Already passes `flow:`. |
-| `book-suggestion-generation.ts` | 109 | Already passes `flow:`. |
+| `book-generation.ts` | 117 | Has options `{providerPolicy, responseFormat}` but NO `flow:` today — add per HIGH-2 rule. |
+| `book-suggestion-generation.ts` | 109 | Has options `{responseFormat}` but NO `flow:` today — add per HIGH-2 rule. |
 | `curriculum.ts` | 110, 157, 2296 | No `flow:` today — add per HIGH-2 rule. |
 | `dictation/generate.ts` | 208 | No `flow:` today — add. |
 | `dictation/prepare-homework.ts` | 78 | No `flow:` today — add. |
 | `dictation/review.ts` | 216 | Already passes `flow: 'dictation.review'`. |
 | `homework-summary.ts` | 286 | No `flow:` today — add. |
 | `monthly-report.ts` | 206 | No `flow:` today — add. |
-| `progress-summary.ts` | 172 | Already passes `flow:`. |
-| `quiz/generate-round.ts` | 92 | Forwards `options` from caller — caller must include both. |
-| `session-highlights.ts` | 249 | Verify `flow:` tagged. |
-| `session-llm-summary.ts` | 256 | Verify `flow:` tagged. |
-| `session-recap.ts` | 358 | Verify `flow:` tagged. |
+| `progress-summary.ts` | 172 | Already passes `flow: 'progress-summary-generation'` (existing hyphenated tag — preserved in `LEARNER_FACING_FLOWS`). |
+| `quiz/generate-round.ts` | 92 | **Variable-forwarding wrapper** (`routeAndCallForQuiz(messages, rung, options)`). Caller must include both `conversationLanguage:` AND `flow:` in the options object. Listed in `IDENTIFIER_FORWARDING_FILES` (see ratchet) — ratchet trusts caller chain, not the wrapper line. |
+| `session-highlights.ts` | 249 | Has options `{ageBracket}` but NO `flow:` today — add per HIGH-2 rule. |
+| `session-llm-summary.ts` | 256 | Already passes `flow: 'session-llm-summary'` (existing hyphenated tag — preserved in `LEARNER_FACING_FLOWS`). |
+| `session-recap.ts` | 358 | No options object at all today — add both `flow:` and `conversationLanguage:`. |
 | `summaries.ts` | 119 | No `flow:` today — add. |
 | `recall-bridge.ts` | 87 | **Reclassified from "ambiguous" → thread.** Output is recall-bridge prose questions delivered directly to the learner ("Generate recall bridge questions… Return ONLY the questions, one per line"). |
 
@@ -122,7 +126,7 @@ Today: a brand-new profile is created server-side with `conversation_language` d
 
 Fix:
 
-1. **Schema.** Extend `createProfileInputSchema` in `packages/schemas/src/profiles.ts` with an optional `conversationLanguage?: ConversationLanguage` field (validated by existing `conversationLanguageSchema`). Already-validated values mean no new DB constraint required (migration 0087 already allows all 10).
+1. **Schema — no change required (verified).** The schema is `profileCreateSchema` in `packages/schemas/src/profiles.ts:56-70` (not `createProfileInputSchema`); `conversationLanguage: conversationLanguageSchema.optional()` is already on line 67. Verify the wire path accepts the field through unchanged before moving to step 2.
 
 2. **API.** `createProfile` in `apps/api/src/services/profile.ts:307` writes the field to the insert when present:
 
@@ -141,13 +145,31 @@ Fix:
      .returning();
    ```
 
-3. **Mobile.** Every call site that POSTs `createProfile` reads `i18next.language`, clamps it through `conversationLanguageSchema.safeParse`, and includes the parsed value in the request body. If the parse fails (e.g. some edge-case `languageTag` that isn't one of the 10), the field is omitted and the server falls back to the DB default. Call sites to update:
+3. **Mobile.** Every call site that POSTs `createProfile` reads `i18next.language`, clamps it through `conversationLanguageSchema.safeParse`, and includes the parsed value in the request body. If the parse fails (e.g. some edge-case `languageTag` that isn't one of the 10), the field is omitted and the server falls back to the DB default.
 
-   - `apps/mobile/src/app/onboarding/profile-setup.tsx` (or equivalent — the first profile is created during onboarding)
-   - `apps/mobile/src/app/(app)/more/children/add.tsx` (parent adding a child)
-   - Any other `createProfile`-shaped POST surface; an exhaustive `git grep` for the route's mutation hook will find them.
+   **Verified call sites** (third-review CRITICAL-A fix — sourced from `grep -rn "client.profiles.\$post" apps/mobile/src`, not the loose `git grep -l createProfile` which produced false positives for files that only render the `tabs.createProfile.*` i18n key):
+
+   - `apps/mobile/src/app/create-profile.tsx:209` — **PRIMARY self-and-child create surface.** Single screen that branches on `isAddingChild` (computed earlier in the file). Apply the rule per-branch: self-create includes `conversationLanguage: parsed.data`; child-create (i.e. `isAddingChild === true`) OMITS the field (see MED-2 rationale below).
+   - `apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx:104` — first save-wizard POST.
+   - `apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx:135` — second save-wizard POST (different code path in the same screen). Both call sites must apply the same self-vs-child branching rule used in `create-profile.tsx`. Confirm the surrounding code resolves `isAddingChild` (or equivalent flag) before editing.
+
+   **The three `(app)/_components/*Gate.tsx` files (`CreateProfileGate`, `ConsentPendingGate`, `ConsentWithdrawnGate`) do NOT POST and need no change here.** They render i18n strings and route the user to one of the verified call sites above. Earlier drafts listed them based on i18n-key grep false positives.
+
+   Re-run the verified-call-site grep before starting work in case a new surface lands between spec and implementation:
+
+   ```bash
+   grep -rn "client.profiles.\\\$post" apps/mobile/src
+   ```
 
    **For child profiles created by a parent: OMIT the field** and let the DB default `'en'` apply. Rationale (MED-2): the parent's `i18next.language` does not reliably predict the child's language (cross-language families exist — Norwegian-speaking child on an English-UI parent account, or vice versa). The DB default is at least predictable; using parent's locale is silently-wrong-in-some-families. When the child first signs in on their own device, `useMentorLanguageSync` overwrites the row to match the child's UI choice. Until then, pre-sync LLM cards rendered for parent-initiated work (e.g. parent-triggered topic suggestion) render in English — the same fallback as adult solo signup before sync resolves.
+
+### WIP coordination (third review — HIGH-A)
+
+As of 2026-05-27 a `fix-onboarding` branch is in flight that (a) edits `apps/mobile/src/app/create-profile.tsx` (copy + button-label changes around the same `client.profiles.$post` call at line 209) and (b) adds a new `apps/mobile/src/app/ready.tsx` reflection screen between profile creation and the first session. Implementation order:
+
+1. Land `fix-onboarding` (or rebase this spec's mobile edits on top of it). Do not open a competing branch that touches `create-profile.tsx:209` — the two diffs will conflict, and the WIP renames neighbouring strings.
+2. After landing, the line number for the POST call may shift; re-verify with `grep -n "client.profiles.\\\$post" apps/mobile/src/app/create-profile.tsx` before editing.
+3. The new `ready.tsx` screen lives OUTSIDE `(app)/` and therefore does NOT mount `useMentorLanguageSync`. The race window the signup-time fix targets is unchanged by WIP — and `create-subject.tsx` (also edited by WIP) can trigger `POST /sessions` with server-side curriculum-prep LLM calls before the user ever reaches `(app)/session`. The "thread `conversationLanguage` in the create-profile POST body" approach in this spec is still the correct fix; do not be tempted to defer it on the assumption that "ready.tsx adds a delay so the patch-after race resolves itself" — it doesn't, because the server-side LLM calls fire on `POST /sessions`, not on session-screen mount.
 
 4. **`useMentorLanguageSync` unchanged.** It remains the steady-state path for UI language changes after the profile exists. No race for established profiles — the field is already persisted.
 
@@ -155,29 +177,37 @@ Fix:
 
 **Structural finding (HIGH-2):** the tripwire's predicate is `options.flow && LEARNER_FACING_FLOWS.has(options.flow)`. Most existing learner-prose call sites (`assessments.ts`, `curriculum.ts`, `dictation/generate.ts`, `dictation/prepare-homework.ts`, `homework-summary.ts`, `monthly-report.ts`, `summaries.ts`) currently pass NO options object. After threading `conversationLanguage:` alone, those call sites would still fail to trigger the warn — the tripwire would be effectively dead for half the target surface.
 
-**Rule:** every call site touched by this PR adds `flow:` *and* `conversationLanguage:` together. Threading `flow:` is essentially free (the value already lives in the existing `LEARNER_FACING_FLOWS` list) and also closes the existing `llm.stop_reason` metric gap at `router.ts:710`, which today logs `flow: undefined` for most surfaces.
+**Rule:** every call site touched by this PR adds `flow:` *and* `conversationLanguage:` together. The `LEARNER_FACING_FLOWS` set is **introduced by this PR** (verified: `grep -n LEARNER_FACING_FLOWS apps/api/src/services/llm/router.ts` returns 0 hits today). Adding `flow:` also closes the existing `llm.stop_reason` metric gap at `router.ts:710`, which today logs `flow: undefined` for most surfaces.
+
+**Tag-string convention (CRITICAL-2):** existing flow tags in the codebase use mixed conventions — `exchange.process` and `dictation.review` are dotted; `progress-summary-generation` and `session-llm-summary` are hyphenated. The set below **preserves existing tag strings verbatim** so the runtime tripwire actually matches today's tags (no renames in this PR — renaming would silently break the `llm.stop_reason` dashboard queries that filter by these strings). New flow tags introduced by this PR adopt the dotted convention for consistency going forward; a follow-up PR may normalize the legacy hyphenated tags with a coordinated dashboard update.
 
 ```ts
-// Inside routeAndCall, after option parsing, before the model call:
+// Inside routeAndCall, after option parsing, before the model call.
+// IMPORTANT: tag strings are load-bearing — they appear in llm.stop_reason
+// dashboards and Sentry breadcrumbs. Do not normalize without a paired
+// dashboard sweep. Source of truth lives here in router.ts.
 const LEARNER_FACING_FLOWS = new Set([
-  'exchange.process',
-  'session.recap',
-  'session.highlights',
-  'session.llm.summary',
-  'monthly.report',
-  'progress.summary',
-  'book.generation',
-  'book.suggestion',
-  'curriculum.generate',
-  'dictation.generate',
-  'dictation.review',
-  'homework.summary',
-  'homework.prepare',
-  'quiz.generate',
-  'assessment.evaluate',
-  'recall.bridge',
-  'post.session.suggestions',
-  // source of truth lives next to LEARNER_FACING_FLOWS in router.ts
+  // Pre-existing tags (verbatim — DO NOT rename in this PR):
+  'exchange.process',                  // exchanges.ts:1313
+  'dictation.review',                  // dictation/review.ts:216
+  'progress-summary-generation',       // progress-summary.ts:173 (hyphenated — preserved)
+  'session-llm-summary',               // session-llm-summary.ts:257 (hyphenated — preserved)
+
+  // New tags introduced by this PR (dotted convention):
+  'session.recap',                     // session-recap.ts:358
+  'session.highlights',                // session-highlights.ts:249
+  'monthly.report',                    // monthly-report.ts:206
+  'book.generation',                   // book-generation.ts:117
+  'book.suggestion',                   // book-suggestion-generation.ts:109
+  'curriculum.generate',               // curriculum.ts:110, 157, 2296
+  'dictation.generate',                // dictation/generate.ts:208
+  'dictation.prepare-homework',        // dictation/prepare-homework.ts:78
+  'homework.summary',                  // homework-summary.ts:286
+  'quiz.generate',                     // quiz/generate-round.ts (via caller)
+  'assessment.evaluate',               // assessments.ts:283, 330, 431
+  'recall.bridge',                     // recall-bridge.ts:87
+  'post.session.suggestions',          // inngest/functions/post-session-suggestions.ts:167
+  'summaries.generate',                // summaries.ts:119
 ]);
 
 if (
@@ -185,9 +215,13 @@ if (
   LEARNER_FACING_FLOWS.has(options.flow) &&
   !options.conversationLanguage
 ) {
-  console.warn(
-    `[llm.language.missing] flow=${options.flow} sessionId=${options.sessionId ?? 'n/a'}`,
-  );
+  // LOW-2: use the project's structured logger (matches the existing
+  // llm.stop_reason emission at router.ts:81), not console.warn.
+  // Structured fields bucket cleanly in Cloudflare logs / Sentry breadcrumbs.
+  logger.warn('llm.language.missing', {
+    flow: options.flow,
+    sessionId: options.sessionId ?? null,
+  });
 }
 ```
 
@@ -230,6 +264,26 @@ const INTERNAL_NON_PROSE_FILES = new Set([
   'apps/api/src/routes/test-seed.ts',
 ]);
 
+// Third-review CRITICAL-B — per-SITE (file + line) exemption for the
+// wrapper-internal forward call only. Previous design exempted the whole
+// file via `IDENTIFIER_FORWARDING_FILES` AND used a `\brouteAndCall\s*\(`
+// regex that did NOT match `routeAndCallForQuiz(` (no word-boundary on the
+// F side). The combined effect: the three real caller sites at
+// generate-round.ts:558, 626, 675 were invisible to the ratchet. This fix
+// (a) scans both the direct `routeAndCall(` AND the `routeAndCallForQuiz(`
+// alternation, (b) exempts only the wrapper-internal forwarder line, not
+// the whole file, so wrapper CALLERS still get the same `flow:` +
+// `conversationLanguage:` checks every other learner-prose site does.
+//
+// Maintenance: if `routeAndCallForQuiz` is moved or its forwarder line
+// shifts, update the line number below. CI will fail loudly because the
+// wrapper's options-identifier forward would otherwise be flagged.
+const WRAPPER_FORWARDER_SITES = new Set<string>([
+  // routeAndCallForQuiz wrapper's internal forward to routeAndCall —
+  // options is forwarded as an identifier, regex would always fail here.
+  'apps/api/src/services/quiz/generate-round.ts:92',
+]);
+
 describe('routeAndCall sites must thread conversationLanguage + flow', () => {
   it('every learner-facing call site threads conversationLanguage AND flow in the same call', () => {
     const files = globSync('apps/api/src/{services,inngest,routes}/**/*.ts', {
@@ -242,14 +296,17 @@ describe('routeAndCall sites must thread conversationLanguage + flow', () => {
       const src = fs.readFileSync(f, 'utf-8');
       const sites = findRouteAndCallSites(src);
       for (const site of sites) {
+        // Third-review CRITICAL-B: per-site (file:line) exemption for
+        // wrapper-internal forwarders only — not the whole file.
+        if (WRAPPER_FORWARDER_SITES.has(`${rel}:${site.startLine}`)) continue;
         // LOW-1 fix: scan only inside the option-object braces (site.optionsText),
         // not the whole call expression, so a stray comment containing the
         // word "conversationLanguage" upstream doesn't satisfy the regex.
         if (!/\bconversationLanguage\s*:/.test(site.optionsText)) {
-          violations.push(`${rel}:${site.startLine} — routeAndCall without conversationLanguage`);
+          violations.push(`${rel}:${site.startLine} — ${site.callName} without conversationLanguage`);
         }
         if (!/\bflow\s*:/.test(site.optionsText)) {
-          violations.push(`${rel}:${site.startLine} — routeAndCall without flow tag`);
+          violations.push(`${rel}:${site.startLine} — ${site.callName} without flow tag`);
         }
       }
     }
@@ -258,16 +315,30 @@ describe('routeAndCall sites must thread conversationLanguage + flow', () => {
 });
 ```
 
+**Wrapper-name coverage (third review — CRITICAL-B).** The regex below explicitly alternates `routeAndCall` and `routeAndCallForQuiz` so the three real caller sites at `quiz/generate-round.ts:558, 626, 675` are scanned the same way as direct call sites. Only the wrapper-internal forwarder line (`generate-round.ts:92`) is exempted, via `WRAPPER_FORWARDER_SITES` (file + line, not whole-file). If a new wrapper is introduced in the future, add its name to the alternation AND add only its forwarder line to `WRAPPER_FORWARDER_SITES` — do not whole-file-exempt.
+
+**DI-via-function-reference is invisible to the ratchet (MEDIUM-2).** The regex `\brouteAndCall\s*\(` matches only direct invocation sites. Three files in the repo pass `routeAndCall` as a function reference into a downstream receiver:
+
+- `apps/api/src/routes/filing.ts:156` → `fileToLibrary(..., routeAndCall)`
+- `apps/api/src/inngest/functions/auto-file-session.ts:93` → same receiver
+- `apps/api/src/inngest/functions/freeform-filing.ts:170` → same receiver
+
+The receiver is `services/filing.ts:331` — denylisted as JSON classification. Today the DI pattern is safe. Going forward: **any new receiver of a `routeAndCall` reference must either (a) live in a file the ratchet scans (and that file must itself invoke `routeAndCall` so the scan picks it up), or (b) be explicitly added to `INTERNAL_NON_PROSE_FILES`**. The audit step below (`grep -rln "routeAndCall("` plus a second `grep -rln "routeAndCall," | grep -v "routeAndCall("` for DI handoffs) must run in the implementation PR to confirm no new DI receivers have been introduced.
+
 **`findRouteAndCallSites` (LOW-2 — concrete sketch):**
 
 ```ts
-type CallSite = { startLine: number; text: string; optionsText: string };
+type CallSite = { startLine: number; text: string; optionsText: string; callName: string };
 
 function findRouteAndCallSites(src: string): CallSite[] {
   const sites: CallSite[] = [];
-  const re = /\brouteAndCall\s*\(/g;
+  // Third-review CRITICAL-B: alternation so wrapper-name callers (e.g.
+  // routeAndCallForQuiz) are scanned. The capture group records WHICH
+  // name matched so violation messages can name the actual call.
+  const re = /\b(routeAndCall|routeAndCallForQuiz)\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
+    const callName = m[1];
     // Walk balanced parens from after the opening '(' to find the matching ')'.
     let depth = 1;
     let i = m.index + m[0].length;
@@ -275,8 +346,12 @@ function findRouteAndCallSites(src: string): CallSite[] {
       const ch = src[i];
       if (ch === '(') depth++;
       else if (ch === ')') depth--;
-      // (For production: skip string/template/comment bodies so braces inside
-      // strings don't unbalance the scan. The safe-non-core guard does the same.)
+      // Production implementation MUST skip string/template/comment bodies
+      // so that braces/parens inside strings don't unbalance the scan.
+      // Copy the scanner from `apps/api/src/services/safe-non-core.guard.test.ts`
+      // — it already handles single/double/backtick strings, line comments,
+      // and block comments with the same balanced-walk approach. Do not
+      // re-derive the state machine here; share the helper.
       i++;
     }
     const text = src.slice(m.index, i);
@@ -284,7 +359,7 @@ function findRouteAndCallSites(src: string): CallSite[] {
     // comma after the opening paren and capturing through the matching '}'.
     const optionsText = extractThirdArgObject(text) ?? '';
     const startLine = src.slice(0, m.index).split('\n').length;
-    sites.push({ startLine, text, optionsText });
+    sites.push({ startLine, text, optionsText, callName });
   }
   return sites;
 }
@@ -327,27 +402,40 @@ A second sweep (`de`, `es`, `ja`, `pl`, `pt`) for a single representative flow (
 ## File Map
 
 **New:**
-- `apps/api/src/services/llm/router.language-coverage.test.ts` — `{services,inngest,routes}/**` ratchet (HIGH-1 fix).
-- `apps/api/eval-llm/fixtures/<flow>/nb-locale.fixture.ts` — ~17 Tier-1 prompt snapshots (one per learner-prose flow).
+- `apps/api/src/services/llm/router.language-coverage.test.ts` — `{services,inngest,routes}/**` ratchet (HIGH-1 fix). Includes `INTERNAL_NON_PROSE_FILES` denylist AND `IDENTIFIER_FORWARDING_FILES` wrapper-allowlist (CRITICAL-3 fix).
+- `apps/api/eval-llm/fixtures/<flow>/nb-locale.fixture.ts` — 16 new Tier-1 prompt snapshots + 1 verify of the existing `exchange-process` fixture (one per learner-prose flow).
 - `apps/api/eval-llm/fixtures/session-recap/{de,es,ja,pl,pt}-locale.fixture.ts` — 5 additional locale snapshots for the recap flow (table-coverage check on `CONVERSATION_LANGUAGE_NAMES`).
+- `apps/api/src/services/session-recap.nb-locale.integration.test.ts` — end-to-end smoke (HIGH-2 from review-2 fix): seeds a profile with `conversationLanguage: 'nb'`, drives `generateSessionRecap` via the real service path, and asserts the assembled system prompt contains the Norwegian directive substring. Single-locale, single-flow — the cross-flow coverage lives in the Tier-1 prompt-assembly snapshots above; this smoke proves the threading reaches the router under real wiring (route handler → service → router) for at least one flow.
 
 **Edited:**
-- `packages/schemas/src/profiles.ts` — add `conversationLanguage?` to `createProfileInputSchema`.
-- `apps/api/src/services/profile.ts:307` — write field through to insert.
+- `packages/schemas/src/profiles.ts` — **no change required** (HIGH-1 from review-2). `profileCreateSchema` (line 56-70) already has `conversationLanguage: conversationLanguageSchema.optional()` at line 67. Listed here for traceability only.
+- `apps/api/src/services/profile.ts:307` — write field through to insert (the only schema-side gap).
 - `apps/api/src/services/llm/router.ts` — `LEARNER_FACING_FLOWS` set + warn block, plus the two new flow tags (`recall.bridge`, `post.session.suggestions`).
 - 16 learner-prose service files listed in the call-sites-to-update table — add `conversationLanguage` parameter AND `flow:` tag to every `routeAndCall` site (HIGH-2 mandatory pairing).
 - `apps/api/src/inngest/functions/post-session-suggestions.ts` — load `profile.conversationLanguage` from event payload, add `flow:` + `conversationLanguage:` to the `routeAndCall` site.
 - Corresponding Inngest functions / route handlers for the learner-prose services — load profile, pass `conversationLanguage` down to the service.
 - 15 denylisted files — add `// conversationLanguage not threaded: <reason>` comment on the `routeAndCall` line.
-- Mobile `createProfile` POST call sites — include `conversationLanguage` from `i18next.language` ONLY for the self-create path. Parent-creates-child omits the field (MED-2 fix).
+- Mobile `client.profiles.$post` call sites (third-review CRITICAL-A — list re-verified): `apps/mobile/src/app/create-profile.tsx:209` (branch on `isAddingChild`), `apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx:104`, `apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx:135` — include `conversationLanguage` from `i18next.language` ONLY for the self-create branch. Parent-creates-child omits the field (MED-2 fix). The three `(app)/_components/*Gate.tsx` files do NOT POST and are NOT edited by this PR.
 
-**Audit step:** before writing call-site changes, run:
+**Audit step:** before writing call-site changes, run THREE greps:
 
 ```bash
-grep -rln "routeAndCall(" apps/api/src/{services,inngest,routes} --include="*.ts" | grep -v test
+# 1. Direct routeAndCall(...) sites — must appear in the learner-prose table OR INTERNAL_NON_PROSE_FILES.
+grep -rn "routeAndCall(" apps/api/src/{services,inngest,routes} --include="*.ts" | grep -v test
+
+# 2. Wrapper-name call sites (third-review CRITICAL-B) — `routeAndCallForQuiz(...)`
+# is the only wrapper today. Each call site must thread `flow:` + `conversationLanguage:`
+# in its own options object (the ratchet alternates regex to cover this).
+grep -rn "routeAndCallForQuiz(" apps/api/src/{services,inngest,routes} --include="*.ts" | grep -v test
+
+# 3. DI-via-function-reference sites (MEDIUM-2 — invisible to the ratchet).
+# Each match's receiver must itself either invoke routeAndCall directly
+# (and thus appear in #1) or live in INTERNAL_NON_PROSE_FILES.
+grep -rn "routeAndCall," apps/api/src/{services,inngest,routes} --include="*.ts" \
+  | grep -v test | grep -v "routeAndCall("
 ```
 
-Confirm the file list matches the call-sites tables in this spec. If a new site has been added since this spec was written, add it to either the learner-prose table or `INTERNAL_NON_PROSE_FILES` (with reason) in the same PR.
+Confirm both lists match what this spec inventories. If a new site has been added since this spec was written, add it to either the learner-prose table, `INTERNAL_NON_PROSE_FILES`, or `IDENTIFIER_FORWARDING_FILES` (with reason) in the same PR.
 
 ## Failure Modes
 
@@ -367,14 +455,14 @@ Reversible. Each commit can be reverted independently:
 
 1. Revert mobile call-site changes — server falls back to DB default `'en'`.
 2. Revert API service-by-service threading — `routeAndCall` ignores undefined `conversationLanguage`, falls back to no directive (today's behaviour).
-3. Revert schema change — `createProfileInputSchema` no longer accepts the field; mobile sends are ignored as extra fields if `.strict()` isn't enabled, or rejected at the boundary if it is (verify before reverting).
-4. Drop the new test file.
+3. Schema — nothing to revert. Step 1 made no schema change; `profileCreateSchema` (verified `.strict()` at `packages/schemas/src/profiles.ts:70`) has `conversationLanguage: conversationLanguageSchema.optional()` already. If a future PR removes that field, revert mobile first or the `.strict()` parser will 400 the POST.
+4. Drop the new test file (`router.language-coverage.test.ts`) and the per-flow eval-harness fixtures.
 
 No data lost. No migration. No destructive operation.
 
 ## Validation
 
-- `pnpm exec nx run api:test` passes (existing + new ratchet test).
-- `pnpm exec nx test:integration api` passes (the integration smoke for `nb` recap).
-- `pnpm eval:llm` snapshots include the six new locale fixtures.
+- `pnpm exec nx run api:test` passes (existing + new ratchet test + the per-flow Tier-1 snapshot fixtures).
+- `pnpm exec nx test:integration api` passes — confirms the new `session-recap.nb-locale.integration.test.ts` (added in File Map) drives the threaded `conversationLanguage` through the real service path and into the assembled system prompt.
+- `pnpm eval:llm` snapshots include all per-flow `nb-locale` fixtures (~17) plus the five additional `session-recap` locale fixtures (`de`, `es`, `ja`, `pl`, `pt`).
 - Manual: change UI language to Norwegian on a fresh emulator profile, trigger a session recap, confirm the card prose is Norwegian.
