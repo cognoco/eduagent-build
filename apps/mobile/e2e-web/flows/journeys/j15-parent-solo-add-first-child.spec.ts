@@ -54,5 +54,5 @@ test('J-15 family-plan parent with no children sees Family setup CTA from Study 
   await expect(page.getByTestId('create-profile-name')).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page).toHaveURL(/\/create-profile(?:\?.*for=child.*)?$/);
+  await expect(page).toHaveURL(/\/create-profile\?(?:.*&)?for=child(?:&.*)?$/);
 });
