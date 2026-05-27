@@ -1,8 +1,7 @@
 import {
-  markIntroSeenSync,
-  hasSeenIntro,
-  clearIntroSeen,
-  introSecureStoreKey,
+  markPreAuthIntroSeenSync,
+  hasSeenPreAuthIntro,
+  preAuthIntroSecureStoreKey,
   __resetIntroStateForTests,
 } from './intro-state';
 import * as SecureStore from './secure-storage';
@@ -25,93 +24,81 @@ afterAll(() => {
   setItemSpy.mockRestore();
 });
 
-describe('introSecureStoreKey', () => {
-  it('produces a sanitized, prefixed, versioned key', () => {
-    expect(introSecureStoreKey('user_abc123')).toBe(
-      'intro_seen_v1_user_abc123',
-    );
-  });
-
-  it('runs the userId through the SecureStore sanitizer', () => {
-    // Clerk userIds are alphanumeric + underscores, but defense in depth:
-    // any colon / slash / equals must be sanitized to underscore.
-    expect(introSecureStoreKey('user:1/2=3')).toBe('intro_seen_v1_user_1_2_3');
-  });
-});
-
-describe('hasSeenIntro', () => {
-  it('returns false when neither the in-memory cache nor SecureStore have the flag', () => {
-    expect(hasSeenIntro('user_1', null)).toBe(false);
-  });
-
-  it('returns true when the in-memory cache has the flag', () => {
-    setItemSpy.mockResolvedValue(undefined);
-    markIntroSeenSync('user_1');
-    expect(hasSeenIntro('user_1', null)).toBe(true);
-  });
-
-  it('returns true when the SecureStore value is present (cold-start case)', () => {
-    expect(hasSeenIntro('user_1', '2026-05-25T10:00:00.000Z')).toBe(true);
-  });
-
-  it('does not leak the in-memory flag across userIds', () => {
-    setItemSpy.mockResolvedValue(undefined);
-    markIntroSeenSync('user_a');
-    expect(hasSeenIntro('user_b', null)).toBe(false);
-  });
-});
-
-describe('markIntroSeenSync', () => {
-  it('writes the sanitized key with an ISO-8601 timestamp value', async () => {
-    setItemSpy.mockResolvedValue(undefined);
-    markIntroSeenSync('user_1');
-    await Promise.resolve();
-    expect(setItemSpy).toHaveBeenCalledWith(
-      'intro_seen_v1_user_1',
-      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
-    );
-  });
-
-  it('sets the in-memory flag synchronously, before the async write resolves', () => {
-    // Never resolves — proves the in-memory flag does not depend on the write.
-    setItemSpy.mockReturnValue(new Promise(() => undefined));
-    markIntroSeenSync('user_1');
-    expect(hasSeenIntro('user_1', null)).toBe(true);
-  });
-
-  it('emits intro_securestore_write_failed and keeps the in-memory flag when the write rejects', async () => {
-    setItemSpy.mockRejectedValue(new Error('disk full'));
-    markIntroSeenSync('user_1');
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(track).toHaveBeenCalledWith('intro_securestore_write_failed', {
-      message: 'disk full',
+describe('pre-auth intro state', () => {
+  describe('preAuthIntroSecureStoreKey', () => {
+    it('returns the static device-scoped key', () => {
+      expect(preAuthIntroSecureStoreKey()).toBe('preAuthIntroSeen.v1');
     });
-    // User is not trapped in a re-show loop within this session.
-    expect(hasSeenIntro('user_1', null)).toBe(true);
-  });
 
-  it('stringifies non-Error rejection values for the failure metric', async () => {
-    setItemSpy.mockRejectedValue('keystore locked');
-    markIntroSeenSync('user_1');
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(track).toHaveBeenCalledWith('intro_securestore_write_failed', {
-      message: 'keystore locked',
+    it('uses only SecureStore-safe characters (letters, digits, dot, dash, underscore)', () => {
+      expect(preAuthIntroSecureStoreKey()).toMatch(/^[A-Za-z0-9._-]+$/);
     });
   });
-});
 
-describe('clearIntroSeen', () => {
-  it('removes only the targeted user from the in-memory cache', () => {
-    setItemSpy.mockResolvedValue(undefined);
-    markIntroSeenSync('user_a');
-    markIntroSeenSync('user_b');
-    clearIntroSeen('user_a');
-    expect(hasSeenIntro('user_a', null)).toBe(false);
-    expect(hasSeenIntro('user_b', null)).toBe(true);
+  describe('hasSeenPreAuthIntro', () => {
+    it('returns false when neither in-memory nor SecureStore have the flag', () => {
+      expect(hasSeenPreAuthIntro(null)).toBe(false);
+    });
+
+    it('returns true when the in-memory cache has the flag', () => {
+      setItemSpy.mockResolvedValue(undefined);
+      markPreAuthIntroSeenSync();
+      expect(hasSeenPreAuthIntro(null)).toBe(true);
+    });
+
+    it('returns true when the SecureStore value is present (cold-start case)', () => {
+      expect(hasSeenPreAuthIntro('2026-05-27T10:00:00.000Z')).toBe(true);
+    });
   });
 
-  it('is a no-op when the userId is not in the cache', () => {
-    expect(() => clearIntroSeen('never_marked')).not.toThrow();
-    expect(hasSeenIntro('never_marked', null)).toBe(false);
+  describe('markPreAuthIntroSeenSync', () => {
+    it('writes the device-scoped key with an ISO-8601 timestamp value', async () => {
+      setItemSpy.mockResolvedValue(undefined);
+      markPreAuthIntroSeenSync();
+      await Promise.resolve();
+      expect(setItemSpy).toHaveBeenCalledWith(
+        'preAuthIntroSeen.v1',
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+      );
+    });
+
+    it('sets the in-memory flag synchronously, before the async write resolves', () => {
+      // Never resolves — proves the in-memory flag does not depend on the write.
+      setItemSpy.mockReturnValue(new Promise(() => undefined));
+      markPreAuthIntroSeenSync();
+      expect(hasSeenPreAuthIntro(null)).toBe(true);
+    });
+
+    it('emits intro_securestore_write_failed and keeps the in-memory flag when the write rejects', async () => {
+      setItemSpy.mockRejectedValue(new Error('disk full'));
+      markPreAuthIntroSeenSync();
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(track).toHaveBeenCalledWith('intro_securestore_write_failed', {
+        message: 'disk full',
+      });
+      // User is not trapped in a re-show loop within this session.
+      expect(hasSeenPreAuthIntro(null)).toBe(true);
+    });
+
+    it('stringifies non-Error rejection values for the failure metric', async () => {
+      setItemSpy.mockRejectedValue('keystore locked');
+      markPreAuthIntroSeenSync();
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(track).toHaveBeenCalledWith('intro_securestore_write_failed', {
+        message: 'keystore locked',
+      });
+    });
+
+    // Race regression: after marking seen in memory, a remount of the pre-auth
+    // welcome path must NOT re-show cards even if the SecureStore write has
+    // not yet committed (probe reads null from disk).
+    it('survives a remount where the SecureStore write has not yet committed', () => {
+      // Simulate the SecureStore write still pending.
+      setItemSpy.mockReturnValue(new Promise(() => undefined));
+      markPreAuthIntroSeenSync();
+      // Subsequent probe (e.g. on remount) sees null on disk but the
+      // in-memory bit must answer the gate.
+      expect(hasSeenPreAuthIntro(null)).toBe(true);
+    });
   });
 });

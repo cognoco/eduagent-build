@@ -12,9 +12,12 @@ import * as Linking from 'expo-linking';
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 
-// Mutable flag state so individual tests can toggle PREVIEW_ONBOARDING_ENABLED.
-// Defaults to true (matches the real feature-flags.ts value).
+// Mutable flag state so individual tests can toggle the two preview flags.
+// Defaults match the real feature-flags.ts: PREVIEW_ONBOARDING_ENABLED true,
+// PREVIEW_ENTRY_CTA_ENABLED false. Tests that need the CTA visible flip
+// mockPreviewEntryCtaEnabled to true.
 let mockPreviewOnboardingEnabled = true;
+let mockPreviewEntryCtaEnabled = false;
 jest.mock(
   '../../lib/feature-flags' /* gc1-allow: screen test pins flag branch for CTA visibility */,
   () => ({
@@ -24,6 +27,7 @@ jest.mock(
         MIC_IN_PILL_ENABLED: true,
         I18N_ENABLED: true,
         PREVIEW_ONBOARDING_ENABLED: mockPreviewOnboardingEnabled,
+        PREVIEW_ENTRY_CTA_ENABLED: mockPreviewEntryCtaEnabled,
         ADULT_OWNER_GATE_ENABLED: true,
       };
     },
@@ -1271,30 +1275,52 @@ describe('SignInScreen', () => {
 // PREVIEW_ONBOARDING_ENABLED flag gate — Try MentoMate CTA
 // ---------------------------------------------------------------------------
 
-describe('SignInScreen — Try MentoMate CTA', () => {
+describe('SignInScreen — Try MentoMate CTA (PREVIEW_ONBOARDING_ENABLED × PREVIEW_ENTRY_CTA_ENABLED)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearTransitionState();
     clearPendingAuthRedirect();
     clearSessionExpiredNotice();
-    // Restore flag to default (on) before each test in this describe block
+    // Reset both flags to their real defaults before each case.
     mockPreviewOnboardingEnabled = true;
+    mockPreviewEntryCtaEnabled = false;
   });
 
   afterEach(() => {
-    // Restore global default so other describe blocks are unaffected
     mockPreviewOnboardingEnabled = true;
+    mockPreviewEntryCtaEnabled = false;
   });
 
-  it('renders the Try MentoMate CTA when flag is on', async () => {
+  it('renders the CTA when both PREVIEW_ONBOARDING_ENABLED and PREVIEW_ENTRY_CTA_ENABLED are on', async () => {
     mockPreviewOnboardingEnabled = true;
+    mockPreviewEntryCtaEnabled = true;
     render(<SignInScreen />);
     await act(async () => undefined);
     expect(screen.getByTestId('try-mentomate-cta')).toBeTruthy();
   });
 
-  it('hides the CTA when flag is off', async () => {
+  it('hides the CTA when PREVIEW_ENTRY_CTA_ENABLED is off (default product state)', async () => {
+    mockPreviewOnboardingEnabled = true;
+    mockPreviewEntryCtaEnabled = false;
+    render(<SignInScreen />);
+    await act(async () => undefined);
+    expect(screen.queryByTestId('try-mentomate-cta')).toBeNull();
+  });
+
+  // Engine-off branch: even if a future build flips the CTA flag on, the CTA
+  // must stay hidden when the preview engine itself is off — otherwise the
+  // button would route to /preview, which would dead-end without the engine.
+  it('hides the CTA when PREVIEW_ONBOARDING_ENABLED is off, regardless of PREVIEW_ENTRY_CTA_ENABLED', async () => {
     mockPreviewOnboardingEnabled = false;
+    mockPreviewEntryCtaEnabled = true;
+    render(<SignInScreen />);
+    await act(async () => undefined);
+    expect(screen.queryByTestId('try-mentomate-cta')).toBeNull();
+  });
+
+  it('hides the CTA when both flags are off', async () => {
+    mockPreviewOnboardingEnabled = false;
+    mockPreviewEntryCtaEnabled = false;
     render(<SignInScreen />);
     await act(async () => undefined);
     expect(screen.queryByTestId('try-mentomate-cta')).toBeNull();

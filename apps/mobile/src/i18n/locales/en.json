@@ -2421,8 +2421,8 @@
     "createProfile": {
       "signOutFailedTitle": "Could not sign out",
       "signOutFailedMessage": "Please try again",
-      "welcome": "Turn \"I don't get it\" into \"I've got this.\"",
-      "setupProfile": "Your private mentor. Any subject. Any level.",
+      "welcome": "Let's set up your mentor",
+      "setupProfile": "Tell us who is learning so help starts at the right level.",
       "getStarted": "Begin",
       "signOutLabel": "Sign out",
       "signOut": "Sign out"
@@ -3005,27 +3005,71 @@
   },
   "welcomeIntro": {
     "card1": {
-      "headline": "Your notebook fills up as you learn",
-      "supporting": "Notes and what your mentor remembers about you build a study record you can come back to."
+      "headline": "A mentor you can talk to",
+      "supporting": "Ask when you are stuck, explain what you do not get, and get help that adapts to how you learn."
     },
     "card2": {
-      "headline": "Recaps and progress save automatically",
-      "supporting": "After every session, you'll see what you covered and what's worth revisiting."
+      "headline": "All your study in one place",
+      "supporting": "Study as many subjects as you need, get help with assignments, save notes, and bookmark what matters."
     },
     "card3": {
-      "headline": "Your mentor remembers you",
-      "supporting": "Tell it once — your interests, how you learn, what's hard — and it carries that forward."
+      "headline": "Picks up where you left off",
+      "supporting": "Your mentor remembers your progress, adapts to your pace, and helps with quick bursts or steady routines."
     },
     "card4": {
-      "headline": "Built for families",
-      "supporting": "Parents see what their kids worked on and get conversation starters. To add a child, open More and tap Add a child."
+      "headline": "Built for real learning",
+      "supporting": "Clear explanations, guided questions, and practice that sticks help you think, practice, and remember."
+    },
+    "scene": {
+      "card1": {
+        "learner": "I do not get this yet.",
+        "mentor": "Let's slow it down. What part feels confusing?"
+      },
+      "card2": {
+        "subjects": {
+          "math": "Math",
+          "history": "History",
+          "spanish": "Spanish"
+        },
+        "chips": {
+          "notes": "Notes",
+          "bookmarks": "Bookmarks",
+          "quiz": "Quiz"
+        }
+      },
+      "card3": {
+        "rows": {
+          "lastTime": "Last time",
+          "lastTimeBody": "You wrapped up Cells & DNA basics",
+          "next": "Next",
+          "nextBody": "Pick up with Photosynthesis when ready",
+          "pace": "Pace",
+          "paceBody": "Short bursts work well for you"
+        }
+      },
+      "card4": {
+        "chips": {
+          "explain": "Clear explanation",
+          "think": "Think it through",
+          "practice": "Practice in context",
+          "remember": "Remember it later"
+        }
+      }
+    },
+    "bridge": {
+      "headline": "Turn \"I don't get it\" into \"I've got this.\"",
+      "supporting": "Create a free account so your mentor can remember your subjects, notes, and progress.",
+      "primaryCta": "Create free account",
+      "secondaryCta": "I already have an account"
     },
     "next": "Next",
     "letsStart": "Let's start",
     "a11y": {
       "previous": "Previous card",
       "next": "Next card",
-      "dots": "Page {{current}} of {{total}}"
+      "dots": "Page {{current}} of {{total}}",
+      "bridgePrimary": "Create a free account",
+      "bridgeSecondary": "Sign in to an existing account"
     }
   },
   "profiles": {

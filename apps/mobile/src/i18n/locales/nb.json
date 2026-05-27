@@ -2998,27 +2998,71 @@
   },
   "welcomeIntro": {
     "card1": {
-      "headline": "Your notebook fills up as you learn",
-      "supporting": "Notes and what your mentor remembers about you build a study record you can come back to."
+      "headline": "En mentor du kan snakke med",
+      "supporting": "Spør når du står fast, forklar hva du ikke forstår, og få hjelp som tilpasser seg måten du lærer på."
     },
     "card2": {
-      "headline": "Recaps and progress save automatically",
-      "supporting": "After every session, you'll see what you covered and what's worth revisiting."
+      "headline": "All læring på ett sted",
+      "supporting": "Studer så mange fag du vil, få hjelp med oppgaver, lagre notater og bokmerk det som betyr noe."
     },
     "card3": {
-      "headline": "Your mentor remembers you",
-      "supporting": "Tell it once — your interests, how you learn, what's hard — and it carries that forward."
+      "headline": "Tar opp tråden der du slapp",
+      "supporting": "Mentoren din husker fremgangen din, tilpasser seg tempoet ditt og hjelper både med korte økter og jevne rutiner."
     },
     "card4": {
-      "headline": "Built for families",
-      "supporting": "Parents see what their kids worked on and get conversation starters. To add a child, open More and tap Add a child."
+      "headline": "Bygd for ekte læring",
+      "supporting": "Tydelige forklaringer, veiledende spørsmål og øvelser som setter seg hjelper deg å tenke, øve og huske."
     },
-    "next": "Next",
-    "letsStart": "Let's start",
+    "scene": {
+      "card1": {
+        "learner": "Jeg skjønner ikke dette ennå.",
+        "mentor": "La oss ta det rolig. Hvilken del føles forvirrende?"
+      },
+      "card2": {
+        "subjects": {
+          "math": "Matte",
+          "history": "Historie",
+          "spanish": "Spansk"
+        },
+        "chips": {
+          "notes": "Notater",
+          "bookmarks": "Bokmerker",
+          "quiz": "Quiz"
+        }
+      },
+      "card3": {
+        "rows": {
+          "lastTime": "Forrige gang",
+          "lastTimeBody": "Du fullførte Celler og DNA-grunnlag",
+          "next": "Neste",
+          "nextBody": "Fortsett med fotosyntese når du er klar",
+          "pace": "Tempo",
+          "paceBody": "Korte økter fungerer bra for deg"
+        }
+      },
+      "card4": {
+        "chips": {
+          "explain": "Tydelig forklaring",
+          "think": "Tenk det gjennom",
+          "practice": "Øv i sammenheng",
+          "remember": "Husk det senere"
+        }
+      }
+    },
+    "bridge": {
+      "headline": "Gjør «Jeg forstår det ikke» til «Dette har jeg.»",
+      "supporting": "Opprett en gratis konto så mentoren kan huske fagene, notatene og fremgangen din.",
+      "primaryCta": "Opprett gratis konto",
+      "secondaryCta": "Jeg har allerede en konto"
+    },
+    "next": "Neste",
+    "letsStart": "La oss starte",
     "a11y": {
-      "previous": "Previous card",
-      "next": "Next card",
-      "dots": "Page {{current}} of {{total}}"
+      "previous": "Forrige kort",
+      "next": "Neste kort",
+      "dots": "Side {{current}} av {{total}}",
+      "bridgePrimary": "Opprett en gratis konto",
+      "bridgeSecondary": "Logg inn på en eksisterende konto"
     }
   },
   "proxy": {

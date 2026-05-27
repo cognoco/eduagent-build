@@ -20,22 +20,282 @@ interface CardSpec {
   readonly index: CardIndex;
   readonly headline: string;
   readonly supporting: string;
-  readonly icon: keyof typeof Ionicons.glyphMap;
+  readonly fallbackIcon: keyof typeof Ionicons.glyphMap;
 }
 
-const CARD_ICONS = [
-  'book-outline',
+// Fallback accent icons per card — used only inside the scene slot when the
+// product scene needs a representative glyph. The primary visual is the
+// composed app-like scene rendered by `renderScene` below.
+const CARD_FALLBACK_ICONS = [
+  'chatbubbles-outline',
   'albums-outline',
-  'sparkles-outline',
-  'people-outline',
+  'time-outline',
+  'school-outline',
 ] as const satisfies ReadonlyArray<keyof typeof Ionicons.glyphMap>;
 
-const TOTAL_CARDS = CARD_ICONS.length;
+const TOTAL_CARDS = CARD_FALLBACK_ICONS.length;
 const LAST_INDEX: CardIndex = (TOTAL_CARDS - 1) as CardIndex;
 
 export interface WelcomeIntroProps {
   onComplete: () => void;
   onCardAdvanced?: (cardIndex: number) => void;
+}
+
+// Compact mentor-chat scene: learner message bubble + mentor response bubble.
+function Card1Scene({
+  colors,
+  t,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  t: (k: string) => string;
+}): React.ReactElement {
+  return (
+    <View testID="welcome-card-1-scene" className="w-full mb-8">
+      <View
+        className="self-end rounded-2xl px-4 py-3 mb-2"
+        style={{ backgroundColor: colors.accent, maxWidth: '80%' }}
+      >
+        <Text className="text-body-sm" style={{ color: colors.textInverse }}>
+          {t('welcomeIntro.scene.card1.learner')}
+        </Text>
+      </View>
+      <View
+        className="self-start rounded-2xl px-4 py-3 flex-row items-start"
+        style={{ backgroundColor: colors.surfaceElevated, maxWidth: '85%' }}
+      >
+        <Ionicons
+          name="sparkles"
+          size={14}
+          color={colors.accent}
+          style={{ marginRight: 6, marginTop: 3 }}
+        />
+        <Text
+          className="text-body-sm flex-1"
+          style={{ color: colors.textPrimary }}
+        >
+          {t('welcomeIntro.scene.card1.mentor')}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// Compact study-space scene: a row of subject tiles and a row of small chips
+// (Notes / Bookmarks / Quiz).
+function Card2Scene({
+  colors,
+  t,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  t: (k: string) => string;
+}): React.ReactElement {
+  const subjects: Array<{
+    key: string;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }> = [
+    {
+      key: 'math',
+      label: t('welcomeIntro.scene.card2.subjects.math'),
+      icon: 'calculator-outline',
+    },
+    {
+      key: 'history',
+      label: t('welcomeIntro.scene.card2.subjects.history'),
+      icon: 'time-outline',
+    },
+    {
+      key: 'spanish',
+      label: t('welcomeIntro.scene.card2.subjects.spanish'),
+      icon: 'language-outline',
+    },
+  ];
+  const chips: Array<{
+    key: string;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }> = [
+    {
+      key: 'notes',
+      label: t('welcomeIntro.scene.card2.chips.notes'),
+      icon: 'document-text-outline',
+    },
+    {
+      key: 'bookmarks',
+      label: t('welcomeIntro.scene.card2.chips.bookmarks'),
+      icon: 'bookmark-outline',
+    },
+    {
+      key: 'quiz',
+      label: t('welcomeIntro.scene.card2.chips.quiz'),
+      icon: 'help-circle-outline',
+    },
+  ];
+  return (
+    <View testID="welcome-card-2-scene" className="w-full mb-8">
+      <View className="flex-row justify-between mb-4">
+        {subjects.map((s) => (
+          <View
+            key={s.key}
+            className="rounded-2xl items-center justify-center px-3 py-3"
+            style={{
+              backgroundColor: colors.surfaceElevated,
+              width: '31%',
+            }}
+          >
+            <Ionicons name={s.icon} size={24} color={colors.accent} />
+            <Text
+              className="text-caption mt-2"
+              style={{ color: colors.textPrimary }}
+            >
+              {s.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <View className="flex-row flex-wrap justify-center">
+        {chips.map((c) => (
+          <View
+            key={c.key}
+            className="flex-row items-center rounded-full px-3 py-1 mr-2 mb-2"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <Ionicons
+              name={c.icon}
+              size={12}
+              color={colors.textSecondary}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              className="text-caption"
+              style={{ color: colors.textSecondary }}
+            >
+              {c.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// Compact continuity scene: three rows labelled Last time / Next / Pace,
+// each with a one-line body.
+function Card3Scene({
+  colors,
+  t,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  t: (k: string) => string;
+}): React.ReactElement {
+  const rows: Array<{
+    key: string;
+    label: string;
+    body: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }> = [
+    {
+      key: 'lastTime',
+      label: t('welcomeIntro.scene.card3.rows.lastTime'),
+      body: t('welcomeIntro.scene.card3.rows.lastTimeBody'),
+      icon: 'checkmark-circle-outline',
+    },
+    {
+      key: 'next',
+      label: t('welcomeIntro.scene.card3.rows.next'),
+      body: t('welcomeIntro.scene.card3.rows.nextBody'),
+      icon: 'arrow-forward-circle-outline',
+    },
+    {
+      key: 'pace',
+      label: t('welcomeIntro.scene.card3.rows.pace'),
+      body: t('welcomeIntro.scene.card3.rows.paceBody'),
+      icon: 'speedometer-outline',
+    },
+  ];
+  return (
+    <View testID="welcome-card-3-scene" className="w-full mb-8">
+      {rows.map((r) => (
+        <View
+          key={r.key}
+          className="flex-row items-start rounded-2xl px-4 py-3 mb-2"
+          style={{ backgroundColor: colors.surfaceElevated }}
+        >
+          <Ionicons
+            name={r.icon}
+            size={18}
+            color={colors.accent}
+            style={{ marginRight: 10, marginTop: 1 }}
+          />
+          <View className="flex-1">
+            <Text
+              className="text-caption font-semibold"
+              style={{ color: colors.textSecondary }}
+            >
+              {r.label}
+            </Text>
+            <Text
+              className="text-body-sm mt-0.5"
+              style={{ color: colors.textPrimary }}
+            >
+              {r.body}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// Compact method-chip scene: four method labels.
+function Card4Scene({
+  colors,
+  t,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  t: (k: string) => string;
+}): React.ReactElement {
+  const chips: Array<{ key: string; label: string }> = [
+    { key: 'explain', label: t('welcomeIntro.scene.card4.chips.explain') },
+    { key: 'think', label: t('welcomeIntro.scene.card4.chips.think') },
+    { key: 'practice', label: t('welcomeIntro.scene.card4.chips.practice') },
+    { key: 'remember', label: t('welcomeIntro.scene.card4.chips.remember') },
+  ];
+  return (
+    <View
+      testID="welcome-card-4-scene"
+      className="w-full flex-row flex-wrap justify-center mb-8"
+    >
+      {chips.map((c) => (
+        <View
+          key={c.key}
+          className="rounded-full px-3 py-2 mr-2 mb-2"
+          style={{ backgroundColor: colors.surfaceElevated }}
+        >
+          <Text className="text-body-sm" style={{ color: colors.textPrimary }}>
+            {c.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function renderScene(
+  index: CardIndex,
+  colors: ReturnType<typeof useThemeColors>,
+  t: (k: string) => string,
+): React.ReactElement {
+  switch (index) {
+    case 0:
+      return <Card1Scene colors={colors} t={t} />;
+    case 1:
+      return <Card2Scene colors={colors} t={t} />;
+    case 2:
+      return <Card3Scene colors={colors} t={t} />;
+    case 3:
+      return <Card4Scene colors={colors} t={t} />;
+  }
 }
 
 export function WelcomeIntro({
@@ -55,25 +315,25 @@ export function WelcomeIntro({
         index: 0,
         headline: t('welcomeIntro.card1.headline'),
         supporting: t('welcomeIntro.card1.supporting'),
-        icon: CARD_ICONS[0],
+        fallbackIcon: CARD_FALLBACK_ICONS[0],
       },
       {
         index: 1,
         headline: t('welcomeIntro.card2.headline'),
         supporting: t('welcomeIntro.card2.supporting'),
-        icon: CARD_ICONS[1],
+        fallbackIcon: CARD_FALLBACK_ICONS[1],
       },
       {
         index: 2,
         headline: t('welcomeIntro.card3.headline'),
         supporting: t('welcomeIntro.card3.supporting'),
-        icon: CARD_ICONS[2],
+        fallbackIcon: CARD_FALLBACK_ICONS[2],
       },
       {
         index: 3,
         headline: t('welcomeIntro.card4.headline'),
         supporting: t('welcomeIntro.card4.supporting'),
-        icon: CARD_ICONS[3],
+        fallbackIcon: CARD_FALLBACK_ICONS[3],
       },
     ],
     [t],
@@ -161,12 +421,9 @@ export function WelcomeIntro({
               testID={`welcome-card-${item.index + 1}`}
               accessibilityLabel={`${headline}. ${supporting}`}
             >
-              <View
-                className="rounded-full p-6 mb-8"
-                style={{ backgroundColor: colors.surfaceElevated }}
-              >
-                <Ionicons name={item.icon} size={64} color={colors.accent} />
-              </View>
+              {/* Stable scene slot above the headline so card-to-card swipes
+                  do not shift headline/body placement. */}
+              {renderScene(item.index, colors, t as (k: string) => string)}
               <Text
                 className="text-display-sm font-bold text-center text-textPrimary mb-4"
                 style={{ color: colors.textPrimary }}

@@ -169,9 +169,9 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
   },
   {
     file: 'apps/mobile/src/lib/intro-state.ts',
-    line: 43,
+    line: 57,
     reason:
-      'Welcome-intro "seen" flag is per-Clerk-userId, not per-profileId — falls outside PER_PROFILE_KEYS. Per GLOBAL_KEYS comment, onboarding flags that legitimately survive sign-out cycles are intentionally excluded from global wipe: a user who signs out to switch accounts on the same device must not re-see the intro on next sign-in. Cross-user leakage is impossible because the key embeds the Clerk userId. Sign-out clears only the in-memory bit (clearIntroSeen).',
+      'Pre-auth welcome-intro "seen" flag is device-scoped (single static key, no userId or profileId) — falls outside PER_PROFILE_KEYS. Per GLOBAL_KEYS comment, onboarding flags that legitimately survive sign-out cycles are intentionally excluded from the global wipe: a user who signs out and back in on the same device must not re-see the intro. The key contains no user identifier, so cross-account leakage is structurally impossible (the only signal is "this device has been through the welcome cards once"). Spec: docs/plans/2026-05-27-pre-auth-welcome-flow.md.',
   },
 ];
 

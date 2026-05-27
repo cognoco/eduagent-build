@@ -17,6 +17,16 @@ export const FEATURE_FLAGS = {
   // isFamilyCapableProfile() and the mentomate_preview_intent entry in sign-out-cleanup ship UNCONDITIONALLY.
   PREVIEW_ONBOARDING_ENABLED: true,
 
+  // Narrow gate for the "Try MentoMate" entry CTA on the sign-in screen. The
+  // CTA is only meaningful when the preview engine is also enabled, and the
+  // pre-auth welcome flow (docs/plans/2026-05-27-pre-auth-welcome-flow.md)
+  // makes the main front door the welcome cards + LightBulb bridge — not the
+  // preview demo. Keep the engine alive (PREVIEW_ONBOARDING_ENABLED:true) so
+  // existing deep-links + the SaveWizard handoff still function, but hide
+  // the visible CTA by default. Sign-in renders the CTA only when BOTH flags
+  // are on:  PREVIEW_ONBOARDING_ENABLED && PREVIEW_ENTRY_CTA_ENABLED.
+  PREVIEW_ENTRY_CTA_ENABLED: false,
+
   MODE_NAV_V0_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV === 'true',
   MODE_NAV_V1_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V1 === 'true',
 

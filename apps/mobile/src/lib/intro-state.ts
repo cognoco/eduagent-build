@@ -1,66 +1,71 @@
 // ---------------------------------------------------------------------------
-// First-launch welcome intro — per-Clerk-userId, per-device flag.
+// Pre-auth welcome intro — device-scoped first-open flag.
 //
-// SecureStore writes are async; the intro completion handler must persist
-// the "seen" flag and immediately navigate. If we only relied on SecureStore,
-// the layout's intro-gate check could re-read the stale value before the
-// write commits and bounce the user back to /welcome.
+// The welcome intro is shown BEFORE sign-in, so there is no Clerk userId to
+// scope the "seen" state against. The flag is per-device: a fresh install
+// sees the cards once; subsequent cold opens (signed-out or signed-in) skip
+// straight to the sign-in / app shell. The UX consequence is accepted: on a
+// shared device, only the first signed-out first-open user sees the welcome
+// cards. A second user signing up later on the same device goes straight to
+// auth (see the plan's "Product Decisions" section).
 //
-// Fix: pair a synchronous in-memory Set with the async SecureStore write.
-// `markIntroSeenSync` flips the in-memory bit synchronously, then fires the
-// SecureStore write best-effort. `hasSeenIntro` checks the in-memory cache
-// first, falling back to the SecureStore value that the layout effect loaded.
+// SecureStore writes are async; the bridge CTAs must persist the flag and
+// immediately navigate to /sign-up or /sign-in. If we only relied on
+// SecureStore, the root entry's intro probe could re-read the stale (null)
+// value on the next mount and bounce the user back to /welcome. Fix: pair a
+// synchronous in-memory boolean with the async SecureStore write.
+// `markPreAuthIntroSeenSync` flips the in-memory bit synchronously, then
+// fires the SecureStore write best-effort. `hasSeenPreAuthIntro` checks the
+// in-memory bit first, falling back to the SecureStore value the caller
+// loaded.
 //
 // On SecureStore write failure: Sentry capture + `intro_securestore_write_failed`
 // metric (per CLAUDE.md "silent recovery without escalation is banned" —
-// Sentry alone isn't queryable as a rate). User keeps the in-memory flag for
-// this session and never sees the intro twice in one process.
+// Sentry alone isn't queryable as a rate). The in-memory bit still answers
+// the gate for the remainder of the process so the user is never trapped in
+// a re-show loop.
 //
-// Sign-out path calls `clearIntroSeen(userId)` so a second account signing
-// in on the same device doesn't inherit the previous user's in-memory bit
-// (the SecureStore key is userId-scoped, so this is belt-and-suspenders).
+// The flag intentionally survives sign-out: a user who completes the intro,
+// signs in, then signs out should not re-see the intro on the next sign-in.
+// That's why sign-out cleanup does NOT clear this key (the previous per-user
+// `clearIntroSeen(userId)` call was removed when this module moved
+// pre-auth).
 //
-// Versioned `_v1` suffix lets us force a one-time re-show by bumping to
-// `_v2`. Not a "what's new" channel.
+// Versioned `.v1` suffix lets us force a one-time re-show by bumping to
+// `.v2`. Not a "what's new" channel.
 //
-// Spec: docs/specs/2026-05-25-welcome-intro.md
+// Spec: docs/plans/2026-05-27-pre-auth-welcome-flow.md
 // ---------------------------------------------------------------------------
 
-import { setItemAsync, sanitizeSecureStoreKey } from './secure-storage';
+import { setItemAsync } from './secure-storage';
 import { Sentry } from './sentry';
 import { track } from './analytics';
 
-const KEY_PREFIX = 'intro_seen_v1_';
+// Dot-delimited so it satisfies the SecureStore key sanitizer
+// (letters, digits, dot, dash, underscore) without going through
+// sanitizeSecureStoreKey at every call.
+const PRE_AUTH_INTRO_KEY = 'preAuthIntroSeen.v1';
 
-const inMemoryIntroSeen = new Set<string>();
+let inMemoryIntroSeen = false;
 
-export function introSecureStoreKey(userId: string): string {
-  return sanitizeSecureStoreKey(`${KEY_PREFIX}${userId}`);
+export function preAuthIntroSecureStoreKey(): string {
+  return PRE_AUTH_INTRO_KEY;
 }
 
-export function markIntroSeenSync(userId: string): void {
-  inMemoryIntroSeen.add(userId);
-  setItemAsync(introSecureStoreKey(userId), new Date().toISOString()).catch(
-    (err) => {
-      Sentry.captureException(err);
-      track('intro_securestore_write_failed', {
-        message: err instanceof Error ? err.message : String(err),
-      });
-    },
-  );
+export function markPreAuthIntroSeenSync(): void {
+  inMemoryIntroSeen = true;
+  setItemAsync(PRE_AUTH_INTRO_KEY, new Date().toISOString()).catch((err) => {
+    Sentry.captureException(err);
+    track('intro_securestore_write_failed', {
+      message: err instanceof Error ? err.message : String(err),
+    });
+  });
 }
 
-export function hasSeenIntro(
-  userId: string,
-  securestoreValue: string | null,
-): boolean {
-  return inMemoryIntroSeen.has(userId) || !!securestoreValue;
-}
-
-export function clearIntroSeen(userId: string): void {
-  inMemoryIntroSeen.delete(userId);
+export function hasSeenPreAuthIntro(securestoreValue: string | null): boolean {
+  return inMemoryIntroSeen || !!securestoreValue;
 }
 
 export function __resetIntroStateForTests(): void {
-  inMemoryIntroSeen.clear();
+  inMemoryIntroSeen = false;
 }
