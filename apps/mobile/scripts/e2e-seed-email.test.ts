@@ -28,6 +28,14 @@ function loadRuntimeWithPrefix(
 }
 
 describe('buildSeedEmail', () => {
+  it('throws when prefix is too long to leave alias space', () => {
+    const { buildSeedEmail } = loadRuntimeWithPrefix('p'.repeat(64));
+
+    expect(() => buildSeedEmail('x')).toThrow(
+      /PLAYWRIGHT_EMAIL_PREFIX must be shorter than 55 characters/,
+    );
+  });
+
   it('leaves short seed aliases readable', () => {
     const { buildSeedEmail } = loadRuntimeWithPrefix('pw-short-');
 
