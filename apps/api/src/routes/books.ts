@@ -189,19 +189,6 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             existing.book.topicsGenerated &&
             activeTopicCount < MIN_GENERATED_BOOK_TOPICS
           ) {
-            if (expandExisting) {
-              const learnerAge = await getProfileAge(db, profileId);
-              const expanded = await expandExistingBookTopics(
-                db,
-                profileId,
-                subjectId,
-                bookId,
-                existing,
-                priorKnowledge,
-                { learnerAge, generateBookTopics, captureException },
-              );
-              return c.json(bookWithTopicsSchema.parse(expanded));
-            }
             if (isStaleBookGenerationClaim(existing.book.updatedAt)) {
               const learnerAge = await getProfileAge(db, profileId);
               const expanded = await expandExistingBookTopics(
