@@ -21,6 +21,19 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+export function childProfileHref(
+  profileId: string,
+  mode?: 'progress' | 'settings',
+): Href {
+  const encodedProfileId = encodeURIComponent(profileId);
+  if (!mode) {
+    return `/(app)/child/${encodedProfileId}` as Href;
+  }
+
+  const encodedMode = encodeURIComponent(mode);
+  return `/(app)/child/${encodedProfileId}?mode=${encodedMode}` as Href;
+}
+
 export function homeHrefForReturnTo(
   returnTo: string | string[] | undefined,
   returnId?: string | string[] | undefined,
@@ -37,12 +50,7 @@ export function homeHrefForReturnTo(
     } as Href;
   }
   if (token === FAMILY_RECAPS_RETURN_TO) return FAMILY_RECAPS_HREF as Href;
-  if (token === FAMILY_CHILDREN_RETURN_TO && id) {
-    return {
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: id },
-    } as Href;
-  }
+  if (token === FAMILY_CHILDREN_RETURN_TO && id) return childProfileHref(id);
   if (token === FAMILY_PROGRESS_RETURN_TO) return FAMILY_PROGRESS_HREF as Href;
   if (token === STUDY_PROGRESS_RETURN_TO) return STUDY_PROGRESS_HREF as Href;
   if (token === FAMILY_CHILDREN_RETURN_TO) return FAMILY_CHILDREN_HREF as Href;
@@ -143,10 +151,7 @@ export function pushChildReport(
   profileId: string,
   reportId: string,
 ): void {
-  router.push({
-    pathname: '/(app)/child/[profileId]',
-    params: { profileId },
-  } as Href);
+  router.push(childProfileHref(profileId));
   router.push({
     pathname: '/(app)/child/[profileId]/report/[reportId]',
     params: { profileId, reportId },
@@ -162,10 +167,7 @@ export function pushChildWeeklyReport(
   profileId: string,
   weeklyReportId: string,
 ): void {
-  router.push({
-    pathname: '/(app)/child/[profileId]',
-    params: { profileId },
-  } as Href);
+  router.push(childProfileHref(profileId));
   router.push({
     pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
     params: { profileId, weeklyReportId },

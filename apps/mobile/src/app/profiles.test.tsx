@@ -210,10 +210,9 @@ describe('ProfilesScreen', () => {
     expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
     expect(mockSetMode).toHaveBeenCalledWith('family');
     expect(mockDismiss).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-id', mode: 'settings' },
-    });
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/child/child-id?mode=settings',
+    );
     // replace must NOT be the navigation path — it never dismissed the modal
     // in production (this was the actual symptom of BUG-774).
     expect(mockReplace).not.toHaveBeenCalled();
@@ -239,10 +238,9 @@ describe('ProfilesScreen', () => {
 
     expect(mockDismiss).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-id', mode: 'settings' },
-    });
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/child/child-id?mode=settings',
+    );
   });
 
   it('does not expose a normal UI path into child proxy mode', () => {
@@ -416,10 +414,9 @@ describe('ProfilesScreen', () => {
     expect(mockSetMode).toHaveBeenCalledWith('family');
     expect(mockSwitchProfile).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-id', mode: 'settings' },
-    });
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/child/child-id?mode=settings',
+    );
   });
 
   it('shows edit buttons for owner on all profiles', () => {

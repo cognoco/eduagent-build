@@ -23,46 +23,93 @@ export async function pressableClick(target: Locator): Promise<void> {
     // the post-click assertion in the calling test will catch the blocked UI.
   });
 
-  await expect(target).toBeVisible({ timeout: 15_000 });
-  await target.scrollIntoViewIfNeeded();
-  await target.evaluate((element) => {
-    const eventDefaults = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      button: 0,
-    };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await expect(target).toBeVisible({ timeout: 15_000 });
 
-    const dispatchPointerEvent = (
-      type: 'pointerdown' | 'pointerup',
-      buttons: number,
-    ) => {
-      const PointerEventCtor = window.PointerEvent ?? window.MouseEvent;
-      element.dispatchEvent(
-        new PointerEventCtor(type, {
-          ...eventDefaults,
-          buttons,
-          pointerId: 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-        } as PointerEventInit),
-      );
-    };
+    try {
+      await target.scrollIntoViewIfNeeded();
+      await target.evaluate((element) => {
+        const eventDefaults = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          button: 0,
+        };
 
-    dispatchPointerEvent('pointerdown', 1);
-    // RNW listens to pointer events when PointerEvent exists; mouse events are
-    // retained for environments that only support the compatibility path.
-    element.dispatchEvent(
-      new MouseEvent('mousedown', { ...eventDefaults, buttons: 1 }),
-    );
-    dispatchPointerEvent('pointerup', 0);
-    element.dispatchEvent(
-      new MouseEvent('mouseup', { ...eventDefaults, buttons: 0 }),
-    );
-    element.dispatchEvent(
-      new MouseEvent('click', { ...eventDefaults, buttons: 0 }),
-    );
+        const dispatchPointerEvent = (
+          type: 'pointerdown' | 'pointerup',
+          buttons: number,
+        ) => {
+          const PointerEventCtor = window.PointerEvent ?? window.MouseEvent;
+          element.dispatchEvent(
+            new PointerEventCtor(type, {
+              ...eventDefaults,
+              buttons,
+              pointerId: 1,
+              pointerType: 'mouse',
+              isPrimary: true,
+            } as PointerEventInit),
+          );
+        };
+
+        dispatchPointerEvent('pointerdown', 1);
+        // RNW listens to pointer events when PointerEvent exists; mouse events
+        // are retained for environments that only support the compatibility
+        // path.
+        element.dispatchEvent(
+          new MouseEvent('mousedown', { ...eventDefaults, buttons: 1 }),
+        );
+        dispatchPointerEvent('pointerup', 0);
+        element.dispatchEvent(
+          new MouseEvent('mouseup', { ...eventDefaults, buttons: 0 }),
+        );
+        element.dispatchEvent(
+          new MouseEvent('click', { ...eventDefaults, buttons: 0 }),
+        );
+      });
+      return;
+    } catch (error) {
+      if (
+        attempt === 1 ||
+        !(error instanceof Error) ||
+        !error.message.includes('Element is not attached to the DOM')
+      ) {
+        throw error;
+      }
+    }
+  }
+}
+
+export async function domClick(target: Locator): Promise<void> {
+  const page = target.page();
+  const splash = page.getByTestId('animated-splash');
+
+  await splash.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {
+    // Most app states do not render the splash at all. If it is still visible,
+    // the post-click assertion in the calling test will catch the blocked UI.
   });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await expect(target).toBeVisible({ timeout: 15_000 });
+
+    try {
+      await target.scrollIntoViewIfNeeded();
+      await target.evaluate((element) => {
+        const clickable = element as HTMLElement;
+        clickable.focus?.();
+        clickable.click();
+      });
+      return;
+    } catch (error) {
+      if (
+        attempt === 1 ||
+        !(error instanceof Error) ||
+        !error.message.includes('Element is not attached to the DOM')
+      ) {
+        throw error;
+      }
+    }
+  }
 }
 
 export async function pressableClickByTestId(

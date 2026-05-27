@@ -45,6 +45,7 @@ import {
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 import { BaseCoachingCard } from '../coaching/BaseCoachingCard';
+import { childProfileHref } from '../../lib/navigation';
 
 const SINGLE_CHILD_PROMPT_COUNT = 3;
 const MULTI_CHILD_PROMPT_COUNT = 1;
@@ -983,20 +984,14 @@ export function ParentHomeScreen({
 
   const pushChildProfile = useCallback(
     (childProfileId: string): void => {
-      router.push({
-        pathname: '/(app)/child/[profileId]',
-        params: { profileId: childProfileId, mode: 'settings' },
-      } as Href);
+      router.push(childProfileHref(childProfileId, 'settings'));
     },
     [router],
   );
 
   const pushChildProgress = useCallback(
     (childProfileId: string): void => {
-      router.push({
-        pathname: '/(app)/child/[profileId]',
-        params: { profileId: childProfileId, mode: 'progress' },
-      } as Href);
+      router.push(childProfileHref(childProfileId, 'progress'));
     },
     [router],
   );

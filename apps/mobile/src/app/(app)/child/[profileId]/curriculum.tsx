@@ -15,7 +15,11 @@ import { useTranslation } from 'react-i18next';
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
-import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
+import {
+  childProfileHref,
+  FAMILY_HOME_PATH,
+  goBackOrReplace,
+} from '../../../../lib/navigation';
 import { firstParam } from '../../../../lib/route-params';
 import { useThemeColors } from '../../../../lib/theme';
 
@@ -171,10 +175,7 @@ export default function ChildCurriculumScreen(): React.ReactElement {
   const childName = child?.displayName ?? t('common.loading');
   const subjects = child?.subjects ?? [];
   const backHref: Href = profileId
-    ? ({
-        pathname: '/(app)/child/[profileId]',
-        params: { profileId },
-      } as Href)
+    ? childProfileHref(profileId)
     : (FAMILY_HOME_PATH as Href);
 
   const contentContainerStyle = useMemo(

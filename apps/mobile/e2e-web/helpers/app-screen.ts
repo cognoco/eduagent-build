@@ -5,7 +5,9 @@ type TestId = string | RegExp;
 
 interface WaitForAppScreenOptions {
   timeout?: number;
+  childProfileRetries?: number;
   profileLoadRetries?: number;
+  familyRouteRecovery?: (() => Promise<void>) | null;
   screenRetryTestId?: string;
   screenRetries?: number;
 }
@@ -25,10 +27,12 @@ export async function waitForAppScreen(
   options: WaitForAppScreenOptions = {},
 ): Promise<Locator> {
   const timeout = options.timeout ?? 60_000;
+  const maxChildProfileRetries = options.childProfileRetries ?? 2;
   const maxProfileRetries = options.profileLoadRetries ?? 3;
   const maxScreenRetries = options.screenRetries ?? 2;
   const deadline = Date.now() + timeout;
   const target = page.getByTestId(testId);
+  let childProfileRetryCount = 0;
   let profileRetryCount = 0;
   let screenRetryCount = 0;
 
@@ -48,6 +52,22 @@ export async function waitForAppScreen(
       continue;
     }
 
+    const childProfileUnavailable = page.getByTestId(
+      'child-profile-unavailable',
+    );
+    if (
+      childProfileRetryCount < maxChildProfileRetries &&
+      (await childProfileUnavailable.isVisible().catch(() => false))
+    ) {
+      const childProfileRetry = page.getByTestId('child-profile-retry');
+      if (await childProfileRetry.isVisible().catch(() => false)) {
+        childProfileRetryCount += 1;
+        await pressableClick(childProfileRetry);
+        await page.waitForTimeout(500);
+        continue;
+      }
+    }
+
     if (options.screenRetryTestId && screenRetryCount < maxScreenRetries) {
       const screenRetry = page.getByTestId(options.screenRetryTestId);
       if (await screenRetry.isVisible().catch(() => false)) {
@@ -58,12 +78,29 @@ export async function waitForAppScreen(
       }
     }
 
+    if (options.familyRouteRecovery) {
+      const familyRouteBlocked = page.getByTestId('family-route-blocked');
+      const learnerScreen = page.getByTestId('learner-screen');
+      const modeSwitcherError = page.getByTestId('mode-switcher-error');
+      if (
+        (await familyRouteBlocked.isVisible().catch(() => false)) ||
+        (await childProfileUnavailable.isVisible().catch(() => false)) ||
+        (await learnerScreen.isVisible().catch(() => false)) ||
+        (await modeSwitcherError.isVisible().catch(() => false))
+      ) {
+        await options.familyRouteRecovery();
+        await page.waitForTimeout(500);
+        continue;
+      }
+    }
+
     await page.waitForTimeout(500);
   }
 
   throw new Error(
     `Timed out waiting for ${describeTestId(testId)} after ${timeout}ms` +
-      ` (profile load retries: ${profileRetryCount}/${maxProfileRetries},` +
+      ` (child profile retries: ${childProfileRetryCount}/${maxChildProfileRetries},` +
+      ` profile load retries: ${profileRetryCount}/${maxProfileRetries},` +
       ` screen retries: ${screenRetryCount}/${maxScreenRetries})`,
   );
 }

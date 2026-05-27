@@ -72,6 +72,12 @@ export function useUpdateProfileAppContext() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    retry: (failureCount, error) => {
+      const status = (error as { status?: number }).status;
+      if (status && status >= 400 && status < 500) return false;
+      return failureCount < 2;
+    },
+    retryDelay: 250,
     mutationFn: async ({
       profileId,
       defaultAppContext,

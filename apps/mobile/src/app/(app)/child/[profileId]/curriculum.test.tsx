@@ -61,6 +61,7 @@ jest.mock(
   '../../../../lib/navigation' /* gc1-allow: back fallback helper is not under test here */,
   () => ({
     FAMILY_HOME_PATH: '/(app)/home',
+    childProfileHref: (profileId: string) => `/(app)/child/${profileId}`,
     goBackOrReplace: jest.fn(),
   }),
 );

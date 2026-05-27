@@ -245,10 +245,9 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a', mode: 'progress' },
-    });
+    expect(mockPush).toHaveBeenLastCalledWith(
+      '/(app)/child/child-a?mode=progress',
+    );
   });
 
   it('routes the child initial to child profile settings', async () => {
@@ -258,10 +257,9 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-child-profile-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a', mode: 'settings' },
-    });
+    expect(mockPush).toHaveBeenLastCalledWith(
+      '/(app)/child/child-a?mode=settings',
+    );
   });
 
   it('routes the progress action to the child quick progress screen', async () => {
@@ -271,10 +269,9 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a', mode: 'progress' },
-    });
+    expect(mockPush).toHaveBeenLastCalledWith(
+      '/(app)/child/child-a?mode=progress',
+    );
   });
 
   it('does not render duplicate recent activity or own learning actions', async () => {
