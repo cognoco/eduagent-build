@@ -188,7 +188,10 @@ describe('book-generation', () => {
           }),
         ]),
         3,
-        { providerPolicy: 'gemini_only', responseFormat: 'json' },
+        expect.objectContaining({
+          providerPolicy: 'gemini_only',
+          responseFormat: 'json',
+        }),
       );
     });
   });
@@ -241,7 +244,10 @@ describe('book-generation', () => {
           }),
         ]),
         3,
-        { providerPolicy: 'gemini_only', responseFormat: 'json' },
+        expect.objectContaining({
+          providerPolicy: 'gemini_only',
+          responseFormat: 'json',
+        }),
       );
     });
 
@@ -277,7 +283,10 @@ describe('book-generation', () => {
           }),
         ]),
         3,
-        { providerPolicy: 'gemini_only', responseFormat: 'json' },
+        expect.objectContaining({
+          providerPolicy: 'gemini_only',
+          responseFormat: 'json',
+        }),
       );
     });
 
@@ -463,7 +472,10 @@ describe('book-generation', () => {
           }),
         ]),
         3,
-        { providerPolicy: 'gemini_only', responseFormat: 'json' },
+        expect.objectContaining({
+          providerPolicy: 'gemini_only',
+          responseFormat: 'json',
+        }),
       );
     });
   });

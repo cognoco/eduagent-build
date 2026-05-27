@@ -32,6 +32,11 @@ export const dictationGenerateFlow: FlowDefinition<GenerateContext> = {
         context: 'free_time' as const,
       })),
       libraryTopics: profile.libraryTopics,
+      // i18n Phase 1 — wire conversationLanguage so snapshots capture the
+      // language-preamble injection that routeAndCall applies at runtime.
+      conversationLanguage: profile.conversationLanguage as
+        | import('../../src/services/dictation/generate').GenerateContext['conversationLanguage']
+        | undefined,
     };
   },
 
@@ -44,6 +49,9 @@ export const dictationGenerateFlow: FlowDefinition<GenerateContext> = {
       notes: [
         `Uses fine-grained ageYears=${input.ageYears} — 2-bucket literary scaling (≤13 chapter-book, >13 literary).`,
         `Native language drives punctuation-name mapping.`,
+        input.conversationLanguage
+          ? `i18n Phase 1: conversationLanguage=${input.conversationLanguage} wired for runtime preamble injection.`
+          : `conversationLanguage absent — language preamble not injected.`,
         interestLabels.length > 0
           ? `Interests wired (audit P0.1): ${interestLabels.join(', ')}.`
           : `No interests — default literary theme used.`,

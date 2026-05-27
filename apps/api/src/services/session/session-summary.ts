@@ -6,6 +6,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { sessionSummaries, type Database } from '@eduagent/database';
 import {
   ConflictError,
+  type ConversationLanguage,
   type SessionSummary,
   type SummarySubmitInput,
 } from '@eduagent/schemas';
@@ -119,6 +120,7 @@ export async function submitSummary(
   profileId: string,
   sessionId: string,
   input: SummarySubmitInput,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<{
   summary: {
     id: string;
@@ -172,6 +174,7 @@ export async function submitSummary(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
     input.content,
+    { conversationLanguage: options?.conversationLanguage },
   );
 
   const finalStatus = evaluation.isAccepted ? 'accepted' : 'submitted';

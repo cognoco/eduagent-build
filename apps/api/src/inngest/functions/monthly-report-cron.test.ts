@@ -40,9 +40,25 @@ const mockSelectDistinct = jest
 // mockMonthlyReportDb.query.familyLinks.findMany so existing tests that
 // only seed findMany continue to work.
 const mockSelectFromFamilyLinksWhere = jest.fn();
-const mockSelectFrom = jest
+
+// i18n Phase 1 — db.select({conversationLanguage}).from(profiles).where(...).limit(1)
+// used to resolve the parent's conversation_language for report prose.
+const mockSelectFromProfilesLimit = jest
   .fn()
-  .mockReturnValue({ where: mockSelectFromFamilyLinksWhere });
+  .mockResolvedValue([{ conversationLanguage: null }]);
+const mockSelectFromProfilesWhere = jest
+  .fn()
+  .mockReturnValue({ limit: mockSelectFromProfilesLimit });
+
+const mockSelectFrom = jest.fn().mockImplementation((table: unknown) => {
+  // Dispatch based on whether the table has conversationLanguage (profiles)
+  // vs the familyLinks table (used by the cron fanout query).
+  const t = table as Record<string, unknown>;
+  if ('conversationLanguage' in t) {
+    return { where: mockSelectFromProfilesWhere };
+  }
+  return { where: mockSelectFromFamilyLinksWhere };
+});
 const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
 
 // Insert chain for monthlyReports
@@ -89,7 +105,11 @@ const mockMonthlyReportDb = createTransactionalMockDb({
 const mockDatabaseModule = createDatabaseModuleMock({
   db: mockMonthlyReportDb,
   exports: {
-    profiles: { id: col('id'), displayName: col('displayName') },
+    profiles: {
+      id: col('id'),
+      displayName: col('displayName'),
+      conversationLanguage: col('conversationLanguage'),
+    },
     progressSnapshots: {
       profileId: col('profileId'),
       snapshotDate: col('snapshotDate'),
@@ -873,6 +893,7 @@ describe('monthlyReportGenerate', () => {
 
       expect(mockGenerateReportHighlights).toHaveBeenCalledWith(
         expect.objectContaining({ childName: 'Emma' }),
+        { conversationLanguage: undefined },
       );
     });
 

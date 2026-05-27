@@ -63,6 +63,7 @@ export async function extractVocabularyFromTranscript(
   ];
 
   try {
+    // conversationLanguage not threaded: vocabulary extraction in source language
     const result = await routeAndCall(messages, 1);
     // [BUG-461] brace-depth walker replaces greedy regex
     const jsonStr = extractFirstJsonObject(result.response);

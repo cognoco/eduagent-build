@@ -51,7 +51,8 @@
     "basic fractions",
     "human body systems",
     "water cycle"
-  ]
+  ],
+  "conversationLanguage": "cs"
 }
 ```
 
@@ -121,5 +122,6 @@ Generate a dictation for me.
 
 - Uses fine-grained ageYears=11 — 2-bucket literary scaling (≤13 chapter-book, >13 literary).
 - Native language drives punctuation-name mapping.
+- i18n Phase 1: conversationLanguage=cs wired for runtime preamble injection.
 - Interests wired (audit P0.1): horses, forest animals, nature journaling, drawing.
 - Library topics wired (audit P0.1): Czech reading comprehension, basic fractions, human body systems, water cycle.

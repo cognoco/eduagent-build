@@ -38,6 +38,7 @@ const mockDb = {
     subjects: { findFirst: jest.fn() },
     curriculumTopics: { findMany: jest.fn() },
     consentStates: { findFirst: jest.fn() },
+    profiles: { findFirst: jest.fn() },
   },
   select: jest.fn(),
   insert: jest.fn(),
@@ -104,6 +105,10 @@ beforeEach(() => {
   mockDb.insert.mockReturnValue({ values: valuesThunk });
   // Default: no consent row → processing allowed (pre-consent-flow account).
   mockDb.query.consentStates.findFirst.mockResolvedValue(undefined);
+  // i18n Phase 1: profile lookup for conversationLanguage.
+  mockDb.query.profiles.findFirst.mockResolvedValue({
+    conversationLanguage: null,
+  });
 });
 
 const validEventData = {

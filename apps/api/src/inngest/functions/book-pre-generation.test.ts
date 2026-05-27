@@ -324,6 +324,8 @@ describe('bookPreGeneration', () => {
         'Ancient Greece',
         'Gods and heroes',
         expect.any(Number), // learnerAge derived from birthYear
+        undefined,
+        { conversationLanguage: undefined },
       );
       expect(mockPersistBookTopics).toHaveBeenCalledWith(
         expect.anything(), // db
@@ -397,6 +399,8 @@ describe('bookPreGeneration', () => {
         'Ancient Greece',
         '',
         12, // fallback age
+        undefined,
+        { conversationLanguage: undefined },
       );
     });
   });
@@ -483,6 +487,8 @@ describe('bookPreGeneration', () => {
         'Ancient Greece',
         '', // description ?? '' fallback
         expect.any(Number),
+        undefined,
+        { conversationLanguage: undefined },
       );
     });
   });

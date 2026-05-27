@@ -5,7 +5,11 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { llmSummarySchema, type LlmSummary } from '@eduagent/schemas';
+import {
+  llmSummarySchema,
+  type ConversationLanguage,
+  type LlmSummary,
+} from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall, type ChatMessage } from './llm';
 import { createLogger } from './logger';
 import { projectAiResponseContent } from './llm/project-response';
@@ -23,6 +27,9 @@ export interface SessionLlmSummaryInput {
   summaryId?: string;
   subjectId?: string | null;
   topicId?: string | null;
+  // i18n Phase 1 — learner-prose threading. Callers load this from
+  // profile.conversation_language and forward it through.
+  conversationLanguage?: ConversationLanguage;
 }
 
 interface SessionLlmSummaryPromptInput {
@@ -256,6 +263,7 @@ export async function generateLlmSummary(
     const result = await routeAndCall(messages, 2, {
       flow: 'session-llm-summary',
       sessionId: input.sessionId,
+      conversationLanguage: input.conversationLanguage,
     });
     const parsed = parseLlmSummaryResponse(result.response);
     if (parsed.ok) {

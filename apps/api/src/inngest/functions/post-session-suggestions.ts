@@ -6,9 +6,11 @@ import { getStepDatabase } from '../helpers';
 import {
   curriculumTopics,
   curriculumBooks,
+  profiles,
   topicSuggestions,
   subjects,
 } from '@eduagent/database';
+import { type ConversationLanguage } from '@eduagent/schemas';
 import { routeAndCall } from '../../services/llm';
 import { isGdprProcessingAllowed } from '../../services/consent';
 import { extractFirstJsonObject } from '../../services/llm/extract-json';
@@ -135,6 +137,20 @@ export const postSessionSuggestions = inngest.createFunction(
         };
       }
 
+      // i18n Phase 1 — load conversation_language from the active profile so
+      // the LLM-generated topic-title suggestions render in the learner's
+      // language, not the DB default 'en'.
+      const ownerProfile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profileId),
+        columns: { conversationLanguage: true },
+      });
+      // DB returns string | null; cast to union before passing to LLM router.
+      const conversationLanguage =
+        (ownerProfile?.conversationLanguage as
+          | ConversationLanguage
+          | null
+          | undefined) ?? undefined;
+
       // [PROMPT-INJECT-8] book.title, book.description, topic titles, and
       // completedTopicTitle are all learner- or LLM-generated stored text.
       // Wrap each in a named tag and sanitize before interpolation.
@@ -164,7 +180,10 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
         },
       ];
 
-      const llmResult = await routeAndCall(messages, 1);
+      const llmResult = await routeAndCall(messages, 1, {
+        flow: 'post.session.suggestions',
+        conversationLanguage,
+      });
 
       // [BUG-842 / F-SVC-009] Use canonical extractFirstJsonObject helper
       // (handles markdown fences AND brace-depth walking) instead of ad-hoc

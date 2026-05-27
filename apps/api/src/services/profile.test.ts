@@ -450,6 +450,38 @@ describe('createProfile', () => {
     expect(createGrantedConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBe('PENDING');
   });
+
+  // i18n Phase 1 — Signup-time fix. The first LLM call on a fresh profile
+  // must use the device locale rather than English. The mobile client
+  // forwards i18next.language; createProfile threads it into the INSERT.
+  it('writes conversationLanguage to the insert when provided', async () => {
+    const row = mockProfileRow();
+    const db = createMockDb({ insertReturning: [row] });
+    await createProfile(db, 'account-123', {
+      displayName: 'Locale Test',
+      birthYear: 2010,
+      conversationLanguage: 'nb',
+    });
+    const valuesMock = (db.insert as jest.Mock).mock.results[0]!.value
+      .values as jest.Mock;
+    const passed = valuesMock.mock.calls[0]![0] as {
+      conversationLanguage?: string;
+    };
+    expect(passed.conversationLanguage).toBe('nb');
+  });
+
+  it('omits conversationLanguage from the insert when not provided (DB default applies)', async () => {
+    const row = mockProfileRow();
+    const db = createMockDb({ insertReturning: [row] });
+    await createProfile(db, 'account-123', {
+      displayName: 'No Locale Test',
+      birthYear: 2010,
+    });
+    const valuesMock = (db.insert as jest.Mock).mock.results[0]!.value
+      .values as jest.Mock;
+    const passed = valuesMock.mock.calls[0]![0] as Record<string, unknown>;
+    expect('conversationLanguage' in passed).toBe(false);
+  });
 });
 
 describe('getProfile', () => {

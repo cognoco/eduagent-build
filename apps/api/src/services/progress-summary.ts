@@ -4,7 +4,11 @@ import {
   progressSummaries,
   type Database,
 } from '@eduagent/database';
-import type { KnowledgeInventory, ProgressSummary } from '@eduagent/schemas';
+import type {
+  ConversationLanguage,
+  KnowledgeInventory,
+  ProgressSummary,
+} from '@eduagent/schemas';
 
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
@@ -159,6 +163,8 @@ export async function generateProgressSummary(input: {
   inventory: KnowledgeInventory;
   latestSessionId: string;
   latestSessionAt: Date;
+  // i18n Phase 1 — learner-prose threading.
+  conversationLanguage?: ConversationLanguage;
 }): Promise<string> {
   const prompt = buildProgressSummaryPrompt({
     childName: input.childName,
@@ -172,6 +178,7 @@ export async function generateProgressSummary(input: {
   const result = await routeAndCall(messages, 2, {
     flow: 'progress-summary-generation',
     sessionId: input.latestSessionId,
+    conversationLanguage: input.conversationLanguage,
   });
   return trimSummary(result.response);
 }

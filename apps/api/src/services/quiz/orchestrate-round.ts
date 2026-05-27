@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import {
   SubjectNotFoundError,
   type CefrLevel,
+  type ConversationLanguage,
   type GenerateRoundInput,
   type QuizActivityType,
   type QuizQuestion,
@@ -127,6 +128,12 @@ export async function buildAndGenerateRound(
     allVocabulary,
     topicTitles,
     difficultyBump,
+    // i18n Phase 1 — quiz prose follows the learner's UI locale.
+    conversationLanguage:
+      (profileMeta.conversationLanguage as
+        | ConversationLanguage
+        | null
+        | undefined) ?? undefined,
   });
   return { ...round, activityType: input.activityType };
 }

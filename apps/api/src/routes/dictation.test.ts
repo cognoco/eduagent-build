@@ -163,7 +163,9 @@ describe('POST /v1/dictation/prepare-homework', () => {
       TEST_ENV,
     );
 
-    expect(prepareHomework).toHaveBeenCalledWith('Test sentence.');
+    expect(prepareHomework).toHaveBeenCalledWith('Test sentence.', {
+      conversationLanguage: undefined,
+    });
   });
 
   it('returns 400 when text is empty string', async () => {

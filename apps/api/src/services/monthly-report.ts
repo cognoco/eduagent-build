@@ -1,6 +1,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { monthlyReports, type Database } from '@eduagent/database';
 import type {
+  ConversationLanguage,
   MonthlyReportData,
   MonthlyReportRecord,
   MonthlyReportSummary,
@@ -170,6 +171,9 @@ export function generateMonthlyReportData(
 
 export async function generateReportHighlights(
   reportData: MonthlyReportData,
+  // i18n Phase 1 — learner-prose threading. Optional so existing callers
+  // compile; callers should load profile.conversation_language and pass it.
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<{
   highlights: string[];
   nextSteps: string[];
@@ -203,7 +207,10 @@ export async function generateReportHighlights(
   };
 
   try {
-    const result = await routeAndCall(messages, 1);
+    const result = await routeAndCall(messages, 1, {
+      flow: 'monthly.report',
+      conversationLanguage: options?.conversationLanguage,
+    });
     // [SEC/BUG] Use the canonical brace-depth extractor instead of a raw
     // JSON.parse so leading/trailing prose from the model does not throw.
     const jsonStr = extractFirstJsonObject(result.response);

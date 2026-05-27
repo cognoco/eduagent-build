@@ -208,7 +208,9 @@ describe('getUnpickedBookSuggestionsWithTopup', () => {
     );
 
     expect(generateMock).toHaveBeenCalledTimes(1);
-    expect(generateMock).toHaveBeenCalledWith(db, PROFILE_ID, SUBJECT_ID);
+    expect(generateMock).toHaveBeenCalledWith(db, PROFILE_ID, SUBJECT_ID, {
+      conversationLanguage: undefined,
+    });
     expect(result.suggestions).toHaveLength(5);
     expect(result.curriculumBookCount).toBe(1);
   });

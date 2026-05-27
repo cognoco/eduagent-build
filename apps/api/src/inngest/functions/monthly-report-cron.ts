@@ -46,7 +46,10 @@ import { getRecentNotificationCount } from '../../services/settings';
 import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
-import { progressMetricsSchema } from '@eduagent/schemas';
+import {
+  progressMetricsSchema,
+  type ConversationLanguage,
+} from '@eduagent/schemas';
 
 // [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
 // Older snapshot rows may have a different shape from what current code
@@ -358,7 +361,21 @@ export const monthlyReportGenerate = inngest.createFunction(
           practiceSummary,
         );
 
-        const llmContent = await generateReportHighlights(reportData);
+        // i18n Phase 1 — parent receives the report so use the parent's
+        // conversation_language for prose. For self-reports parentId === childId.
+        const [reportTargetProfile] = await db
+          .select({ conversationLanguage: profiles.conversationLanguage })
+          .from(profiles)
+          .where(eq(profiles.id, parentId))
+          .limit(1);
+        const llmContent = await generateReportHighlights(reportData, {
+          // DB returns string | null; cast to union before passing to LLM call.
+          conversationLanguage:
+            (reportTargetProfile?.conversationLanguage as
+              | ConversationLanguage
+              | null
+              | undefined) ?? undefined,
+        });
         reportData = {
           ...reportData,
           highlights: llmContent.highlights,

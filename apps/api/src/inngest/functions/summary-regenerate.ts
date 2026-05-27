@@ -6,7 +6,11 @@ import {
   sessionSummaries,
 } from '@eduagent/database';
 import { NonRetriableError } from 'inngest';
-import type { LlmSummary, SummaryEventPayload } from '@eduagent/schemas';
+import type {
+  LlmSummary,
+  SummaryEventPayload,
+  ConversationLanguage,
+} from '@eduagent/schemas';
 import { summaryEventPayloadSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -92,7 +96,10 @@ async function regenerateLearnerRecapForSession(
   }
 
   const [profile] = await db
-    .select({ birthYear: profiles.birthYear })
+    .select({
+      birthYear: profiles.birthYear,
+      conversationLanguage: profiles.conversationLanguage,
+    })
     .from(profiles)
     .where(eq(profiles.id, payload.profileId))
     .limit(1);
@@ -110,6 +117,12 @@ async function regenerateLearnerRecapForSession(
     subjectId: sessionRow.subjectId,
     exchangeCount: sessionRow.exchangeCount ?? 0,
     birthYear: profile.birthYear,
+    // DB returns string | null; cast to union before passing to LLM call.
+    conversationLanguage:
+      (profile.conversationLanguage as
+        | ConversationLanguage
+        | null
+        | undefined) ?? undefined,
   });
 
   if (!recap) {
@@ -167,12 +180,25 @@ export const sessionSummaryCreate = inngest.createFunction(
         'pending',
       );
 
+      // i18n Phase 1 — load conversation_language for summary prose.
+      const [createProfile] = await db
+        .select({ conversationLanguage: profiles.conversationLanguage })
+        .from(profiles)
+        .where(eq(profiles.id, payload.profileId))
+        .limit(1);
+
       const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,
         profileId: payload.profileId,
         summaryId: summaryRow.id,
         subjectId: payload.subjectId ?? null,
         topicId: payload.topicId ?? null,
+        // DB returns string | null; cast to union before passing to LLM call.
+        conversationLanguage:
+          (createProfile?.conversationLanguage as
+            | ConversationLanguage
+            | null
+            | undefined) ?? undefined,
       });
 
       if (!summary) {
@@ -230,12 +256,24 @@ export const sessionSummaryRegenerate = inngest.createFunction(
 
     const result = await step.run('regenerate-summary', async () => {
       const db = getStepDatabase();
+      // i18n Phase 1 — load conversation_language for the regenerated summary.
+      const [regenerateProfile] = await db
+        .select({ conversationLanguage: profiles.conversationLanguage })
+        .from(profiles)
+        .where(eq(profiles.id, payload.profileId))
+        .limit(1);
       const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,
         profileId: payload.profileId,
         summaryId: payload.sessionSummaryId,
         subjectId: payload.subjectId ?? null,
         topicId: payload.topicId ?? null,
+        // DB returns string | null; cast to union before passing to LLM call.
+        conversationLanguage:
+          (regenerateProfile?.conversationLanguage as
+            | ConversationLanguage
+            | null
+            | undefined) ?? undefined,
       });
 
       return {

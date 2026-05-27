@@ -12,6 +12,7 @@ import {
   dictationStreakSchema,
   DICTATION_REVIEW_MAX_PROMPT_CHARS,
   ERROR_CODES,
+  type ConversationLanguage,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -102,7 +103,17 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     async (c) => {
       requireProfileId(c.get('profileId'));
       const { text } = c.req.valid('json');
-      const result = await prepareHomework(text);
+      // i18n Phase 1 — read conversation_language from the active profile so
+      // the LLM-detected language detection still produces the JSON in the
+      // learner's locale.
+      const profileMeta = c.get('profileMeta');
+      const result = await prepareHomework(text, {
+        conversationLanguage:
+          (profileMeta?.conversationLanguage as
+            | ConversationLanguage
+            | null
+            | undefined) ?? undefined,
+      });
       return c.json(prepareHomeworkOutputSchema.parse(result), 200);
     },
   )
@@ -127,7 +138,15 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       profileId,
       profileMeta.birthYear,
     );
-    const result = await generateDictation(ctx);
+    // i18n Phase 1 — forward the learner's UI locale into the dictation LLM.
+    const result = await generateDictation({
+      ...ctx,
+      conversationLanguage:
+        (profileMeta.conversationLanguage as
+          | ConversationLanguage
+          | null
+          | undefined) ?? undefined,
+    });
 
     return c.json(generateDictationOutputSchema.parse(result), 200);
   })
@@ -279,6 +298,12 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         language: input.language,
         ageYears,
         recentStruggles,
+        // i18n Phase 1 — feedback prose follows the learner's UI locale.
+        conversationLanguage:
+          (profileMeta.conversationLanguage as
+            | ConversationLanguage
+            | null
+            | undefined) ?? undefined,
       });
 
       return c.json(dictationReviewResultSchema.parse(result), 200);

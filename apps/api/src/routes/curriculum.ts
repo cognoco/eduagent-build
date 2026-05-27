@@ -18,6 +18,7 @@ import {
   challengeCurriculumResponseSchema,
   explainTopicResponseSchema,
   ERROR_CODES,
+  type ConversationLanguage,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -243,11 +244,19 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
     try {
+      const profileMeta = c.get('profileMeta');
       const explanation = await explainTopicOrdering(
         db,
         profileId,
         subjectId,
         topicId,
+        {
+          conversationLanguage:
+            (profileMeta?.conversationLanguage as
+              | ConversationLanguage
+              | null
+              | undefined) ?? undefined,
+        },
       );
       return c.json(explainTopicResponseSchema.parse({ explanation }));
     } catch (error) {

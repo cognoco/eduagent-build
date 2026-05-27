@@ -310,7 +310,11 @@ describe('generateRecallBridge', () => {
     const db = createMockDb();
     await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
 
-    // Second argument to routeAndCall is the rung
-    expect(mockRouteAndCall).toHaveBeenCalledWith(expect.any(Array), 1);
+    // Second argument to routeAndCall is the rung; third is options
+    expect(mockRouteAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      1,
+      expect.objectContaining({ flow: 'recall.bridge' }),
+    );
   });
 });

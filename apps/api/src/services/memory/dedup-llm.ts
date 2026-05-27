@@ -20,7 +20,7 @@ export interface DedupLlmDeps {
 
 export async function runDedupLlm(
   pair: DedupPair,
-  deps: DedupLlmDeps = {}
+  deps: DedupLlmDeps = {},
 ): Promise<DedupLlmResult> {
   const messages: ChatMessage[] = [
     { role: 'user', content: buildDedupPrompt(pair) },
@@ -29,6 +29,7 @@ export async function runDedupLlm(
   let raw: string;
   let modelVersion: string;
   try {
+    // conversationLanguage not threaded: output is a similarity decision, not prose
     const result = await (deps.caller ?? routeAndCall)(messages, 1, {
       llmTier: 'flash',
       flow: 'memory-dedup',

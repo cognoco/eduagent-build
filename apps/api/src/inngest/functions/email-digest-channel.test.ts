@@ -722,6 +722,14 @@ function buildMonthlyMockDb(
     .mockReturnValue({ onConflictDoNothing: mockOnConflictDoNothing });
   const mockInsert = jest.fn().mockReturnValue({ values: mockInsertValues });
 
+  // i18n Phase 1: monthly-report-cron does db.select({conversationLanguage}).from(profiles).where(...).limit(1)
+  const mockSelectLimit = jest
+    .fn()
+    .mockResolvedValue([{ conversationLanguage: null }]);
+  const mockSelectWhere = jest.fn().mockReturnValue({ limit: mockSelectLimit });
+  const mockSelectFrom = jest.fn().mockReturnValue({ where: mockSelectWhere });
+  const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
+
   return {
     query: {
       consentStates: {
@@ -759,6 +767,7 @@ function buildMonthlyMockDb(
       },
     },
     insert: mockInsert,
+    select: mockSelect,
   };
 }
 

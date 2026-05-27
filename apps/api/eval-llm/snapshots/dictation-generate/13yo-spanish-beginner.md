@@ -51,7 +51,8 @@
     "Spanish family vocabulary",
     "Spanish numbers 1-1000",
     "Spain geography"
-  ]
+  ],
+  "conversationLanguage": "en"
 }
 ```
 
@@ -121,5 +122,6 @@ Generate a dictation for me.
 
 - Uses fine-grained ageYears=13 — 2-bucket literary scaling (≤13 chapter-book, >13 literary).
 - Native language drives punctuation-name mapping.
+- i18n Phase 1: conversationLanguage=en wired for runtime preamble injection.
 - Interests wired (audit P0.1): horses, showjumping, eventing, nature photography.
 - Library topics wired (audit P0.1): Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography.

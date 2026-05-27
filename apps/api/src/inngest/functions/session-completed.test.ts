@@ -1521,6 +1521,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SESSION_ID,
+        { conversationLanguage: undefined },
       );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary',

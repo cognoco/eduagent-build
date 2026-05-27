@@ -262,6 +262,7 @@ testSeedRoutes.get('/__test/llm-ping', async (c) => {
       });
     }
 
+    // conversationLanguage not threaded: test-seeding infrastructure, not learner-facing
     const result = await routeAndCall(messages, 1);
     return c.json({
       ok: true,

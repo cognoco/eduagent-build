@@ -551,7 +551,7 @@ describe('generateCategorizedBookSuggestions', () => {
           expect.objectContaining({ role: 'user' }),
         ]),
         2,
-        { responseFormat: 'json' },
+        expect.objectContaining({ responseFormat: 'json' }),
       );
     });
 

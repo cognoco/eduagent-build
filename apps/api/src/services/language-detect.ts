@@ -55,6 +55,7 @@ export async function detectLanguageSubject(
   ];
 
   try {
+    // conversationLanguage not threaded: output is {lang} identification, not prose
     const result = await routeAndCall(messages, 1);
     // [PROMPT-INJECT-110] Depth-aware extractor; strips markdown fences and
     // doesn't grab past the JSON when the LLM appends prose.

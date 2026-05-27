@@ -117,6 +117,7 @@ export async function classifySubject(
     const sanitized = sanitizeLlmInput(text);
 
     try {
+      // conversationLanguage not threaded: output is a fixed taxonomy slug
       const suggestResult = await routeAndCall(
         [
           {
@@ -203,6 +204,7 @@ export async function classifySubject(
   ];
 
   try {
+    // conversationLanguage not threaded: output is a fixed taxonomy slug
     const result = await routeAndCall(messages, 1); // Rung 1 = Gemini Flash (fast/cheap)
 
     // [BUG-461] brace-depth walker replaces greedy regex

@@ -19,6 +19,7 @@ import {
 import type {
   BookSuggestion,
   BookSuggestionsTopupOutcome,
+  ConversationLanguage,
 } from '@eduagent/schemas';
 import { createLogger } from './logger';
 
@@ -179,6 +180,7 @@ export async function getUnpickedBookSuggestionsWithTopup(
   db: Database,
   profileId: string,
   subjectId: string,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<Envelope> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -210,6 +212,7 @@ export async function getUnpickedBookSuggestionsWithTopup(
         db,
         profileId,
         subjectId,
+        { conversationLanguage: options?.conversationLanguage },
       );
       unpicked = await db
         .select()

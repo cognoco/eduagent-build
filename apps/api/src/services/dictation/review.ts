@@ -3,6 +3,7 @@ import {
   DictationPayloadTooLargeError,
   dictationReviewPromptCharCount,
   dictationReviewResultSchema,
+  type ConversationLanguage,
   type DictationSentence,
   type DictationReviewResult,
 } from '@eduagent/schemas';
@@ -156,6 +157,8 @@ export interface ReviewDictationInput {
    * feedback in the review. Optional. Medium/high confidence struggles only.
    */
   recentStruggles?: string[];
+  /** i18n Phase 1 — learner-prose threading. Callers load from profile.conversation_language. */
+  conversationLanguage?: ConversationLanguage;
 }
 
 export async function reviewDictation(
@@ -169,6 +172,7 @@ export async function reviewDictation(
     ageYears,
     preferredExplanations,
     recentStruggles,
+    conversationLanguage,
   } = input;
 
   // [WI-206] Defense-in-depth payload-size guard. The route handler enforces
@@ -213,7 +217,10 @@ export async function reviewDictation(
   ];
 
   // Rung 2 — vision-capable model required
-  const result = await routeAndCall(messages, 2, { flow: 'dictation.review' });
+  const result = await routeAndCall(messages, 2, {
+    flow: 'dictation.review',
+    conversationLanguage,
+  });
 
   if (!result.response || result.response.trim() === '') {
     const err = new UpstreamLlmError(

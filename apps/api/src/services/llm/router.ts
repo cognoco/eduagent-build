@@ -67,6 +67,45 @@ function getErrorDiagnostics(err: unknown): {
 // streaming path because the stream-wrapper does not materialize the reply text.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// i18n Phase 1 — learner-facing flow tripwire.
+//
+// Every entry below denotes a `routeAndCall` site that produces learner-visible
+// prose. The static ratchet test
+// (apps/api/src/services/llm/router.language-coverage.test.ts) is the primary
+// defence; this set powers a secondary runtime warn so that any call site that
+// somehow ships with `flow:` but without `conversationLanguage:` (e.g. via a
+// partial revert) surfaces in logs.
+//
+// Tag strings are load-bearing — they appear in llm.stop_reason dashboards and
+// Sentry breadcrumbs. The mixed dotted/hyphenated convention preserves the
+// pre-existing tag strings verbatim. Do NOT rename without a paired dashboard
+// sweep.
+// ---------------------------------------------------------------------------
+const LEARNER_FACING_FLOWS: ReadonlySet<string> = new Set([
+  // Pre-existing tags (verbatim — DO NOT rename in this PR):
+  'exchange.process',
+  'dictation.review',
+  'progress-summary-generation',
+  'session-llm-summary',
+
+  // New tags introduced by i18n Phase 1 (dotted convention):
+  'session.recap',
+  'session.highlights',
+  'monthly.report',
+  'book.generation',
+  'book.suggestion',
+  'curriculum.generate',
+  'dictation.generate',
+  'dictation.prepare-homework',
+  'homework.summary',
+  'quiz.generate',
+  'assessment.evaluate',
+  'recall.bridge',
+  'post.session.suggestions',
+  'summaries.generate',
+]);
+
 function logStopReason(fields: {
   provider: string;
   model: string;
@@ -716,6 +755,19 @@ export async function routeAndCall(
     responseFormat?: 'json';
   },
 ): Promise<RouteResult> {
+  // i18n Phase 1 — runtime tripwire. The static ratchet test is the primary
+  // defence; this warn catches any call site that ships with `flow:` but
+  // without `conversationLanguage:` (e.g. via a partial revert).
+  if (
+    _options?.flow &&
+    LEARNER_FACING_FLOWS.has(_options.flow) &&
+    !_options.conversationLanguage
+  ) {
+    logger.warn('llm.language.missing', {
+      flow: _options.flow,
+      session_id: _options.sessionId ?? null,
+    });
+  }
   const capability = getMessageCapability(messages);
   const safeMessages = withSafetyPreamble(messages, _options?.ageBracket, {
     conversationLanguage: _options?.conversationLanguage,

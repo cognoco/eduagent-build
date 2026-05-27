@@ -10,6 +10,7 @@ import {
   chatExchangeSchema,
   declineAssessmentRefreshResponseSchema,
   getActiveAssessmentResponseSchema,
+  type ConversationLanguage,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
@@ -150,6 +151,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           answer,
           snapshot.exchangeHistory,
         );
+        // i18n Phase 1 — pass the learner's conversation_language so the
+        // LLM-evaluated feedback prose renders in their UI locale.
+        const assessmentProfileMeta = c.get('profileMeta');
         const evaluation = forceReview
           ? buildNeedsReviewEvaluation()
           : await evaluateAssessmentAnswer(
@@ -163,7 +167,14 @@ export const assessmentRoutes = new Hono<RouteEnv>()
               // lockAssessmentForAnswerSubmission under FOR UPDATE — pass
               // the snapshot's status for defense-in-depth in case the
               // service signature drifts.
-              { assessmentStatus: snapshot.status },
+              {
+                assessmentStatus: snapshot.status,
+                conversationLanguage:
+                  (assessmentProfileMeta?.conversationLanguage as
+                    | ConversationLanguage
+                    | null
+                    | undefined) ?? undefined,
+              },
             );
 
         const updatedHistory = [
@@ -361,6 +372,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
             languageCode: null,
           };
 
+      // i18n Phase 1 — thread conversation_language into the quick-check
+      // feedback prose.
+      const quickCheckProfileMeta = c.get('profileMeta');
       const evaluation = await evaluateQuickCheckAnswer(
         {
           ...topicContext,
@@ -368,6 +382,13 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           exchangeHistory: [],
         },
         answer,
+        {
+          conversationLanguage:
+            (quickCheckProfileMeta?.conversationLanguage as
+              | ConversationLanguage
+              | null
+              | undefined) ?? undefined,
+        },
       );
 
       return c.json(

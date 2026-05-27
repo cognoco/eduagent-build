@@ -1,8 +1,16 @@
 // @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { NonRetriableError } from 'inngest';
 import { eq, and } from 'drizzle-orm';
-import { curriculumBooks, subjects, type Database } from '@eduagent/database';
-import { subjectCurriculumPrewarmRequestedEventSchema } from '@eduagent/schemas';
+import {
+  curriculumBooks,
+  profiles,
+  subjects,
+  type Database,
+} from '@eduagent/database';
+import {
+  subjectCurriculumPrewarmRequestedEventSchema,
+  type ConversationLanguage,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { generateBookTopics } from '../../services/book-generation';
@@ -27,6 +35,8 @@ type PrewarmContext =
       bookTitle: string;
       bookDescription: string;
       learnerAge: number;
+      // i18n Phase 1 — pre-warmed topic titles surface to the learner.
+      conversationLanguage?: ConversationLanguage;
     }
   | { status: 'consent-blocked' };
 
@@ -95,6 +105,10 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           return { status: 'consent-blocked' as const };
         }
 
+        const langRow = await db.query.profiles.findFirst({
+          where: eq(profiles.id, profileId),
+          columns: { conversationLanguage: true },
+        });
         return {
           status: 'pending',
           profileId,
@@ -103,6 +117,12 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           bookTitle: book.title,
           bookDescription: book.description ?? '',
           learnerAge: await getProfileAge(db, profileId),
+          // DB returns string | null; cast to union before passing forward.
+          conversationLanguage:
+            (langRow?.conversationLanguage as
+              | ConversationLanguage
+              | null
+              | undefined) ?? undefined,
         };
       },
     );
@@ -137,6 +157,8 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           context.bookTitle,
           context.bookDescription,
           context.learnerAge,
+          undefined,
+          { conversationLanguage: context.conversationLanguage },
         );
         if (result.topics.length === 0) {
           const err = new NonRetriableError('prewarm-empty-topics');

@@ -2,6 +2,7 @@ import {
   type CefrLevel,
   computeAgeBracket,
   type CapitalsQuestion,
+  type ConversationLanguage,
   guessWhoLlmOutputSchema,
   type QuizQuestion,
   type GuessWhoQuestion,
@@ -392,6 +393,9 @@ interface GenerateParams {
   // generateQuizRound will fetch them from the learning profile.
   interests?: Interest[];
   nativeLanguage?: string;
+  // i18n Phase 1 — learner-prose threading. Callers load this from
+  // profile.conversation_language.
+  conversationLanguage?: ConversationLanguage;
 }
 
 export async function generateQuizRound(params: GenerateParams): Promise<{
@@ -416,6 +420,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     topicTitles,
     difficultyBump = false,
     nativeLanguage,
+    conversationLanguage,
   } = params;
 
   const plan = resolveRoundContent({
@@ -556,7 +561,9 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     ];
 
     const llmResult = await routeAndCallForQuiz(messages, 1, {
+      flow: 'quiz.generate',
       ageBracket,
+      conversationLanguage,
     });
 
     const raw = llmResult.response.slice(0, 64 * 1024);
@@ -624,7 +631,9 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     ];
 
     const llmResult = await routeAndCallForQuiz(messages, 1, {
+      flow: 'quiz.generate',
       ageBracket,
+      conversationLanguage,
     });
 
     const raw = llmResult.response.slice(0, 64 * 1024);
@@ -673,7 +682,9 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
 
         try {
           const clueResult = await routeAndCallForQuiz(clueMessages, 1, {
+            flow: 'quiz.generate',
             ageBracket,
+            conversationLanguage,
           });
           const clueRaw = clueResult.response.slice(0, 16 * 1024);
           const parsed = guessWhoMasteryClueSchema.parse(

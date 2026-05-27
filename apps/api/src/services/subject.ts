@@ -17,6 +17,7 @@ import {
   subjectCurriculumPrewarmRequestedEventSchema,
 } from '@eduagent/schemas';
 import type {
+  ConversationLanguage,
   LanguageSetupInput,
   SubjectCreateInput,
   SubjectUpdateInput,
@@ -307,6 +308,7 @@ export async function createSubjectWithStructure(
   db: Database,
   profileId: string,
   input: SubjectCreateInput,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<CreatedSubjectWithStructure> {
   // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
   // the rawInput IS the focus even if the client didn't send it explicitly.
@@ -428,10 +430,11 @@ export async function createSubjectWithStructure(
   const { detectSubjectType } = await import('./book-generation');
   const subject = await createSubject(db, profileId, input);
   let classificationFailed = false;
-  const detectedStructure = await detectSubjectType(
-    subject.name,
-    learnerAge,
-  ).catch(async (error) => {
+  // i18n Phase 1 — thread conversation_language into the subject-structure
+  // LLM so the persisted books/topics render in the learner's UI language.
+  const detectedStructure = await detectSubjectType(subject.name, learnerAge, {
+    conversationLanguage: options?.conversationLanguage,
+  }).catch(async (error) => {
     classificationFailed = true;
     logger.warn(
       '[createSubjectWithStructure] Falling back to deterministic subject structure',

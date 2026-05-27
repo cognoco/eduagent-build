@@ -7,7 +7,10 @@ import {
   learningSessions,
   subjects,
 } from '@eduagent/database';
-import { bookSuggestionGenerationResultSchema } from '@eduagent/schemas';
+import {
+  bookSuggestionGenerationResultSchema,
+  type ConversationLanguage,
+} from '@eduagent/schemas';
 
 import { getLanguageByCode } from '../data/languages';
 import { routeAndCall, extractFirstJsonObject, type ChatMessage } from './llm';
@@ -87,6 +90,7 @@ function emitFailureMetric(
 
 async function callBookSuggestionGenerationJson(
   messages: ChatMessage[],
+  conversationLanguage?: ConversationLanguage,
 ): Promise<BookSuggestionGenerationResult | null> {
   let lastFailure = '';
   for (let attempt = 0; attempt < BOOK_SUGGESTION_JSON_ATTEMPTS; attempt++) {
@@ -107,7 +111,9 @@ async function callBookSuggestionGenerationJson(
           ];
 
     const result = await routeAndCall(attemptMessages, 2, {
+      flow: 'book.suggestion',
       responseFormat: 'json',
+      conversationLanguage,
     });
 
     let json: unknown;
@@ -153,6 +159,7 @@ export async function generateCategorizedBookSuggestions(
   db: Database,
   profileId: string,
   subjectId: string,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<GenerationOutcome> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -302,7 +309,10 @@ export async function generateCategorizedBookSuggestions(
       existingSuggestionTitles,
       studiedTopics,
     });
-    const validated = await callBookSuggestionGenerationJson(messages);
+    const validated = await callBookSuggestionGenerationJson(
+      messages,
+      options?.conversationLanguage,
+    );
     if (!validated) {
       emitFailureMetric(profileId, subjectId, 'parse');
       return 'parse';

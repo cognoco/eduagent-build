@@ -1,5 +1,8 @@
 import { generateDictationOutputSchema } from '@eduagent/schemas';
-import type { GenerateDictationOutput } from '@eduagent/schemas';
+import type {
+  ConversationLanguage,
+  GenerateDictationOutput,
+} from '@eduagent/schemas';
 import { routeAndCall } from '../llm';
 import type { ChatMessage } from '../llm';
 import { UpstreamLlmError } from '../../errors';
@@ -44,6 +47,8 @@ export interface GenerateContext {
    * When present, the passage will prefer themes that intersect with these topics.
    */
   libraryTopics?: string[];
+  /** i18n Phase 1 — learner-prose threading. Callers load from profile.conversation_language. */
+  conversationLanguage?: ConversationLanguage;
 }
 
 // [CR-770] Single source of truth for the child-vs-teen pedagogical boundary
@@ -205,7 +210,10 @@ export async function generateDictation(
     { role: 'user', content: 'Generate a dictation for me.' },
   ];
 
-  const result = await routeAndCall(messages, 1);
+  const result = await routeAndCall(messages, 1, {
+    flow: 'dictation.generate',
+    conversationLanguage: ctx.conversationLanguage,
+  });
 
   let jsonStr: string;
   try {

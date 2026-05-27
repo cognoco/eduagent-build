@@ -233,6 +233,7 @@ describe('POST /v1/subjects', () => {
       expect.anything(),
       PROFILE_ID,
       expect.objectContaining({ name: 'Chemistry' }),
+      { conversationLanguage: undefined },
     );
   });
 
