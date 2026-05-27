@@ -28,6 +28,7 @@ Notes:
 - The original flow IDs are preserved so each row can be traced back to `mobile-app-flow-inventory.md`.
 - Adults can be both students and mentors. Mentor access must not replace the adult's own Study flows.
 - Mentor mode should expose parent-native child review/support surfaces. Normal mentor review should not require parent proxy/view-as-child mode.
+- Mentor-only rows that were previously listed as exclusions in the student inventory are owned here: `PARENT-*`, child memory/consent management, parent gateway/navigation/setup, child reports, and parent-facing cross-cutting vocabulary.
 
 ## Mentor Audience Contract
 
@@ -57,11 +58,12 @@ Notes:
 | ACCOUNT-08 | Adult owners and child editors where allowed | Learning preferences can expose child accommodation/celebration editors only through mentor gates. |
 | ACCOUNT-09 through ACCOUNT-14 | Owner profiles | Change password, export, delete, privacy policy, and terms remain owner account controls. |
 | ACCOUNT-15 | Adult self only | Self mentor memory remains the adult's own student/account surface. It is not the child memory editor. |
-| ACCOUNT-16 | Adult owners with child access | Child mentor memory is a mentor child-support surface. It uses child routes and child consent rules. |
-| ACCOUNT-17 | Adult owners with child access | Child memory consent prompts appear on child memory/detail surfaces where needed. |
+| ACCOUNT-16 | Adult owners with child access | Child mentor memory is a mentor child-support surface. It uses child routes and child consent rules, not the student's self memory route. |
+| ACCOUNT-17 | Adult owners with child access | Child memory consent prompts appear on child memory/detail surfaces where needed. They are not student self-service prompts. |
 | ACCOUNT-18 | Child or adult subject owner, depending on route | Subject analogy preference for a child belongs under child detail/curriculum access, not top-level adult Study Library. |
-| ACCOUNT-19 through ACCOUNT-24, ACCOUNT-26, ACCOUNT-27 | Adult owners/guardians and affected child profiles | Consent request, handoff, pending, withdrawn, post-approval, regional variants, and deny confirmation determine whether child learning data can be shown to the mentor. |
-| ACCOUNT-25 | Adult owners with child access | Parent consent management for a child is a mentor flow under child detail. |
+| ACCOUNT-19 through ACCOUNT-24, ACCOUNT-26 | Adult owners/guardians and affected child profiles | Consent request, handoff, pending, withdrawn, post-approval, and regional variants determine whether child learning data can be shown to the mentor. |
+| ACCOUNT-25 | Adult owners with child access | Parent consent management for a child is a mentor flow under child detail. Current browser path is Family Home -> child avatar/profile -> child detail settings. Withdrawing consent switches to the screen-level `Sharing paused` state with a request-consent-again CTA; the old in-section grace-period banner is not the active child-detail surface for withdrawn consent. |
+| ACCOUNT-27 | Adult owners/guardians | Parent consent deny confirmation is a mentor/guardian action that affects whether the child can proceed, not a student self-service flow. |
 | ACCOUNT-28, ACCOUNT-29 | Adult owners | App language and the current mentor-language/account-language row remain account/profile settings. Do not create a separate "mentor identity" from these settings. |
 | ACCOUNT-30 | Compatibility only | Parent-proxy More restrictions apply only if retained proxy mode is entered. Normal mentor flows should not enter proxy. |
 
@@ -70,11 +72,11 @@ Notes:
 | Original ID | Mentor access | How it should work |
 | --- | --- | --- |
 | HOME-01 | Bridge only | Learner home is the adult's Study surface. From Mentor mode, use an explicit switch/bridge to Study if the adult wants to learn. |
-| HOME-02 | Adult owners with family access | Parent gateway home becomes the Family/Children home target. It should summarize children and route into child detail, Recaps, Progress, setup, or account actions. |
-| HOME-03 | Adult owners with family access | Parent-mode navigation target is `home`, `recaps`, `progress`, `more`, not the old guardian hybrid tab set. |
+| HOME-02 | Adult owners with family access | Parent gateway home becomes the Family/Children home target. It should summarize children and route into child detail, Recaps, Progress, setup, or account actions. Current app mounts `LearnerScreen` at `/(app)/home`; the `ParentHomeScreen` branch activates inside `LearnerScreen` only when mode=family. |
+| HOME-03 | Adult owners with family access | Parent-mode navigation target is `home`, `recaps`, `progress`, `more`, not the old guardian hybrid tab set. Current V0 entry may start family-capable adults on adult Study/My Learning with a `Children` switch before the Family branch is shown. |
 | HOME-04 | All users | Animated splash and initial shell remain shared. |
 | HOME-05, HOME-06 | Bridge only | Empty first-user and resume-session states are Study concerns for the adult as learner, not mentor child-review surfaces. |
-| HOME-07 | Adult owners without child links | Add-first-child/family setup is a mentor setup state, not the final Family tab shell. It must offer continue-studying/skip paths. |
+| HOME-07 | Adult owners without child links | Add-first-child/family setup is a mentor setup state, not the final Family tab shell. It must offer continue-studying/skip paths. Current Study-mode entry is the learner-home `Set up Family` CTA for eligible adult owners, which leads to More and then Add child rather than a parent-home-only branch. |
 | HOME-08 | All app contexts | Home loading-timeout fallback must recover to a Mentor-safe root when in Mentor mode. |
 
 ## Child Setup And Curriculum
@@ -91,6 +93,8 @@ Notes:
 
 ## Child Review, Recaps, Reports, And Progress
 
+These are mentor-owned flows. They are not duplicated in the student inventory as student rows.
+
 | Original ID | Mentor access | How it should work |
 | --- | --- | --- |
 | PARENT-01 | Adult owners with child access | Parent dashboard behavior becomes part of the Family/Children home target. Solo adults without child links should remain Study-safe plus setup CTA. (Today `/(app)/dashboard` already redirects to `/(app)/home`; actual parent surface is `ParentHomeScreen` branch inside `LearnerScreen`.) |
@@ -98,8 +102,8 @@ Notes:
 | PARENT-03 | Adult owners with child access | Child detail is the main mentor drill-down surface. |
 | PARENT-04 | Adult owners with child access | Child subject/topic drill-down remains parent-native and must enforce family-link/consent access. |
 | PARENT-05 | Adult owners with child access | Child session/transcript drill-down is a mentor review surface. Normal access should not depend on parent proxy. |
-| PARENT-06 | Adult owners with child access | Child reports list and report detail remain mentor review flows. |
-| PARENT-07 | Transition target | Current parent library behavior should become child curriculum access from child routes. The final Mentor shell should not expose the adult top-level Library tab. |
+| PARENT-06 | Adult owners with child access | Child reports list and report detail remain mentor review flows. Current routes include `/(app)/progress/reports/` and `/(app)/progress/reports/[reportId]`; these are not student-facing Study rows. |
+| PARENT-07 | Transition target | Current parent library behavior should become child curriculum access from child routes. Adult self library remains LEARN-08 in Study; the final Mentor shell should not expose the adult top-level Library tab. |
 | PARENT-08 | Adult owners with child access | Subject raw-input audit remains a mentor review surface. |
 | PARENT-09 | Adult owners with child access | Guided label tooltip remains mentor-facing support copy. |
 | PARENT-10 | Adult owners with child access | Child topic Understanding and Retention cards remain mentor-facing interpretation surfaces. |
