@@ -171,6 +171,19 @@ describe('DictationReviewScreen', () => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
     });
 
+    it('ignores a synchronous double-press while saving the result', () => {
+      mockRecordMutateAsync.mockReturnValue(new Promise(() => undefined));
+      const { getByTestId } = render(<DictationReviewScreen />);
+      const done = getByTestId('review-done');
+
+      act(() => {
+        fireEvent.press(done);
+        fireEvent.press(done);
+      });
+
+      expect(mockRecordMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
     it('disables Done accessibly while the result save is pending', () => {
       mockRecordIsPending = true;
       const { getByTestId } = render(<DictationReviewScreen />);

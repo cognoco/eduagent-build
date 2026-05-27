@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -33,6 +33,7 @@ export default function DictationReviewScreen(): React.ReactElement {
   const [currentMistakeIndex, setCurrentMistakeIndex] = useState(0);
   const [typedSentence, setTypedSentence] = useState('');
   const [completedCount, setCompletedCount] = useState(0);
+  const savingRef = useRef(false);
 
   const isPerfect = mistakes.length === 0;
   const currentMistake = mistakes[currentMistakeIndex];
@@ -49,6 +50,8 @@ export default function DictationReviewScreen(): React.ReactElement {
 
   const handleDone = async () => {
     if (!data) return;
+    if (savingRef.current || recordResult.isPending) return;
+    savingRef.current = true;
 
     const localDate = new Date().toISOString().slice(0, 10);
     const mistakeCount = mistakes.length;
@@ -83,6 +86,8 @@ export default function DictationReviewScreen(): React.ReactElement {
           onPress: () => router.replace('/(app)/practice' as Href),
         },
       ]);
+    } finally {
+      savingRef.current = false;
     }
   };
 

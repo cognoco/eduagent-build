@@ -116,6 +116,7 @@ export default function CreateProfileScreen() {
   const [loading, setLoading] = useState(false);
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
   // [ACCOUNT-01] Capture Study/Family intent on first profile setup.
   // Persisted via PATCH /profiles/:id/app-context immediately after creation.
   // null = not chosen yet (gates submit for the first-profile flow).
@@ -137,6 +138,7 @@ export default function CreateProfileScreen() {
       if (abortRef.current === controller) {
         abortRef.current = null;
         inFlightRef.current = false;
+        requestSeqRef.current += 1;
       }
       setLoading(false);
       setError(
@@ -148,6 +150,7 @@ export default function CreateProfileScreen() {
 
   useEffect(() => {
     return () => {
+      requestSeqRef.current += 1;
       abortRef.current?.abort();
     };
   }, []);
@@ -218,6 +221,8 @@ export default function CreateProfileScreen() {
     inFlightRef.current = true;
     const controller = new AbortController();
     abortRef.current = controller;
+    const requestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = requestSeq;
     setLoading(true);
 
     try {
@@ -239,6 +244,9 @@ export default function CreateProfileScreen() {
       );
       await assertOk(res);
       const result = (await res.json()) as { profile: Profile };
+      if (requestSeqRef.current !== requestSeq || controller.signal.aborted) {
+        return;
+      }
 
       // [ACCOUNT-01] Persist Study/Family intent immediately after creation.
       // The profile is created with defaultAppContext=null; setting it now
@@ -330,7 +338,7 @@ export default function CreateProfileScreen() {
         );
       }
     } catch (err: unknown) {
-      if (isAbortError(err)) {
+      if (isAbortError(err) && controller.signal.aborted) {
         return;
       }
       // [BUG-947] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.

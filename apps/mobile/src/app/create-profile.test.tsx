@@ -722,6 +722,81 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).toHaveBeenCalledTimes(1);
     });
 
+    it('ignores a timed-out create response that resolves after the form unlocks', async () => {
+      const staleProfile = {
+        id: 'stale-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      const retryProfile = { ...staleProfile, id: 'retry-id' };
+      let firstSignal: AbortSignal | undefined;
+      let resolveFirst: ((response: Response) => void) | undefined = undefined;
+      mockFetch
+        .mockImplementationOnce((_input: RequestInfo, init?: RequestInit) => {
+          firstSignal = init?.signal ?? undefined;
+          return new Promise<Response>((resolve) => {
+            resolveFirst = resolve;
+          });
+        })
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: retryProfile }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(firstSignal?.aborted).toBe(true);
+      await act(async () => {
+        resolveFirst?.(
+          new Response(JSON.stringify({ profile: staleProfile }), {
+            status: 200,
+          }),
+        );
+        await Promise.resolve();
+      });
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+      });
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
+    });
+
+    it('shows an error for AbortError failures not caused by this request signal', async () => {
+      const abortError = Object.assign(new Error('Unexpected abort'), {
+        name: 'AbortError',
+      });
+      mockFetch.mockRejectedValueOnce(abortError);
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(
+          String(screen.getByTestId('create-profile-error').props.children),
+        ).toContain("can't be reached");
+      });
+    });
+
     it('ignores a synchronous double-tap while profile creation is already in flight', async () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
 
