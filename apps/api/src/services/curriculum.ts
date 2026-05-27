@@ -38,6 +38,7 @@ import {
   type GeneratedBookTopic,
   type GeneratedConnection,
   type GeneratedTopic,
+  type IncompleteBookGenerationClaimRepairResult,
 } from '@eduagent/schemas';
 
 import { NotFoundError } from '../errors';
@@ -50,6 +51,7 @@ import {
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 import { buildFallbackBookTopics } from './book-generation-fallbacks';
+import { getProfileAge } from './profile';
 
 const logger = createLogger();
 import { regenerateLanguageCurriculum } from './language-curriculum';
@@ -864,7 +866,16 @@ export async function releaseBookGenerationClaimIfEmpty(
         )`,
         sql`NOT EXISTS (
           SELECT 1 FROM curriculum_topics
+          INNER JOIN curricula
+          ON curricula.id = curriculum_topics.curriculum_id
           WHERE curriculum_topics.book_id = ${bookId}
+          AND curriculum_topics.skipped = false
+          AND curricula.subject_id = ${subjectId}
+          AND curricula.version = (
+            SELECT MAX(latest_curricula.version)
+            FROM curricula AS latest_curricula
+            WHERE latest_curricula.subject_id = ${subjectId}
+          )
         )`,
       ),
     );
@@ -1260,19 +1271,158 @@ export function normalizeTopicTitle(title: string): string {
   return title.trim().toLowerCase();
 }
 
+const BOOK_GENERATION_STALE_MS = 15 * 60 * 1000;
+
+export function isStaleBookGenerationClaim(updatedAt: string): boolean {
+  const updatedAtMs = Date.parse(updatedAt);
+  if (Number.isNaN(updatedAtMs)) return true;
+  return Date.now() - updatedAtMs >= BOOK_GENERATION_STALE_MS;
+}
+
+export async function repairIncompleteBookGenerationClaim(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+  existing: BookWithTopics,
+  priorKnowledge: string | undefined,
+  deps: {
+    generateBookTopics: (
+      bookTitle: string,
+      bookDescription: string,
+      learnerAge: number,
+      context?: string,
+    ) => Promise<BookTopicGenerationResult>;
+    captureException: (
+      error: unknown,
+      context?: { profileId?: string; extra?: Record<string, unknown> },
+    ) => void;
+  },
+): Promise<IncompleteBookGenerationClaimRepairResult> {
+  const activeTopicCount = existing.topics.filter(
+    (topic) => !topic.skipped,
+  ).length;
+  if (
+    !existing.book.topicsGenerated ||
+    activeTopicCount >= MIN_GENERATED_BOOK_TOPICS
+  ) {
+    return { status: 'not_incomplete' };
+  }
+
+  if (!isStaleBookGenerationClaim(existing.book.updatedAt)) {
+    return { status: 'in_progress' };
+  }
+
+  const learnerAge = await getProfileAge(db, profileId);
+  const book = await expandExistingBookTopics(
+    db,
+    profileId,
+    subjectId,
+    bookId,
+    existing,
+    priorKnowledge,
+    { learnerAge, ...deps },
+  );
+  return { status: 'repaired', book };
+}
+
+function buildConflictRepairBookTopics(
+  bookTitle: string,
+  bookDescription: string | null,
+): GeneratedBookTopic[] {
+  const title = bookTitle.trim() || 'this book';
+  const context =
+    bookDescription?.trim() || `Learn the essentials of ${title}.`;
+  const topicTemplates = [
+    {
+      title: `Fresh questions about ${title}`,
+      description: `Ask useful questions that open a new path into ${title}.`,
+      chapter: 'Getting started',
+      estimatedMinutes: 15,
+    },
+    {
+      title: `New examples of ${title}`,
+      description: 'Use different examples to make the ideas concrete.',
+      chapter: 'Core understanding',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Practice plan for ${title}`,
+      description: 'Turn the next study step into a short, focused plan.',
+      chapter: 'Practice',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Common mix-ups in ${title}`,
+      description: 'Spot confusing ideas and learn how to tell them apart.',
+      chapter: 'Core understanding',
+      estimatedMinutes: 15,
+    },
+    {
+      title: `Mini project on ${title}`,
+      description: 'Apply the topic in a small project or explanation.',
+      chapter: 'Practice',
+      estimatedMinutes: 25,
+    },
+    {
+      title: `Review challenge for ${title}`,
+      description: 'Check what stuck and what needs another pass.',
+      chapter: 'Review',
+      estimatedMinutes: 10,
+    },
+    {
+      title: `Compare ideas in ${title}`,
+      description: 'Compare related ideas and explain the differences.',
+      chapter: 'Core understanding',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Explain ${title} simply`,
+      description: 'Practice a clear explanation in plain language.',
+      chapter: 'Review',
+      estimatedMinutes: 15,
+    },
+    {
+      title: `Apply ${title}`,
+      description: 'Use the topic in a realistic example or problem.',
+      chapter: 'Practice',
+      estimatedMinutes: 20,
+    },
+    {
+      title: `Reflect on ${title}`,
+      description: context,
+      chapter: 'Review',
+      estimatedMinutes: 10,
+    },
+  ];
+
+  return topicTemplates.map((topic, index) => ({
+    ...topic,
+    sortOrder: index + 1,
+  }));
+}
+
 export function prepareTopicExpansion(
   generated: BookTopicGenerationResult,
   existingTopics: Array<{ title: string; skipped?: boolean }>,
   bookTitle: string,
   bookDescription: string | null,
 ): BookTopicGenerationResult {
-  const existingTitleKeys = new Set(
+  const existingActiveTopicCount = existingTopics.filter(
+    (topic) => !topic.skipped,
+  ).length;
+  const existingActiveTitleKeys = new Set(
     existingTopics
       .filter((topic) => !topic.skipped)
       .map((topic) => normalizeTopicTitle(topic.title)),
   );
+  const existingTitleKeys = new Set(
+    existingTopics.map((topic) => normalizeTopicTitle(topic.title)),
+  );
   const seenTitleKeys = new Set(existingTitleKeys);
   const expansionTopics: GeneratedBookTopic[] = [];
+  const repairedActiveTopicCount = () =>
+    existingActiveTopicCount + expansionTopics.length;
 
   const addTopic = (topic: GeneratedBookTopic) => {
     if (expansionTopics.length >= MAX_GENERATED_BOOK_TOPICS) return;
@@ -1288,25 +1438,43 @@ export function prepareTopicExpansion(
   for (const topic of generated.topics) addTopic(topic);
 
   const fallback = buildFallbackBookTopics(bookTitle, bookDescription ?? '');
-  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
+  if (repairedActiveTopicCount() < MIN_GENERATED_BOOK_TOPICS) {
     for (const topic of fallback.topics) addTopic(topic);
   }
 
-  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
+  if (repairedActiveTopicCount() < MIN_GENERATED_BOOK_TOPICS) {
+    for (const topic of buildConflictRepairBookTopics(
+      bookTitle,
+      bookDescription,
+    )) {
+      if (repairedActiveTopicCount() >= MIN_GENERATED_BOOK_TOPICS) break;
+      addTopic(topic);
+    }
+  }
+
+  if (repairedActiveTopicCount() < MIN_GENERATED_BOOK_TOPICS) {
     throw new Error(
-      `Book topic expansion produced only ${expansionTopics.length} unique topics`,
+      `Book topic expansion produced only ${repairedActiveTopicCount()} total active topics`,
     );
   }
 
   const expansionTitleKeys = new Set(
     expansionTopics.map((topic) => normalizeTopicTitle(topic.title)),
   );
+  const activeTitleKeys = new Set([
+    ...existingActiveTitleKeys,
+    ...expansionTitleKeys,
+  ]);
   const seenConnectionKeys = new Set<string>();
   const connections = [...generated.connections, ...fallback.connections]
     .filter((connection) => {
       const topicA = normalizeTopicTitle(connection.topicA);
       const topicB = normalizeTopicTitle(connection.topicB);
-      return expansionTitleKeys.has(topicA) && expansionTitleKeys.has(topicB);
+      return (
+        activeTitleKeys.has(topicA) &&
+        activeTitleKeys.has(topicB) &&
+        (expansionTitleKeys.has(topicA) || expansionTitleKeys.has(topicB))
+      );
     })
     .filter((connection) => {
       const topicA = normalizeTopicTitle(connection.topicA);
@@ -1356,8 +1524,8 @@ export async function persistBookTopics(
     ),
     orderBy: asc(curriculumTopics.sortOrder),
   });
+  const existingActiveTopics = existingTopics.filter((topic) => !topic.skipped);
 
-  // Idempotent: if topics already exist, just ensure the flag is set
   if (existingTopics.length > 0) {
     if (options.appendToExisting) {
       const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
@@ -1415,6 +1583,13 @@ export async function persistBookTopics(
             ),
             orderBy: asc(curriculumTopics.sortOrder),
           });
+          const activeTopicRows = topicRows.filter((topic) => !topic.skipped);
+          if (activeTopicRows.length < MIN_GENERATED_BOOK_TOPICS) {
+            throw new Error(
+              `Generated book topics persisted only ${activeTopicRows.length} active topics`,
+            );
+          }
+
           const topicIdByTitle = new Map(
             topicRows.map((topic) => [
               normalizeTopicTitle(topic.title),
@@ -1475,24 +1650,34 @@ export async function persistBookTopics(
       }
     }
 
-    await db
-      .update(curriculumBooks)
-      .set({
-        topicsGenerated: true,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(curriculumBooks.id, bookId),
-          eq(curriculumBooks.subjectId, subjectId),
-        ),
-      );
+    // Idempotent only when a complete active topic set already exists.
+    // Partial or skipped-only rows are not a generated book and must continue
+    // into the insert path so the post-transaction count guard can validate it.
+    if (existingActiveTopics.length >= MIN_GENERATED_BOOK_TOPICS) {
+      await db
+        .update(curriculumBooks)
+        .set({
+          topicsGenerated: true,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(curriculumBooks.id, bookId),
+            eq(curriculumBooks.subjectId, subjectId),
+          ),
+        );
 
-    const existing = await getBookWithTopics(db, profileId, subjectId, bookId);
-    if (!existing) {
-      throw new NotFoundError('Book');
+      const existing = await getBookWithTopics(
+        db,
+        profileId,
+        subjectId,
+        bookId,
+      );
+      if (!existing) {
+        throw new NotFoundError('Book');
+      }
+      return existing;
     }
-    return existing;
   }
 
   const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
@@ -1505,14 +1690,28 @@ export async function persistBookTopics(
     );
   }
 
+  const shouldAppendGeneratedTopics =
+    existingTopics.length > 0 &&
+    existingActiveTopics.length < MIN_GENERATED_BOOK_TOPICS;
+  const maxExistingSortOrder =
+    existingTopics.length > 0
+      ? Math.max(...existingTopics.map((topic) => topic.sortOrder))
+      : 0;
+  const topicsToInsert = shouldAppendGeneratedTopics
+    ? topics.map((topic, index) => ({
+        ...topic,
+        sortOrder: maxExistingSortOrder + index + 1,
+      }))
+    : topics;
+
   // Wrap topic + connection inserts + flag update in a transaction
   // so a partial failure doesn't leave a half-generated book.
   await db.transaction(async (tx) => {
-    if (topics.length > 0) {
+    if (topicsToInsert.length > 0) {
       await tx
         .insert(curriculumTopics)
         .values(
-          topics.map((topic) => ({
+          topicsToInsert.map((topic) => ({
             curriculumId: curriculum.id,
             title: topic.title,
             description: topic.description,
@@ -1534,13 +1733,22 @@ export async function persistBookTopics(
       orderBy: asc(curriculumTopics.sortOrder),
     });
 
+    const activePostInsertTopicRows = insertedTopicRows.filter(
+      (topic) => !topic.skipped,
+    );
+    if (activePostInsertTopicRows.length < MIN_GENERATED_BOOK_TOPICS) {
+      throw new Error(
+        `Generated book topics persisted only ${activePostInsertTopicRows.length} active topics`,
+      );
+    }
+
     // Map DB rows by sortOrder for stable resolution (titles may collide)
     const topicIdBySortOrder = new Map(
       insertedTopicRows.map((topic) => [topic.sortOrder, topic.id]),
     );
     // Map LLM-generated titles to their sortOrder (first occurrence wins)
     const sortOrderByTitle = new Map<string, number>();
-    for (const topic of topics) {
+    for (const topic of topicsToInsert) {
       const titleKey = normalizeTopicTitle(topic.title);
       if (!sortOrderByTitle.has(titleKey)) {
         sortOrderByTitle.set(titleKey, topic.sortOrder);

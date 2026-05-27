@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
-import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
+import { apiError } from '../errors';
 
 type MaintenanceEnv = {
   Bindings: {
@@ -59,15 +60,47 @@ async function verifyMaintenanceSecret(c: {
   return constantTimeEqual(provided, expected);
 }
 
+async function sendMaintenanceBackfillOrError(
+  c: Context<MaintenanceEnv>,
+  surface: string,
+  eventName: string,
+): Promise<Response> {
+  try {
+    // core-send: maintenance backfill endpoints must report real dispatch status.
+    await inngest.send({
+      name: eventName,
+      data: {
+        requestedAt: new Date().toISOString(),
+        environment: c.env.ENVIRONMENT ?? 'unknown',
+      },
+    });
+  } catch (error) {
+    captureException(error, {
+      requestPath: c.req.path,
+      extra: {
+        surface,
+        environment: c.env.ENVIRONMENT ?? 'unknown',
+      },
+    });
+    return apiError(
+      c,
+      502,
+      ERROR_CODES.INTERNAL_ERROR,
+      'Failed to queue maintenance backfill',
+    );
+  }
+
+  return c.json({ queued: true });
+}
+
 export const maintenanceRoutes = new Hono<MaintenanceEnv>()
   .post('/maintenance/sentry-smoke', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
-      return c.json(
-        {
-          code: ERROR_CODES.FORBIDDEN,
-          message: 'Maintenance secret required',
-        },
+      return apiError(
+        c,
         403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
       );
     }
 
@@ -90,51 +123,33 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
   })
   .post('/maintenance/memory-facts-backfill', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
-      return c.json(
-        {
-          code: ERROR_CODES.FORBIDDEN,
-          message: 'Maintenance secret required',
-        },
+      return apiError(
+        c,
         403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
       );
     }
 
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'admin/memory-facts-backfill.requested',
-          data: {
-            requestedAt: new Date().toISOString(),
-            environment: c.env.ENVIRONMENT ?? 'unknown',
-          },
-        }),
+    return sendMaintenanceBackfillOrError(
+      c,
       'maintenance.memory-facts-backfill',
+      'admin/memory-facts-backfill.requested',
     );
-
-    return c.json({ queued: true });
   })
   .post('/maintenance/progress-self-reports-backfill', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
-      return c.json(
-        {
-          code: ERROR_CODES.FORBIDDEN,
-          message: 'Maintenance secret required',
-        },
+      return apiError(
+        c,
         403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
       );
     }
 
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'admin/progress-self-reports-backfill.requested',
-          data: {
-            requestedAt: new Date().toISOString(),
-            environment: c.env.ENVIRONMENT ?? 'unknown',
-          },
-        }),
+    return sendMaintenanceBackfillOrError(
+      c,
       'maintenance.progress-self-reports-backfill',
+      'admin/progress-self-reports-backfill.requested',
     );
-
-    return c.json({ queued: true });
   });

@@ -27,6 +27,7 @@ import {
   persistBookTopics,
   claimBookForGeneration,
   releaseBookGenerationClaimIfEmpty,
+  repairIncompleteBookGenerationClaim,
   moveTopicToBook,
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
@@ -38,6 +39,7 @@ import { buildFallbackBookTopics } from '../services/book-generation-fallbacks';
 import { getProfileAge } from '../services/profile';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
+import { safeSend } from '../services/safe-non-core';
 
 type BooksRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -152,6 +154,31 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, bookId } = c.req.valid('param');
       const { priorKnowledge, expandExisting } = c.req.valid('json');
+      const enqueueTopicsGenerated = (): void => {
+        // Fire-and-forget: pre-generate next books in background.
+        // Pre-generation is an optimization, so dispatch failure must not
+        // block the response — but it MUST be observable so we can see if
+        // the optimization silently stops working.
+        void safeSend(
+          () =>
+            inngest.send({
+              name: 'app/book.topics-generated',
+              data: {
+                subjectId,
+                bookId,
+                profileId,
+                timestamp: new Date().toISOString(),
+              },
+            }),
+          'books.generate-topics.topics-generated',
+          {
+            profileId,
+            subjectId,
+            bookId,
+            event: 'app/book.topics-generated',
+          },
+        );
+      };
 
       try {
         // Atomic CAS: only one concurrent request wins the right to generate.
@@ -174,10 +201,23 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           if (!existing) {
             return notFound(c, 'Book not found');
           }
-          const activeTopicCount = existing.topics.filter(
-            (topic) => !topic.skipped,
-          ).length;
-          if (existing.book.topicsGenerated && activeTopicCount === 0) {
+          const incompleteClaimRepair =
+            await repairIncompleteBookGenerationClaim(
+              db,
+              profileId,
+              subjectId,
+              bookId,
+              existing,
+              priorKnowledge,
+              { generateBookTopics, captureException },
+            );
+          if (incompleteClaimRepair.status === 'repaired') {
+            enqueueTopicsGenerated();
+            return c.json(
+              bookWithTopicsSchema.parse(incompleteClaimRepair.book),
+            );
+          }
+          if (incompleteClaimRepair.status === 'in_progress') {
             return apiError(
               c,
               409,
@@ -185,6 +225,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
               'Book topic generation is still in progress. Please retry shortly.',
             );
           }
+          const activeTopicCount = existing.topics.filter(
+            (topic) => !topic.skipped,
+          ).length;
           if (expandExisting && activeTopicCount < MIN_GENERATED_BOOK_TOPICS) {
             const learnerAge = await getProfileAge(db, profileId);
             const expanded = await expandExistingBookTopics(
@@ -245,30 +288,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           throw error;
         }
 
-        // Fire-and-forget: pre-generate next books in background.
-        // Pre-generation is an optimization, so dispatch failure must not
-        // block the response — but it MUST be observable so we can see if
-        // the optimization silently stops working.
-        inngest
-          .send({
-            name: 'app/book.topics-generated',
-            data: {
-              subjectId,
-              bookId,
-              profileId,
-              timestamp: new Date().toISOString(),
-            },
-          })
-          .catch((err) => {
-            captureException(err, {
-              profileId,
-              extra: {
-                event: 'app/book.topics-generated',
-                subjectId,
-                bookId,
-              },
-            });
-          });
+        enqueueTopicsGenerated();
 
         return c.json(bookWithTopicsSchema.parse(persisted));
       } catch (error) {

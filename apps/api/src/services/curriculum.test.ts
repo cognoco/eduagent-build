@@ -22,6 +22,9 @@ import {
   expandExistingBookTopics,
   generateBookTopicsWithFallback,
   releaseBookGenerationClaimIfEmpty,
+  isStaleBookGenerationClaim,
+  repairIncompleteBookGenerationClaim,
+  prepareTopicExpansion,
   deleteTopicIfSafe,
   deleteBook,
 } from './curriculum';
@@ -1173,31 +1176,58 @@ describe('persistBookTopics', () => {
     bookExists = true,
     curriculumExists = true,
     existingTopicCount = 0,
+    existingTopicRows = undefined as
+      | Array<{
+          id: string;
+          title?: string;
+          sortOrder: number;
+          skipped: boolean;
+        }>
+      | undefined,
+    simulateTopicSortOrderConflicts = false,
     insertedTopicRows = [] as Array<{
       id: string;
       sortOrder: number;
       skipped: boolean;
     }>,
+    simulateTopicTitleConflicts = false,
   } = {}): Database {
     const subjectRow = subjectExists ? mockSubjectRow() : undefined;
     const bookRow = bookExists ? mockBookRow() : undefined;
     const curriculumRow = curriculumExists ? mockCurriculumRow() : undefined;
 
-    const existingTopics = Array.from({ length: existingTopicCount }, (_, i) =>
-      mockTopicRow({
-        id: `existing-topic-${i}`,
-        sortOrder: i,
-        title: `Existing Topic ${i}`,
-      }),
-    );
+    const existingTopics =
+      existingTopicRows?.map((row) =>
+        mockTopicRow({
+          id: row.id,
+          sortOrder: row.sortOrder,
+          title: row.title ?? `Existing Topic ${row.sortOrder}`,
+          skipped: row.skipped,
+        }),
+      ) ??
+      Array.from({ length: existingTopicCount }, (_, i) =>
+        mockTopicRow({
+          id: `existing-topic-${i}`,
+          sortOrder: i,
+          title: `Existing Topic ${i}`,
+        }),
+      );
 
-    // Build rows for the transaction's topic query
-    const insertedRows =
-      insertedTopicRows.length > 0
-        ? insertedTopicRows.map((row) => ({
+    let generatedRowsFromInsert:
+      | Array<ReturnType<typeof mockTopicRow>>
+      | undefined;
+
+    const buildGeneratedRows = () => {
+      if (generatedRowsFromInsert) {
+        return generatedRowsFromInsert;
+      }
+
+      return insertedTopicRows.length > 0
+        ? insertedTopicRows.map((row, index) => ({
             ...mockTopicRow({
               id: row.id,
               sortOrder: row.sortOrder,
+              title: sampleTopics[index]?.title ?? `Inserted Topic ${index}`,
             }),
             bookId: BOOK_ID,
             skipped: row.skipped,
@@ -1212,6 +1242,12 @@ describe('persistBookTopics', () => {
             chapter: topic.chapter,
             skipped: false,
           }));
+    };
+
+    const buildInsertedRows = () => [
+      ...existingTopics,
+      ...buildGeneratedRows(),
+    ];
 
     // For getBookWithTopics after persist — need a fresh set of query mocks
     const postPersistBookRow = bookExists
@@ -1234,8 +1270,57 @@ describe('persistBookTopics', () => {
     const topicsFindMany = jest
       .fn()
       .mockResolvedValueOnce(existingTopics) // existing check in persistBookTopics
-      .mockResolvedValueOnce(insertedRows) // transaction re-read
-      .mockResolvedValueOnce(insertedRows); // getBookWithTopics
+      .mockImplementationOnce(async () => buildInsertedRows()) // transaction re-read
+      .mockImplementationOnce(async () => buildInsertedRows()); // getBookWithTopics
+
+    const insertValues = jest.fn((values: unknown) => {
+      const rows = Array.isArray(values) ? values : [values];
+      if (
+        rows.every(
+          (
+            row,
+          ): row is {
+            title: string;
+            sortOrder: number;
+            bookId: string;
+          } =>
+            typeof row === 'object' &&
+            row !== null &&
+            'title' in row &&
+            'sortOrder' in row &&
+            'bookId' in row,
+        )
+      ) {
+        const occupiedSortOrders = new Set(
+          existingTopics.map((topic) => topic.sortOrder),
+        );
+        const occupiedTitleKeys = new Set(
+          existingTopics.map((topic) => topic.title.trim().toLowerCase()),
+        );
+        generatedRowsFromInsert = rows
+          .filter(
+            (row) =>
+              (!simulateTopicSortOrderConflicts ||
+                !occupiedSortOrders.has(row.sortOrder)) &&
+              (!simulateTopicTitleConflicts ||
+                !occupiedTitleKeys.has(row.title.trim().toLowerCase())),
+          )
+          .map((row, index) => ({
+            ...mockTopicRow({
+              id: `inserted-topic-${index}`,
+              sortOrder: row.sortOrder,
+              title: row.title,
+            }),
+            bookId: row.bookId,
+            skipped: false,
+          }));
+      }
+
+      return {
+        returning: jest.fn().mockResolvedValue([]),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      };
+    });
 
     const db = {
       query: {
@@ -1262,10 +1347,7 @@ describe('persistBookTopics', () => {
         }),
       }),
       insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
-        }),
+        values: insertValues,
       }),
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
@@ -1303,7 +1385,9 @@ describe('persistBookTopics', () => {
 
   describe('idempotency', () => {
     it('returns existing data without inserting when topics already exist', async () => {
-      const db = createPersistMockDb({ existingTopicCount: 2 });
+      const db = createPersistMockDb({
+        existingTopicCount: sampleTopics.length,
+      });
 
       const result = await persistBookTopics(
         db,
@@ -1325,6 +1409,123 @@ describe('persistBookTopics', () => {
       expect(result.book).toEqual(expect.objectContaining({}));
     });
 
+    it('[WI-142] inserts generated topics when existing rows are skipped-only', async () => {
+      const db = createPersistMockDb({
+        existingTopicRows: [
+          {
+            id: 'skipped-topic-1',
+            title: 'Discarded angle',
+            sortOrder: 1,
+            skipped: true,
+          },
+          {
+            id: 'skipped-topic-2',
+            title: 'Discarded detail',
+            sortOrder: 2,
+            skipped: true,
+          },
+        ],
+      });
+
+      const result = await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections,
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(result.book.topicsGenerated).toBe(true);
+      expect(result.topics.filter((topic) => !topic.skipped)).toHaveLength(
+        sampleTopics.length,
+      );
+    });
+
+    it('[WI-142] avoids sort-order conflicts when repairing skipped-only rows', async () => {
+      const db = createPersistMockDb({
+        simulateTopicSortOrderConflicts: true,
+        existingTopicRows: sampleTopics.map((topic) => ({
+          id: `skipped-topic-${topic.sortOrder}`,
+          title: `Discarded ${topic.title}`,
+          sortOrder: topic.sortOrder,
+          skipped: true,
+        })),
+      });
+
+      const result = await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections,
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(result.book.topicsGenerated).toBe(true);
+      expect(result.topics.filter((topic) => !topic.skipped)).toHaveLength(
+        sampleTopics.length,
+      );
+    });
+
+    it('[WI-142] appends generated topics when existing active rows are partial', async () => {
+      const db = createPersistMockDb({
+        simulateTopicSortOrderConflicts: true,
+        existingTopicRows: [
+          {
+            id: 'partial-topic-1',
+            title: 'Partial stale topic',
+            sortOrder: 1,
+            skipped: false,
+          },
+        ],
+      });
+
+      const result = await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections,
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(result.book.topicsGenerated).toBe(true);
+      expect(result.topics.filter((topic) => !topic.skipped)).toHaveLength(
+        sampleTopics.length + 1,
+      );
+    });
+
+    it('[WI-142] rejects append repair when skipped title conflicts block inserts', async () => {
+      const db = createPersistMockDb({
+        simulateTopicTitleConflicts: true,
+        existingTopicRows: sampleTopics.map((topic) => ({
+          id: `skipped-topic-${topic.sortOrder}`,
+          title: topic.title,
+          sortOrder: topic.sortOrder + 100,
+          skipped: true,
+        })),
+      });
+
+      await expect(
+        persistBookTopics(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+          BOOK_ID,
+          sampleTopics,
+          sampleConnections,
+          { appendToExisting: true },
+        ),
+      ).rejects.toThrow('Generated book topics persisted only 0 active topics');
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
     it('calling twice with same data does not duplicate topics', async () => {
       // First call: no existing topics — enters the transaction path
       const db = createPersistMockDb({ existingTopicCount: 0 });
@@ -1342,7 +1543,9 @@ describe('persistBookTopics', () => {
 
       // Second call: topics now exist — takes the idempotent path
       // Reset the mock DB to simulate topics already existing
-      const db2 = createPersistMockDb({ existingTopicCount: 2 });
+      const db2 = createPersistMockDb({
+        existingTopicCount: sampleTopics.length,
+      });
       await persistBookTopics(
         db2,
         PROFILE_ID,
@@ -2032,6 +2235,258 @@ describe('releaseBookGenerationClaimIfEmpty', () => {
     expect(whereText).toContain(PROFILE_ID.toLowerCase());
     expect(whereText).toContain('subject_id');
     expect(whereText).toContain(SUBJECT_ID.toLowerCase());
+  });
+
+  it('[WI-142] only treats non-skipped latest-curriculum topics as blocking release', async () => {
+    const where = jest.fn().mockResolvedValue(undefined);
+    const set = jest.fn().mockReturnValue({ where });
+    const update = jest.fn().mockReturnValue({ set });
+    const db = { update } as unknown as Database;
+
+    await releaseBookGenerationClaimIfEmpty(
+      db,
+      SUBJECT_ID,
+      'book-1',
+      PROFILE_ID,
+    );
+
+    const whereText = extractSqlTextAndValues(where.mock.calls[0][0]).join(' ');
+    expect(whereText).toContain('curriculum_topics.skipped = false');
+    expect(whereText).toContain('curricula.version = (');
+    expect(whereText).toContain('max(latest_curricula.version)');
+  });
+});
+
+describe('isStaleBookGenerationClaim', () => {
+  it('[WI-142 review] treats the book generation staleness policy as curriculum domain logic', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T10:00:00.000Z'));
+
+    try {
+      expect(isStaleBookGenerationClaim('2026-05-27T09:44:59.999Z')).toBe(true);
+      expect(isStaleBookGenerationClaim('2026-05-27T09:45:00.001Z')).toBe(
+        false,
+      );
+      expect(isStaleBookGenerationClaim('not-a-date')).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('repairIncompleteBookGenerationClaim', () => {
+  it('[WI-142 review] classifies fresh incomplete generated books as in progress', async () => {
+    jest.useFakeTimers().setSystemTime(NOW);
+
+    try {
+      const result = await repairIncompleteBookGenerationClaim(
+        {} as Database,
+        PROFILE_ID,
+        SUBJECT_ID,
+        'book-1',
+        {
+          book: {
+            id: 'book-1',
+            subjectId: SUBJECT_ID,
+            title: 'Ancient Egypt',
+            description: 'Explore pyramids and pharaohs',
+            emoji: null,
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: NOW.toISOString(),
+            updatedAt: NOW.toISOString(),
+          },
+          topics: [
+            {
+              id: 'topic-1',
+              title: 'Pyramids',
+              description: 'Why pyramids mattered',
+              chapter: 'The Story',
+              sortOrder: 1,
+              relevance: 'core',
+              estimatedMinutes: 20,
+              bookId: 'book-1',
+              skipped: false,
+              source: 'generated',
+            },
+          ],
+          connections: [],
+          status: 'NOT_STARTED',
+          completedTopicCount: 0,
+          completedTopicIds: [],
+        },
+        undefined,
+        {
+          generateBookTopics: jest.fn(),
+          captureException: jest.fn(),
+        },
+      );
+
+      expect(result.status).toBe('in_progress');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('prepareTopicExpansion', () => {
+  it('[WI-142] avoids skipped existing titles when building repair topics', () => {
+    const existingTopics = [
+      { title: 'Start with Ancient Egypt', skipped: true },
+    ];
+    const generated: BookTopicGenerationResult = {
+      topics: [
+        {
+          title: 'Start with Ancient Egypt',
+          description: 'Duplicate of a skipped topic row.',
+          chapter: 'Getting started',
+          sortOrder: 1,
+          estimatedMinutes: 15,
+        },
+      ],
+      connections: [],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    expect(result.topics).toHaveLength(5);
+    expect(result.topics.map((topic) => topic.title)).toEqual([
+      'Key ideas in Ancient Egypt',
+      'Important words for Ancient Egypt',
+      'Examples of Ancient Egypt',
+      'Practice with Ancient Egypt',
+      'Review Ancient Egypt',
+    ]);
+  });
+
+  it('[WI-142] creates fresh fallback topics when skipped rows occupy every deterministic fallback title', () => {
+    const skippedFallbackTitles = [
+      'Start with Ancient Egypt',
+      'Key ideas in Ancient Egypt',
+      'Important words for Ancient Egypt',
+      'Examples of Ancient Egypt',
+      'Practice with Ancient Egypt',
+      'Review Ancient Egypt',
+    ];
+    const existingTopics = skippedFallbackTitles.map((title) => ({
+      title,
+      skipped: true,
+    }));
+    const generated: BookTopicGenerationResult = {
+      topics: [],
+      connections: [],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    const resultTitles = result.topics.map((topic) => topic.title);
+
+    expect(result.topics).toHaveLength(5);
+    expect(
+      resultTitles.filter((title) => skippedFallbackTitles.includes(title)),
+    ).toEqual([]);
+  });
+
+  it('[WI-142] preserves generated connections between new and existing active topics', () => {
+    const existingTopics = [{ title: 'Timeline of Egypt', skipped: false }];
+    const generated: BookTopicGenerationResult = {
+      topics: [
+        {
+          title: 'Old Kingdom',
+          description: 'Age of pyramid-builders.',
+          chapter: 'Story',
+          sortOrder: 1,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'Middle Kingdom',
+          description: 'Reunification and stability.',
+          chapter: 'Story',
+          sortOrder: 2,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'New Kingdom',
+          description: 'The age of empire.',
+          chapter: 'Story',
+          sortOrder: 3,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'Daily Life',
+          description: 'How ordinary people lived.',
+          chapter: 'Society',
+          sortOrder: 4,
+          estimatedMinutes: 25,
+        },
+      ],
+      connections: [{ topicA: 'Old Kingdom', topicB: 'Timeline of Egypt' }],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    expect(result.connections).toContainEqual({
+      topicA: 'Old Kingdom',
+      topicB: 'Timeline of Egypt',
+    });
+  });
+
+  it('[WI-142] accepts fallback overlap when the repaired book reaches the minimum topic count', () => {
+    const existingTopics = [
+      { title: 'Start with Ancient Egypt' },
+      { title: 'Key ideas in Ancient Egypt' },
+    ];
+    const generated: BookTopicGenerationResult = {
+      topics: [
+        {
+          title: 'Start with Ancient Egypt',
+          description: 'Duplicate of an existing fallback topic.',
+          chapter: 'Getting started',
+          sortOrder: 1,
+          estimatedMinutes: 15,
+        },
+        {
+          title: 'Key ideas in Ancient Egypt',
+          description: 'Duplicate of an existing fallback topic.',
+          chapter: 'Getting started',
+          sortOrder: 2,
+          estimatedMinutes: 20,
+        },
+      ],
+      connections: [],
+    };
+
+    const result = prepareTopicExpansion(
+      generated,
+      existingTopics,
+      'Ancient Egypt',
+      'Explore pyramids, pharaohs, and daily life.',
+    );
+
+    expect(result.topics).toHaveLength(4);
+    expect(result.topics.map((topic) => topic.title)).toEqual([
+      'Important words for Ancient Egypt',
+      'Examples of Ancient Egypt',
+      'Practice with Ancient Egypt',
+      'Review Ancient Egypt',
+    ]);
+    expect(existingTopics.length + result.topics.length).toBeGreaterThanOrEqual(
+      5,
+    );
   });
 });
 

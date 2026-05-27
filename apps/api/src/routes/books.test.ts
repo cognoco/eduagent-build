@@ -71,7 +71,7 @@ const mockBook = {
   sortOrder: 1,
   topicsGenerated: false,
   createdAt: '2026-04-04T00:00:00.000Z',
-  updatedAt: '2026-04-04T00:00:00.000Z',
+  updatedAt: new Date().toISOString(),
 };
 
 const mockBookWithTopics = {
@@ -86,6 +86,58 @@ const mockBookWithTopics = {
       sortOrder: 1,
       relevance: 'core',
       estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440011',
+      curriculumId: 'curr-1',
+      title: 'Old Kingdom',
+      description: 'The age of pyramid builders',
+      chapter: 'The Story',
+      sortOrder: 2,
+      relevance: 'core',
+      estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440012',
+      curriculumId: 'curr-1',
+      title: 'Middle Kingdom',
+      description: 'Reunification and stability',
+      chapter: 'The Story',
+      sortOrder: 3,
+      relevance: 'core',
+      estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440013',
+      curriculumId: 'curr-1',
+      title: 'New Kingdom',
+      description: 'The age of empire',
+      chapter: 'The Story',
+      sortOrder: 4,
+      relevance: 'core',
+      estimatedMinutes: 30,
+      bookId: mockBook.id,
+      skipped: false,
+      source: 'generated',
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440014',
+      curriculumId: 'curr-1',
+      title: 'Daily Life',
+      description: 'How ordinary people lived',
+      chapter: 'Society',
+      sortOrder: 5,
+      relevance: 'core',
+      estimatedMinutes: 25,
       bookId: mockBook.id,
       skipped: false,
       source: 'generated',
@@ -109,6 +161,9 @@ jest.mock(
       persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
       claimBookForGeneration: jest.fn().mockResolvedValue(null),
       releaseBookGenerationClaimIfEmpty: jest.fn().mockResolvedValue(undefined),
+      repairIncompleteBookGenerationClaim: jest
+        .fn()
+        .mockResolvedValue({ status: 'not_incomplete' }),
       moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
       deleteBook: jest.fn().mockResolvedValue({
         deleted: true,
@@ -247,10 +302,12 @@ import {
   getBookWithTopics,
   claimBookForGeneration,
   releaseBookGenerationClaimIfEmpty,
+  repairIncompleteBookGenerationClaim,
   deleteBook,
 } from '../services/curriculum';
+import { inngest } from '../inngest/client';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
-import { ERROR_CODES } from '@eduagent/schemas';
+import { ERROR_CODES, type BookWithTopics } from '@eduagent/schemas';
 
 const mockGetBooks = getBooks as jest.MockedFunction<typeof getBooks>;
 const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
@@ -265,7 +322,14 @@ const mockReleaseBookGenerationClaimIfEmpty =
   releaseBookGenerationClaimIfEmpty as jest.MockedFunction<
     typeof releaseBookGenerationClaimIfEmpty
   >;
+const mockRepairIncompleteBookGenerationClaim =
+  repairIncompleteBookGenerationClaim as jest.MockedFunction<
+    typeof repairIncompleteBookGenerationClaim
+  >;
 const mockDeleteBook = deleteBook as jest.MockedFunction<typeof deleteBook>;
+const mockInngestSend = inngest.send as jest.MockedFunction<
+  typeof inngest.send
+>;
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -414,7 +478,7 @@ describe('book routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.book.title).toBe('Ancient Egypt');
-      expect(body.topics).toHaveLength(1);
+      expect(body.topics).toHaveLength(5);
       expect(body.topics[0].chapter).toBe('The Story');
       expect(body.status).toBe('NOT_STARTED');
     });
@@ -592,9 +656,16 @@ describe('book routes', () => {
 
     it('[WI-78 review] rejects an empty generated claim without releasing an active generator', async () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'in_progress',
+      });
       mockGetBookWithTopics.mockResolvedValueOnce({
         ...mockBookWithTopics,
-        book: { ...mockBook, topicsGenerated: true },
+        book: {
+          ...mockBook,
+          topicsGenerated: true,
+          updatedAt: new Date().toISOString(),
+        },
         topics: [],
       } as never);
 
@@ -617,9 +688,16 @@ describe('book routes', () => {
 
     it('[WI-78 review] treats skipped-only generated topics as empty', async () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'in_progress',
+      });
       mockGetBookWithTopics.mockResolvedValueOnce({
         ...mockBookWithTopics,
-        book: { ...mockBook, topicsGenerated: true },
+        book: {
+          ...mockBook,
+          topicsGenerated: true,
+          updatedAt: new Date().toISOString(),
+        },
         topics: mockBookWithTopics.topics.map((topic) => ({
           ...topic,
           skipped: true,
@@ -643,12 +721,199 @@ describe('book routes', () => {
       expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
     });
 
-    it('expands an already-generated thin book when requested', async () => {
+    it('[WI-142] repairs a stale empty generation claim instead of leaving the book stuck generated', async () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
-      mockGetBookWithTopics.mockResolvedValueOnce(mockBookWithTopics as never);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'repaired',
+        book: mockBookWithTopics as BookWithTopics,
+      });
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: {
+          ...mockBook,
+          topicsGenerated: true,
+          updatedAt: '2026-04-04T00:00:00.000Z',
+        },
+        topics: [],
+      } as never);
 
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockRepairIncompleteBookGenerationClaim).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend).toHaveBeenCalledWith({
+        name: 'app/book.topics-generated',
+        data: {
+          subjectId: SUBJECT_ID,
+          bookId: BOOK_ID,
+          profileId: 'test-profile-id',
+          timestamp: expect.any(String),
+        },
+      });
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
+    it('[WI-142] repairs a stale partial generation claim instead of reporting success', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'repaired',
+        book: mockBookWithTopics as BookWithTopics,
+      });
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: {
+          ...mockBook,
+          topicsGenerated: true,
+          updatedAt: '2026-04-04T00:00:00.000Z',
+        },
+        topics: [mockBookWithTopics.topics[0]],
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockRepairIncompleteBookGenerationClaim).toHaveBeenCalledTimes(1);
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
+    it('[WI-142] blocks fresh partial generation claims while the generator may still be active', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'in_progress',
+      });
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: {
+          ...mockBook,
+          topicsGenerated: true,
+          updatedAt: new Date().toISOString(),
+        },
+        topics: [mockBookWithTopics.topics[0]],
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toMatchObject({
+        code: ERROR_CODES.CONFLICT,
+      });
       const { expandExistingBookTopics } = jest.requireMock(
         '../services/curriculum',
+      );
+      expect(expandExistingBookTopics).not.toHaveBeenCalled();
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
+    it('[WI-142] blocks explicit expansion for fresh partial generation claims', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'in_progress',
+      });
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: {
+          ...mockBook,
+          topicsGenerated: true,
+          updatedAt: new Date().toISOString(),
+        },
+        topics: [mockBookWithTopics.topics[0]],
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ expandExisting: true }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toMatchObject({
+        code: ERROR_CODES.CONFLICT,
+      });
+      const { expandExistingBookTopics } = jest.requireMock(
+        '../services/curriculum',
+      );
+      expect(expandExistingBookTopics).not.toHaveBeenCalled();
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
+    it('[WI-142] repairs stale skipped-only generated topics instead of looping on a no-op release', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'repaired',
+        book: mockBookWithTopics as BookWithTopics,
+      });
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: {
+          ...mockBook,
+          topicsGenerated: true,
+          updatedAt: '2026-04-04T00:00:00.000Z',
+        },
+        topics: mockBookWithTopics.topics.map((topic) => ({
+          ...topic,
+          skipped: true,
+        })),
+      } as never);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockRepairIncompleteBookGenerationClaim).toHaveBeenCalledTimes(1);
+      expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
+    });
+
+    it('expands a stale already-generated thin book when requested', async () => {
+      const staleThinBookWithTopics = {
+        ...mockBookWithTopics,
+        book: {
+          ...mockBookWithTopics.book,
+          updatedAt: '2026-04-04T00:00:00.000Z',
+        },
+        topics: [mockBookWithTopics.topics[0]],
+      };
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'repaired',
+        book: mockBookWithTopics as BookWithTopics,
+      });
+      mockGetBookWithTopics.mockResolvedValueOnce(
+        staleThinBookWithTopics as never,
       );
 
       const res = await app.request(
@@ -662,12 +927,9 @@ describe('book routes', () => {
       );
 
       expect(res.status).toBe(200);
-      // Route delegates to the extracted service. We verify the route
-      // forwards the right inputs; the orchestration itself (LLM call,
-      // fallback, prepareTopicExpansion, persistBookTopics) is covered in
-      // curriculum.test.ts → describe('expandExistingBookTopics').
-      expect(expandExistingBookTopics).toHaveBeenCalledTimes(1);
-      const call = expandExistingBookTopics.mock.calls[0];
+      // Route delegates the stale-repair decision to the curriculum service.
+      expect(mockRepairIncompleteBookGenerationClaim).toHaveBeenCalledTimes(1);
+      const call = mockRepairIncompleteBookGenerationClaim.mock.calls[0]!;
       const [
         ,
         profileIdArg,
@@ -680,11 +942,10 @@ describe('book routes', () => {
       expect(profileIdArg).toBe('test-profile-id');
       expect(subjectIdArg).toBe(SUBJECT_ID);
       expect(bookIdArg).toBe(BOOK_ID);
-      expect(existingArg).toBe(mockBookWithTopics);
+      expect(existingArg).toEqual(staleThinBookWithTopics);
       expect(priorArg).toBeUndefined();
       expect(depsArg).toEqual(
         expect.objectContaining({
-          learnerAge: 12,
           generateBookTopics: expect.any(Function),
           captureException: expect.any(Function),
         }),
