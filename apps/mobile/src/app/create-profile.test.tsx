@@ -778,6 +778,93 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
     });
 
+    it('keeps duplicate-submit lock active after the POST resolves while success work finishes', async () => {
+      const newProfile = {
+        id: 'slow-success-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
+      );
+      mockSwitchProfile.mockReturnValueOnce(new Promise(() => undefined));
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith('slow-success-id');
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+      expect(
+        screen.getByTestId('create-profile-submit').props.accessibilityState
+          ?.disabled,
+      ).toBe(true);
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a timed-out create failure that rejects after a retry succeeds', async () => {
+      const retryProfile = {
+        id: 'retry-id',
+        accountId: 'a1',
+        displayName: 'Sam',
+        avatarUrl: null,
+        birthYear: 2000,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        createdAt: '2026-02-16T00:00:00Z',
+        updatedAt: '2026-02-16T00:00:00Z',
+      };
+      let rejectFirst: ((reason: Error) => void) | undefined = undefined;
+      mockFetch
+        .mockImplementationOnce(() => {
+          return new Promise<Response>((_resolve, reject) => {
+            rejectFirst = reject;
+          });
+        })
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: retryProfile }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      await fillAndSubmit();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+      });
+
+      await act(async () => {
+        rejectFirst?.(new Error('stale network failure'));
+        await Promise.resolve();
+      });
+
+      expect(screen.queryByTestId('create-profile-error')).toBeNull();
+    });
+
     it('shows an error for AbortError failures not caused by this request signal', async () => {
       const abortError = Object.assign(new Error('Unexpected abort'), {
         name: 'AbortError',

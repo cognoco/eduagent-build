@@ -76,15 +76,6 @@ function parseWebBirthDate(value: string): Date | null {
   return parsed;
 }
 
-function isAbortError(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'name' in err &&
-    (err as { name?: unknown }).name === 'AbortError'
-  );
-}
-
 export default function CreateProfileScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -114,6 +105,7 @@ export default function CreateProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [createPostPending, setCreatePostPending] = useState(false);
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const requestSeqRef = useRef(0);
@@ -130,7 +122,7 @@ export default function CreateProfileScreen() {
   // hasn't resolved, surface an inline error and restore the form so the user
   // can retry. Avoids an infinite spinner dead-end on slow/stuck networks.
   useEffect(() => {
-    if (!loading) return undefined;
+    if (!createPostPending) return undefined;
     const PROFILE_CREATE_TIMEOUT_MS = 30_000;
     const timer = setTimeout(() => {
       const controller = abortRef.current;
@@ -140,13 +132,14 @@ export default function CreateProfileScreen() {
         inFlightRef.current = false;
         requestSeqRef.current += 1;
       }
+      setCreatePostPending(false);
       setLoading(false);
       setError(
         'Creating your profile is taking too long. Check your connection and try again.',
       );
     }, PROFILE_CREATE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [createPostPending]);
 
   useEffect(() => {
     return () => {
@@ -223,6 +216,7 @@ export default function CreateProfileScreen() {
     abortRef.current = controller;
     const requestSeq = requestSeqRef.current + 1;
     requestSeqRef.current = requestSeq;
+    setCreatePostPending(true);
     setLoading(true);
 
     try {
@@ -244,6 +238,7 @@ export default function CreateProfileScreen() {
       );
       await assertOk(res);
       const result = (await res.json()) as { profile: Profile };
+      setCreatePostPending(false);
       if (requestSeqRef.current !== requestSeq || controller.signal.aborted) {
         return;
       }
@@ -338,7 +333,7 @@ export default function CreateProfileScreen() {
         );
       }
     } catch (err: unknown) {
-      if (isAbortError(err) && controller.signal.aborted) {
+      if (requestSeqRef.current !== requestSeq || controller.signal.aborted) {
         return;
       }
       // [BUG-947] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.
@@ -378,6 +373,7 @@ export default function CreateProfileScreen() {
       if (abortRef.current === controller) {
         abortRef.current = null;
         inFlightRef.current = false;
+        setCreatePostPending(false);
         setLoading(false);
       }
     }
