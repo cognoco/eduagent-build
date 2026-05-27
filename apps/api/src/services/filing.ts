@@ -328,6 +328,7 @@ export async function fileToLibrary(
 
   const messages: ChatMessage[] = [{ role: 'system', content: prompt }];
 
+  // conversationLanguage not threaded: output is JSON subject/topic categorization
   const llmResult = await routeAndCall(messages, 1);
 
   // [BUG-842 / F-SVC-009] Use the canonical extractFirstJsonObject helper

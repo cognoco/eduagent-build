@@ -22,6 +22,7 @@ import {
   profileListResponseSchema,
   onboardingPronounsPatchSchema,
   onboardingLanguagePatchSchema,
+  profileCreateSchema,
   profileUpdateSchema,
   NEW_LEARNER_SESSION_THRESHOLD,
 } from './profiles.js';
@@ -293,5 +294,34 @@ describe('[BUG-780] onboarding patch schemas mirror profileUpdateSchema', () => 
     for (const key of Object.keys(schema.shape)) {
       expect(updateKeys.has(key)).toBe(true);
     }
+  });
+});
+
+describe('profileCreateSchema — conversationLanguage at the create boundary (i18n Phase 1)', () => {
+  const baseValid = {
+    displayName: 'Alex',
+    birthYear: 2013,
+  };
+
+  it('accepts a valid conversationLanguage code at create time', () => {
+    const parsed = profileCreateSchema.parse({
+      ...baseValid,
+      conversationLanguage: 'nb',
+    });
+    expect(parsed.conversationLanguage).toBe('nb');
+  });
+
+  it('allows conversationLanguage to be omitted (DB default applies server-side)', () => {
+    const parsed = profileCreateSchema.parse(baseValid);
+    expect(parsed.conversationLanguage).toBeUndefined();
+  });
+
+  it('rejects an unsupported conversationLanguage code', () => {
+    expect(() =>
+      profileCreateSchema.parse({
+        ...baseValid,
+        conversationLanguage: 'zz',
+      }),
+    ).toThrow();
   });
 });

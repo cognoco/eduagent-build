@@ -5,7 +5,10 @@ import {
   type Database,
   type ScopedRepository,
 } from '@eduagent/database';
-import { learnerRecapLlmOutputSchema } from '@eduagent/schemas';
+import {
+  learnerRecapLlmOutputSchema,
+  type ConversationLanguage,
+} from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { projectAiResponseContent } from './llm/project-response';
@@ -25,6 +28,10 @@ interface RecapInput {
   subjectId: string;
   exchangeCount: number;
   birthYear: number;
+  // i18n Phase 1 — learner-prose threading. When provided, the router
+  // prepends a "write the learner-visible prose in {language}" directive
+  // to the safety preamble. Callers load this from profile.conversation_language.
+  conversationLanguage?: ConversationLanguage;
 }
 
 export interface LearnerRecapResult {
@@ -373,6 +380,11 @@ export async function generateLearnerRecap(
       },
     ],
     1,
+    {
+      flow: 'session.recap',
+      sessionId: input.sessionId,
+      conversationLanguage: input.conversationLanguage,
+    },
   );
 
   const jsonObject = extractFirstJsonObject(result.response);

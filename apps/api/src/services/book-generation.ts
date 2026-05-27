@@ -6,6 +6,7 @@ import {
   bookTopicGenerationResultSchema,
   type BookGenerationResult,
   type BookTopicGenerationResult,
+  type ConversationLanguage,
 } from '@eduagent/schemas';
 
 type SafeParser<T> = {
@@ -93,6 +94,7 @@ async function callBookGenerationJson<T>(
   messages: ChatMessage[],
   schema: SafeParser<T>,
   labels: { invalidJson: string; unexpectedShape: string },
+  conversationLanguage?: ConversationLanguage,
 ): Promise<T> {
   let firstFailure: Error | undefined;
   let lastFailureMessage = '';
@@ -115,8 +117,10 @@ async function callBookGenerationJson<T>(
           ];
 
     const result = await routeAndCall(attemptMessages, BOOK_GENERATION_RUNG, {
+      flow: 'book.generation',
       providerPolicy: 'gemini_only',
       responseFormat: 'json',
+      conversationLanguage,
     });
 
     let parsed: unknown;
@@ -149,6 +153,7 @@ async function callBookGenerationJson<T>(
 export async function detectSubjectType(
   subjectName: string,
   learnerAge: number,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<BookGenerationResult> {
   // [PROMPT-INJECT-8] subjectName is learner-owned free text. Wrap in a
   // named tag and sanitize so a crafted value cannot break the string or
@@ -162,10 +167,15 @@ export async function detectSubjectType(
     },
   ];
 
-  return callBookGenerationJson(messages, bookGenerationResultSchema, {
-    invalidJson: 'LLM returned invalid JSON for subject detection',
-    unexpectedShape: 'LLM returned unexpected subject detection structure',
-  });
+  return callBookGenerationJson(
+    messages,
+    bookGenerationResultSchema,
+    {
+      invalidJson: 'LLM returned invalid JSON for subject detection',
+      unexpectedShape: 'LLM returned unexpected subject detection structure',
+    },
+    options?.conversationLanguage,
+  );
 }
 
 export async function generateBookTopics(
@@ -173,6 +183,7 @@ export async function generateBookTopics(
   bookDescription: string,
   learnerAge: number,
   priorKnowledge?: string,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<BookTopicGenerationResult> {
   // [PROMPT-INJECT-8] bookTitle and bookDescription are learner- or LLM-
   // generated stored text; priorKnowledge is raw learner text. Wrap each in
@@ -199,8 +210,13 @@ export async function generateBookTopics(
     },
   ];
 
-  return callBookGenerationJson(messages, bookTopicGenerationResultSchema, {
-    invalidJson: 'LLM returned invalid JSON for book topic generation',
-    unexpectedShape: 'LLM returned unexpected book topic structure',
-  });
+  return callBookGenerationJson(
+    messages,
+    bookTopicGenerationResultSchema,
+    {
+      invalidJson: 'LLM returned invalid JSON for book topic generation',
+      unexpectedShape: 'LLM returned unexpected book topic structure',
+    },
+    options?.conversationLanguage,
+  );
 }

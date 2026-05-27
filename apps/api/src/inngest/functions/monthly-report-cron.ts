@@ -47,6 +47,7 @@ import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
 import { progressMetricsSchema } from '@eduagent/schemas';
+import { parseConversationLanguage } from '../../services/llm';
 
 // [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
 // Older snapshot rows may have a different shape from what current code
@@ -358,7 +359,19 @@ export const monthlyReportGenerate = inngest.createFunction(
           practiceSummary,
         );
 
-        const llmContent = await generateReportHighlights(reportData);
+        // i18n Phase 1 — parent receives the report so use the parent's
+        // conversation_language for prose. For self-reports parentId === childId.
+        const [reportTargetProfile] = await db
+          .select({ conversationLanguage: profiles.conversationLanguage })
+          .from(profiles)
+          .where(eq(profiles.id, parentId))
+          .limit(1);
+        const llmContent = await generateReportHighlights(reportData, {
+          // DB returns string | null; parse to union before passing to LLM call.
+          conversationLanguage: parseConversationLanguage(
+            reportTargetProfile?.conversationLanguage,
+          ),
+        });
         reportData = {
           ...reportData,
           highlights: llmContent.highlights,

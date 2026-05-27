@@ -10,6 +10,7 @@ import type { LlmSummary, SummaryEventPayload } from '@eduagent/schemas';
 import { summaryEventPayloadSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { parseConversationLanguage } from '../../services/llm';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import { generateLearnerRecap } from '../../services/session-recap';
@@ -92,7 +93,10 @@ async function regenerateLearnerRecapForSession(
   }
 
   const [profile] = await db
-    .select({ birthYear: profiles.birthYear })
+    .select({
+      birthYear: profiles.birthYear,
+      conversationLanguage: profiles.conversationLanguage,
+    })
     .from(profiles)
     .where(eq(profiles.id, payload.profileId))
     .limit(1);
@@ -110,6 +114,10 @@ async function regenerateLearnerRecapForSession(
     subjectId: sessionRow.subjectId,
     exchangeCount: sessionRow.exchangeCount ?? 0,
     birthYear: profile.birthYear,
+    // DB returns string | null; parse to union before passing to LLM call.
+    conversationLanguage: parseConversationLanguage(
+      profile?.conversationLanguage,
+    ),
   });
 
   if (!recap) {
@@ -167,12 +175,23 @@ export const sessionSummaryCreate = inngest.createFunction(
         'pending',
       );
 
+      // i18n Phase 1 — load conversation_language for summary prose.
+      const [createProfile] = await db
+        .select({ conversationLanguage: profiles.conversationLanguage })
+        .from(profiles)
+        .where(eq(profiles.id, payload.profileId))
+        .limit(1);
+
       const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,
         profileId: payload.profileId,
         summaryId: summaryRow.id,
         subjectId: payload.subjectId ?? null,
         topicId: payload.topicId ?? null,
+        // DB returns string | null; parse to union before passing to LLM call.
+        conversationLanguage: parseConversationLanguage(
+          createProfile?.conversationLanguage,
+        ),
       });
 
       if (!summary) {
@@ -230,12 +249,22 @@ export const sessionSummaryRegenerate = inngest.createFunction(
 
     const result = await step.run('regenerate-summary', async () => {
       const db = getStepDatabase();
+      // i18n Phase 1 — load conversation_language for the regenerated summary.
+      const [regenerateProfile] = await db
+        .select({ conversationLanguage: profiles.conversationLanguage })
+        .from(profiles)
+        .where(eq(profiles.id, payload.profileId))
+        .limit(1);
       const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,
         profileId: payload.profileId,
         summaryId: payload.sessionSummaryId,
         subjectId: payload.subjectId ?? null,
         topicId: payload.topicId ?? null,
+        // DB returns string | null; parse to union before passing to LLM call.
+        conversationLanguage: parseConversationLanguage(
+          regenerateProfile?.conversationLanguage,
+        ),
       });
 
       return {

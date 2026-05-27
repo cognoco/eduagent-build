@@ -23,6 +23,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getCurriculum,
@@ -243,11 +244,17 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
     try {
+      const profileMeta = c.get('profileMeta');
       const explanation = await explainTopicOrdering(
         db,
         profileId,
         subjectId,
         topicId,
+        {
+          conversationLanguage: parseConversationLanguage(
+            profileMeta?.conversationLanguage,
+          ),
+        },
       );
       return c.json(explainTopicResponseSchema.parse({ explanation }));
     } catch (error) {

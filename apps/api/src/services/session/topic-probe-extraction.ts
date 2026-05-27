@@ -76,7 +76,7 @@ export function inferPaceHint(exchangeHistory: ExchangeEntry[]): PaceHint {
 }
 
 export function defaultExtractedSignals(
-  history: ExchangeEntry[]
+  history: ExchangeEntry[],
 ): ExtractedInterviewSignals {
   return {
     goals: [],
@@ -89,7 +89,7 @@ export function defaultExtractedSignals(
 
 export async function extractSignalsFromExchangeHistory(
   exchangeHistory: ExchangeEntry[],
-  options?: { llmTier?: LLMTier }
+  options?: { llmTier?: LLMTier },
 ): Promise<ExtractedInterviewSignals> {
   let conversationText = exchangeHistory
     .map((e) => `${e.role.toUpperCase()}: ${escapeXml(e.content)}`)
@@ -110,6 +110,7 @@ export async function extractSignalsFromExchangeHistory(
     },
   ];
 
+  // conversationLanguage not threaded: signal extraction from transcript, internal JSON
   const result = await routeAndCall(messages, 2, {
     llmTier: options?.llmTier,
   });
@@ -124,7 +125,7 @@ export async function extractSignalsFromExchangeHistory(
           reason: 'no_json_found',
           rawResponseLength: result.response.length,
         },
-      }
+      },
     );
     return defaultExtractedSignals(exchangeHistory);
   }

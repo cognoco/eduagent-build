@@ -92,6 +92,7 @@ export async function resolveSubjectName(
     },
   ];
 
+  // conversationLanguage not threaded: output is a fixed taxonomy slug
   const result = await routeAndCall(messages, 1);
 
   try {

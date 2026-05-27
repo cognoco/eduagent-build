@@ -54,6 +54,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { projectAiResponseContent } from '../../services/llm/project-response';
+import { parseConversationLanguage } from '../../services/llm';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   cefrLevelSchema,
@@ -1011,8 +1012,13 @@ export const sessionCompleted = inngest.createFunction(
             // [BUG-734] Pass ageBracket so router can apply age-appropriate
             // safety preamble. Falls back to undefined if birthYear is missing
             // (router applies minor-safe default).
+            // i18n Phase 1 — pull conversation_language so the parent-facing
+            // insights render in the learner's selected language.
             const [profileForBracket] = await db
-              .select({ birthYear: profiles.birthYear })
+              .select({
+                birthYear: profiles.birthYear,
+                conversationLanguage: profiles.conversationLanguage,
+              })
               .from(profiles)
               .where(eq(profiles.id, profileId))
               .limit(1);
@@ -1023,6 +1029,10 @@ export const sessionCompleted = inngest.createFunction(
 
             const result = await generateSessionInsights(transcriptText, {
               ageBracket,
+              // DB returns string | null; parse to union before passing to LLM.
+              conversationLanguage: parseConversationLanguage(
+                profileForBracket?.conversationLanguage,
+              ),
             });
 
             if (result.valid) {
@@ -1155,7 +1165,10 @@ export const sessionCompleted = inngest.createFunction(
           }
 
           const [profile] = await db
-            .select({ birthYear: profiles.birthYear })
+            .select({
+              birthYear: profiles.birthYear,
+              conversationLanguage: profiles.conversationLanguage,
+            })
             .from(profiles)
             .where(eq(profiles.id, profileId))
             .limit(1);
@@ -1173,6 +1186,11 @@ export const sessionCompleted = inngest.createFunction(
             subjectId,
             exchangeCount: exchangeCount ?? 0,
             birthYear: profile.birthYear,
+            // i18n Phase 1 — thread the learner's UI locale into the recap LLM.
+            // DB returns string | null; parse to union before passing forward.
+            conversationLanguage: parseConversationLanguage(
+              profile?.conversationLanguage,
+            ),
           });
 
           if (!recap) {
@@ -1238,12 +1256,24 @@ export const sessionCompleted = inngest.createFunction(
           }
           summaryRowId = summaryRow.id;
 
+          // i18n Phase 1 — load conversation_language so the parent-facing
+          // summary renders in the learner's selected language.
+          const [llmSummaryProfile] = await db
+            .select({ conversationLanguage: profiles.conversationLanguage })
+            .from(profiles)
+            .where(eq(profiles.id, profileId))
+            .limit(1);
+
           const summary = await generateAndStoreLlmSummary(db, {
             sessionId,
             profileId,
             summaryId: summaryRow.id,
             subjectId: subjectId ?? null,
             topicId: topicId ?? null,
+            // DB returns string | null; parse to union before passing to LLM.
+            conversationLanguage: parseConversationLanguage(
+              llmSummaryProfile?.conversationLanguage,
+            ),
           });
 
           if (!summary) {
@@ -1654,7 +1684,19 @@ export const sessionCompleted = inngest.createFunction(
         }
         return runIsolated('extract-homework-summary', profileId, async () => {
           const db = getStepDatabase();
-          await extractAndStoreHomeworkSummary(db, profileId, sessionId);
+          // i18n Phase 1 — thread conversation_language to the homework
+          // summary LLM so the parent-facing card matches the learner locale.
+          const [homeworkProfile] = await db
+            .select({ conversationLanguage: profiles.conversationLanguage })
+            .from(profiles)
+            .where(eq(profiles.id, profileId))
+            .limit(1);
+          await extractAndStoreHomeworkSummary(db, profileId, sessionId, {
+            // DB returns string | null; parse to union before passing to LLM.
+            conversationLanguage: parseConversationLanguage(
+              homeworkProfile?.conversationLanguage,
+            ),
+          });
         });
       }),
     );

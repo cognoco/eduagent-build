@@ -25,6 +25,7 @@ import type {
   AssessmentRecord,
   AssessmentStatus,
   ChatExchange,
+  ConversationLanguage,
 } from '@eduagent/schemas';
 import { parseAssessmentExchangeHistory } from '@eduagent/schemas';
 
@@ -256,6 +257,7 @@ export function resolveAssessmentStatus(input: {
  */
 export async function generateQuickCheck(
   context: QuickCheckContext,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<QuickCheckResult> {
   // [PROMPT-INJECT-8] topic fields are stored content; exchange history is
   // raw learner+assistant text. Sanitize titles, entity-encode the joined
@@ -280,7 +282,10 @@ export async function generateQuickCheck(
     },
   ];
 
-  const result = await routeAndCall(messages, 2);
+  const result = await routeAndCall(messages, 2, {
+    flow: 'assessment.evaluate',
+    conversationLanguage: options?.conversationLanguage,
+  });
   return parseQuickCheckResult(result.response);
 }
 
@@ -315,7 +320,10 @@ export function isTerminalAssessmentStatus(status: AssessmentStatus): boolean {
 export async function evaluateAssessmentAnswer(
   context: AssessmentContext,
   answer: string,
-  options?: { assessmentStatus?: AssessmentStatus },
+  options?: {
+    assessmentStatus?: AssessmentStatus;
+    conversationLanguage?: ConversationLanguage;
+  },
 ): Promise<AssessmentEvaluation> {
   if (
     options?.assessmentStatus &&
@@ -327,7 +335,10 @@ export async function evaluateAssessmentAnswer(
   }
 
   const messages = buildAssessmentEvaluationMessages(context, answer);
-  const result = await routeAndCall(messages, 2);
+  const result = await routeAndCall(messages, 2, {
+    flow: 'assessment.evaluate',
+    conversationLanguage: options?.conversationLanguage,
+  });
   const evaluation = parseAssessmentEvaluation(
     result.response,
     context.currentDepth,
@@ -411,6 +422,7 @@ export function buildAssessmentAppHelpEvaluation(
 export async function evaluateQuickCheckAnswer(
   context: AssessmentContext,
   answer: string,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<AssessmentEvaluation> {
   const safeTopicTitle = sanitizeXmlValue(context.topicTitle, 200);
   const safeTopicDescription = sanitizeXmlValue(context.topicDescription, 500);
@@ -428,7 +440,10 @@ export async function evaluateQuickCheckAnswer(
     },
   ];
 
-  const result = await routeAndCall(messages, 2);
+  const result = await routeAndCall(messages, 2, {
+    flow: 'assessment.evaluate',
+    conversationLanguage: options?.conversationLanguage,
+  });
   return parseAssessmentEvaluation(result.response, context.currentDepth, {
     passMode: 'llm',
   });

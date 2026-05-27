@@ -128,6 +128,7 @@ async function callWithTimeout(
     setTimeout(() => reject(new Error('timeout')), timeoutMs);
   });
   // rung 1: Flash routing by design — depth analysis is latency-sensitive and doesn't need advanced model capabilities.
+  // conversationLanguage not threaded: depth-analysis JSON, internal metric
   const llmPromise = routeAndCall(messages, 1, { ageBracket }).then(
     (result) => result.response,
   );

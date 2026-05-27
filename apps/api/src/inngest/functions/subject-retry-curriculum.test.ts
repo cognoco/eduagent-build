@@ -87,6 +87,10 @@ function makeMockDb(
       consentStates: {
         findFirst: jest.fn().mockResolvedValue(undefined),
       },
+      // i18n Phase 1: profile lookup for conversationLanguage.
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ conversationLanguage: null }),
+      },
     },
     select: jest.fn(),
     // [WI-125] update().set().where().returning() chain for the
@@ -260,6 +264,8 @@ describe('subjectRetryCurriculum', () => {
       'Algebra',
       'Intro to algebra',
       14,
+      undefined,
+      { conversationLanguage: undefined },
     );
     expect(mockPersistBookTopics).toHaveBeenCalledWith(
       mockDb,

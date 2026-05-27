@@ -33,7 +33,10 @@ import type { Database } from '@eduagent/database';
 import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
 import { idempotencyPreflight } from '../middleware/idempotency';
-import { requireProfileId } from '../middleware/profile-scope';
+import {
+  requireProfileId,
+  type ProfileMeta,
+} from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { streamSSEUtf8 } from '../route-utils/sse-utf8';
 import { addBreadcrumb, captureException } from '../services/sentry';
@@ -84,7 +87,7 @@ import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
 } from '../services/idempotency-marker';
-import { CircuitOpenError } from '../services/llm';
+import { CircuitOpenError, parseConversationLanguage } from '../services/llm';
 import {
   isChallengeRoundRuntimeEnabled,
   isTopicIntentMatcherEnabled,
@@ -167,6 +170,7 @@ type SessionRouteEnv = {
     quotaDecrementQuotaModel: QuotaModel | undefined;
     quotaRemainingTurns: number | undefined;
     quotaFractionRemaining: number | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -1399,11 +1403,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
+      // i18n Phase 1 — thread conversation_language to summary evaluation.
+      const summaryProfileMeta = c.get('profileMeta');
       const result = await submitSummary(
         db,
         profileId,
         sessionId,
         c.req.valid('json'),
+        {
+          conversationLanguage: parseConversationLanguage(
+            summaryProfileMeta?.conversationLanguage,
+          ),
+        },
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
       // Default false — only true when dispatch actually succeeds.
@@ -1474,7 +1485,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
       }
 
-      const result = await generateRecallBridge(db, profileId, sessionId);
+      // i18n Phase 1 — profile-scope middleware exposes the active profile's
+      // conversation_language. Forward it so the recall-bridge LLM prose
+      // matches the learner's selected UI language.
+      const profileMeta = c.get('profileMeta');
+      const result = await generateRecallBridge(db, profileId, sessionId, {
+        conversationLanguage: parseConversationLanguage(
+          profileMeta?.conversationLanguage,
+        ),
+      });
       // [L8-F9] Validate response shape against the public contract.
       return c.json(recallBridgeResultSchema.parse(result));
     },

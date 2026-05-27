@@ -12,6 +12,7 @@ import {
   getActiveAssessmentResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
@@ -150,6 +151,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           answer,
           snapshot.exchangeHistory,
         );
+        // i18n Phase 1 — pass the learner's conversation_language so the
+        // LLM-evaluated feedback prose renders in their UI locale.
+        const assessmentProfileMeta = c.get('profileMeta');
         const evaluation = forceReview
           ? buildNeedsReviewEvaluation()
           : await evaluateAssessmentAnswer(
@@ -163,7 +167,12 @@ export const assessmentRoutes = new Hono<RouteEnv>()
               // lockAssessmentForAnswerSubmission under FOR UPDATE — pass
               // the snapshot's status for defense-in-depth in case the
               // service signature drifts.
-              { assessmentStatus: snapshot.status },
+              {
+                assessmentStatus: snapshot.status,
+                conversationLanguage: parseConversationLanguage(
+                  assessmentProfileMeta?.conversationLanguage,
+                ),
+              },
             );
 
         const updatedHistory = [
@@ -361,6 +370,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
             languageCode: null,
           };
 
+      // i18n Phase 1 — thread conversation_language into the quick-check
+      // feedback prose.
+      const quickCheckProfileMeta = c.get('profileMeta');
       const evaluation = await evaluateQuickCheckAnswer(
         {
           ...topicContext,
@@ -368,6 +380,11 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           exchangeHistory: [],
         },
         answer,
+        {
+          conversationLanguage: parseConversationLanguage(
+            quickCheckProfileMeta?.conversationLanguage,
+          ),
+        },
       );
 
       return c.json(

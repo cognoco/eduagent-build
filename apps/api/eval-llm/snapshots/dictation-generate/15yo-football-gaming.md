@@ -54,7 +54,8 @@
     "algebra equations",
     "US history: Civil War",
     "physics: forces and motion"
-  ]
+  ],
+  "conversationLanguage": "en"
 }
 ```
 
@@ -124,5 +125,6 @@ Generate a dictation for me.
 
 - Uses fine-grained ageYears=15 — 2-bucket literary scaling (≤13 chapter-book, >13 literary).
 - Native language drives punctuation-name mapping.
+- i18n Phase 1: conversationLanguage=en wired for runtime preamble injection.
 - Interests wired (audit P0.1): football, NFL, esports, competitive gaming, sports statistics.
 - Library topics wired (audit P0.1): algebra equations, US history: Civil War, physics: forces and motion.

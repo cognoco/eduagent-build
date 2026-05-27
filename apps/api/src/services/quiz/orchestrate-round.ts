@@ -12,6 +12,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { ProfileMeta } from '../../middleware/profile-scope';
+import { parseConversationLanguage } from '../llm';
 import { VocabularyContextError } from '../../errors';
 import { shouldApplyDifficultyBump } from './difficulty-bump';
 import { generateQuizRound } from './generate-round';
@@ -127,6 +128,10 @@ export async function buildAndGenerateRound(
     allVocabulary,
     topicTitles,
     difficultyBump,
+    // i18n Phase 1 — quiz prose follows the learner's UI locale.
+    conversationLanguage: parseConversationLanguage(
+      profileMeta?.conversationLanguage,
+    ),
   });
   return { ...round, activityType: input.activityType };
 }

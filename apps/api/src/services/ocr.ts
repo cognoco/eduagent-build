@@ -127,6 +127,7 @@ export class GeminiOcrProvider implements OcrProvider {
       },
     ];
 
+    // conversationLanguage not threaded: output is extracted source-image text; UI locale irrelevant
     const result = await routeAndCall(messages, 1, { flow: 'ocr.extract' });
     return parseOcrResponse(result.response);
   }

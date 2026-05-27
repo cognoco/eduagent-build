@@ -6,6 +6,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  ConversationLanguage,
   HomeworkProblem,
   HomeworkSessionMetadata,
   HomeworkSummary,
@@ -210,6 +211,7 @@ export async function extractHomeworkSummary(
   db: Database,
   profileId: string,
   sessionId: string,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<HomeworkSummary> {
   const [sessionRow] = await db
     .select({
@@ -283,7 +285,11 @@ export async function extractHomeworkSummary(
   ];
 
   try {
-    const result = await routeAndCall(messages, 2);
+    const result = await routeAndCall(messages, 2, {
+      flow: 'homework.summary',
+      sessionId,
+      conversationLanguage: options?.conversationLanguage,
+    });
     return parseHomeworkSummaryResponse(result.response, fallback);
   } catch (err) {
     logger.warn('[homework-summary] LLM call failed, using fallback', {
@@ -305,6 +311,7 @@ export async function extractAndStoreHomeworkSummary(
   db: Database,
   profileId: string,
   sessionId: string,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<HomeworkSummary> {
   // [WI-216] Idempotency short-circuit: if the homework summary has already
   // been written for this session, do not call the LLM again. The
@@ -328,7 +335,12 @@ export async function extractAndStoreHomeworkSummary(
     return existingMetadata.homeworkSummary;
   }
 
-  const summary = await extractHomeworkSummary(db, profileId, sessionId);
+  const summary = await extractHomeworkSummary(
+    db,
+    profileId,
+    sessionId,
+    options,
+  );
 
   // [WI-216 H2] TOCTOU fix — the pre-LLM check above can race with a
   // concurrent invocation for the same session. Two callers may both see

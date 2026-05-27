@@ -579,6 +579,7 @@ async function runTopicIntentMatcher(
 ): Promise<z.infer<typeof topicIntentMatcherResponseSchema> | null> {
   const messages = buildTopicIntentMatcherMessages({ rawInput, topics });
   const response = await Promise.race([
+    // conversationLanguage not threaded: topic-intent matcher; JSON classification
     routeAndCall(messages, 1, {
       flow: 'topic-intent-matcher',
       llmTier: 'flash',

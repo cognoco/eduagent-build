@@ -1755,6 +1755,7 @@ export async function analyzeSessionTranscript(
     { role: 'user', content: transcriptText },
   ];
 
+  // conversationLanguage not threaded: output is JSON session-analysis inference
   const result = await routeAndCall(messages, 1, {});
   if (!result.response) return null;
 

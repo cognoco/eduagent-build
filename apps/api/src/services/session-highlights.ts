@@ -5,6 +5,7 @@
 import {
   ENGAGEMENT_SIGNALS,
   type AgeBracket,
+  type ConversationLanguage,
   type EngagementSignal,
 } from '@eduagent/schemas';
 import { routeAndCall } from './llm/router';
@@ -241,7 +242,12 @@ export function buildSessionInsightsUserPrompt(transcript: string): string {
 
 export async function generateSessionInsights(
   transcript: string,
-  options?: { ageBracket?: AgeBracket },
+  options?: {
+    ageBracket?: AgeBracket;
+    // i18n Phase 1 — learner-prose threading. Callers load this from
+    // profile.conversation_language and forward it through.
+    conversationLanguage?: ConversationLanguage;
+  },
 ): Promise<SessionInsightsResult> {
   const userPrompt = buildSessionInsightsUserPrompt(transcript);
 
@@ -252,7 +258,11 @@ export async function generateSessionInsights(
         { role: 'user', content: userPrompt },
       ],
       2,
-      { ageBracket: options?.ageBracket },
+      {
+        flow: 'session.highlights',
+        ageBracket: options?.ageBracket,
+        conversationLanguage: options?.conversationLanguage,
+      },
     );
 
     return validateSessionInsights(result.response);

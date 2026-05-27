@@ -1,10 +1,16 @@
 // @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { NonRetriableError } from 'inngest';
 import { eq, and, or, lt, isNull } from 'drizzle-orm';
-import { curriculumBooks, subjects, type Database } from '@eduagent/database';
+import {
+  curriculumBooks,
+  profiles,
+  subjects,
+  type Database,
+} from '@eduagent/database';
 import { subjectCurriculumRetryRequestedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 import { getProfileAge } from '../../services/profile';
@@ -73,11 +79,19 @@ export const subjectRetryCurriculum = inngest.createFunction(
         return { status: 'consent-blocked' as const };
       }
 
+      const langRow = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profileId),
+        columns: { conversationLanguage: true },
+      });
       return {
         status: 'pending' as const,
         bookTitle: book.title,
         bookDescription: book.description ?? '',
         learnerAge: await getProfileAge(db, profileId),
+        // DB returns string | null; parse to union before passing forward.
+        conversationLanguage: parseConversationLanguage(
+          langRow?.conversationLanguage,
+        ),
       };
     });
 
@@ -162,6 +176,8 @@ export const subjectRetryCurriculum = inngest.createFunction(
           context.bookTitle,
           context.bookDescription,
           context.learnerAge,
+          undefined,
+          { conversationLanguage: context.conversationLanguage },
         );
         if (result.topics.length === 0) {
           const err = new NonRetriableError('retry-empty-topics');

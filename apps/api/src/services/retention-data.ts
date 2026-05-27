@@ -162,6 +162,7 @@ export async function evaluateRecallQuality(
       },
     ];
 
+    // conversationLanguage not threaded: output is integer 0-5 quality score
     const result = await routeAndCall(messages, 1);
     const parsed = parseInt(result.response.trim(), 10);
 

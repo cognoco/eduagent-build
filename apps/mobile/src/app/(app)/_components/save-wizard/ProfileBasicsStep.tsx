@@ -7,7 +7,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { computeAgeBracket, type Profile } from '@eduagent/schemas';
+import { useTranslation } from 'react-i18next';
+import {
+  computeAgeBracket,
+  conversationLanguageSchema,
+  type Profile,
+} from '@eduagent/schemas';
 import { useApiClient } from '../../../../lib/api-client';
 import { assertOk } from '../../../../lib/assert-ok';
 import { formatApiError } from '../../../../lib/format-api-error';
@@ -29,6 +34,16 @@ export function ProfileBasicsStep({
 }): React.ReactElement {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { i18n } = useTranslation();
+  // i18n Phase 1 — Signup-time fix. The owner POST is a self-create, so
+  // forward the device UI language for the first LLM call. The child POST
+  // OMITS the field (MED-2): the parent's UI locale does not reliably
+  // predict the child's language; DB default 'en' applies until the child
+  // first signs in on their own device.
+  const ownerConversationLanguage = (() => {
+    const parsed = conversationLanguageSchema.safeParse(i18n.language);
+    return parsed.success ? parsed.data : undefined;
+  })();
 
   const [parentName, setParentName] = React.useState('');
   const [parentBirthYear, setParentBirthYear] = React.useState('');
@@ -105,6 +120,9 @@ export function ProfileBasicsStep({
           json: {
             displayName: parentName.trim(),
             birthYear: Number(parentBirthYear),
+            ...(ownerConversationLanguage
+              ? { conversationLanguage: ownerConversationLanguage }
+              : {}),
           },
         });
         await assertOk(res);
@@ -178,6 +196,9 @@ export function ProfileBasicsStep({
     childBirthYear,
     previewState,
     onComplete,
+    // i18n Phase 1 — owner POST reads this; without it in deps, a language
+    // change between mount and submit would send the stale locale.
+    ownerConversationLanguage,
   ]);
 
   return (

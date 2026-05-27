@@ -51,7 +51,8 @@
     "French subjunctive",
     "essay structure",
     "Enlightenment thinkers"
-  ]
+  ],
+  "conversationLanguage": "fr"
 }
 ```
 
@@ -121,5 +122,6 @@ Generate a dictation for me.
 
 - Uses fine-grained ageYears=17 — 2-bucket literary scaling (≤13 chapter-book, >13 literary).
 - Native language drives punctuation-name mapping.
+- i18n Phase 1: conversationLanguage=fr wired for runtime preamble injection.
 - Interests wired (audit P0.1): French literature, philosophy, existentialism, creative writing.
 - Library topics wired (audit P0.1): Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers.

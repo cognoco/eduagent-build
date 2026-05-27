@@ -116,6 +116,7 @@ async function parseLearnerInputToAnalysis(
   ];
 
   try {
+    // conversationLanguage not threaded: output is JSON analysis of a note, not user-visible prose
     const result = await routeAndCall(messages, 1, {});
     // [BUG-480] Replace greedy regex with brace-depth walker so prose
     // containing "{...}" mid-paragraph doesn't corrupt the extraction.

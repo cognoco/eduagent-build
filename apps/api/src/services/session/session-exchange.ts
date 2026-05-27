@@ -85,6 +85,7 @@ import type {
   LlmProviderPolicy,
   PreferredLlmProvider,
 } from '../llm';
+import { parseConversationLanguage } from '../llm';
 import type { LLMTier } from '../subscription';
 import { inngest } from '../../inngest/client';
 import {
@@ -2311,10 +2312,10 @@ export async function prepareExchangeContext(
     // every downstream call path (processExchange, streamExchange) receives
     // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
     // DB CHECK constraint guarantees this is a valid ConversationLanguage.
-    // Drizzle infers `string`; narrow to the union type for downstream safety.
-    conversationLanguage: profile?.conversationLanguage as
-      | ConversationLanguage
-      | undefined,
+    // Drizzle infers `string`; parse to the union type for downstream safety.
+    conversationLanguage: parseConversationLanguage(
+      profile?.conversationLanguage,
+    ),
     pronouns: profile?.pronouns ?? null,
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,

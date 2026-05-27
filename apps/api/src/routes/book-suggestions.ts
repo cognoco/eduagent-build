@@ -3,7 +3,10 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
+import {
+  requireProfileId,
+  type ProfileMeta,
+} from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getUnpickedBookSuggestionsWithTopup,
@@ -14,6 +17,7 @@ import {
   bookSuggestionsResponseSchema,
   bookSuggestionsArrayResponseSchema,
 } from '@eduagent/schemas';
+import { parseConversationLanguage } from '../services/llm';
 
 type BookSuggestionsEnv = {
   Bindings: { DATABASE_URL: string };
@@ -21,6 +25,7 @@ type BookSuggestionsEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -67,10 +72,17 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
 
       assertNotProxyMode(c);
 
+      // i18n Phase 1 — forward the active profile's conversation_language.
+      const profileMeta = c.get('profileMeta');
       const result = await getUnpickedBookSuggestionsWithTopup(
         db,
         profileId,
         subjectId,
+        {
+          conversationLanguage: parseConversationLanguage(
+            profileMeta?.conversationLanguage,
+          ),
+        },
       );
       return c.json(bookSuggestionsResponseSchema.parse(result), 200);
     },

@@ -15,6 +15,7 @@ export {
   getOpenAIAdvancedModel,
   _setOpenAIAdvancedModelForTesting,
 } from './router';
+export { parseConversationLanguage } from './conversation-language';
 export { mockProvider, createMockProvider } from './providers/mock';
 export { createGeminiProvider } from './providers/gemini';
 export { createOpenAIProvider } from './providers/openai';

@@ -1241,4 +1241,70 @@ describe('LLM Router', () => {
       expect(system).not.toMatch(/pronouns "[^"]*"[^ ]/);
     });
   });
+
+  describe('learner-facing flow tripwire (i18n Phase 1)', () => {
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('warns when flow is learner-facing but conversationLanguage is missing', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
+      try {
+        await routeAndCall([{ role: 'user', content: 'Hi' }], 1, {
+          flow: 'session.recap',
+        });
+        const warned = warnSpy.mock.calls.some((args) =>
+          args.some(
+            (a) => typeof a === 'string' && a.includes('llm.language.missing'),
+          ),
+        );
+        expect(warned).toBe(true);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('does not warn when conversationLanguage is provided', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
+      try {
+        await routeAndCall([{ role: 'user', content: 'Hi' }], 1, {
+          flow: 'session.recap',
+          conversationLanguage: 'nb',
+        });
+        const warned = warnSpy.mock.calls.some((args) =>
+          args.some(
+            (a) => typeof a === 'string' && a.includes('llm.language.missing'),
+          ),
+        );
+        expect(warned).toBe(false);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('does not warn when flow is not in LEARNER_FACING_FLOWS', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
+      try {
+        await routeAndCall([{ role: 'user', content: 'Hi' }], 1, {
+          flow: 'subject.classify',
+        });
+        const warned = warnSpy.mock.calls.some((args) =>
+          args.some(
+            (a) => typeof a === 'string' && a.includes('llm.language.missing'),
+          ),
+        );
+        expect(warned).toBe(false);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
 });

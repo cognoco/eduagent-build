@@ -12,7 +12,10 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import type { RecallBridgeResult } from '@eduagent/schemas';
+import type {
+  ConversationLanguage,
+  RecallBridgeResult,
+} from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage, type EscalationRung } from './llm';
 import { sanitizeXmlValue } from './llm/sanitize';
 
@@ -35,6 +38,7 @@ export async function generateRecallBridge(
   db: Database,
   profileId: string,
   sessionId: string,
+  options?: { conversationLanguage?: ConversationLanguage },
 ): Promise<RecallBridgeResult> {
   const repo = createScopedRepository(db, profileId);
   const session = await repo.sessions.findFirst(
@@ -84,7 +88,11 @@ export async function generateRecallBridge(
   ];
 
   const rung: EscalationRung = 1; // cheapest model — simple recall questions
-  const result = await routeAndCall(messages, rung);
+  const result = await routeAndCall(messages, rung, {
+    flow: 'recall.bridge',
+    sessionId,
+    conversationLanguage: options?.conversationLanguage,
+  });
 
   const questions = result.response
     .split('\n')

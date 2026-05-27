@@ -85,7 +85,18 @@ const TIMESTAMP = '2026-01-01T00:00:00.000Z';
 describe('summary-regenerate handlers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetStepDatabase.mockReturnValue({});
+    // i18n Phase 1: summary-regenerate calls db.select({conversationLanguage}).from(profiles).where(...).limit(1)
+    const mockSelectLimit = jest
+      .fn()
+      .mockResolvedValue([{ conversationLanguage: null }]);
+    const mockSelectWhere = jest
+      .fn()
+      .mockReturnValue({ limit: mockSelectLimit });
+    const mockSelectFrom = jest
+      .fn()
+      .mockReturnValue({ where: mockSelectWhere });
+    const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
+    mockGetStepDatabase.mockReturnValue({ select: mockSelect });
   });
 
   it('creates a missing summary row and emits app/session.summary.generated', async () => {

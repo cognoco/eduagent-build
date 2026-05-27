@@ -40,9 +40,39 @@ const mockSelectDistinct = jest
 // mockMonthlyReportDb.query.familyLinks.findMany so existing tests that
 // only seed findMany continue to work.
 const mockSelectFromFamilyLinksWhere = jest.fn();
-const mockSelectFrom = jest
+
+// i18n Phase 1 — db.select({conversationLanguage}).from(profiles).where(...).limit(1)
+// used to resolve the parent's conversation_language for report prose.
+const mockSelectFromProfilesLimit = jest
   .fn()
-  .mockReturnValue({ where: mockSelectFromFamilyLinksWhere });
+  .mockResolvedValue([{ conversationLanguage: null }]);
+const mockSelectFromProfilesWhere = jest
+  .fn()
+  .mockReturnValue({ limit: mockSelectFromProfilesLimit });
+
+// Hoisted mock table descriptors. They are passed back into
+// createDatabaseModuleMock below so production code resolves `profiles` and
+// `familyLinks` from `@eduagent/database` to these exact objects — which
+// lets `mockSelectFrom` dispatch on identity rather than coincidental
+// property presence. Identity dispatch survives schema evolution: if another
+// table gains a `conversationLanguage` column, this dispatch won't
+// silently route it to the profiles mock.
+const profilesTableMock = {
+  id: col('id'),
+  displayName: col('displayName'),
+  conversationLanguage: col('conversationLanguage'),
+};
+const familyLinksTableMock = {
+  parentProfileId: col('parentProfileId'),
+  childProfileId: col('childProfileId'),
+};
+
+const mockSelectFrom = jest.fn().mockImplementation((table: unknown) => {
+  if (table === profilesTableMock) {
+    return { where: mockSelectFromProfilesWhere };
+  }
+  return { where: mockSelectFromFamilyLinksWhere };
+});
 const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
 
 // Insert chain for monthlyReports
@@ -89,7 +119,7 @@ const mockMonthlyReportDb = createTransactionalMockDb({
 const mockDatabaseModule = createDatabaseModuleMock({
   db: mockMonthlyReportDb,
   exports: {
-    profiles: { id: col('id'), displayName: col('displayName') },
+    profiles: profilesTableMock,
     progressSnapshots: {
       profileId: col('profileId'),
       snapshotDate: col('snapshotDate'),
@@ -118,10 +148,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
       id: col('id'),
       email: col('email'),
     },
-    familyLinks: {
-      parentProfileId: col('parentProfileId'),
-      childProfileId: col('childProfileId'),
-    },
+    familyLinks: familyLinksTableMock,
   },
 });
 
@@ -873,6 +900,7 @@ describe('monthlyReportGenerate', () => {
 
       expect(mockGenerateReportHighlights).toHaveBeenCalledWith(
         expect.objectContaining({ childName: 'Emma' }),
+        { conversationLanguage: undefined },
       );
     });
 

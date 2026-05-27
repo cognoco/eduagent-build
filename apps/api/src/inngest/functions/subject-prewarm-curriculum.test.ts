@@ -230,6 +230,8 @@ describe('subjectPrewarmCurriculum', () => {
       'Tea',
       'The tea plant and drink',
       12,
+      undefined,
+      { conversationLanguage: undefined },
     );
     expect(persistBookTopicsSpy).toHaveBeenCalledWith(
       mockDb,

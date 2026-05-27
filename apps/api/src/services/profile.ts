@@ -313,6 +313,13 @@ export async function createProfile(
       birthYear,
       location: input.location ?? null,
       isOwner: isOwner ?? false,
+      // i18n Phase 1 — close the first-render race. When omitted, Drizzle
+      // skips the column and the DB default 'en' applies. When the mobile
+      // client forwards i18next.language, the very first LLM call on the new
+      // profile uses the device locale rather than English.
+      ...(input.conversationLanguage !== undefined
+        ? { conversationLanguage: input.conversationLanguage }
+        : {}),
     })
     .returning();
 

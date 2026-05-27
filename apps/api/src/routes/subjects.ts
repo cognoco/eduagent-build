@@ -15,7 +15,10 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
+import {
+  requireProfileId,
+  type ProfileMeta,
+} from '../middleware/profile-scope';
 import {
   listSubjects,
   createSubjectWithStructure,
@@ -28,6 +31,7 @@ import {
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError, SubjectNotFoundError } from '../errors';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 type SubjectRouteEnv = {
@@ -36,6 +40,7 @@ type SubjectRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -94,7 +99,13 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     // which converts UpstreamLlmError → 502 LLM_UNAVAILABLE and captures all
     // others to Sentry. The old try/catch was masking quota and LLM errors
     // as generic 500s, making them invisible in Sentry.
-    const result = await createSubjectWithStructure(db, profileId, input);
+    // i18n Phase 1 — thread conversation_language into subject-structure LLM.
+    const subjectProfileMeta = c.get('profileMeta');
+    const result = await createSubjectWithStructure(db, profileId, input, {
+      conversationLanguage: parseConversationLanguage(
+        subjectProfileMeta?.conversationLanguage,
+      ),
+    });
     return c.json(createSubjectWithStructureResponseSchema.parse(result), 201);
   })
   .put(

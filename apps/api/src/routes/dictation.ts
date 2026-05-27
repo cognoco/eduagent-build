@@ -18,6 +18,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError, validationError } from '../errors';
 import {
@@ -102,7 +103,15 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     async (c) => {
       requireProfileId(c.get('profileId'));
       const { text } = c.req.valid('json');
-      const result = await prepareHomework(text);
+      // i18n Phase 1 — read conversation_language from the active profile so
+      // the LLM-detected language detection still produces the JSON in the
+      // learner's locale.
+      const profileMeta = c.get('profileMeta');
+      const result = await prepareHomework(text, {
+        conversationLanguage: parseConversationLanguage(
+          profileMeta?.conversationLanguage,
+        ),
+      });
       return c.json(prepareHomeworkOutputSchema.parse(result), 200);
     },
   )
@@ -127,7 +136,13 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       profileId,
       profileMeta.birthYear,
     );
-    const result = await generateDictation(ctx);
+    // i18n Phase 1 — forward the learner's UI locale into the dictation LLM.
+    const result = await generateDictation({
+      ...ctx,
+      conversationLanguage: parseConversationLanguage(
+        profileMeta?.conversationLanguage,
+      ),
+    });
 
     return c.json(generateDictationOutputSchema.parse(result), 200);
   })
@@ -279,6 +294,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         language: input.language,
         ageYears,
         recentStruggles,
+        // i18n Phase 1 — feedback prose follows the learner's UI locale.
+        conversationLanguage: parseConversationLanguage(
+          profileMeta?.conversationLanguage,
+        ),
       });
 
       return c.json(dictationReviewResultSchema.parse(result), 200);
