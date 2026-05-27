@@ -2398,6 +2398,34 @@ describe('getFamilyPoolStatus', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null for free tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'free' });
+    const pool = mockQuotaPoolRow({ monthlyLimit: 500, usedThisMonth: 42 });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+      selectResult: [{ count: 1 }],
+    });
+
+    const result = await getFamilyPoolStatus(db, subscriptionId);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for plus tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus' });
+    const pool = mockQuotaPoolRow({ monthlyLimit: 500, usedThisMonth: 42 });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+      selectResult: [{ count: 1 }],
+    });
+
+    const result = await getFamilyPoolStatus(db, subscriptionId);
+
+    expect(result).toBeNull();
+  });
+
   it('returns pool status for family tier', async () => {
     const sub = mockSubscriptionRow({ tier: 'family' });
     const pool = mockQuotaPoolRow({ monthlyLimit: 1500, usedThisMonth: 300 });

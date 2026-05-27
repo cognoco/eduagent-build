@@ -661,6 +661,13 @@ export async function getFamilyPoolStatus(
     return null;
   }
 
+  // Only family and pro tiers have a family-capable quota pool path.
+  // Return null early so the caller's route schema can map this to
+  // the existing 404 response instead of parsing an invalid tier.
+  if (sub.tier !== 'family' && sub.tier !== 'pro') {
+    return null;
+  }
+
   const pool = await findQuotaPool__unscoped(db, subscriptionId);
 
   if (!pool) {
