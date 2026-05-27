@@ -19,6 +19,7 @@ Notes:
 - Every adult can still be a student. Mentor/Family access must not remove or weaken the adult's own Study flows.
 - These flows should keep working as they do today unless a row explicitly says the entry point changes.
 - Mentor-only flow IDs are owned by `docs/flows/mentor-flow-access-inventory.md`. This document only keeps Study flows and Study-side bridges that affect whether the active learner can keep studying.
+- Student-owned direct activity IDs live here, not in the mentor inventory: Study home/empty/resume states, active-learner chat/homework classifier fallbacks, freeform/guided learning, practice, quiz, dictation, homework capture/tutoring, and saved bookmarks.
 
 ## Student Audience Contract
 
@@ -99,7 +100,7 @@ Notes:
 | LEARN-17 through LEARN-21 | All students | Progress tab, subject progress, streaks, milestones, and vocabulary browser show the active student's own progress in Study mode. |
 | LEARN-22 | Language-learning students | Per-subject vocabulary list belongs to the active student's subject. |
 | LEARN-23 | Session owner; mentor read access is separate | Read-only transcript is available for the active student's own completed sessions. Parent/mentor recap access should use mentor routes, not student transcript ownership. |
-| LEARN-24 | All students | Saved bookmarks show the active student's saved messages and allow delete where the active role permits it. |
+| LEARN-24 | All students | Saved bookmarks show the active student's saved messages and allow delete where the active role permits it. Parent/mentor access would need a separate parent-readable bookmark view; retained proxy delete restrictions do not redefine Study ownership. |
 | LEARN-26 | All students | First-curriculum session entry creates the first materialized session for the active student's subject. |
 
 ## Practice, Quiz, And Dictation

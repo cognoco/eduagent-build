@@ -29,6 +29,7 @@ Notes:
 - Adults can be both students and mentors. Mentor access must not replace the adult's own Study flows.
 - Mentor mode should expose parent-native child review/support surfaces. Normal mentor review should not require parent proxy/view-as-child mode.
 - Mentor-only rows that were previously listed as exclusions in the student inventory are owned here: `PARENT-*`, child memory/consent management, parent gateway/navigation/setup, child reports, and parent-facing cross-cutting vocabulary.
+- Student-only direct activity rows are owned by `docs/flows/student-flow-access-inventory.md` and are not duplicated here.
 
 ## Mentor Audience Contract
 
@@ -71,11 +72,9 @@ Notes:
 
 | Original ID | Mentor access | How it should work |
 | --- | --- | --- |
-| HOME-01 | Bridge only | Learner home is the adult's Study surface. From Mentor mode, use an explicit switch/bridge to Study if the adult wants to learn. |
 | HOME-02 | Adult owners with family access | Parent gateway home becomes the Family/Children home target. It should summarize children and route into child detail, Recaps, Progress, setup, or account actions. Current app mounts `LearnerScreen` at `/(app)/home`; the `ParentHomeScreen` branch activates inside `LearnerScreen` only when mode=family. |
 | HOME-03 | Adult owners with family access | Parent-mode navigation target is `home`, `recaps`, `progress`, `more`, not the old guardian hybrid tab set. Current V0 entry may start family-capable adults on adult Study/My Learning with a `Children` switch before the Family branch is shown. |
 | HOME-04 | All users | Animated splash and initial shell remain shared. |
-| HOME-05, HOME-06 | Bridge only | Empty first-user and resume-session states are Study concerns for the adult as learner, not mentor child-review surfaces. |
 | HOME-07 | Adult owners without child links | Add-first-child/family setup is a mentor setup state, not the final Family tab shell. It must offer continue-studying/skip paths. Current Study-mode entry is the learner-home `Set up Family` CTA for eligible adult owners, which leads to More and then Add child rather than a parent-home-only branch. |
 | HOME-08 | All app contexts | Home loading-timeout fallback must recover to a Mentor-safe root when in Mentor mode. |
 
@@ -84,7 +83,6 @@ Notes:
 | Original ID | Mentor access | How it should work |
 | --- | --- | --- |
 | SUBJECT-01, SUBJECT-02 | Through child curriculum only | Creating a subject for a child should reuse the subject creation behavior but launch from child cards/details, scoped to the child, not from the adult top-level Library. |
-| SUBJECT-03, SUBJECT-04 | Not a normal Mentor route | Chat/homework classifier fallbacks are active-learner flows. If a mentor wants to study the topic, bridge to adult Study. |
 | SUBJECT-05 through SUBJECT-07 | Through child curriculum where supported | Subject resolution, broad/focused subject, and focused-book flows can be reused for child curriculum management if launched from a child route and scoped to that child. |
 | SUBJECT-08 | Child language subject setup where supported | Per-subject language setup belongs to the child learner's subject when a mentor is managing child curriculum. |
 | SUBJECT-12 | Child curriculum view | View curriculum without starting a student session should be reachable from child curriculum/detail surfaces. |
@@ -112,18 +110,12 @@ These are mentor-owned flows. They are not duplicated in the student inventory a
 | PARENT-13 | Adult owners with child access | Child weekly report detail remains push/deep-link capable and marks reports viewed on mount. |
 | LEARN-07, LEARN-23 | Read-only source material for mentor recaps | Student session summary/transcript behavior stays owned by the student. Mentor access should use parent-native recap/session routes and family-link checks. |
 | LEARN-17 through LEARN-21 | Family progress only | In Mentor mode, Progress is child/family progress only. It must exclude the adult's own progress. |
-| LEARN-24 | Not a normal Mentor surface | Saved bookmarks are student-owned. Parent proxy delete restrictions are compatibility behavior, not the target mentor UX. |
 
-## Learning, Practice, Homework, Quiz, And Dictation
+## Child Curriculum Bridges
 
 | Original ID | Mentor access | How it should work |
 | --- | --- | --- |
-| LEARN-01 through LEARN-06 | Bridge to adult Study | Freeform chat, guided sessions, core learning, coach bubbles, and voice controls are not directly surfaced in Mentor mode. If the adult wants to learn, switch to Study as the adult. |
 | LEARN-08 through LEARN-16, LEARN-22, LEARN-25, LEARN-26 | Child curriculum or adult Study, depending on entry | Library/book/topic/review/vocabulary behavior remains student-owned. Mentor mode can expose child curriculum read/manage paths, but learning sessions and writes must be clearly scoped to the child or bridge to adult Study. |
-| PRACTICE-01 through PRACTICE-04 | Not directly surfaced | Practice hub and recitation/review activities are student flows. Mentor mode may link to them only by switching the adult into Study as themselves. |
-| QUIZ-01 through QUIZ-13 | Not directly surfaced | Quiz is a student activity. Mentor mode may show child quiz history/recaps only through parent-native review surfaces, not by launching a child quiz as the mentor. |
-| DICT-01 through DICT-10 | Not directly surfaced | Dictation is a student activity. Mentor mode may show child progress/recaps, but dictation playback/review remains active-student work. |
-| HOMEWORK-01 through HOMEWORK-07 | Not directly surfaced as child impersonation | Homework capture/tutoring is a student flow. A mentor can help through review/support surfaces or switch to Study as themselves; normal mentor mode should not start child homework by proxy unless a separately designed guardian-assist flow exists. |
 
 ## Recaps Target
 
@@ -160,18 +152,6 @@ The original inventory did not have a first-class Recaps flow. The target Mentor
 | CC-12 | Feedback sheet applies to gates and More in mentor contexts. |
 | CC-17 | Profile-as-lens pattern is especially important for child routes: child profile IDs must come through the navigation lens and server checks, not screen-level guesses. |
 | CC-18 | Stable list refs apply to child lists, Recaps feed, reports, and family progress. |
-
-## Student Flows Excluded From Mentor Surface
-
-| Original ID | Mentor behavior |
-| --- | --- |
-| HOME-01, HOME-05, HOME-06 | Not surfaced in Mentor mode except through an explicit switch to Study. |
-| LEARN-01 through LEARN-06 | Adult can access these as a student, not as a mentor acting on a child. |
-| PRACTICE-01 through PRACTICE-04 | Student-only direct activity surface. |
-| QUIZ-01 through QUIZ-13 | Student-only direct activity surface; mentor can review outcomes only where parent-native review exists. |
-| DICT-01 through DICT-10 | Student-only direct activity surface; mentor can review outcomes only where parent-native review exists. |
-| HOMEWORK-01 through HOMEWORK-07 | Student-only direct capture/tutoring surface unless a future guardian-assist flow is explicitly designed. |
-| LEARN-24 | Saved bookmarks remain student-owned unless a separate parent-readable bookmark view is designed. |
 
 ## Validation Focus
 
