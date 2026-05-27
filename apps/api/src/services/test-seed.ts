@@ -4672,13 +4672,23 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
 
   // Daily quota maxed; monthly bucket deliberately well below cap so the
   // failure attributable to the daily gate, not the monthly one.
+  // Fail-fast on the tier-config invariant — the whole point of this seed is
+  // an exhausted daily cap, which only makes sense if the tier has one. A
+  // silent `?? 10` fallback would mask future config drift and the structural
+  // test (`usedToday === dailyLimit`) would surface as a confusing
+  // `10 === 0` failure instead of an actionable error.
+  if (freeTier.dailyLimit == null) {
+    throw new Error(
+      'family-owner-daily-quota-with-child: free tier has no dailyLimit — cannot seed an exhausted-daily scenario',
+    );
+  }
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
     monthlyLimit: freeTier.monthlyQuota,
     usedThisMonth: 12,
     dailyLimit: freeTier.dailyLimit,
-    usedToday: freeTier.dailyLimit ?? 10,
+    usedToday: freeTier.dailyLimit,
     cycleResetAt: futureDate(30),
   });
 
@@ -4759,6 +4769,16 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
  *  active-profile state). The seed-side guarantee is the **precondition**:
  *  adult library deliberately holds a *different* subject name so the bridge
  *  flow is exercising the "topic not yet in adult library" branch.
+ *
+ *  Caller prerequisite: the owner is created WITHOUT
+ *  `defaultAppContext: 'family'` (intentionally — this seed is about the
+ *  backstack contract, not about app-context defaults). Callers MUST switch
+ *  the app into Family mode before deep-linking to the child surfaces,
+ *  otherwise the `showLearnThisToo` navigation gate hides the
+ *  Add-to-my-learning button and the bridge flow cannot be exercised. The
+ *  paired probe does this via `switchAppMode(page, 'family')`; any other
+ *  caller (future Chrome automation, ad-hoc Playwright) needs the equivalent
+ *  step.
  *
  *  Idempotency note: the account-level cleanup performed by `seedScenario`
  *  (clerk_seed_* prefix) wipes any prior adult-side copy before reseeding,
