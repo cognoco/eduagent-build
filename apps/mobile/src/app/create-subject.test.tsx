@@ -1597,6 +1597,62 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
       jest.useRealTimers();
     }
   });
+
+  it('keeps the timeout retry UI and ignores a direct-match resolve that completes after the 30s timeout', async () => {
+    jest.useFakeTimers();
+    try {
+      let resolveLate!: (value: unknown) => void;
+      const pendingResolve = new Promise<unknown>((resolve) => {
+        resolveLate = resolve;
+      });
+
+      mockFetch.setRoute('/subjects/resolve', () => pendingResolve);
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      await enterSubjectName('Geometry');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      await waitFor(() => {
+        screen.getByTestId('subject-book-loading');
+        screen.getByText('Checking subject name...');
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.getByTestId('resolve-timeout-retry')).toBeTruthy();
+
+      await act(async () => {
+        resolveLate({
+          status: 'direct_match',
+          resolvedName: 'Geometry',
+          suggestions: [],
+          displayMessage: 'Geometry it is.',
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const navigatedToSessionOrReady = mockReplace.mock.calls.some((call) => {
+        const target = call[0];
+        return (
+          typeof target === 'object' &&
+          target !== null &&
+          'pathname' in target &&
+          (target.pathname === '/(app)/session' || target.pathname === '/ready')
+        );
+      });
+
+      expect(navigatedToSessionOrReady).toBe(false);
+      expect(screen.getByTestId('resolve-timeout-retry')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 // [BUG-829] KeyboardAvoidingView behavior prop must use Platform.select

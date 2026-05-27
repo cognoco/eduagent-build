@@ -256,6 +256,10 @@ function CreateSubjectScreenAuthenticated() {
         resolveTimeoutRef.current = null;
       }
       const handle = setTimeout(() => {
+        // Mark all in-flight resolve/create work as cancelled so late
+        // responses cannot drive navigation after the timeout has already
+        // shown the retry UI.
+        cancelledRef.current = true;
         setResolveTimedOut(true);
         setResolveState({ phase: 'idle' });
         setError(t('subject.resolveTookTooLong'));
