@@ -189,6 +189,7 @@ describe('book-generation', () => {
         ]),
         3,
         expect.objectContaining({
+          flow: 'book.generation',
           providerPolicy: 'gemini_only',
           responseFormat: 'json',
         }),
@@ -245,6 +246,7 @@ describe('book-generation', () => {
         ]),
         3,
         expect.objectContaining({
+          flow: 'book.generation',
           providerPolicy: 'gemini_only',
           responseFormat: 'json',
         }),
@@ -284,6 +286,7 @@ describe('book-generation', () => {
         ]),
         3,
         expect.objectContaining({
+          flow: 'book.generation',
           providerPolicy: 'gemini_only',
           responseFormat: 'json',
         }),
@@ -473,6 +476,7 @@ describe('book-generation', () => {
         ]),
         3,
         expect.objectContaining({
+          flow: 'book.generation',
           providerPolicy: 'gemini_only',
           responseFormat: 'json',
         }),

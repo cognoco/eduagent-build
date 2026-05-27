@@ -1161,6 +1161,21 @@ export async function routeAndStream(
     responseFormat?: 'json';
   },
 ): Promise<StreamResult> {
+  // i18n Phase 1 — same tripwire as routeAndCall. Streaming flows go through
+  // their own entry point, so the warn block has to be duplicated here to
+  // cover learner-facing surfaces that stream (e.g. exchange.process) from
+  // partially reverting.
+  if (
+    options?.flow &&
+    LEARNER_FACING_FLOWS.has(options.flow) &&
+    !options.conversationLanguage
+  ) {
+    logger.warn('llm.language.missing', {
+      flow: options.flow,
+      session_id: options.sessionId ?? null,
+      surface: 'stream',
+    });
+  }
   const capability = getMessageCapability(messages);
   const safeMessages = withSafetyPreamble(messages, options?.ageBracket, {
     conversationLanguage: options?.conversationLanguage,
