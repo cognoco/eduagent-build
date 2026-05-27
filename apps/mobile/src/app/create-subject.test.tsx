@@ -1597,6 +1597,182 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
       jest.useRealTimers();
     }
   });
+
+  it('keeps the timeout retry UI and ignores a direct-match resolve that completes after the 30s timeout', async () => {
+    jest.useFakeTimers();
+    try {
+      let resolveLate!: (value: unknown) => void;
+      const pendingResolve = new Promise<unknown>((resolve) => {
+        resolveLate = resolve;
+      });
+
+      mockFetch.setRoute('/subjects/resolve', () => pendingResolve);
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      await enterSubjectName('Geometry');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      await waitFor(() => {
+        screen.getByTestId('subject-book-loading');
+        screen.getByText('Checking subject name...');
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.getByTestId('resolve-timeout-retry')).toBeTruthy();
+
+      await act(async () => {
+        resolveLate({
+          status: 'direct_match',
+          resolvedName: 'Geometry',
+          suggestions: [],
+          displayMessage: 'Geometry it is.',
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const navigatedToSessionOrReady = mockReplace.mock.calls.some((call) => {
+        const target = call[0];
+        return (
+          typeof target === 'object' &&
+          target !== null &&
+          'pathname' in target &&
+          (target.pathname === '/(app)/session' || target.pathname === '/ready')
+        );
+      });
+
+      expect(navigatedToSessionOrReady).toBe(false);
+      expect(screen.getByTestId('resolve-timeout-retry')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps a timed-out resolve stale after retry starts a new resolve attempt', async () => {
+    jest.useFakeTimers();
+    try {
+      let resolveFirst!: (value: unknown) => void;
+      let resolveSecond!: (value: unknown) => void;
+      const firstResolve = new Promise<unknown>((resolve) => {
+        resolveFirst = resolve;
+      });
+      const secondResolve = new Promise<unknown>((resolve) => {
+        resolveSecond = resolve;
+      });
+      let resolveCalls = 0;
+      const createdSubjectNames: string[] = [];
+
+      mockFetch.setRoute('/subjects/resolve', () => {
+        resolveCalls++;
+        return resolveCalls === 1 ? firstResolve : secondResolve;
+      });
+      mockFetch.setRoute('/subjects', (_url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          const body = extractJsonBody(init) as { name?: string };
+          const subjectName = body.name ?? 'Subject';
+          createdSubjectNames.push(subjectName);
+          return {
+            subject: {
+              id: `subject-${createdSubjectNames.length}`,
+              name: subjectName,
+            },
+          };
+        }
+        return { subjects: [] };
+      });
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      await enterSubjectName('Geometry');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      await waitFor(() => {
+        screen.getByTestId('subject-book-loading');
+        screen.getByText('Checking subject name...');
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      fireEvent.press(screen.getByTestId('resolve-timeout-retry'));
+
+      await waitFor(() => {
+        expect(resolveCalls).toBe(2);
+      });
+
+      await act(async () => {
+        resolveFirst({
+          status: 'direct_match',
+          resolvedName: 'Stale Geometry',
+          suggestions: [],
+          displayMessage: 'Stale Geometry it is.',
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const navigatedWithStaleSubject = mockReplace.mock.calls.some((call) => {
+        const target = call[0];
+        return (
+          typeof target === 'object' &&
+          target !== null &&
+          'params' in target &&
+          target.params !== null &&
+          typeof target.params === 'object' &&
+          (('subjectName' in target.params &&
+            target.params.subjectName === 'Stale Geometry') ||
+            ('subject' in target.params &&
+              target.params.subject === 'Stale Geometry'))
+        );
+      });
+
+      expect(navigatedWithStaleSubject).toBe(false);
+      expect(createdSubjectNames).not.toContain('Stale Geometry');
+      expect(screen.getByTestId('subject-book-loading')).toBeTruthy();
+
+      await act(async () => {
+        resolveSecond({
+          status: 'direct_match',
+          resolvedName: 'Fresh Geometry',
+          suggestions: [],
+          displayMessage: 'Fresh Geometry it is.',
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const navigatedWithFreshSubject = mockReplace.mock.calls.some((call) => {
+        const target = call[0];
+        return (
+          typeof target === 'object' &&
+          target !== null &&
+          'params' in target &&
+          target.params !== null &&
+          typeof target.params === 'object' &&
+          (('subjectName' in target.params &&
+            target.params.subjectName === 'Fresh Geometry') ||
+            ('subject' in target.params &&
+              target.params.subject === 'Fresh Geometry'))
+        );
+      });
+
+      expect(navigatedWithFreshSubject).toBe(true);
+      expect(createdSubjectNames).toEqual(['Fresh Geometry']);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 // [BUG-829] KeyboardAvoidingView behavior prop must use Platform.select
