@@ -16,8 +16,8 @@ import {
 import {
   bookSuggestionsResponseSchema,
   bookSuggestionsArrayResponseSchema,
-  type ConversationLanguage,
 } from '@eduagent/schemas';
+import { parseConversationLanguage } from '../services/llm';
 
 type BookSuggestionsEnv = {
   Bindings: { DATABASE_URL: string };
@@ -79,11 +79,9 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
         profileId,
         subjectId,
         {
-          conversationLanguage:
-            (profileMeta?.conversationLanguage as
-              | ConversationLanguage
-              | null
-              | undefined) ?? undefined,
+          conversationLanguage: parseConversationLanguage(
+            profileMeta?.conversationLanguage,
+          ),
         },
       );
       return c.json(bookSuggestionsResponseSchema.parse(result), 200);

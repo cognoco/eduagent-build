@@ -13,6 +13,7 @@ import {
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 import { getProfileAge } from '../../services/profile';
@@ -117,12 +118,10 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           bookTitle: book.title,
           bookDescription: book.description ?? '',
           learnerAge: await getProfileAge(db, profileId),
-          // DB returns string | null; cast to union before passing forward.
-          conversationLanguage:
-            (langRow?.conversationLanguage as
-              | ConversationLanguage
-              | null
-              | undefined) ?? undefined,
+          // DB returns string | null; parse to union before passing forward.
+          conversationLanguage: parseConversationLanguage(
+            langRow?.conversationLanguage,
+          ),
         };
       },
     );

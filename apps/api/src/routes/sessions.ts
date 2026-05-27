@@ -26,7 +26,6 @@ import {
   sessionAutoFileRequestedEventSchema,
   UpstreamLlmError,
   getSubjectSessionsResponseSchema,
-  type ConversationLanguage,
   type SubscriptionTier,
   type QuotaModel,
 } from '@eduagent/schemas';
@@ -88,7 +87,7 @@ import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
 } from '../services/idempotency-marker';
-import { CircuitOpenError } from '../services/llm';
+import { CircuitOpenError, parseConversationLanguage } from '../services/llm';
 import {
   isChallengeRoundRuntimeEnabled,
   isTopicIntentMatcherEnabled,
@@ -1412,11 +1411,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         sessionId,
         c.req.valid('json'),
         {
-          conversationLanguage:
-            (summaryProfileMeta?.conversationLanguage as
-              | ConversationLanguage
-              | null
-              | undefined) ?? undefined,
+          conversationLanguage: parseConversationLanguage(
+            summaryProfileMeta?.conversationLanguage,
+          ),
         },
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
@@ -1493,11 +1490,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // matches the learner's selected UI language.
       const profileMeta = c.get('profileMeta');
       const result = await generateRecallBridge(db, profileId, sessionId, {
-        conversationLanguage:
-          (profileMeta?.conversationLanguage as
-            | ConversationLanguage
-            | null
-            | undefined) ?? undefined,
+        conversationLanguage: parseConversationLanguage(
+          profileMeta?.conversationLanguage,
+        ),
       });
       // [L8-F9] Validate response shape against the public contract.
       return c.json(recallBridgeResultSchema.parse(result));

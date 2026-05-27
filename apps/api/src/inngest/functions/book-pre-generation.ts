@@ -10,10 +10,8 @@ import { NonRetriableError } from 'inngest';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { curriculumBooks, profiles, subjects } from '@eduagent/database';
-import {
-  bookTopicsGeneratedEventSchema,
-  type ConversationLanguage,
-} from '@eduagent/schemas';
+import { bookTopicsGeneratedEventSchema } from '@eduagent/schemas';
+import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
 
@@ -123,11 +121,9 @@ export const bookPreGeneration = inngest.createFunction(
         learnerAge,
         // i18n Phase 1 — surfaced topic titles render to the learner.
         // DB returns string | null; cast to the union before passing forward.
-        conversationLanguage:
-          (profile?.conversationLanguage as
-            | ConversationLanguage
-            | null
-            | undefined) ?? undefined,
+        conversationLanguage: parseConversationLanguage(
+          profile?.conversationLanguage,
+        ),
       };
     });
 

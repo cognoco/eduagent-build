@@ -10,9 +10,9 @@ import {
   chatExchangeSchema,
   declineAssessmentRefreshResponseSchema,
   getActiveAssessmentResponseSchema,
-  type ConversationLanguage,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
@@ -169,11 +169,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
               // service signature drifts.
               {
                 assessmentStatus: snapshot.status,
-                conversationLanguage:
-                  (assessmentProfileMeta?.conversationLanguage as
-                    | ConversationLanguage
-                    | null
-                    | undefined) ?? undefined,
+                conversationLanguage: parseConversationLanguage(
+                  assessmentProfileMeta?.conversationLanguage,
+                ),
               },
             );
 
@@ -383,11 +381,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         },
         answer,
         {
-          conversationLanguage:
-            (quickCheckProfileMeta?.conversationLanguage as
-              | ConversationLanguage
-              | null
-              | undefined) ?? undefined,
+          conversationLanguage: parseConversationLanguage(
+            quickCheckProfileMeta?.conversationLanguage,
+          ),
         },
       );
 

@@ -54,12 +54,12 @@ import {
   type Database,
 } from '@eduagent/database';
 import { projectAiResponseContent } from '../../services/llm/project-response';
+import { parseConversationLanguage } from '../../services/llm';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   cefrLevelSchema,
   computeAgeBracket,
   verificationTypeSchema,
-  type ConversationLanguage,
 } from '@eduagent/schemas';
 import {
   analyzeSessionTranscript,
@@ -1029,12 +1029,10 @@ export const sessionCompleted = inngest.createFunction(
 
             const result = await generateSessionInsights(transcriptText, {
               ageBracket,
-              // DB returns string | null; cast to union before passing to LLM.
-              conversationLanguage:
-                (profileForBracket?.conversationLanguage as
-                  | ConversationLanguage
-                  | null
-                  | undefined) ?? undefined,
+              // DB returns string | null; parse to union before passing to LLM.
+              conversationLanguage: parseConversationLanguage(
+                profileForBracket?.conversationLanguage,
+              ),
             });
 
             if (result.valid) {
@@ -1189,12 +1187,10 @@ export const sessionCompleted = inngest.createFunction(
             exchangeCount: exchangeCount ?? 0,
             birthYear: profile.birthYear,
             // i18n Phase 1 — thread the learner's UI locale into the recap LLM.
-            // DB returns string | null; cast to union before passing forward.
-            conversationLanguage:
-              (profile.conversationLanguage as
-                | ConversationLanguage
-                | null
-                | undefined) ?? undefined,
+            // DB returns string | null; parse to union before passing forward.
+            conversationLanguage: parseConversationLanguage(
+              profile?.conversationLanguage,
+            ),
           });
 
           if (!recap) {
@@ -1274,12 +1270,10 @@ export const sessionCompleted = inngest.createFunction(
             summaryId: summaryRow.id,
             subjectId: subjectId ?? null,
             topicId: topicId ?? null,
-            // DB returns string | null; cast to union before passing to LLM.
-            conversationLanguage:
-              (llmSummaryProfile?.conversationLanguage as
-                | ConversationLanguage
-                | null
-                | undefined) ?? undefined,
+            // DB returns string | null; parse to union before passing to LLM.
+            conversationLanguage: parseConversationLanguage(
+              llmSummaryProfile?.conversationLanguage,
+            ),
           });
 
           if (!summary) {
@@ -1698,12 +1692,10 @@ export const sessionCompleted = inngest.createFunction(
             .where(eq(profiles.id, profileId))
             .limit(1);
           await extractAndStoreHomeworkSummary(db, profileId, sessionId, {
-            // DB returns string | null; cast to union before passing to LLM.
-            conversationLanguage:
-              (homeworkProfile?.conversationLanguage as
-                | ConversationLanguage
-                | null
-                | undefined) ?? undefined,
+            // DB returns string | null; parse to union before passing to LLM.
+            conversationLanguage: parseConversationLanguage(
+              homeworkProfile?.conversationLanguage,
+            ),
           });
         });
       }),

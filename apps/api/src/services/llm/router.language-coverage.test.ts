@@ -96,11 +96,18 @@ interface CallSite {
  * (no `typescript` import — this is a structural existence check).
  */
 /**
- * Replace comment bodies with spaces (preserving newlines so line numbers
- * stay stable) so the regex scan in findRouteAndCallSites doesn't match
- * `routeAndCall(` mentions inside JSDoc or `//` comments — only real call
- * sites. String bodies are NOT masked here because the brace-balanced walk
- * needs to see them to track string state.
+ * Replace comment AND string-literal bodies with spaces (preserving newlines
+ * so line numbers stay stable) so the regex scan in findRouteAndCallSites
+ * doesn't false-match on `routeAndCall(` substrings that appear inside JSDoc,
+ * `//` comments, or string literals (e.g. an interpolated error message that
+ * mentions the function name).
+ *
+ * Quote characters themselves are preserved so the downstream brace-balanced
+ * walk's string-state tracking still has the open/close anchors it needs;
+ * only the *content* between quotes is blanked. Template-literal `${expr}`
+ * holes are treated as opaque (their text is also blanked) — this is safe
+ * for the static scan because a `routeAndCall(` site inside an interpolation
+ * would not be a real call site anyway.
  */
 function maskComments(src: string): string {
   let out = '';
@@ -111,12 +118,20 @@ function maskComments(src: string): string {
     const next = src[i + 1];
     if (stringQuote) {
       if (ch === '\\') {
-        out += ch + (next ?? '');
+        // Preserve the escape sequence's length so subsequent offsets/lines
+        // stay accurate; blank the actual characters.
+        out += next === '\n' ? ' \n' : '  ';
         i += 2;
         continue;
       }
-      if (ch === stringQuote) stringQuote = null;
-      out += ch;
+      if (ch === stringQuote) {
+        stringQuote = null;
+        out += ch;
+        i++;
+        continue;
+      }
+      // Inside a string body — blank, preserving newlines for line numbers.
+      out += ch === '\n' ? '\n' : ' ';
       i++;
       continue;
     }
@@ -140,7 +155,12 @@ function maskComments(src: string): string {
       }
       continue;
     }
-    if (ch === '"' || ch === "'" || ch === '`') stringQuote = ch;
+    if (ch === '"' || ch === "'" || ch === '`') {
+      stringQuote = ch;
+      out += ch;
+      i++;
+      continue;
+    }
     out += ch;
     i++;
   }

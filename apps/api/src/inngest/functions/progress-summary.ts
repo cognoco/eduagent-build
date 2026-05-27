@@ -1,10 +1,9 @@
 // @inngest-admin: parent-chain (learningSessions and familyLinks queried with profileId enforced)
 import { and, desc, eq } from 'drizzle-orm';
 import { familyLinks, learningSessions, profiles } from '@eduagent/database';
-import { type ConversationLanguage } from '@eduagent/schemas';
-
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { parseConversationLanguage } from '../../services/llm';
 import { buildKnowledgeInventory } from '../../services/snapshot-aggregation';
 import {
   deterministicProgressSummaryFallback,
@@ -87,12 +86,10 @@ export const progressSummaryGeneration = inngest.createFunction(
         latestSessionId: latestSession.id,
         latestSessionAt: latestSession.startedAt,
         inventory,
-        // DB returns string | null; cast to union before passing to LLM call.
-        conversationLanguage:
-          (profile.conversationLanguage as
-            | ConversationLanguage
-            | null
-            | undefined) ?? undefined,
+        // DB returns string | null; parse to union before passing to LLM call.
+        conversationLanguage: parseConversationLanguage(
+          profile.conversationLanguage,
+        ),
       };
     });
 

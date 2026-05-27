@@ -18,12 +18,12 @@ import {
   challengeCurriculumResponseSchema,
   explainTopicResponseSchema,
   ERROR_CODES,
-  type ConversationLanguage,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   getCurriculum,
@@ -251,11 +251,9 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         subjectId,
         topicId,
         {
-          conversationLanguage:
-            (profileMeta?.conversationLanguage as
-              | ConversationLanguage
-              | null
-              | undefined) ?? undefined,
+          conversationLanguage: parseConversationLanguage(
+            profileMeta?.conversationLanguage,
+          ),
         },
       );
       return c.json(explainTopicResponseSchema.parse({ explanation }));

@@ -12,13 +12,13 @@ import {
   dictationStreakSchema,
   DICTATION_REVIEW_MAX_PROMPT_CHARS,
   ERROR_CODES,
-  type ConversationLanguage,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError, validationError } from '../errors';
 import {
@@ -108,11 +108,9 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       // learner's locale.
       const profileMeta = c.get('profileMeta');
       const result = await prepareHomework(text, {
-        conversationLanguage:
-          (profileMeta?.conversationLanguage as
-            | ConversationLanguage
-            | null
-            | undefined) ?? undefined,
+        conversationLanguage: parseConversationLanguage(
+          profileMeta?.conversationLanguage,
+        ),
       });
       return c.json(prepareHomeworkOutputSchema.parse(result), 200);
     },
@@ -141,11 +139,9 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     // i18n Phase 1 — forward the learner's UI locale into the dictation LLM.
     const result = await generateDictation({
       ...ctx,
-      conversationLanguage:
-        (profileMeta.conversationLanguage as
-          | ConversationLanguage
-          | null
-          | undefined) ?? undefined,
+      conversationLanguage: parseConversationLanguage(
+        profileMeta?.conversationLanguage,
+      ),
     });
 
     return c.json(generateDictationOutputSchema.parse(result), 200);
@@ -299,11 +295,9 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         ageYears,
         recentStruggles,
         // i18n Phase 1 — feedback prose follows the learner's UI locale.
-        conversationLanguage:
-          (profileMeta.conversationLanguage as
-            | ConversationLanguage
-            | null
-            | undefined) ?? undefined,
+        conversationLanguage: parseConversationLanguage(
+          profileMeta?.conversationLanguage,
+        ),
       });
 
       return c.json(dictationReviewResultSchema.parse(result), 200);

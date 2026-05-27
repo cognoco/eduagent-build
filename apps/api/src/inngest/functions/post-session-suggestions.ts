@@ -10,8 +10,7 @@ import {
   topicSuggestions,
   subjects,
 } from '@eduagent/database';
-import { type ConversationLanguage } from '@eduagent/schemas';
-import { routeAndCall } from '../../services/llm';
+import { routeAndCall, parseConversationLanguage } from '../../services/llm';
 import { isGdprProcessingAllowed } from '../../services/consent';
 import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
@@ -144,12 +143,10 @@ export const postSessionSuggestions = inngest.createFunction(
         where: eq(profiles.id, profileId),
         columns: { conversationLanguage: true },
       });
-      // DB returns string | null; cast to union before passing to LLM router.
-      const conversationLanguage =
-        (ownerProfile?.conversationLanguage as
-          | ConversationLanguage
-          | null
-          | undefined) ?? undefined;
+      // DB returns string | null; parse to union before passing to LLM router.
+      const conversationLanguage = parseConversationLanguage(
+        ownerProfile?.conversationLanguage,
+      );
 
       // [PROMPT-INJECT-8] book.title, book.description, topic titles, and
       // completedTopicTitle are all learner- or LLM-generated stored text.

@@ -12,7 +12,6 @@ import {
   subjectListResponseSchema,
   subjectResponseSchema,
   createSubjectWithStructureResponseSchema,
-  type ConversationLanguage,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -32,6 +31,7 @@ import {
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError, SubjectNotFoundError } from '../errors';
+import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 type SubjectRouteEnv = {
@@ -102,11 +102,9 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     // i18n Phase 1 — thread conversation_language into subject-structure LLM.
     const subjectProfileMeta = c.get('profileMeta');
     const result = await createSubjectWithStructure(db, profileId, input, {
-      conversationLanguage:
-        (subjectProfileMeta?.conversationLanguage as
-          | ConversationLanguage
-          | null
-          | undefined) ?? undefined,
+      conversationLanguage: parseConversationLanguage(
+        subjectProfileMeta?.conversationLanguage,
+      ),
     });
     return c.json(createSubjectWithStructureResponseSchema.parse(result), 201);
   })

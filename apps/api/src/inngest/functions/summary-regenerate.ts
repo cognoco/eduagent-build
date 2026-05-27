@@ -6,14 +6,11 @@ import {
   sessionSummaries,
 } from '@eduagent/database';
 import { NonRetriableError } from 'inngest';
-import type {
-  LlmSummary,
-  SummaryEventPayload,
-  ConversationLanguage,
-} from '@eduagent/schemas';
+import type { LlmSummary, SummaryEventPayload } from '@eduagent/schemas';
 import { summaryEventPayloadSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { parseConversationLanguage } from '../../services/llm';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import { generateLearnerRecap } from '../../services/session-recap';
@@ -117,12 +114,10 @@ async function regenerateLearnerRecapForSession(
     subjectId: sessionRow.subjectId,
     exchangeCount: sessionRow.exchangeCount ?? 0,
     birthYear: profile.birthYear,
-    // DB returns string | null; cast to union before passing to LLM call.
-    conversationLanguage:
-      (profile.conversationLanguage as
-        | ConversationLanguage
-        | null
-        | undefined) ?? undefined,
+    // DB returns string | null; parse to union before passing to LLM call.
+    conversationLanguage: parseConversationLanguage(
+      profile?.conversationLanguage,
+    ),
   });
 
   if (!recap) {
@@ -193,12 +188,10 @@ export const sessionSummaryCreate = inngest.createFunction(
         summaryId: summaryRow.id,
         subjectId: payload.subjectId ?? null,
         topicId: payload.topicId ?? null,
-        // DB returns string | null; cast to union before passing to LLM call.
-        conversationLanguage:
-          (createProfile?.conversationLanguage as
-            | ConversationLanguage
-            | null
-            | undefined) ?? undefined,
+        // DB returns string | null; parse to union before passing to LLM call.
+        conversationLanguage: parseConversationLanguage(
+          createProfile?.conversationLanguage,
+        ),
       });
 
       if (!summary) {
@@ -268,12 +261,10 @@ export const sessionSummaryRegenerate = inngest.createFunction(
         summaryId: payload.sessionSummaryId,
         subjectId: payload.subjectId ?? null,
         topicId: payload.topicId ?? null,
-        // DB returns string | null; cast to union before passing to LLM call.
-        conversationLanguage:
-          (regenerateProfile?.conversationLanguage as
-            | ConversationLanguage
-            | null
-            | undefined) ?? undefined,
+        // DB returns string | null; parse to union before passing to LLM call.
+        conversationLanguage: parseConversationLanguage(
+          regenerateProfile?.conversationLanguage,
+        ),
       });
 
       return {
