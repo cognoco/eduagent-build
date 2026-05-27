@@ -117,32 +117,36 @@ async function exerciseBridgeBackstack(
 }
 
 test.describe('Mentor audit BRIDGE-04 — bridge backstack contract', () => {
-  // One spec for all three surfaces — the cost of seeding + sign-in + mode
-  // switch dominates per-test time, so amortising across surfaces keeps the
-  // run fast without giving up per-surface assertions.
-  test('Add-to-my-learning → Open → goBack lands on the originating child/recap surface', async ({
-    page,
-  }) => {
-    const scenario = mentorAuditScenarios.bridgeBackstack;
+  // Each surface gets its own test + its own seed. Sharing a single seed
+  // across surfaces would pollute the adult library after the first
+  // Add-to-my-learning click, so the second + third surfaces would silently
+  // exercise the "already exists" toast branch instead of the "new clone"
+  // branch this contract cares about. Splitting also unconditionally
+  // re-asserts the Family-mode prerequisite per surface — `page.goto()`
+  // resets transient client state, and a single pre-loop `switchAppMode`
+  // would not survive a future change to mode-state persistence.
+  for (const surface of ENTRY_SURFACES) {
+    test(`Add-to-my-learning → Open → goBack lands on the originating ${surface.key} surface`, async ({
+      page,
+    }) => {
+      const scenario = mentorAuditScenarios.bridgeBackstack;
 
-    const seeded = await seedAndSignIn(page, {
-      scenario: scenario.seedScenario,
-      alias: scenario.key,
-      landingTestId: scenario.landingTestId,
-      landingPath: scenario.landingPath,
-    });
-
-    // Bridge UI gates on Family mode (showLearnThisToo). The seed produces a
-    // solo-default profile (no `defaultAppContext: 'family'`) so we must
-    // explicitly switch into Family before deep-linking to the child surfaces
-    // — otherwise the Add-to-my-learning button is hidden and the probe
-    // would fail on the visibility assertion above with a misleading message.
-    await switchAppMode(page, 'family');
-
-    for (const surface of ENTRY_SURFACES) {
-      await test.step(`bridge backstack from child ${surface.key}`, async () => {
-        await exerciseBridgeBackstack(page, surface, seeded.ids);
+      const seeded = await seedAndSignIn(page, {
+        scenario: scenario.seedScenario,
+        // Per-surface alias prevents Clerk email collisions when the project
+        // runs serially (fullyParallel: false on this Playwright project).
+        alias: `${scenario.key}-${surface.key}`,
+        landingTestId: scenario.landingTestId,
+        landingPath: scenario.landingPath,
       });
-    }
-  });
+
+      // Bridge UI gates on Family mode (showLearnThisToo). The seed
+      // intentionally creates the owner WITHOUT `defaultAppContext: 'family'`
+      // (see seedMentorAuditBridgeBackstack docstring), so each test must
+      // switch into Family before deep-linking to the child surfaces.
+      await switchAppMode(page, 'family');
+
+      await exerciseBridgeBackstack(page, surface, seeded.ids);
+    });
+  }
 });
