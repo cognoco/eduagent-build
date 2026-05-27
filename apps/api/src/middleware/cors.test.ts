@@ -118,6 +118,17 @@ describe('CORS middleware', () => {
 
       expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
     });
+
+    it('includes CORS headers on protected-route 401 responses', async () => {
+      const res = await app.request('/v1/profiles', {
+        headers: { Origin: 'http://127.0.0.1:19008' },
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
+        'http://127.0.0.1:19008',
+      );
+    });
   });
 
   // [BUG-245] Global hono/secure-headers middleware — the JSON API must

@@ -2,6 +2,14 @@ diff --git a/dist/metro/index.js b/dist/metro/index.js
 index c91ba6a..394cd59 100644
 --- a/dist/metro/index.js
 +++ b/dist/metro/index.js
+@@ -34,6 +34,7 @@ function getConfig(config, options) {
+     const originalMiddleware = config.server?.enhanceMiddleware;
+     const poisonPillPath = "./interop-poison.pill";
+     fs_1.default.mkdirSync(outputDirectory, { recursive: true });
++    fs_1.default.writeFileSync(platformPath("web"), "");
+     fs_1.default.writeFileSync(platformPath("ios"), "");
+     fs_1.default.writeFileSync(platformPath("android"), "");
+     fs_1.default.writeFileSync(platformPath("native"), "");
 @@ -46,7 +46,7 @@ function getConfig(config, options) {
              ...config.transformer,
              ...{

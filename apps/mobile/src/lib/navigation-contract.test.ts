@@ -892,6 +892,34 @@ describe('resolveNavigationContract snapshot surface', () => {
       ),
     ).toMatchSnapshot();
   });
+
+  it('keeps owner add-child access while the role discriminator is unresolved', () => {
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: makeProfile({
+          id: 'owner-profile',
+          isOwner: true,
+          birthYear: 1990,
+          hasFamilyLinks: false,
+          defaultAppContext: null,
+        }),
+        profiles: [
+          makeProfile({
+            id: 'owner-profile',
+            isOwner: true,
+            birthYear: 1990,
+            hasFamilyLinks: false,
+            defaultAppContext: null,
+          }),
+        ],
+        role: null,
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    expect(contract.gates.showAddChild).toBe(true);
+    expect(contract.home.screen).toBe('LearnerHome');
+  });
 });
 
 describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint)', () => {

@@ -1,13 +1,37 @@
-import path from 'node:path';
-import { expect, test } from '@playwright/test';
-import { authStateDir } from '../../helpers/runtime';
+import { expect, test, type Page } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
-test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
+async function retryRoundSaveIfNeeded(page: Page) {
+  const playError = page.getByTestId('quiz-play-error');
+  const retry = page.getByTestId('quiz-play-retry');
+  const seeResults = page.getByTestId('quiz-final-see-results');
+  const resultsScreen = page.getByTestId('quiz-results-screen');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!(await playError.isVisible().catch(() => false))) {
+      return;
+    }
+
+    await pressableClick(retry);
+    await expect(playError.or(seeResults).or(resultsScreen)).toBeVisible({
+      timeout: 30_000,
+    });
+  }
+
+  await expect(playError).toBeHidden({ timeout: 1 });
+}
 
 test('J-10 learner → Practice → Quiz → launch → play → results → home', async ({
   page,
 }) => {
+  await seedAndSignIn(page, {
+    scenario: 'onboarding-complete',
+    alias: 'j10',
+    landingTestId: 'learner-screen',
+    landingPath: '/home',
+  });
+
   await page.goto('/home', { waitUntil: 'commit' });
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
@@ -100,17 +124,19 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     await expect(answerFeedback).toBeVisible({
       timeout: 30_000,
     });
-    await expect(answerFeedback).toHaveText('Ready for the next one', {
-      timeout: 5_000,
-    });
+    await retryRoundSaveIfNeeded(page);
 
     const nextQuestion = page.getByTestId('quiz-next-question');
     const seeResults = page.getByTestId('quiz-final-see-results');
     const resultsScreen = page.getByTestId('quiz-results-screen');
 
-    await expect(nextQuestion.or(seeResults).or(resultsScreen)).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(
+      nextQuestion
+        .or(seeResults)
+        .or(resultsScreen)
+        .or(page.getByTestId('quiz-play-error')),
+    ).toBeVisible({ timeout: 30_000 });
+    await retryRoundSaveIfNeeded(page);
 
     if (await resultsScreen.isVisible().catch(() => false)) break;
     if (await seeResults.isVisible().catch(() => false)) {

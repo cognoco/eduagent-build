@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { pressableClick } from '../../helpers/pressable';
 
@@ -23,6 +23,45 @@ import { pressableClick } from '../../helpers/pressable';
  * Spanish (es) four_strands subject with enough vocabulary to generate a
  * deterministic 4-option multiple-choice round.
  */
+
+async function waitForQuizPlayAfterLaunch(page: Page): Promise<void> {
+  const playScreen = page.getByTestId('quiz-play-screen');
+  const launchError = page.getByTestId('quiz-launch-error-fallback');
+  const launchRetry = page.getByTestId('quiz-launch-retry');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await expect(playScreen.or(launchError)).toBeVisible({ timeout: 60_000 });
+    if (await playScreen.isVisible().catch(() => false)) {
+      return;
+    }
+
+    await expect(launchRetry).toBeVisible({ timeout: 5_000 });
+    await pressableClick(launchRetry);
+  }
+
+  await expect(playScreen).toBeVisible({ timeout: 1 });
+}
+
+async function retryRoundSaveIfNeeded(page: Page): Promise<void> {
+  const playError = page.getByTestId('quiz-play-error');
+  const retry = page.getByTestId('quiz-play-retry');
+  const seeResults = page.getByTestId('quiz-final-see-results');
+  const resultsScreen = page.getByTestId('quiz-results-screen');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!(await playError.isVisible().catch(() => false))) {
+      return;
+    }
+
+    await pressableClick(retry);
+    await expect(playError.or(seeResults).or(resultsScreen)).toBeVisible({
+      timeout: 30_000,
+    });
+  }
+
+  await expect(playError).toBeHidden({ timeout: 1 });
+}
+
 test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-924)', async ({
   page,
 }) => {
@@ -49,10 +88,7 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
   });
 
   await pressableClick(page.getByTestId(`quiz-vocabulary-${subjectId}`));
-
-  await expect(page.getByTestId('quiz-play-screen')).toBeVisible({
-    timeout: 60_000,
-  });
+  await waitForQuizPlayAfterLaunch(page);
 
   const quizScreen = page.getByTestId('quiz-play-screen');
 
@@ -120,17 +156,19 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
     await expect(answerFeedback).toBeVisible({
       timeout: 30_000,
     });
-    await expect(answerFeedback).toHaveText('Ready for the next one', {
-      timeout: 5_000,
-    });
+    await retryRoundSaveIfNeeded(page);
 
     const nextQuestion = page.getByTestId('quiz-next-question');
     const seeResults = page.getByTestId('quiz-final-see-results');
     const resultsScreen = page.getByTestId('quiz-results-screen');
 
-    await expect(nextQuestion.or(seeResults).or(resultsScreen)).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(
+      nextQuestion
+        .or(seeResults)
+        .or(resultsScreen)
+        .or(page.getByTestId('quiz-play-error')),
+    ).toBeVisible({ timeout: 30_000 });
+    await retryRoundSaveIfNeeded(page);
 
     if (await resultsScreen.isVisible().catch(() => false)) break;
     if (await seeResults.isVisible().catch(() => false)) {

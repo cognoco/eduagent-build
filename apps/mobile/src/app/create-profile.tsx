@@ -85,7 +85,12 @@ export default function CreateProfileScreen() {
   const queryClient = useQueryClient();
   const client = useApiClient();
   const { isLoaded, isSignedIn } = useAuth();
-  const { activeProfile, profiles, switchProfile } = useProfile();
+  const {
+    activeProfile,
+    profiles,
+    switchProfile,
+    isLoading: isProfileLoading,
+  } = useProfile();
   const navigationContract = useNavigationContract();
   const activeProfileRole = useActiveProfileRole();
   const updateAppContext = useUpdateProfileAppContext();
@@ -98,6 +103,8 @@ export default function CreateProfileScreen() {
   const isParentAddingChild =
     activeProfile?.isOwner === true && profiles.length > 0;
   const isAddingChild = params.for === 'child' || isParentAddingChild;
+  const isFirstProfileCreation =
+    !isProfileLoading && !activeProfile && profiles.length === 0;
 
   const [displayName, setDisplayName] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -180,8 +187,12 @@ export default function CreateProfileScreen() {
     !loading;
 
   const onSubmit = useCallback(async () => {
-    if (activeProfileRole !== 'owner' || navigationContract.isParentProxy)
+    if (
+      !isFirstProfileCreation &&
+      (activeProfileRole !== 'owner' || navigationContract.isParentProxy)
+    ) {
       return;
+    }
     if (!canSubmit || !birthDate) return;
 
     const trimmedName = displayName.trim();
@@ -338,6 +349,7 @@ export default function CreateProfileScreen() {
     }
   }, [
     activeProfileRole,
+    isFirstProfileCreation,
     navigationContract.isParentProxy,
     canSubmit,
     displayName,
@@ -373,7 +385,7 @@ export default function CreateProfileScreen() {
   // WI-296: useActiveProfileRole returns null while the role is still
   // resolving. Show a spinner rather than the access-blocked screen so a
   // legitimate owner does not briefly see the blocked UI before the role lands.
-  if (activeProfileRole === null) {
+  if (!isFirstProfileCreation && activeProfileRole === null) {
     return (
       <View
         testID="create-profile-role-loading"
@@ -388,7 +400,10 @@ export default function CreateProfileScreen() {
   // owner, or when a parent is acting as a proxy for a child profile. In both
   // cases the API would reject the request; gate early to avoid a misleading
   // form that silently fails.
-  if (activeProfileRole !== 'owner' || navigationContract.isParentProxy) {
+  if (
+    !isFirstProfileCreation &&
+    (activeProfileRole !== 'owner' || navigationContract.isParentProxy)
+  ) {
     return (
       <View
         testID="create-profile-access-blocked"

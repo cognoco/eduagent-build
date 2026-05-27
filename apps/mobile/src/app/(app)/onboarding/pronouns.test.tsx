@@ -222,16 +222,23 @@ describe('PronounsScreen', () => {
     );
   });
 
-  it('calls updatePronouns.mutate with null when skip pressed', () => {
+  it('starts the next onboarding step before best-effort clearing pronouns on skip', () => {
     const { getByTestId } = render(<PronounsScreen />);
     fireEvent.press(getByTestId('pronouns-skip'));
-    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith(
-      { pronouns: null },
+    expect(mockStartFirstCurriculumMutate).toHaveBeenCalledWith(
+      { sessionType: 'learning', inputMode: 'text' },
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),
       }),
     );
+    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith({ pronouns: null });
+    const startCallOrder =
+      mockStartFirstCurriculumMutate.mock.invocationCallOrder[0];
+    const clearCallOrder = mockUpdatePronounsMutate.mock.invocationCallOrder[0];
+    expect(startCallOrder).toBeDefined();
+    expect(clearCallOrder).toBeDefined();
+    expect(startCallOrder!).toBeLessThan(clearCallOrder!);
   });
 
   it('shows error alert on save failure', () => {
@@ -260,13 +267,19 @@ describe('PronounsScreen', () => {
     mockSearchParams = { returnTo: 'settings' };
     const { getByTestId } = render(<PronounsScreen />);
     fireEvent.press(getByTestId('pronouns-skip'));
-    // Trigger onSuccess
-    const call = mockUpdatePronounsMutate.mock.calls[0];
-    call[1].onSuccess();
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/more',
     );
+  });
+
+  it('replaces home immediately on skip when no onboarding subject is present', () => {
+    mockSearchParams = {};
+    const { getByTestId, queryByTestId } = render(<PronounsScreen />);
+    fireEvent.press(getByTestId('pronouns-skip'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith({ pronouns: null });
+    expect(queryByTestId('pronouns-skip')).toBeNull();
   });
 
   it('age-gates below-13 learners (shows empty view, not form)', () => {

@@ -77,18 +77,20 @@ export default function PronounsScreen(): React.ReactElement {
   const [customPronouns, setCustomPronouns] = useState(
     initialChoice === OTHER_KEY ? (activeProfile?.pronouns ?? '') : '',
   );
+  const [isForwarding, setIsForwarding] = useState(false);
   const updatePronouns = useUpdatePronouns();
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
     subjectId ?? '',
   );
 
   const navigateForward = useCallback(() => {
+    setIsForwarding(true);
     if (returnTo === 'settings') {
       goBackOrReplace(router, '/(app)/more' as Href);
       return;
     }
     if (!subjectId) {
-      goBackOrReplace(router, '/(app)/home' as const);
+      router.replace('/(app)/home' as const);
       return;
     }
     startFirstCurriculumSession.mutate(
@@ -127,16 +129,10 @@ export default function PronounsScreen(): React.ReactElement {
 
   const handleSkip = useCallback(() => {
     // Skip writes null to clear any prior pronouns (Settings edit case) and
-    // forwards. Never blocks onboarding progress per spec.
-    updatePronouns.mutate(
-      { pronouns: null },
-      {
-        onSuccess: navigateForward,
-        // Skip is non-blocking — if the clear fails, still move forward
-        // rather than trapping the user.
-        onError: navigateForward,
-      },
-    );
+    // forwards. Never blocks onboarding progress per spec, so navigate before
+    // the best-effort clear can be delayed by network or cache refresh work.
+    navigateForward();
+    updatePronouns.mutate({ pronouns: null });
   }, [updatePronouns, navigateForward]);
 
   const effectivePronouns = useMemo(() => {
@@ -171,6 +167,9 @@ export default function PronounsScreen(): React.ReactElement {
   // While age-gate redirect is in flight, render nothing (brief flicker) —
   // below-13 learners should never see the form even momentarily.
   if (ageGated) return <View className="flex-1 bg-background" />;
+  if (isForwarding) {
+    return <View pointerEvents="none" style={{ display: 'none' }} />;
+  }
 
   return (
     <View

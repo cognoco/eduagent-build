@@ -1,7 +1,6 @@
-import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
-import { authStateDir } from '../../helpers/runtime';
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
 // J-19: Subscription paywall UI
 //
@@ -13,20 +12,23 @@ import { authStateDir } from '../../helpers/runtime';
 //   - mobile-only upgrade notice replaces the native purchase CTA on web
 //   - no-offerings static fallback renders (expected on web)
 //   - static-tier-free and static-tier-plus cards are present
-//   - restore-purchases-button is present (required by App Store 3.1.1)
+//   - native restore-purchases CTA is hidden on web (RevenueCat SDK is native)
 //   - byok-waitlist-section renders
 //   - back-navigation returns to the more tab
 //
 // RevenueCat is a true external boundary (mobile SDK, no web support) —
 // mocking it here is correct per CLAUDE.md "Mock only true external boundaries".
-
-test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
-
 test('J-19 free-tier learner sees subscription paywall with static tier comparison on web', async ({
   page,
 }) => {
   // ── 1. Navigate to More tab and open Subscription via the nav row ──────────
-  await page.goto('/more', { waitUntil: 'commit' });
+  await seedAndSignIn(page, {
+    scenario: 'trial-expired',
+    alias: 'j19-free-tier',
+    landingPath: '/more',
+    landingTestId: 'more-row-account',
+  });
+
   await expect(page.getByTestId('more-row-account')).toBeVisible({
     timeout: 60_000,
   });
@@ -65,7 +67,7 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
 
   // Fallback disclaimer copy — asserted against the actual text in subscription.tsx:1406
   await expect(page.getByTestId('no-offerings')).toContainText(
-    "store purchasing isn't available on this device yet",
+    /store purchasing isn['’]t available on this device yet/,
   );
 
   // ── 6. Verify static Free and Plus tier cards are visible ──────────────────
@@ -78,15 +80,15 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
 
   // ── 7. Verify pricing text is present in the tier cards ───────────────────
   await expect(page.getByTestId('static-tier-free')).toContainText(
-    '10 questions per day, 100 per month',
+    /100 questions\/month, 10\/day per profile/,
   );
   await expect(page.getByTestId('static-tier-plus')).toContainText(
-    '700 questions per month',
+    /700 questions\/month/,
   );
 
-  // ── 8. Verify Restore Purchases button is present ─────────────────────────
-  // Required by App Store 3.1.1. Must be visible for IAP compliance.
-  await expect(page.getByTestId('restore-purchases-button')).toBeVisible();
+  // ── 8. Verify native Restore Purchases button is hidden on web ────────────
+  // Required in the native app, but hidden on web because it calls RevenueCat.
+  await expect(page.getByTestId('restore-purchases-button')).toHaveCount(0);
 
   // ── 9. Verify BYOK waitlist section is present ────────────────────────────
   await expect(page.getByTestId('byok-waitlist-section')).toBeVisible();

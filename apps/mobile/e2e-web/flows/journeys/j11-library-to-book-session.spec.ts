@@ -1,16 +1,17 @@
-import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
-import { authStateDir } from '../../helpers/runtime';
-import { readSeedData } from '../../helpers/seed-data';
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
-
-test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
 test('J-11 learner → Library → shelf → book → start learning', async ({
   page,
 }) => {
-  const seed = await readSeedData('solo-learner');
+  const seed = await seedAndSignIn(page, {
+    scenario: 'onboarding-complete',
+    alias: 'j11',
+    landingTestId: 'learner-screen',
+    landingPath: '/home',
+  });
   const subjectId = seed.ids.subjectId;
 
   await page.goto('/home', { waitUntil: 'commit' });

@@ -162,6 +162,23 @@ describe('CreateProfileScreen', () => {
     expect(screen.queryByTestId('persona-parent')).toBeNull();
   });
 
+  it('[ACCOUNT-01] renders first-profile form while no active profile exists yet', () => {
+    mockActiveProfileRole = null;
+    mockUseProfile.mockReturnValue({
+      switchProfile: mockSwitchProfile,
+      activeProfile: null,
+      profiles: [],
+      isLoading: false,
+    });
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    screen.getByTestId('create-profile-name');
+    screen.getByTestId('create-profile-submit');
+    expect(screen.queryByTestId('create-profile-role-loading')).toBeNull();
+    expect(screen.queryByTestId('create-profile-access-blocked')).toBeNull();
+  });
+
   // [BUG-900] When a parent (account owner with existing profile) opens the
   // create-profile screen, the copy must address the child, not the parent.
   describe('isParentAddingChild copy [BUG-900]', () => {

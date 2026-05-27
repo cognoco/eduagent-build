@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { waitForAppScreen } from '../../helpers/app-screen';
+import { ensureFamilyHome, waitForAppScreen } from '../../helpers/app-screen';
 import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
@@ -15,7 +15,7 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await waitForAppScreen(page, 'parent-home-screen', {
+  await ensureFamilyHome(page, {
     timeout: 60_000,
   });
 

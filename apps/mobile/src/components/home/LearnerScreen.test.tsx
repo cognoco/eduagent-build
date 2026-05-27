@@ -24,6 +24,12 @@ let mockLinkedChildren: Array<{
   displayName: string;
   isOwner: boolean;
 }> = [];
+type TestProfile = {
+  id: string;
+  displayName: string;
+  isOwner: boolean;
+  birthYear?: number | null;
+};
 let mockSubscriptionTier = 'plus';
 const mockSwitchProfile = jest.fn(async () => ({ success: true }));
 // [ACCOUNT-04] Explicit proxy flag — controls isExplicitProxyMode in the mock
@@ -172,6 +178,9 @@ jest.mock(
 jest.mock(
   '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
+    useSubscriptionStatus: () => ({
+      data: { tier: mockSubscriptionTier },
+    }),
     useSubscription: () => ({ data: { tier: mockSubscriptionTier } }),
     useFamilySubscription: () => ({
       data: { profileCount: 2, maxProfiles: 5 },
@@ -243,8 +252,13 @@ const { fetchCallsMatching } = require('../../test-utils/mock-api-routes');
 const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO };
 
 const defaultProps = {
-  profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true }],
-  activeProfile: { id: 'p1', displayName: 'Alex', isOwner: true },
+  profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true, birthYear: 1990 }],
+  activeProfile: {
+    id: 'p1',
+    displayName: 'Alex',
+    isOwner: true,
+    birthYear: 1990,
+  },
 };
 
 const QUIZ_DISCOVERY_CARD = {
@@ -266,12 +280,8 @@ describe('LearnerScreen', () => {
   // / `useParentProxy()` see — without ever mocking the real profile module.
   function renderLearner(
     props: Partial<{
-      profiles: Array<{ id: string; displayName: string; isOwner: boolean }>;
-      activeProfile: {
-        id: string;
-        displayName: string;
-        isOwner: boolean;
-      } | null;
+      profiles: TestProfile[];
+      activeProfile: TestProfile | null;
     }> = {},
   ): ReturnType<typeof render> {
     const merged = { ...defaultProps, ...props };
@@ -435,11 +445,21 @@ describe('LearnerScreen', () => {
 
   it('hides Family setup CTA when gates.showAddChild is false', async () => {
     mockShowAddChild = false;
+    mockSubscriptionTier = 'plus';
     mockLinkedChildren = [];
     renderLearner();
 
     await waitFor(() => screen.getByTestId('learner-screen'));
     expect(screen.queryByTestId('home-family-setup-cta-button')).toBeNull();
+  });
+
+  it('keeps Family setup CTA for a family-plan owner while the navigation gate catches up', async () => {
+    mockShowAddChild = false;
+    mockSubscriptionTier = 'family';
+    mockLinkedChildren = [];
+    renderLearner();
+
+    await waitFor(() => screen.getByTestId('home-family-setup-cta-button'));
   });
 
   it('keeps home actions available when the subject list fails to load', async () => {

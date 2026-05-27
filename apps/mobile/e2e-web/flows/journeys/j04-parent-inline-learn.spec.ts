@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { waitForAppScreen } from '../../helpers/app-screen';
+import { ensureFamilyHome } from '../../helpers/app-screen';
 import { pressableClick } from '../../helpers/pressable';
 
 test('J-04 parent opens child progress detail from child action', async ({
@@ -7,7 +7,7 @@ test('J-04 parent opens child progress detail from child action', async ({
 }) => {
   await page.goto('/home', { waitUntil: 'commit' });
 
-  await waitForAppScreen(page, 'parent-home-screen', {
+  await ensureFamilyHome(page, {
     timeout: 60_000,
   });
   const childCard = page.getByTestId(/^parent-home-check-child-/).first();

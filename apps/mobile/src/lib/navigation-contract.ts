@@ -254,7 +254,11 @@ export function resolveNavigationContract(
     context.profiles,
   );
   const familyCapable = isFamilyCapable(context.activeProfile);
-  const ownerRole = isOwnerRole(context.role);
+  const ownerRole =
+    isOwnerRole(context.role) ||
+    (context.role === null &&
+      context.activeProfile?.isOwner === true &&
+      !context.isParentProxy);
   const subscriptionReady = context.subscription.status === 'ready';
   const familyHubEligible = isFamilyHubEligible(context);
   const legacyV0ModeNavActive =

@@ -1,12 +1,8 @@
-import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Dialog, Page } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
-import { authStateDir } from '../../helpers/runtime';
-import { readSeedData } from '../../helpers/seed-data';
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
-
-test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
 async function waitForCompletedAssistantTurn(page: Page) {
   const thinkingBulb = page.getByTestId('thinking-bulb-animation');
@@ -75,7 +71,12 @@ async function endSessionAndDismissFilingPrompt(page: Page) {
 test('J-08 learner → Ask → freeform chat → end session → summary → home', async ({
   page,
 }) => {
-  const seed = await readSeedData('solo-learner');
+  const seed = await seedAndSignIn(page, {
+    scenario: 'onboarding-complete',
+    alias: 'j08',
+    landingTestId: 'learner-screen',
+    landingPath: '/home',
+  });
   const subjectId = seed.ids.subjectId;
 
   await page.goto('/home', { waitUntil: 'commit' });

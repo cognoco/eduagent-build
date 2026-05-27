@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { waitForAppScreen } from '../../helpers/app-screen';
+import { ensureFamilyHome, waitForAppScreen } from '../../helpers/app-screen';
 import { pressableClick } from '../../helpers/pressable';
 import { readSeedData } from '../../helpers/seed-data';
 
@@ -12,7 +12,7 @@ test('J-07 parent → child progress → session recap → back to parent home',
 
   await page.goto('/home', { waitUntil: 'commit' });
 
-  await waitForAppScreen(page, 'parent-home-screen', {
+  await ensureFamilyHome(page, {
     timeout: 60_000,
   });
 
