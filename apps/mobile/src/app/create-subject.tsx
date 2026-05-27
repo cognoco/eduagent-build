@@ -130,6 +130,7 @@ function CreateSubjectScreenAuthenticated() {
   // [BUG-692] Ref set when Cancel is pressed mid-flight; checked post-await
   // before any router navigation and inside catch before showing alerts.
   const cancelledRef = useRef(false);
+  const resolveAttemptRef = useRef(0);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const transitionToFirstSession = useCallback(
@@ -260,6 +261,7 @@ function CreateSubjectScreenAuthenticated() {
         // responses cannot drive navigation after the timeout has already
         // shown the retry UI.
         cancelledRef.current = true;
+        resolveAttemptRef.current += 1;
         setResolveTimedOut(true);
         setResolveState({ phase: 'idle' });
         setError(t('subject.resolveTookTooLong'));
@@ -419,6 +421,8 @@ function CreateSubjectScreenAuthenticated() {
       setOriginalInput((prev) => prev || trimmedInput);
       setResolveState({ phase: 'resolving' });
       setError('');
+      const resolveAttemptId = resolveAttemptRef.current + 1;
+      resolveAttemptRef.current = resolveAttemptId;
       cancelledRef.current = false; // [BUG-692] reset on each new attempt
 
       try {
@@ -427,7 +431,12 @@ function CreateSubjectScreenAuthenticated() {
         });
 
         // [BUG-692] Abort if the user cancelled while resolve was in flight.
-        if (cancelledRef.current) return;
+        if (
+          cancelledRef.current ||
+          resolveAttemptRef.current !== resolveAttemptId
+        ) {
+          return;
+        }
 
         if (result.status === 'direct_match') {
           await doCreate(
@@ -443,7 +452,12 @@ function CreateSubjectScreenAuthenticated() {
         setResolveState({ phase: 'suggestion', result });
       } catch {
         // [BUG-692] Don't show error if user already navigated away.
-        if (cancelledRef.current) return;
+        if (
+          cancelledRef.current ||
+          resolveAttemptRef.current !== resolveAttemptId
+        ) {
+          return;
+        }
         // Don't fall through to create on network error
         setError(t('subject.resolveNetworkError'));
         setResolveState({ phase: 'idle' });
