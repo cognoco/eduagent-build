@@ -228,4 +228,27 @@ export const mentorAuditScenarios = {
     // out of the default seeded registry until a standing MFA fixture exists.
     requiresChromeOnly: true,
   },
+  // Third wave — BILLING-07/08 + BRIDGE-03/04
+  // (docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md §§11b, 11c, 14).
+  familyPoolMembers: {
+    key: 'mentor-audit-family-pool-members',
+    seedScenario: 'mentor-audit-family-pool-members',
+    email: buildSeedEmail('mentor-audit-family-pool-members'),
+    landingPath: '/home',
+    landingTestId: 'learner-screen',
+  },
+  familyOwnerDailyQuotaWithChild: {
+    key: 'mentor-audit-family-owner-daily-quota-with-child',
+    seedScenario: 'mentor-audit-family-owner-daily-quota-with-child',
+    email: buildSeedEmail('mentor-audit-family-owner-daily-quota-with-child'),
+    landingPath: '/home',
+    landingTestId: 'learner-screen',
+  },
+  bridgeBackstack: {
+    key: 'mentor-audit-bridge-backstack',
+    seedScenario: 'mentor-audit-bridge-backstack',
+    email: buildSeedEmail('mentor-audit-bridge-backstack'),
+    landingPath: '/home',
+    landingTestId: 'learner-screen',
+  },
 } as const satisfies Record<string, MentorAuditScenario>;

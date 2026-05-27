@@ -136,7 +136,11 @@ export type SeedScenario =
   | 'mentor-audit-family-no-children' // alias: parent-solo (see Task 1b note)
   | 'mentor-audit-rich-child-history'
   | 'mentor-audit-session-revoked'
-  | 'mentor-audit-mfa-totp';
+  | 'mentor-audit-mfa-totp'
+  // Third wave (BILLING-07/08 + BRIDGE-03/04).
+  | 'mentor-audit-family-pool-members'
+  | 'mentor-audit-family-owner-daily-quota-with-child'
+  | 'mentor-audit-bridge-backstack';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -4540,6 +4544,364 @@ async function seedMentorAuditMfaTotp(
   };
 }
 
+/** BILLING-08 — Family in normal mid-month use. Distinct from
+ *  `mentor-audit-family-at-profile-limit` (which pins at the add-child cap) and
+ *  from `mentor-audit-quota-family-monthly` (which exhausts the monthly pool).
+ *  This seed is the "shared pool partially consumed" semantic seed that the
+ *  audit row reads to verify the pool readout in steady state.
+ *
+ *  Pinned: 2 consented children (matches the most common Family shape — owner
+ *  + 2 kids — without coupling to the add-child cap). usedThisMonth is set to
+ *  ~50% of the Family monthly cap so the readout shows non-trivial usage on
+ *  both sides of the divide. */
+async function seedMentorAuditFamilyPoolMembers(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const familyTier = getTierConfig('family');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Pool-Sharing Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'family',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  const usedThisMonth = Math.floor(familyTier.monthlyQuota / 2);
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: familyTier.monthlyQuota,
+    usedThisMonth,
+    cycleResetAt: futureDate(30),
+  });
+
+  // Pinned at 2 consented children — see docstring.
+  const childProfileIds: string[] = [];
+  for (let i = 0; i < 2; i += 1) {
+    const childProfileId = await createBaseProfile(db, accountId, {
+      displayName: `Pool Child ${i + 1}`,
+      birthYear: 2014,
+      isOwner: false,
+    });
+    childProfileIds.push(childProfileId);
+
+    await db.insert(familyLinks).values({
+      id: generateUUIDv7(),
+      parentProfileId,
+      childProfileId,
+    });
+
+    await db.insert(consentStates).values({
+      id: generateUUIDv7(),
+      profileId: childProfileId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: email,
+      respondedAt: new Date(),
+    });
+  }
+
+  return {
+    scenario: 'mentor-audit-family-pool-members',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: {
+      parentProfileId,
+      subscriptionId,
+      childProfileId1: childProfileIds[0] ?? '',
+      childProfileId2: childProfileIds[1] ?? '',
+      // String-encoded because SeedResult.ids is Record<string, string>; the
+      // audit row reads it as a numeric percentage of the monthly cap.
+      quotaUsedThisMonth: String(usedThisMonth),
+      quotaMonthlyLimit: String(familyTier.monthlyQuota),
+    },
+  };
+}
+
+/** BILLING-07 + BRIDGE-03 — Free-tier owner whose daily cap is exhausted,
+ *  with a linked consented child who still has real learning state. Proves
+ *  child-review surfaces remain reachable while adult Study/billable actions
+ *  hit the daily quota gate. Distinct from `mentor-audit-quota-owner-daily`
+ *  (no child) because the audit needs to exercise the Family Mentor context
+ *  against a real child while the adult is quota-blocked. */
+async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Owner with defaultAppContext: 'family' — must use the direct insert
+  // because createBaseProfile() does not pass that field through. Pattern
+  // mirrors makeConsentThresholdSeeder() at the top of the mentor-audit pack.
+  const ownerProfileId = generateUUIDv7();
+  await db.insert(profiles).values({
+    id: ownerProfileId,
+    accountId,
+    displayName: 'Daily-Capped Family Owner',
+    birthYear: 1985,
+    isOwner: true,
+    defaultAppContext: 'family',
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: ownerProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  // Daily quota maxed; monthly bucket deliberately well below cap so the
+  // failure attributable to the daily gate, not the monthly one.
+  // Fail-fast on the tier-config invariant — the whole point of this seed is
+  // an exhausted daily cap, which only makes sense if the tier has one. A
+  // silent `?? 10` fallback would mask future config drift and the structural
+  // test (`usedToday === dailyLimit`) would surface as a confusing
+  // `10 === 0` failure instead of an actionable error.
+  if (freeTier.dailyLimit == null) {
+    throw new Error(
+      'family-owner-daily-quota-with-child: free tier has no dailyLimit — cannot seed an exhausted-daily scenario',
+    );
+  }
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: 12,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: freeTier.dailyLimit,
+    cycleResetAt: futureDate(30),
+  });
+
+  // Linked consented child with real learning state — subject + topic +
+  // completed session + summary (recap). Mirrors seedParentMultiChild for
+  // child1 but trimmed to a single child to keep the scenario semantic.
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Linked Learner',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId: ownerProfileId,
+    childProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const { subjectId: childSubjectId, topicIds: childTopicIds } =
+    await createSubjectWithCurriculum(
+      db,
+      childProfileId,
+      'Mathematics',
+      'active',
+      3,
+    );
+  const childTopicId = childTopicIds[0];
+  if (!childTopicId) {
+    throw new Error(
+      'family-owner-daily-quota-with-child: child subject missing topic',
+    );
+  }
+
+  const { sessionId: childSessionId } = await insertSessionWithRecap(db, {
+    profileId: childProfileId,
+    subjectId: childSubjectId,
+    topicId: childTopicId,
+    recapContent:
+      'We compared fractions and explained why bigger denominators do not always mean bigger values.',
+    recapHighlight:
+      'Used a number line to defend the answer without prompting.',
+    engagementSignal: 'focused',
+    endedDaysAgo: 1,
+    exchangeCount: 8,
+  });
+
+  return {
+    scenario: 'mentor-audit-family-owner-daily-quota-with-child',
+    accountId,
+    profileId: ownerProfileId,
+    email,
+    password,
+    ids: {
+      ownerProfileId,
+      childProfileId,
+      subscriptionId,
+      childSubjectId,
+      childTopicId,
+      childSessionId,
+    },
+  };
+}
+
+/** BRIDGE-04 — Family owner + child holding a topic that is NOT yet in the
+ *  adult owner's Library. The Playwright probe in `bridge-backstack.spec.ts`
+ *  uses this seed to drive Add-to-my-learning across child topic / session /
+ *  recap entry surfaces, then asserts router.back() lands on the original
+ *  Family child/recap context (not the Tabs first-route, not the proxy/child
+ *  active-profile state). The seed-side guarantee is the **precondition**:
+ *  adult library deliberately holds a *different* subject name so the bridge
+ *  flow is exercising the "topic not yet in adult library" branch.
+ *
+ *  Caller prerequisite: the owner is created WITHOUT
+ *  `defaultAppContext: 'family'` (intentionally — this seed is about the
+ *  backstack contract, not about app-context defaults). Callers MUST switch
+ *  the app into Family mode before deep-linking to the child surfaces,
+ *  otherwise the `showLearnThisToo` navigation gate hides the
+ *  Add-to-my-learning button and the bridge flow cannot be exercised. The
+ *  paired probe does this via `switchAppMode(page, 'family')`; any other
+ *  caller (future Chrome automation, ad-hoc Playwright) needs the equivalent
+ *  step.
+ *
+ *  Idempotency note: the account-level cleanup performed by `seedScenario`
+ *  (clerk_seed_* prefix) wipes any prior adult-side copy before reseeding,
+ *  so no in-seed cleanup is needed.
+ *
+ *  `childRecapId` is intentionally equal to `childSessionId` — the recaps
+ *  API treats `recapId` as the learning_sessions id (see
+ *  apps/api/src/services/recaps.ts:92, `getRecapForParent` → `getChildSessionDetail`). */
+async function seedMentorAuditBridgeBackstack(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const ownerProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Bridge Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: ownerProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  // Adult library deliberately gets a *different* subject name from the
+  // child's, so the bridge flow exercises the "not yet in adult library"
+  // branch (descriptionDivergent=false, alreadyExisted=false, topicState=new).
+  // If both used 'Mathematics' the bridge would surface a divergent/exists
+  // toast and the back-stack assertion would test the wrong branch.
+  await createSubjectWithCurriculum(db, ownerProfileId, 'Personal Reading');
+
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Bridge Child',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId: ownerProfileId,
+    childProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const childSubjectName = 'Mathematics';
+  const { subjectId: childSubjectId, topicIds: childTopicIds } =
+    await createSubjectWithCurriculum(
+      db,
+      childProfileId,
+      childSubjectName,
+      'active',
+      3,
+    );
+  const childTopicId = childTopicIds[0];
+  if (!childTopicId) {
+    throw new Error('bridge-backstack: child subject missing topic');
+  }
+
+  const { sessionId: childSessionId } = await insertSessionWithRecap(db, {
+    profileId: childProfileId,
+    subjectId: childSubjectId,
+    topicId: childTopicId,
+    recapContent:
+      'We worked through fraction comparison and connected the steps back to last week.',
+    recapHighlight: 'Spotted the denominator pattern without prompting.',
+    engagementSignal: 'curious',
+    endedDaysAgo: 1,
+    exchangeCount: 8,
+  });
+
+  return {
+    scenario: 'mentor-audit-bridge-backstack',
+    accountId,
+    profileId: ownerProfileId,
+    email,
+    password,
+    ids: {
+      ownerProfileId,
+      childProfileId,
+      childSubjectId,
+      childSubjectName,
+      childTopicId,
+      childSessionId,
+      // recapId === sessionId per the recaps service contract (recaps.ts:92).
+      childRecapId: childSessionId,
+    },
+  };
+}
+
 /** Lookup helper for the post-sign-in Clerk-Backend mentor-audit flows. */
 async function findClerkUserIdForAccount(
   db: Database,
@@ -4767,6 +5129,11 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'mentor-audit-rich-child-history': seedMentorAuditRichChildHistory,
   'mentor-audit-session-revoked': seedMentorAuditSessionRevoked,
   'mentor-audit-mfa-totp': seedMentorAuditMfaTotp,
+  // Third wave — BILLING-07/08 + BRIDGE-03/04 (docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md §§11b, 11c, 14).
+  'mentor-audit-family-pool-members': seedMentorAuditFamilyPoolMembers,
+  'mentor-audit-family-owner-daily-quota-with-child':
+    seedMentorAuditFamilyOwnerDailyQuotaWithChild,
+  'mentor-audit-bridge-backstack': seedMentorAuditBridgeBackstack,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
