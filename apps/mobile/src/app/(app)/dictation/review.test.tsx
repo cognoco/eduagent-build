@@ -170,6 +170,47 @@ describe('DictationReviewScreen', () => {
       );
       expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
     });
+
+    it('ignores a synchronous double-press while saving the result', () => {
+      mockRecordMutateAsync.mockReturnValue(new Promise(() => undefined));
+      const { getByTestId } = render(<DictationReviewScreen />);
+      const done = getByTestId('review-done');
+
+      act(() => {
+        fireEvent.press(done);
+        fireEvent.press(done);
+      });
+
+      expect(mockRecordMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps Done locked after a successful save while navigation is pending', async () => {
+      mockRecordMutateAsync.mockResolvedValue(undefined);
+      const { getByTestId } = render(<DictationReviewScreen />);
+      const done = getByTestId('review-done');
+
+      await act(async () => {
+        fireEvent.press(done);
+        await Promise.resolve();
+      });
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+
+      await act(async () => {
+        fireEvent.press(done);
+        await Promise.resolve();
+      });
+
+      expect(mockRecordMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables Done accessibly while the result save is pending', () => {
+      mockRecordIsPending = true;
+      const { getByTestId } = render(<DictationReviewScreen />);
+
+      expect(
+        getByTestId('review-done').props.accessibilityState?.disabled,
+      ).toBe(true);
+    });
   });
 
   describe('remediation flow (with mistakes)', () => {

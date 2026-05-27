@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -105,6 +105,10 @@ export default function CreateProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [createPostPending, setCreatePostPending] = useState(false);
+  const inFlightRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
   // [ACCOUNT-01] Capture Study/Family intent on first profile setup.
   // Persisted via PATCH /profiles/:id/app-context immediately after creation.
   // null = not chosen yet (gates submit for the first-profile flow).
@@ -118,16 +122,31 @@ export default function CreateProfileScreen() {
   // hasn't resolved, surface an inline error and restore the form so the user
   // can retry. Avoids an infinite spinner dead-end on slow/stuck networks.
   useEffect(() => {
-    if (!loading) return undefined;
+    if (!createPostPending) return undefined;
     const PROFILE_CREATE_TIMEOUT_MS = 30_000;
     const timer = setTimeout(() => {
+      const controller = abortRef.current;
+      controller?.abort();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        inFlightRef.current = false;
+        requestSeqRef.current += 1;
+      }
+      setCreatePostPending(false);
       setLoading(false);
       setError(
         'Creating your profile is taking too long. Check your connection and try again.',
       );
     }, PROFILE_CREATE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [createPostPending]);
+
+  useEffect(() => {
+    return () => {
+      requestSeqRef.current += 1;
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
@@ -183,6 +202,7 @@ export default function CreateProfileScreen() {
     if (activeProfileRole !== 'owner' || navigationContract.isParentProxy)
       return;
     if (!canSubmit || !birthDate) return;
+    if (inFlightRef.current) return;
 
     const trimmedName = displayName.trim();
     if (trimmedName.length > 50) {
@@ -191,6 +211,12 @@ export default function CreateProfileScreen() {
     }
 
     setError('');
+    inFlightRef.current = true;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = requestSeq;
+    setCreatePostPending(true);
     setLoading(true);
 
     try {
@@ -206,9 +232,20 @@ export default function CreateProfileScreen() {
         birthDay: birthDate.getDate(),
       };
 
-      const res = await client.profiles.$post({ json: body });
+      const res = await client.profiles.$post(
+        { json: body },
+        { init: { signal: controller.signal } },
+      );
       await assertOk(res);
       const result = (await res.json()) as { profile: Profile };
+      if (
+        abortRef.current !== controller ||
+        requestSeqRef.current !== requestSeq ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
+      setCreatePostPending(false);
 
       // [ACCOUNT-01] Persist Study/Family intent immediately after creation.
       // The profile is created with defaultAppContext=null; setting it now
@@ -300,6 +337,9 @@ export default function CreateProfileScreen() {
         );
       }
     } catch (err: unknown) {
+      if (requestSeqRef.current !== requestSeq || controller.signal.aborted) {
+        return;
+      }
       // [BUG-947] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.
       // The route returns 402 with an actionable "upgrade to Family or Pro"
       // message; without this branch the generic UpstreamError path renders it
@@ -334,7 +374,12 @@ export default function CreateProfileScreen() {
         setError(formatApiError(err));
       }
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        inFlightRef.current = false;
+        setCreatePostPending(false);
+        setLoading(false);
+      }
     }
   }, [
     activeProfileRole,

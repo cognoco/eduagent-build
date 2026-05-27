@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -33,6 +33,7 @@ export default function DictationReviewScreen(): React.ReactElement {
   const [currentMistakeIndex, setCurrentMistakeIndex] = useState(0);
   const [typedSentence, setTypedSentence] = useState('');
   const [completedCount, setCompletedCount] = useState(0);
+  const savingRef = useRef(false);
 
   const isPerfect = mistakes.length === 0;
   const currentMistake = mistakes[currentMistakeIndex];
@@ -49,6 +50,8 @@ export default function DictationReviewScreen(): React.ReactElement {
 
   const handleDone = async () => {
     if (!data) return;
+    if (savingRef.current || recordResult.isPending) return;
+    savingRef.current = true;
 
     const localDate = new Date().toISOString().slice(0, 10);
     const mistakeCount = mistakes.length;
@@ -65,6 +68,7 @@ export default function DictationReviewScreen(): React.ReactElement {
       // [CRIT-2] Navigate only after successful save — guarded per CLAUDE.md
       router.replace('/(app)/practice' as Href);
     } catch (err) {
+      savingRef.current = false;
       // [CRIT-2] Show user-visible feedback on failure — bare catch {} is forbidden.
       // Pattern matches complete.tsx [ASSUMP-F11].
       console.warn('[dictation] review result recording failed:', err);
