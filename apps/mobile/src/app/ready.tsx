@@ -59,7 +59,6 @@ export default function ReadyScreen() {
 
   const subject = (params.subject ?? '').trim();
   const learner = (activeProfile?.displayName ?? '').trim();
-  const isChildLearner = activeProfile?.isOwner === false;
 
   // Stagger reveals so the screen feels alive instead of "loading."
   const [visibleRows, setVisibleRows] = useState(reduceMotion ? 3 : 0);
@@ -107,9 +106,9 @@ export default function ReadyScreen() {
     params.rawInput,
   ]);
 
-  const toneRow = isChildLearner
-    ? t('onboarding.ready.rowToneChild', { learner })
-    : t('onboarding.ready.rowTone');
+  // /ready always runs as the learner whose profile is now active —
+  // create-profile.tsx calls switchProfile(...) before this screen loads.
+  const toneRow = t('onboarding.ready.rowTone');
 
   return (
     <View
