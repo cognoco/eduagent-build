@@ -4701,11 +4701,24 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
       'family-owner-daily-quota-with-child: free tier has no dailyLimit — cannot seed an exhausted-daily scenario',
     );
   }
+  // Derive monthly usage from the tier cap (~25%) rather than hardcoding —
+  // a literal like `12` silently inverts the "monthly below cap" invariant
+  // if the free tier cap is ever set below the literal. Guarded so the
+  // intent is preserved if the cap changes.
+  const monthlyUsedBelowCap = Math.floor(freeTier.monthlyQuota / 4);
+  if (
+    monthlyUsedBelowCap <= 0 ||
+    monthlyUsedBelowCap >= freeTier.monthlyQuota
+  ) {
+    throw new Error(
+      `family-owner-daily-quota-with-child: derived monthly usage (${monthlyUsedBelowCap}) does not satisfy 0 < used < ${freeTier.monthlyQuota}`,
+    );
+  }
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
     monthlyLimit: freeTier.monthlyQuota,
-    usedThisMonth: 12,
+    usedThisMonth: monthlyUsedBelowCap,
     dailyLimit: freeTier.dailyLimit,
     usedToday: freeTier.dailyLimit,
     cycleResetAt: futureDate(30),
