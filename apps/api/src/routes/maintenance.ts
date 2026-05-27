@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
+import { apiError } from '../errors';
 
 type MaintenanceEnv = {
   Bindings: {
@@ -59,14 +61,7 @@ async function verifyMaintenanceSecret(c: {
 }
 
 async function sendMaintenanceBackfillOrError(
-  c: {
-    env: MaintenanceEnv['Bindings'];
-    req: { path: string };
-    json: (
-      data: unknown,
-      status?: 200 | 403 | 502,
-    ) => Response | Promise<Response>;
-  },
+  c: Context<MaintenanceEnv>,
   surface: string,
   eventName: string,
 ): Promise<Response> {
@@ -87,13 +82,11 @@ async function sendMaintenanceBackfillOrError(
         environment: c.env.ENVIRONMENT ?? 'unknown',
       },
     });
-    return c.json(
-      {
-        queued: false,
-        code: ERROR_CODES.INTERNAL_ERROR,
-        message: 'Failed to queue maintenance backfill',
-      },
+    return apiError(
+      c,
       502,
+      ERROR_CODES.INTERNAL_ERROR,
+      'Failed to queue maintenance backfill',
     );
   }
 
@@ -103,12 +96,11 @@ async function sendMaintenanceBackfillOrError(
 export const maintenanceRoutes = new Hono<MaintenanceEnv>()
   .post('/maintenance/sentry-smoke', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
-      return c.json(
-        {
-          code: ERROR_CODES.FORBIDDEN,
-          message: 'Maintenance secret required',
-        },
+      return apiError(
+        c,
         403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
       );
     }
 
@@ -131,12 +123,11 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
   })
   .post('/maintenance/memory-facts-backfill', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
-      return c.json(
-        {
-          code: ERROR_CODES.FORBIDDEN,
-          message: 'Maintenance secret required',
-        },
+      return apiError(
+        c,
         403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
       );
     }
 
@@ -148,12 +139,11 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
   })
   .post('/maintenance/progress-self-reports-backfill', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
-      return c.json(
-        {
-          code: ERROR_CODES.FORBIDDEN,
-          message: 'Maintenance secret required',
-        },
+      return apiError(
+        c,
         403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
       );
     }
 

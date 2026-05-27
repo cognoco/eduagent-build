@@ -305,6 +305,7 @@ import {
   repairIncompleteBookGenerationClaim,
   deleteBook,
 } from '../services/curriculum';
+import { inngest } from '../inngest/client';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES, type BookWithTopics } from '@eduagent/schemas';
 
@@ -326,6 +327,9 @@ const mockRepairIncompleteBookGenerationClaim =
     typeof repairIncompleteBookGenerationClaim
   >;
 const mockDeleteBook = deleteBook as jest.MockedFunction<typeof deleteBook>;
+const mockInngestSend = inngest.send as jest.MockedFunction<
+  typeof inngest.send
+>;
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -745,6 +749,15 @@ describe('book routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockRepairIncompleteBookGenerationClaim).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend).toHaveBeenCalledWith({
+        name: 'app/book.topics-generated',
+        data: {
+          subjectId: SUBJECT_ID,
+          bookId: BOOK_ID,
+          profileId: 'test-profile-id',
+          timestamp: expect.any(String),
+        },
+      });
       expect(mockReleaseBookGenerationClaimIfEmpty).not.toHaveBeenCalled();
     });
 

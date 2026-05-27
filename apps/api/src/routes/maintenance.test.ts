@@ -177,7 +177,7 @@ describe('maintenanceRoutes', () => {
     ]);
   });
 
-  it('[WI-158] reports memory facts backfill dispatch failure as not queued', async () => {
+  it('[WI-158] reports memory facts backfill dispatch failure as a typed API error', async () => {
     mockInngestTransport.setSendError(new Error('transport down'));
     const app = createTestApp({
       ENVIRONMENT: 'staging',
@@ -191,7 +191,6 @@ describe('maintenanceRoutes', () => {
 
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({
-      queued: false,
       code: ERROR_CODES.INTERNAL_ERROR,
       message: 'Failed to queue maintenance backfill',
     });
@@ -245,7 +244,7 @@ describe('maintenanceRoutes', () => {
     ]);
   });
 
-  it('[WI-158] reports self progress backfill dispatch failure as not queued', async () => {
+  it('[WI-158] reports self progress backfill dispatch failure as a typed API error', async () => {
     mockInngestTransport.setSendError(new Error('transport down'));
     const app = createTestApp({
       ENVIRONMENT: 'staging',
@@ -262,7 +261,6 @@ describe('maintenanceRoutes', () => {
 
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({
-      queued: false,
       code: ERROR_CODES.INTERNAL_ERROR,
       message: 'Failed to queue maintenance backfill',
     });

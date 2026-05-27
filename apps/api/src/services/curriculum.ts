@@ -38,6 +38,7 @@ import {
   type GeneratedBookTopic,
   type GeneratedConnection,
   type GeneratedTopic,
+  type IncompleteBookGenerationClaimRepairResult,
 } from '@eduagent/schemas';
 
 import { NotFoundError } from '../errors';
@@ -1277,11 +1278,6 @@ export function isStaleBookGenerationClaim(updatedAt: string): boolean {
   if (Number.isNaN(updatedAtMs)) return true;
   return Date.now() - updatedAtMs >= BOOK_GENERATION_STALE_MS;
 }
-
-type IncompleteBookGenerationClaimRepairResult =
-  | { status: 'not_incomplete' }
-  | { status: 'in_progress' }
-  | { status: 'repaired'; book: BookWithTopics };
 
 export async function repairIncompleteBookGenerationClaim(
   db: Database,

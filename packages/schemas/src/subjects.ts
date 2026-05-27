@@ -188,6 +188,11 @@ export const bookWithTopicsSchema = z.object({
 });
 export type BookWithTopics = z.infer<typeof bookWithTopicsSchema>;
 
+export type IncompleteBookGenerationClaimRepairResult =
+  | { status: 'not_incomplete' }
+  | { status: 'in_progress' }
+  | { status: 'repaired'; book: BookWithTopics };
+
 // Curriculum generation input — used by the LLM curriculum generator
 
 export const curriculumInputSchema = z.object({
