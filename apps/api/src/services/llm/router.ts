@@ -85,6 +85,7 @@ function getErrorDiagnostics(err: unknown): {
 const LEARNER_FACING_FLOWS: ReadonlySet<string> = new Set([
   // Pre-existing tags (verbatim — DO NOT rename in this PR):
   'exchange.process',
+  'exchange.stream',
   'dictation.review',
   'progress-summary-generation',
   'session-llm-summary',

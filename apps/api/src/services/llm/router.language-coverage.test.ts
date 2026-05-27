@@ -1,7 +1,7 @@
 /**
- * i18n Phase 1 — forward-only ratchet for `routeAndCall` learner-prose coverage.
+ * i18n Phase 1 — forward-only ratchet for learner-prose LLM-call coverage.
  *
- * Every `routeAndCall(` (and `routeAndCallForQuiz(`) site in
+ * Every `routeAndCall(`, `routeAndCallForQuiz(`, AND `routeAndStream(` site in
  * `apps/api/src/{services,inngest,routes}/**` must either:
  *   1. Pass `flow:` AND `conversationLanguage:` keys in its options object
  *      (the learner-prose contract — the prose is generated in the learner's
@@ -150,7 +150,11 @@ function maskComments(src: string): string {
 function findRouteAndCallSites(rawSrc: string): CallSite[] {
   const src = maskComments(rawSrc);
   const sites: CallSite[] = [];
-  const re = /\b(routeAndCall|routeAndCallForQuiz)\s*\(/g;
+  // Covers the three LLM-call entry points. The runtime tripwire fires for
+  // `routeAndStream` too (router.ts), so the static ratchet must also gate
+  // streaming sites — otherwise a future learner-prose stream caller without
+  // `conversationLanguage:` would slip past CI and only show up in logs.
+  const re = /\b(routeAndCall|routeAndCallForQuiz|routeAndStream)\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     const callName = m[1]!;

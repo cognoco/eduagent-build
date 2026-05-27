@@ -48,6 +48,7 @@ const okResult: ChatResult = { content: 'ok', stopReason: 'stop' };
 // per-flow assertion below ensures it also produces the right directive.
 const LEARNER_FACING_FLOW_TAGS = [
   'exchange.process',
+  'exchange.stream',
   'dictation.review',
   'progress-summary-generation',
   'session-llm-summary',

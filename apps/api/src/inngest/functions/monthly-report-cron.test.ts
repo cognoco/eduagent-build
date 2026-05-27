@@ -50,11 +50,25 @@ const mockSelectFromProfilesWhere = jest
   .fn()
   .mockReturnValue({ limit: mockSelectFromProfilesLimit });
 
+// Hoisted mock table descriptors. They are passed back into
+// createDatabaseModuleMock below so production code resolves `profiles` and
+// `familyLinks` from `@eduagent/database` to these exact objects — which
+// lets `mockSelectFrom` dispatch on identity rather than coincidental
+// property presence. Identity dispatch survives schema evolution: if another
+// table gains a `conversationLanguage` column, this dispatch won't
+// silently route it to the profiles mock.
+const profilesTableMock = {
+  id: col('id'),
+  displayName: col('displayName'),
+  conversationLanguage: col('conversationLanguage'),
+};
+const familyLinksTableMock = {
+  parentProfileId: col('parentProfileId'),
+  childProfileId: col('childProfileId'),
+};
+
 const mockSelectFrom = jest.fn().mockImplementation((table: unknown) => {
-  // Dispatch based on whether the table has conversationLanguage (profiles)
-  // vs the familyLinks table (used by the cron fanout query).
-  const t = table as Record<string, unknown>;
-  if ('conversationLanguage' in t) {
+  if (table === profilesTableMock) {
     return { where: mockSelectFromProfilesWhere };
   }
   return { where: mockSelectFromFamilyLinksWhere };
@@ -105,11 +119,7 @@ const mockMonthlyReportDb = createTransactionalMockDb({
 const mockDatabaseModule = createDatabaseModuleMock({
   db: mockMonthlyReportDb,
   exports: {
-    profiles: {
-      id: col('id'),
-      displayName: col('displayName'),
-      conversationLanguage: col('conversationLanguage'),
-    },
+    profiles: profilesTableMock,
     progressSnapshots: {
       profileId: col('profileId'),
       snapshotDate: col('snapshotDate'),
@@ -138,10 +148,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
       id: col('id'),
       email: col('email'),
     },
-    familyLinks: {
-      parentProfileId: col('parentProfileId'),
-      childProfileId: col('childProfileId'),
-    },
+    familyLinks: familyLinksTableMock,
   },
 });
 
