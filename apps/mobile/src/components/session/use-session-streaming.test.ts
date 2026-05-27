@@ -1460,4 +1460,169 @@ describe('useSessionStreaming', () => {
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // WI-306: silence prompt draft freshness — stale-closure regression
+  // -------------------------------------------------------------------------
+  describe('WI-306 silence prompt draft freshness', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    async function fireSilenceTimer() {
+      await act(async () => {
+        jest.advanceTimersByTime(20 * 60 * 1000 + 1000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    }
+
+    function messagesAfterSilence(
+      opts: ReturnType<typeof makeOpts>,
+      initialMessages: Array<Record<string, unknown>> = [],
+    ) {
+      return applyMessageUpdates(
+        (opts.setMessages as jest.Mock).mock.calls,
+        initialMessages,
+      );
+    }
+
+    it('adds and persists one silence prompt when draft is empty at schedule and fire time', async () => {
+      const opts = makeOpts({ activeSessionId: 'session-1', draftText: '' });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      act(() => {
+        result.current.scheduleSilencePrompt('session-1', 2);
+      });
+      await fireSilenceTimer();
+
+      expect(messagesAfterSilence(opts)).toEqual([
+        expect.objectContaining({
+          id: 'silence-prompt',
+          role: 'assistant',
+          isSystemPrompt: true,
+        }),
+      ]);
+      expect(opts.recordSystemPrompt.mutateAsync).toHaveBeenCalledWith({
+        kind: 'silence_nudge',
+      });
+      const arg = opts.recordSystemPrompt.mutateAsync.mock.calls[0]?.[0];
+      expect(arg).not.toHaveProperty('content');
+    });
+
+    it('does not add or persist a silence prompt when the learner types before the timer fires', async () => {
+      let opts = makeOpts({ activeSessionId: 'session-1', draftText: '' });
+      const { result, rerender } = renderHook(() =>
+        useSessionStreaming(opts as any),
+      );
+
+      act(() => {
+        result.current.scheduleSilencePrompt('session-1', 2);
+      });
+
+      act(() => {
+        opts = { ...opts, draftText: 'I am working on it' } as ReturnType<
+          typeof makeOpts
+        >;
+        rerender(opts);
+      });
+      // Flush the useEffect that syncs draftText into the ref (React 19 + fake timers)
+      act(() => {
+        jest.advanceTimersByTime(0);
+      });
+      await fireSilenceTimer();
+
+      expect(opts.setMessages).not.toHaveBeenCalled();
+      expect(messagesAfterSilence(opts)).toEqual([]);
+      expect(opts.recordSystemPrompt.mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('adds a silence prompt when draft was non-empty at schedule time but empty at fire time', async () => {
+      let opts = makeOpts({
+        activeSessionId: 'session-1',
+        draftText: 'starting an answer',
+      });
+      const { result, rerender } = renderHook(() =>
+        useSessionStreaming(opts as any),
+      );
+
+      act(() => {
+        result.current.scheduleSilencePrompt('session-1', 2);
+      });
+
+      act(() => {
+        opts = { ...opts, draftText: '' } as ReturnType<typeof makeOpts>;
+        rerender(opts);
+      });
+      // Flush the useEffect that syncs draftText into the ref (React 19 + fake timers)
+      act(() => {
+        jest.advanceTimersByTime(0);
+      });
+      await fireSilenceTimer();
+
+      expect(messagesAfterSilence(opts)).toEqual([
+        expect.objectContaining({ id: 'silence-prompt' }),
+      ]);
+      expect(opts.recordSystemPrompt.mutateAsync).toHaveBeenCalledWith({
+        kind: 'silence_nudge',
+      });
+    });
+
+    it('treats whitespace-only draft text at fire time as empty', async () => {
+      let opts = makeOpts({ activeSessionId: 'session-1', draftText: '' });
+      const { result, rerender } = renderHook(() =>
+        useSessionStreaming(opts as any),
+      );
+
+      act(() => {
+        result.current.scheduleSilencePrompt('session-1', 2);
+      });
+
+      act(() => {
+        opts = { ...opts, draftText: '   \n\t  ' } as ReturnType<
+          typeof makeOpts
+        >;
+        rerender(opts);
+      });
+      // Flush the useEffect that syncs draftText into the ref (React 19 + fake timers)
+      act(() => {
+        jest.advanceTimersByTime(0);
+      });
+      await fireSilenceTimer();
+
+      expect(messagesAfterSilence(opts)).toEqual([
+        expect.objectContaining({ id: 'silence-prompt' }),
+      ]);
+      expect(opts.recordSystemPrompt.mutateAsync).toHaveBeenCalledWith({
+        kind: 'silence_nudge',
+      });
+    });
+
+    it('does not append a duplicate silence prompt when one already exists', async () => {
+      const existingPrompt = {
+        id: 'silence-prompt',
+        role: 'assistant',
+        content: 'Still working on it?',
+        isSystemPrompt: true,
+      };
+      const opts = makeOpts({
+        activeSessionId: 'session-1',
+        draftText: '',
+        messages: [existingPrompt],
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      act(() => {
+        result.current.scheduleSilencePrompt('session-1', 2);
+      });
+      await fireSilenceTimer();
+
+      const message = messagesAfterSilence(opts, [existingPrompt]);
+      expect(message.filter((m) => m.id === 'silence-prompt')).toHaveLength(1);
+    });
+  });
 });

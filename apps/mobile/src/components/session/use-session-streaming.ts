@@ -274,6 +274,13 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     responseHistory,
   } = opts;
 
+  // WI-306: Mirror draftText into a ref so the silence-timer callback reads the
+  // value at fire time rather than the stale closure value at schedule time.
+  const draftTextRef = useRef(draftText);
+  useEffect(() => {
+    draftTextRef.current = draftText;
+  }, [draftText]);
+
   // Serialization tail for concurrent continueWithMessage callers.
   //
   // Earlier shape was `while (activeContinueRef.current) await activeContinueRef.current;`
@@ -480,7 +487,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       silenceTimerRef.current = setTimeout(
         async () => {
-          if (draftText.trim()) return;
+          if (draftTextRef.current.trim()) return;
 
           const prompt =
             "Still working on it? Take your time - I'm here when you're ready.";
@@ -529,7 +536,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     },
     [
       activeProfileId,
-      draftText,
       effectiveMode,
       effectiveSubjectId,
       effectiveSubjectName,
