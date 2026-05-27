@@ -130,6 +130,10 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-rich-child-history',
       'mentor-audit-session-revoked',
       'mentor-audit-mfa-totp',
+      // Third wave — BILLING-07/08 + BRIDGE-03/04 (plan §§11b, 11c, 14).
+      'mentor-audit-family-pool-members',
+      'mentor-audit-family-owner-daily-quota-with-child',
+      'mentor-audit-bridge-backstack',
     ]);
   });
 
@@ -657,6 +661,41 @@ describe('mentor-audit seed pack returns required IDs', () => {
       scenario: 'mentor-audit-mfa-totp',
       requiredIds: [],
     },
+    // Third wave — BILLING-07/08 + BRIDGE-03/04.
+    {
+      scenario: 'mentor-audit-family-pool-members',
+      requiredIds: [
+        'parentProfileId',
+        'subscriptionId',
+        'childProfileId1',
+        'childProfileId2',
+        'quotaUsedThisMonth',
+        'quotaMonthlyLimit',
+      ],
+    },
+    {
+      scenario: 'mentor-audit-family-owner-daily-quota-with-child',
+      requiredIds: [
+        'ownerProfileId',
+        'childProfileId',
+        'subscriptionId',
+        'childSubjectId',
+        'childTopicId',
+        'childSessionId',
+      ],
+    },
+    {
+      scenario: 'mentor-audit-bridge-backstack',
+      requiredIds: [
+        'ownerProfileId',
+        'childProfileId',
+        'childSubjectId',
+        'childSubjectName',
+        'childTopicId',
+        'childSessionId',
+        'childRecapId',
+      ],
+    },
   ];
 
   it.each(MENTOR_AUDIT_SCENARIOS)(
@@ -759,6 +798,169 @@ describe('mentor-audit seed pack returns required IDs', () => {
     expect(profileRows).toHaveLength(4);
     expect(profileRows.filter((row) => row.isOwner === true)).toHaveLength(1);
     expect(profileRows.filter((row) => row.isOwner === false)).toHaveLength(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // Third-wave structural assertions — BILLING-07/08 + BRIDGE-03/04.
+  // -------------------------------------------------------------------------
+
+  it('family-pool-members seeds exactly 1 owner + 2 children and partial monthly usage', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    const insertMock = jest.fn().mockImplementation(() => ({
+      values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
+        captured.push(row);
+        return Promise.resolve();
+      }),
+    }));
+    const db = {
+      insert: insertMock,
+      delete: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
+      }),
+      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
+    } as unknown as Database;
+
+    const result = await seedScenario(
+      db,
+      'mentor-audit-family-pool-members',
+      'test@example.com',
+    );
+
+    const profileRows = captured.filter(
+      (row) => 'birthYear' in row && 'displayName' in row && 'isOwner' in row,
+    );
+    expect(profileRows).toHaveLength(3);
+    expect(profileRows.filter((row) => row.isOwner === true)).toHaveLength(1);
+    expect(profileRows.filter((row) => row.isOwner === false)).toHaveLength(2);
+
+    // Quota pool row must reflect partial use (~50% of monthly cap) — the
+    // audit reads this to verify the steady-state pool readout.
+    const quotaRow = captured.find(
+      (row) =>
+        'monthlyLimit' in row &&
+        'usedThisMonth' in row &&
+        'subscriptionId' in row,
+    );
+    expect(quotaRow).toBeDefined();
+    const monthlyLimit = Number(quotaRow?.monthlyLimit);
+    const usedThisMonth = Number(quotaRow?.usedThisMonth);
+    expect(monthlyLimit).toBeGreaterThan(0);
+    expect(usedThisMonth).toBeGreaterThan(0);
+    expect(usedThisMonth).toBeLessThan(monthlyLimit);
+    expect(usedThisMonth).toBe(Math.floor(monthlyLimit / 2));
+
+    expect(result.ids.quotaMonthlyLimit).toBe(String(monthlyLimit));
+    expect(result.ids.quotaUsedThisMonth).toBe(String(usedThisMonth));
+  });
+
+  it('family-owner-daily-quota-with-child sets defaultAppContext=family on the owner and stocks the child with learning state', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    const insertMock = jest.fn().mockImplementation(() => ({
+      values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
+        captured.push(row);
+        return Promise.resolve();
+      }),
+    }));
+    const db = {
+      insert: insertMock,
+      delete: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
+      }),
+      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
+    } as unknown as Database;
+
+    const result = await seedScenario(
+      db,
+      'mentor-audit-family-owner-daily-quota-with-child',
+      'test@example.com',
+    );
+
+    // Owner profile must carry defaultAppContext: 'family' — this is the
+    // contract that drives the Mentor context for the audit's BILLING-07 row.
+    const ownerRow = captured.find(
+      (row) => row.id === result.ids.ownerProfileId,
+    );
+    expect(ownerRow).toBeDefined();
+    expect(ownerRow?.defaultAppContext).toBe('family');
+    expect(ownerRow?.isOwner).toBe(true);
+
+    // Exactly one familyLinks row — 1 linked child, not 2 or 3.
+    const familyLinkRows = captured.filter(
+      (row) => 'parentProfileId' in row && 'childProfileId' in row,
+    );
+    expect(familyLinkRows).toHaveLength(1);
+
+    // Quota: daily cap fully consumed, monthly bucket deliberately below cap
+    // so the failure attributable to the daily gate (not monthly).
+    const quotaRow = captured.find(
+      (row) =>
+        'dailyLimit' in row && 'usedToday' in row && 'subscriptionId' in row,
+    );
+    expect(quotaRow).toBeDefined();
+    expect(Number(quotaRow?.usedToday)).toBe(Number(quotaRow?.dailyLimit));
+    expect(Number(quotaRow?.usedThisMonth)).toBeLessThan(
+      Number(quotaRow?.monthlyLimit),
+    );
+
+    // Child must have a real session row (not just subject/topic scaffolding).
+    const sessionRows = captured.filter(
+      (row) => 'sessionType' in row && 'status' in row && 'profileId' in row,
+    );
+    expect(sessionRows.length).toBeGreaterThan(0);
+  });
+
+  it('bridge-backstack puts the child topic in a subject the adult library does NOT have', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    const insertMock = jest.fn().mockImplementation(() => ({
+      values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
+        captured.push(row);
+        return Promise.resolve();
+      }),
+    }));
+    const db = {
+      insert: insertMock,
+      delete: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
+      }),
+      query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
+    } as unknown as Database;
+
+    const result = await seedScenario(
+      db,
+      'mentor-audit-bridge-backstack',
+      'test@example.com',
+    );
+
+    // Two subjects total: one for the owner (adult library), one for the
+    // child. Their `name` fields MUST differ, otherwise the bridge flow would
+    // surface the "already exists / divergent" branch instead of exercising
+    // the new-clone backstack contract BRIDGE-04 cares about.
+    const subjectRows = captured.filter(
+      (row) =>
+        'name' in row && 'profileId' in row && typeof row.name === 'string',
+    );
+    expect(subjectRows).toHaveLength(2);
+
+    const ownerSubjects = subjectRows.filter(
+      (row) => row.profileId === result.ids.ownerProfileId,
+    );
+    const childSubjects = subjectRows.filter(
+      (row) => row.profileId === result.ids.childProfileId,
+    );
+    expect(ownerSubjects).toHaveLength(1);
+    expect(childSubjects).toHaveLength(1);
+    expect(ownerSubjects[0]?.name).not.toBe(childSubjects[0]?.name);
+    expect(childSubjects[0]?.name).toBe(result.ids.childSubjectName);
+
+    // recapId === sessionId per recaps service contract — the seed must
+    // mirror that or the Playwright probe would deep-link to a missing recap.
+    expect(result.ids.childRecapId).toBe(result.ids.childSessionId);
   });
 });
 
