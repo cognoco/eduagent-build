@@ -1887,6 +1887,18 @@
     "index": {
       "redirectTitle": "Primeiro, vamos personalizar alguns pontos básicos",
       "redirectBody": "Vamos começar pelos pronomes para que os próximos passos façam sentido desde o início."
+    },
+    "ready": {
+      "title": "You're all set.",
+      "introWithLearner": "For {{learner}}:",
+      "intro": "Here's what's set up:",
+      "rowTone": "Your mentor will talk to you the right way",
+      "rowToneChild": "Your mentor will talk to {{learner}} the right way",
+      "rowSubject": "Starting with {{subject}}",
+      "rowPace": "Pace stays at your speed — never rushed",
+      "reassurance": "Most learners feel the difference in the first session.",
+      "cta": "Let's start",
+      "ctaLabel": "Start your first session"
     }
   },
   "parentView": {
