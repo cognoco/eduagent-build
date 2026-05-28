@@ -47,10 +47,16 @@ concurrency:
 jobs:
   # Check if mobile is actually affected by the changes
   check-affected:
-    # Skip if CI failed (workflow_run trigger only)
-    if: >
+    # Skip if CI failed (workflow_run trigger only); allow manual dispatch;
+    # require same-repo push to main for automated runs.
+    if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     runs-on: ubuntu-latest
     outputs:
       mobile-affected: ${{ steps.check.outputs.affected }}
@@ -167,9 +173,12 @@ jobs:
   build-preview:
     needs: [check-affected, lint, test]
     # always() needed because lint/test are skipped (not failed) on workflow_run
-    if: |
+    if: |-
       always() &&
       github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
       needs.check-affected.result == 'success' &&
       needs.check-affected.outputs.mobile-affected == 'true' &&
       needs.check-affected.outputs.native-changed == 'true'

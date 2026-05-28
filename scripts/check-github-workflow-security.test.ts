@@ -1,7 +1,31 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { parse } from 'yaml';
 import { checkGithubWorkflowSecurity } from './check-github-workflow-security';
+
+function readWorkflow(relativePath: string): Record<string, unknown> {
+  return parse(
+    readFileSync(join(process.cwd(), relativePath), 'utf8'),
+  ) as Record<string, unknown>;
+}
+
+function workflowOn(
+  workflow: Record<string, unknown>,
+): Record<string, unknown> {
+  return (workflow.on ?? workflow.true) as Record<string, unknown>;
+}
+
+function jobIf(workflow: Record<string, unknown>, jobId: string): string {
+  const jobs = workflow.jobs as Record<string, { if?: unknown }>;
+  return String(jobs[jobId]?.if ?? '');
+}
 
 function writeFixture(root: string, relativePath: string, content: string) {
   const filePath = join(root, relativePath);
@@ -549,5 +573,54 @@ describe('checkGithubWorkflowSecurity', () => {
     );
 
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  it('requires mobile workflow_run builds to come from successful push on main in this repository', () => {
+    const workflow = readWorkflow('.github/workflows/mobile-ci.yml');
+    const on = workflowOn(workflow);
+
+    expect(on).toHaveProperty('workflow_run');
+    expect(on).toHaveProperty('workflow_dispatch');
+    expect(
+      (
+        (on.workflow_dispatch as { inputs?: Record<string, { type?: string }> })
+          .inputs ?? {}
+      ).skip_tests?.type,
+    ).toBe('boolean');
+
+    const checkAffectedIf = jobIf(workflow, 'check-affected');
+    expect(checkAffectedIf).toContain(
+      "github.event_name == 'workflow_dispatch'",
+    );
+    expect(checkAffectedIf).toContain(
+      "github.event.workflow_run.conclusion == 'success'",
+    );
+    expect(checkAffectedIf).toContain(
+      "github.event.workflow_run.event == 'push'",
+    );
+    expect(checkAffectedIf).toContain(
+      "github.event.workflow_run.head_branch == 'main'",
+    );
+    expect(checkAffectedIf).toContain(
+      'github.event.workflow_run.head_repository.full_name == github.repository',
+    );
+
+    const buildPreviewIf = jobIf(workflow, 'build-preview');
+    expect(buildPreviewIf).toContain("github.event_name == 'workflow_run'");
+    expect(buildPreviewIf).toContain(
+      "github.event.workflow_run.event == 'push'",
+    );
+    expect(buildPreviewIf).toContain(
+      "github.event.workflow_run.head_branch == 'main'",
+    );
+    expect(buildPreviewIf).toContain(
+      'github.event.workflow_run.head_repository.full_name == github.repository',
+    );
+    expect(buildPreviewIf).toContain(
+      "needs.check-affected.outputs.mobile-affected == 'true'",
+    );
+    expect(buildPreviewIf).toContain(
+      "needs.check-affected.outputs.native-changed == 'true'",
+    );
   });
 });
