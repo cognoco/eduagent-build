@@ -2,7 +2,6 @@
   "common": {
     "cancel": "Cancel",
     "ok": "OK",
-    "save": "Save",
     "done": "Done",
     "loading": "Loading...",
     "retry": "Retry",
@@ -16,10 +15,7 @@
     "close": "Close",
     "next": "Next",
     "back": "Back",
-    "search": "Search",
-    "noResults": "No results found",
     "and": "and",
-    "retryHint": "Tap to retry",
     "usageMeter": {
       "questionsUsed": "{{used}} / {{limit}} questions used"
     },
@@ -68,7 +64,6 @@
   "errorBoundary": {
     "title": "Something went wrong",
     "message": "An unexpected error occurred. You can try again or go back to the home screen.",
-    "sessionCrashTitle": "Session screen crashed",
     "logged": "We've logged this automatically."
   },
   "recovery": {
@@ -77,15 +72,8 @@
     "goHome": "Go Home",
     "signOut": "Sign Out"
   },
-  "autoSuggest": {
-    "title": "Chat in {{language}}?",
-    "message": "Would you like your mentor to talk to you in {{language}}?",
-    "accept": "Yes, switch",
-    "dismiss": "No thanks"
-  },
   "settings": {
     "appLanguage": "App Language",
-    "appLanguageDescription": "Change the language of the app interface",
     "languageChangeFailedTitle": "Couldn't change language",
     "languageChangeFailedMessage": "We couldn't switch the app language. Please try again."
   },
@@ -133,7 +121,6 @@
       "intentHeading": "What do you need right now?",
       "askAnythingLabel": "Ask anything",
       "askAnythingSubtitle": "Quick question, study idea, or something confusing",
-      "askAnythingPlaceholder": "Ask anything...",
       "yourSubjects": "Your subjects",
       "newSubject": "New subject",
       "emptySubjectsTitle": "Your subjects will show up here",
@@ -172,17 +159,10 @@
       "consentDeletedTitle": "{{name}}'s account was deleted",
       "consentDeletedBody": "The withdrawal grace period has ended."
     },
-    "childCard": {
-      "title": "Children",
-      "accessibilityLabel": "Open Family"
-    },
     "parent": {
       "greeting": "Hey {{displayName}}",
       "accountLink": "Open account",
-      "intentHeader": "What do you need right now?",
       "tonight": {
-        "titleMorning": "Conversation starters",
-        "titleAfternoon": "Conversation starters",
         "titleEvening": "Conversation starters",
         "promptWithTopic": "What felt clearer in {{topic}} this week?",
         "promptNoActivity": "What would make starting feel easy this week?",
@@ -199,7 +179,6 @@
       },
       "childrenHeader": "Children",
       "familyManagementHeader": "Your family",
-      "familyToolsHeader": "Family tools",
       "familySummary": {
         "nameListWithMore_one": "{{names}} + {{count}} more",
         "nameListWithMore_other": "{{names}} + {{count}} more",
@@ -214,31 +193,17 @@
         "addProfileAction": "Add profile",
         "addProfileAccessibilityLabel": "Add a family profile"
       },
-      "encouragementNote": "Nudges are gentle one-way encouragements.",
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
-      "cards": {
-        "checkChild": "See how {{childName}} is doing",
-        "checkChildFallback": "Tap to see this week's progress",
-        "weeklyReport": "Read {{childName}}'s weekly report",
-        "weeklyReportSubtitle": "Catch up on the latest summary",
-        "sendNudge": "Send {{childName}} a nudge",
-        "sendNudgeSubtitle": "Choose a short encouragement"
-      },
       "snapshot": {
         "noActivity": "No activity this week",
         "sessions_one": "{{count}} session this week",
         "sessions_other": "{{count}} sessions this week"
       },
       "childCard": {
-        "statusLine": "{{activity}} · {{focus}} · {{signal}}",
         "minutesThisWeek_one": "{{count}} min this week",
         "minutesThisWeek_other": "{{count}} min this week",
         "readyToStart": "Ready to start",
         "statusPending": "Checking in",
-        "statusUpdating": "updating",
-        "confidenceImproving": "confidence improving",
-        "needsEncouragement": "needs encouragement",
-        "steady": "steady",
         "progressAction": "Progress",
         "reportsAction": "Reports",
         "nudgeAction": "Nudge"
@@ -247,37 +212,10 @@
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress"
   },
-  "dashboard": {
-    "backLabel": "Back",
-    "title": "Child progress",
-    "subtitle": "How your children are doing",
-    "demoDashboardHint": "Here's what your dashboard will look like",
-    "errorTitle": "Couldn't load your dashboard",
-    "errorMessage": "Check your internet connection and try again.",
-    "retryLoadingLabel": "Retry loading dashboard",
-    "libraryButton": "Library",
-    "libraryFallbackLabel": "Open parent library",
-    "moreButton": "More",
-    "moreFallbackLabel": "Open parent settings",
-    "emptyMessage": "No children linked yet. Add a child profile to see their progress here.",
-    "addChild": "Add a child",
-    "addChildLabel": "Add a child",
-    "continueSolo": "Continue solo",
-    "continueSoloLabel": "Continue solo",
-    "linkChildCta": "Link your child's account",
-    "linkChildCtaLabel": "Link your child's account to get started",
-    "demoPreviewLabel": "Preview",
-    "demoPreviewMessage": "This is sample data. Once your child starts learning, you will see their real progress here.",
-    "demoBannerLabel": "Preview mode: this is sample data showing what your dashboard will look like once your child starts learning",
-    "demoAlertTitle": "Preview Mode",
-    "demoAlertMessage": "Link your child's account to see real data."
-  },
   "family": {
     "orientationCueBody": "Kids' progress and your own learning, all in one place.",
     "orientationCueDismiss": "Got it",
     "orientationCueTitle": "This is your home",
-    "subtitle": "Everyone you're learning alongside.",
-    "title": "Family",
     "withdrawal": {
       "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} accounts closing soon",
@@ -296,7 +234,6 @@
     "accommodation": {
       "sectionHeader": "Your learning accommodation",
       "viewAndManage": "View & manage",
-      "screenTitle": "Learning accommodation",
       "notSureWhichToPick": "Not sure which to pick?",
       "guideActive": "Active",
       "childScreenTitle": "{{name}}'s learning preferences"
@@ -311,27 +248,18 @@
       "description": "Switch back to your account to change settings. While viewing as a child, this area stays locked."
     },
     "mentorMemory": {
-      "sectionHeader": "Mentor memory",
-      "viewAndManage": "What your mentor knows",
-      "viewAndManageDescription": "Strengths, interests, and how you learn best"
+      "sectionHeader": "Mentor memory"
     },
     "family": {
       "sectionHeader": "Family",
-      "childProgress": "Child progress",
-      "childCount_one": "{{count}} child",
-      "childCount_other": "{{count}} children",
       "addChild": "Add a child",
       "addChildDescription": "Create a profile so your child can learn with their own mentor",
       "addChildAccessLabel": "Add a child profile",
-      "yourChild": "your child",
-      "openFamilyPreferencesAccessLabel": "Open family preferences",
       "breakdownSharingTitle": "Share family usage",
       "breakdownSharingDescription": "Show usage per profile.",
       "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
-      "sectionHeader": "Your celebrations",
-      "inlinePrompt": "Celebrations",
       "lessAnimationTitle": "Prefer less animation? Click here",
       "lessAnimationDescription": "Adjust how often milestone animations appear",
       "screenTitle": "Celebration settings",
@@ -354,7 +282,6 @@
       "updateErrorTitle": "Could not update notification settings"
     },
     "privacy": {
-      "sectionHeader": "Privacy",
       "privacyAndData": "Privacy & data",
       "withdrawalArchiveTitle": "When I withdraw consent for a child",
       "withdrawalArchiveAuto": "Automatic",
@@ -374,7 +301,6 @@
       "couldNotSignOut": "Could not sign out"
     },
     "other": {
-      "sectionHeader": "Other",
       "helpAndSupport": "Help & Support",
       "reportAProblem": "Report a Problem",
       "privacyPolicy": "Privacy Policy",
@@ -406,27 +332,15 @@
       "tryAgainMoment": "Please try again in a moment.",
       "couldNotSaveSetting": "Could not save setting"
     },
-    "mentorLanguageLabels": {
-      "en": "English",
-      "cs": "Czech",
-      "de": "German",
-      "es": "Spanish",
-      "fr": "French",
-      "it": "Italian",
-      "pl": "Polish",
-      "pt": "Portuguese"
-    },
     "appVersion": "MentoMate v1.0.0"
   },
   "session": {
     "challenge": {
       "offerTitle": "Up for a challenge round?",
-      "offerBody": "You've got the basics — want to try explaining it in your own words and turn that into a note?",
       "tryIt": "Try it",
       "notNow": "Not now",
       "dontAskAgain": "Don't ask again",
       "banner": {
-        "active": "Challenge round in progress",
         "question": "Question {{index}} of {{total}}"
       },
       "draft": {
@@ -434,12 +348,6 @@
         "save": "Save note",
         "edit": "Edit first",
         "skip": "Skip"
-      },
-      "partial": {
-        "body": "You've got the strong pieces. I'll save those — we'll tighten the fuzzy bit next time."
-      },
-      "allMissing": {
-        "body": "Let's revisit this together first."
       }
     },
     "mentorMemory": {
@@ -531,7 +439,6 @@
     "accessories": {
       "addNote": "Add note",
       "switchTopic": "Switch topic",
-      "parkIt": "Park it",
       "pickSubject": "Pick the subject",
       "adding": "Adding...",
       "newSubject": "+ New subject",
@@ -563,7 +470,6 @@
       "topUpCreditsWithCount": "Top up credits ({{count}} remaining)",
       "childDailyMessage": "You've reached today's question limit.",
       "childMonthlyMessage": "You've reached this month's question limit.",
-      "askParent": "Ask parent",
       "topUpCredits": "Top up credits",
       "notifyParent": "Notify parent",
       "notifyParentSent": "Sent — parent has been notified",
@@ -766,7 +672,6 @@
       "leaveQuizButton": "Leave quiz",
       "seeResultsLabel": "See quiz results",
       "oneMoreLabel": "Start one more quiz",
-      "nextQuestionLabel": "Next question",
       "disputeLabel": "Dispute this answer",
       "dismissLabel": "Dismiss",
       "saveAndFinishLabel": "Save progress and finish round"
@@ -887,8 +792,6 @@
       "tapToRetry": "Tap to retry",
       "tookTooLong": "That took too long — try again",
       "retryGenerating": "Retry generating a dictation",
-      "pickingTopic": "Picking a topic...",
-      "takesAFewSeconds": "This takes a few seconds",
       "loadingTitle": "Finding your next review...",
       "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
       "cancelGenerating": "Cancel generating a dictation",
@@ -1054,31 +957,21 @@
     "row": {
       "review": "Keep it fresh",
       "finished": "Finished",
-      "notStarted": "not started",
       "paused": "Paused",
       "archived": "Archived",
-      "hasNotes": "Has notes",
-      "bookTopics": "{{progress}} topics",
       "shelfSubtitle_one": "{{count}} book · {{progress}} topics",
       "shelfSubtitle_other": "{{count}} books · {{progress}} topics",
       "shelfSubtitleUnstarted": "Start learning",
-      "shelfEmpty": "No books in this subject yet. Study a topic and it'll be filed here.",
-      "bookAccessibilityLabel": "{{title}}, {{progress}} topics{{retentionSuffix}}{{notesSuffix}}",
-      "bookRetentionSuffix": ", retention {{status}}",
-      "bookNotesSuffix": ", has notes",
       "shelfAccessibilityLabel": "{{name}} shelf, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Tap to {{action}}.",
       "shelfPausedSuffix": ", paused",
       "shelfArchivedSuffix": ", archived",
       "shelfReviewSuffix": ", review needed",
       "shelfFinishedSuffix": ", finished",
-      "shelfActionExpand": "expand",
-      "shelfActionCollapse": "collapse",
       "shelfActionOpen": "open",
       "urgencyBadge": "Soon: {{reason}}"
     },
     "shelf": {
       "missingParam": "Missing subject. Please go back and try again.",
-      "loading": "Loading this shelf...",
       "loadingTitle": "Opening your shelf...",
       "loadingMessage": "We're finding the books and next steps saved for this subject.",
       "errorTitle": "Couldn't load this shelf",
@@ -1087,8 +980,6 @@
       "topicProgress": "{{completed}}/{{total}} topics",
       "settingsAccessibilityLabel": "Subject settings",
       "studyNext": "Study next",
-      "chooseBook": "Browse or choose a book",
-      "chooseAnotherBook": "Browse or add another book",
       "addAnotherBook": "Add another book",
       "browseAll": "Browse all suggestions",
       "emptyPickTitle": "Pick a book to start",
@@ -1170,7 +1061,6 @@
     "suggestedSubjectsLabel": "Suggested subjects",
     "continueSubject": "Continue {{name}}",
     "continueSubjectLabel": "Continue {{name}}",
-    "startSubject": "Start {{name}}",
     "startSubjectLabel": "Start {{name}}",
     "notSureHint": "Not sure? Just describe what interests you — like \"I want to understand how plants grow\"",
     "checkingName": "Checking subject name...",
@@ -1453,8 +1343,6 @@
     "tryCameraAgain": "Try camera again",
     "tryCameraAgainLabel": "Try camera again",
     "tryReadingAgainLabel": "Try reading again",
-    "classifyErrorTitle": "Could not identify the subject",
-    "classifyErrorMessage": "Please pick the subject this homework belongs to.",
     "listening": "Listening...",
     "voiceHint": "Say the homework problem out loud.",
     "stopDictatingProblemLabel": "Stop dictating problem",
@@ -1473,7 +1361,6 @@
     }
   },
   "progress": {
-    "pageTitle": "My Learning Journey",
     "pageTitleMine": "My progress",
     "pageTitleProfile": "{{name}}'s progress",
     "pageTitleFallbackName": "Your child",
@@ -1483,11 +1370,6 @@
     "keepLearning": "Keep learning",
     "refreshFailedTitle": "Refresh failed",
     "refreshFailed": "We couldn't refresh your progress right now.",
-    "loadingTitle": "Loading your learning journey",
-    "loadTimeout": {
-      "title": "Progress is taking too long to load",
-      "message": "Check your connection, then try again or head home."
-    },
     "hero": {
       "sessionsCompleted": "{{count}} session completed",
       "sessionsCompleted_other": "{{count}} sessions completed",
@@ -1506,42 +1388,19 @@
     },
     "register": {
       "child": {
-        "weekTitle": "Your week",
-        "monthTitle": "Your month",
-        "growthTitle": "What you learned",
         "growthSubtitle": "Your weekly wins",
         "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
         "retentionStrong": "What came back to you this week.",
         "retentionFading": "Worth a quick refresh.",
-        "retentionWeak": "Worth coming back to.",
-        "growthPrimaryLegend": "Topics learned",
-        "growthSecondaryLegend": "Words added",
-        "currentlyWorkingOnTitle": "What you're working on right now",
-        "currentlyWorkingOnDetected": "Spotted in your recent sessions"
+        "retentionWeak": "Worth coming back to."
       },
       "adult": {
-        "weekTitle": "Weekly report",
-        "monthTitle": "Monthly report",
-        "growthTitle": "Your growth",
-        "growthSubtitle": "Weekly changes in topics mastered and vocabulary",
-        "masteredTopicsHero": "You've mastered {{count}} topics. Your progress keeps stacking up.",
         "retentionStrong": "Still remembered.",
         "retentionFading": "Getting fuzzy — a quick review will help.",
-        "retentionWeak": "Needs a quick refresh.",
-        "growthPrimaryLegend": "Topics mastered",
-        "growthSecondaryLegend": "Vocabulary growth",
-        "currentlyWorkingOnTitle": "Currently working on",
-        "currentlyWorkingOnDetected": "Detected from recent sessions"
+        "retentionWeak": "Needs a quick refresh."
       }
     },
-    "currentlyWorkingOn": {
-      "andNMore": "and {{count}} more"
-    },
     "guardian": {
-      "sessionCount_one": "{{count}} session",
-      "sessionCount_other": "{{count}} sessions",
-      "lastStudied": "Last studied {{date}}",
-      "topicsMastered": "{{mastered}}/{{total}} topics mastered",
       "summaryFallback": "No summary available yet. One will appear after the next session.",
       "noRecentSessions": "No new sessions since {{date}}.",
       "noRecentSessionsFallback": "No new sessions since a while ago.",
@@ -1553,18 +1412,6 @@
       "goToChildCurriculum": "Open child curriculum"
     },
     "weeklyReport": {
-      "thisWeekSoFar": "This week so far",
-      "practiceTitle": "Practice highlights",
-      "chips": {
-        "time": "{{time}} spent",
-        "topics": "{{count}} topic started",
-        "topics_other": "{{count}} topics started",
-        "streak": "{{count}}-day streak"
-      },
-      "practice": {
-        "quizzes": "quizzes completed",
-        "reviews": "reviews finished"
-      },
       "mini": {
         "sessions": "{{count}} session",
         "sessions_other": "{{count}} sessions",
@@ -1572,25 +1419,6 @@
         "words_other": "{{count}} words",
         "topics": "{{count}} topic touched",
         "topics_other": "{{count}} topics touched"
-      },
-      "empty": {
-        "child": "Your first weekly summary is on its way.",
-        "adult": "Your first weekly summary lands after a full week of learning."
-      }
-    },
-    "monthlyReport": {
-      "highlightsTitle": "Highlights",
-      "nextStepTitle": "Next step",
-      "bars": {
-        "sessions": "Sessions",
-        "time": "Time",
-        "topics": "Topics",
-        "quizzes": "Quizzes",
-        "reviews": "Reviews"
-      },
-      "empty": {
-        "child": "Your first monthly summary lands at the end of {{month}}.",
-        "adult": "Your first monthly summary lands at the end of {{month}}."
       }
     },
     "previousReports": {
@@ -1620,17 +1448,9 @@
       "error": "We couldn't load recent sessions right now.",
       "sessionFallback": "Studied {{date}}"
     },
-    "newLearner": {
-      "title": "You've completed {{count}} session. Keep going!",
-      "title_other": "You've completed {{count}} sessions. Keep going!",
-      "subtitle": "Complete {{count}} more session to see your full learning journey!",
-      "subtitle_other": "Complete {{count}} more sessions to see your full learning journey!"
-    },
     "empty": {
       "title": "Progress appears after the first study session",
-      "subtitle": "Sessions, mastery, reviews, and reports will appear here once there is something to measure.",
-      "withSubjectTitle": "Progress unlocks after you study {{subject}}",
-      "withSubjectSubtitle": "Study a topic in {{subject}} first. Sessions, mastery, and reviews will appear here once there is something to measure."
+      "subtitle": "Sessions, mastery, reviews, and reports will appear here once there is something to measure."
     },
     "error": {
       "loadTitle": "We couldn't load your progress",
@@ -1669,21 +1489,7 @@
       "topicsExplored": "+{{count}} topic explored this week",
       "topicsExplored_other": "+{{count}} topics explored this week"
     },
-    "growth": {
-      "title": "Your growth",
-      "subtitle": "Weekly changes in topics mastered and vocabulary",
-      "emptyFoundation": "You're building a foundation. Growth will become visible once you master your first topic.",
-      "emptyInProgress": "You've put in {{count}} session. Keep going — mastery shows up after repeat exposures.",
-      "emptyInProgress_other": "You've put in {{count}} sessions. Keep going — mastery shows up after repeat exposures.",
-      "emptyJustStarted": "You just started. Keep going and your growth will appear here."
-    },
     "milestones": {
-      "recentTitle": "Recent milestones",
-      "seeAll": "See all milestones",
-      "seeAllLink": "See all →",
-      "allReached": "You've reached all session milestones. Keep exploring!",
-      "nextMilestone": "Complete {{count}} more session to reach your next milestone.",
-      "nextMilestone_other": "Complete {{count}} more sessions to reach your next milestone.",
       "pageTitle": "Your Milestones",
       "earned": "{{count}} milestone earned",
       "earned_other": "{{count}} milestones earned",
@@ -1755,9 +1561,6 @@
       "retentionTitle": "Memory check",
       "retentionLoadError": "We couldn't load what needs review right now.",
       "retryRetention": "Retry loading review status",
-      "retentionStrong": "Still remembered.",
-      "retentionFading": "Getting fuzzy — a quick review will help.",
-      "retentionWeak": "Needs a quick refresh.",
       "openShelf": "Open shelf",
       "resume": "Resume",
       "chooseNext": "Choose next",
@@ -1822,29 +1625,6 @@
         "forgotten_other": "Last seen {{count}} days ago"
       }
     },
-    "growthChart": {
-      "a11y": {
-        "topicsLearned": "topics learned",
-        "topicsMastered": "topics mastered",
-        "wordsAdded": "words added",
-        "vocabularyGrowth": "vocabulary growth"
-      }
-    },
-    "growthSnapshot": {
-      "latestWeek": "Latest week",
-      "recentWeeks": "Recent weeks",
-      "sessions_one": "{{count}} session",
-      "sessions_other": "{{count}} sessions",
-      "topicsExplored_one": "{{count}} topic explored",
-      "topicsExplored_other": "{{count}} topics explored",
-      "topicsLearned_one": "{{count}} topic learned",
-      "topicsLearned_other": "{{count}} topics learned",
-      "topicsMastered_one": "{{count}} topic mastered",
-      "topicsMastered_other": "{{count}} topics mastered",
-      "wordsAdded_one": "{{count}} word added",
-      "wordsAdded_other": "{{count}} words added",
-      "weekDetail": "{{sessions}} sessions · {{time}} · {{topics}} topics · {{words}} words"
-    },
     "remediation": {
       "heading": "Try a different approach",
       "body": "It is completely normal to need another pass at this.",
@@ -1861,7 +1641,6 @@
   },
   "onboarding": {
     "common": {
-      "noSubjectSelected": "No subject selected",
       "saving": "Saving…",
       "skip": "Skip",
       "stepLabels": {
@@ -1871,34 +1650,9 @@
         "yourPlan": "Your plan"
       }
     },
-    "mentorLanguagePicker": {
-      "title": "What language should your mentor speak?",
-      "subtitle": "Your mentor will use this language for chats, encouragement, and explanations. You can change it later in More.",
-      "otherLabel": "Other",
-      "otherSublabel": "Tell us which language",
-      "saving": "Saving…",
-      "otherModal": {
-        "title": "Which language?",
-        "subtitle": "We'll pass your request to the team and let you know when we add it.",
-        "placeholder": "e.g. Norwegian, Mandarin, Arabic",
-        "submit": "Send request",
-        "cancel": "Cancel",
-        "thanksTitle": "Thanks!",
-        "thanksMessage": "We've passed your request to the team.",
-        "thanksDone": "Done"
-      },
-      "swapAppPrompt": {
-        "title": "Switch the app to {{language}} too?",
-        "message": "Your mentor will speak {{language}}. Want the rest of the app interface in {{language}} as well?",
-        "accept": "Yes, switch the app",
-        "decline": "No, keep it as is"
-      }
-    },
     "languageSetup": {
-      "title": "Language setup",
       "calibrationTitle": "Quick check",
       "calibrationSubtitle": "Which language do you speak at home? One tap, then we start.",
-      "subtitle": "We'll switch this subject into a language-focused path with direct instruction, vocabulary tracking, and speaking practice.",
       "learningHint": "Looks like you're learning {{language}}!",
       "approachHint": "We'll use a language-focused approach built around vocabulary, fluency, input, and output practice.",
       "noSubjectSelected": "No language subject selected",
@@ -1929,7 +1683,6 @@
     "pronouns": {
       "title": "What are your pronouns?",
       "subtitle": "Helps us personalise your experience (optional).",
-      "skipForNow": "Skip for now",
       "saveErrorTitle": "Could not save pronouns",
       "saveErrorMessage": "Something went wrong. Please try again.",
       "somethingElse": "Something else",
@@ -1944,70 +1697,29 @@
       "introWithLearner": "For {{learner}}:",
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
-      "rowToneChild": "Your mentor will talk to {{learner}} the right way",
       "rowSubject": "Starting with {{subject}}",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
-      "cta": "Let's start",
-      "ctaLabel": "Start your first session"
+      "cta": "Let's start"
     }
   },
   "parentView": {
     "index": {
       "yourChild": "Your child",
-      "childOverview": "{{name}}'s overview",
-      "viewingAs": "Viewing as {{name}}",
-      "totalSessions": "{{count}} sessions",
-      "recentActivity": "Recent activity",
-      "noRecentActivity": "No recent activity yet",
       "lastSessionAgo": "Last session {{time}}",
       "noSessionsYet": "No sessions yet",
-      "viewAllSessions": "View all sessions",
-      "subjectsExplored": "Subjects explored",
-      "noSubjectsYet": "No subjects yet",
-      "viewSubject": "View {{name}}",
-      "openReports": "Open reports",
       "reportsSubtitle": "Weekly and monthly updates for {{name}}",
       "curriculumTitle": "Curriculum",
       "curriculumSubtitle": "Browse {{name}}'s subjects and topics",
       "curriculumNotAvailableTitle": "This child's curriculum is not available",
       "curriculumNotAvailableBody": "You can only review curriculum for children linked to your family account.",
-      "refreshActivity": "Refresh activity",
-      "loadingChild": "Loading child data...",
-      "couldNotLoad": "Could not load child data",
-      "switchChild": "Switch child",
-      "openMentorMemory": "Open mentor memory",
-      "timeOnApp": "{{duration}} on app",
-      "timeOnAppUnavailable": "Time on app unavailable",
-      "childNotFound": "Child not found",
-      "unableToLoadChild": "We were unable to load this child's profile.",
-      "clearAlert": {
-        "title": "Clear mentor memory?",
-        "message": "This will remove all notes the mentor has saved about {{name}}. This cannot be undone.",
-        "confirm": "Clear memory"
-      },
-      "errorTitle": "Something went wrong",
-      "couldNotWithdrawConsent": "Could not withdraw consent",
-      "couldNotCancelDeletion": "Could not cancel deletion",
-      "couldNotSaveSetting": "Could not save setting",
-      "pleaseTryAgain": "Please try again",
       "profileNotFound": "Profile not found",
       "unableToLoadChildDetails": "Unable to load child details",
       "profileNoLongerAvailable": "This profile is no longer available",
       "profileRemovedOrNoAccess": "The profile may have been removed or you no longer have access",
       "backToDashboard": "Back to dashboard",
       "noAccessToProfile": "You don't have access to this profile",
-      "dayStreak": "{{count}}-day streak",
-      "visibleProgress": "Visible progress",
-      "topicsMastered": "Topics mastered",
-      "wordsKnown": "Words known",
-      "topicsThisWeek": "Topics this week",
-      "wordsThisWeek": "Words this week",
-      "openMonthlyReports": "Open monthly reports",
-      "monthlyReports": "Monthly reports",
-      "monthlyReportsSummary": "Detailed summaries of your child's learning each month",
       "firstReportSoon": "The first report will arrive at the end of the month",
-      "progressUnlockMessage": "Progress details unlock after the first few sessions",
       "progressNudgeFreshTitle": "Ask about {{focus}} while it is fresh",
       "progressNudgeFreshSubtitle": "{{name}} studied {{focus}} {{time}}. Try a quick pass yourself, then ask what clicked.",
       "progressNudgeRecentTitle": "Keep {{focus}} warm",
@@ -2017,108 +1729,42 @@
       "progressNudgeStartTitle": "Learn alongside {{name}}",
       "progressNudgeStartSubtitle": "Open {{subject}} to see what is ready, then try a small lesson yourself so you can help.",
       "openProgressNudgeAction": "Open {{subject}}",
-      "recentGrowth": "Recent growth",
-      "recentGrowthSubtitle": "Topics mastered over the last 8 weeks",
       "subjects": "Subjects",
       "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
       "subjectRawInputAudit": "Your child searched for \"{{rawInput}}\"",
       "openSubjectProgress": "Open {{subject}} progress",
-      "viewSubjectDetails": "View {{name}} details",
-      "childSearchedFor": "Searched for",
       "recentSessions": "Recent sessions",
       "couldNotLoadSessions": "Could not load sessions",
-      "refreshChildProfile": "Refresh child profile",
       "refresh": "Refresh",
       "startSession": "Start a session",
       "goToCurriculum": "Go to curriculum",
       "viewSessionFrom": "View session from",
-      "mentorMemoryTitle": "What the mentor knows about {{name}}",
       "mentorMemoryTitleFallback": "Mentor memory",
       "manageMentorMemoryForChild": "Manage what the mentor remembers about {{name}}",
       "profileDetails": "Profile details",
       "childProfileJoined": "Added {{date}}",
-      "setUpMentorMemory": "Set up mentor memory",
-      "chooseWhatMentorRemembers": "Choose what the mentor remembers",
-      "viewWhatMentorKnows": "View what the mentor knows",
-      "whatTheMentorKnows": "What the mentor knows",
-      "reviewAndAdjustPrivacy": "Review and adjust privacy settings",
       "learningAccommodationTitle": "Learning accommodation for {{name}}",
-      "learningAccommodationTitleFallback": "Learning accommodation",
-      "learningAccommodationDescription": "Adjust how the mentor teaches to fit your child's learning needs",
       "noLearningPreferenceSet": "No learning preference set",
-      "toggleDecisionGuide": "Show decision guide",
-      "notSureWhichToPick": "Not sure which to pick?",
-      "pickAccommodation": "Pick an accommodation",
-      "active": "Active",
-      "accommodationTryIt": "Try it",
-      "consentSettingsCouldNotLoad": "Consent settings could not load",
-      "retryConsentSettings": "Retry",
-      "consentRestrictedTitle": "Consent needed before progress is shown",
-      "consentRestrictedPendingBody": "{{name}}'s learning details are hidden until consent is active. Check again after consent is completed.",
-      "consentRestrictedRequestedBody": "The consent request for {{name}} is already waiting for approval. Once it is approved, progress appears here automatically.",
-      "consentRestrictedWithdrawnBody": "{{name}}'s learning details are hidden because consent was withdrawn. Restore consent to keep the account active during the grace period.",
-      "checkConsentStatus": "Check consent status",
-      "accountTitle": "Account — {{name}}",
-      "accountTitleFallback": "Account",
       "childProfileScopeHint": "Progress and reports live in their own tabs, so this page only keeps child-specific settings.",
       "consentTitle": "Consent",
       "consentDescription": "Manage parental consent for {{name}}.",
       "consentStatusError": "Could not load consent status. Please try again.",
       "deletionPending": "Deletion scheduled",
-      "deletionCountdown": "Account will be deleted on {{date}}",
       "deletionGraceDays_one": "1 day left to cancel deletion.",
       "deletionGraceDays_other": "{{count}} days left to cancel deletion.",
       "deletionGraceFallback": "Deletion is scheduled. Try cancelling now if this was a mistake.",
-      "deletionProcessing": "Deletion in progress",
       "cancelDeletion": "Cancel deletion",
-      "cancelling": "Cancelling…",
-      "refreshDeletionStatus": "Refresh deletion status",
-      "refreshStatus": "Refresh status",
       "withdrawConsent": "Withdraw consent",
-      "withdrawing": "Withdrawing…",
       "withdrawConsentConfirmTitle": "Withdraw consent?",
-      "thisChild": "this child",
       "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
-      "confirmWithdrawConsent": "Confirm — withdraw consent",
-      "withdraw": "Withdraw"
+      "confirmWithdrawConsent": "Confirm — withdraw consent"
     },
     "mentorMemory": {
       "title": "Mentor memory",
       "subtitle": "What the mentor knows about {{name}}",
-      "toggleCollection": "Toggle memory collection",
-      "toggleInjection": "Toggle memory injection",
-      "collectionOn": "Collection on",
-      "collectionOff": "Collection off",
-      "injectionOn": "Injection on",
-      "injectionOff": "Injection off",
-      "collectionDescription": "When on, the mentor saves observations about {{name}} during sessions.",
-      "injectionDescription": "When on, the mentor uses saved observations to personalise sessions for {{name}}.",
       "tellTheMentor": "Tell the mentor",
-      "tellTheMentorPlaceholder": "Add a note for the mentor about {{name}}…",
-      "addNote": "Add note",
       "hiddenItems": "{{count}} hidden items",
-      "showHidden": "Show hidden",
-      "hideItem": "Hide this",
-      "noMemoryYet": "No memory yet",
-      "noMemoryDescription": "The mentor will start saving observations about {{name}} after a few sessions.",
-      "privacyNote": "Memory is private and only visible to you.",
-      "correctionLabel": "Correction",
       "correctionPlaceholder": "What should the mentor know instead?",
-      "saveCorrection": "Save correction",
-      "exportMemory": "Export memory",
-      "exportTitle": "{{name}}'s mentor memory",
-      "clearMemory": "Clear all memory",
-      "clearMemoryAlert": {
-        "title": "Clear all memory?",
-        "message": "This will permanently delete all mentor memory for {{name}}.",
-        "confirm": "Clear"
-      },
-      "loadingMemory": "Loading memory…",
-      "couldNotLoad": "Could not load mentor memory",
-      "memoryCleared": "Memory cleared",
-      "noteSaved": "Note saved",
-      "correctionSaved": "Correction saved",
-      "itemHidden": "Item hidden",
       "couldNotDeleteItem": "Could not delete this item",
       "pleaseTryAgain": "Please try again",
       "couldNotRestoreItem": "Could not restore this item",
@@ -2158,28 +1804,13 @@
       "title": "Reports",
       "loadingReports": "Loading reports…",
       "couldNotLoadReports": "Couldn't load reports",
-      "somethingWentWrong": "Something went wrong loading reports.",
-      "noReportsYet": "No reports yet",
-      "noReportsDescription": "Reports will appear here after {{name}} has a few sessions.",
-      "firstReportEmptyTimeContext": "a few days",
       "seeProgressNow": "See {{name}}'s progress now",
-      "weeklySnapshot": "Weekly snapshot",
-      "monthlyReport": "Monthly report",
       "newBadge": "New",
       "backToLatest": "Back to latest report",
-      "nextReportIn": "Next report in {{timeContext}}",
-      "noReportScheduled": "No report scheduled",
       "subtitle": "Monthly and weekly learning summaries",
-      "loadingWeeklySnapshots": "Loading weekly snapshots…",
-      "couldNotLoadWeeklySnapshots": "Could not load weekly snapshots",
       "checkConnectionRetry": "Check your connection and try again",
-      "retryWeeklySnapshots": "Retry weekly snapshots",
-      "weeklySnapshots": "Weekly snapshots",
       "weekOf": "Week of",
-      "weeklySnapshotsEmpty": "No weekly snapshots yet for {{name}}",
-      "monthlyReports": "Monthly reports",
       "retryReports": "Retry reports",
-      "openReport": "Open report for {{month}}",
       "firstReportArriveOn": "{{name}}'s first report will arrive on {{date}}",
       "firstReportTimeContext": "{{name}}'s first report {{timeContext}}"
     },
@@ -2187,16 +1818,13 @@
       "sessions": "Sessions",
       "timeOnApp": "Time on app",
       "topicsMastered": "Topics mastered",
-      "totalWordsKnown": "Total words known",
       "highlights": "Highlights",
       "whatsNext": "What's next",
       "subjectBreakdown": "Subject breakdown",
       "subjectStats": "{{topicsMastered}} topics · {{vocabularyTotal}} words · {{activeMinutes}} min",
-      "reportGone": "This report is no longer available",
       "reportGoneBody": "It may have been archived or removed.",
       "backToReports": "Back to reports",
       "loadingReport": "Loading report…",
-      "tryAgain": "Try again",
       "monthlyReport": "Monthly report",
       "subtitle": "A summary of your child's learning this month",
       "totalWords": "Total words",
@@ -2205,10 +1833,6 @@
       "testPoints": "Test points"
     },
     "session": {
-      "error": "Could not load session",
-      "notFound": "Session not found",
-      "notFoundBody": "This session may have been removed.",
-      "backToChild": "Back to child profile",
       "duration": "Duration",
       "type": "Type",
       "sessionRecap": "Session recap",
@@ -2218,13 +1842,9 @@
       "copy": "Copy",
       "copied": "Copied ✓",
       "copyFailed": "Could not copy",
-      "noRecap": "No recap available",
       "noRecapBody": "The recap for this session isn't available yet.",
-      "summaryEmptyNote": "No summary text was generated for this session.",
       "homeworkHelp": "Homework help",
-      "openTopic": "Open {{title}}",
       "openThisTopic": "Open this topic",
-      "continueWithTopic": "Continue with this topic",
       "somethingWentWrong": "Something went wrong",
       "sessionNoLongerAvailable": "This session is no longer available",
       "copyConversationPrompt": "Copy conversation",
@@ -2243,10 +1863,8 @@
       "viewTopicDetails": "View details for {{title}}",
       "topicsCouldNotLoad": "Topics could not be loaded",
       "retryLoadingTopics": "Retry loading topics",
-      "topicsNewLearner": "Topics will appear here after a few sessions.",
       "topicsNewLearnerTitle": "No lesson topics yet",
       "topicsNewLearnerBody": "This can happen after early sessions or free browsing. Recent sessions below still show what happened.",
-      "noTopicsYet": "No topics yet",
       "noTopicsYetTitle": "No lesson topics yet",
       "noTopicsYetBody": "Sessions may still exist here before the mentor has enough lesson-level progress to show.",
       "recentSubjectSessions": "Recent {{subject}} sessions",
@@ -2465,7 +2083,6 @@
     "familyHubLabel": "Family Hub",
     "myLearning": "My Learning",
     "myLearningLabel": "My Learning",
-    "family": "Family",
     "children": "Children",
     "childrenLabel": "Children",
     "library": "Library",
@@ -2506,139 +2123,6 @@
     "buttonLabel": "Add to my learning",
     "privacyNote": "Private to your learning"
   },
-  "ocrTimeout": "Reading took too long — please try again",
-  "permissionTitle": "Camera access needed",
-  "permissionDenied": "Camera access denied",
-  "permissionPrompt": "To snap your homework, we need access to your camera",
-  "openSettingsLabel": "Open settings to allow camera access",
-  "openSettings": "Open settings",
-  "allowCameraLabel": "Allow camera access",
-  "allowCamera": "Allow camera",
-  "closeCameraLabel": "Close camera",
-  "centerHomework": "Centre your homework in the frame",
-  "galleryLabel": "Choose from gallery",
-  "takePhotoLabel": "Take photo",
-  "flashLabel": "Flash: {{state}}",
-  "flashOff": "Off",
-  "flashOn": "On",
-  "photoPreviewLabel": "Photo preview",
-  "photoCaptured": "Photo captured",
-  "retakeLabel": "Retake photo",
-  "retake": "Retake",
-  "useThisPhotoLabel": "Use this photo",
-  "useThis": "Use this",
-  "cancelAndGoBackLabel": "Cancel and go back",
-  "readingHomework": "Reading your {{subject}} homework…",
-  "cancelOcrLabel": "Cancel reading",
-  "problemsFound": "Problems found",
-  "addSkippedFragmentsLabel": "Add skipped fragments",
-  "skippedFragments_one": "{{count}} fragment skipped",
-  "skippedFragments_other": "{{count}} fragments skipped",
-  "problemNumber": "Problem {{number}}",
-  "removeProblemLabel": "Remove problem {{number}}",
-  "remove": "Remove",
-  "problemInputLabel": "Problem {{number}} text",
-  "addProblemLabel": "Add another problem",
-  "addProblem": "Add problem",
-  "classifyFallbackPrompt": "Which subject is this for?",
-  "typeSubjectManuallyLabel": "Type subject name manually",
-  "typeSubjectManually": "Type it in",
-  "classifyLoading": "Working out the subject…",
-  "looksLike": "Looks like",
-  "change": "Change",
-  "whichSubject": "Which subject?",
-  "loadingSubjects": "Loading subjects…",
-  "selectSubjectLabel": "Select {{name}}",
-  "createNewSubjectLabel": "Create a new subject",
-  "createNewSubject": "Create new subject",
-  "orTypeSubject": "Or type a subject name",
-  "subjectInputPlaceholder": "e.g. Maths, History…",
-  "typeSubjectLabel": "Type subject name",
-  "continueWithSubjectLabel": "Continue with this subject",
-  "creatingSubject": "Creating subject…",
-  "startSessionLabel": "Start session",
-  "letsGo": "Let's go!",
-  "ocrDefaultError": "Couldn't read the homework",
-  "typeItOut": "Type it out",
-  "manualInputPlaceholder": "Type or paste the problem here…",
-  "typeManuallyLabel": "Type homework manually",
-  "noSubjectsYet": "No subjects yet",
-  "createSubject": "Create a subject",
-  "continueWithProblemLabel": "Continue with this problem",
-  "continueArrow": "Continue →",
-  "tryCameraAgainLabel": "Try the camera again",
-  "tryCameraAgain": "Try camera again",
-  "tryReadingAgainLabel": "Try reading again",
-  "openingMessage": "Let's find out what you already know",
-  "passedMessage": "Great — you've already mastered {{mastery}}% of this topic",
-  "missingParams": "Assessment could not start — required information is missing",
-  "title": "Assessment",
-  "sameEmailWarning": "That's the same email address — please use your parent's email",
-  "backToChild": "Back to child",
-  "deliveryFailedTitle": "Email not delivered",
-  "deliverySentBody": "We sent an approval email to {{email}}",
-  "deliveryFailedBody": "We couldn't deliver the email to {{email}}",
-  "deliveryFailedHint": "Check the address and try again",
-  "resendEmail": "Resend email",
-  "resolveTookTooLong": "That took too long — please try again",
-  "resolveNetworkError": "Check your connection and try again",
-  "enterSubjectNameError": "Please enter a subject name",
-  "retryCheckLabel": "Retry",
-  "manageSubjects": "Manage subjects",
-  "prompt": "What would you like to learn?",
-  "nameLabel": "Subject name",
-  "namePlaceholder": "e.g. Maths, History, Spanish…",
-  "retryLoadSubjectsLabel": "Retry loading subjects",
-  "subjectsLoadError": "Could not load your subjects",
-  "tapToRetry": "Tap to retry",
-  "suggestedSubjectsLabel": "Suggested subjects",
-  "continueSubjectLabel": "Continue with this subject",
-  "continueSubject": "Continue",
-  "startSubjectLabel": "Start this subject",
-  "startSubject": "Start",
-  "notSureHint": "Not sure? Describe it and we'll help",
-  "checkingName": "Checking…",
-  "somethingElse": "Something else",
-  "somethingElseHint": "Describe what you want to learn in your own words",
-  "clarifyLabel": "Describe your subject",
-  "clarifyPlaceholder": "e.g. the history of Ancient Rome…",
-  "checkThisInstead": "Check this instead",
-  "useMyWordsLabel": "Use my own words",
-  "useMyWords": "Use my words",
-  "noMatchFallback": "No close match found",
-  "justUse": "Just use “{{name}}”",
-  "editSubjectNameLabel": "Edit subject name",
-  "editInstead": "Edit",
-  "acceptSuggestionLabel": "Accept suggestion",
-  "accept": "Accept",
-  "editSuggestionLabel": "Edit suggestion",
-  "startLearning": "Start learning",
-  "validationHint": "Subject names must be between 2 and 80 characters",
-  "scheduledTitle": "Deletion scheduled",
-  "scheduledBody": "Your account is scheduled for deletion on {{date}}",
-  "scheduledAccountActive": "Your account is still active until then",
-  "keepAccountLabel": "Keep my account",
-  "keepAccount": "Keep account",
-  "signOutFailedTitle": "Could not sign out",
-  "signOutFailedMessage": "Please try again",
-  "signOutNowLabel": "Sign out now",
-  "signOutNow": "Sign out",
-  "closeWithoutCancellingLabel": "Close without cancelling deletion",
-  "familyWarningTitle": "Family accounts will lose access",
-  "familyWarningBody": "Any child profiles linked to your account will also be deleted",
-  "subscriptionWarningTitle": "Active subscription",
-  "subscriptionWarningBodyPrefix": "You have an active subscription. Deleting your account will ",
-  "subscriptionWarningNot": "not",
-  "subscriptionWarningBodySuffix": " cancel it automatically — please cancel it first.",
-  "confirmPromptPrefix": "Type ",
-  "confirmPromptSuffix": " to confirm",
-  "confirmInputLabel": "Type {{phrase}} to confirm deletion",
-  "permanentDeleteLabel": "Permanently delete my account",
-  "permanentDelete": "Delete my account",
-  "warningBody1": "All your learning data, progress, and mentor memory will be permanently deleted.",
-  "warningBody2": "This cannot be undone.",
-  "understandDeleteLabel": "I understand — delete my account",
-  "understandDelete": "I understand",
   "subscription": {
     "trial": {
       "active": "Trial active",
@@ -2783,14 +2267,6 @@
     "moreOptions": "More options"
   },
   "subscriptionScreen": {
-    "back": "Back",
-    "backAccessibilityLabel": "Go back",
-    "title": "Subscription",
-    "loading": {
-      "error": "Unable to load subscription details. Please try again.",
-      "retryAccessibilityLabel": "Retry loading subscription",
-      "retry": "Retry"
-    },
     "tierLabels": {
       "free": "Free",
       "plus": "Plus",
@@ -2838,46 +2314,7 @@
       "sixMonth": "6 Months",
       "twoMonth": "2 Months"
     },
-    "currentPlan": {
-      "sectionHeader": "Current plan",
-      "statusCancelling": "Cancelling",
-      "statusPastDue": "Past due",
-      "statusExpired": "Expired",
-      "statusActive": "Active",
-      "accessUntil": "Access until {{date}}",
-      "renews": "Renews {{date}}",
-      "upgradeButton": "Upgrade",
-      "upgradeAccessibilityLabel": "Upgrade plan"
-    },
-    "cancellationNotice": {
-      "title": "Subscription ending",
-      "body": "Your subscription has been cancelled. You can continue using all features until {{date}}. After that, your account will revert to the Free tier."
-    },
-    "usage": {
-      "sectionHeader": "Usage this month",
-      "dailyQuestions": "Today: {{used}} / {{limit}} daily questions",
-      "topUpCreditsRemaining_one": "+ {{count}} top-up credit remaining",
-      "topUpCreditsRemaining_other": "+ {{count}} top-up credits remaining",
-      "yourShare": "Your share",
-      "yourUsage": "Your usage",
-      "questionsCount_one": "{{count}} question",
-      "questionsCount_other": "{{count}} questions",
-      "familyAggregate": "Family aggregate",
-      "quotaResets": "Quota resets {{date}}",
-      "subscriptionRenews": "Subscription renews {{date}}",
-      "dailyLimitResets": "Daily limit — resets at midnight"
-    },
-    "familyPool": {
-      "sectionHeader": "Family pool",
-      "profilesConnected": "of {{max}} profiles connected",
-      "questionsLeft": "shared questions left this cycle.",
-      "ownerSuffix": " (owner)",
-      "removingMember": "Removing…",
-      "removeMember": "Remove"
-    },
     "plans": {
-      "sectionHeader": "Plans",
-      "confirmingPurchase": "Confirming purchase…",
       "currentBadge": "Current",
       "retryOfferings": "Retry",
       "retryOfferingsAccessibilityLabel": "Retry loading subscription offerings",
@@ -2887,64 +2324,22 @@
       "offeringsWebOnly": "You’re on the {{tier}} plan with {{limits}}. Here’s what each plan includes — store purchasing isn’t available on this device yet."
     },
     "packageOption": {
-      "currentPlan": "Current plan",
-      "subscribeTo": "Subscribe to",
-      "subscribe": "Subscribe",
-      "processing": "Processing…",
       "currentPlanLabel": "Current plan",
       "subscribeLabel": "Subscribe",
       "processingLabel": "Processing…",
       "currentPlanAccessibilityLabel": "Current plan: {{title}}, {{price}}",
       "subscribePlanAccessibilityLabel": "Subscribe to {{title}}, {{price}}"
     },
-    "restore": {
-      "sectionHeader": "Restore purchases",
-      "checkLater": "Check later"
-    },
-    "topUp": {
-      "sectionHeader": "Need more questions?",
-      "buyAccessibilityLabel": "Buy 500 credits",
-      "buyButton": "Buy 500 credits",
-      "openingStore": "Opening store…",
-      "credits": "One-time purchase. Credits expire in 12 months.",
-      "checkLater": "Check later",
-      "checkLaterAccessibilityLabel": "Cancel top-up confirmation",
-      "confirmingPollMessage": "Confirming your purchase…",
-      "confirmingPollMessageLong": "Still confirming — this can take up to 30 seconds. Your purchase is safe."
-    },
-    "manageBilling": {
-      "sectionHeader": "Manage",
-      "button": "Manage billing",
-      "buttonAccessibilityLabel": "Manage billing",
-      "webInfo": "Manage billing",
-      "webInfoSubtitle": "Subscription is managed on your mobile device",
-      "opensAppStore": "Opens App Store subscriptions",
-      "opensGooglePlay": "Opens Google Play subscriptions"
-    },
-    "byokWaitlist": {
-      "joinButton": "Join the waitlist",
-      "leaveButton": "Leave waitlist",
-      "joiningButton": "Joining…",
-      "leavingButton": "Leaving…"
-    },
     "childPaywall": {
-      "title": "Ask a parent",
-      "body": "You’ve used all your questions for today. Your parent needs to upgrade to keep learning.",
       "cooldownZero": "0 seconds",
       "cooldownHours_one": "{{count}} hour",
       "cooldownHours_other": "{{count}} hours",
       "cooldownMinutes_one": "{{count}} minute",
       "cooldownMinutes_other": "{{count}} minutes",
       "cooldownSeconds_one": "{{count}} second",
-      "cooldownSeconds_other": "{{count}} seconds",
-      "xpThisWeek_one": "{{count}} XP this week",
-      "xpThisWeek_other": "{{count}} XP this week",
-      "topicsThisWeek_one": "{{count}} topic this week",
-      "topicsThisWeek_other": "{{count}} topics this week"
+      "cooldownSeconds_other": "{{count}} seconds"
     },
     "alerts": {
-      "topUpNotAvailableTitle": "Not available",
-      "topUpNotAvailableBody": "Top-up credits aren’t available right now. Try again later or contact support.",
       "topUpRetry": "Retry",
       "networkErrorTitle": "Network error",
       "networkErrorBody": "Please check your internet connection and try again.",
@@ -2957,19 +2352,6 @@
       "manageBillingErrorBody": "You can manage your subscription directly at:\n{{url}}",
       "tryAgain": "Try again",
       "checkAgain": "Check again",
-      "topUpPurchaseConfirmedTitle": "Purchase confirmed",
-      "topUpPurchaseConfirmedBody": "Your 500 credits are being added. They usually appear within a minute — pull down to refresh your usage.",
-      "topUpCheckLaterTitle": "Check later",
-      "topUpCheckLaterBody": "Credits will appear shortly — tap refresh to check.",
-      "contactSupportTitle": "Contact support",
-      "contactSupportBody": "Email support@mentomate.app for help with subscriptions.",
-      "removeFamilyTitle": "Remove from family?",
-      "removeFamilyBody": "{{name}}’s profile will be removed from this family plan and hidden from profile switching.",
-      "removeFamilyConfirm": "Remove",
-      "familyUpdatedTitle": "Family updated",
-      "familyUpdatedBody": "{{name}} was removed from your family plan.",
-      "removeFamilyErrorTitle": "Could not remove profile",
-      "removeFamilyErrorBody": "Please check your connection and try again.",
       "topUpConnectionErrorTitle": "Network error",
       "topUpConnectionErrorBody": "Please check your internet connection and try again."
     }
