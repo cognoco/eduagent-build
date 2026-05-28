@@ -1,15 +1,42 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { fireEvent, waitFor } from '@testing-library/react-native';
+import type { ChildSession } from '@eduagent/schemas';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../../../test-utils/mock-api-routes';
+import {
+  renderScreen,
+  NAMED_PROFILES,
+} from '../../../../test-utils/screen-render';
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      if (opts && typeof opts === 'object') {
-        return `${key}:${JSON.stringify(opts)}`;
-      }
-      return key;
-    },
+// ---------------------------------------------------------------------------
+// Boundary mocks (allowed: native + i18n + transport + presentational shims)
+// ---------------------------------------------------------------------------
+
+// i18n boundary. This screen's assertions reference RAW translation keys
+// (e.g. /parentView\.retention\.strong\.label/), so we keep a key-passthrough
+// mock rather than the en.json-resolving shared mock — switching to resolved
+// strings would silently change what every key-based assertion matches.
+jest.mock(
+  'react-i18next' /* gc1-allow: i18n boundary — key-passthrough so key assertions stay exact */,
+  () => ({
+    useTranslation: () => ({
+      t: (key: string, opts?: Record<string, unknown>) => {
+        if (opts && typeof opts === 'object') {
+          return `${key}:${JSON.stringify(opts)}`;
+        }
+        return key;
+      },
+    }),
+    // The real api-client/profile chain now loads (it isn't hook-mocked), which
+    // pulls in i18n/index.ts -> i18next.use(initReactI18next). Provide the
+    // boundary exports it needs so init doesn't blow up; the `t` passthrough
+    // above is unchanged.
+    initReactI18next: { type: '3rdParty', init: () => undefined },
+    Trans: ({ children }: { children?: unknown }) => children ?? null,
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Router + navigation
@@ -24,7 +51,7 @@ let mockLocalSearchParams: { profileId: string; mode?: string } = {
   profileId: 'child-001',
 };
 
-jest.mock('expo-router', () => ({
+jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useRouter: () => ({
     back: mockBack,
     canGoBack: mockCanGoBack,
@@ -34,9 +61,12 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockLocalSearchParams,
 }));
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock(
+  'react-native-safe-area-context' /* gc1-allow: native-boundary */,
+  () => ({
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  }),
+);
 
 jest.mock(
   '../../../../lib/navigation' /* gc1-allow: route fallback helper is asserted through focused route behavior here */,
@@ -60,92 +90,37 @@ jest.mock(
   }),
 );
 
-// ---------------------------------------------------------------------------
-// Profile (IDOR guard — profiles must include child-001)
-// ---------------------------------------------------------------------------
-
-const mockUseProfile = jest.fn();
-
-jest.mock(
-  '../../../../lib/profile' /* gc1-allow: profile context requires app provider setup; this test controls the owned child profile only */,
-  () => ({
-    useProfile: (...args: unknown[]) => mockUseProfile(...args),
-  }),
-);
-// ---------------------------------------------------------------------------
-// Dashboard hooks
-// ---------------------------------------------------------------------------
-
-const mockUseChildDetail = jest.fn();
-const mockUseDashboard = jest.fn();
+// Navigation-contract isolation. `useNavigationContract` resolves the whole
+// app navigation contract from feature flags + family shape; under the test
+// default flags (MODE_NAV_V0/V1 off) the real contract would set shape='study'
+// and `isSurfaced('child/[profileId]/curriculum')` would be false — the inverse
+// of what this screen's curriculum behavior asserts. Surfacing is owned by the
+// navigation-contract's own unit tests; here we isolate it behind a spy so the
+// screen's USE of `isSurfaced` (call args + show/hide) stays directly
+// assertable without flipping production flags into V1.
+//
+// IMPORTANT: only `useNavigationContract` is overridden. The data hooks
+// (useDashboard / useProfileSessions / useChildDetail) call the sibling export
+// `useNavigationDataScopeContract`, which must keep its REAL implementation so
+// those hooks scope correctly — hence requireActual + targeted override.
 const mockIsSurfaced = jest.fn(() => true);
 
 jest.mock(
-  '../../../../hooks/use-dashboard' /* gc1-allow: query hooks require API client and QueryClientProvider; route rendering owns response handling */,
-  () => ({
-    useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
-    useDashboard: (...args: unknown[]) => mockUseDashboard(...args),
-  }),
+  '../../../../hooks/use-navigation-contract' /* gc1-allow: isolate screen-facing nav contract; keep useNavigationDataScopeContract real */,
+  () => {
+    const actual = jest.requireActual(
+      '../../../../hooks/use-navigation-contract',
+    );
+    return {
+      ...actual,
+      useNavigationContract: () => ({ isSurfaced: mockIsSurfaced }),
+    };
+  },
 );
 
-jest.mock(
-  '../../../../hooks/use-navigation-contract' /* gc1-allow: route test controls contract surfacing without app context providers */,
-  () => ({
-    useNavigationContract: () => ({ isSurfaced: mockIsSurfaced }),
-  }),
-);
-
-const mockUseProfileSessions = jest.fn();
-
-jest.mock(
-  '../../../../hooks/use-progress' /* gc1-allow: recent-session list owns API query wiring; child-detail tests assert rendered navigation surface */,
-  () => ({
-    useProfileSessions: (...args: unknown[]) => mockUseProfileSessions(...args),
-  }),
-);
-
-// ---------------------------------------------------------------------------
-// Learner-profile hooks
-// ---------------------------------------------------------------------------
-
-const mockUseChildLearnerProfile = jest.fn();
-
-jest.mock(
-  '../../../../hooks/use-learner-profile' /* gc1-allow: query hook requires API client and QueryClientProvider; row rendering only needs the selected preference */,
-  () => ({
-    useChildLearnerProfile: (...args: unknown[]) =>
-      mockUseChildLearnerProfile(...args),
-  }),
-);
-
-// ---------------------------------------------------------------------------
-// Consent hooks
-// ---------------------------------------------------------------------------
-
-const mockUseChildConsentStatus = jest.fn();
-const mockRevokeMutate = jest.fn();
-const mockRestoreMutate = jest.fn();
-
-jest.mock(
-  '../../../../hooks/use-consent' /* gc1-allow: query/mutation hooks require API client and QueryClientProvider; child detail only owns rendering and invocation */,
-  () => ({
-    useChildConsentStatus: (...args: unknown[]) =>
-      mockUseChildConsentStatus(...args),
-    useRevokeConsent: () => ({
-      mutate: mockRevokeMutate,
-      isPending: false,
-    }),
-    useRestoreConsent: () => ({
-      mutate: mockRestoreMutate,
-      isPending: false,
-    }),
-  }),
-);
-
-// ---------------------------------------------------------------------------
-// Common components barrel (includes Reanimated animations — cannot render in JSDOM)
-// ---------------------------------------------------------------------------
-
+// Common components barrel (includes Reanimated animations — cannot render in
+// JSDOM). We keep a thin ErrorFallback shim so the data-absent fallback testIDs
+// stay assertable.
 jest.mock(
   '../../../../components/common' /* gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM */,
   () => ({
@@ -199,6 +174,21 @@ jest.mock(
   }),
 );
 
+// Route the Hono RPC client through our mock fetch so real hooks run.
+const mockFetch: RoutedMockFetch = createRoutedMockFetch();
+
+jest.mock(
+  '../../../../lib/api-client' /* gc1-allow: transport-boundary — routed mock fetch drives real hooks */,
+  () => {
+    const actual = jest.requireActual('../../../../lib/api-client');
+    const { hc } = require('hono/client');
+    return {
+      ...actual,
+      useApiClient: () => hc('http://localhost', { fetch: mockFetch }),
+    };
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Module under test (required AFTER all mocks are set up)
 // ---------------------------------------------------------------------------
@@ -208,96 +198,197 @@ const { default: ChildDetailScreen } = require('./index') as {
 };
 
 // ---------------------------------------------------------------------------
-// Default mock values
+// Profile fixtures — guardian (active owner) + linked child. The URL profileId
+// (child-001) must appear in profiles[] to clear the IDOR / no-access guard.
 // ---------------------------------------------------------------------------
 
+const guardianProfile = {
+  ...NAMED_PROFILES.guardian,
+  id: 'parent-001',
+  accountId: 'account-family',
+  displayName: 'Parent',
+  isOwner: true,
+  hasFamilyLinks: true,
+};
+const linkedChildProfile = {
+  ...NAMED_PROFILES.linkedChild,
+  id: 'child-001',
+  accountId: 'account-family',
+  displayName: 'Emma',
+  isOwner: false,
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
 // ---------------------------------------------------------------------------
-// Default mock values
+// Fixture factories — produce schema-valid responses so the REAL hooks'
+// childSessionsResponseSchema.parse() and assertOk() succeed.
 // ---------------------------------------------------------------------------
 
-function setupDefaultMocks() {
-  mockLocalSearchParams = { profileId: 'child-001' };
-  mockIsSurfaced.mockReturnValue(true);
+function makeSession(overrides: Partial<ChildSession> = {}): ChildSession {
+  return {
+    sessionId: '22222222-2222-7222-8222-222222222222',
+    subjectId: '11111111-1111-7111-8111-111111111111',
+    subjectName: 'Mathematics',
+    topicId: null,
+    topicTitle: null,
+    sessionType: 'learning',
+    startedAt: '2026-05-13T12:00:00.000Z',
+    endedAt: null,
+    exchangeCount: 0,
+    escalationRung: 1,
+    durationSeconds: 600,
+    wallClockSeconds: 900,
+    displayTitle: 'Session',
+    displaySummary: null,
+    homeworkSummary: null,
+    highlight: 'Used a number line to compare fractions.',
+    narrative: null,
+    conversationPrompt: null,
+    engagementSignal: null,
+    drills: [],
+    ...overrides,
+  };
+}
 
-  mockUseProfile.mockReturnValue({
-    activeProfile: {
-      id: 'parent-001',
-      displayName: 'Parent',
-      isOwner: true,
+const defaultChildDetail = {
+  displayName: 'Emma',
+  summary: 'Year 6',
+  currentStreak: 0,
+  totalXp: 0,
+  progress: null,
+  subjects: [
+    {
+      subjectId: '11111111-1111-7111-8111-111111111111',
+      name: 'Mathematics',
+      retentionStatus: 'strong',
+      rawInput: 'fractions homework',
     },
-    profiles: [
-      {
-        id: 'child-001',
-        displayName: 'Emma',
-        createdAt: '2026-01-01T00:00:00.000Z',
-      },
-    ],
-    isLoading: false,
-  });
+  ],
+};
 
-  mockUseDashboard.mockReturnValue({
-    data: undefined,
-    isLoading: false,
-  });
+const defaultLearnerProfile = {
+  accommodationMode: 'none',
+  memoryConsentStatus: 'granted',
+  updatedAt: null,
+};
 
-  mockUseChildDetail.mockReturnValue({
-    data: {
-      displayName: 'Emma',
-      summary: 'Year 6',
-      currentStreak: 0,
-      totalXp: 0,
-      progress: null,
-      subjects: [
-        {
-          subjectId: '11111111-1111-7111-8111-111111111111',
-          name: 'Mathematics',
-          retentionStatus: 'strong',
-          rawInput: 'fractions homework',
-        },
-      ],
+const consentedStatus = {
+  consentStatus: 'CONSENTED',
+  respondedAt: '2026-01-01T00:00:00.000Z',
+  consentType: 'GDPR',
+};
+
+interface RouteConfig {
+  childDetail?: unknown;
+  childDetailError?: number;
+  dashboard?: unknown;
+  dashboardUndefined?: boolean;
+  sessions?: ChildSession[];
+  learnerProfile?: unknown;
+  consent?: unknown;
+  consentError?: number;
+}
+
+/**
+ * Configure all endpoints the screen's real hooks call. Branches the shared
+ * `/dashboard/children/child-001` route on sub-path (detail vs sessions).
+ */
+function setRoutes(config: RouteConfig = {}): void {
+  const childDetail =
+    'childDetail' in config ? config.childDetail : defaultChildDetail;
+  const sessions = config.sessions ?? [makeSession()];
+
+  mockFetch.setRoute(
+    '/dashboard/children/child-001',
+    (url: string, init?: RequestInit) => {
+      if (url.includes('/sessions')) {
+        return { sessions };
+      }
+      if (init?.method && init.method !== 'GET') return {};
+      // Child detail GET.
+      if (config.childDetailError) {
+        return new Response(JSON.stringify({ message: 'detail failed' }), {
+          status: config.childDetailError,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return { child: childDetail };
     },
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  });
+  );
 
-  mockUseProfileSessions.mockReturnValue({
-    data: [
-      {
-        sessionId: '22222222-2222-7222-8222-222222222222',
-        startedAt: '2026-05-13T12:00:00.000Z',
-        sessionType: 'learning',
-        durationSeconds: 600,
-        wallClockSeconds: 900,
-        displaySummary: null,
-        highlight: 'Used a number line to compare fractions.',
-        homeworkSummary: null,
-      },
-    ],
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  });
+  // Top-level dashboard aggregate. Empty children triggers a /dashboard/demo
+  // fallback inside useDashboard, so route both.
+  if (config.dashboardUndefined) {
+    // Return a shape with empty children so the hook falls back to demo.
+    mockFetch.setRoute('/dashboard', () => ({
+      children: [],
+      pendingNotices: [],
+      demoMode: false,
+    }));
+    mockFetch.setRoute('/dashboard/demo', () => ({
+      children: [],
+      pendingNotices: [],
+      demoMode: true,
+    }));
+  } else {
+    const dashboard = config.dashboard ?? {
+      children: [],
+      pendingNotices: [],
+      demoMode: false,
+    };
+    mockFetch.setRoute('/dashboard', () => dashboard);
+    mockFetch.setRoute('/dashboard/demo', () => ({
+      children: [],
+      pendingNotices: [],
+      demoMode: true,
+    }));
+  }
 
-  mockUseChildLearnerProfile.mockReturnValue({
-    data: {
-      accommodationMode: 'none',
-      memoryConsentStatus: 'granted',
-      updatedAt: null,
+  mockFetch.setRoute('/learner-profile/child-001', () => ({
+    profile: config.learnerProfile ?? defaultLearnerProfile,
+  }));
+
+  mockFetch.setRoute(
+    '/consent/child-001/status',
+    (_url: string, init?: RequestInit) => {
+      // revoke / restore PUTs share the /consent/child-001 prefix but carry a
+      // different sub-path; only the status GET resolves here.
+      if (init?.method && init.method !== 'GET') return {};
+      if (config.consentError) {
+        return new Response(JSON.stringify({ message: 'consent failed' }), {
+          status: config.consentError,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return config.consent ?? consentedStatus;
     },
-  });
+  );
 
-  mockUseChildConsentStatus.mockReturnValue({
-    data: {
-      consentStatus: 'CONSENTED',
-      respondedAt: '2026-01-01T00:00:00.000Z',
-      consentType: 'GDPR',
-    },
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
+  mockFetch.setRoute('/consent/child-001/revoke', () => ({
+    message: 'revoked',
+    consentStatus: 'WITHDRAWN',
+  }));
+  mockFetch.setRoute('/consent/child-001/restore', () => ({
+    message: 'restored',
+    consentStatus: 'CONSENTED',
+  }));
+}
+
+function renderChildDetail() {
+  return renderScreen(<ChildDetailScreen />, {
+    profile: guardianProfile,
+    profiles: [guardianProfile, linkedChildProfile],
+    installGlobalFetch: false,
+    routedFetch: mockFetch,
   });
 }
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockFetch.mockClear();
+  mockLocalSearchParams = { profileId: 'child-001' };
+  mockIsSurfaced.mockReturnValue(true);
+});
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -305,110 +396,124 @@ function setupDefaultMocks() {
 
 describe('ChildDetailScreen — accommodation nav row', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    setupDefaultMocks();
+    setRoutes();
   });
 
-  it('renders the accommodation nav row', () => {
-    render(<ChildDetailScreen />);
+  it('renders the accommodation nav row', async () => {
+    const { result, cleanup } = renderChildDetail();
 
-    expect(
-      screen.getByTestId('child-accommodation-row-child-001'),
-    ).toBeTruthy();
+    await waitFor(() => {
+      result.getByTestId('child-accommodation-row-child-001');
+    });
+
+    cleanup();
   });
 
-  it('navigates to the accommodation screen when pressed', () => {
-    render(<ChildDetailScreen />);
+  it('navigates to the accommodation screen when pressed', async () => {
+    const { result, cleanup } = renderChildDetail();
 
-    fireEvent.press(screen.getByTestId('child-accommodation-row-child-001'));
+    fireEvent.press(
+      await waitFor(() =>
+        result.getByTestId('child-accommodation-row-child-001'),
+      ),
+    );
 
     expect(mockPush).toHaveBeenCalledWith(
       '/(app)/more/accommodation?childProfileId=child-001',
     );
+
+    cleanup();
   });
 
-  it('shows the active accommodation mode name', () => {
-    mockUseChildLearnerProfile.mockReturnValue({
-      data: {
+  it('shows the active accommodation mode name', async () => {
+    setRoutes({
+      learnerProfile: {
         accommodationMode: 'audio-first',
         memoryConsentStatus: 'granted',
         updatedAt: null,
       },
-      isLoading: false,
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    const row = screen.getByTestId('child-accommodation-row-child-001');
-    expect(row).toHaveTextContent(/Audio-First/);
+    const row = await waitFor(() =>
+      result.getByTestId('child-accommodation-row-child-001'),
+    );
+    await waitFor(() => {
+      expect(row).toHaveTextContent(/Audio-First/);
+    });
+
+    cleanup();
   });
 });
 
 describe('ChildDetailScreen — profile overview', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    setupDefaultMocks();
+    setRoutes();
   });
 
-  it('shows a last-session signal in the header when sessions exist', () => {
-    mockUseProfileSessions.mockReturnValue({
-      data: [
-        {
+  it('shows a last-session signal in the header when sessions exist', async () => {
+    setRoutes({
+      sessions: [
+        makeSession({
           sessionId: '33333333-3333-7333-8333-333333333333',
           startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          sessionType: 'learning',
-          durationSeconds: 600,
-          wallClockSeconds: 900,
-          displaySummary: null,
           highlight: null,
-          homeworkSummary: null,
-        },
+        }),
       ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByText(/2 hours ago/);
-  });
-
-  it('shows a no-sessions-yet header signal when there is no session history', () => {
-    mockUseProfileSessions.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+    await waitFor(() => {
+      result.getByText(/2 hours ago/);
     });
 
-    render(<ChildDetailScreen />);
-
-    expect(
-      screen.getAllByText(/No sessions yet|parentView\.index\.noSessionsYet/),
-    ).not.toHaveLength(0);
+    cleanup();
   });
 
-  it('links to the child mentor memory management screen', () => {
-    render(<ChildDetailScreen />);
+  it('shows a no-sessions-yet header signal when there is no session history', async () => {
+    setRoutes({ sessions: [] });
 
-    fireEvent.press(screen.getByTestId('mentor-memory-link'));
+    const { result, cleanup } = renderChildDetail();
+
+    await waitFor(() => {
+      expect(
+        result.getAllByText(/No sessions yet|parentView\.index\.noSessionsYet/),
+      ).not.toHaveLength(0);
+    });
+
+    cleanup();
+  });
+
+  it('links to the child mentor memory management screen', async () => {
+    const { result, cleanup } = renderChildDetail();
+
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('mentor-memory-link')),
+    );
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/mentor-memory',
       params: { profileId: 'child-001' },
     });
+
+    cleanup();
   });
 
-  it('shows profile details when the profile already has a created date', () => {
-    render(<ChildDetailScreen />);
+  it('shows profile details when the profile already has a created date', async () => {
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('child-profile-details');
+    await waitFor(() => {
+      result.getByTestId('child-profile-details');
+    });
+
+    cleanup();
   });
 
-  it('shows parent data surfaces for reports, subjects, raw input, and recent sessions', () => {
-    mockUseChildDetail.mockReturnValue({
-      data: {
+  it('shows parent data surfaces for reports, subjects, raw input, and recent sessions', async () => {
+    setRoutes({
+      childDetail: {
         displayName: 'Emma',
         summary: 'Year 6',
         currentStreak: 0,
@@ -439,75 +544,92 @@ describe('ChildDetailScreen — profile overview', () => {
         },
         currentlyWorkingOn: ['Algebra'],
       },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('child-reports-link');
-    screen.getByTestId('child-subjects-section');
-    screen.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
-    screen.getByTestId(
-      'subject-raw-input-11111111-1111-7111-8111-111111111111',
-    );
-    screen.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
-    expect(screen.queryByTestId('child-weekly-headline-card')).toBeNull();
-    expect(screen.queryByTestId('child-reports-button')).toBeNull();
-    expect(screen.queryByTestId('growth-teaser')).toBeNull();
-    screen.getByTestId('consent-section');
+    await waitFor(() => {
+      result.getByTestId('child-reports-link');
+    });
+    result.getByTestId('child-subjects-section');
+    result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
+    await waitFor(() => {
+      result.getByTestId(
+        'subject-raw-input-11111111-1111-7111-8111-111111111111',
+      );
+    });
+    await waitFor(() => {
+      result.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
+    });
+    expect(result.queryByTestId('child-weekly-headline-card')).toBeNull();
+    expect(result.queryByTestId('child-reports-button')).toBeNull();
+    expect(result.queryByTestId('growth-teaser')).toBeNull();
+    result.getByTestId('consent-section');
+
+    cleanup();
   });
 
-  it('shows only child settings when opened from the child avatar card', () => {
+  it('shows only child settings when opened from the child avatar card', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    expect(screen.queryByTestId('child-reports-link')).toBeNull();
-    expect(screen.queryByTestId('child-subjects-section')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('child-accommodation-row-child-001');
+    });
+    expect(result.queryByTestId('child-reports-link')).toBeNull();
+    expect(result.queryByTestId('child-subjects-section')).toBeNull();
     expect(
-      screen.queryByTestId('session-card-22222222-2222-7222-8222-222222222222'),
+      result.queryByTestId('session-card-22222222-2222-7222-8222-222222222222'),
     ).toBeNull();
-    screen.getByTestId('child-accommodation-row-child-001');
-    screen.getByTestId('mentor-memory-link');
-    screen.getByTestId('child-profile-details');
-    screen.getByTestId('consent-section');
+    result.getByTestId('mentor-memory-link');
+    result.getByTestId('child-profile-details');
+    result.getByTestId('consent-section');
+
+    cleanup();
   });
 
-  it('shows only child progress when opened from the Progress action', () => {
+  it('shows only child progress when opened from the Progress action', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    expect(screen.queryByTestId('child-reports-link')).toBeNull();
-    screen.getByTestId('child-progress-nudge-card');
-    screen.getByTestId('child-subjects-section');
-    screen.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
+    await waitFor(() => {
+      result.getByTestId('child-subjects-section');
+    });
+    expect(result.queryByTestId('child-reports-link')).toBeNull();
+    result.getByTestId('child-progress-nudge-card');
+    await waitFor(() => {
+      result.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
+    });
     expect(
-      screen.queryByTestId('child-accommodation-row-child-001'),
+      result.queryByTestId('child-accommodation-row-child-001'),
     ).toBeNull();
-    expect(screen.queryByTestId('mentor-memory-link')).toBeNull();
-    expect(screen.queryByTestId('child-profile-details')).toBeNull();
-    expect(screen.queryByTestId('consent-section')).toBeNull();
+    expect(result.queryByTestId('mentor-memory-link')).toBeNull();
+    expect(result.queryByTestId('child-profile-details')).toBeNull();
+    expect(result.queryByTestId('consent-section')).toBeNull();
+
+    cleanup();
   });
 
-  it('back arrow returns to family home instead of whatever screen is in history', () => {
+  it('back arrow returns to family home instead of whatever screen is in history', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
     mockCanGoBack.mockReturnValue(true);
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    fireEvent.press(screen.getByTestId('back-button'));
+    fireEvent.press(await waitFor(() => result.getByTestId('back-button')));
 
     expect(mockBack).not.toHaveBeenCalled();
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+
+    cleanup();
   });
 
-  it('hides subject memory status while the child is still a new learner', () => {
+  it('hides subject memory status while the child is still a new learner', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
-    mockUseChildDetail.mockReturnValue({
-      data: {
+    setRoutes({
+      childDetail: {
         displayName: 'Emma',
         summary: 'Getting started',
         currentStreak: 0,
@@ -523,22 +645,23 @@ describe('ChildDetailScreen — profile overview', () => {
           },
         ],
       },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
-    expect(screen.queryByText('parentView.retention.strong.label')).toBeNull();
-    expect(screen.queryByText('strong')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
+    });
+    expect(result.queryByText('parentView.retention.strong.label')).toBeNull();
+    expect(result.queryByText('strong')).toBeNull();
+
+    cleanup();
   });
 
-  it('uses the friendly memory status label after there is enough activity', () => {
+  it('uses the friendly memory status label after there is enough activity', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
-    mockUseChildDetail.mockReturnValue({
-      data: {
+    setRoutes({
+      childDetail: {
         displayName: 'Emma',
         summary: 'Settled rhythm',
         currentStreak: 0,
@@ -554,53 +677,52 @@ describe('ChildDetailScreen — profile overview', () => {
           },
         ],
       },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByText(/parentView\.retention\.strong\.label/);
-    expect(screen.queryByText('strong')).toBeNull();
+    await waitFor(() => {
+      result.getByText(/parentView\.retention\.strong\.label/);
+    });
+    expect(result.queryByText('strong')).toBeNull();
+
+    cleanup();
   });
 
-  it('uses a fresh progress nudge when the child studied recently', () => {
+  it('uses a fresh progress nudge when the child studied recently', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
-    mockUseProfileSessions.mockReturnValue({
-      data: [
-        {
+    setRoutes({
+      sessions: [
+        makeSession({
           sessionId: '33333333-3333-7333-8333-333333333333',
           subjectId: '11111111-1111-7111-8111-111111111111',
           subjectName: 'Mathematics',
           topicId: '44444444-4444-7444-8444-444444444444',
           topicTitle: 'Fractions',
           startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          sessionType: 'learning',
-          durationSeconds: 600,
-          wallClockSeconds: 900,
-          displaySummary: null,
           highlight: null,
-          homeworkSummary: null,
-        },
+        }),
       ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByText(/parentView\.index\.progressNudgeFreshTitle/);
-    expect(screen.queryByText(/ease back/)).toBeNull();
+    await waitFor(() => {
+      result.getByText(/parentView\.index\.progressNudgeFreshTitle/);
+    });
+    expect(result.queryByText(/ease back/)).toBeNull();
+
+    cleanup();
   });
 
-  it('opens the nudge subject from the progress action card', () => {
+  it('opens the nudge subject from the progress action card', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    fireEvent.press(screen.getByTestId('child-progress-nudge-card'));
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('child-progress-nudge-card')),
+    );
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
@@ -611,35 +733,31 @@ describe('ChildDetailScreen — profile overview', () => {
         childName: 'Emma',
       },
     });
+
+    cleanup();
   });
 
-  it('opens the latest topic from the progress action card when the session has one', () => {
+  it('opens the latest topic from the progress action card when the session has one', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
-    mockUseProfileSessions.mockReturnValue({
-      data: [
-        {
+    setRoutes({
+      sessions: [
+        makeSession({
           sessionId: '33333333-3333-7333-8333-333333333333',
           subjectId: '11111111-1111-7111-8111-111111111111',
           subjectName: 'Mathematics',
           topicId: '44444444-4444-7444-8444-444444444444',
           topicTitle: 'Fractions',
           startedAt: '2026-05-13T12:00:00.000Z',
-          sessionType: 'learning',
-          durationSeconds: 600,
-          wallClockSeconds: 900,
-          displaySummary: null,
           highlight: null,
-          homeworkSummary: null,
-        },
+        }),
       ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    fireEvent.press(screen.getByTestId('child-progress-nudge-card'));
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('child-progress-nudge-card')),
+    );
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/topic/[topicId]',
@@ -656,17 +774,14 @@ describe('ChildDetailScreen — profile overview', () => {
         childName: 'Emma',
       },
     });
+
+    cleanup();
   });
 
-  it('keeps the child progress surface open when the detail query fails but dashboard data has the child', () => {
-    mockUseChildDetail.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      refetch: jest.fn(),
-    });
-    mockUseDashboard.mockReturnValue({
-      data: {
+  it('keeps the child progress surface open when the detail query fails but dashboard data has the child', async () => {
+    setRoutes({
+      childDetailError: 500,
+      dashboard: {
         children: [
           {
             profileId: 'child-001',
@@ -703,61 +818,64 @@ describe('ChildDetailScreen — profile overview', () => {
         pendingNotices: [],
         demoMode: false,
       },
-      isLoading: false,
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    expect(screen.queryByTestId('child-profile-unavailable')).toBeNull();
-    screen.getByTestId('child-detail-scroll');
-    screen.getByText('Emma');
-    screen.getByTestId('child-subjects-section');
-    screen.getByText('Programming');
+    await waitFor(() => {
+      result.getByText('Programming');
+    });
+    expect(result.queryByTestId('child-profile-unavailable')).toBeNull();
+    result.getByTestId('child-detail-scroll');
+    result.getByText('Emma');
+    result.getByTestId('child-subjects-section');
+
+    cleanup();
   });
 
-  it('keeps child profile settings open when the linked profile exists but detail data is unavailable', () => {
+  it('keeps child profile settings open when the linked profile exists but detail data is unavailable', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
-    mockUseChildDetail.mockReturnValue({
-      data: null,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseDashboard.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-    });
+    setRoutes({ childDetail: null, dashboardUndefined: true });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    expect(screen.queryByTestId('child-profile-unavailable')).toBeNull();
-    screen.getByTestId('child-detail-scroll');
-    screen.getByText('Emma');
-    screen.getByTestId('mentor-memory-link');
-    screen.getByTestId('child-profile-details');
+    await waitFor(() => {
+      result.getByTestId('mentor-memory-link');
+    });
+    expect(result.queryByTestId('child-profile-unavailable')).toBeNull();
+    result.getByTestId('child-detail-scroll');
+    result.getByText('Emma');
+    result.getByTestId('child-profile-details');
+
+    cleanup();
   });
 
-  it('routes subject and report surfaces from child detail', () => {
-    render(<ChildDetailScreen />);
+  it('routes subject and report surfaces from child detail', async () => {
+    const { result, cleanup } = renderChildDetail();
 
+    await waitFor(() => {
+      result.getByTestId('child-curriculum-link');
+    });
     expect(mockIsSurfaced).toHaveBeenCalledWith(
       'child/[profileId]/curriculum',
       { profileId: 'child-001' },
     );
-    fireEvent.press(screen.getByTestId('child-curriculum-link'));
+    fireEvent.press(result.getByTestId('child-curriculum-link'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/curriculum',
       params: { profileId: 'child-001' },
     });
 
-    fireEvent.press(screen.getByTestId('child-reports-link'));
+    fireEvent.press(result.getByTestId('child-reports-link'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/reports',
       params: { profileId: 'child-001' },
     });
 
     fireEvent.press(
-      screen.getByTestId('subject-card-11111111-1111-7111-8111-111111111111'),
+      await waitFor(() =>
+        result.getByTestId('subject-card-11111111-1111-7111-8111-111111111111'),
+      ),
     );
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
@@ -768,76 +886,100 @@ describe('ChildDetailScreen — profile overview', () => {
         childName: 'Emma',
       },
     });
+
+    cleanup();
   });
 
-  it('hides curriculum when the navigation contract does not surface it', () => {
+  it('hides curriculum when the navigation contract does not surface it', async () => {
     mockIsSurfaced.mockReturnValue(false);
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    expect(screen.queryByTestId('child-curriculum-link')).toBeNull();
-    screen.getByTestId('child-reports-link');
+    await waitFor(() => {
+      result.getByTestId('child-reports-link');
+    });
+    expect(result.queryByTestId('child-curriculum-link')).toBeNull();
+
+    cleanup();
   });
 
-  it('renders parent consent management for a consented child', () => {
-    render(<ChildDetailScreen />);
+  it('renders parent consent management for a consented child', async () => {
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('consent-section');
-    screen.getByTestId('withdraw-consent-button');
-    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('withdraw-consent-button');
+    });
+    result.getByTestId('consent-section');
+    expect(result.queryByTestId('grace-period-banner')).toBeNull();
+
+    cleanup();
   });
 
-  it('invokes consent revocation from the withdraw confirmation', () => {
-    render(<ChildDetailScreen />);
+  it('invokes consent revocation from the withdraw confirmation', async () => {
+    const { result, cleanup } = renderChildDetail();
 
-    fireEvent.press(screen.getByTestId('withdraw-consent-button'));
-
-    expect(mockRevokeMutate).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ onError: expect.any(Function) }),
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('withdraw-consent-button')),
     );
+
+    // platformAlert mock auto-fires the destructive button -> revoke mutation.
+    await waitFor(() => {
+      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/revoke');
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+      expect(calls[0]?.init?.method).toBe('PUT');
+    });
+
+    cleanup();
   });
 
-  it('renders the consent-withdrawn empty state (not grace-period banner) for a withdrawn child', () => {
+  it('renders the consent-withdrawn empty state (not grace-period banner) for a withdrawn child', async () => {
     // WI-263: consent WITHDRAWN now shows the screen-level empty state instead
     // of the ConsentManagementSection grace-period banner. The empty state CTA
     // calls restoreConsent directly.
-    mockUseChildConsentStatus.mockReturnValue({
-      data: {
+    setRoutes({
+      consent: {
         consentStatus: 'WITHDRAWN',
         respondedAt: new Date().toISOString(),
         consentType: 'GDPR',
       },
-      isLoading: false,
-      isError: false,
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('consent-withdrawn-empty-state');
-    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('consent-withdrawn-empty-state');
+    });
+    expect(result.queryByTestId('grace-period-banner')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('consent-withdrawn-request-cta'));
-    expect(mockRestoreMutate).toHaveBeenCalledWith(undefined);
+    fireEvent.press(result.getByTestId('consent-withdrawn-request-cta'));
+    await waitFor(() => {
+      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/restore');
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+      expect(calls[0]?.init?.method).toBe('PUT');
+    });
+
+    cleanup();
   });
 
-  it('keeps consent management visible and retryable when consent status fails to load', () => {
-    const refetch = jest.fn();
-    mockUseChildConsentStatus.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      refetch,
+  it('keeps consent management visible and retryable when consent status fails to load', async () => {
+    setRoutes({ consentError: 500 });
+
+    const { result, cleanup } = renderChildDetail();
+
+    await waitFor(() => {
+      result.getByTestId('consent-status-error');
+    });
+    result.getByTestId('consent-section');
+
+    // Recover the endpoint, then retry should re-fetch and clear the error.
+    mockFetch.setRoute('/consent/child-001/status', () => consentedStatus);
+    fireEvent.press(result.getByTestId('consent-status-retry'));
+
+    await waitFor(() => {
+      result.getByTestId('withdraw-consent-button');
     });
 
-    render(<ChildDetailScreen />);
-
-    screen.getByTestId('consent-section');
-    screen.getByTestId('consent-status-error');
-
-    fireEvent.press(screen.getByTestId('consent-status-retry'));
-
-    expect(refetch).toHaveBeenCalledTimes(1);
+    cleanup();
   });
 });
 
@@ -852,48 +994,48 @@ describe('ChildDetailScreen — profile overview', () => {
 // ---------------------------------------------------------------------------
 
 describe('ChildDetailScreen — deletionGraceDays plural key routing', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    setupDefaultMocks();
-  });
-
-  function setupWithdrawnConsent(daysAgo: number) {
+  function setupWithdrawnConsent(daysAgo: number): void {
     // respondedAt is daysAgo days in the past; grace period = 7 days
     // daysRemaining = ceil((7 - daysAgo) * MS_PER_DAY / MS_PER_DAY) = 7 - daysAgo
     const respondedAt = new Date(
       Date.now() - daysAgo * 24 * 60 * 60 * 1000,
     ).toISOString();
-    mockUseChildConsentStatus.mockReturnValue({
-      data: {
+    setRoutes({
+      consent: {
         consentStatus: 'WITHDRAWN',
         respondedAt,
         consentType: 'GDPR',
       },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
   }
 
-  it('shows the consent-withdrawn empty state (not grace-period banner) when 1 day remains', () => {
+  it('shows the consent-withdrawn empty state (not grace-period banner) when 1 day remains', async () => {
     // WI-263: withdrawn consent now shows screen-level empty state;
     // grace-period-banner is no longer reachable from this screen when WITHDRAWN.
     setupWithdrawnConsent(6);
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('consent-withdrawn-empty-state');
-    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('consent-withdrawn-empty-state');
+    });
+    expect(result.queryByTestId('grace-period-banner')).toBeNull();
+
+    cleanup();
   });
 
-  it('shows the consent-withdrawn empty state (not grace-period banner) when 5 days remain', () => {
+  it('shows the consent-withdrawn empty state (not grace-period banner) when 5 days remain', async () => {
     // WI-263: same — empty state replaces the full screen for withdrawn consent.
     setupWithdrawnConsent(2);
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('consent-withdrawn-empty-state');
-    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('consent-withdrawn-empty-state');
+    });
+    expect(result.queryByTestId('grace-period-banner')).toBeNull();
+
+    cleanup();
   });
 });
 
@@ -904,89 +1046,98 @@ describe('ChildDetailScreen — deletionGraceDays plural key routing', () => {
 // ---------------------------------------------------------------------------
 
 describe('ChildDetailScreen — data-absent state (BUG-681)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    setupDefaultMocks();
-
-    // Empty profiles bypasses the no-access guard (profiles.length > 0 is false)
-    // and leaves ownedProfile=undefined, so detailUnavailable=true when
-    // childDetail is also null/undefined.
-    mockUseProfile.mockReturnValue({
-      activeProfile: {
-        id: 'parent-001',
-        displayName: 'Parent',
-        isOwner: true,
-      },
+  // Empty profiles bypasses the no-access guard (profiles.length > 0 is false)
+  // and leaves ownedProfile=undefined, so detailUnavailable=true when
+  // childDetail is also null/undefined.
+  function renderWithoutProfiles() {
+    return renderScreen(<ChildDetailScreen />, {
+      profile: guardianProfile,
       profiles: [],
-      isLoading: false,
+      installGlobalFetch: false,
+      routedFetch: mockFetch,
     });
+  }
 
-    mockUseChildDetail.mockReturnValue({
-      data: null,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseDashboard.mockReturnValue({
-      data: { children: [], pendingNotices: [], demoMode: false },
-      isLoading: false,
+  beforeEach(() => {
+    setRoutes({
+      childDetail: null,
+      dashboard: { children: [], pendingNotices: [], demoMode: false },
     });
   });
 
-  it('[BUG-681] renders ErrorFallback wrapper when childDetail is null and no known profile', () => {
-    render(<ChildDetailScreen />);
+  it('[BUG-681] renders ErrorFallback wrapper when childDetail is null and no known profile', async () => {
+    const { result, cleanup } = renderWithoutProfiles();
 
-    screen.getByTestId('child-profile-unavailable');
-    screen.getByTestId('child-profile-unavailable-fallback');
-    expect(screen.queryByTestId('child-detail-scroll')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('child-profile-unavailable');
+    });
+    result.getByTestId('child-profile-unavailable-fallback');
+    expect(result.queryByTestId('child-detail-scroll')).toBeNull();
+
+    cleanup();
   });
 
-  it('[BUG-681] ErrorFallback exposes both retry and back-to-dashboard actions', () => {
-    render(<ChildDetailScreen />);
+  it('[BUG-681] ErrorFallback exposes both retry and back-to-dashboard actions', async () => {
+    const { result, cleanup } = renderWithoutProfiles();
 
-    screen.getByTestId('child-profile-retry');
-    screen.getByTestId('child-profile-back');
+    await waitFor(() => {
+      result.getByTestId('child-profile-retry');
+    });
+    result.getByTestId('child-profile-back');
+
+    cleanup();
   });
 
-  it('[BUG-681] retry action calls refetch on the child detail query', () => {
-    const refetch = jest.fn();
-    mockUseChildDetail.mockReturnValue({
-      data: null,
-      isLoading: false,
-      isError: false,
-      refetch,
+  it('[BUG-681] retry action re-fetches the child detail query', async () => {
+    const { result, cleanup } = renderWithoutProfiles();
+
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('child-profile-retry')),
+    );
+
+    // Retry triggers a fresh GET to the child-detail endpoint.
+    await waitFor(() => {
+      const detailGets = fetchCallsMatching(
+        mockFetch,
+        '/dashboard/children/child-001',
+      ).filter(
+        ({ url, init }) =>
+          !url.includes('/sessions') &&
+          (!init?.method || init.method === 'GET'),
+      );
+      expect(detailGets.length).toBeGreaterThanOrEqual(2);
     });
 
-    render(<ChildDetailScreen />);
-    fireEvent.press(screen.getByTestId('child-profile-retry'));
-
-    expect(refetch).toHaveBeenCalledTimes(1);
+    cleanup();
   });
 
-  it('[BUG-681] back-to-dashboard action navigates to family home', () => {
-    render(<ChildDetailScreen />);
-    fireEvent.press(screen.getByTestId('child-profile-back'));
+  it('[BUG-681] back-to-dashboard action navigates to family home', async () => {
+    const { result, cleanup } = renderWithoutProfiles();
+
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('child-profile-back')),
+    );
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+
+    cleanup();
   });
 
-  it('[BUG-681] renders ErrorFallback when the detail query errors with no fallback data', () => {
-    mockUseChildDetail.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      refetch: jest.fn(),
-    });
-    mockUseDashboard.mockReturnValue({
-      data: undefined,
-      isLoading: false,
+  it('[BUG-681] renders ErrorFallback when the detail query errors with no fallback data', async () => {
+    setRoutes({
+      childDetailError: 500,
+      dashboardUndefined: true,
     });
 
-    render(<ChildDetailScreen />);
+    const { result, cleanup } = renderWithoutProfiles();
 
-    screen.getByTestId('child-profile-unavailable');
-    screen.getByTestId('child-profile-unavailable-fallback');
-    expect(screen.queryByTestId('child-detail-scroll')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('child-profile-unavailable');
+    });
+    result.getByTestId('child-profile-unavailable-fallback');
+    expect(result.queryByTestId('child-detail-scroll')).toBeNull();
+
+    cleanup();
   });
 });
 
@@ -996,66 +1147,82 @@ describe('ChildDetailScreen — data-absent state (BUG-681)', () => {
 
 describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    setupDefaultMocks();
-
-    mockUseChildConsentStatus.mockReturnValue({
-      data: {
+    setRoutes({
+      consent: {
         consentStatus: 'WITHDRAWN',
         respondedAt: new Date().toISOString(),
         consentType: 'GDPR',
       },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
   });
 
-  it('[WI-263] renders the consent-withdrawn empty state when consent is WITHDRAWN', () => {
-    render(<ChildDetailScreen />);
+  it('[WI-263] renders the consent-withdrawn empty state when consent is WITHDRAWN', async () => {
+    const { result, cleanup } = renderChildDetail();
 
-    screen.getByTestId('consent-withdrawn-empty-state');
-    screen.getByTestId('consent-withdrawn-request-cta');
-    expect(screen.queryByTestId('child-detail-scroll')).toBeNull();
+    await waitFor(() => {
+      result.getByTestId('consent-withdrawn-empty-state');
+    });
+    result.getByTestId('consent-withdrawn-request-cta');
+    expect(result.queryByTestId('child-detail-scroll')).toBeNull();
+
+    cleanup();
   });
 
-  it('[WI-263] does NOT call useChildLearnerProfile with the real profileId when consent is WITHDRAWN', () => {
-    render(<ChildDetailScreen />);
+  it('[WI-263] does NOT fetch the learner-profile with the real childProfileId when consent is WITHDRAWN', async () => {
+    // The learner-profile read is gated as
+    // `consentResolved && !consentWithdrawn ? profileId : undefined`, so when
+    // consent resolves WITHDRAWN the hook stays disabled and NO request to the
+    // real child learner-profile endpoint must ever appear.
+    const { result, cleanup } = renderChildDetail();
 
-    // The hook must have been called (it always mounts) but the first arg
-    // must be undefined — never the real profile id — so the enabled guard
-    // blocks the fetch. An empty call list would pass vacuously.
-    const calls = mockUseChildLearnerProfile.mock.calls;
-    expect(calls.length).toBeGreaterThan(0);
-    expect(calls.every((args: unknown[]) => args[0] === undefined)).toBe(true);
-  });
-
-  it('[WI-263] positive control — calls useChildLearnerProfile with the real profileId when consent is CONSENTED', () => {
-    // Override the consent mock to CONSENTED for this test only.
-    mockUseChildConsentStatus.mockReturnValue({
-      data: {
-        consentStatus: 'CONSENTED',
-        respondedAt: '2026-01-01T00:00:00.000Z',
-        consentType: 'GDPR',
-      },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+    await waitFor(() => {
+      result.getByTestId('consent-withdrawn-empty-state');
     });
 
-    render(<ChildDetailScreen />);
+    const learnerProfileCalls = fetchCallsMatching(
+      mockFetch,
+      '/learner-profile/child-001',
+    );
+    expect(learnerProfileCalls).toHaveLength(0);
 
-    const calls = mockUseChildLearnerProfile.mock.calls;
-    expect(calls.length).toBeGreaterThan(0);
-    // When consented the hook must eventually be called with the real id.
-    expect(calls.some((args: unknown[]) => args[0] === 'child-001')).toBe(true);
+    cleanup();
   });
 
-  it('[WI-263] request-cta triggers the restore-consent mutation', () => {
-    render(<ChildDetailScreen />);
+  it('[WI-263] positive control — fetches the learner-profile with the real childProfileId when consent is CONSENTED', async () => {
+    // When consented the gate opens and the screen must fetch the real
+    // child learner-profile endpoint.
+    setRoutes({ consent: consentedStatus });
 
-    fireEvent.press(screen.getByTestId('consent-withdrawn-request-cta'));
+    const { result, cleanup } = renderChildDetail();
 
-    expect(mockRestoreMutate).toHaveBeenCalledWith(undefined);
+    await waitFor(() => {
+      result.getByTestId('child-accommodation-row-child-001');
+    });
+
+    await waitFor(() => {
+      const learnerProfileCalls = fetchCallsMatching(
+        mockFetch,
+        '/learner-profile/child-001',
+      );
+      expect(learnerProfileCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    cleanup();
+  });
+
+  it('[WI-263] request-cta triggers the restore-consent mutation', async () => {
+    const { result, cleanup } = renderChildDetail();
+
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('consent-withdrawn-request-cta')),
+    );
+
+    await waitFor(() => {
+      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/restore');
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+      expect(calls[0]?.init?.method).toBe('PUT');
+    });
+
+    cleanup();
   });
 });

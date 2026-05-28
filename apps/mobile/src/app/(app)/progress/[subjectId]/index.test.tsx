@@ -1,3 +1,4 @@
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import {
   act,
   render,
@@ -5,251 +6,190 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
+import {
+  ProfileContext,
+  type ProfileContextValue,
+} from '../../../../lib/profile';
+import { AppContextProvider } from '../../../../lib/app-context';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../../../test-utils/mock-api-routes';
+import {
+  createTestProfile,
+  renderScreen,
+  type RenderScreenResult,
+} from '../../../../test-utils/screen-render';
 
 import ProgressSubjectScreen from '.';
 
-jest.mock('react-i18next', () => ({
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      // Minimal translation table for progress.subject assertions in this suite.
-      const map: Record<string, string> = {
-        'progress.subject.noSubjectTitle': 'No subject selected',
-        'progress.subject.noSubjectSubtitle':
-          'Pick a subject from your progress page to see details.',
-        'progress.subject.backToProgress': 'Back to progress',
-        'progress.subject.loadingTooLong': 'Loading is taking too long',
-        'progress.subject.checkConnection':
-          'Check your connection and try again.',
-        'progress.subject.errorTitle': "We couldn't load this subject",
-        'progress.subject.errorMessageServer':
-          'Something went wrong on our end. Tap below to retry.',
-        'progress.subject.errorMessageNetwork':
-          'Check your connection and try again.',
-        'progress.subject.fallbackTitle': 'Subject progress',
-        'progress.subject.topicsMastered': `${opts?.mastered ?? ''}/${
-          opts?.total ?? ''
-        } planned topics mastered`,
-        'progress.subject.noTopicsPlanned': 'No topics planned yet',
-        'progress.subject.topicsExplored': `${opts?.count ?? ''} ${
-          (opts?.count ?? 0) === 1 ? 'topic' : 'topics'
-        } explored`,
-        'progress.subject.wordsTracked': `${
-          opts?.count ?? ''
-        } words tracked in this subject`,
-        'progress.subject.sessionsCompleted': `${opts?.count ?? ''} ${
-          (opts?.count ?? 0) === 1 ? 'session' : 'sessions'
-        } completed`,
-        'progress.subject.statStarted': 'Started',
-        'progress.subject.statNotStarted': 'Not started',
-        'progress.subject.statTimeSpent': 'Time spent',
-        'progress.subject.statSessions': 'Sessions',
-        'progress.subject.vocabularyTitle': 'Vocabulary',
-        'progress.subject.vocabularyBreakdown': `${
-          opts?.mastered ?? ''
-        } mastered • ${opts?.learning ?? ''} learning • ${opts?.new ?? ''} new`,
-        'progress.subject.wordCount': `${opts?.count ?? ''} words`,
-        'progress.subject.viewAllVocab': 'View all vocabulary',
-        'progress.subject.viewAllVocabLink': 'View all vocabulary →',
-        'progress.subject.languageMilestone': 'Language milestone',
-        'progress.subject.milestoneLoadError': 'Could not load milestone data.',
-        'progress.subject.retryMilestone': 'Retry loading milestone',
-        'progress.subject.wordsProgress': `${opts?.mastered ?? ''}/${
-          opts?.target ?? ''
-        } words`,
-        'progress.subject.phrasesProgress': `${opts?.mastered ?? ''}/${
-          opts?.target ?? ''
-        } phrases`,
-        'progress.subject.upNext': `Up next: ${opts?.level ?? ''} — ${
-          opts?.title ?? ''
-        }`,
-        'progress.subject.milestoneNoData':
-          'Complete a session to start tracking your milestone progress.',
-        'progress.subject.retentionTitle': 'Current retention',
-        'progress.subject.retentionLoadError':
-          "We couldn't load retention data right now.",
-        'progress.subject.retryRetention': 'Retry loading retention',
-        'progress.subject.retentionStrong': 'Knowledge feels stable right now.',
-        'progress.subject.retentionFading':
-          'A light review would help keep this fresh.',
-        'progress.subject.retentionWeak':
-          'This subject would benefit from some extra attention.',
-        'progress.register.adult.retentionStrong': 'Still remembered.',
-        'progress.register.adult.retentionFading':
-          'Getting fuzzy — a quick review will help.',
-        'progress.register.adult.retentionWeak': 'Needs a quick refresh.',
-        'progress.register.child.retentionStrong':
-          'What came back to you this week.',
-        'progress.register.child.retentionFading': 'Worth a quick refresh.',
-        'progress.register.child.retentionWeak': 'Worth coming back to.',
-        'progress.subject.openShelf': 'Open shelf',
-        'progress.subject.pastConversations': 'Past conversations',
-        'progress.subject.resume': 'Resume',
-        'progress.subject.chooseNext': 'Choose next',
-        'progress.subject.hideSubject': 'Hide subject',
-        'progress.subject.hidingSubject': 'Hiding subject...',
-        'progress.subject.hideSubjectHint':
-          'Hides this subject from your main student views. You can restore it from Library later.',
-        'progress.subject.hideConfirmTitle': `Hide ${opts?.subject ?? ''}?`,
-        'progress.subject.hideConfirmMessage':
-          'This will move the subject out of your main views. Your learning history stays saved, and you can restore it from Library.',
-        'progress.subject.hideConfirmAction': 'Hide subject',
-        'progress.subject.hideErrorTitle': 'Could not hide subject',
-        'progress.subject.goneTitle': 'This subject is no longer available',
-        'progress.subject.goneSubtitle':
-          'It may have been removed or merged into another subject.',
-        'progress.keepLearning': 'Keep learning',
-        'common.cancel': 'Cancel',
-        'common.retry': 'Retry',
-        'common.tryAgain': 'Try Again',
-        'common.goBack': 'Go back',
-      };
-      if (key in map) return map[key]!;
-      return key;
-    },
-  }),
-}));
-
-const mockReplace = jest.fn();
-const mockPush = jest.fn();
-const mockGoBackOrReplace = jest.fn();
-const mockPushLearningResumeTarget = jest.fn();
-const mockLocalSearchParams = jest.fn(() => ({ subjectId: 's1' }));
-
-jest.mock('expo-router', () => ({
-  useFocusEffect: jest.fn((callback: () => void) => {
-    callback();
-  }),
-  useRouter: () => ({ back: jest.fn(), replace: mockReplace, push: mockPush }),
-  useLocalSearchParams: () => mockLocalSearchParams(),
-}));
+// ─── Boundary mocks (external/native runtime only) ──────────────────────
+//
+// Everything that previously stubbed internal modules
+// (lib/profile via direct hook returns, use-progress, use-language-progress,
+// use-subjects, use-active-profile-role, use-navigation-contract,
+// lib/navigation, lib/format-api-error, components/common, components/progress)
+// now runs for real. The screen's real hooks hit the routed mock fetch
+// installed by `renderScreen`, the real ProfileContext drives role + proxy
+// state, and the real ErrorFallback / ProgressBar render. The only mocks left
+// are true native/external boundaries the harness cannot run in JSDOM.
 
 jest.mock(
-  '../../../../hooks/use-active-profile-role' /* gc1-allow: unit test boundary */,
+  'react-i18next' /* gc1-allow: i18n boundary — pinned translation table for progress.subject assertions */,
   () => ({
-    // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
-    useActiveProfileRole: () => 'owner',
-  }),
-);
-
-let mockIsParentProxy = false;
-jest.mock(
-  '../../../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests (WI-279) */,
-  () => ({
-    useNavigationContract: () => ({
-      isParentProxy: mockIsParentProxy,
-      gates: {},
+    initReactI18next: { type: '3rdParty', init: jest.fn() },
+    useTranslation: () => ({
+      t: (key: string, opts?: Record<string, unknown>) => {
+        // Minimal translation table for progress.subject assertions in this suite.
+        const map: Record<string, string> = {
+          'progress.subject.noSubjectTitle': 'No subject selected',
+          'progress.subject.noSubjectSubtitle':
+            'Pick a subject from your progress page to see details.',
+          'progress.subject.backToProgress': 'Back to progress',
+          'progress.subject.loadingTooLong': 'Loading is taking too long',
+          'progress.subject.checkConnection':
+            'Check your connection and try again.',
+          'progress.subject.errorTitle': "We couldn't load this subject",
+          'progress.subject.errorMessageServer':
+            'Something went wrong on our end. Tap below to retry.',
+          'progress.subject.errorMessageNetwork':
+            'Check your connection and try again.',
+          'progress.subject.fallbackTitle': 'Subject progress',
+          'progress.subject.topicsMastered': `${opts?.mastered ?? ''}/${
+            opts?.total ?? ''
+          } planned topics mastered`,
+          'progress.subject.noTopicsPlanned': 'No topics planned yet',
+          'progress.subject.topicsExplored': `${opts?.count ?? ''} ${
+            (opts?.count ?? 0) === 1 ? 'topic' : 'topics'
+          } explored`,
+          'progress.subject.wordsTracked': `${
+            opts?.count ?? ''
+          } words tracked in this subject`,
+          'progress.subject.sessionsCompleted': `${opts?.count ?? ''} ${
+            (opts?.count ?? 0) === 1 ? 'session' : 'sessions'
+          } completed`,
+          'progress.subject.statStarted': 'Started',
+          'progress.subject.statNotStarted': 'Not started',
+          'progress.subject.statTimeSpent': 'Time spent',
+          'progress.subject.statSessions': 'Sessions',
+          'progress.subject.vocabularyTitle': 'Vocabulary',
+          'progress.subject.vocabularyBreakdown': `${
+            opts?.mastered ?? ''
+          } mastered • ${opts?.learning ?? ''} learning • ${opts?.new ?? ''} new`,
+          'progress.subject.wordCount': `${opts?.count ?? ''} words`,
+          'progress.subject.viewAllVocab': 'View all vocabulary',
+          'progress.subject.viewAllVocabLink': 'View all vocabulary →',
+          'progress.subject.languageMilestone': 'Language milestone',
+          'progress.subject.milestoneLoadError':
+            'Could not load milestone data.',
+          'progress.subject.retryMilestone': 'Retry loading milestone',
+          'progress.subject.wordsProgress': `${opts?.mastered ?? ''}/${
+            opts?.target ?? ''
+          } words`,
+          'progress.subject.phrasesProgress': `${opts?.mastered ?? ''}/${
+            opts?.target ?? ''
+          } phrases`,
+          'progress.subject.upNext': `Up next: ${opts?.level ?? ''} — ${
+            opts?.title ?? ''
+          }`,
+          'progress.subject.milestoneNoData':
+            'Complete a session to start tracking your milestone progress.',
+          'progress.subject.retentionTitle': 'Current retention',
+          'progress.subject.retentionLoadError':
+            "We couldn't load retention data right now.",
+          'progress.subject.retryRetention': 'Retry loading retention',
+          'progress.subject.retentionStrong':
+            'Knowledge feels stable right now.',
+          'progress.subject.retentionFading':
+            'A light review would help keep this fresh.',
+          'progress.subject.retentionWeak':
+            'This subject would benefit from some extra attention.',
+          'progress.register.adult.retentionStrong': 'Still remembered.',
+          'progress.register.adult.retentionFading':
+            'Getting fuzzy — a quick review will help.',
+          'progress.register.adult.retentionWeak': 'Needs a quick refresh.',
+          'progress.register.child.retentionStrong':
+            'What came back to you this week.',
+          'progress.register.child.retentionFading': 'Worth a quick refresh.',
+          'progress.register.child.retentionWeak': 'Worth coming back to.',
+          'progress.subject.openShelf': 'Open shelf',
+          'progress.subject.pastConversations': 'Past conversations',
+          'progress.subject.resume': 'Resume',
+          'progress.subject.chooseNext': 'Choose next',
+          'progress.subject.hideSubject': 'Hide subject',
+          'progress.subject.hidingSubject': 'Hiding subject...',
+          'progress.subject.hideSubjectHint':
+            'Hides this subject from your main student views. You can restore it from Library later.',
+          'progress.subject.hideConfirmTitle': `Hide ${opts?.subject ?? ''}?`,
+          'progress.subject.hideConfirmMessage':
+            'This will move the subject out of your main views. Your learning history stays saved, and you can restore it from Library.',
+          'progress.subject.hideConfirmAction': 'Hide subject',
+          'progress.subject.hideErrorTitle': 'Could not hide subject',
+          'progress.subject.goneTitle': 'This subject is no longer available',
+          'progress.subject.goneSubtitle':
+            'It may have been removed or merged into another subject.',
+          'proxy.readOnly.hint': 'You are viewing this in read-only mode.',
+          'progress.keepLearning': 'Keep learning',
+          'common.cancel': 'Cancel',
+          'common.retry': 'Retry',
+          'common.tryAgain': 'Try Again',
+          'common.goBack': 'Go back',
+        };
+        if (key in map) return map[key]!;
+        return key;
+      },
     }),
   }),
 );
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
-}));
+const mockReplace = jest.fn();
+const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => false);
+const mockLocalSearchParams = jest.fn(() => ({ subjectId: 's1' }));
 
 jest.mock(
-  '../../../../lib/navigation' /* gc1-allow: unit test boundary */,
-  () => ({
-    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-    pushLearningResumeTarget: (...args: unknown[]) =>
-      mockPushLearningResumeTarget(...args),
-  }),
-);
-
-jest.mock(
-  '../../../../components/common' /* gc1-allow: unit test boundary */,
+  'expo-router' /* gc1-allow: expo-router needs a native navigation container unavailable in JSDOM; router spies assert navigation */,
   () => {
-    const { View, Text, Pressable } = require('react-native');
+    const React = require('react');
     return {
-      ErrorFallback: (props: {
-        testID?: string;
-        title?: string;
-        message?: string;
-        primaryAction?: { testID?: string; onPress: () => void; label: string };
-        secondaryAction?: {
-          testID?: string;
-          onPress: () => void;
-          label: string;
-        };
-      }) => (
-        <View testID={props.testID}>
-          {props.title ? <Text>{props.title}</Text> : null}
-          {props.message ? <Text>{props.message}</Text> : null}
-          {props.primaryAction ? (
-            <Pressable
-              testID={props.primaryAction.testID}
-              onPress={props.primaryAction.onPress}
-            >
-              <Text>{props.primaryAction.label}</Text>
-            </Pressable>
-          ) : null}
-          {props.secondaryAction ? (
-            <Pressable
-              testID={props.secondaryAction.testID}
-              onPress={props.secondaryAction.onPress}
-            >
-              <Text>{props.secondaryAction.label}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ),
+      // Real useFocusEffect fires the callback on focus (mount), NOT on every
+      // render. Invoking it via useEffect([]) mirrors that: it runs once after
+      // mount. Calling it on every render (the naive `callback()`) would loop
+      // forever now that the real query hooks re-render on refetch. The mock is
+      // still recorded on every render so the re-focus test can grab the latest
+      // callback via `.mock.calls.at(-1)` and invoke it manually.
+      useFocusEffect: jest.fn((callback: () => void) => {
+        React.useEffect(() => {
+          callback();
+        }, [callback]);
+      }),
+      useRouter: () => ({
+        back: mockBack,
+        replace: mockReplace,
+        push: mockPush,
+        canGoBack: mockCanGoBack,
+      }),
+      useLocalSearchParams: () => mockLocalSearchParams(),
     };
   },
 );
 
 jest.mock(
-  '../../../../components/progress' /* gc1-allow: unit test boundary */,
+  'react-native-safe-area-context' /* gc1-allow: native module that requires device/simulator to resolve insets */,
   () => ({
-    ProgressBar: () => null,
-  }),
-);
-
-const mockUseProgressInventory = jest.fn();
-const mockUseSubjectProgress = jest.fn();
-const mockUseLearningResumeTarget = jest.fn();
-jest.mock(
-  '../../../../hooks/use-progress' /* gc1-allow: unit test boundary */,
-  () => ({
-    useProgressInventory: (...args: unknown[]) =>
-      mockUseProgressInventory(...args),
-    useSubjectProgress: (...args: unknown[]) => mockUseSubjectProgress(...args),
-    useLearningResumeTarget: (...args: unknown[]) =>
-      mockUseLearningResumeTarget(...args),
-  }),
-);
-
-const mockUseLanguageProgress = jest.fn();
-jest.mock(
-  '../../../../hooks/use-language-progress' /* gc1-allow: unit test boundary */,
-  () => ({
-    useLanguageProgress: (...args: unknown[]) =>
-      mockUseLanguageProgress(...args),
-  }),
-);
-
-const mockMutateSubjectAsync = jest.fn();
-const mockUseUpdateSubject = jest.fn();
-jest.mock(
-  '../../../../hooks/use-subjects' /* gc1-allow: unit test boundary */,
-  () => ({
-    useUpdateSubject: (...args: unknown[]) => mockUseUpdateSubject(...args),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
   }),
 );
 
 const mockPlatformAlert = jest.fn();
 jest.mock(
-  '../../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
+  '../../../../lib/platform-alert' /* gc1-allow: wraps Alert.alert which is unavailable in JSDOM */,
   () => ({
     platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-  }),
-);
-
-jest.mock(
-  '../../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
-  () => ({
-    ...jest.requireActual('../../../../lib/format-api-error'),
-    formatApiError: (err: Error) => `formatted: ${err.message}`,
   }),
 );
 
@@ -269,73 +209,168 @@ const fullSubject = {
   sessionsCount: 5,
 };
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
+const OWNER_PROFILE = createTestProfile({
+  id: 'profile-owner',
+  accountId: 'account-1',
+  displayName: 'Test Owner',
+  isOwner: true,
+  birthYear: 1990,
+});
 
-function mockHooks({
-  inventoryData = { subjects: [fullSubject] } as
-    | { subjects: (typeof fullSubject)[] }
-    | undefined,
-  inventoryIsLoading = false,
-  inventoryIsError = false,
-  inventoryError = null as Error | null,
-  subjectProgressData = undefined as
-    | {
-        retentionStatus: string;
-        urgencyScore?: number;
-        topicsCompleted?: number;
-        topicsVerified?: number;
-        lastSessionAt?: string | null;
-      }
-    | undefined,
-  subjectProgressIsError = false,
-  languageProgressData = undefined as Record<string, unknown> | undefined,
-  languageProgressIsLoading = false,
-  languageProgressIsError = false,
-} = {}) {
-  const inventoryRefetch = jest.fn();
-  const subjectProgressRefetch = jest.fn();
-  const resumeTargetRefetch = jest.fn();
-  const languageProgressRefetch = jest.fn();
+type SubjectFixture = typeof fullSubject;
 
-  mockUseProgressInventory.mockReturnValue({
-    data: inventoryIsLoading || inventoryIsError ? undefined : inventoryData,
-    isLoading: inventoryIsLoading,
-    isError: inventoryIsError,
-    error: inventoryError,
-    refetch: inventoryRefetch,
+interface SubjectProgressFixture {
+  retentionStatus: string;
+  urgencyScore?: number;
+  topicsCompleted?: number;
+  topicsVerified?: number;
+  lastSessionAt?: string | null;
+}
+
+interface RouteOptions {
+  /** subjects[] returned by GET /progress/inventory. */
+  subjects?: SubjectFixture[];
+  /** Make GET /progress/inventory fail. 'server' → 500 (UpstreamError),
+   * 'network' → fetch throws (NetworkError). */
+  inventoryError?: 'server' | 'network';
+  /** progress returned by GET /subjects/:id/progress (null = no retention). */
+  subjectProgress?: SubjectProgressFixture | null;
+  /** Make GET /subjects/:id/progress fail with a 500. */
+  subjectProgressError?: boolean;
+  /** data returned by GET /subjects/:id/cefr-progress. */
+  languageProgress?: Record<string, unknown>;
+  /** Make GET /subjects/:id/cefr-progress fail with a 500. */
+  languageProgressError?: boolean;
+  /** target returned by GET /progress/resume-target. */
+  resumeTarget?: Record<string, unknown> | null;
+  /** Make the PATCH /subjects/:id (hide) fail with this 400 message. */
+  hideErrorMessage?: string;
+}
+
+function serverError(): Response {
+  return new Response(
+    JSON.stringify({
+      code: 'UPSTREAM_ERROR',
+      message: 'Internal server error',
+    }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } },
+  );
+}
+
+function badRequest(message: string): Response {
+  return new Response(JSON.stringify({ code: 'BAD_REQUEST', message }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
   });
+}
 
-  mockUseSubjectProgress.mockReturnValue({
-    data: subjectProgressData,
-    isLoading: false,
-    isError: subjectProgressIsError,
-    error: subjectProgressIsError ? new Error('retention fail') : null,
-    refetch: subjectProgressRefetch,
-  });
-
-  mockUseLearningResumeTarget.mockReturnValue({
-    data: null,
-    refetch: resumeTargetRefetch,
-  });
-
-  mockUseLanguageProgress.mockReturnValue({
-    data: languageProgressData,
-    isLoading: languageProgressIsLoading,
-    isError: languageProgressIsError,
-    error: languageProgressIsError ? new Error('lang fail') : null,
-    refetch: languageProgressRefetch,
-  });
-
-  mockUseUpdateSubject.mockReturnValue({
-    mutateAsync: mockMutateSubjectAsync,
-    isPending: false,
-  });
+/**
+ * Build the routes the real hooks hit. Endpoints discovered from the hook
+ * sources (apps/mobile/src/hooks/use-progress.ts, use-language-progress.ts,
+ * use-subjects.ts) — the Hono RPC base is `${getApiUrl()}/v1`:
+ *   - useProgressInventory     → GET  /progress/inventory   → KnowledgeInventory
+ *   - useSubjectProgress       → GET  /subjects/:id/progress → { progress }
+ *   - useLearningResumeTarget  → GET  /progress/resume-target → { target }
+ *   - useLanguageProgress      → GET  /subjects/:id/cefr-progress → LanguageProgress
+ *   - useUpdateSubject         → PATCH /subjects/:id          → { subject }
+ *
+ * Insertion order matters: the routed mock returns the first `includes()`
+ * match. The two `/subjects/s1/...` sub-paths and the cefr path precede the
+ * bare `/subjects/s1` PATCH route so a GET never falls into the PATCH handler.
+ */
+function buildRoutes(opts: RouteOptions = {}): Record<string, unknown> {
+  const subjects = opts.subjects ?? [fullSubject];
 
   return {
-    inventoryRefetch,
-    languageProgressRefetch,
-    resumeTargetRefetch,
-    subjectProgressRefetch,
+    '/subjects/s1/cefr-progress': opts.languageProgressError
+      ? () => serverError()
+      : (opts.languageProgress ?? {}),
+    '/subjects/s1/progress': opts.subjectProgressError
+      ? () => serverError()
+      : { progress: opts.subjectProgress ?? null },
+    '/progress/resume-target': { target: opts.resumeTarget ?? null },
+    '/progress/inventory':
+      opts.inventoryError === 'network'
+        ? () => {
+            throw new TypeError('Network request failed');
+          }
+        : opts.inventoryError === 'server'
+          ? () => serverError()
+          : { subjects },
+    // Bare subject route — only the PATCH (hide) lands here.
+    '/subjects/s1': opts.hideErrorMessage
+      ? () => badRequest(opts.hideErrorMessage as string)
+      : { subject: { id: 's1', status: 'archived' } },
+  };
+}
+
+// ─── Render helpers ────────────────────────────────────────────────────────
+
+let active: RenderScreenResult | null = null;
+
+function mount(opts: RouteOptions = {}): RenderScreenResult {
+  active = renderScreen(<ProgressSubjectScreen />, {
+    profile: OWNER_PROFILE,
+    profiles: [OWNER_PROFILE],
+    routes: buildRoutes(opts),
+  });
+  return active;
+}
+
+/**
+ * Proxy-mode render. `renderScreen` hard-codes `isExplicitProxyMode: false`,
+ * and the real `useNavigationContract` → `useParentProxy` derives proxy state
+ * purely from that flag, so the proxy write-guard tests build the same provider
+ * stack as the harness but with `isExplicitProxyMode: true`. This keeps the
+ * navigation contract real instead of mocking it.
+ */
+function mountProxy(opts: RouteOptions = {}): {
+  routedFetch: RoutedMockFetch;
+  cleanup: () => void;
+} {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
+  const routedFetch = createRoutedMockFetch(buildRoutes(opts));
+  const prevFetch = globalThis.fetch;
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    routedFetch as unknown as typeof fetch;
+
+  const profileContextValue: ProfileContextValue = {
+    profiles: [OWNER_PROFILE],
+    activeProfile: OWNER_PROFILE,
+    isExplicitProxyMode: true,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
+  function Wrapper({ children }: { children: ReactNode }): ReactElement {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        ProfileContext.Provider,
+        { value: profileContextValue },
+        createElement(AppContextProvider, null, children),
+      ),
+    );
+  }
+
+  render(<ProgressSubjectScreen />, { wrapper: Wrapper });
+
+  return {
+    routedFetch,
+    cleanup: () => {
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+    },
   };
 }
 
@@ -344,9 +379,13 @@ function mockHooks({
 describe('ProgressSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsParentProxy = false;
+    mockCanGoBack.mockReturnValue(false);
     mockLocalSearchParams.mockReturnValue({ subjectId: 's1' });
-    mockMutateSubjectAsync.mockResolvedValue({ subject: {} });
+  });
+
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
   });
 
   // ── Missing subjectId ────────────────────────────────────────────────────
@@ -356,21 +395,18 @@ describe('ProgressSubjectScreen', () => {
     });
 
     it('shows "No subject selected" view with correct testID', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+      mount();
       screen.getByTestId('progress-subject-missing');
       screen.getByText('No subject selected');
     });
 
     it('shows a "Back to progress" action button', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+      mount();
       screen.getByTestId('progress-subject-missing-back');
     });
 
     it('navigates to progress list when back button pressed', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+      mount();
       fireEvent.press(screen.getByTestId('progress-subject-missing-back'));
       expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
     });
@@ -379,79 +415,92 @@ describe('ProgressSubjectScreen', () => {
   // ── Loading ──────────────────────────────────────────────────────────────
   describe('loading state', () => {
     it('shows skeleton placeholder with correct testID', () => {
-      mockHooks({ inventoryIsLoading: true });
-      render(<ProgressSubjectScreen />);
+      mount();
+      // React Query starts pending; the skeleton renders synchronously before
+      // the routed fetch resolves on the next microtask.
       screen.getByTestId('progress-subject-loading');
     });
 
     it('does not show subject content while loading', () => {
-      mockHooks({ inventoryIsLoading: true });
-      render(<ProgressSubjectScreen />);
+      mount();
       expect(screen.queryByText('Math')).toBeNull();
     });
   });
 
   // ── Error (inventory query) ──────────────────────────────────────────────
   describe('inventory error state', () => {
-    it('shows ErrorFallback with correct testID', () => {
-      mockHooks({ inventoryIsError: true });
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('progress-subject-error');
+    it('shows ErrorFallback with correct testID', async () => {
+      mount({ inventoryError: 'server' });
+      await screen.findByTestId('progress-subject-error');
     });
 
-    it('shows error title', () => {
-      mockHooks({ inventoryIsError: true });
-      render(<ProgressSubjectScreen />);
-      screen.getByText("We couldn't load this subject");
+    it('shows error title', async () => {
+      mount({ inventoryError: 'server' });
+      await screen.findByText("We couldn't load this subject");
     });
 
-    it('calls refetch when retry button pressed', () => {
-      const { inventoryRefetch } = mockHooks({ inventoryIsError: true });
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByTestId('progress-subject-error-retry'));
-      expect(inventoryRefetch).toHaveBeenCalled();
+    it('calls refetch when retry button pressed', async () => {
+      const { routedFetch } = mount({ inventoryError: 'server' });
+      const retry = await screen.findByTestId('progress-subject-error-retry');
+      const before = fetchCallsMatching(
+        routedFetch,
+        '/progress/inventory',
+      ).length;
+      fireEvent.press(retry);
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(routedFetch, '/progress/inventory').length,
+        ).toBeGreaterThan(before);
+      });
     });
 
-    it('navigates to progress list when error back button pressed', () => {
-      mockHooks({ inventoryIsError: true });
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByTestId('progress-subject-error-back'));
+    it('navigates to progress list when error back button pressed', async () => {
+      mount({ inventoryError: 'server' });
+      const back = await screen.findByTestId('progress-subject-error-back');
+      fireEvent.press(back);
       expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
     });
 
-    it('shows connection message for non-API errors', () => {
-      mockHooks({
-        inventoryIsError: true,
-        inventoryError: new Error('network error'),
-      });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Check your connection and try again.');
+    it('shows connection message for non-API errors', async () => {
+      mount({ inventoryError: 'network' });
+      await screen.findByText('Check your connection and try again.');
     });
 
-    it('shows server error message when error message includes "API error"', () => {
-      mockHooks({
-        inventoryIsError: true,
-        inventoryError: new Error('API error 500'),
-      });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Something went wrong on our end. Tap below to retry.');
+    it('shows server error message when error is a server fault', async () => {
+      mount({ inventoryError: 'server' });
+      await screen.findByText(
+        'Something went wrong on our end. Tap below to retry.',
+      );
     });
   });
 
   // ── Subject found (happy path) ───────────────────────────────────────────
   describe('subject found', () => {
-    it('displays the subject name', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Math');
+    it('displays the subject name', async () => {
+      mount();
+      await screen.findByText('Math');
     });
 
-    it('refreshes subject progress when the mounted progress tab focuses again', () => {
-      const refs = mockHooks();
-      render(<ProgressSubjectScreen />);
+    it('refreshes subject progress when the mounted progress tab focuses again', async () => {
+      const { routedFetch } = mount();
+      await screen.findByText('Math');
 
-      expect(refs.inventoryRefetch).not.toHaveBeenCalled();
+      const before = {
+        inventory: fetchCallsMatching(routedFetch, '/progress/inventory')
+          .length,
+        subjectProgress: fetchCallsMatching(
+          routedFetch,
+          '/subjects/s1/progress',
+        ).length,
+        resume: fetchCallsMatching(routedFetch, '/progress/resume-target')
+          .length,
+        language: fetchCallsMatching(routedFetch, '/subjects/s1/cefr-progress')
+          .length,
+      };
 
+      // The real screen registers its refetch callback via useFocusEffect; the
+      // first focus (fired on mount by the mock) is a no-op guard, so grab the
+      // last registered callback and invoke it to simulate a re-focus.
       const focusCallback = (useFocusEffect as jest.Mock).mock.calls.at(
         -1,
       )?.[0] as () => void;
@@ -459,70 +508,75 @@ describe('ProgressSubjectScreen', () => {
         focusCallback();
       });
 
-      expect(refs.inventoryRefetch).toHaveBeenCalled();
-      expect(refs.subjectProgressRefetch).toHaveBeenCalled();
-      expect(refs.resumeTargetRefetch).toHaveBeenCalled();
-      expect(refs.languageProgressRefetch).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(routedFetch, '/progress/inventory').length,
+        ).toBeGreaterThan(before.inventory);
+        expect(
+          fetchCallsMatching(routedFetch, '/subjects/s1/progress').length,
+        ).toBeGreaterThan(before.subjectProgress);
+        expect(
+          fetchCallsMatching(routedFetch, '/progress/resume-target').length,
+        ).toBeGreaterThan(before.resume);
+        expect(
+          fetchCallsMatching(routedFetch, '/subjects/s1/cefr-progress').length,
+        ).toBeGreaterThan(before.language);
+      });
     });
 
-    it('shows topics mastered / total heading', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      screen.getByText('3/10 planned topics mastered');
+    it('shows topics mastered / total heading', async () => {
+      mount();
+      await screen.findByText('3/10 planned topics mastered');
     });
 
-    it('shows sessions count when vocabulary total is 0', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      screen.getByText('5 sessions completed');
+    it('shows sessions count when vocabulary total is 0', async () => {
+      mount();
+      await screen.findByText('5 sessions completed');
     });
 
-    it('shows stat cards — Started, Not started, Time spent, Sessions', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Started');
+    it('shows stat cards — Started, Not started, Time spent, Sessions', async () => {
+      mount();
+      await screen.findByText('Started');
       screen.getByText('Not started');
       screen.getByText('Time spent');
       screen.getByText('Sessions');
     });
 
-    it('shows formatted wallClockMinutes in Time spent stat card (priority over activeMinutes)', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+    it('shows formatted wallClockMinutes in Time spent stat card (priority over activeMinutes)', async () => {
+      mount();
       // wallClockMinutes=45 takes priority over activeMinutes=30; formatMinutes(45) → "45 min"
-      screen.getByText('45 min');
+      await screen.findByText('45 min');
     });
 
-    it('shows "Choose next", "Past conversations", and "Open shelf" buttons when there is no resume target', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Choose next');
+    it('shows "Choose next", "Past conversations", and "Open shelf" buttons when there is no resume target', async () => {
+      mount();
+      await screen.findByText('Choose next');
       screen.getByText('Past conversations');
       screen.getByText('Open shelf');
       screen.getByText('Hide subject');
     });
 
-    it('navigates to subject sessions on "Past conversations" press', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Past conversations'));
+    it('navigates to subject sessions on "Past conversations" press', async () => {
+      mount();
+      const btn = await screen.findByText('Past conversations');
+      fireEvent.press(btn);
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/progress/[subjectId]/sessions',
         params: { subjectId: 's1' },
       });
     });
 
-    it('opens the shelf on primary action press when there is no resume target', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Choose next'));
+    it('opens the shelf on primary action press when there is no resume target', async () => {
+      mount();
+      const btn = await screen.findByText('Choose next');
+      fireEvent.press(btn);
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId: 's1' },
       });
     });
 
-    it('resumes the shared subject target on "Resume" press', () => {
+    it('resumes the shared subject target on "Resume" press', async () => {
       const target = {
         subjectId: 's1',
         subjectName: 'Math',
@@ -534,46 +588,55 @@ describe('ProgressSubjectScreen', () => {
         lastActivityAt: '2026-02-15T09:00:00.000Z',
         reason: 'Continue Fractions',
       };
-      mockHooks();
-      mockUseLearningResumeTarget.mockReturnValue({ data: target });
+      mount({ resumeTarget: target });
 
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Resume'));
+      const btn = await screen.findByText('Resume');
+      fireEvent.press(btn);
 
-      expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
-        expect.anything(),
-        target,
-      );
+      // Real pushLearningResumeTarget seeds the home stack, then pushes the
+      // session route with the resume params — a stronger assertion than the
+      // old spy on the helper.
+      expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          mode: 'learning',
+          subjectId: 's1',
+          subjectName: 'Math',
+          topicId: 't1',
+          topicName: 'Fractions',
+          resumeFromSessionId: 'prev-session',
+        }),
+      });
       expect(mockPush).not.toHaveBeenCalledWith(
         '/(app)/session?mode=learning&subjectId=s1',
       );
     });
 
-    it('navigates to shelf on "Open shelf" press', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Open shelf'));
+    it('navigates to shelf on "Open shelf" press', async () => {
+      mount();
+      const btn = await screen.findByText('Open shelf');
+      fireEvent.press(btn);
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId: 's1' },
       });
     });
 
-    it('back arrow calls goBackOrReplace with progress route', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByTestId('progress-subject-back'));
-      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-        expect.anything(),
-        '/(app)/progress',
-      );
+    it('back arrow replaces with progress route when the back-stack is empty', async () => {
+      mount();
+      const back = await screen.findByTestId('progress-subject-back');
+      // canGoBack() defaults to false (deep-link entry), so the real
+      // goBackOrReplace falls back to router.replace(backFallback).
+      fireEvent.press(back);
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
     });
 
-    it('asks for confirmation before hiding the subject', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+    it('asks for confirmation before hiding the subject', async () => {
+      const { routedFetch } = mount();
+      const hide = await screen.findByTestId('progress-subject-hide');
 
-      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+      fireEvent.press(hide);
 
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         'Hide Math?',
@@ -587,14 +650,18 @@ describe('ProgressSubjectScreen', () => {
         ]),
         { cancelable: true },
       );
-      expect(mockMutateSubjectAsync).not.toHaveBeenCalled();
+      expect(
+        fetchCallsMatching(routedFetch, '/subjects/s1').filter(
+          (c) => c.init?.method === 'PATCH',
+        ),
+      ).toHaveLength(0);
     });
 
     it('archives the subject and returns to progress after confirmation', async () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+      const { routedFetch } = mount();
+      const hide = await screen.findByTestId('progress-subject-hide');
 
-      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+      fireEvent.press(hide);
       const buttons = mockPlatformAlert.mock.calls[0]?.[2] as Array<{
         text: string;
         onPress?: () => void;
@@ -602,35 +669,43 @@ describe('ProgressSubjectScreen', () => {
       buttons.find((button) => button.text === 'Hide subject')?.onPress?.();
 
       await waitFor(() => {
-        expect(mockMutateSubjectAsync).toHaveBeenCalledWith({
-          subjectId: 's1',
+        const patchCalls = fetchCallsMatching(
+          routedFetch,
+          '/subjects/s1',
+        ).filter((c) => c.init?.method === 'PATCH');
+        expect(patchCalls).toHaveLength(1);
+        expect(JSON.parse(patchCalls[0]!.init?.body as string)).toEqual({
           status: 'archived',
         });
       });
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
+      });
     });
 
     it('shows a friendly error if hiding fails', async () => {
-      mockMutateSubjectAsync.mockRejectedValueOnce(new Error('Nope'));
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+      mount({ hideErrorMessage: 'Nope' });
+      const hide = await screen.findByTestId('progress-subject-hide');
 
-      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+      fireEvent.press(hide);
       const buttons = mockPlatformAlert.mock.calls[0]?.[2] as Array<{
         text: string;
         onPress?: () => void;
       }>;
       buttons.find((button) => button.text === 'Hide subject')?.onPress?.();
 
+      // The real PATCH returns a 400 with message "Nope"; assertOk throws a
+      // BadRequestError and the real formatApiError passes the short,
+      // non-technical server message through verbatim.
       await waitFor(() => {
         expect(mockPlatformAlert).toHaveBeenLastCalledWith(
           'Could not hide subject',
-          'formatted: Nope',
+          'Nope',
         );
       });
     });
 
-    it('shows topics explored when total is null', () => {
+    it('shows topics explored when total is null', async () => {
       const subjectNoTotal = {
         ...fullSubject,
         topics: {
@@ -641,10 +716,9 @@ describe('ProgressSubjectScreen', () => {
           inProgress: 3,
         },
       };
-      mockHooks({ inventoryData: { subjects: [subjectNoTotal] } });
-      render(<ProgressSubjectScreen />);
+      mount({ subjects: [subjectNoTotal] });
       // max(explored, mastered+inProgress) = max(7, 5) = 7 topics explored
-      screen.getByText('7 topics explored');
+      await screen.findByText('7 topics explored');
     });
   });
 
@@ -661,51 +735,46 @@ describe('ProgressSubjectScreen', () => {
       },
     };
 
-    it('shows vocabulary word count when total > 0', () => {
-      mockHooks({ inventoryData: { subjects: [subjectWithVocab] } });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('42 words tracked in this subject');
+    it('shows vocabulary word count when total > 0', async () => {
+      mount({ subjects: [subjectWithVocab] });
+      await screen.findByText('42 words tracked in this subject');
     });
 
-    it('shows mastered / learning / new breakdown', () => {
-      mockHooks({ inventoryData: { subjects: [subjectWithVocab] } });
-      render(<ProgressSubjectScreen />);
-      screen.getByText(/20 mastered/);
+    it('shows mastered / learning / new breakdown', async () => {
+      mount({ subjects: [subjectWithVocab] });
+      await screen.findByText(/20 mastered/);
       screen.getByText(/15 learning/);
       screen.getByText(/7 new/);
     });
 
-    it('shows "View all vocabulary" button', () => {
-      mockHooks({ inventoryData: { subjects: [subjectWithVocab] } });
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('vocab-view-all');
+    it('shows "View all vocabulary" button', async () => {
+      mount({ subjects: [subjectWithVocab] });
+      await screen.findByTestId('vocab-view-all');
     });
 
-    it('does not show vocabulary section when total is 0', () => {
-      mockHooks();
-      render(<ProgressSubjectScreen />);
+    it('does not show vocabulary section when total is 0', async () => {
+      mount();
+      await screen.findByText('Math');
       expect(screen.queryByTestId('vocab-view-all')).toBeNull();
     });
   });
 
   // ── Subject gone ─────────────────────────────────────────────────────────
   describe('subject gone (inventory loaded, subject not found)', () => {
-    it('shows "no longer available" card with correct testID', () => {
-      mockHooks({ inventoryData: { subjects: [] } });
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('progress-subject-gone');
+    it('shows "no longer available" card with correct testID', async () => {
+      mount({ subjects: [] });
+      await screen.findByTestId('progress-subject-gone');
     });
 
-    it('shows explanatory text', () => {
-      mockHooks({ inventoryData: { subjects: [] } });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('This subject is no longer available');
+    it('shows explanatory text', async () => {
+      mount({ subjects: [] });
+      await screen.findByText('This subject is no longer available');
     });
 
-    it('navigates to progress list when gone-back button pressed', () => {
-      mockHooks({ inventoryData: { subjects: [] } });
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByTestId('progress-subject-gone-back'));
+    it('navigates to progress list when gone-back button pressed', async () => {
+      mount({ subjects: [] });
+      const back = await screen.findByTestId('progress-subject-gone-back');
+      fireEvent.press(back);
       expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
     });
   });
@@ -730,125 +799,127 @@ describe('ProgressSubjectScreen', () => {
       },
     };
 
-    it('shows CEFR milestone card', () => {
-      mockHooks({
-        inventoryData: { subjects: [languageSubject] },
-        languageProgressData: milestoneData,
+    it('shows CEFR milestone card', async () => {
+      mount({
+        subjects: [languageSubject],
+        languageProgress: milestoneData,
       });
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('cefr-milestone-card');
+      await screen.findByTestId('cefr-milestone-card');
     });
 
-    it('shows current level and milestone title', () => {
-      mockHooks({
-        inventoryData: { subjects: [languageSubject] },
-        languageProgressData: milestoneData,
+    it('shows current level and milestone title', async () => {
+      mount({
+        subjects: [languageSubject],
+        languageProgress: milestoneData,
       });
-      render(<ProgressSubjectScreen />);
-      screen.getByText(/A2/);
+      await screen.findByText(/A2/);
       screen.getByText(/Everyday conversations/);
     });
 
-    it('shows words and phrases progress counts', () => {
-      mockHooks({
-        inventoryData: { subjects: [languageSubject] },
-        languageProgressData: milestoneData,
+    it('shows words and phrases progress counts', async () => {
+      mount({
+        subjects: [languageSubject],
+        languageProgress: milestoneData,
       });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('80/150 words');
+      await screen.findByText('80/150 words');
       screen.getByText('20/40 phrases');
     });
 
-    it('shows next milestone label when present', () => {
-      mockHooks({
-        inventoryData: { subjects: [languageSubject] },
-        languageProgressData: milestoneData,
+    it('shows next milestone label when present', async () => {
+      mount({
+        subjects: [languageSubject],
+        languageProgress: milestoneData,
       });
-      render(<ProgressSubjectScreen />);
-      screen.getByText(/Up next: B1/);
+      await screen.findByText(/Up next: B1/);
     });
 
-    it('shows "Complete a session" prompt when no milestone data yet', () => {
-      mockHooks({
-        inventoryData: { subjects: [languageSubject] },
-        languageProgressData: { currentLevel: 'A1', currentMilestone: null },
+    it('shows "Complete a session" prompt when no milestone data yet', async () => {
+      mount({
+        subjects: [languageSubject],
+        languageProgress: { currentLevel: 'A1', currentMilestone: null },
       });
-      render(<ProgressSubjectScreen />);
-      screen.getByText(
+      await screen.findByText(
         'Complete a session to start tracking your milestone progress.',
       );
     });
 
-    it('shows CEFR card for general subject when languageProgress is present', () => {
+    it('shows CEFR card for general subject when languageProgress is present', async () => {
       // isLanguageSubject = pedagogyMode four_strands OR !!languageProgress
-      mockHooks({ languageProgressData: milestoneData });
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('cefr-milestone-card');
+      mount({ languageProgress: milestoneData });
+      await screen.findByTestId('cefr-milestone-card');
     });
 
-    it('shows retry button when language progress query errors', () => {
-      const { languageProgressRefetch } = mockHooks({
-        inventoryData: { subjects: [languageSubject] },
-        languageProgressIsError: true,
+    it('shows retry button when language progress query errors', async () => {
+      const { routedFetch } = mount({
+        subjects: [languageSubject],
+        languageProgressError: true,
       });
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('cefr-milestone-card');
-      const retryBtn = screen.getByTestId('cefr-milestone-retry');
+      await screen.findByTestId('cefr-milestone-card');
+      const retryBtn = await screen.findByTestId('cefr-milestone-retry');
+      const before = fetchCallsMatching(
+        routedFetch,
+        '/subjects/s1/cefr-progress',
+      ).length;
       fireEvent.press(retryBtn);
-      expect(languageProgressRefetch).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(routedFetch, '/subjects/s1/cefr-progress').length,
+        ).toBeGreaterThan(before);
+      });
     });
   });
 
   // ── Retention error ──────────────────────────────────────────────────────
   describe('retention error state', () => {
-    it('shows retention error card with correct testID', () => {
-      mockHooks({ subjectProgressIsError: true });
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('progress-subject-retention-error');
+    it('shows retention error card with correct testID', async () => {
+      mount({ subjectProgressError: true });
+      await screen.findByTestId('progress-subject-retention-error');
     });
 
-    it('shows retention error heading', () => {
-      mockHooks({ subjectProgressIsError: true });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Current retention');
+    it('shows retention error heading', async () => {
+      mount({ subjectProgressError: true });
+      await screen.findByText('Current retention');
     });
 
-    it('calls subjectProgressQuery.refetch on retry press', () => {
-      const { subjectProgressRefetch } = mockHooks({
-        subjectProgressIsError: true,
+    it('calls subjectProgressQuery.refetch on retry press', async () => {
+      const { routedFetch } = mount({ subjectProgressError: true });
+      const retry = await screen.findByTestId(
+        'progress-subject-retention-retry',
+      );
+      const before = fetchCallsMatching(
+        routedFetch,
+        '/subjects/s1/progress',
+      ).length;
+      fireEvent.press(retry);
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(routedFetch, '/subjects/s1/progress').length,
+        ).toBeGreaterThan(before);
       });
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByTestId('progress-subject-retention-retry'));
-      expect(subjectProgressRefetch).toHaveBeenCalled();
     });
   });
 
   // ── Retention data (legacy progress) ────────────────────────────────────
   describe('retention data present', () => {
-    it('shows adult copy for strong retention', () => {
-      mockHooks({ subjectProgressData: { retentionStatus: 'strong' } });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Still remembered.');
+    it('shows adult copy for strong retention', async () => {
+      mount({ subjectProgress: { retentionStatus: 'strong' } });
+      await screen.findByText('Still remembered.');
     });
 
-    it('shows review suggestion for fading retention', () => {
-      mockHooks({ subjectProgressData: { retentionStatus: 'fading' } });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Getting fuzzy — a quick review will help.');
+    it('shows review suggestion for fading retention', async () => {
+      mount({ subjectProgress: { retentionStatus: 'fading' } });
+      await screen.findByText('Getting fuzzy — a quick review will help.');
     });
 
-    it('shows extra attention message for weak retention', () => {
-      mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
-      render(<ProgressSubjectScreen />);
-      screen.getByText('Needs a quick refresh.');
+    it('shows extra attention message for weak retention', async () => {
+      mount({ subjectProgress: { retentionStatus: 'weak' } });
+      await screen.findByText('Needs a quick refresh.');
     });
 
-    it('shows the retention card for overdue retention even when no completed sessions are recorded', () => {
-      mockHooks({
-        inventoryData: {
-          subjects: [{ ...fullSubject, sessionsCount: 0 }],
-        },
-        subjectProgressData: {
+    it('shows the retention card for overdue retention even when no completed sessions are recorded', async () => {
+      mount({
+        subjects: [{ ...fullSubject, sessionsCount: 0 }],
+        subjectProgress: {
           retentionStatus: 'weak',
           urgencyScore: 2,
           topicsCompleted: 0,
@@ -857,18 +928,14 @@ describe('ProgressSubjectScreen', () => {
         },
       });
 
-      render(<ProgressSubjectScreen />);
-
-      screen.getByTestId('progress-subject-retention-card');
+      await screen.findByTestId('progress-subject-retention-card');
       screen.getByText('Needs a quick refresh.');
     });
 
-    it('shows the retention card when retention is weak even if activity counters are empty', () => {
-      mockHooks({
-        inventoryData: {
-          subjects: [{ ...fullSubject, sessionsCount: 0 }],
-        },
-        subjectProgressData: {
+    it('shows the retention card when retention is weak even if activity counters are empty', async () => {
+      mount({
+        subjects: [{ ...fullSubject, sessionsCount: 0 }],
+        subjectProgress: {
           retentionStatus: 'weak',
           urgencyScore: 0,
           topicsCompleted: 0,
@@ -877,18 +944,14 @@ describe('ProgressSubjectScreen', () => {
         },
       });
 
-      render(<ProgressSubjectScreen />);
-
-      screen.getByTestId('progress-subject-retention-card');
+      await screen.findByTestId('progress-subject-retention-card');
       screen.getByText('Needs a quick refresh.');
     });
 
-    it('does not show a strong-retention card for a subject with no activity or due reviews', () => {
-      mockHooks({
-        inventoryData: {
-          subjects: [{ ...fullSubject, sessionsCount: 0 }],
-        },
-        subjectProgressData: {
+    it('does not show a strong-retention card for a subject with no activity or due reviews', async () => {
+      mount({
+        subjects: [{ ...fullSubject, sessionsCount: 0 }],
+        subjectProgress: {
           retentionStatus: 'strong',
           urgencyScore: 0,
           topicsCompleted: 0,
@@ -897,18 +960,18 @@ describe('ProgressSubjectScreen', () => {
         },
       });
 
-      render(<ProgressSubjectScreen />);
-
+      // Wait for the subject body to render before asserting the card is absent.
+      await screen.findByText('Math');
       expect(
         screen.queryByTestId('progress-subject-retention-card'),
       ).toBeNull();
     });
 
-    it('opens the shelf when the retention card is pressed without a resume target', () => {
-      mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
-      render(<ProgressSubjectScreen />);
+    it('opens the shelf when the retention card is pressed without a resume target', async () => {
+      mount({ subjectProgress: { retentionStatus: 'weak' } });
 
-      fireEvent.press(screen.getByTestId('progress-subject-retention-card'));
+      const card = await screen.findByTestId('progress-subject-retention-card');
+      fireEvent.press(card);
 
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/shelf/[subjectId]',
@@ -916,7 +979,7 @@ describe('ProgressSubjectScreen', () => {
       });
     });
 
-    it('resumes the subject target when the retention card is pressed and a resume target exists', () => {
+    it('resumes the subject target when the retention card is pressed and a resume target exists', async () => {
       const target = {
         subjectId: 's1',
         subjectName: 'Math',
@@ -928,41 +991,60 @@ describe('ProgressSubjectScreen', () => {
         lastActivityAt: '2026-02-15T09:00:00.000Z',
         reason: 'Continue Fractions',
       };
-      mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
-      mockUseLearningResumeTarget.mockReturnValue({ data: target });
+      mount({
+        subjectProgress: { retentionStatus: 'weak' },
+        resumeTarget: target,
+      });
 
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByTestId('progress-subject-retention-card'));
+      const card = await screen.findByTestId('progress-subject-retention-card');
+      // Wait for the resume target to load so the card resolves to the resume
+      // action rather than the shelf fallback.
+      await screen.findByText('Resume');
+      fireEvent.press(card);
 
-      expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
-        expect.anything(),
-        target,
-      );
+      expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          mode: 'learning',
+          subjectId: 's1',
+          topicId: 't1',
+        }),
+      });
     });
   });
 
   // ── Proxy mode write guard [WI-279] ──────────────────────────────────────
   describe('proxy mode write guard [WI-279]', () => {
-    beforeEach(() => {
-      mockIsParentProxy = true;
-      mockHooks();
+    let proxy: { routedFetch: RoutedMockFetch; cleanup: () => void } | null =
+      null;
+
+    afterEach(() => {
+      if (proxy) proxy.cleanup();
+      proxy = null;
     });
 
-    it('renders the hide button disabled in proxy mode [WI-279]', () => {
-      render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('progress-subject-hide')).toBeDisabled();
+    it('renders the hide button disabled in proxy mode [WI-279]', async () => {
+      proxy = mountProxy();
+      const hide = await screen.findByTestId('progress-subject-hide');
+      expect(hide).toBeDisabled();
     });
 
-    it('shows the proxy read-only hint in proxy mode [WI-279]', () => {
-      render(<ProgressSubjectScreen />);
-      screen.getByTestId('progress-subject-proxy-hint');
+    it('shows the proxy read-only hint in proxy mode [WI-279]', async () => {
+      proxy = mountProxy();
+      await screen.findByTestId('progress-subject-proxy-hint');
     });
 
-    it('does NOT dispatch updateSubject when hide button is pressed in proxy mode [WI-279]', () => {
-      render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+    it('does NOT dispatch updateSubject when hide button is pressed in proxy mode [WI-279]', async () => {
+      proxy = mountProxy();
+      const hide = await screen.findByTestId('progress-subject-hide');
+      fireEvent.press(hide);
       expect(mockPlatformAlert).not.toHaveBeenCalled();
-      expect(mockMutateSubjectAsync).not.toHaveBeenCalled();
+      expect(
+        fetchCallsMatching(proxy.routedFetch, '/subjects/s1').filter(
+          (c) => c.init?.method === 'PATCH',
+        ),
+      ).toHaveLength(0);
     });
   });
 });
