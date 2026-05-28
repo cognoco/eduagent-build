@@ -186,6 +186,13 @@ One Opus agent per file (pilot first to de-risk, then a 5-file fan-out). Each ag
 
 **Wave 7 deferred (next obvious batch):** `subscription.test.tsx` (8), `recaps/[recapId].test.tsx` (8), `session-summary/[sessionId].test.tsx` (10), `practice/assessment/assessment-start.test.tsx` (10), and the remaining 8-row More/onboarding screens — same harness pattern.
 
+**Wave 7 post-review fixes (2026-05-28, claude-review CHANGES_REQUESTED).** Findings triaged against the diff:
+
+- *(should-fix)* `session/index.test.tsx` carried a spurious `gc1-allow: test-design boundary` on its `use-milestone-tracker` mock. The mock is a `jest.requireActual` **targeted override** (only `useMilestoneTracker` is replaced; `celebrationForReason`/`getMilestoneLabel` stay real) — i.e. the canonical `pattern-a` form, which does not take a `gc1-allow`. Annotation removed; the line reclassifies `pattern-a; gc1-allow → pattern-a`. **Full conversion to the real tracker is deferred** (tracked): the real `trackExchange` evaluates every exchange and would fire celebration overlays across the whole send-message suite, so converting needs separate celebration-isolation work, not a per-file edit.
+- *(should-fix — false positive)* The reviewer flagged a second `use-milestone-tracker` mock in `progress/[subjectId]/index.test.tsx`; that file has no such mock (its "milestone" references are CEFR language-milestone copy). No change.
+- *(consider — actioned)* Added a targeted regression test in `use-subjects.test.ts` (`refetchInterval tolerates a non-array payload without throwing [BUG-634 / M-2]`) that seeds a non-array `subjects` payload and asserts the guard returns `false` without throwing — locking in the `!Array.isArray` fix.
+- *(consider — deferred)* `progress.test.tsx`'s local `renderProgress()` helper duplicates the `renderScreen` provider stack because the shared harness hard-codes `isExplicitProxyMode: false`. Tracked as a follow-up: either extend `renderScreen` with a proxy-mode option or migrate the helper once the harness gains that knob.
+
 ### Wave 6 backlog (rest of softer-cleanup candidates) — `gc1-allow`-only rows that could become `pattern-a`
 
 GC1 ratchet + GC6 boy-scout rule cover all *new* internal-mock pressure. The remaining 369 internal-path rows annotated with `gc1-allow:` (no `requireActual`) split into two groups:
