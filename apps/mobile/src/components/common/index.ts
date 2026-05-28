@@ -20,6 +20,7 @@ export { ProfileSwitcher } from './ProfileSwitcher';
 export { RewardBurst } from './RewardBurst';
 export type { RewardBurstIntensity, RewardBurstVariant } from './RewardBurst';
 export { ShimmerSkeleton } from './ShimmerSkeleton';
+export { ThemedMarkdown } from './ThemedMarkdown';
 export { TimeoutLoader } from './TimeoutLoader';
 export { TrackedView } from './TrackedView';
 export { UsageMeter } from './UsageMeter';

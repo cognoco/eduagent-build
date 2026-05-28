@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo } from 'react';
-import { View, Text, type TextStyle } from 'react-native';
+import { memo, useEffect } from 'react';
+import { View, Text } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInUp,
@@ -10,11 +10,11 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMathContent } from '../../lib/math-format';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
+import { ThemedMarkdown } from '../common';
 
 export type VerificationBadge = 'evaluate' | 'teach_back';
 
@@ -167,88 +167,6 @@ const ESCALATION_STYLES: Partial<
   },
 };
 
-// ---------------------------------------------------------------------------
-// Markdown styles — themed to match chat bubble text
-// ---------------------------------------------------------------------------
-
-function buildMarkdownStyles(
-  fallbackTextColor: string,
-): Record<string, TextStyle | { backgroundColor?: string }> {
-  // Primary text color comes from NativeWind className="text-text-primary"
-  // on the custom inline/textgroup render rules (see `rules` prop below).
-  // NativeWind resolves via CSS variables which are always in sync with
-  // background colors. However, during theme transitions the React context
-  // (useThemeColors) and NativeWind CSS variables can briefly desync.
-  // To prevent invisible text (dark-on-dark or light-on-light) during that
-  // window, we set an explicit `color` on the base style as a safety net.
-  // Whichever system updates first wins — text is never invisible.
-  const base: TextStyle = {
-    fontSize: 15,
-    lineHeight: 22,
-    color: fallbackTextColor,
-  };
-  return {
-    body: base,
-    text: base,
-    textgroup: base,
-    inline: base,
-    // Paragraph renders as a View (via _VIEW_SAFE_paragraph, which strips text
-    // props). Keep the library's default layout props so text wraps correctly.
-    paragraph: {
-      ...base,
-      marginTop: 0,
-      marginBottom: 4,
-      flexWrap: 'wrap' as const,
-      flexDirection: 'row' as const,
-      alignItems: 'flex-start' as const,
-      justifyContent: 'flex-start' as const,
-      width: '100%',
-    },
-    strong: { ...base, fontWeight: '700' },
-    em: { ...base, fontStyle: 'italic' },
-    s: { ...base, textDecorationLine: 'line-through' as const },
-    bullet_list: { ...base, marginBottom: 4 },
-    ordered_list: { ...base, marginBottom: 4 },
-    list_item: { ...base, marginBottom: 2 },
-    bullet_list_icon: { ...base, marginLeft: 10, marginRight: 10 },
-    ordered_list_icon: { ...base, marginLeft: 10, marginRight: 10 },
-    bullet_list_content: { flex: 1 },
-    ordered_list_content: { flex: 1 },
-    code_inline: {
-      ...base,
-      fontFamily: 'monospace',
-      paddingHorizontal: 4,
-      borderRadius: 4,
-    },
-    fence: {
-      ...base,
-      fontFamily: 'monospace',
-      padding: 8,
-      borderRadius: 8,
-      marginBottom: 4,
-    },
-    code_block: {
-      ...base,
-      fontFamily: 'monospace',
-      padding: 8,
-      borderRadius: 8,
-      marginBottom: 4,
-    },
-    heading1: { ...base, fontSize: 18, fontWeight: '700', marginBottom: 4 },
-    heading2: { ...base, fontSize: 17, fontWeight: '700', marginBottom: 4 },
-    heading3: { ...base, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    link: { ...base, textDecorationLine: 'underline' as const },
-    blockquote: {
-      ...base,
-      paddingLeft: 8,
-      marginBottom: 4,
-    },
-    softbreak: base,
-    hardbreak: { ...base, width: '100%', height: 1 },
-    hr: { height: 1, marginVertical: 8 },
-  };
-}
-
 const VERIFICATION_BADGE_CONFIG: Record<VerificationBadge, { label: string }> =
   {
     evaluate: { label: 'THINK-DEEPER CLEARED' },
@@ -305,11 +223,6 @@ export const MessageBubble = memo(function MessageBubble({
     isAI && escalationRung ? ESCALATION_STYLES[escalationRung] : undefined;
   const isThinking = streaming && !content;
 
-  const mdStyles = useMemo(
-    () => buildMarkdownStyles(colors.textPrimary),
-    [colors.textPrimary],
-  );
-
   const bubbleBg = escalation
     ? `${escalation.bg} ${escalation.border}`
     : isAI
@@ -345,50 +258,11 @@ export const MessageBubble = memo(function MessageBubble({
           <ThinkingIndicator />
         ) : isAI ? (
           <View testID="message-ai-content">
-            <Markdown
-              mergeStyle={false}
-              style={mdStyles}
-              rules={{
-                // Force NativeWind-resolved text color on wrapper nodes.
-                // The Markdown lib's StyleSheet.create() styles can be
-                // overridden by Android force-dark; NativeWind classes
-                // bypass that because they resolve via CSS variables.
-                // The inline `style.color` is the same safety net described
-                // on `buildMarkdownStyles` — without it these custom rules
-                // bypass the fallback and bubble text can render invisibly
-                // during NativeWind/theme desync windows.
-                inline: (node: { key: string }, children: React.ReactNode) => (
-                  <Text
-                    key={node.key}
-                    className="text-text-primary text-body leading-relaxed"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {children}
-                  </Text>
-                ),
-                textgroup: (
-                  node: { key: string },
-                  children: React.ReactNode,
-                ) => (
-                  <Text
-                    key={node.key}
-                    className="text-text-primary text-body leading-relaxed"
-                    style={{ color: colors.textPrimary }}
-                  >
-                    {children}
-                  </Text>
-                ),
-              }}
-            >
-              {displayContent}
-            </Markdown>
+            <ThemedMarkdown>{displayContent}</ThemedMarkdown>
             {streaming && <BlinkingCursor />}
           </View>
         ) : (
-          <Text
-            className="text-body leading-relaxed text-text-inverse"
-            style={{ color: colors.textInverse }}
-          >
+          <Text className="text-body leading-relaxed text-text-inverse">
             {displayContent}
           </Text>
         )}

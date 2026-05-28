@@ -99,6 +99,11 @@ jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output 
 jest.mock('../common', () => ({ // gc1-allow: animated shared components leak timers in this shell render suite
   DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
+  ThemedMarkdown: ({ children }: { children: unknown }) => {
+    const React = require('react');
+    const { Text } = require('react-native');
+    return React.createElement(Text, null, children);
+  },
 }));
 
 // ---------------------------------------------------------------------------
