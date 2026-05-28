@@ -112,6 +112,12 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   // Unconditional: cleanup is harmless when key absent; prevents cross-account
   // leak if feature flag is off but the key was written in a prior session.
   'mentomate_preview_intent',
+  // pre-auth-audience.ts — chooser audience carried across signup (1h TTL).
+  // Unlike the intro-seen flag this is transient onboarding intent, not a
+  // durable "seen" latch, so it IS wiped on sign-out: the next signed-out user
+  // on a shared device must start from a clean chooser, not inherit the prior
+  // user's parent/learner choice. Spec: docs/plans/2026-05-28-parent-audience-add-child-onboarding.md
+  'preAuthAudience.v1',
 ];
 
 // [CR-SECURESTORE-REGISTRY-11] Documented exceptions — specific callsites that
