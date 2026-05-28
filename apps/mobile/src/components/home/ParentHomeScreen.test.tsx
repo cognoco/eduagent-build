@@ -482,15 +482,15 @@ describe('ParentHomeScreen', () => {
       }),
     );
     expect(promptTextStyle.backgroundColor).toBeUndefined();
-    expect(resolvedStyle('parent-home-child-card-child-a')).toEqual(
+    expect(resolvedStyle(result, 'parent-home-child-card-child-a')).toEqual(
       expect.objectContaining({
         borderColor: expect.any(String),
         borderWidth: 1,
       }),
     );
-    expect(resolvedStyle('parent-home-child-card-child-a').borderColor).toMatch(
-      /^#[0-9a-f]{8}$/i,
-    );
+    expect(
+      resolvedStyle(result, 'parent-home-child-card-child-a').borderColor,
+    ).toMatch(/^#[0-9a-f]{8}$/i);
     expect(
       result.getAllByText('Fractions · 18 min this week').length,
     ).toBeGreaterThan(0);
