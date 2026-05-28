@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
-import { markWelcomeIntroSeenFromSession } from '../../helpers/auth';
+import { markPreAuthIntroSeen } from '../../helpers/auth';
 import { waitForScreenDismissingPostApproval } from '../../helpers/post-approval';
 import { buildSeedEmail } from '../../helpers/runtime';
 import { seedScenario } from '../../helpers/test-seed';
@@ -27,7 +27,7 @@ test('W-03 deep link to authenticated route redirects to sign-in and back', asyn
   await page.getByTestId('sign-in-button').click();
 
   await expect
-    .poll(async () => markWelcomeIntroSeenFromSession(page), {
+    .poll(async () => markPreAuthIntroSeen(page), {
       timeout: 30_000,
     })
     .toBe(true);

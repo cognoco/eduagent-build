@@ -6,8 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as SecureStore from '../../lib/secure-storage';
-import { hasSeenIntro, introSecureStoreKey } from '../../lib/intro-state';
 import { useProfile } from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import {
@@ -69,7 +67,6 @@ const FULL_SCREEN_ROUTES = new Set([
   'shelf',
   'shelf/[subjectId]',
   'shelf/[subjectId]/book/[bookId]',
-  'welcome',
 ]);
 
 // Bug 763: Routes that must NEVER appear in the tab bar / debug-link surface,
@@ -100,14 +97,11 @@ const HIDDEN_TAB_ROUTES = [
   'vocabulary',
   'topic',
   'onboarding',
-  'welcome',
 ] as const;
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
-const WELCOME_INTRO_PATH = '/(app)/welcome';
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
-const INTRO_PROBE_TIMEOUT_MS = 2_500;
 
 const iconMap: Record<
   string,
@@ -150,11 +144,6 @@ export default function AppLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const currentAppPath = toInternalAppRedirectPath(pathname);
-  const isWelcomeIntroPath = currentAppPath === WELCOME_INTRO_PATH;
-  // The welcome route is a child of this layout. Parent-level app gates must
-  // let it mount, otherwise redirecting to /(app)/welcome loops forever and the
-  // route never gets to mark the intro as seen.
-  const shouldRunAppShellGates = !isWelcomeIntroPath;
   const {
     profiles,
     activeProfile,
@@ -336,51 +325,6 @@ export default function AppLayout() {
     };
   }, []);
 
-  // Welcome intro probe — per-Clerk-userId, per-device. Mirrors the preview
-  // probe shape so the routing block below can treat it the same way (one
-  // 'loading' branch, one 'unseen' branch). Spec: docs/specs/2026-05-25-welcome-intro.md
-  const [introProbeState, setIntroProbeState] = React.useState<
-    'loading' | 'seen' | 'unseen'
-  >('loading');
-  React.useEffect(() => {
-    if (!userId) {
-      // No signed-in user → no intro decision to make. Stay 'loading' so the
-      // sign-in redirect runs first; the effect re-fires once userId hydrates.
-      setIntroProbeState('loading');
-      return;
-    }
-    let cancelled = false;
-    setIntroProbeState('loading');
-    const timeout = setTimeout(() => {
-      if (cancelled) return;
-      Sentry.addBreadcrumb({
-        category: 'intro',
-        level: 'warning',
-        message: 'intro SecureStore read timed out',
-      });
-      setIntroProbeState(hasSeenIntro(userId, null) ? 'seen' : 'unseen');
-    }, INTRO_PROBE_TIMEOUT_MS);
-    void SecureStore.getItemAsync(introSecureStoreKey(userId))
-      .then((value) => {
-        if (cancelled) return;
-        clearTimeout(timeout);
-        setIntroProbeState(hasSeenIntro(userId, value) ? 'seen' : 'unseen');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        clearTimeout(timeout);
-        // Treat read failure as 'unseen' — at worst the user sees the intro
-        // one extra time, then markIntroSeenSync writes again successfully
-        // (spec: Failure Modes row 2). Falls through to the in-memory cache
-        // for the same userId so a within-session retry is still 'seen'.
-        setIntroProbeState(hasSeenIntro(userId, null) ? 'seen' : 'unseen');
-      });
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-    };
-  }, [userId]);
-
   // [CRITICAL-B2] DELIBERATELY no auto-cleanup effect here. A previous
   // iteration had:
   //   useEffect(() => { if (activeProfile && profiles.length > 0) clearPreviewState() })
@@ -560,15 +504,13 @@ export default function AppLayout() {
   //   5. profileLoadError fallback  (independent of preview state)
   //   6. preview-probe-loading spinner
   //   7. SaveWizardGate branch
-  //   8. Welcome intro gate  ← HERE (spec: docs/specs/2026-05-25-welcome-intro.md)
-  //        - Fires AFTER preview probe + wizard so previewers/wizard users
-  //          are never unmounted mid-flow.
-  //        - Fires BEFORE CreateProfileGate so the longitudinal-companion
-  //          positioning lands before utility onboarding.
-  //   9. !activeProfile → CreateProfileGate
-  //  10. consent gates → Tabs
+  //   8. !activeProfile → CreateProfileGate
+  //   9. consent gates → Tabs
+  //
+  // The welcome intro used to live at step 8; it moved pre-auth in
+  // docs/plans/2026-05-27-pre-auth-welcome-flow.md, so this layout no longer
+  // probes intro state. Signed-in users always skip the cards.
   if (
-    shouldRunAppShellGates &&
     FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
     previewProbeState === 'loading'
   ) {
@@ -583,7 +525,6 @@ export default function AppLayout() {
   }
 
   if (
-    shouldRunAppShellGates &&
     FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
     previewProbeState === 'present' &&
     !wizardDone &&
@@ -599,34 +540,8 @@ export default function AppLayout() {
     );
   }
 
-  // Step 8: welcome intro — once per Clerk userId per device. Loading branch
-  // holds the screen on the existing spinner so there's no flash of home/
-  // CreateProfileGate before the SecureStore probe settles (spec: Paint Goal).
-  if (userId && introProbeState === 'loading' && shouldRunAppShellGates) {
-    return (
-      <View
-        className="flex-1 bg-background items-center justify-center"
-        testID="intro-state-loading"
-      >
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-  // hasSeenIntro check covers the post-completion render: markIntroSeenSync
-  // flips an in-memory flag synchronously, but the probe useEffect depends
-  // only on [userId] so introProbeState stays 'unseen' after welcome → home
-  // navigation. Without this check the gate bounces the user back to /welcome.
-  if (
-    userId &&
-    introProbeState === 'unseen' &&
-    !hasSeenIntro(userId, null) &&
-    shouldRunAppShellGates
-  ) {
-    return <Redirect href="/(app)/welcome" />;
-  }
-
   // No profile exists — show gate that pushes to profile creation modal
-  if (shouldRunAppShellGates && !activeProfile) {
+  if (!activeProfile) {
     return (
       <FeedbackProvider>
         <CreateProfileGate />
@@ -639,7 +554,6 @@ export default function AppLayout() {
 
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
   if (
-    shouldRunAppShellGates &&
     activeProfile?.consentStatus &&
     PENDING_CONSENT_STATUSES.has(activeProfile.consentStatus)
   ) {
@@ -651,7 +565,7 @@ export default function AppLayout() {
   }
 
   // Gate: block access when consent has been withdrawn (deletion pending)
-  if (shouldRunAppShellGates && activeProfile?.consentStatus === 'WITHDRAWN') {
+  if (activeProfile?.consentStatus === 'WITHDRAWN') {
     return (
       <FeedbackProvider>
         <ConsentWithdrawnGate />
@@ -660,7 +574,7 @@ export default function AppLayout() {
   }
 
   // Show celebratory landing once after consent approval
-  if (shouldRunAppShellGates && showPostApproval) {
+  if (showPostApproval) {
     return (
       <FeedbackProvider>
         <PostApprovalLanding onContinue={dismissPostApproval} />

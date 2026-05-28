@@ -1,9 +1,11 @@
-# Flow: First-Launch Welcome Intro — 4-card swipe-through
-# Validates: after a fresh sign-in (clean SecureStore so the per-userId intro
-#   flag is absent), the app lands on the 4-card welcome intro, advances
-#   through each card, and the "Let's start" CTA navigates to the learner
-#   home where the My Notes entry point is visible.
-# Spec: docs/specs/2026-05-25-welcome-intro.md
+# Flow: First-Open Pre-Auth Welcome Intro — 4-card swipe-through + LightBulb bridge
+# Validates: on a clean install (SecureStore empty so the device-scoped
+#   `preAuthIntroSeen.v1` flag is absent), the app lands on the 4-card
+#   welcome intro BEFORE sign-in, advances through each card, then shows
+#   the LightBulb bridge with two CTAs. Tapping "I already have an account"
+#   marks the intro seen and routes to /sign-in. A subsequent sign-in lands
+#   in the app shell without re-showing the cards.
+# Spec: docs/plans/2026-05-27-pre-auth-welcome-flow.md
 # Tags: smoke, onboarding, regression
 #
 # Usage:
@@ -15,17 +17,24 @@
 #       apps/mobile/e2e/flows/onboarding/welcome-intro.yaml
 #
 # What this catches:
-#   - Routing-order regression: intro fires after preview probe + SaveWizard
-#     and BEFORE CreateProfileGate / consent gate
-#   - "Let's start" CTA not wired (no navigation, or navigates to wrong route)
-#   - SecureStore write-and-redirect race: the next launch would otherwise
-#     re-show the intro because intro_seen_v1_<userId> is absent
+#   - Pre-auth routing regression: index.tsx must route signed-out first-open
+#     users to /(auth)/welcome, NOT directly to /(auth)/sign-in.
+#   - LightBulb bridge wiring: tapping "Let's start" on card 4 must surface
+#     the bridge, not skip to sign-in.
+#   - Bridge "I already have an account" must mark the device intro flag
+#     seen and route to /sign-in.
+#   - SecureStore write-and-redirect race: after sign-in, the cards must
+#     NOT re-render. If markPreAuthIntroSeenSync's in-memory bit didn't
+#     fire synchronously, the next cold-open probe would re-show them.
 #   - testID drift on welcome-card-{1..4} / welcome-next-button /
-#     welcome-start-button / home-my-notes
+#     welcome-start-button / pre-auth-bridge / pre-auth-bridge-secondary /
+#     home-my-notes.
 #
 # testIDs verified against:
 #   apps/mobile/src/components/welcome/WelcomeIntro.tsx (welcome-intro,
 #   welcome-card-{1..4}, welcome-next-button, welcome-start-button)
+#   apps/mobile/src/app/(auth)/welcome.tsx (pre-auth-bridge,
+#   pre-auth-bridge-primary, pre-auth-bridge-secondary)
 #   apps/mobile/src/components/home/LearnerScreen.tsx (home-my-notes)
 appId: com.mentomate.app
 tags:
@@ -34,14 +43,73 @@ tags:
   - regression
 ---
 # 1. App is launched by seed-and-run.sh via ADB with `pm clear` — SecureStore
-#    is empty so intro_seen_v1_<userId> is absent and the intro will fire on
-#    first sign-in. Wait for the sign-in screen.
+#    is empty so preAuthIntroSeen.v1 is absent and the index route's pre-auth
+#    probe routes to /(auth)/welcome. Wait for card 1 to mount.
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-1"
+    timeout: 120000
+
+- takeScreenshot: welcome-intro-card-1
+
+# 2. Advance through cards 2 → 3 → 4 via the primary "Next" CTA.
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-2"
+    timeout: 10000
+
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-3"
+    timeout: 10000
+
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-4"
+    timeout: 10000
+
+# 3. The final card swaps the CTA to "Let's start". Confirm next-button is
+#    unmounted (not just hidden) and start-button is present.
+- assertNotVisible:
+    id: "welcome-next-button"
+- assertVisible:
+    id: "welcome-start-button"
+
+- takeScreenshot: welcome-intro-card-4
+
+# 4. Tap "Let's start" — the route transitions from the cards to the
+#    LightBulb bridge. Both CTAs must be present.
+- tapOn:
+    id: "welcome-start-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "pre-auth-bridge"
+    timeout: 10000
+- assertVisible:
+    id: "pre-auth-bridge-primary"
+- assertVisible:
+    id: "pre-auth-bridge-secondary"
+
+- takeScreenshot: welcome-intro-bridge
+
+# 5. Tap "I already have an account" — markPreAuthIntroSeenSync fires
+#    synchronously and the route replaces to /(auth)/sign-in.
+- tapOn:
+    id: "pre-auth-bridge-secondary"
+
 - extendedWaitUntil:
     visible:
       id: "sign-in-button"
-    timeout: 120000
+    timeout: 30000
 
-# 2. Sign in with the seeded test user.
+# 6. Sign in with the seeded test user.
 - extendedWaitUntil:
     visible:
       id: "sign-in-email"
@@ -66,61 +134,14 @@ tags:
 - tapOn:
     id: "sign-in-button"
 
-# 3. Land on the welcome intro. The layout gate routes here after the preview
-#    probe + SaveWizard settle and before CreateProfileGate / consent.
-- extendedWaitUntil:
-    visible:
-      id: "welcome-card-1"
-    timeout: 30000
-
-- takeScreenshot: welcome-intro-card-1
-
-# 4. Advance through cards 2 → 3 → 4 via the primary "Next" CTA.
-- tapOn:
-    id: "welcome-next-button"
-- extendedWaitUntil:
-    visible:
-      id: "welcome-card-2"
-    timeout: 10000
-
-- tapOn:
-    id: "welcome-next-button"
-- extendedWaitUntil:
-    visible:
-      id: "welcome-card-3"
-    timeout: 10000
-
-- tapOn:
-    id: "welcome-next-button"
-- extendedWaitUntil:
-    visible:
-      id: "welcome-card-4"
-    timeout: 10000
-
-# 5. The final card swaps the CTA to "Let's start". Confirm the next-button
-#    is no longer rendered (it must be unmounted, not just hidden) and the
-#    start-button is present.
-- assertNotVisible:
-    id: "welcome-next-button"
-- assertVisible:
-    id: "welcome-start-button"
-
-- takeScreenshot: welcome-intro-card-4
-
-# 6. Tap "Let's start" — markIntroSeenSync(userId) fires synchronously, then
-#    router.replace to /(app)/home. The learner-home My Notes entry point is
-#    the spec's card-1 promise surface and must be reachable immediately.
-- tapOn:
-    id: "welcome-start-button"
-
+# 7. Land in the learner app shell. The cards must NOT re-render — the (app)
+#    layout has no welcome-intro probe anymore, and the index probe respects
+#    the in-memory seen bit.
 - extendedWaitUntil:
     visible:
       id: "home-my-notes"
     timeout: 30000
 
-# 7. The intro must NOT re-render. (If the SecureStore write raced the
-#    redirect and the in-memory flag was not set, the layout gate would
-#    bounce back to /welcome.)
 - assertNotVisible:
     id: "welcome-intro"
 

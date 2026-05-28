@@ -100,12 +100,39 @@ jest.mock(
   }),
 );
 
+// SecureStore is a native boundary. The real intro-state + preview helpers
+// are exercised; only the underlying expo-secure-store wrapper is stubbed.
+jest.mock(
+  '../lib/secure-storage' /* gc1-allow: native-boundary — wraps expo-secure-store which is unavailable in jest */,
+  () => ({
+    getItemAsync: jest.fn().mockResolvedValue(null),
+    setItemAsync: jest.fn().mockResolvedValue(undefined),
+    deleteItemAsync: jest.fn().mockResolvedValue(undefined),
+    sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+  }),
+);
+
+// Track helper from analytics shouldn't be invoked by the routing tests, but
+// import-time evaluation requires it to be defined. Pattern A — preserve the
+// rest of the analytics surface so any future indirect consumer doesn't trip.
+jest.mock('../lib/analytics', () => ({
+  ...jest.requireActual('../lib/analytics'),
+  track: jest.fn(),
+}));
+
 const Index = require('./index').default;
+const SecureStoreMock = require('../lib/secure-storage');
+const previewState = require('../lib/preview-onboarding-state');
+const introState = require('../lib/intro-state');
 
 describe('Index screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    introState.__resetIntroStateForTests();
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: false,
       isSignedIn: false,
@@ -143,47 +170,121 @@ describe('Index screen', () => {
     screen.getByTestId('redirect-/(app)/home');
   });
 
-  it('redirects unauthenticated user to sign-in', () => {
+  // -------------------------------------------------------------------------
+  // Signed-out first-open routing — preview state + pre-auth intro probe
+  // -------------------------------------------------------------------------
+
+  it('redirects a signed-out first-open user to /(auth)/welcome when intro is unseen and no preview state', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: false,
     });
+    jest.spyOn(previewState, 'getPreviewState').mockResolvedValue(null);
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
 
     render(<Index />);
 
-    screen.getByTestId('redirect-/(auth)/sign-in');
+    await waitFor(() => screen.getByTestId('redirect-/(auth)/welcome'));
+    expect(screen.queryByTestId('redirect-/(auth)/sign-in')).toBeNull();
   });
 
-  // [#508] Break test: retry must restart the 15s timer, not just hide the
-  // timeout screen. Without the retryCount dependency, setShowTimeout(false)
-  // hides the timeout but the timer never re-registers — the spinner shows
-  // immediately and the timeout screen never fires again.
+  it('redirects a returning signed-out user to /(auth)/sign-in when intro has been seen', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+    jest.spyOn(previewState, 'getPreviewState').mockResolvedValue(null);
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === 'preAuthIntroSeen.v1'
+          ? Promise.resolve('2026-05-27T10:00:00.000Z')
+          : Promise.resolve(null),
+    );
+
+    render(<Index />);
+
+    await waitFor(() => screen.getByTestId('redirect-/(auth)/sign-in'));
+    expect(screen.queryByTestId('redirect-/(auth)/welcome')).toBeNull();
+  });
+
+  it('redirects a signed-out user with valid preview state to /(auth)/sign-in and marks the intro seen', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+    jest.spyOn(previewState, 'getPreviewState').mockResolvedValue({
+      intent: 'self',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    const markSpy = jest.spyOn(introState, 'markPreAuthIntroSeenSync');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+
+    render(<Index />);
+
+    await waitFor(() => screen.getByTestId('redirect-/(auth)/sign-in'));
+    expect(screen.queryByTestId('redirect-/(auth)/welcome')).toBeNull();
+    expect(markSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('fail-opens to /(auth)/sign-in when the SecureStore intro probe rejects', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+    jest.spyOn(previewState, 'getPreviewState').mockResolvedValue(null);
+    (SecureStoreMock.getItemAsync as jest.Mock).mockRejectedValue(
+      new Error('keystore locked'),
+    );
+    const markSpy = jest.spyOn(introState, 'markPreAuthIntroSeenSync');
+
+    render(<Index />);
+
+    await waitFor(() => screen.getByTestId('redirect-/(auth)/sign-in'));
+    expect(screen.queryByTestId('redirect-/(auth)/welcome')).toBeNull();
+    // Failure path does NOT mark the intro as seen — the user gets cards on
+    // the next cold open when SecureStore recovers.
+    expect(markSpy).not.toHaveBeenCalled();
+  });
+
+  it('fail-opens to /(auth)/sign-in when the preview-state probe rejects', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+    jest
+      .spyOn(previewState, 'getPreviewState')
+      .mockRejectedValue(new Error('disk error'));
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+
+    render(<Index />);
+
+    await waitFor(() => screen.getByTestId('redirect-/(auth)/sign-in'));
+    expect(screen.queryByTestId('redirect-/(auth)/welcome')).toBeNull();
+  });
+
+  // [#508] retry restarts the 15s timer — preserved from before.
   it('[#508] retry tap hides timeout screen and re-triggers 15s timer', async () => {
     render(<Index />);
 
-    // First timeout fires
     await act(async () => {
       jest.advanceTimersByTime(15_001);
     });
 
     screen.getByTestId('index-timeout-retry');
 
-    // Tap retry → should show spinner (timeout hidden), not immediately timeout
     await act(async () => {
       fireEvent.press(screen.getByTestId('index-timeout-retry'));
     });
 
-    // Spinner visible, timeout screen gone
     screen.getByTestId('index-loading');
     expect(screen.queryByTestId('index-timeout-retry')).toBeNull();
 
-    // Advance 14.9s — still under the new 15s window, so timeout must NOT fire
     await act(async () => {
       jest.advanceTimersByTime(14_900);
     });
     expect(screen.queryByTestId('index-timeout-retry')).toBeNull();
 
-    // Cross the 15s threshold → timeout fires again (proves timer restarted)
     await act(async () => {
       jest.advanceTimersByTime(200);
     });
@@ -203,7 +304,8 @@ describe('Index screen', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
   });
 
-  it('hides timeout screen when isLoaded becomes true', async () => {
+  it('hides timeout screen when isLoaded becomes true (signed-out → welcome)', async () => {
+    jest.spyOn(previewState, 'getPreviewState').mockResolvedValue(null);
     const { rerender } = render(<Index />);
 
     await act(async () => {
@@ -220,6 +322,6 @@ describe('Index screen', () => {
     rerender(<Index />);
 
     expect(screen.queryByTestId('index-timeout-retry')).toBeNull();
-    screen.getByTestId('redirect-/(auth)/sign-in');
+    await waitFor(() => screen.getByTestId('redirect-/(auth)/welcome'));
   });
 });
