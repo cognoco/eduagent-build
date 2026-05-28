@@ -50,6 +50,7 @@ Out of scope (must NOT change):
 | Family-context PATCH fails after owner profile created | Flaky network on the app-context PATCH | Profile still created; redirected to add-child anyway | Existing non-throwing catch (create-profile.tsx:293-300); user can set mode from More → Account |
 | Add-child POST hits profile limit (free tier) on the redirect screen | Free-plan parent tries to add a child | PROFILE_LIMIT_EXCEEDED upgrade alert (existing, create-profile.tsx:375-399) | "See plans" CTA → /(app)/subscription |
 | Parent skips the add-child screen | Taps Cancel on the redirect | Lands on learner home | More → Add child remains available; mentor home appears once a child is linked |
+| Created profile requires consent (`needsConsentFlow`) | Minor self-registering | Routed to `/consent`, not add-child; carrier cleared | Not reachable for the family path: `wantsFamily` requires `isAdultBirthDate`, and consent only applies to minors — the two branches are mutually exclusive by age. An adult owner never hits consent. If it ever could, recovery is More → Add child (V0 door). |
 
 ## Tasks
 
