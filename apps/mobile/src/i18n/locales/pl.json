@@ -554,6 +554,7 @@
       "title": "Niektórych wiadomości nie można było wysłać",
       "description": "Skopiuj je lub wyślij do pomocy technicznej, aby Twoje postępy nie zostały utracone.",
       "copyMessage": "Kopiuj wiadomość",
+      "copyError": "Nie udało się skopiować do schowka. Twoja wiadomość nadal tu jest — spróbuj ponownie.",
       "sendToSupport": "Wyślij do pomocy technicznej"
     },
     "expired": {
@@ -942,6 +943,7 @@
     },
     "noteMenu": {
       "title": "Opcje notatki",
+      "webEditPrompt": "Naciśnij OK, aby edytować tę notatkę. Naciśnij Anuluj, jeśli wolisz ją usunąć.",
       "deleteTitle": "Usuń notatkę",
       "deleteMessage": "Czy na pewno chcesz usunąć tę notatkę?"
     },

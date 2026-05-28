@@ -19,6 +19,7 @@ import type {
   Profile,
 } from '@eduagent/schemas';
 import { isInGracePeriod } from '../../lib/consent-grace';
+import { formatMediumDateTime } from '../../lib/format-datetime';
 import type { Translate } from '../../i18n';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
@@ -71,13 +72,10 @@ function firstNameOf(name: string): string {
   return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
+// [#11] Delegates to the Hermes-safe formatter so a missing-ICU throw cannot
+// crash the child-cap banner subtree. See lib/format-datetime.ts.
 function formatChildCapResetAt(resetsAt: string): string {
-  const date = new Date(resetsAt);
-  if (Number.isNaN(date.getTime())) return resetsAt;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  return formatMediumDateTime(resetsAt) || resetsAt;
 }
 
 function ChildCapNotificationBanner({

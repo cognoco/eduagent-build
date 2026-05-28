@@ -92,7 +92,7 @@ export function useDashboard(): UseQueryResult<DashboardData> {
         await assertOk(res);
         const data = (await res.json()) as DashboardData;
 
-        if (data.children.length === 0) {
+        if ((data.children?.length ?? 0) === 0) {
           const demoRes = await client.dashboard.demo.$get(
             {},
             { init: { signal } },

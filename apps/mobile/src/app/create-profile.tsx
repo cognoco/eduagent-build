@@ -341,24 +341,33 @@ export default function CreateProfileScreen() {
       // Non-parent flow: first-time user or child self-registering.
       // Navigate FIRST — prevents crash from tree remount (themeKey change)
       // destroying the modal's navigation state during switchProfile.
-      // Only redirect to consent when the API returned a pending consent status
-      // (child self-registering who needs parental approval).
       const needsConsentFlow =
         result.profile.consentStatus === 'PENDING' ||
         result.profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
-      // Navigate FIRST — switchProfile triggers a nav-tree remount via
-      // setActiveProfileId; any router call that fires after the remount
-      // starts operates on a torn-down navigator and silently no-ops on web.
-      // The profile context's isLoading guard prevents CreateProfileGate from
-      // flashing during the switch window (profiles.length > 0 &&
-      // activeProfile === null stays true until the switch completes).
-      if (needsConsentFlow) {
-        router.replace({
-          pathname: '/consent',
-          params: { profileId: result.profile.id },
-        });
-      } else if (wantsFamily) {
+      // [#7] Consent double-surface race fix. Previously this branch did
+      // router.replace('/consent') AND THEN switchProfile to the pending child.
+      // Switching the active profile mounts the layout's ConsentPendingGate for
+      // that profile, so two consent surfaces raced: the explicit /consent modal
+      // and the layout gate. On web a router call issued just before the
+      // switch-induced nav-tree remount silently no-ops, so the user could land
+      // on the gate instead of the /consent email form — non-deterministic.
+      //
+      // The layout ConsentPendingGate is the single source of truth for a
+      // pending-consent profile: for status PENDING it renders the full
+      // "send to parent" surface (with its own push to /consent), and for
+      // PARENTAL_CONSENT_REQUESTED it renders the waiting/resend UI. So we do
+      // NOT push /consent here — we only switch to the child, and the gate takes
+      // over deterministically with exactly one consent surface. For the
+      // non-consent path we close the modal as before.
+      //
+      // switchProfile triggers a nav-tree remount via setActiveProfileId; any
+      // router call that fires after the remount starts operates on a torn-down
+      // navigator and silently no-ops on web. The profile context's isLoading
+      // guard prevents CreateProfileGate from flashing during the switch window
+      // (profiles.length > 0 && activeProfile === null stays true until the
+      // switch completes).
+      if (!needsConsentFlow && wantsFamily) {
         // Parent's own profile is created — take them straight to the
         // add-a-child screen (skippable via its Cancel) instead of the learner
         // home. Navigate FIRST (same remount-ordering reason as below), then
@@ -367,7 +376,7 @@ export default function CreateProfileScreen() {
           pathname: '/create-profile',
           params: { for: 'child' },
         });
-      } else {
+      } else if (!needsConsentFlow) {
         handleClose();
       }
 

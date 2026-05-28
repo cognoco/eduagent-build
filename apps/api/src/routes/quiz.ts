@@ -103,14 +103,25 @@ function toClientSafeQuestions(
         freeTextEligible: q.freeTextEligible,
       };
     }
-    return {
-      type: 'guess_who',
-      clues: q.clues,
-      mcFallbackOptions: q.mcFallbackOptions,
-      funFact: q.funFact,
-      isLibraryItem: q.isLibraryItem,
-      topicId: q.topicId,
-    };
+    if (q.type === 'guess_who') {
+      return {
+        type: 'guess_who',
+        clues: q.clues,
+        mcFallbackOptions: q.mcFallbackOptions,
+        funFact: q.funFact,
+        isLibraryItem: q.isLibraryItem,
+        topicId: q.topicId,
+      };
+    }
+    // Exhaustiveness guard: adding a 4th QuizQuestion type (schema in
+    // @eduagent/schemas) without handling it here becomes a compile error
+    // rather than being silently coerced into a guess_who shape.
+    const _exhaustive: never = q;
+    throw new Error(
+      `toClientSafeQuestions: unhandled quiz question type ${
+        (_exhaustive as { type?: string }).type ?? 'unknown'
+      }`,
+    );
   });
 }
 

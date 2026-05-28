@@ -1,5 +1,10 @@
 import { type ReactNode } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  type GestureResponderEvent,
+} from 'react-native';
 import { ShimmerSkeleton } from '../common';
 
 export interface BaseCoachingCardProps {
@@ -48,6 +53,19 @@ export function BaseCoachingCard({
     return <Skeleton />;
   }
 
+  // [#12] When the whole card is pressable (onPress) AND it renders CTA
+  // buttons, a tap on a CTA would otherwise fire BOTH the CTA handler and the
+  // card onPress (web event bubbling / native gesture ambiguity). Stop the
+  // event from propagating to the card wrapper so each tap fires exactly once.
+  const handlePrimary = (e?: GestureResponderEvent): void => {
+    e?.stopPropagation?.();
+    onPrimary();
+  };
+  const handleSecondary = (e?: GestureResponderEvent): void => {
+    e?.stopPropagation?.();
+    onSecondary?.();
+  };
+
   const content = (
     <>
       <Text className="text-display font-bold text-text-primary leading-tight">
@@ -58,7 +76,7 @@ export function BaseCoachingCard({
       )}
       {metadata && <View className="mt-3">{metadata}</View>}
       <Pressable
-        onPress={onPrimary}
+        onPress={handlePrimary}
         className="bg-primary rounded-button py-3.5 mt-5 items-center"
         style={{ minHeight: 48 }}
         accessibilityRole="button"
@@ -71,7 +89,7 @@ export function BaseCoachingCard({
       </Pressable>
       {secondaryLabel && onSecondary && (
         <Pressable
-          onPress={onSecondary}
+          onPress={handleSecondary}
           className="mt-3 items-center py-2"
           style={{ minHeight: 44 }}
           accessibilityRole="button"

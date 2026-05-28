@@ -172,6 +172,24 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
         path: c.req.path,
       });
       captureException(err, { requestPath: c.req.path });
+
+      // [BUG — JWKS infra outage → mass forced sign-out] A JWKS/network fetch
+      // failure is NOT a token-validation failure: the user's token may be
+      // perfectly valid; we simply could not reach Clerk to fetch the signing
+      // key. Returning 401 here makes the mobile client treat the session as
+      // expired (api-client.ts signs out on res.status === 401), so a Clerk
+      // JWKS outage would force-sign-out every active user simultaneously.
+      // Return 503 with Retry-After so the client retries the request rather
+      // than nuking the session. A genuinely invalid/expired token still falls
+      // through to the 401 below.
+      c.header('Retry-After', '30');
+      return c.json(
+        {
+          code: ERROR_CODES.SERVICE_UNAVAILABLE,
+          message: 'Authentication service temporarily unavailable',
+        },
+        503,
+      );
     } else {
       // [BUG-1] Non-infra (token-validation) failures were previously only
       // recorded via Sentry breadcrumb — dropped when no exception fires —

@@ -22,6 +22,10 @@ export function OutboxFailedBanner({
 }: OutboxFailedBannerProps): React.ReactElement | null {
   const { t } = useTranslation();
   const [entries, setEntries] = React.useState<OutboxEntry[]>([]);
+  // [#10] Per-entry copy error. When the clipboard write fails we must NOT
+  // delete the only copy of the message — instead surface an actionable error
+  // and keep the entry so the user can retry.
+  const [copyErrorId, setCopyErrorId] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     const failed = await listPermanentlyFailed(profileId, flow);
@@ -59,7 +63,15 @@ export function OutboxFailedBanner({
             accessibilityRole="button"
             accessibilityLabel={t('session.outboxFailed.copyMessage')}
             onPress={async () => {
-              await Clipboard.setStringAsync(entry.content);
+              setCopyErrorId(null);
+              try {
+                // Only delete AFTER a confirmed successful copy — otherwise a
+                // rejected clipboard write would destroy the only copy.
+                await Clipboard.setStringAsync(entry.content);
+              } catch {
+                setCopyErrorId(entry.id);
+                return;
+              }
               await deletePermanentlyFailed(profileId, flow, entry.id);
               await refresh();
             }}
@@ -68,6 +80,18 @@ export function OutboxFailedBanner({
               {t('session.outboxFailed.copyMessage')}
             </Text>
           </Pressable>
+          {copyErrorId === entry.id ? (
+            <Text
+              testID={`outbox-copy-error-${entry.id}`}
+              accessibilityLiveRegion={
+                Platform.OS === 'android' ? 'assertive' : undefined
+              }
+              accessibilityRole="alert"
+              className="mt-2 text-body-sm text-danger"
+            >
+              {t('session.outboxFailed.copyError')}
+            </Text>
+          ) : null}
         </View>
       ))}
       {onEscalate ? (

@@ -529,6 +529,7 @@
       "title": "Noen meldinger kunne ikke sendes",
       "description": "Kopier dem eller send dem til kundestøtte slik at fremgangen din ikke går tapt.",
       "copyMessage": "Kopier melding",
+      "copyError": "Kunne ikke kopiere til utklippstavlen. Meldingen din er fortsatt her – prøv igjen.",
       "sendToSupport": "Send til kundestøtte"
     },
     "expired": {
@@ -901,6 +902,7 @@
     },
     "noteMenu": {
       "title": "Notatalternativer",
+      "webEditPrompt": "Trykk OK for å redigere dette notatet. Trykk Avbryt hvis du heller vil slette det.",
       "deleteTitle": "Slett notat",
       "deleteMessage": "Er du sikker på at du vil slette dette notatet?"
     },

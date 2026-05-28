@@ -57,21 +57,27 @@ jest.mock(
   }),
 );
 
-let mockActiveProfile: {
-  id: string;
-  birthYear?: number;
-  pronouns?: string | null;
-} = {
+let mockActiveProfile:
+  | {
+      id: string;
+      birthYear?: number;
+      pronouns?: string | null;
+    }
+  | undefined = {
   id: 'profile-1',
   birthYear: 2005,
   pronouns: null,
 };
+let mockProfileIsLoading = false;
 
 jest.mock(
   '../../../lib/profile' /* gc1-allow: profile context requires full provider tree */,
   () => ({
     ...jest.requireActual('../../../lib/profile'),
-    useProfile: () => ({ activeProfile: mockActiveProfile }),
+    useProfile: () => ({
+      activeProfile: mockActiveProfile,
+      isLoading: mockProfileIsLoading,
+    }),
   }),
 );
 
@@ -140,6 +146,7 @@ describe('PronounsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdatePronounsIsPending = false;
+    mockProfileIsLoading = false;
     mockActiveProfile = {
       id: 'profile-1',
       birthYear: 2005, // ~19 years old — above age gate
@@ -304,5 +311,49 @@ describe('PronounsScreen', () => {
     // he/him option should have selected state
     const heHim = getByTestId('pronouns-option-he-him');
     expect(heHim.props.accessibilityState?.selected).toBe(true);
+  });
+
+  // [#6b] While the profile is still resolving, the age gate cannot be
+  // evaluated. The screen must NOT render the pronouns form — a possibly-
+  // sub-13 learner could otherwise briefly see the field.
+  it('[#6b] does NOT show the pronouns field while the profile is still loading', () => {
+    mockProfileIsLoading = true;
+    mockActiveProfile = undefined;
+    const { queryByTestId, getByTestId } = render(<PronounsScreen />);
+    // Holding view is rendered instead of the form.
+    getByTestId('pronouns-loading');
+    expect(queryByTestId('pronouns-option-she-her')).toBeNull();
+    expect(queryByTestId('pronouns-continue')).toBeNull();
+  });
+
+  // [#6b] Even when isLoading is false, if activeProfile is not yet present
+  // (undefined) we cannot know the age — still hide the form.
+  it('[#6b] does NOT show the pronouns field when activeProfile is not yet present', () => {
+    mockProfileIsLoading = false;
+    mockActiveProfile = undefined;
+    const { queryByTestId, getByTestId } = render(<PronounsScreen />);
+    getByTestId('pronouns-loading');
+    expect(queryByTestId('pronouns-option-she-her')).toBeNull();
+  });
+
+  // [#6a] The age-gate effect calls navigateForward, which fires
+  // startFirstCurriculumSession.mutate (a server side-effect). navigateForward's
+  // identity changes whenever the mutation hook returns a new object, so a
+  // re-render with ageGated still true must NOT fire mutate a second time.
+  it('[#6a] fires the first-curriculum-session mutation at most once when re-rendered while age-gated', () => {
+    mockActiveProfile = {
+      id: 'profile-1',
+      birthYear: new Date().getFullYear() - 10, // 10 years old — age-gated
+      pronouns: null,
+    };
+    const { rerender } = render(<PronounsScreen />);
+    // First render: age gate forwards once.
+    expect(mockStartFirstCurriculumMutate).toHaveBeenCalledTimes(1);
+    // Re-render (e.g. mutation hook returns a new object → navigateForward
+    // identity changes → age-gate effect re-runs). Must not duplicate the
+    // session-creation side-effect.
+    rerender(<PronounsScreen />);
+    rerender(<PronounsScreen />);
+    expect(mockStartFirstCurriculumMutate).toHaveBeenCalledTimes(1);
   });
 });

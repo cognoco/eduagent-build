@@ -19,9 +19,14 @@ const BAR_COLORS: Record<WarningLevel, string> = {
 
 export function UsageMeter({ used, limit, warningLevel }: UsageMeterProps) {
   const { t } = useTranslation();
-  const percentage = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
+  // Guard against NaN / Infinity / negative props producing an invalid CSS
+  // width (e.g. `width: "NaN%"`). Clamp to [0, 100] with a finite fallback.
+  const rawPercentage = limit > 0 ? (used / limit) * 100 : 0;
+  const percentage = Number.isFinite(rawPercentage)
+    ? Math.max(0, Math.min(rawPercentage, 100))
+    : 0;
   const barColor = BAR_COLORS[warningLevel];
-  const clampedUsed = Math.min(used, limit);
+  const clampedUsed = Math.max(0, Math.min(used, limit));
 
   return (
     <View>

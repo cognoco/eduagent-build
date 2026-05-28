@@ -394,7 +394,12 @@ describe('CreateProfileScreen', () => {
     });
   });
 
-  it('redirects to consent screen for child under 16', async () => {
+  // [#7] Consent double-surface race fix. The child self-register path no
+  // longer pushes /consent itself (that raced with the layout ConsentPendingGate
+  // on web). It now switches to the pending child and lets the gate own the
+  // single consent surface. This test asserts the deterministic behavior:
+  // switchProfile fires, and create-profile does NOT also navigate to /consent.
+  it('switches to the pending child and does NOT push /consent (gate owns the surface) for a child under 16', async () => {
     const newProfile = {
       id: 'child-id',
       accountId: 'a1',
@@ -429,12 +434,20 @@ describe('CreateProfileScreen', () => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
+    // Switches to the pending child so the layout ConsentPendingGate takes over.
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/consent',
-        params: { profileId: 'child-id' },
-      });
+      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
     });
+
+    // Must NOT also push/replace to /consent — that is the double-surface race.
+    expect(mockPush).not.toHaveBeenCalledWith('/consent');
+    expect(mockReplace).not.toHaveBeenCalledWith('/consent');
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/consent' }),
+    );
+    // And must NOT close the modal (handleClose) on the consent path — the
+    // switch-induced gate is the destination, not home/back.
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('auto-detects persona from birthdate (no picker shown)', async () => {

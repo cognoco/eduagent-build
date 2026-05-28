@@ -196,6 +196,47 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           exchangeHistory: updatedHistory,
         });
 
+        // [CR #8] Fold retention + XP into the SAME transaction as the status
+        // UPDATE so a terminal assessment can never commit `passed` while the
+        // SM-2/retention update or XP grant silently fails. Previously these
+        // ran in a separate tx2 after tx1 committed: if tx2 failed, the
+        // assessment was permanently `passed` (the FOR UPDATE terminal-state
+        // guard now blocks resubmission) but XP/retention were never applied,
+        // and the failure was invisible. Co-committing makes the whole
+        // terminal transition atomic — a retention/XP failure rolls back the
+        // status UPDATE, the lock releases, and the learner can retry.
+        // `recordAssessmentCompletionActivity` (an activity-log write) stays
+        // OUTSIDE the tx: it is observability, not learner-facing state, and a
+        // failure there must not roll back a correctly-scored assessment.
+        if (
+          newStatus !== 'in_progress' &&
+          !forceReview &&
+          snapshot.topicId &&
+          snapshot.subjectId
+        ) {
+          const sm2Quality = mapEvaluateQualityToSm2(
+            evaluation.passed,
+            Math.round(evaluation.masteryScore * 5),
+          );
+          const sessionTimestamp =
+            updated?.updatedAt ?? new Date().toISOString();
+          await updateRetentionFromSession(
+            txDb,
+            profileId,
+            snapshot.topicId,
+            sm2Quality,
+            sessionTimestamp,
+          );
+          if (newStatus === 'passed') {
+            await insertSessionXpEntry(
+              txDb,
+              profileId,
+              snapshot.topicId,
+              snapshot.subjectId,
+            );
+          }
+        }
+
         return {
           snapshot,
           evaluation,
@@ -205,48 +246,26 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           forceReview,
         };
       });
-      // Alias for downstream code that read `assessment.*` after the update.
-      // The post-tx code uses snapshot for assessment.topicId / subjectId etc.
+      // Keep the transaction result explicit; post-tx activity still reads the
+      // pre-fetch `assessment` for immutable topic/subject fields.
       void lockedAssessment;
       void updatedHistory;
 
-      // Wire terminal standalone assessments into the retention lifecycle.
-      // Retention uses the same aggregate mastery signal as the pass gate.
+      // Terminal-assessment retention + XP are now applied atomically inside
+      // the transaction above (see [CR #8]). The only post-tx work is the
+      // activity-log write, which is observability and intentionally tolerant
+      // of failure — a failed activity log must not undo a committed,
+      // correctly-scored assessment.
+      //
       // A learner acknowledgement like "OK" after a prior answer is a review
-      // handoff, not a scored recall attempt; do not let that light-touch turn
-      // mutate SM-2 or block the chat with retention-side validation.
+      // handoff, not a scored recall attempt; forceReview turns are excluded
+      // from completion activity just as they are from retention/XP above.
       if (
         newStatus !== 'in_progress' &&
         !forceReview &&
         assessment.topicId &&
         assessment.subjectId
       ) {
-        const sm2Quality = mapEvaluateQualityToSm2(
-          evaluation.passed,
-          Math.round(evaluation.masteryScore * 5),
-        );
-        const sessionTimestamp =
-          updatedAssessment?.updatedAt ?? new Date().toISOString();
-        await db.transaction(async (tx) => {
-          // Cast: PgTransaction has all query methods; services only use
-          // select/insert/update — $withAuth/batch are not called.
-          const txDb = tx as unknown as Database;
-          await updateRetentionFromSession(
-            txDb,
-            profileId,
-            assessment.topicId,
-            sm2Quality,
-            sessionTimestamp,
-          );
-          if (newStatus === 'passed') {
-            await insertSessionXpEntry(
-              txDb,
-              profileId,
-              assessment.topicId,
-              assessment.subjectId,
-            );
-          }
-        });
         try {
           await recordAssessmentCompletionActivity(
             db,

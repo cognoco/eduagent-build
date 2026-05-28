@@ -158,6 +158,11 @@ function SubscriptionContent(): React.ReactElement | null {
 
   // Restore-purchase polling state (BUG-397)
   const [restorePolling, setRestorePolling] = useState(false);
+  // [#LOW] "Check later" cancels the spinner but the poll loop keeps running.
+  // These refs let the post-resolve alert detect a user-cancelled flow and
+  // suppress a late "Restored!"/"confirmed" alert that would confuse the user.
+  const restoreCancelledRef = useRef(false);
+  const topUpCancelledRef = useRef(false);
 
   // Post-purchase polling state — shows visible feedback while the webhook
   // confirms the new subscription tier (PR-FIX-07)
@@ -236,6 +241,7 @@ function SubscriptionContent(): React.ReactElement | null {
     // BUG-397: RevenueCat's CustomerInfo is a local snapshot — the webhook
     // may not have processed yet, so poll the API (same pattern as top-up)
     // waiting for a paid subscription tier.
+    restoreCancelledRef.current = false;
     setRestorePolling(true);
 
     const restoreOutcome = await poll.run({
@@ -263,6 +269,11 @@ function SubscriptionContent(): React.ReactElement | null {
       return;
     }
     setRestorePolling(false);
+
+    // User tapped "Check later" — don't fire a late success/failure alert.
+    if (restoreCancelledRef.current) {
+      return;
+    }
 
     if (restoreOutcome === 'confirmed') {
       await refetchUsage();
@@ -500,6 +511,7 @@ function SubscriptionContent(): React.ReactElement | null {
     // Purchase succeeded on store side — now poll API for webhook confirmation
     if (!mountedRef.current) return;
     setTopUpPurchasing(false);
+    topUpCancelledRef.current = false;
     setTopUpPolling(true);
     setPollMessage('Confirming your purchase...');
     const baseCredits = usage?.topUpCreditsRemaining ?? 0;
@@ -520,6 +532,11 @@ function SubscriptionContent(): React.ReactElement | null {
     if (topUpOutcome === 'unmounted') return;
     topUpInFlightRef.current = false;
     setTopUpPolling(false);
+
+    // User tapped "Check later" — suppress the late confirmation alert.
+    if (topUpCancelledRef.current) {
+      return;
+    }
 
     if (topUpOutcome === 'confirmed') {
       platformAlert(
@@ -629,7 +646,10 @@ function SubscriptionContent(): React.ReactElement | null {
 
   if (isChild && (trialOrExpired || quotaExhausted)) {
     const quotaKind =
-      usage?.dailyLimit !== null && usage?.dailyRemainingQuestions === 0
+      // `usage?.dailyLimit !== null` is true when usage is undefined, which
+      // mislabels a monthly exhaustion as a daily one. Require an actual daily
+      // limit AND a zero daily remainder before calling it daily_exceeded.
+      usage?.dailyLimit != null && usage?.dailyRemainingQuestions === 0
         ? 'daily_exceeded'
         : 'monthly_exceeded';
     return (
@@ -798,7 +818,12 @@ function SubscriptionContent(): React.ReactElement | null {
                         ? 'Expired'
                         : status === 'trial'
                           ? t('subscription.statusBadge.trial')
-                          : 'Active'}
+                          : status === 'active'
+                            ? 'Active'
+                            : // Don't show a green "Active" badge for unknown
+                              // statuses (paused, incomplete, etc.) — surface the
+                              // raw status so it's never misrepresented as healthy.
+                              (status ?? 'Unknown')}
                 </Text>
               </View>
             </View>
@@ -1129,6 +1154,7 @@ function SubscriptionContent(): React.ReactElement | null {
               {restorePolling && (
                 <Pressable
                   onPress={() => {
+                    restoreCancelledRef.current = true;
                     setRestorePolling(false);
                     platformAlert(
                       t('subscription.restore.cancelledTitle'),
@@ -1189,6 +1215,7 @@ function SubscriptionContent(): React.ReactElement | null {
               {topUpPolling && (
                 <Pressable
                   onPress={() => {
+                    topUpCancelledRef.current = true;
                     setTopUpPolling(false);
                     platformAlert(
                       'Check later',

@@ -9,6 +9,7 @@ import { platformAlert } from '../../../../lib/platform-alert';
 import * as SecureStore from '../../../../lib/secure-storage';
 import { migrateSecureStoreKey } from '../../../../lib/migrate-secure-store-key';
 import { useThemeColors } from '../../../../lib/theme';
+import { formatMediumDateTime } from '../../../../lib/format-datetime';
 import { useProfile } from '../../../../lib/profile';
 import { useNotifyParentSubscribe } from '../../../../hooks/use-settings';
 import { useNotifyParentChildCap } from '../../../../hooks/use-child-cap-notifications';
@@ -21,14 +22,10 @@ import {
   formatCooldownLabel,
 } from '../child-paywall-helpers';
 
+// [#11] Hermes-safe — delegates to the shared formatter so a missing-ICU
+// Intl throw cannot crash the paywall. See lib/format-datetime.ts.
 function formatResetAt(value: string | undefined): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  return value ? formatMediumDateTime(value) || value : '';
 }
 
 type ChildPaywallMode = 'subscription' | 'quota';

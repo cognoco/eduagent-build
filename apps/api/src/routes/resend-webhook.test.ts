@@ -623,6 +623,51 @@ describe('malformed payload', () => {
     const body = await res.json();
     expect(body.code).toBe('VALIDATION_ERROR');
   });
+
+  // [LOW — resend payload not validated BREAK TEST] A signature-verified
+  // payload whose `data` is missing (or non-object) previously reached
+  // handleEmailBounced, which read `data.email_id` on `undefined` and threw →
+  // 500 → Svix retries the permanently-bad payload. After the fix the route
+  // safeParses the shape and, since the signature is already verified, acks
+  // with 200 (no retry) and captures to Sentry for ops review.
+  it('[LOW] acks 200 (no retry) and captures to Sentry when data is missing on a signed payload', async () => {
+    const sentryMock = require('../services/sentry') as {
+      captureException: jest.Mock;
+    };
+    sentryMock.captureException.mockClear();
+
+    // Valid JSON, valid signature, but `data` is absent — handlers depend on it.
+    const rawBody = JSON.stringify({ type: 'email.bounced' });
+    const id = 'msg_missing_data';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const res = await app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      TEST_ENV,
+    );
+
+    // Must NOT 500 / 4xx — ack so Svix does not retry the malformed payload.
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.skipped).toBe('malformed_payload');
+    // Observability: the parse failure is escalated, not silently swallowed.
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    // The bounce handler must never have run (would have thrown on data.email_id).
+    expect(inngest.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/email.bounced' }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

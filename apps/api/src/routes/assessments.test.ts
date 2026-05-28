@@ -120,6 +120,8 @@ import {
   lockAssessmentForAnswerSubmission,
 } from '../services/assessments';
 import { getSession } from '../services/session';
+import { updateRetentionFromSession } from '../services/retention-data';
+import { insertSessionXpEntry } from '../services/xp';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
 
@@ -215,6 +217,8 @@ const getSessionMock = jest.mocked(getSession);
 const lockAssessmentForAnswerSubmissionMock = jest.mocked(
   lockAssessmentForAnswerSubmission,
 );
+const updateRetentionFromSessionMock = jest.mocked(updateRetentionFromSession);
+const insertSessionXpEntryMock = jest.mocked(insertSessionXpEntry);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -501,6 +505,124 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     expect(evaluateAssessmentAnswerMock).toHaveBeenCalledTimes(1);
     // Likewise only one UPDATE commits.
     expect(updateAssessmentMock).toHaveBeenCalledTimes(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // [CR #8] Terminal assessment: retention + XP must be applied atomically
+  // with the status UPDATE. Previously these ran in a separate post-tx
+  // transaction with no retry and no escalation, so a failure left the
+  // assessment permanently `passed` while SM-2/retention + XP were silently
+  // skipped (and the FOR UPDATE terminal-state guard blocked resubmission).
+  // The fix folds them into the same transaction as the status UPDATE.
+  // -------------------------------------------------------------------------
+  describe('[CR #8] terminal assessment retention + XP atomicity', () => {
+    function setupPassingAnswer() {
+      getAssessmentMock.mockResolvedValue(
+        makeAssessmentRecord({ status: 'in_progress' }),
+      );
+      loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
+      shouldEndAssessmentForReviewMock.mockReturnValue(false);
+      evaluateAssessmentAnswerMock.mockResolvedValue(
+        makeEvaluation({ passed: true }),
+      );
+      resolveAssessmentStatusMock.mockReturnValue('passed');
+      updateAssessmentMock.mockResolvedValue(
+        makeAssessmentRecord({ status: 'passed' }),
+      );
+    }
+
+    it('applies retention + XP on a passing assessment', async () => {
+      setupPassingAnswer();
+
+      const res = await makeApp().request(path, validAnswerBody());
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({ status: 'passed' });
+
+      // SM-2/retention is updated for the topic.
+      expect(updateRetentionFromSessionMock).toHaveBeenCalledTimes(1);
+      expect(updateRetentionFromSessionMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        TOPIC_ID,
+        expect.any(Number),
+        expect.any(String),
+      );
+      // XP is granted for the passed topic/subject.
+      expect(insertSessionXpEntryMock).toHaveBeenCalledTimes(1);
+      expect(insertSessionXpEntryMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        TOPIC_ID,
+        SUBJECT_ID,
+      );
+    });
+
+    it('runs retention + XP inside the SAME transaction as the status UPDATE', async () => {
+      setupPassingAnswer();
+
+      // Track whether the writes happened within a db.transaction() callback.
+      let insideTransaction = false;
+      const txCallOrder: string[] = [];
+      const transactionMock = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => {
+          insideTransaction = true;
+          try {
+            return await fn({});
+          } finally {
+            insideTransaction = false;
+          }
+        });
+      updateRetentionFromSessionMock.mockImplementation(async () => {
+        txCallOrder.push(`retention:${insideTransaction}`);
+      });
+      insertSessionXpEntryMock.mockImplementation(async () => {
+        txCallOrder.push(`xp:${insideTransaction}`);
+      });
+
+      const app = new Hono<TestEnv>();
+      app.use('*', async (c, next) => {
+        c.set('db', { transaction: transactionMock } as unknown as Database);
+        c.set('profileId', PROFILE_ID);
+        c.set('profileMeta', {
+          birthYear: 2000,
+          location: 'EU',
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        });
+        await next();
+      });
+      app.route('/v1', assessmentRoutes);
+
+      const res = await app.request(path, validAnswerBody());
+
+      expect(res.status).toBe(200);
+      // Only ONE transaction is opened (status UPDATE + retention + XP share it).
+      expect(transactionMock).toHaveBeenCalledTimes(1);
+      // Both writes observed insideTransaction === true.
+      expect(txCallOrder).toEqual(['retention:true', 'xp:true']);
+    });
+
+    it('does NOT silently succeed when the XP write fails — the failure propagates', async () => {
+      setupPassingAnswer();
+      // Simulate the post-terminal write failing. Because it is now inside the
+      // status-UPDATE transaction, the failure rolls back the whole terminal
+      // transition rather than leaving a passed-but-no-XP assessment.
+      insertSessionXpEntryMock.mockRejectedValueOnce(
+        new Error('xp insert failed'),
+      );
+
+      const res = await makeApp().request(path, validAnswerBody());
+
+      // The request fails loudly (5xx) instead of returning 200/passed with
+      // XP silently skipped. In production the surrounding tx rolls back the
+      // status UPDATE so the learner can retry.
+      expect(res.status).toBe(500);
+    });
   });
 });
 

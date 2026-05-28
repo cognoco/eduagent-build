@@ -18,8 +18,8 @@ import { Alert, Platform } from 'react-native';
 
 // window.alert/confirm exist at runtime on web but aren't typed in RN's TS config
 const win = globalThis as unknown as {
-  alert: (msg: string) => void;
-  confirm: (msg: string) => boolean;
+  alert?: (msg: string) => void;
+  confirm?: (msg: string) => boolean;
 };
 
 type AlertButton = {
@@ -48,7 +48,11 @@ export function platformAlert(
 
   // Single button or no buttons: simple window.alert
   if (!buttons || buttons.length <= 1) {
-    win.alert(fullMessage);
+    // In a non-DOM web context (SSR, worker, headless) window.alert may be
+    // absent — invoke the action directly so the flow never dead-ends.
+    if (typeof win.alert === 'function') {
+      win.alert(fullMessage);
+    }
     buttons?.[0]?.onPress?.();
     return;
   }
@@ -60,6 +64,14 @@ export function platformAlert(
     ? buttons.find((b) => b !== cancelButton)
     : buttons[buttons.length - 1];
   const dismissButton = cancelButton ?? buttons[0];
+
+  // In a non-DOM web context window.confirm may be absent. Rather than
+  // dead-end the flow, default to the dismiss (safe / non-destructive) path.
+  if (typeof win.confirm !== 'function') {
+    dismissButton?.onPress?.();
+    options?.onDismiss?.();
+    return;
+  }
 
   const confirmed = win.confirm(fullMessage);
 

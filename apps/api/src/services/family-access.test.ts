@@ -10,8 +10,13 @@
 // implementation is broken and pass with correct implementation.
 // ---------------------------------------------------------------------------
 
+import type { Context } from 'hono';
 import type { Database } from '@eduagent/database';
-import { hasParentAccess, assertParentAccess } from './family-access';
+import {
+  hasParentAccess,
+  assertParentAccess,
+  assertCanManageOwnConsent,
+} from './family-access';
 import { ForbiddenError } from '../errors';
 
 // ---------------------------------------------------------------------------
@@ -99,7 +104,7 @@ describe('assertParentAccess', () => {
   it('resolves without throwing when a family link exists', async () => {
     const db = dbWithLink(PARENT_ID, CHILD_ID);
     await expect(
-      assertParentAccess(db, PARENT_ID, CHILD_ID)
+      assertParentAccess(db, PARENT_ID, CHILD_ID),
     ).resolves.toBeUndefined();
   });
 
@@ -110,7 +115,7 @@ describe('assertParentAccess', () => {
     const db = dbWithoutLink();
 
     await expect(
-      assertParentAccess(db, PARENT_ID, UNRELATED_ID)
+      assertParentAccess(db, PARENT_ID, UNRELATED_ID),
     ).rejects.toThrow(ForbiddenError);
   });
 
@@ -118,14 +123,74 @@ describe('assertParentAccess', () => {
     const db = dbWithoutLink();
 
     await expect(
-      assertParentAccess(db, PARENT_ID, UNRELATED_ID)
+      assertParentAccess(db, PARENT_ID, UNRELATED_ID),
     ).rejects.toThrow('You do not have access to this child profile.');
   });
 
   it('does not throw for the correct linked pair', async () => {
     const db = dbWithLink(PARENT_ID, CHILD_ID);
     await expect(
-      assertParentAccess(db, PARENT_ID, CHILD_ID)
+      assertParentAccess(db, PARENT_ID, CHILD_ID),
     ).resolves.not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assertCanManageOwnConsent — age-gate UTC consistency
+//
+// [CR LOW] This consent age-gate must compute age with getUTCFullYear() so it
+// agrees with the canonical calculateAge() (consent.ts) and getProfileAge()
+// (profile.ts) at the 18 boundary. A local getFullYear() could disagree by a
+// year depending on host timezone. We pin the boundary using birthYear math
+// derived from the same UTC year the SUT uses, so the test is timezone-stable.
+// ---------------------------------------------------------------------------
+
+describe('assertCanManageOwnConsent', () => {
+  // Derive birth years from the UTC year the SUT uses (calculateAge =
+  // getUTCFullYear() - birthYear), so the boundary assertions hold regardless
+  // of the machine timezone the test runs in.
+  const CURRENT_UTC_YEAR = new Date().getUTCFullYear();
+
+  function ctxWith(meta: {
+    isOwner?: boolean;
+    birthYear?: number | null;
+  }): Context {
+    return {
+      get: (key: string) => (key === 'profileMeta' ? meta : undefined),
+    } as unknown as Context;
+  }
+
+  it('allows an account owner regardless of age', () => {
+    const minorOwner = ctxWith({
+      isOwner: true,
+      birthYear: CURRENT_UTC_YEAR - 12,
+    });
+    expect(() => assertCanManageOwnConsent(minorOwner)).not.toThrow();
+  });
+
+  it('allows a non-owner adult exactly at the 18 boundary', () => {
+    // age === 18 → permitted
+    const adult = ctxWith({
+      isOwner: false,
+      birthYear: CURRENT_UTC_YEAR - 18,
+    });
+    expect(() => assertCanManageOwnConsent(adult)).not.toThrow();
+  });
+
+  it('[BREAK] blocks a non-owner minor one year under the 18 boundary', () => {
+    // age === 17 → blocked. With a buggy local getFullYear() in a timezone
+    // where the local year differs from the UTC year, the computed age could
+    // tip to 18 and wrongly permit this minor. Pinning birthYear off the UTC
+    // year keeps this assertion exact.
+    const minor = ctxWith({
+      isOwner: false,
+      birthYear: CURRENT_UTC_YEAR - 17,
+    });
+    expect(() => assertCanManageOwnConsent(minor)).toThrow(ForbiddenError);
+  });
+
+  it('fails closed when birthYear is missing for a non-owner', () => {
+    const unknownAge = ctxWith({ isOwner: false, birthYear: null });
+    expect(() => assertCanManageOwnConsent(unknownAge)).toThrow(ForbiddenError);
   });
 });

@@ -529,6 +529,7 @@
       "title": "Algunos mensajes no se pudieron enviar",
       "description": "Cópialos o envíalos a soporte para que no se pierda tu progreso.",
       "copyMessage": "Copiar mensaje",
+      "copyError": "No se pudo copiar al portapapeles. Tu mensaje sigue aquí; inténtalo de nuevo.",
       "sendToSupport": "Enviar a soporte"
     },
     "expired": {
@@ -917,6 +918,7 @@
     },
     "noteMenu": {
       "title": "Opciones de nota",
+      "webEditPrompt": "Pulsa Aceptar para editar esta nota. Pulsa Cancelar si prefieres eliminarla.",
       "deleteTitle": "Eliminar nota",
       "deleteMessage": "¿Seguro que quieres eliminar esta nota?"
     },

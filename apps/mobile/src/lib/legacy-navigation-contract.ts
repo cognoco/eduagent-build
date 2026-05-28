@@ -165,6 +165,19 @@ export function resolveShellVisibleTabs({
 }): Set<string> {
   if (useContract) return new Set(navigationContract.visibleTabs);
   if (isParentProxy) return computeVisibleTabs(tabShape, true);
-  if (familyCapable && mode !== null) return computeModeVisibleTabs(mode);
+  if (familyCapable) {
+    // V0 family-capable owner. Once `mode` resolves this returns the mode tab
+    // set (Family = 3 tabs, Study = 4 tabs). During the load window `mode` is
+    // null; falling through to `computeVisibleTabs('guardian')` here would
+    // render the transient 5-tab GUARDIAN_TABS shell and then snap to the 3-tab
+    // Family shell once `mode` arrives. That 5->3 snap drops `library` /
+    // `own-learning` — if the user had tapped one of those transient tabs the
+    // active tab disappears and the navigator falls back to Home. A V0
+    // family-capable owner resolves to Family mode on a fresh load (see
+    // app-context `derivedMode`: `familyCapable ? 'family' : 'study'`, with no
+    // override before user interaction), so hold the Family mode shell during
+    // load to stabilize the tab set and eliminate the flicker.
+    return computeModeVisibleTabs(mode ?? 'family');
+  }
   return computeVisibleTabs(tabShape, false);
 }

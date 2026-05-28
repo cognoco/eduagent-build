@@ -453,3 +453,67 @@ describe('[WI-173 / DS-084] settings proxy-mode guard', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [CR LOW defense-in-depth] Child celebration routes must require the owner
+// gate, not just the family-link check inside the service. The GET branch has
+// no proxy guard, so assertOwnerProfile is the only protection there. This
+// asserts a non-owner profile is rejected (403) from both child branches,
+// matching the pattern used by consent / learner-profile / onboarding.
+// ---------------------------------------------------------------------------
+describe('[CR LOW] child celebration routes require owner gate', () => {
+  const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440111';
+
+  function asNonOwnerProfile() {
+    mockFamilyLinksFindFirst.mockResolvedValue({
+      parentProfileId: 'profile-1',
+      childProfileId: CHILD_PROFILE_ID,
+    });
+    mockProfileFindFirst.mockResolvedValue({
+      id: 'profile-1',
+      accountId: 'test-account-id',
+      displayName: 'Kid',
+      avatarUrl: null,
+      birthYear: 2014,
+      location: 'EU',
+      isOwner: false,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      archivedAt: null,
+    });
+  }
+
+  it('GET /settings/celebration-level?childProfileId returns 403 for a non-owner', async () => {
+    asNonOwnerProfile();
+
+    const res = await app.request(
+      `/v1/settings/celebration-level?childProfileId=${CHILD_PROFILE_ID}`,
+      { headers: PROFILE_HEADERS },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('PUT /settings/celebration-level with childProfileId returns 403 for a non-owner', async () => {
+    asNonOwnerProfile();
+
+    const res = await app.request(
+      '/v1/settings/celebration-level',
+      {
+        method: 'PUT',
+        headers: { ...PROFILE_HEADERS, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          childProfileId: CHILD_PROFILE_ID,
+          celebrationLevel: 'all',
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+  });
+});

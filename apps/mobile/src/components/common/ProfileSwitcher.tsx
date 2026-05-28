@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
-import { View, Text, Pressable, Platform } from 'react-native';
+import { View, Text, Pressable, Platform, Modal } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
 import { isGuardianProfile } from '../../lib/profile';
 import { platformAlert } from '../../lib/platform-alert';
@@ -12,6 +12,22 @@ function roleLabel(
   allProfiles: ReadonlyArray<{ isOwner: boolean }>,
 ): string {
   return isGuardianProfile(profile, allProfiles) ? 'Parent' : 'Student';
+}
+
+/** Derive up-to-2-char uppercase initials. Null-safe: a missing/blank
+ * displayName falls back to '?' instead of throwing on `.split(' ').map(w[0])`
+ * (the empty-string case yields `[undefined]` → `.toUpperCase()` on undefined). */
+function deriveInitials(displayName: string | null | undefined): string {
+  const trimmed = (displayName ?? '').trim();
+  if (!trimmed) return '?';
+  return (
+    trimmed
+      .split(/\s+/)
+      .map((w) => w[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || '?'
+  );
 }
 
 interface ProfileSwitcherProps {
@@ -30,14 +46,7 @@ export function ProfileSwitcher({
   const switchingRef = useRef(false);
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
-  const initials = activeProfile
-    ? activeProfile.displayName
-        .split(' ')
-        .map((w) => w[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase()
-    : '?';
+  const initials = deriveInitials(activeProfile?.displayName);
 
   const handleSelect = useCallback(
     async (profileId: string) => {
@@ -103,101 +112,109 @@ export function ProfileSwitcher({
         </Text>
       </Pressable>
 
-      {isOpen && (
-        <>
-          {/* Backdrop — closes dropdown on outside tap */}
+      {/* [#9] Render the menu in a Modal/portal so it escapes any clipping
+          parent (header / ScrollView / overflow:hidden). The previous in-flow
+          absolutely-positioned dropdown was clipped to invisible/cut-off inside
+          a scrolling header on web/Android. The Modal backdrop reliably covers
+          the whole viewport and outside-tap still closes. */}
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        {/* Guard the body on isOpen as well: at runtime Modal already gates on
+            `visible`, but this also ensures nothing renders when closed under
+            test renderers whose Modal mock ignores `visible`. */}
+        {isOpen ? (
+          /* Backdrop — fills the viewport; tap outside the menu to close. */
           <Pressable
             onPress={() => setIsOpen(false)}
-            style={{
-              position: 'absolute',
-              top: -1000,
-              left: -1000,
-              right: -1000,
-              bottom: -1000,
-              zIndex: 40,
-            }}
+            style={{ flex: 1 }}
             accessibilityLabel="Close profile switcher"
             testID="profile-switcher-backdrop"
-          />
-
-          {/* Dropdown menu */}
-          <View
-            className="bg-surface-elevated rounded-card shadow-lg"
-            style={{
-              position: 'absolute',
-              // BUG-408: Use fixed offset instead of percentage — Android doesn't
-              // resolve `top: '100%'` correctly in non-sized absolute parents.
-              top: 40,
-              right: 0,
-              minWidth: 200,
-              marginTop: 4,
-              zIndex: 50,
-              ...Platform.select({
-                android: { elevation: 8 },
-                default: {},
-              }),
-            }}
-            testID="profile-switcher-menu"
           >
-            {profiles.map((profile) => {
-              const isActive = profile.id === activeProfileId;
-              return (
-                <Pressable
-                  key={profile.id}
-                  onPress={() => handleSelect(profile.id)}
-                  disabled={switching}
-                  className={`px-4 py-3 flex-row items-center ${
-                    isActive ? 'bg-primary-soft' : ''
-                  } ${switching ? 'opacity-50' : ''}`}
-                  accessibilityRole="menuitem"
-                  accessibilityLabel={`${profile.displayName}, ${roleLabel(
-                    profile,
-                    profiles,
-                  )}${isActive ? ', active' : ''}`}
-                  accessibilityState={{ selected: isActive }}
-                  testID={`profile-option-${profile.id}`}
-                >
-                  <View
-                    className={`w-8 h-8 rounded-full items-center justify-center me-3 ${
-                      isActive ? 'bg-primary' : 'bg-border'
-                    }`}
-                  >
-                    <Text
-                      className={`text-caption font-bold ${
-                        isActive ? 'text-text-inverse' : 'text-text-secondary'
-                      }`}
+            {/* Menu anchored to the top-right, near the chip. The inner View
+              swallows presses so a tap on the menu doesn't close it.
+              onStartShouldSetResponder stops touch propagation to the
+              backdrop without requiring an empty onPress handler. */}
+            <View
+              style={{
+                position: 'absolute',
+                top: Platform.OS === 'ios' ? 96 : 56,
+                right: 12,
+              }}
+            >
+              <View
+                className="bg-surface-elevated rounded-card shadow-lg"
+                style={{
+                  minWidth: 200,
+                  ...Platform.select({
+                    android: { elevation: 8 },
+                    default: {},
+                  }),
+                }}
+                testID="profile-switcher-menu"
+                onStartShouldSetResponder={() => true}
+              >
+                {profiles.map((profile) => {
+                  const isActive = profile.id === activeProfileId;
+                  return (
+                    <Pressable
+                      key={profile.id}
+                      onPress={() => handleSelect(profile.id)}
+                      disabled={switching}
+                      className={`px-4 py-3 flex-row items-center ${
+                        isActive ? 'bg-primary-soft' : ''
+                      } ${switching ? 'opacity-50' : ''}`}
+                      accessibilityRole="menuitem"
+                      accessibilityLabel={`${profile.displayName}, ${roleLabel(
+                        profile,
+                        profiles,
+                      )}${isActive ? ', active' : ''}`}
+                      accessibilityState={{ selected: isActive }}
+                      testID={`profile-option-${profile.id}`}
                     >
-                      {profile.displayName
-                        .split(' ')
-                        .map((w) => w[0])
-                        .join('')
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className={`text-body-sm font-medium ${
-                        isActive ? 'text-primary' : 'text-text-primary'
-                      }`}
-                    >
-                      {profile.displayName}
-                    </Text>
-                    <Text className="text-caption text-text-secondary">
-                      {roleLabel(profile, profiles)}
-                    </Text>
-                  </View>
-                  {isActive && (
-                    <Text className="text-primary text-body-sm ms-2">
-                      {'\u2713'}
-                    </Text>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      )}
+                      <View
+                        className={`w-8 h-8 rounded-full items-center justify-center me-3 ${
+                          isActive ? 'bg-primary' : 'bg-border'
+                        }`}
+                      >
+                        <Text
+                          className={`text-caption font-bold ${
+                            isActive
+                              ? 'text-text-inverse'
+                              : 'text-text-secondary'
+                          }`}
+                        >
+                          {deriveInitials(profile.displayName)}
+                        </Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className={`text-body-sm font-medium ${
+                            isActive ? 'text-primary' : 'text-text-primary'
+                          }`}
+                        >
+                          {profile.displayName}
+                        </Text>
+                        <Text className="text-caption text-text-secondary">
+                          {roleLabel(profile, profiles)}
+                        </Text>
+                      </View>
+                      {isActive && (
+                        <Text className="text-primary text-body-sm ms-2">
+                          {'\u2713'}
+                        </Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </Pressable>
+        ) : null}
+      </Modal>
     </View>
   );
 }

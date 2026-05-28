@@ -227,10 +227,23 @@ describe('isValidTransition', () => {
     expect(isValidTransition('cancelled', 'active')).toBe(true);
   });
 
-  it('rejects expired -> anything (terminal state)', () => {
-    expect(isValidTransition('expired', 'active')).toBe(false);
+  // [#4 MEDIUM — expired->active reactivation] A RevenueCat RENEWAL /
+  // PRODUCT_CHANGE for an already-expired account is a real, successful
+  // re-charge that must revive the subscription. Pre-fix, expired was treated
+  // as terminal so applySubscriptionUpdateFromRevenuecat threw, the webhook
+  // 500'd, RevenueCat retried for ~3 days, and the customer stayed downgraded
+  // despite paying. Post-fix expired->active / expired->past_due are valid.
+  it('[#4] allows expired -> active (RevenueCat RENEWAL reactivation after re-charge)', () => {
+    expect(isValidTransition('expired', 'active')).toBe(true);
+  });
+
+  it('[#4] allows expired -> past_due (reactivation landing in grace period)', () => {
+    expect(isValidTransition('expired', 'past_due')).toBe(true);
+  });
+
+  it('still rejects expired -> trial / cancelled (not legitimate reactivations)', () => {
     expect(isValidTransition('expired', 'trial')).toBe(false);
-    expect(isValidTransition('expired', 'past_due')).toBe(false);
+    expect(isValidTransition('expired', 'cancelled')).toBe(false);
   });
 
   it('rejects trial -> cancelled (must go through active first)', () => {

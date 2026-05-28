@@ -326,7 +326,9 @@ describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => 
   // error boundary or the webhook 500 path, and quota pool is never updated.
   it('[BUG-447] throws on invalid status transition so quota pool stays coherent', async () => {
     const account = await seedAccount(1);
-    // 'expired' → 'active' is invalid per the state machine
+    // 'expired' → 'trial' is invalid per the state machine. (Note: expired ->
+    // active / past_due are now VALID reactivations per fix #4, so this test
+    // uses expired -> trial, which remains an illegitimate transition.)
     const { subscription } = await seedSubscriptionWithQuota(
       account.id,
       'plus',
@@ -344,7 +346,7 @@ describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => 
       updateSubscriptionFromRevenuecatWebhook(db, account.id, {
         eventId: 'evt-bad-transition',
         tier: 'family', // attempting tier+status change
-        status: 'active', // expired -> active is invalid
+        status: 'trial', // expired -> trial is invalid
       }),
     ).rejects.toThrow(/Invalid subscription transition/);
 
@@ -356,6 +358,40 @@ describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => 
     // updateQuotaPoolLimit call that a caller would have made for 'family' tier
     const poolAfter = await loadQuotaPool(subscription.id);
     expect(poolAfter!.monthlyLimit).toBe(limitBefore);
+  });
+
+  // [#4 MEDIUM — expired->active reactivation BREAK TEST] A RevenueCat RENEWAL
+  // delivers status='active' for an already-expired account (a successful
+  // re-charge after lapse). Pre-fix, isValidTransition('expired','active') was
+  // false → applySubscriptionUpdateFromRevenuecat threw → the webhook 500'd and
+  // RevenueCat retried for ~3 days while the customer stayed downgraded despite
+  // paying. Post-fix the reactivation succeeds: no throw, status becomes active.
+  it('[#4] expired account receiving a RENEWAL (status=active) reactivates without throwing', async () => {
+    const account = await seedAccount(1);
+    const { subscription } = await seedSubscriptionWithQuota(
+      account.id,
+      'plus',
+      { status: 'expired' },
+    );
+    const db = createIntegrationDb();
+
+    const result = await updateSubscriptionFromRevenuecatWebhook(
+      db,
+      account.id,
+      {
+        eventId: 'evt-expired-renewal-reactivation',
+        status: 'active',
+      },
+    );
+
+    // Must NOT throw and must apply the reactivation.
+    expect(result).not.toBeNull();
+    expect(result!.webhookApplied).toBe(true);
+    expect(result!.status).toBe('active');
+
+    const row = await loadSubscription(account.id);
+    expect(row!.status).toBe('active');
+    expect(row!.id).toBe(subscription.id);
   });
 
   // [CR-2026-05-19-M3] SITE 4: SQL-level WHERE guard smoke test.
