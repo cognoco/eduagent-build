@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { apiError } from '../errors';
@@ -254,19 +255,28 @@ function handleEmailDelivered(data: ResendEmailEventData): void {
 // Payload types
 // ---------------------------------------------------------------------------
 
-interface ResendEmailEventData {
-  email_id?: string;
-  from?: string;
-  to?: string;
-  subject?: string;
-  [key: string]: unknown;
-}
+// Minimal shape validation (parity with the RevenueCat route's Zod gate).
+// We only assert the fields the handlers actually read so a malformed payload
+// — e.g. `data` missing entirely — is rejected at the boundary instead of
+// throwing inside handleEmailBounced (`data.email_id` on `undefined`) and
+// 500ing, which would make Svix retry the bad payload for ~3 days.
+const resendEmailEventDataSchema = z
+  .object({
+    email_id: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    subject: z.string().optional(),
+  })
+  .passthrough();
 
-interface ResendWebhookPayload {
-  type: string;
-  data: ResendEmailEventData;
-  [key: string]: unknown;
-}
+const resendWebhookPayloadSchema = z
+  .object({
+    type: z.string(),
+    data: resendEmailEventDataSchema,
+  })
+  .passthrough();
+
+type ResendEmailEventData = z.infer<typeof resendEmailEventDataSchema>;
 
 // ---------------------------------------------------------------------------
 // Route
@@ -509,9 +519,9 @@ export const resendWebhookRoute = new Hono<{
   }
 
   // Parse payload — rawBody already read, parse manually
-  let payload: ResendWebhookPayload;
+  let rawPayload: unknown;
   try {
-    payload = JSON.parse(rawBody) as ResendWebhookPayload;
+    rawPayload = JSON.parse(rawBody);
   } catch {
     return apiError(
       c,
@@ -521,7 +531,28 @@ export const resendWebhookRoute = new Hono<{
     );
   }
 
-  const { type, data } = payload;
+  // Validate the shape the handlers depend on. The Svix signature is already
+  // verified above, so a malformed body is a provider-side bug, not an attack
+  // or a transient outage. Ack with 200 (no Svix retry) + capture to Sentry
+  // for ops review rather than throwing inside handleEmailBounced and 500ing.
+  const parsed = resendWebhookPayloadSchema.safeParse(rawPayload);
+  if (!parsed.success) {
+    logger.warn('[resend] Malformed webhook payload — acknowledged', {
+      event: 'resend.malformed_payload',
+      issues: parsed.error.issues.map((i: z.core.$ZodIssue) =>
+        i.path.join('.'),
+      ),
+    });
+    captureException(new Error('Resend webhook payload failed validation'), {
+      extra: {
+        category: 'resend.malformed_payload',
+        issues: parsed.error.flatten(),
+      },
+    });
+    return c.json({ received: true, skipped: 'malformed_payload' }, 200);
+  }
+
+  const { type, data } = parsed.data;
 
   switch (type) {
     case 'email.bounced':

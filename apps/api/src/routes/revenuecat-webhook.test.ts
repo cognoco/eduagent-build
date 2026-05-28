@@ -479,6 +479,45 @@ describe('idempotency', () => {
     expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
   });
 
+  // [BREAK TEST — #1 HIGH: top-up out-of-order skip → lost paid credits]
+  // The ordering watermark (lastRevenuecatEventTimestampMs) is advanced only by
+  // SUBSCRIPTION events, never by top-ups. A retried/out-of-order
+  // NON_RENEWING_PURCHASE that arrives after a later subscription event makes
+  // isRevenuecatEventProcessed() return true (stale-by-timestamp). Before the
+  // fix, the route skipped the event and the user never got their paid credits.
+  // After the fix, NON_RENEWING_PURCHASE is exempt from the ordering skip and
+  // MUST still reach purchaseTopUpCredits (its per-transaction-ID onConflict is
+  // the correct idempotency boundary).
+  it('[#1] does NOT skip out-of-order NON_RENEWING_PURCHASE — credits still granted', async () => {
+    // Simulate stale-by-timestamp: a newer subscription event already advanced
+    // the watermark past this top-up's event_timestamp_ms.
+    (isRevenuecatEventProcessed as jest.Mock).mockResolvedValue(true);
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ tier: 'plus' }),
+    );
+
+    const staleTopUp = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'txn_out_of_order_1',
+      event_timestamp_ms: Date.now() - 600000, // 10 min ago, older than watermark
+    });
+
+    const res = await makeRequest(staleTopUp);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    // Must NOT be skipped by the ordering gate.
+    expect(body.skipped).toBeUndefined();
+    // Credits MUST be granted (per-transaction-ID dedup is the real boundary).
+    expect(purchaseTopUpCredits).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      500,
+      expect.any(Date),
+      'txn_out_of_order_1',
+    );
+  });
+
   it('passes event_timestamp_ms to isRevenuecatEventProcessed [4C.3]', async () => {
     const timestampMs = 1700000000000;
     const payload = makeWebhookPayload('RENEWAL', {
@@ -818,15 +857,18 @@ describe('RENEWAL', () => {
   });
 
   // [BUG-447] BREAK TEST: when updateSubscriptionFromRevenuecatWebhook throws
-  // (invalid transition), handleRenewal must NOT call updateQuotaPoolLimit.
+  // (any invalid transition), handleRenewal must NOT call updateQuotaPoolLimit.
   // Pre-fix, the function returned the existing row, callers treated that as
   // success and updated quota — tier divergence. Post-fix, the throw propagates
   // and the route returns 500 (unhandled), never reaching updateQuotaPoolLimit.
+  // (Note: expired->active is now a VALID reactivation per fix #4; this test
+  // uses a generic invalid-transition rejection to exercise the propagation
+  // contract, which is independent of which specific transition is illegal.)
   it('[BUG-447] does NOT call updateQuotaPoolLimit when update throws on invalid transition', async () => {
     (
       updateSubscriptionFromRevenuecatWebhook as jest.Mock
     ).mockRejectedValueOnce(
-      new Error('Invalid subscription transition: expired -> active'),
+      new Error('Invalid subscription transition: active -> trial'),
     );
 
     const res = await makeRequest(makeWebhookPayload('RENEWAL'));
@@ -1558,19 +1600,21 @@ describe('PRODUCT_CHANGE', () => {
     expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
   });
 
-  // [BUG-446] BREAK TEST: PRODUCT_CHANGE on an expired subscription must NOT
-  // call updateQuotaPoolLimit. With the wave-3 fix in place (BUG-447),
-  // updateSubscriptionAndQuotaFromRevenuecatWebhook throws on the invalid
-  // expired->active transition. The throw propagates from handleProductChange,
-  // skipping the `if (updated)` branch that contains updateQuotaPoolLimit.
-  // Pre-fix (before the throw was introduced), the function returned the existing
-  // row and callers proceeded to call updateQuotaPoolLimit — divergent billing state.
-  // Reverting the throw in the atomic update helper makes this fail.
-  it('[BUG-446] PRODUCT_CHANGE on expired subscription does NOT call updateQuotaPoolLimit', async () => {
+  // [BUG-446] BREAK TEST: when updateSubscriptionAndQuotaFromRevenuecatWebhook
+  // throws (any invalid transition), handleProductChange must NOT call
+  // updateQuotaPoolLimit — the throw propagates and skips the `if (updated)`
+  // branch that contains the quota update, so subscription.tier and the quota
+  // pool can never diverge. Pre-fix (before the throw was introduced) the
+  // function returned the existing row and callers proceeded to update quota.
+  // (Note: expired->active is now a VALID reactivation per fix #4 — PRODUCT_CHANGE
+  // on an expired sub legitimately reactivates AND updates quota. This test
+  // therefore forces a generic invalid-transition rejection to exercise the
+  // route's error-propagation contract, independent of the specific transition.)
+  it('[BUG-446] does NOT call updateQuotaPoolLimit when the atomic update throws on invalid transition', async () => {
     (
       updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
     ).mockRejectedValueOnce(
-      new Error('Invalid subscription transition: expired -> active'),
+      new Error('Invalid subscription transition: active -> trial'),
     );
 
     const res = await makeRequest(

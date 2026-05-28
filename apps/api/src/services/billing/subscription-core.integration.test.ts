@@ -522,11 +522,14 @@ describe('updateSubscriptionFromWebhook', () => {
       lastStripeEventTimestamp: new Date('2026-01-01T00:00:00.000Z'),
     });
 
-    // expired -> active is not a valid transition in the state machine
+    // expired -> trial is not a valid transition in the state machine.
+    // (Note: expired -> active / past_due are now VALID reactivations per fix
+    // #4 — a re-charge after lapse legitimately revives the subscription — so
+    // this test uses expired -> trial, which remains illegitimate.)
     const ts = new Date('2026-06-20T00:00:00.000Z').toISOString();
     await expect(
       updateSubscriptionFromWebhook(db, 'sub_invalid_001', {
-        status: 'active',
+        status: 'trial',
         lastStripeEventTimestamp: ts,
       }),
     ).rejects.toThrow(/Invalid Stripe subscription transition/);

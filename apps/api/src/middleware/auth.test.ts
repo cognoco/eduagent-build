@@ -365,8 +365,15 @@ describe('authMiddleware', () => {
       );
     });
 
-    it('always returns 401 regardless of error type', async () => {
-      jwtMock.verifyJWT.mockRejectedValueOnce(
+    // [#2 HIGH — JWKS infra outage → mass forced sign-out]
+    // Previously the infra-failure branch returned 401, which the mobile client
+    // treats as session-expired (api-client.ts signs out on res.status === 401).
+    // A Clerk JWKS outage would force-sign-out every active user at once. The
+    // infra branch now returns 503 + Retry-After so the client retries instead
+    // of nuking the session. A genuinely invalid/expired token still returns 401.
+    it('[#2] returns 503 with Retry-After when JWKS fetch fails (infra outage — must NOT sign user out)', async () => {
+      // Simulate the external JWKS lookup boundary throwing a fetch failure.
+      jwtMock.lookupJWKByKid.mockRejectedValueOnce(
         new Error('Failed to fetch JWKS: network error'),
       );
 
@@ -377,6 +384,46 @@ describe('authMiddleware', () => {
         TEST_ENV,
       );
 
+      // 503 — NOT 401. 401 would trigger client sign-out.
+      expect(res.status).toBe(503);
+      expect(res.headers.get('Retry-After')).toBe('30');
+      const body = await res.json();
+      expect(body.code).toBe('SERVICE_UNAVAILABLE');
+      // Infra failures are still captured to Sentry for alerting.
+      expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('[#2] returns 503 when the JWKS fetch aborts (timeout)', async () => {
+      const abortError = new DOMException(
+        'The user aborted a request.',
+        'AbortError',
+      );
+      jwtMock.lookupJWKByKid.mockRejectedValueOnce(abortError);
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer some.jwt.token' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get('Retry-After')).toBe('30');
+    });
+
+    it('[#2] still returns 401 for a genuinely invalid/expired token (not infra)', async () => {
+      jwtMock.verifyJWT.mockRejectedValueOnce(
+        new Error('Invalid JWT: signature mismatch'),
+      );
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer some.jwt.token' } },
+        TEST_ENV,
+      );
+
+      // A real bad token still expires the session — 401 is correct here.
       expect(res.status).toBe(401);
       const body = await res.json();
       expect(body.code).toBe('UNAUTHORIZED');

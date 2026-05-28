@@ -2875,9 +2875,11 @@ describe('updateSubscriptionFromRevenuecatWebhook — invalid transition', () =>
     // [BUG-447] Function now throws on rejected transition instead of silently
     // returning existing — prevents caller (handleRenewal etc.) from proceeding
     // to updateQuotaPoolLimit with a tier that never landed on the subscription row.
+    // NOTE: expired -> active / past_due are now VALID reactivations (fix #4), so
+    // this test uses expired -> trial, which remains an illegitimate transition.
     await expect(
       updateSubscriptionFromRevenuecatWebhook(db, accountId, {
-        status: 'active', // expired -> active is invalid
+        status: 'trial', // expired -> trial is invalid
         eventId: 'new-event',
       }),
     ).rejects.toThrow(/Invalid subscription transition/);
@@ -2891,7 +2893,7 @@ describe('updateSubscriptionFromRevenuecatWebhook — invalid transition', () =>
     expect((err as Error).message).toMatch(/Invalid subscription transition/);
     expect(ctx.extra.subscriptionId).toBe(subscriptionId);
     expect(ctx.extra.fromStatus).toBe('expired');
-    expect(ctx.extra.toStatus).toBe('active');
+    expect(ctx.extra.toStatus).toBe('trial');
   });
 });
 

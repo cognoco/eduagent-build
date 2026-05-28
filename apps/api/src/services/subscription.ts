@@ -136,6 +136,16 @@ const VALID_TRANSITIONS = new Set([
   'past_due->expired', // Stripe customer.subscription.deleted while past_due
   'cancelled->active', // [BUG-443] Stripe portal uncancel (cancel_at_period_end=false) reverses cancellation; payment_succeeded on a cancelled sub re-activates it
   'cancelled->expired',
+  // Reactivation after expiry. A RevenueCat RENEWAL / PRODUCT_CHANGE for an
+  // already-`expired` account represents a real, successful charge that revives
+  // the subscription. Previously these threw ("expired->active" not allowed),
+  // 500'd the webhook, and left the customer downgraded despite paying while
+  // RevenueCat retried for ~3 days. This mirrors how INITIAL_PURCHASE
+  // reactivation already works (it routes through activateSubscriptionFromRevenuecat,
+  // which bypasses the transition guard). past_due is included for the
+  // expired-then-grace-period reactivation ordering.
+  'expired->active',
+  'expired->past_due',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -187,8 +197,10 @@ export function resolveEffectiveAccessTier(
  * - active -> past_due, cancelled, expired
  * - past_due -> active, cancelled, expired
  * - cancelled -> active, expired
+ * - expired -> active, past_due (RevenueCat RENEWAL/PRODUCT_CHANGE reactivation
+ *   after a successful re-charge; expired is NOT a terminal state)
  *
- * Invalid: expired -> anything, trial -> cancelled (must go through active first)
+ * Invalid: trial -> cancelled (must go through active first)
  */
 export function isValidTransition(from: string, to: string): boolean {
   return VALID_TRANSITIONS.has(`${from}->${to}`);

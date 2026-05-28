@@ -25,8 +25,10 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
+import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertOwnerProfile } from '../services/family-access';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
@@ -62,6 +64,7 @@ type SettingsRouteEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -107,6 +110,13 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const query = c.req.valid('query');
+      // [CR defense-in-depth] Parent-on-behalf child routes must require the
+      // owner gate (matches consent / learner-profile / onboarding), not just
+      // the family-link check inside the service. A non-owner never has child
+      // links today, but gating only on the link diverges from the pattern.
+      if (query.childProfileId) {
+        assertOwnerProfile(c);
+      }
       const celebrationLevel = query.childProfileId
         ? await getChildCelebrationLevel(db, profileId, query.childProfileId)
         : await getCelebrationLevel(db, profileId);
@@ -127,6 +137,12 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
+      // [CR defense-in-depth] See GET handler above — owner gate on the
+      // parent-on-behalf child branch for consistency with other parent-admin
+      // routes.
+      if (body.childProfileId) {
+        assertOwnerProfile(c);
+      }
       const result = body.childProfileId
         ? await upsertChildCelebrationLevel(
             db,

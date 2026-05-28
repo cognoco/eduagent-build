@@ -217,7 +217,22 @@ export const revenuecatWebhookRoute = new Hono<{
     event.id,
     event.event_timestamp_ms,
   );
-  if (alreadyProcessed && event.type !== 'BILLING_ISSUE') {
+  // [BD-01 ordering exemptions]
+  // - BILLING_ISSUE: a re-delivered payment-failure must still re-assert
+  //   past_due even if a newer subscription event already advanced the
+  //   timestamp watermark.
+  // - NON_RENEWING_PURCHASE (top-up): the ordering watermark
+  //   (lastRevenuecatEventTimestampMs) is only advanced by SUBSCRIPTION
+  //   events, never by top-ups. An out-of-order / retried top-up that arrives
+  //   AFTER a later subscription event would otherwise be silently dropped
+  //   here and the user never receives the paid credits. Top-ups carry their
+  //   own per-transaction-ID idempotency (purchaseTopUpCredits uses
+  //   INSERT ... ON CONFLICT DO NOTHING on revenuecatTransactionId), which is
+  //   the correct dedup boundary — so exempting them from the timestamp skip
+  //   is safe and required for correctness.
+  const exemptFromOrderingSkip =
+    event.type === 'BILLING_ISSUE' || event.type === 'NON_RENEWING_PURCHASE';
+  if (alreadyProcessed && !exemptFromOrderingSkip) {
     return c.json({ received: true, skipped: true });
   }
 
