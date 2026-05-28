@@ -4,39 +4,56 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { WelcomeIntro } from './WelcomeIntro';
 
 const translations: Record<string, string> = {
-  'welcomeIntro.card1.headline': 'A mentor you can talk to',
-  'welcomeIntro.card1.supporting':
+  // Learner deck
+  'welcomeIntro.learner.card1.headline': 'A mentor you can talk to',
+  'welcomeIntro.learner.card1.supporting':
     'Ask when you are stuck, explain what you do not get, and get help that adapts to how you learn.',
-  'welcomeIntro.card2.headline': 'All your study in one place',
-  'welcomeIntro.card2.supporting':
-    'Study as many subjects as you need, get help with assignments, save notes, and bookmark what matters.',
-  'welcomeIntro.card3.headline': 'Picks up where you left off',
-  'welcomeIntro.card3.supporting':
-    'Your mentor remembers your progress, adapts to your pace, and helps with quick bursts or steady routines.',
-  'welcomeIntro.card4.headline': 'Built for real learning',
-  'welcomeIntro.card4.supporting':
+  'welcomeIntro.learner.card2.headline':
+    'Remembers you, picks up where you left off',
+  'welcomeIntro.learner.card2.supporting':
+    'Your subjects, notes, and pace stay in one place, and your mentor adapts every time you come back.',
+  'welcomeIntro.learner.card3.headline': 'Built for real learning',
+  'welcomeIntro.learner.card3.supporting':
     'Clear explanations, guided questions, and practice that sticks help you think, practice, and remember.',
-  'welcomeIntro.scene.card1.learner': 'I do not get this yet.',
-  'welcomeIntro.scene.card1.mentor':
+  // Parent deck
+  'welcomeIntro.parent.card1.headline': 'A personal mentor for your child',
+  'welcomeIntro.parent.card1.supporting':
+    'Teaches at their pace and helps with homework by teaching the method and checking their work — never just handing over answers to copy.',
+  'welcomeIntro.parent.card2.headline':
+    'Stay in the loop, step in when it matters',
+  'welcomeIntro.parent.card2.supporting':
+    "Watch your child's progress and get involved exactly when they need you — not a moment sooner.",
+  'welcomeIntro.parent.card3.headline': 'No more homework battles',
+  'welcomeIntro.parent.card3.supporting':
+    'Take back your evenings and turn them into quality time instead of nightly fights.',
+  // Learner scenes
+  'welcomeIntro.scene.learner.card1.learner': 'I do not get this yet.',
+  'welcomeIntro.scene.learner.card1.mentor':
     "Let's slow it down. What part feels confusing?",
-  'welcomeIntro.scene.card2.subjects.math': 'Math',
-  'welcomeIntro.scene.card2.subjects.history': 'History',
-  'welcomeIntro.scene.card2.subjects.spanish': 'Spanish',
-  'welcomeIntro.scene.card2.chips.notes': 'Notes',
-  'welcomeIntro.scene.card2.chips.bookmarks': 'Bookmarks',
-  'welcomeIntro.scene.card2.chips.quiz': 'Quiz',
-  'welcomeIntro.scene.card3.rows.lastTime': 'Last time',
-  'welcomeIntro.scene.card3.rows.lastTimeBody':
+  'welcomeIntro.scene.learner.card2.subjects.math': 'Math',
+  'welcomeIntro.scene.learner.card2.subjects.history': 'History',
+  'welcomeIntro.scene.learner.card2.subjects.spanish': 'Spanish',
+  'welcomeIntro.scene.learner.card2.resume.label': 'Last time',
+  'welcomeIntro.scene.learner.card2.resume.body':
     'You wrapped up Cells & DNA basics',
-  'welcomeIntro.scene.card3.rows.next': 'Next',
-  'welcomeIntro.scene.card3.rows.nextBody':
-    'Pick up with Photosynthesis when ready',
-  'welcomeIntro.scene.card3.rows.pace': 'Pace',
-  'welcomeIntro.scene.card3.rows.paceBody': 'Short bursts work well for you',
-  'welcomeIntro.scene.card4.chips.explain': 'Clear explanation',
-  'welcomeIntro.scene.card4.chips.think': 'Think it through',
-  'welcomeIntro.scene.card4.chips.practice': 'Practice in context',
-  'welcomeIntro.scene.card4.chips.remember': 'Remember it later',
+  'welcomeIntro.scene.learner.card3.chips.explain': 'Clear explanation',
+  'welcomeIntro.scene.learner.card3.chips.think': 'Think it through',
+  'welcomeIntro.scene.learner.card3.chips.practice': 'Practice in context',
+  'welcomeIntro.scene.learner.card3.chips.remember': 'Remember it later',
+  // Parent scenes
+  'welcomeIntro.scene.parent.card1.child': "I'm stuck on question 3.",
+  'welcomeIntro.scene.parent.card1.mentor':
+    "Let's start with what you've tried. Walk me through step one.",
+  'welcomeIntro.scene.parent.card2.thisWeek.label': 'This week',
+  'welcomeIntro.scene.parent.card2.thisWeek.body': '4 sessions, 2 subjects',
+  'welcomeIntro.scene.parent.card2.strong.label': 'Going well',
+  'welcomeIntro.scene.parent.card2.strong.body': 'Fractions are clicking',
+  'welcomeIntro.scene.parent.card2.review.label': 'Could use you',
+  'welcomeIntro.scene.parent.card2.review.body': 'Long division — stuck twice',
+  'welcomeIntro.scene.parent.card3.chips.evenings': 'Calmer evenings',
+  'welcomeIntro.scene.parent.card3.chips.nagging': 'Less nagging',
+  'welcomeIntro.scene.parent.card3.chips.quality': 'Quality time',
+  // Shared
   'welcomeIntro.next': 'Next',
   'welcomeIntro.letsStart': "Let's start",
   'welcomeIntro.a11y.previous': 'Previous card',
@@ -84,116 +101,123 @@ jest.mock(
   }),
 );
 
-describe('<WelcomeIntro />', () => {
+describe('<WelcomeIntro audience="learner" />', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders the first card by default with the new headline and "Next" CTA', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
+  it('renders the 3 learner cards with the learner headlines', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     expect(screen.getByTestId('welcome-card-1')).toBeTruthy();
     expect(screen.getByText('A mentor you can talk to')).toBeTruthy();
-    expect(screen.getByTestId('welcome-next-button')).toBeTruthy();
-    expect(screen.queryByTestId('welcome-start-button')).toBeNull();
+    expect(
+      screen.getByText('Remembers you, picks up where you left off'),
+    ).toBeTruthy();
+    expect(screen.getByText('Built for real learning')).toBeTruthy();
+    // Only 3 cards — no 4th.
+    expect(screen.queryByTestId('welcome-card-4')).toBeNull();
   });
 
-  it('renders an app-scene slot above each card with a stable testID', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
-    // Scene 1 visible on initial render
+  it('renders a stable scene slot per learner card', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     expect(screen.getByTestId('welcome-card-1-scene')).toBeTruthy();
-    // All four scenes render (FlatList horizontal — all items mount eagerly)
     expect(screen.getByTestId('welcome-card-2-scene')).toBeTruthy();
     expect(screen.getByTestId('welcome-card-3-scene')).toBeTruthy();
-    expect(screen.getByTestId('welcome-card-4-scene')).toBeTruthy();
   });
 
-  it('card 1 scene shows a mentor-chat exchange', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
+  it('learner card 1 shows the mentor-chat exchange', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     expect(screen.getByText('I do not get this yet.')).toBeTruthy();
     expect(
       screen.getByText("Let's slow it down. What part feels confusing?"),
     ).toBeTruthy();
   });
 
-  it('card 2 scene shows subject tiles and study chips', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
-    expect(screen.getByText('Math')).toBeTruthy();
-    expect(screen.getByText('History')).toBeTruthy();
-    expect(screen.getByText('Notes')).toBeTruthy();
-    expect(screen.getByText('Bookmarks')).toBeTruthy();
-    expect(screen.getByText('Quiz')).toBeTruthy();
-  });
-
-  it('card 3 scene shows continuity rows', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
-    expect(screen.getByText('Last time')).toBeTruthy();
-    expect(screen.getByText('Pace')).toBeTruthy();
-    // "Next" is also the primary CTA label, so assert the row body text instead.
-    expect(
-      screen.getByText('Pick up with Photosynthesis when ready'),
-    ).toBeTruthy();
-  });
-
-  it('card 4 scene shows method chips', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
-    expect(screen.getByText('Clear explanation')).toBeTruthy();
-    expect(screen.getByText('Think it through')).toBeTruthy();
-    expect(screen.getByText('Practice in context')).toBeTruthy();
-    expect(screen.getByText('Remember it later')).toBeTruthy();
-  });
-
-  it('advances to the next card when the primary CTA is tapped', () => {
-    const onCardAdvanced = jest.fn();
-    render(
-      <WelcomeIntro onComplete={jest.fn()} onCardAdvanced={onCardAdvanced} />,
-    );
-    fireEvent.press(screen.getByTestId('welcome-next-button'));
-    expect(onCardAdvanced).toHaveBeenCalledWith(2);
-  });
-
-  it('shows the "Let\'s start" CTA on the final card and not the "Next" CTA', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
-    fireEvent.press(screen.getByTestId('welcome-next-button'));
+  it('reaches the "Let\'s start" CTA after 2 Next taps (3 cards total)', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     fireEvent.press(screen.getByTestId('welcome-next-button'));
     fireEvent.press(screen.getByTestId('welcome-next-button'));
     expect(screen.getByTestId('welcome-start-button')).toBeTruthy();
     expect(screen.queryByTestId('welcome-next-button')).toBeNull();
   });
 
-  it('calls onComplete when the "Let\'s start" CTA on card 4 is tapped', () => {
+  it('calls onComplete from the final learner card', () => {
     const onComplete = jest.fn();
-    render(<WelcomeIntro onComplete={onComplete} />);
-    fireEvent.press(screen.getByTestId('welcome-next-button'));
+    render(<WelcomeIntro audience="learner" onComplete={onComplete} />);
     fireEvent.press(screen.getByTestId('welcome-next-button'));
     fireEvent.press(screen.getByTestId('welcome-next-button'));
     fireEvent.press(screen.getByTestId('welcome-start-button'));
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call onComplete on intermediate "Next" presses', () => {
+  it('exposes a "Page 1 of 3" a11y label', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
+    expect(screen.getByTestId('welcome-dots').props.accessibilityLabel).toBe(
+      'Page 1 of 3',
+    );
+  });
+});
+
+describe('<WelcomeIntro audience="parent" />', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('renders the 3 parent cards with the parent headlines', () => {
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
+    expect(screen.getByText('A personal mentor for your child')).toBeTruthy();
+    expect(
+      screen.getByText('Stay in the loop, step in when it matters'),
+    ).toBeTruthy();
+    expect(screen.getByText('No more homework battles')).toBeTruthy();
+    expect(screen.queryByTestId('welcome-card-4')).toBeNull();
+  });
+
+  it('parent card 1 supporting copy is truthful about homework help (no answer hand-over)', () => {
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
+    expect(
+      screen.getByText(/never just handing over answers to copy/),
+    ).toBeTruthy();
+  });
+
+  it('parent card 1 shows a child-homework chat where the mentor guides, not answers', () => {
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
+    expect(screen.getByText("I'm stuck on question 3.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Let's start with what you've tried. Walk me through step one.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it('parent card 2 shows a progress overview', () => {
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
+    expect(screen.getByText('This week')).toBeTruthy();
+    expect(screen.getByText('Going well')).toBeTruthy();
+    expect(screen.getByText('Could use you')).toBeTruthy();
+  });
+
+  it('parent card 3 shows the quality-time payoff chips', () => {
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
+    expect(screen.getByText('Calmer evenings')).toBeTruthy();
+    expect(screen.getByText('Less nagging')).toBeTruthy();
+    expect(screen.getByText('Quality time')).toBeTruthy();
+  });
+
+  it('calls onComplete from the final parent card', () => {
     const onComplete = jest.fn();
-    render(<WelcomeIntro onComplete={onComplete} />);
+    render(<WelcomeIntro audience="parent" onComplete={onComplete} />);
     fireEvent.press(screen.getByTestId('welcome-next-button'));
     fireEvent.press(screen.getByTestId('welcome-next-button'));
-    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('welcome-start-button'));
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
+});
 
-  it('renders the cards in order so card 1 headline appears before card 2 headline in the rendered tree', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
-    const h1 = screen.getByText('A mentor you can talk to');
-    const h2 = screen.getByText('All your study in one place');
-    const h3 = screen.getByText('Picks up where you left off');
-    const h4 = screen.getByText('Built for real learning');
-    // All four exist (horizontal FlatList eagerly mounts items).
-    expect(h1).toBeTruthy();
-    expect(h2).toBeTruthy();
-    expect(h3).toBeTruthy();
-    expect(h4).toBeTruthy();
-  });
-
+describe('<WelcomeIntro /> shared behaviour', () => {
   it('hardware-back on card 1 is a no-op (returns true)', () => {
     const addSpy = jest.spyOn(BackHandler, 'addEventListener');
-    render(<WelcomeIntro onComplete={jest.fn()} />);
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     const lastCall = addSpy.mock.calls[addSpy.mock.calls.length - 1];
     expect(lastCall?.[0]).toBe('hardwareBackPress');
     const cb = lastCall?.[1] as () => boolean;
@@ -202,24 +226,50 @@ describe('<WelcomeIntro />', () => {
     addSpy.mockRestore();
   });
 
-  it('hardware-back on cards 2-4 steps back one card', () => {
+  it('advances and reports card index via onCardAdvanced', () => {
+    const onCardAdvanced = jest.fn();
+    render(
+      <WelcomeIntro
+        audience="learner"
+        onComplete={jest.fn()}
+        onCardAdvanced={onCardAdvanced}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('welcome-next-button'));
+    expect(onCardAdvanced).toHaveBeenCalledWith(2);
+  });
+
+  it('calls onBackFromFirstCard when hardware-back is pressed on card 1', () => {
+    const onBackFromFirstCard = jest.fn();
     const addSpy = jest.spyOn(BackHandler, 'addEventListener');
-    render(<WelcomeIntro onComplete={jest.fn()} />);
+    render(
+      <WelcomeIntro
+        audience="learner"
+        onComplete={jest.fn()}
+        onBackFromFirstCard={onBackFromFirstCard}
+      />,
+    );
+    const cb = addSpy.mock.calls[addSpy.mock.calls.length - 1]?.[1] as () =>
+      | boolean
+      | undefined;
+    act(() => {
+      expect(cb()).toBe(true);
+    });
+    expect(onBackFromFirstCard).toHaveBeenCalledTimes(1);
+    addSpy.mockRestore();
+  });
+
+  it('reports hardware-back stepping back one card on card 2', () => {
+    const addSpy = jest.spyOn(BackHandler, 'addEventListener');
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
     fireEvent.press(screen.getByTestId('welcome-next-button'));
     expect(screen.getByTestId('welcome-card-2')).toBeTruthy();
     const calls = addSpy.mock.calls;
-    const latest = calls[calls.length - 1];
-    const cb = latest?.[1] as () => boolean;
+    const cb = calls[calls.length - 1]?.[1] as () => boolean;
     act(() => {
       expect(cb()).toBe(true);
     });
     expect(screen.getByTestId('welcome-intro')).toBeTruthy();
     addSpy.mockRestore();
-  });
-
-  it('exposes a Page {n} of 4 a11y label on the dot indicator', () => {
-    render(<WelcomeIntro onComplete={jest.fn()} />);
-    const dots = screen.getByTestId('welcome-dots');
-    expect(dots.props.accessibilityLabel).toBe('Page 1 of 4');
   });
 });
