@@ -401,36 +401,41 @@ jobs:
           fi
           echo "✓ /v1/health OK"
 
-      - name: Smoke — GET /v1/auth/me (401, unauthenticated)
+      - name: Smoke — auth endpoint check (expect 401/403 — not 5xx/404/200)
         id: smoke-auth
         env:
           STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
         run: |
-          echo "Hitting ${STAGING_API_URL}/v1/auth/me (expect 401 — not 500/404)"
+          echo "Hitting ${STAGING_API_URL}/v1/auth/me (expect 401/403 — protected route mounted and rejecting unauthenticated access)"
           HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" \
             "${STAGING_API_URL}/v1/auth/me")
           echo "HTTP status: ${HTTP_CODE}"
-          # 401 means the auth middleware is live; anything 5xx = worker crash.
-          if [ "${HTTP_CODE}" = "500" ] || [ "${HTTP_CODE}" = "502" ] || [ "${HTTP_CODE}" = "503" ]; then
-            echo "✗ /v1/auth/me returned ${HTTP_CODE} — worker is erroring"
+          # 401 or 403 means the auth middleware is live and the route is mounted;
+          # 2xx = unexpected public access, 404 = route not mounted, 000 = network failure,
+          # 5xx = worker crash — all of these should fail the smoke check.
+          if [ "${HTTP_CODE}" != "401" ] && [ "${HTTP_CODE}" != "403" ]; then
+            echo "✗ /v1/auth/me returned ${HTTP_CODE} — expected 401 or 403"
             exit 1
           fi
-          echo "✓ /v1/auth/me returned ${HTTP_CODE} (non-5xx, auth layer is up)"
+          echo "✓ /v1/auth/me returned ${HTTP_CODE} (protected route is mounted, unauthenticated access rejected)"
 
-      - name: Smoke — GET /v1/sessions (401, unauthenticated)
+      - name: Smoke — sessions endpoint check (expect 401/403 — not 5xx/404/200)
         id: smoke-sessions
         env:
           STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
         run: |
-          echo "Hitting ${STAGING_API_URL}/v1/sessions (expect 401 — not 500/404)"
+          echo "Hitting ${STAGING_API_URL}/v1/sessions (expect 401/403 — protected route mounted and rejecting unauthenticated access)"
           HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" \
             "${STAGING_API_URL}/v1/sessions")
           echo "HTTP status: ${HTTP_CODE}"
-          if [ "${HTTP_CODE}" = "500" ] || [ "${HTTP_CODE}" = "502" ] || [ "${HTTP_CODE}" = "503" ]; then
-            echo "✗ /v1/sessions returned ${HTTP_CODE} — sessions route is broken"
+          # 401 or 403 means the sessions route is mounted and auth is enforced;
+          # 2xx = unexpected public access, 404 = route not mounted, 000 = network failure,
+          # 5xx = worker crash — all of these should fail the smoke check.
+          if [ "${HTTP_CODE}" != "401" ] && [ "${HTTP_CODE}" != "403" ]; then
+            echo "✗ /v1/sessions returned ${HTTP_CODE} — expected 401 or 403"
             exit 1
           fi
-          echo "✓ /v1/sessions returned ${HTTP_CODE} (non-5xx, sessions route is up)"
+          echo "✓ /v1/sessions returned ${HTTP_CODE} (protected route is mounted, unauthenticated access rejected)"
 
       # [BUG-953] Re-use the same failure notification pattern for smoke failures.
       - name: Notify on smoke test failure
