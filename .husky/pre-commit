@@ -82,6 +82,17 @@ if [ -n "$I18N_EN_CHANGED" ]; then
   pnpm exec tsx scripts/check-no-clinical-copy.ts || exit 1
 fi
 
+# i18n orphan / unused-key check — independent of the en.json-gated staleness
+# block above. The reverse-orphan case (a t() call site deleted but its en.json
+# key left behind) is by definition a TSX-only change with NO en.json edit, so
+# it must also fire on .ts/.tsx and keep-list edits. See
+# docs/specs/2026-05-26-i18n-phase2-ui-strings-hygiene.md → Architecture/3.
+if git diff --cached --name-only | grep -qE '^(apps/mobile/src/.*\.(ts|tsx)|apps/mobile/src/i18n/locales/en\.json|scripts/i18n-keep\.ts)$'; then
+  echo "pre-commit: running check-i18n-orphan-keys + keep-rot..."
+  pnpm exec tsx scripts/check-i18n-orphan-keys.ts || exit 1
+  pnpm exec tsx scripts/check-i18n-keep-rot.ts || exit 1
+fi
+
 # GC1 ratchet (pre-commit mirror of CI): block staged test files that add a
 # new relative-path `jest.mock('./...')` / `jest.mock('../...')` unless the
 # factory follows Pattern A (spreads `jest.requireActual(<same path>)`), or
