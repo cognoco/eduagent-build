@@ -81,15 +81,18 @@ jobs:
         Assign a verdict, then post exactly ONE comment. No other output.
 
         Verdicts:
-        - APPROVED - zero findings
-        - APPROVED_WITH_ISSUES - findings exist but none are MUST_FIX
-        - CHANGES_REQUESTED - at least one MUST_FIX finding
-        - BLOCKED - critical security or data integrity violation
+        - APPROVED - no MUST_FIX or SHOULD_FIX findings; CONSIDER findings may exist
+        - CHANGES_REQUESTED - at least one SHOULD_FIX finding and no MUST_FIX finding
+        - BLOCKED - at least one MUST_FIX finding, or any critical security or data integrity violation
 
         Severities:
         - MUST_FIX - security hole, data loss risk, broken functionality, architectural violation
-        - SHOULD_FIX - pattern drift from conventions, missing validation, poor error handling
-        - CONSIDER - better naming, small optimizations
+        - SHOULD_FIX - required before approval: missing validation on a new boundary,
+          missing regression coverage for changed behavior, convention drift likely to
+          create follow-on defects, incomplete error handling on a real path, or a
+          maintainability issue that materially raises future change risk
+        - CONSIDER - optional improvement: naming, clarity, small refactor,
+          maintainability suggestion, or preference. CONSIDER findings never block approval
 
         Use the Write tool to write your review to /tmp/review.md, then post it
         with: gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/review.md
@@ -123,6 +126,10 @@ jobs:
         <details><summary>Review metadata</summary>
 
         - Verdict: {VERDICT}
+        - Review green: true|false
+        - Must-fix count: {count}
+        - Should-fix count: {count}
+        - Consider count: {count}
         - Files in diff: {count}
         - Rules source: trusted base checkout CLAUDE.md, docs/project_context.md
 
@@ -139,6 +146,10 @@ jobs:
         <details><summary>Review metadata</summary>
 
         - Verdict: APPROVED
+        - Review green: true
+        - Must-fix count: 0
+        - Should-fix count: 0
+        - Consider count: 0
         - Files in diff: {count}
         - Rules source: trusted base checkout CLAUDE.md, docs/project_context.md
 
@@ -167,6 +178,9 @@ jobs:
           path: .trusted-actions
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Record review run start
+        run: echo "REVIEW_RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
       - name: Run Claude Code Review (token 1)
         id: review-1
@@ -207,5 +221,76 @@ jobs:
              [[ "${{ steps.review-3.outcome }}" == "success" ]]; then
             echo "::notice::Review completed successfully"
           else
-            echo "::warning::All review tokens exhausted — review skipped"
+            echo "::error::All review tokens exhausted — review did not complete"
+            exit 1
           fi
+
+      - name: Evaluate review verdict
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          comments_json="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate)"
+          review_json="$(
+            jq -c --arg started "$REVIEW_RUN_STARTED_AT" '
+              [ .[]
+                | select(.created_at >= $started)
+                | select(.body | contains("## Claude Code Review:"))
+              ]
+              | sort_by(.created_at)
+              | last // empty
+            ' <<< "$comments_json"
+          )"
+
+          if [[ -z "$review_json" ]]; then
+            echo "::error::No Claude Code Review comment was posted for this run"
+            exit 1
+          fi
+
+          body="$(jq -r '.body' <<< "$review_json")"
+          verdict="$(sed -nE 's/^## Claude Code Review: ([A-Z_]+).*/\1/p' <<< "$body" | head -n1)"
+          must_fix="$(sed -nE 's/^- Must-fix count: ([0-9]+).*/\1/ip' <<< "$body" | head -n1)"
+          should_fix="$(sed -nE 's/^- Should-fix count: ([0-9]+).*/\1/ip' <<< "$body" | head -n1)"
+          consider="$(sed -nE 's/^- Consider count: ([0-9]+).*/\1/ip' <<< "$body" | head -n1)"
+
+          if [[ -z "$verdict" || -z "$must_fix" || -z "$should_fix" || -z "$consider" ]]; then
+            echo "::error::Claude Code Review output is missing required verdict metadata"
+            exit 1
+          fi
+
+          jq -n \
+            --arg verdict "$verdict" \
+            --argjson must_fix "$must_fix" \
+            --argjson should_fix "$should_fix" \
+            --argjson consider "$consider" \
+            '{
+              verdict: $verdict,
+              review_green: ($verdict == "APPROVED" and $must_fix == 0 and $should_fix == 0),
+              counts: {
+                must_fix: $must_fix,
+                should_fix: $should_fix,
+                consider: $consider
+              }
+            }' > claude-review-verdict.json
+
+          if [[ "$verdict" == "BLOCKED" || "$verdict" == "CHANGES_REQUESTED" || "$must_fix" -gt 0 || "$should_fix" -gt 0 ]]; then
+            echo "::error::Claude Code Review is not green: verdict=${verdict}, must_fix=${must_fix}, should_fix=${should_fix}"
+            exit 1
+          fi
+
+          if [[ "$verdict" != "APPROVED" ]]; then
+            echo "::error::Unexpected Claude Code Review verdict: ${verdict}"
+            exit 1
+          fi
+
+          echo "::notice::Claude Code Review green: consider=${consider}"
+
+      - name: Upload review verdict artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: claude-review-verdict
+          path: claude-review-verdict.json
+          if-no-files-found: ignore
