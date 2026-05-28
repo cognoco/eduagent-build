@@ -28,6 +28,20 @@ describe('InlineNoteCard', () => {
     expect(baseProps.onLongPress).toHaveBeenCalledWith('note-1');
   });
 
+  it('renders a visible kebab affordance that triggers the note menu (#5)', () => {
+    const onLongPress = jest.fn();
+    render(<InlineNoteCard {...baseProps} onLongPress={onLongPress} />);
+    // The visible "..." button works without long-press (web / touch-only).
+    const menuButton = screen.getByTestId('note-card-note-1-menu');
+    fireEvent.press(menuButton);
+    expect(onLongPress).toHaveBeenCalledWith('note-1');
+  });
+
+  it('does not render the kebab when no menu handler is provided', () => {
+    render(<InlineNoteCard {...baseProps} onLongPress={undefined} />);
+    expect(screen.queryByTestId('note-card-note-1-menu')).toBeNull();
+  });
+
   it('calls onSourcePress from the source line', () => {
     const onSourcePress = jest.fn();
     render(<InlineNoteCard {...baseProps} onSourcePress={onSourcePress} />);

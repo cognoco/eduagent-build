@@ -112,4 +112,43 @@ describe('BaseCoachingCard', () => {
     const primary = screen.getByTestId('card-primary');
     expect(primary.props.accessibilityRole).toBe('button');
   });
+
+  // [#12] Tapping a CTA inside a pressable card must NOT also fire the card's
+  // onPress. The fix stops event propagation in the CTA handler — assert both
+  // that the CTA fires AND that stopPropagation is invoked on the event (this
+  // is the load-bearing wiring; removing it reintroduces the web double-fire).
+  it('tapping the primary CTA stops propagation and does not fire card onPress', () => {
+    const onPress = jest.fn();
+    const stopPropagation = jest.fn();
+    render(
+      <BaseCoachingCard {...defaultProps} onPress={onPress} testID="card" />,
+    );
+
+    fireEvent.press(screen.getByTestId('card-primary'), { stopPropagation });
+
+    expect(defaultProps.onPrimary).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('tapping the secondary CTA stops propagation and does not fire card onPress', () => {
+    const onPress = jest.fn();
+    const onSecondary = jest.fn();
+    const stopPropagation = jest.fn();
+    render(
+      <BaseCoachingCard
+        {...defaultProps}
+        onPress={onPress}
+        secondaryLabel="Skip"
+        onSecondary={onSecondary}
+        testID="card"
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('card-secondary'), { stopPropagation });
+
+    expect(onSecondary).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
+  });
 });

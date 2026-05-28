@@ -11,6 +11,12 @@ interface InlineNoteCardProps {
   sourceLine: string;
   updatedAt: string;
   defaultExpanded?: boolean;
+  /**
+   * Open the note's edit/delete menu. Fires both on native long-press AND on
+   * the always-visible kebab affordance — the latter is required because
+   * long-press does not fire on a web click and touch-only users cannot
+   * long-press reliably (#5).
+   */
   onLongPress?: (noteId: string) => void;
   onSourcePress?: () => void;
   testID?: string;
@@ -101,6 +107,35 @@ export function InlineNoteCard({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />
+        {onLongPress ? (
+          <Pressable
+            onPress={(e) => {
+              // Stop the tap from also toggling the card's expand/collapse
+              // (the kebab sits inside the card Pressable). Opening the menu
+              // is the only intended effect.
+              e?.stopPropagation?.();
+              onLongPress(noteId);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Note options for ${topicTitle}`}
+            testID={`${cardTestID}-menu`}
+            hitSlop={8}
+            style={{
+              minWidth: 44,
+              minHeight: 44,
+              marginStart: 4,
+              marginEnd: -8,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons
+              name="ellipsis-horizontal"
+              size={18}
+              color={themeColors.textSecondary}
+            />
+          </Pressable>
+        ) : null}
       </View>
       <Text
         style={{ fontSize: 14, color: themeColors.textPrimary }}

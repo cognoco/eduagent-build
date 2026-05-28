@@ -649,6 +649,7 @@
       "title": "Algumas mensagens não puderam ser enviadas",
       "description": "Copie-as ou envie-as para o suporte para que seu progresso não seja perdido.",
       "copyMessage": "Copiar mensagem",
+      "copyError": "Não foi possível copiar para a área de transferência. Sua mensagem continua aqui — tente novamente.",
       "sendToSupport": "Enviar para o suporte"
     },
     "expired": {
@@ -1052,6 +1053,7 @@
     },
     "noteMenu": {
       "title": "Opções de nota",
+      "webEditPrompt": "Pressione OK para editar esta nota. Pressione Cancelar se preferir excluí-la.",
       "deleteTitle": "Excluir nota",
       "deleteMessage": "Tem certeza de que deseja excluir esta nota?"
     },

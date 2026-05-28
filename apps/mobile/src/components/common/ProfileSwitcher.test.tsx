@@ -195,6 +195,51 @@ describe('ProfileSwitcher', () => {
     expect(screen.queryByTestId('profile-switcher-menu')).toBeNull();
   });
 
+  it('opens the menu in a Modal and renders all options (#9)', () => {
+    render(
+      <ProfileSwitcher
+        profiles={profiles}
+        activeProfileId="p1"
+        onSwitch={onSwitch}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('profile-switcher-chip'));
+    // Menu (now hosted in a Modal/portal) and both options are reachable.
+    screen.getByTestId('profile-switcher-menu');
+    screen.getByTestId('profile-option-p1');
+    screen.getByTestId('profile-option-p2');
+  });
+
+  it('does not crash when a profile has a null displayName (#9)', () => {
+    const withNullName: Profile[] = [
+      profiles[0]!,
+      makeProfile({
+        id: 'p3',
+        // Simulate a partial/corrupt profile body — displayName missing.
+        displayName: null as unknown as string,
+        isOwner: false,
+      }),
+    ];
+
+    expect(() =>
+      render(
+        <ProfileSwitcher
+          profiles={withNullName}
+          // Active profile itself has the null name — exercises the chip
+          // initials path too.
+          activeProfileId="p3"
+          onSwitch={onSwitch}
+        />,
+      ),
+    ).not.toThrow();
+
+    // Falls back to '?' for initials rather than throwing.
+    screen.getByText('?');
+    fireEvent.press(screen.getByTestId('profile-switcher-chip'));
+    screen.getByTestId('profile-option-p3');
+  });
+
   it('shows role label for each profile', () => {
     render(
       <ProfileSwitcher

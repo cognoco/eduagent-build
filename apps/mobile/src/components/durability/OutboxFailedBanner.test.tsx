@@ -106,6 +106,30 @@ describe('OutboxFailedBanner', () => {
     });
   });
 
+  it('does NOT delete the entry and surfaces an error when the clipboard write rejects (#10)', async () => {
+    mockListPermanentlyFailed.mockResolvedValue([ENTRY]);
+    mockSetStringAsync.mockRejectedValue(new Error('clipboard blocked'));
+    mockDeletePermanentlyFailed.mockResolvedValue(undefined);
+
+    render(<OutboxFailedBanner profileId="p-1" flow="session" />);
+
+    await waitFor(() => {
+      screen.getByTestId('outbox-copy-e-1');
+    });
+
+    fireEvent.press(screen.getByTestId('outbox-copy-e-1'));
+
+    // Error surfaced...
+    await waitFor(() => {
+      screen.getByTestId('outbox-copy-error-e-1');
+    });
+
+    // ...and the only copy of the message was NOT destroyed.
+    expect(mockDeletePermanentlyFailed).not.toHaveBeenCalled();
+    // The entry text remains visible (no dead-end — user can retry).
+    screen.getByText('Hello world');
+  });
+
   it('renders escalate button when onEscalate prop is provided', async () => {
     mockListPermanentlyFailed.mockResolvedValue([ENTRY]);
 

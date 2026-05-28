@@ -4,6 +4,11 @@ import {
   makeProfile,
 } from '../test-utils/profile-factories';
 import {
+  computeVisibleTabs,
+  resolveContractHomeTabPresentation,
+  resolveHomeTabPresentation,
+} from './legacy-navigation-contract';
+import {
   isFamilyHubEligible,
   resolveNavigationContract,
   type NavigationContract,
@@ -777,6 +782,34 @@ describe('resolveNavigationContract route predicates', () => {
       { route: 'more/privacy', canEnter: false, isSurfaced: false },
     ]);
   });
+
+  it.each([
+    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: false },
+    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: false },
+    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
+  ])(
+    'never lets a proxy session enter or surface more/account or more/privacy (flags %o)',
+    (flags) => {
+      // PROXY_TABS omits `more`; a hidden tab whose routes are enterable is an
+      // inconsistency. The proxy `more/*` block must hold under every flag
+      // combo and regardless of guard ordering.
+      const contract = resolveNavigationContract(
+        makeContext({
+          activeProfile: familyAdult,
+          appContext: 'family',
+          flags,
+          isParentProxy: true,
+          profiles: [familyAdult, child],
+          subscription: { status: 'ready', tier: 'family' },
+        }),
+      );
+
+      expect(contract.canEnter('more/account')).toBe(false);
+      expect(contract.canEnter('more/privacy')).toBe(false);
+      expect(contract.isSurfaced('more/account')).toBe(false);
+      expect(contract.isSurfaced('more/privacy')).toBe(false);
+    },
+  );
 });
 
 describe('resolveNavigationContract curriculum route defaults', () => {
@@ -1021,6 +1054,76 @@ describe('V0 fallback - hard constraint (CLAUDE.md, spec section Hard Constraint
     expect(contract.shape).toBe('study');
     expect(contract.home.screen).toBe('FamilyHome');
     expect(contract.gates.showLearnThisToo).toBe(false);
+  });
+
+  it('keeps the contract LEGACY_GUARDIAN_TABS in sync with the legacy GUARDIAN_TABS shell', () => {
+    // Dual-source guard. The V0 5-tab shell has two independent definitions
+    // that currently agree but can silently diverge:
+    //   1. navigation-contract.ts `LEGACY_GUARDIAN_TABS` (surfaced as the
+    //      contract's `visibleTabs` on the V0-off family-capable path), and
+    //   2. legacy-navigation-contract.ts `GUARDIAN_TABS` (surfaced via
+    //      `computeVisibleTabs('guardian')` — the set the V0 shell actually
+    //      renders).
+    // This forward-only test fails CI if a future edit changes one without the
+    // other.
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: null,
+        flags: {
+          MODE_NAV_V0_ENABLED: false,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    const contractGuardianTabs = new Set(contract.visibleTabs);
+    const legacyGuardianShell = computeVisibleTabs('guardian');
+
+    expect(contractGuardianTabs).toEqual(legacyGuardianShell);
+  });
+
+  it('keeps the V0 home-label decision in sync between the contract and legacy presentation', () => {
+    // The V0 family guardian home tab is labelled from two sources:
+    //   1. the contract `home` block -> resolveContractHomeTabPresentation, and
+    //   2. legacy resolveHomeTabPresentation('guardian', false, 'family').
+    // Both must resolve to the same Family-hub label/icon. (The contract uses
+    // 'tabs.children'; legacy uses the same on its FamilyHome path.)
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        flags: {
+          MODE_NAV_V0_ENABLED: true,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    // V0-on family-capable owner in family mode -> FamilyHome.
+    expect(contract.home.screen).toBe('FamilyHome');
+
+    const contractPresentation = resolveContractHomeTabPresentation(
+      contract.home,
+    );
+    const legacyPresentation = resolveHomeTabPresentation(
+      'guardian',
+      false,
+      'family',
+    );
+
+    expect(contractPresentation.titleKey).toBe('tabs.children');
+    expect(legacyPresentation.titleKey).toBe('tabs.familyHub');
+    // Both decisions must surface the Family-hub home (not the generic/learner
+    // "My Learning" home). The exact i18n key differs by design (contract uses
+    // 'tabs.children', legacy uses 'tabs.familyHub'), but neither may regress
+    // to the learner label.
+    expect(contractPresentation.titleKey).not.toBe('tabs.myLearning');
+    expect(legacyPresentation.titleKey).not.toBe('tabs.myLearning');
   });
 });
 

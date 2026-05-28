@@ -624,6 +624,7 @@
       "title": "Einige Nachrichten konnten nicht gesendet werden",
       "description": "Kopiere sie oder sende sie an den Support, damit dein Fortschritt nicht verloren geht.",
       "copyMessage": "Nachricht kopieren",
+      "copyError": "Kopieren in die Zwischenablage fehlgeschlagen. Deine Nachricht ist noch da – bitte erneut versuchen.",
       "sendToSupport": "An Support senden"
     },
     "expired": {
@@ -1027,6 +1028,7 @@
     },
     "noteMenu": {
       "title": "Notizoptionen",
+      "webEditPrompt": "Drücke OK, um diese Notiz zu bearbeiten. Drücke Abbrechen, wenn du sie stattdessen löschen möchtest.",
       "deleteTitle": "Notiz löschen",
       "deleteMessage": "Bist du sicher, dass du diese Notiz löschen möchtest?"
     },

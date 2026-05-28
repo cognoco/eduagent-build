@@ -8,7 +8,7 @@
 // active learner's safety preamble.
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,7 +37,7 @@ export default function PronounsScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { activeProfile } = useProfile();
+  const { activeProfile, isLoading: isProfileLoading } = useProfile();
   const {
     subjectId,
     subjectName,
@@ -55,6 +55,12 @@ export default function PronounsScreen(): React.ReactElement {
   const totalSteps = Number(totalStepsParam) || 4;
   const stepLabels = getOnboardingStepLabels(t);
 
+  // The profile may still be resolving at mount (activeProfile undefined,
+  // birthYear null). We must NOT evaluate the age gate or render the form
+  // until the profile is loaded — otherwise a possibly-sub-13 learner would
+  // briefly see the pronouns field, which this screen must never do.
+  const profileResolved = !isProfileLoading && activeProfile != null;
+
   // Compute age from birthYear — the learner's age on Dec 31 of the current
   // year rather than the exact birthdate, which we don't store. This is
   // generous (may over-count by up to a year) but the alternative underprompts.
@@ -62,7 +68,10 @@ export default function PronounsScreen(): React.ReactElement {
     if (!activeProfile?.birthYear) return null;
     return new Date().getFullYear() - activeProfile.birthYear;
   }, [activeProfile?.birthYear]);
-  const ageGated = learnerAge !== null && learnerAge < PRONOUNS_PROMPT_MIN_AGE;
+  const ageGated =
+    profileResolved &&
+    learnerAge !== null &&
+    learnerAge < PRONOUNS_PROMPT_MIN_AGE;
 
   // Initialize from existing pronouns value so Settings-triggered edits
   // pre-populate. Preset match ignores case and whitespace.
@@ -78,12 +87,21 @@ export default function PronounsScreen(): React.ReactElement {
     initialChoice === OTHER_KEY ? (activeProfile?.pronouns ?? '') : '',
   );
   const [isForwarding, setIsForwarding] = useState(false);
+  // In-flight guard mirroring ExplainedRedirect's hasNavigatedRef: navigateForward
+  // can fire startFirstCurriculumSession.mutate (a server side-effect that creates
+  // the first curriculum session). The function identity changes whenever the
+  // mutation hook returns a new object, so the age-gate effect below can re-run
+  // and fire mutate a SECOND time → duplicate session creation. The ref ensures
+  // the forward path (and its mutate) runs at most once per mount.
+  const hasForwardedRef = useRef(false);
   const updatePronouns = useUpdatePronouns();
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
     subjectId ?? '',
   );
 
   const navigateForward = useCallback(() => {
+    if (hasForwardedRef.current) return;
+    hasForwardedRef.current = true;
     setIsForwarding(true);
     if (returnTo === 'settings') {
       goBackOrReplace(router, '/(app)/more' as Href);
@@ -164,6 +182,12 @@ export default function PronounsScreen(): React.ReactElement {
     );
   }, [effectivePronouns, updatePronouns, navigateForward, t]);
 
+  // Until the profile resolves we cannot know the learner's age, so we must
+  // not render the form — a possibly-sub-13 learner could otherwise see the
+  // pronouns field during the load window. Render a neutral holding view.
+  if (!profileResolved) {
+    return <View testID="pronouns-loading" className="flex-1 bg-background" />;
+  }
   // While age-gate redirect is in flight, render nothing (brief flicker) —
   // below-13 learners should never see the form even momentarily.
   if (ageGated) return <View className="flex-1 bg-background" />;

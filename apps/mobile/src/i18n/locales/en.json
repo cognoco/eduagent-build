@@ -624,6 +624,7 @@
       "title": "Some messages could not be sent",
       "description": "Copy them or send them to support so your progress isn't lost.",
       "copyMessage": "Copy message",
+      "copyError": "Couldn't copy to clipboard. Your message is still here — try again.",
       "sendToSupport": "Send to support"
     },
     "expired": {
@@ -1103,6 +1104,7 @@
     },
     "noteMenu": {
       "title": "Note options",
+      "webEditPrompt": "Press OK to edit this note. Press Cancel if you'd like to delete it instead.",
       "deleteTitle": "Delete note",
       "deleteMessage": "Are you sure you want to delete this note?"
     },
