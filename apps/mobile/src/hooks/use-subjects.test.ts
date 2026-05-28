@@ -100,6 +100,45 @@ describe('useSubjects', () => {
 
     expect(result.current.error).toBeInstanceOf(Error);
   });
+
+  it('refetchInterval tolerates a non-array payload without throwing [BUG-634 / M-2]', async () => {
+    // A malformed / error payload shaped `{ subjects: <non-array> }` must not
+    // crash the polling guard. Before the fix the guard only checked `!subjects`,
+    // so a truthy non-array reached `subjects.some(...)` and threw a TypeError.
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ subjects: 'not-an-array' }), {
+        status: 200,
+      }),
+    );
+
+    const { result } = renderHook(() => useSubjects(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const query = queryClient.getQueryCache().findAll()[0];
+    expect(query).toBeDefined();
+    expect(query!.state.data).toBe('not-an-array');
+
+    // query.options is typed as QueryOptions (internal), which does not expose
+    // observer-level options like refetchInterval. Cast through unknown to access
+    // the runtime-present refetchInterval function.
+    const refetchInterval = (
+      query!.options as unknown as {
+        refetchInterval: (q: typeof query) => number | false;
+      }
+    ).refetchInterval;
+    expect(typeof refetchInterval).toBe('function');
+
+    let interval: number | false | undefined;
+    expect(() => {
+      interval = refetchInterval(query!);
+    }).not.toThrow();
+    expect(interval).toBe(false);
+  });
 });
 
 describe('useCreateSubject', () => {

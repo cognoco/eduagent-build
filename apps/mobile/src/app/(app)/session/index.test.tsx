@@ -288,16 +288,15 @@ jest.mock(
 // of this file. Challenge-round request details are asserted via
 // fetchCallsMatching.
 
-// use-milestone-tracker is a pure-React state hook (no fetch, no native dep),
-// but it is KEPT mocked deliberately, not because the harness can't run it:
-// the "hydrates milestone tracker state from the recovery marker" test verifies
-// hydration via the mockHydrate spy, and the only visible surface for milestone
-// state (MilestoneDots) is stubbed out by the components/session ChatShell mock
-// — so running the real tracker would leave that test with no observable signal
-// and force a weaker assertion. The deterministic trackExchange result also
-// keeps every send-a-message test from incidentally firing celebration
-// overlays. This is a test-design boundary, NOT a gc1 "can't run" boundary; if
-// the ChatShell mock ever renders MilestoneDots, convert this to the real hook.
+// use-milestone-tracker: pattern-a targeted override (the canonical
+// jest.requireActual spread keeps celebrationForReason / getMilestoneLabel real;
+// only useMilestoneTracker is overridden). The override returns a deterministic
+// trackExchange result and a hydrate spy. Carries NO gc1-allow — this is the
+// sanctioned requireActual-override pattern, not a "can't run" boundary.
+// Deferred (out of scope for this harness wave, tracked): full conversion to the
+// real tracker. The real trackExchange evaluates every exchange and would fire
+// celebration overlays across the entire send-message suite, so converting needs
+// separate celebration-isolation work rather than a per-file edit here.
 const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
 const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
 const mockHydrate = jest.fn();
@@ -309,16 +308,13 @@ const mockMilestoneTracker = {
   hydrate: mockHydrate,
   reset: mockResetMilestones,
 };
-jest.mock(
-  '../../../hooks/use-milestone-tracker' /* gc1-allow: test-design boundary — hydrate asserted via spy; MilestoneDots stubbed by ChatShell mock so the real hook has no observable surface here */,
-  () => {
-    const actual = jest.requireActual('../../../hooks/use-milestone-tracker');
-    return {
-      ...actual,
-      useMilestoneTracker: () => mockMilestoneTracker,
-    };
-  },
-);
+jest.mock('../../../hooks/use-milestone-tracker', () => {
+  const actual = jest.requireActual('../../../hooks/use-milestone-tracker');
+  return {
+    ...actual,
+    useMilestoneTracker: () => mockMilestoneTracker,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // External / rendering mocks
