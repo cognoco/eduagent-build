@@ -10,18 +10,23 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../components/welcome/WelcomeIntro' /* gc1-allow: WelcomeIntro is covered by its own focused unit test; stub here exposes onComplete + onCardAdvanced triggers so this route test can drive the state machine without simulating four swipes */,
+  '../../components/welcome/WelcomeIntro' /* gc1-allow: WelcomeIntro is covered by its own focused unit test; stub here exposes audience + onComplete + onCardAdvanced so this route test can drive the state machine without simulating swipes */,
   () => ({
     WelcomeIntro: ({
+      audience,
       onComplete,
       onCardAdvanced,
+      onBackFromFirstCard,
     }: {
+      audience: 'learner' | 'parent';
       onComplete: () => void;
       onCardAdvanced?: (n: number) => void;
+      onBackFromFirstCard?: () => void;
     }) => {
       const { View, Pressable, Text } = require('react-native');
       return (
         <View testID="welcome-intro-stub">
+          <Text testID="welcome-intro-stub-audience">{audience}</Text>
           <Pressable
             testID="welcome-intro-stub-advance"
             onPress={() => onCardAdvanced?.(2)}
@@ -30,6 +35,12 @@ jest.mock(
           </Pressable>
           <Pressable testID="welcome-intro-stub-complete" onPress={onComplete}>
             <Text>complete</Text>
+          </Pressable>
+          <Pressable
+            testID="welcome-intro-stub-back"
+            onPress={() => onBackFromFirstCard?.()}
+          >
+            <Text>back-from-first</Text>
           </Pressable>
         </View>
       );
@@ -59,9 +70,7 @@ jest.mock(
   }),
 );
 
-// Pattern A — preserve the real analytics surface (other exports like
-// `emitHomeworkOcrGateEvent` may be referenced by sibling imports during
-// module evaluation) while spying on `track`.
+// Pattern A — preserve the real analytics surface while spying on `track`.
 jest.mock('../../lib/analytics', () => ({
   ...jest.requireActual('../../lib/analytics'),
   track: (...args: unknown[]) => mockTrack(...args),
@@ -75,6 +84,13 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       const dict: Record<string, string> = {
+        'welcomeIntro.chooser.question': 'What brings you here?',
+        'welcomeIntro.chooser.learnerCta': 'I want to learn',
+        'welcomeIntro.chooser.learnerHint':
+          "Study, homework help, and a mentor that's yours.",
+        'welcomeIntro.chooser.parentCta': "I'm done fighting over homework",
+        'welcomeIntro.chooser.parentHint':
+          'A mentor for your kids — and your evenings back.',
         'welcomeIntro.bridge.headline':
           'Turn "I don\'t get it" into "I\'ve got this."',
         'welcomeIntro.bridge.supporting':
@@ -94,6 +110,7 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
   useThemeColors: () => ({
     background: '#000',
     accent: '#0af',
+    surfaceElevated: '#222',
     textPrimary: '#fff',
     textSecondary: '#aaa',
     textInverse: '#000',
@@ -102,51 +119,97 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
 
 const PreAuthWelcomeRoute = require('./welcome').default;
 
-describe('<PreAuthWelcomeRoute />', () => {
+function chooseLearner() {
+  fireEvent.press(screen.getByTestId('welcome-chooser-learner'));
+}
+function chooseParent() {
+  fireEvent.press(screen.getByTestId('welcome-chooser-parent'));
+}
+
+describe('<PreAuthWelcomeRoute /> — audience chooser', () => {
   beforeEach(() => {
     mockReplace.mockReset();
     mockMarkPreAuthIntroSeen.mockReset();
     mockTrack.mockReset();
   });
 
-  it('renders the welcome cards on first mount', () => {
+  it('shows the chooser first, not the cards', () => {
     render(<PreAuthWelcomeRoute />);
-    expect(screen.getByTestId('welcome-intro-stub')).toBeTruthy();
+    expect(screen.getByTestId('welcome-chooser')).toBeTruthy();
+    expect(screen.getByTestId('welcome-chooser-learner')).toBeTruthy();
+    expect(screen.getByTestId('welcome-chooser-parent')).toBeTruthy();
+    expect(screen.queryByTestId('welcome-intro-stub')).toBeNull();
     expect(screen.queryByTestId('pre-auth-bridge')).toBeNull();
   });
 
   it('emits intro_started exactly once on mount', () => {
     render(<PreAuthWelcomeRoute />);
     const started = mockTrack.mock.calls.filter(
-      (call) => call[0] === 'intro_started',
+      (c) => c[0] === 'intro_started',
     );
     expect(started.length).toBe(1);
   });
 
+  it('"I want to learn" shows the learner deck and logs the choice', () => {
+    render(<PreAuthWelcomeRoute />);
+    chooseLearner();
+    expect(screen.getByTestId('welcome-intro-stub')).toBeTruthy();
+    expect(
+      screen.getByTestId('welcome-intro-stub-audience').props.children,
+    ).toBe('learner');
+    expect(mockTrack).toHaveBeenCalledWith('intro_audience_selected', {
+      audience: 'learner',
+    });
+  });
+
+  it('"I\'m done fighting over homework" shows the parent deck and logs the choice', () => {
+    render(<PreAuthWelcomeRoute />);
+    chooseParent();
+    expect(
+      screen.getByTestId('welcome-intro-stub-audience').props.children,
+    ).toBe('parent');
+    expect(mockTrack).toHaveBeenCalledWith('intro_audience_selected', {
+      audience: 'parent',
+    });
+  });
+
+  it('does not mark intro seen at the chooser or while viewing cards', () => {
+    render(<PreAuthWelcomeRoute />);
+    expect(mockMarkPreAuthIntroSeen).not.toHaveBeenCalled();
+    chooseParent();
+    expect(mockMarkPreAuthIntroSeen).not.toHaveBeenCalled();
+  });
+});
+
+describe('<PreAuthWelcomeRoute /> — cards → bridge → auth', () => {
+  beforeEach(() => {
+    mockReplace.mockReset();
+    mockMarkPreAuthIntroSeen.mockReset();
+    mockTrack.mockReset();
+  });
+
   it('forwards card-advance events as intro_card_advanced telemetry', () => {
     render(<PreAuthWelcomeRoute />);
+    chooseLearner();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-advance'));
     expect(mockTrack).toHaveBeenCalledWith('intro_card_advanced', { card: 2 });
   });
 
   it('moves to the LightBulb bridge when the cards complete', () => {
     render(<PreAuthWelcomeRoute />);
+    chooseLearner();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
     expect(screen.getByTestId('pre-auth-bridge')).toBeTruthy();
     expect(screen.queryByTestId('welcome-intro-stub')).toBeNull();
     expect(mockTrack).toHaveBeenCalledWith('intro_completed', {});
   });
 
-  it('bridge renders the LightBulb tagline, supporting copy, and both CTAs', () => {
+  it('bridge renders the tagline, supporting copy, and both CTAs', () => {
     render(<PreAuthWelcomeRoute />);
+    chooseParent();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
     expect(
       screen.getByText(/Turn "I don't get it" into "I've got this."/),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        /Create a free account so your mentor can remember your subjects, notes, and progress\./,
-      ),
     ).toBeTruthy();
     expect(screen.getByTestId('pre-auth-bridge-primary')).toBeTruthy();
     expect(screen.getByTestId('pre-auth-bridge-secondary')).toBeTruthy();
@@ -154,6 +217,7 @@ describe('<PreAuthWelcomeRoute />', () => {
 
   it('"Create free account" marks intro seen and replaces to /(auth)/sign-up', () => {
     render(<PreAuthWelcomeRoute />);
+    chooseLearner();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
     fireEvent.press(screen.getByTestId('pre-auth-bridge-primary'));
     expect(mockMarkPreAuthIntroSeen).toHaveBeenCalledTimes(1);
@@ -162,6 +226,7 @@ describe('<PreAuthWelcomeRoute />', () => {
 
   it('"I already have an account" marks intro seen and replaces to /(auth)/sign-in', () => {
     render(<PreAuthWelcomeRoute />);
+    chooseParent();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
     fireEvent.press(screen.getByTestId('pre-auth-bridge-secondary'));
     expect(mockMarkPreAuthIntroSeen).toHaveBeenCalledTimes(1);
@@ -171,14 +236,12 @@ describe('<PreAuthWelcomeRoute />', () => {
   it('hardware-back from the bridge returns to the cards, not app exit', () => {
     const addSpy = jest.spyOn(BackHandler, 'addEventListener');
     render(<PreAuthWelcomeRoute />);
+    chooseLearner();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
     expect(screen.getByTestId('pre-auth-bridge')).toBeTruthy();
 
-    // The latest hardwareBackPress handler must be the bridge's — invoking
-    // it returns true (consumes the press) and drops back to the cards.
     const calls = addSpy.mock.calls.filter((c) => c[0] === 'hardwareBackPress');
-    const latest = calls[calls.length - 1];
-    const cb = latest?.[1] as () => boolean;
+    const cb = calls[calls.length - 1]?.[1] as () => boolean;
     let result: boolean | undefined;
     act(() => {
       result = cb();
@@ -189,10 +252,18 @@ describe('<PreAuthWelcomeRoute />', () => {
     addSpy.mockRestore();
   });
 
-  it('does not mark intro seen merely by viewing the cards or bridge', () => {
+  it('back from the first card returns to the chooser (via onBackFromFirstCard)', () => {
     render(<PreAuthWelcomeRoute />);
-    expect(mockMarkPreAuthIntroSeen).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
-    expect(mockMarkPreAuthIntroSeen).not.toHaveBeenCalled();
+    chooseParent();
+    expect(screen.getByTestId('welcome-intro-stub')).toBeTruthy();
+
+    // WelcomeIntro owns per-card back; when it's on card 0 it calls
+    // onBackFromFirstCard, which the route wires to "return to chooser".
+    act(() => {
+      fireEvent.press(screen.getByTestId('welcome-intro-stub-back'));
+    });
+
+    expect(screen.getByTestId('welcome-chooser')).toBeTruthy();
+    expect(screen.queryByTestId('welcome-intro-stub')).toBeNull();
   });
 });

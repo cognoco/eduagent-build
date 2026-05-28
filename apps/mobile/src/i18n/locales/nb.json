@@ -2997,55 +2997,92 @@
     "updateButton": "Oppdater passord"
   },
   "welcomeIntro": {
-    "card1": {
-      "headline": "En mentor du kan snakke med",
-      "supporting": "Spør når du står fast, forklar hva du ikke forstår, og få hjelp som tilpasser seg måten du lærer på."
+    "chooser": {
+      "question": "Hva fører deg hit?",
+      "learnerCta": "Jeg vil lære",
+      "learnerHint": "Fag, leksehjelp og en mentor som er din.",
+      "parentCta": "Jeg er lei av leksekrangler",
+      "parentHint": "En mentor for barna dine — og kveldene dine tilbake."
     },
-    "card2": {
-      "headline": "All læring på ett sted",
-      "supporting": "Studer så mange fag du vil, få hjelp med oppgaver, lagre notater og bokmerk det som betyr noe."
-    },
-    "card3": {
-      "headline": "Tar opp tråden der du slapp",
-      "supporting": "Mentoren din husker fremgangen din, tilpasser seg tempoet ditt og hjelper både med korte økter og jevne rutiner."
-    },
-    "card4": {
-      "headline": "Bygd for ekte læring",
-      "supporting": "Tydelige forklaringer, veiledende spørsmål og øvelser som setter seg hjelper deg å tenke, øve og huske."
-    },
-    "scene": {
+    "learner": {
       "card1": {
-        "learner": "Jeg skjønner ikke dette ennå.",
-        "mentor": "La oss ta det rolig. Hvilken del føles forvirrende?"
+        "headline": "En mentor du kan snakke med",
+        "supporting": "Spør når du står fast, forklar hva du ikke forstår, og få hjelp som tilpasser seg måten du lærer på."
       },
       "card2": {
-        "subjects": {
-          "math": "Matte",
-          "history": "Historie",
-          "spanish": "Spansk"
-        },
-        "chips": {
-          "notes": "Notater",
-          "bookmarks": "Bokmerker",
-          "quiz": "Quiz"
-        }
+        "headline": "Husker deg og tar opp tråden der du slapp",
+        "supporting": "Fagene, notatene og tempoet ditt er samlet på ett sted, og mentoren tilpasser seg hver gang du kommer tilbake."
       },
       "card3": {
-        "rows": {
-          "lastTime": "Forrige gang",
-          "lastTimeBody": "Du fullførte Celler og DNA-grunnlag",
-          "next": "Neste",
-          "nextBody": "Fortsett med fotosyntese når du er klar",
-          "pace": "Tempo",
-          "paceBody": "Korte økter fungerer bra for deg"
+        "headline": "Bygd for ekte læring",
+        "supporting": "Tydelige forklaringer, veiledende spørsmål og øvelser som setter seg hjelper deg å tenke, øve og huske."
+      }
+    },
+    "parent": {
+      "card1": {
+        "headline": "En personlig mentor for barnet ditt",
+        "supporting": "Underviser i deres eget tempo og hjelper med lekser ved å lære bort metoden og sjekke arbeidet — uten å bare gi bort svar de kan kopiere."
+      },
+      "card2": {
+        "headline": "Følg med, og bidra når det trengs",
+        "supporting": "Se fremgangen til barnet ditt og bli involvert akkurat når de trenger deg — ikke et øyeblikk før."
+      },
+      "card3": {
+        "headline": "Slutt på leksekrangler",
+        "supporting": "Ta tilbake kveldene dine og gjør dem til kvalitetstid i stedet for daglige krangler."
+      }
+    },
+    "scene": {
+      "learner": {
+        "card1": {
+          "learner": "Jeg skjønner ikke dette ennå.",
+          "mentor": "La oss ta det rolig. Hvilken del føles forvirrende?"
+        },
+        "card2": {
+          "subjects": {
+            "math": "Matte",
+            "history": "Historie",
+            "spanish": "Spansk"
+          },
+          "resume": {
+            "label": "Forrige gang",
+            "body": "Du fullførte Celler og DNA-grunnlag"
+          }
+        },
+        "card3": {
+          "chips": {
+            "explain": "Tydelig forklaring",
+            "think": "Tenk det gjennom",
+            "practice": "Øv i sammenheng",
+            "remember": "Husk det senere"
+          }
         }
       },
-      "card4": {
-        "chips": {
-          "explain": "Tydelig forklaring",
-          "think": "Tenk det gjennom",
-          "practice": "Øv i sammenheng",
-          "remember": "Husk det senere"
+      "parent": {
+        "card1": {
+          "child": "Jeg står fast på oppgave 3.",
+          "mentor": "La oss starte med det du har prøvd. Vis meg steg én."
+        },
+        "card2": {
+          "thisWeek": {
+            "label": "Denne uken",
+            "body": "4 økter, 2 fag"
+          },
+          "strong": {
+            "label": "Går bra",
+            "body": "Brøk begynner å sitte"
+          },
+          "review": {
+            "label": "Trenger deg",
+            "body": "Lang divisjon — stoppet to ganger"
+          }
+        },
+        "card3": {
+          "chips": {
+            "evenings": "Roligere kvelder",
+            "nagging": "Mindre mas",
+            "quality": "Kvalitetstid"
+          }
         }
       }
     },
