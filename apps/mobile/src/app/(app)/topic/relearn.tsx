@@ -173,6 +173,7 @@ export default function RelearnScreen() {
   const [isReady, setIsReady] = useState(directEntry);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const cancelledRef = useRef(false);
+  const startGenerationRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [lastMethodId, setLastMethodId] = useState<string | null>(null);
 
@@ -289,6 +290,8 @@ export default function RelearnScreen() {
 
       setError(null);
       cancelledRef.current = false;
+      startGenerationRef.current += 1;
+      const startGeneration = startGenerationRef.current;
       setLastMethodId(methodId);
       setIsSubmitting(true);
 
@@ -303,7 +306,10 @@ export default function RelearnScreen() {
 
       startRelearn.mutate(input, {
         onSuccess: (result) => {
-          if (cancelledRef.current) {
+          if (
+            cancelledRef.current ||
+            startGeneration !== startGenerationRef.current
+          ) {
             return;
           }
           router.push({
@@ -326,12 +332,18 @@ export default function RelearnScreen() {
           } as Href);
         },
         onError: (err: unknown) => {
-          if (cancelledRef.current) {
+          if (
+            cancelledRef.current ||
+            startGeneration !== startGenerationRef.current
+          ) {
             return;
           }
           setError(formatApiError(err));
         },
         onSettled: () => {
+          if (startGeneration !== startGenerationRef.current) {
+            return;
+          }
           setIsSubmitting(false);
         },
       });
@@ -515,6 +527,7 @@ export default function RelearnScreen() {
           <Pressable
             onPress={() => {
               cancelledRef.current = true;
+              startGenerationRef.current += 1;
               setIsSubmitting(false);
               setError(null);
             }}

@@ -549,6 +549,114 @@ describe('RelearnScreen', () => {
     });
   });
 
+  it('ignores a canceled relearn start that resolves after a new start begins', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
+    };
+    const capturedOnSuccesses: Array<
+      | ((result: { sessionId: string; recap: string | null }) => void)
+      | undefined
+    > = [];
+    mockMutate.mockImplementation(
+      (
+        input: unknown,
+        callbacks?: {
+          onSuccess?: (result: {
+            sessionId: string;
+            recap: string | null;
+          }) => void;
+        },
+      ) => {
+        capturedOnSuccesses.push(callbacks?.onSuccess);
+      },
+    );
+
+    render(<RelearnScreen />);
+
+    fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
+    await waitFor(() => {
+      screen.getByTestId('relearn-loading');
+      screen.getByTestId('relearn-cancel');
+    });
+
+    fireEvent.press(screen.getByTestId('relearn-cancel'));
+    screen.getByTestId('relearn-method-phase');
+
+    fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledTimes(2);
+    });
+
+    act(() => {
+      capturedOnSuccesses[0]?.({ sessionId: 'stale-sess', recap: null });
+    });
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/session' }),
+    );
+
+    act(() => {
+      capturedOnSuccesses[1]?.({ sessionId: 'sess-2', recap: null });
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        sessionId: 'sess-2',
+        subjectId: 'sub-1',
+        subjectName: 'Math',
+        topicId: 'topic-1',
+        topicName: 'Algebra',
+        mode: 'relearn',
+      },
+    });
+  });
+
+  it('keeps showing the new start loading state when a canceled start settles later', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
+    };
+    const capturedOnSettleds: Array<(() => void) | undefined> = [];
+    mockMutate.mockImplementation(
+      (
+        input: unknown,
+        callbacks?: {
+          onSettled?: () => void;
+        },
+      ) => {
+        capturedOnSettleds.push(callbacks?.onSettled);
+      },
+    );
+
+    render(<RelearnScreen />);
+
+    fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
+    await waitFor(() => {
+      screen.getByTestId('relearn-loading');
+      screen.getByTestId('relearn-cancel');
+    });
+
+    fireEvent.press(screen.getByTestId('relearn-cancel'));
+    screen.getByTestId('relearn-method-phase');
+
+    fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledTimes(2);
+    });
+
+    act(() => {
+      capturedOnSettleds[0]?.();
+    });
+
+    screen.getByTestId('relearn-loading');
+    screen.getByTestId('relearn-cancel');
+  });
+
   it('redirects in parent proxy mode', () => {
     mockIsParentProxy = true;
 
