@@ -238,8 +238,12 @@ function useLearnerCards(
 ): ReadonlyArray<CardSpec> {
   return React.useMemo(() => {
     // Narrow the t signature locally to avoid TS2589 (excessively deep i18n
-    // type instantiation) when building the CardSpec array. The keys are all
-    // valid — they are validated by the typed t() at the call site above.
+    // type instantiation): the expanded welcomeIntro key union overflows the
+    // type-checker here. Trade-off: this cast drops compile-time key-existence
+    // checking inside the deck, so a typo'd key would render the raw string at
+    // runtime. That risk is covered by (a) scripts/check-i18n-staleness.ts in
+    // pre-push/CI and (b) the copy-assertion unit tests in WelcomeIntro.test.tsx
+    // — NOT by the type system. Keep both guards green.
     const tr = t as unknown as (key: string) => string;
     return [
       {
