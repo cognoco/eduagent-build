@@ -15,10 +15,27 @@ const deployYaml = readFileSync(
   'utf8',
 );
 
-const PROTECTED_ROUTES = ['/v1/auth/me', '/v1/sessions'] as const;
-type ProtectedRoute = (typeof PROTECTED_ROUTES)[number];
+const ROUTE_PROBES = [
+  {
+    route: '/v1/consent-page',
+    acceptedStatuses: ['400'],
+    rejectedStatuses: ['000', '200', '401', '403', '404', '500', '502', '503'],
+  },
+  {
+    route: '/v1/sessions/resume-nudge',
+    acceptedStatuses: ['401'],
+    rejectedStatuses: ['000', '200', '400', '403', '404', '500', '502', '503'],
+  },
+] as const;
+type RouteProbe = (typeof ROUTE_PROBES)[number];
+type SmokeRoute = RouteProbe['route'];
 
-function extractRunScriptForRoute(route: ProtectedRoute): string {
+test('does not use nonexistent or bare auth-short-circuited paths as mounted-route smoke probes', () => {
+  expect(deployYaml).not.toContain('/v1/auth/me');
+  expect(deployYaml).not.toContain('${STAGING_API_URL}/v1/sessions"');
+});
+
+function extractRunScriptForRoute(route: SmokeRoute): string {
   const lines = deployYaml.split('\n');
   const routeLineIdx = lines.findIndex((line) => line.includes(route));
   if (routeLineIdx < 0) {
@@ -96,9 +113,9 @@ function runSmokeScript(
   }
 }
 
-describe.each(PROTECTED_ROUTES)(
-  'deploy.yml staging protected-route smoke for %s',
-  (route) => {
+describe.each(ROUTE_PROBES)(
+  'deploy.yml staging route smoke for $route',
+  ({ route, acceptedStatuses, rejectedStatuses }) => {
     const script = extractRunScriptForRoute(route);
 
     test('executes the expected route probe', () => {
@@ -107,8 +124,8 @@ describe.each(PROTECTED_ROUTES)(
       expect(script).toContain('HTTP_CODE');
     });
 
-    test.each(['401', '403'])(
-      'accepts mounted protected route status %s',
+    test.each([...acceptedStatuses])(
+      'accepts expected route status %s',
       (httpCode) => {
         const result = runSmokeScript(script, httpCode);
         expect(result).toEqual({
@@ -118,7 +135,7 @@ describe.each(PROTECTED_ROUTES)(
       },
     );
 
-    test.each(['200', '000', '404', '500', '502', '503', '504'])(
+    test.each([...rejectedStatuses, '504'])(
       'rejects unexpected status %s',
       (httpCode) => {
         const result = runSmokeScript(script, httpCode);
