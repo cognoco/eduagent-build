@@ -17,6 +17,12 @@ const V0_RESOLVER_ALLOWED_FILES = new Set([
   'apps/mobile/src/lib/app-context.tsx',
   'apps/mobile/src/lib/legacy-navigation-contract.ts',
   'apps/mobile/src/lib/navigation-contract.ts',
+  // Dual-source equivalence guard: asserts the contract's V0 outputs
+  // (LEGACY_GUARDIAN_TABS / FamilyHome) stay in sync with the legacy V0 shell
+  // resolvers. It must import those resolvers to compare both sources. This is
+  // migration-safety tooling — the same intent as this ratchet — and is
+  // deleted alongside the resolvers when V0 is retired.
+  'apps/mobile/src/lib/navigation-contract.test.ts',
 ]);
 
 const DIAGNOSTIC_ALLOWED_FILES = new Set([

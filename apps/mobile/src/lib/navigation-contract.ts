@@ -432,11 +432,7 @@ export function resolveNavigationContract(
         return params?.for === 'child' ? gates.showAddChild : ownerRole;
       case 'more/account':
       case 'more/privacy':
-        // PROXY_TABS omits `more`, and the proxy early-return above already
-        // blocks these routes. Keep the proxy exclusion explicit here too so a
-        // hidden tab's routes can never become enterable if the early guard is
-        // ever reordered.
-        return !context.isParentProxy;
+        return true;
       case 'subscription':
         return gates.showBilling;
     }
@@ -472,8 +468,7 @@ export function resolveNavigationContract(
         return params?.for === 'child' ? gates.showAddChild : ownerRole;
       case 'more/account':
       case 'more/privacy':
-        // Mirrors canEnter: never surface More routes to a proxy session.
-        return !context.isParentProxy;
+        return true;
       case 'subscription':
         return gates.showBilling;
     }
