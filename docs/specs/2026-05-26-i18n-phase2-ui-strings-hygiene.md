@@ -208,7 +208,7 @@ Adding a language requires:
   add `LANGUAGE_LABELS` entry, add to `resources` in `i18n/index.ts`, run
   `pnpm translate`, ensure `scripts/check-i18n-staleness.ts` passes.
 - **Conversation-only locale:** add to `conversationLanguageSchema`, add to
-  `CONVERSATION_LANGUAGE_NAMES` in `apps/api/src/services/llm/router.ts:151`,
+  `CONVERSATION_LANGUAGE_NAMES` in `apps/api/src/services/llm/router.ts:191`,
   add a new migration extending the DB CHECK constraint.
 - **Both:** combination of the two.
 
