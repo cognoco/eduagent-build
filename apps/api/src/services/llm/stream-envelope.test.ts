@@ -1,3 +1,4 @@
+import { parseEnvelope } from './envelope';
 import { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';
 
 async function collect(source: AsyncIterable<string>): Promise<string> {
@@ -24,6 +25,30 @@ async function drain(stream: AsyncIterable<string>): Promise<string> {
     result += chunk;
   }
   return result;
+}
+
+async function expectStreamedReplyToMatchParsedEnvelope(
+  raw: string,
+  chunkSize: number,
+  expectedReply: string,
+): Promise<void> {
+  const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
+    chunked(raw, chunkSize),
+  );
+
+  const streamedReply = await drain(cleanReplyStream);
+  const rawResponse = await rawResponsePromise;
+  const parsed = parseEnvelope(rawResponse, 'exchange.session');
+
+  expect(rawResponse).toBe(raw);
+  expect(parsed.ok).toBe(true);
+  if (!parsed.ok) {
+    throw new Error(`parseEnvelope failed: ${parsed.reason}`);
+  }
+
+  expect(streamedReply).toBe(expectedReply);
+  expect(parsed.envelope.reply).toBe(expectedReply);
+  expect(streamedReply).toBe(parsed.envelope.reply);
 }
 
 describe('streamEnvelopeReply', () => {
@@ -263,6 +288,87 @@ describe('streamEnvelopeReply', () => {
 });
 
 describe('teeEnvelopeStream', () => {
+  it.each([
+    {
+      name: 'strips embedded signals/ui_hints copied inside reply',
+      raw: JSON.stringify({
+        reply:
+          'Who did the actual farming?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true},"ui_hints":{"note_prompt":{"show":false,"post_session":false}}}',
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: true,
+        },
+        ui_hints: { note_prompt: { show: false, post_session: false } },
+      }),
+      chunkSize: 11,
+      expectedReply: 'Who did the actual farming?',
+    },
+    {
+      name: 'strips embedded private_sources/confidence copied inside reply',
+      raw: JSON.stringify({
+        reply:
+          'Use the roads example.","private_sources":{"relied_on":["current_topic"],"insufficient":false},"confidence":"high"}',
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: true,
+        },
+        private_sources: {
+          relied_on: ['current_topic'],
+          insufficient: false,
+        },
+        confidence: 'high',
+      }),
+      chunkSize: 7,
+      expectedReply: 'Use the roads example.',
+    },
+    {
+      name: 'keeps an unconfirmed side-channel lookalike in legitimate prose',
+      raw: JSON.stringify({
+        reply:
+          'When you see ","signals": in a JSON example, it marks metadata, but this sentence is visible.',
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: true,
+        },
+        confidence: 'medium',
+      }),
+      chunkSize: 9,
+      expectedReply:
+        'When you see ","signals": in a JSON example, it marks metadata, but this sentence is visible.',
+    },
+    {
+      name: 'leaves a normal well-formed envelope unchanged',
+      raw: JSON.stringify({
+        reply: 'Nice work. Now compare the two examples.',
+        signals: {
+          partial_progress: true,
+          needs_deepening: false,
+          understanding_check: true,
+        },
+        ui_hints: { note_prompt: { show: false, post_session: false } },
+        private_sources: {
+          relied_on: ['current_topic'],
+          insufficient: false,
+        },
+        confidence: 'high',
+      }),
+      chunkSize: 13,
+      expectedReply: 'Nice work. Now compare the two examples.',
+    },
+  ])(
+    'keeps streamed reply equal to parsed envelope reply: $name',
+    async ({ raw, chunkSize, expectedReply }) => {
+      await expectStreamedReplyToMatchParsedEnvelope(
+        raw,
+        chunkSize,
+        expectedReply,
+      );
+    },
+  );
+
   it('happy path: cleanReplyStream yields reply text, rawResponsePromise resolves with full raw', async () => {
     const raw = '{"reply":"Hello world","signals":{}}';
     const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
