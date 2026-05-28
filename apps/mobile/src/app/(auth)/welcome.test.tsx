@@ -71,13 +71,13 @@ jest.mock(
   }),
 );
 
-// Pattern A — preserve the real carrier surface while spying on the write.
+// Pattern A - preserve the real carrier surface while spying on the write.
 jest.mock('../../lib/pre-auth-audience', () => ({
   ...jest.requireActual('../../lib/pre-auth-audience'),
   markPreAuthAudienceSync: (...args: unknown[]) => mockMarkAudience(...args),
 }));
 
-// Pattern A — preserve the real analytics surface while spying on `track`.
+// Pattern A - preserve the real analytics surface while spying on `track`.
 jest.mock('../../lib/analytics', () => ({
   ...jest.requireActual('../../lib/analytics'),
   track: (...args: unknown[]) => mockTrack(...args),
@@ -97,7 +97,7 @@ jest.mock('react-i18next', () => ({
           "Study, homework help, and a mentor that's yours.",
         'welcomeIntro.chooser.parentCta': "I'm done fighting over homework",
         'welcomeIntro.chooser.parentHint':
-          'A mentor for your kids — and your evenings back.',
+          'A mentor for your kids - and your evenings back.',
         'welcomeIntro.bridge.headline':
           'Turn "I don\'t get it" into "I\'ve got this."',
         'welcomeIntro.bridge.supporting':
@@ -133,7 +133,7 @@ function chooseParent() {
   fireEvent.press(screen.getByTestId('welcome-chooser-parent'));
 }
 
-describe('<PreAuthWelcomeRoute /> — audience chooser', () => {
+describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
   beforeEach(() => {
     mockReplace.mockReset();
     mockMarkPreAuthIntroSeen.mockReset();
@@ -206,7 +206,7 @@ describe('<PreAuthWelcomeRoute /> — audience chooser', () => {
   });
 });
 
-describe('<PreAuthWelcomeRoute /> — cards → bridge → auth', () => {
+describe('<PreAuthWelcomeRoute /> - cards -> bridge -> auth', () => {
   beforeEach(() => {
     mockReplace.mockReset();
     mockMarkPreAuthIntroSeen.mockReset();
@@ -283,8 +283,6 @@ describe('<PreAuthWelcomeRoute /> — cards → bridge → auth', () => {
     chooseParent();
     expect(screen.getByTestId('welcome-intro-stub')).toBeTruthy();
 
-    // WelcomeIntro owns per-card back; when it's on card 0 it calls
-    // onBackFromFirstCard, which the route wires to "return to chooser".
     act(() => {
       fireEvent.press(screen.getByTestId('welcome-intro-stub-back'));
     });

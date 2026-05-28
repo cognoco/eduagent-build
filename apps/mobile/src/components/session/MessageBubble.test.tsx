@@ -13,9 +13,28 @@
 import { render } from '@testing-library/react-native';
 import { MessageBubble } from './MessageBubble';
 
-// react-native-markdown-display renders <Text> children verbatim in our
-// test environment, so plain queryByText assertions work against the
-// markdown body. No additional setup required.
+// react-native-markdown-display is a third-party native renderer. We mock it
+// with a verbatim <Text> passthrough so plain queryByText assertions still
+// work against the markdown body, AND so we can spy on the props ThemedMarkdown
+// forwards — specifically `mergeStyle: false`, the invisible-text fix that must
+// reach the renderer for AI messages. See docs/llm-issues.md.
+const mockMarkdownDisplay = jest.fn();
+
+jest.mock(
+  'react-native-markdown-display' /* gc1-allow: third-party native renderer, cannot run in jsdom */,
+  () => {
+    const React = require('react');
+    const { Text } = require('react-native');
+    return (props: { children: string }) => {
+      mockMarkdownDisplay(props);
+      return React.createElement(Text, null, props.children);
+    };
+  },
+);
+
+beforeEach(() => {
+  mockMarkdownDisplay.mockClear();
+});
 
 describe('MessageBubble — envelope leak regression [BUG-941]', () => {
   it('renders only the .reply field when AI content is a full envelope JSON', () => {
@@ -40,6 +59,30 @@ describe('MessageBubble — envelope leak regression [BUG-941]', () => {
     expect(queryByText(/"partial_progress":/)).toBeNull();
     expect(queryByText(/"ui_hints":/)).toBeNull();
     expect(queryByText(/"fluency_drill":/)).toBeNull();
+  });
+
+  it('forwards mergeStyle=false to the markdown renderer for AI messages (invisible-text regression guard)', () => {
+    // The invisible-text fix lives in ThemedMarkdown, which passes
+    // mergeStyle={false} so its custom className-coloured prose rules own the
+    // text colour. This guards that AI bubbles render through ThemedMarkdown
+    // with that prop intact — if someone swaps ThemedMarkdown for a raw
+    // <Markdown> or drops mergeStyle, this fails.
+    render(<MessageBubble sender="assistant" content="Hola means hello." />);
+
+    expect(mockMarkdownDisplay).toHaveBeenCalledWith(
+      expect.objectContaining({
+        children: 'Hola means hello.',
+        mergeStyle: false,
+      }),
+    );
+  });
+
+  it('does not route user messages through the markdown renderer', () => {
+    // User content renders via plain <Text>, never ThemedMarkdown, so the
+    // markdown renderer must not be invoked at all.
+    render(<MessageBubble sender="user" content="My answer" />);
+
+    expect(mockMarkdownDisplay).not.toHaveBeenCalled();
   });
 
   it('renders plain prose AI content unchanged', () => {

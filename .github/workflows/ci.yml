@@ -136,6 +136,11 @@ jobs:
       - name: i18n orphan-key check
         run: pnpm exec tsx scripts/check-i18n-orphan-keys.ts
 
+      # Liveness guard for scripts/i18n-keep.ts: every KEEP_PATTERNS reason
+      # must cite a real file:line so stale allow-list entries are caught.
+      - name: i18n keep-list rot check
+        run: pnpm exec tsx scripts/check-i18n-keep-rot.ts
+
       # Fail fast on stale translation files — Husky only runs check:i18n when
       # en.json is staged in the same commit, so a PR that touches en.json
       # across multiple commits (or omits it from staging) can let locale

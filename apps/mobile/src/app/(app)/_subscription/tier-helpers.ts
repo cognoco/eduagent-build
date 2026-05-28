@@ -33,7 +33,9 @@ export function getTierFeatureLabel(
   index: number,
   t: Translate,
 ): string {
-  return t(`subscriptionScreen.tierFeatures.${tier}.${index}` as TranslateKey);
+  // tier + index are both runtime-selected; the resulting
+  // {prefix:'subscriptionScreen.tierFeatures.'} marker keeps the whole subtree.
+  return t(`subscriptionScreen.tierFeatures.${tier}.${index}` as TranslateKey); // i18n-allow-multi-var: runtime tier+index
 }
 
 export function childCountBucket(count: number): '0' | '1' | '2-3' | '4+' {

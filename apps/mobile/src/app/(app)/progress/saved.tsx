@@ -10,8 +10,8 @@ import { useTranslation } from 'react-i18next';
 import type { Translate } from '../../../i18n';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Markdown from 'react-native-markdown-display';
 import type { Bookmark } from '@eduagent/schemas';
+import { ThemedMarkdown } from '../../../components/common';
 import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -85,7 +85,7 @@ function BookmarkRow({
 
       <View className="mt-3">
         {expanded ? (
-          <Markdown>{bookmark.content}</Markdown>
+          <ThemedMarkdown>{bookmark.content}</ThemedMarkdown>
         ) : (
           <Text className="text-body text-text-primary" numberOfLines={5}>
             {bookmark.content}

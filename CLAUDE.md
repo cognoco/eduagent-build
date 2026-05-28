@@ -88,6 +88,75 @@ Key rules:
 - `computeAgeBracket()` (from `@eduagent/schemas`) is the canonical age-bracket function — use it for theming and age-appropriate copy, never for feature gating. The removed `personaFromBirthYear()` (and related fossils `isLearner`, local `Persona` type) must not be re-introduced — enforced by `persona-fossil-guard.test.ts`.
 - A solo owner and a child on a parent's account see the **same tabs** — they differ only in what's inside More/Progress.
 
+## Languages
+
+Two language enums exist, and they intentionally diverge:
+
+| Concept | Enum | Where | Count |
+|---|---|---|---|
+| UI shell language | `SUPPORTED_LANGUAGES` | `apps/mobile/src/i18n/index.ts:23` | 7: en, de, es, ja, nb, pl, pt |
+| LLM tutor-prose language | `conversationLanguageSchema` | `packages/schemas/src/profiles.ts:10` | 10: en, cs, es, fr, de, it, pt, pl, ja, nb |
+
+The conversation set is intentionally a **superset**. Czech, French, and Italian
+learners can pick those as their tutor-prose language during onboarding and
+get LLM cards in their language; the UI shell falls back to English because we
+haven't committed to maintaining UI translations for those locales yet.
+
+`useMentorLanguageSync` (`apps/mobile/src/hooks/use-mentor-language-sync.ts:10`)
+clamps `i18next.language` through `conversationLanguageSchema.safeParse` before
+patching the profile, so a UI-language change can never write an invalid value
+to `profiles.conversation_language`. The DB CHECK constraint
+(`profiles_conversation_language_check`, migration 0087) is the hard floor.
+
+Adding a language requires:
+
+- **UI-only locale (already in conversation set):** add to `SUPPORTED_LANGUAGES`,
+  add `LANGUAGE_LABELS` entry, add to `resources` in `i18n/index.ts`, run
+  `pnpm translate`, ensure `scripts/check-i18n-staleness.ts` passes.
+- **Conversation-only locale:** add to `conversationLanguageSchema`, add to
+  `CONVERSATION_LANGUAGE_NAMES` in `apps/api/src/services/llm/router.ts:191`,
+  add a new migration extending the DB CHECK constraint.
+- **Both:** combination of the two.
+
+### UI strings hygiene
+
+`scripts/check-i18n-orphan-keys.ts` is a `ts-morph` AST walker (it replaced the
+old regex scanner). It is the single source of truth for i18n key health:
+
+- **Forward orphans:** a `t('foo.bar')` whose key is missing from `en.json`.
+- **Unused (reverse) orphans:** an `en.json` key no `t(…)` call references.
+  Default-on; pass `--allow-unused` only for ad-hoc local debugging.
+- **Namespace misuse:** `t('ns:key')` colon-prefix and `useTranslation('ns')`.
+- **Multi-interpolation templates:** `t(\`a.${x}.b.${y}\`)` loses the literal
+  between vars; refactor to compute the key, or add an on-line
+  `// i18n-allow-multi-var: <reason>` escape.
+
+Keys reached only through runtime-dynamic dispatch (a map lookup, an
+`i18next.t(entry.key)`, a `${var}`-suffixed template) live in
+`scripts/i18n-keep.ts` as `KEEP_PATTERNS`. Each entry's `reason` must cite a
+real `file:line`; `scripts/check-i18n-keep-rot.ts` fails CI if a cite rots. The
+walker also follows `cond ? 'a' : 'b'`, `x ?? 'a'`, `as` casts, `i18next.t(…)`
+member calls, and `const tr = t` alias rebindings.
+
+### Known gap (tracked separately)
+
+The orphan-key checker only sees strings that pass through `t()`. Hardcoded
+English literals in JSX (e.g. `<Text>Add child</Text>`, `label="Continue"`)
+bypass i18n entirely and render English to every locale. There is no automated
+guard against this today. Phase 3 (TBD) introduces a baseline-allowlist
+ratchet on `JsxText` and JSX-children `StringLiteral` nodes in
+`apps/mobile/src/**`, mirroring the `scripts/no-clinical-copy-baseline.json`
+pattern. Until Phase 3 lands: when adding user-visible copy, route it through
+`t('…')` and add the key to `en.json` in the same PR.
+
+### Variable-interpolation fallbacks
+
+Keys with `{{var}}` interpolation should ship a no-variable companion key when
+the variable is genuinely optional, so the rendered string is never
+"Starting with …" (translators guess at the ellipsis and produce odd output).
+Example: instead of `t('rowSubject', { subject: subject || '…' })`, prefer
+`subject ? t('rowSubject', { subject }) : t('rowSubjectNoSubject')`.
+
 ## Non-Negotiable Engineering Rules
 
 - `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.

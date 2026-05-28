@@ -57,6 +57,9 @@ describe('ParentTransitionNotice', () => {
     });
 
     screen.getByText("You're now mentoring TestKid");
+    expect(
+      screen.queryByText('Try one of these check-in questions tonight.'),
+    ).toBeNull();
   });
 
   it('hides notice when SecureStore has true for the key', async () => {

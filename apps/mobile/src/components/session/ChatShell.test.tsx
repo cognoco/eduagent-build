@@ -94,11 +94,17 @@ jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output 
   }),
 }));
 
-// Stub animated SVG components to avoid reanimated timer leaks in tests
+// Stub shared components that add native renderer/timer dependencies the shell
+// suite does not exercise directly.
 // prettier-ignore
-jest.mock('../common', () => ({ // gc1-allow: animated shared components leak timers in this shell render suite
+jest.mock('../common', () => ({ // gc1-allow: animations leak timers; ThemedMarkdown wraps react-native-markdown-display + theme context and has focused coverage
   DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
+  ThemedMarkdown: ({ children }: { children: unknown }) => {
+    const React = require('react');
+    const { Text } = require('react-native');
+    return React.createElement(Text, null, children);
+  },
 }));
 
 // ---------------------------------------------------------------------------
