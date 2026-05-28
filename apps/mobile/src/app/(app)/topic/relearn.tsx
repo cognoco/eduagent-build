@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -172,6 +172,7 @@ export default function RelearnScreen() {
   );
   const [isReady, setIsReady] = useState(directEntry);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const cancelledRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [lastMethodId, setLastMethodId] = useState<string | null>(null);
 
@@ -287,6 +288,7 @@ export default function RelearnScreen() {
       }
 
       setError(null);
+      cancelledRef.current = false;
       setLastMethodId(methodId);
       setIsSubmitting(true);
 
@@ -301,6 +303,9 @@ export default function RelearnScreen() {
 
       startRelearn.mutate(input, {
         onSuccess: (result) => {
+          if (cancelledRef.current) {
+            return;
+          }
           router.push({
             pathname: '/(app)/session',
             params: {
@@ -321,6 +326,9 @@ export default function RelearnScreen() {
           } as Href);
         },
         onError: (err: unknown) => {
+          if (cancelledRef.current) {
+            return;
+          }
           setError(formatApiError(err));
         },
         onSettled: () => {
@@ -506,6 +514,7 @@ export default function RelearnScreen() {
           </Text>
           <Pressable
             onPress={() => {
+              cancelledRef.current = true;
               setIsSubmitting(false);
               setError(null);
             }}
