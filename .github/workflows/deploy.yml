@@ -401,36 +401,43 @@ jobs:
           fi
           echo "✓ /v1/health OK"
 
-      - name: Smoke — GET /v1/auth/me (401, unauthenticated)
-        id: smoke-auth
+      - name: Smoke — public consent handler check (expect 400 — not 404/5xx)
+        id: smoke-consent-page
         env:
           STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
         run: |
-          echo "Hitting ${STAGING_API_URL}/v1/auth/me (expect 401 — not 500/404)"
-          HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" \
-            "${STAGING_API_URL}/v1/auth/me")
+          echo "Hitting ${STAGING_API_URL}/v1/consent-page (expect 400 from mounted handler for missing token)"
+          HTTP_CODE=$(curl -s --max-time 15 -o /tmp/consent-page.html -w "%{http_code}" \
+            "${STAGING_API_URL}/v1/consent-page")
           echo "HTTP status: ${HTTP_CODE}"
-          # 401 means the auth middleware is live; anything 5xx = worker crash.
-          if [ "${HTTP_CODE}" = "500" ] || [ "${HTTP_CODE}" = "502" ] || [ "${HTTP_CODE}" = "503" ]; then
-            echo "✗ /v1/auth/me returned ${HTTP_CODE} — worker is erroring"
+          # /v1/consent-page is public and reaches its route handler without
+          # global auth short-circuiting. Missing token returns 400; 404 means
+          # the route is not mounted, 000 is network failure, and 5xx is a worker
+          # crash — all should fail the smoke check.
+          if [ "${HTTP_CODE}" != "400" ]; then
+            echo "✗ /v1/consent-page returned ${HTTP_CODE} — expected 400"
+            cat /tmp/consent-page.html || true
             exit 1
           fi
-          echo "✓ /v1/auth/me returned ${HTTP_CODE} (non-5xx, auth layer is up)"
+          echo "✓ /v1/consent-page reached the mounted handler"
 
-      - name: Smoke — GET /v1/sessions (401, unauthenticated)
+      - name: Smoke — sessions auth gate check (expect 401 — not 5xx/200)
         id: smoke-sessions
         env:
           STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
         run: |
-          echo "Hitting ${STAGING_API_URL}/v1/sessions (expect 401 — not 500/404)"
+          echo "Hitting ${STAGING_API_URL}/v1/sessions/resume-nudge (expect 401 from auth middleware)"
           HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" \
-            "${STAGING_API_URL}/v1/sessions")
+            "${STAGING_API_URL}/v1/sessions/resume-nudge")
           echo "HTTP status: ${HTTP_CODE}"
-          if [ "${HTTP_CODE}" = "500" ] || [ "${HTTP_CODE}" = "502" ] || [ "${HTTP_CODE}" = "503" ]; then
-            echo "✗ /v1/sessions returned ${HTTP_CODE} — sessions route is broken"
+          # This proves the staging worker's auth layer rejects protected API
+          # access and catches worker crashes. Route mounting is covered by the
+          # public handler probe above and the static deploy.yml route tests.
+          if [ "${HTTP_CODE}" != "401" ]; then
+            echo "✗ /v1/sessions/resume-nudge returned ${HTTP_CODE} — expected 401"
             exit 1
           fi
-          echo "✓ /v1/sessions returned ${HTTP_CODE} (non-5xx, sessions route is up)"
+          echo "✓ /v1/sessions/resume-nudge rejected unauthenticated access"
 
       # [BUG-953] Re-use the same failure notification pattern for smoke failures.
       - name: Notify on smoke test failure

@@ -84,12 +84,18 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
+const mockMarkdownDisplay = jest.fn();
+
 // react-native-markdown-display pulls in native text rendering
 jest.mock(
   'react-native-markdown-display' /* gc1-allow: third-party native renderer */,
   () => {
+    const React = require('react');
     const { Text } = require('react-native');
-    return ({ children }: { children: string }) => <Text>{children}</Text>;
+    return (props: { children: string }) => {
+      mockMarkdownDisplay(props);
+      return React.createElement(Text, null, props.children);
+    };
   },
 );
 
@@ -189,6 +195,7 @@ function mockHooks({
 describe('SavedBookmarksScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockMarkdownDisplay.mockClear();
     mockLocalSearchParams.mockReturnValue({});
     mockDeleteBookmarkMutateAsync.mockResolvedValue(undefined);
   });
@@ -327,6 +334,23 @@ describe('SavedBookmarksScreen', () => {
       mockHooks({ bookmarks: [BOOKMARK_1] });
       render(<SavedBookmarksScreen />);
       screen.getByText('Hola means hello.');
+    });
+
+    it('renders expanded bookmark content through markdown when the row is pressed', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+
+      expect(mockMarkdownDisplay).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('bookmark-row-bk-1'));
+
+      screen.getByText('Hola means hello.');
+      expect(mockMarkdownDisplay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          children: 'Hola means hello.',
+          mergeStyle: false,
+        }),
+      );
     });
 
     it('shows page title "Saved" when no subjectId param', () => {

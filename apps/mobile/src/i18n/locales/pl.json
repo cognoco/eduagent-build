@@ -2996,55 +2996,92 @@
     "updateButton": "Zaktualizuj hasło"
   },
   "welcomeIntro": {
-    "card1": {
-      "headline": "A mentor you can talk to",
-      "supporting": "Ask when you are stuck, explain what you do not get, and get help that adapts to how you learn."
+    "chooser": {
+      "question": "What brings you here?",
+      "learnerCta": "I want to learn",
+      "learnerHint": "Study, homework help, and a mentor that's yours.",
+      "parentCta": "I'm done fighting over homework",
+      "parentHint": "A mentor for your kids — and your evenings back."
     },
-    "card2": {
-      "headline": "All your study in one place",
-      "supporting": "Study as many subjects as you need, get help with assignments, save notes, and bookmark what matters."
-    },
-    "card3": {
-      "headline": "Picks up where you left off",
-      "supporting": "Your mentor remembers your progress, adapts to your pace, and helps with quick bursts or steady routines."
-    },
-    "card4": {
-      "headline": "Built for real learning",
-      "supporting": "Clear explanations, guided questions, and practice that sticks help you think, practice, and remember."
-    },
-    "scene": {
+    "learner": {
       "card1": {
-        "learner": "I do not get this yet.",
-        "mentor": "Let's slow it down. What part feels confusing?"
+        "headline": "A mentor you can talk to",
+        "supporting": "Ask when you are stuck, explain what you do not get, and get help that adapts to how you learn."
       },
       "card2": {
-        "subjects": {
-          "math": "Math",
-          "history": "History",
-          "spanish": "Spanish"
-        },
-        "chips": {
-          "notes": "Notes",
-          "bookmarks": "Bookmarks",
-          "quiz": "Quiz"
-        }
+        "headline": "Remembers you, picks up where you left off",
+        "supporting": "Your subjects, notes, and pace stay in one place, and your mentor adapts every time you come back."
       },
       "card3": {
-        "rows": {
-          "lastTime": "Last time",
-          "lastTimeBody": "You wrapped up Cells & DNA basics",
-          "next": "Next",
-          "nextBody": "Pick up with Photosynthesis when ready",
-          "pace": "Pace",
-          "paceBody": "Short bursts work well for you"
+        "headline": "Built for real learning",
+        "supporting": "Clear explanations, guided questions, and practice that sticks help you think, practice, and remember."
+      }
+    },
+    "parent": {
+      "card1": {
+        "headline": "A personal mentor for your child",
+        "supporting": "Teaches at their pace and helps with homework by teaching the method and checking their work — never just handing over answers to copy."
+      },
+      "card2": {
+        "headline": "Stay in the loop, step in when it matters",
+        "supporting": "Watch your child's progress and get involved exactly when they need you — not a moment sooner."
+      },
+      "card3": {
+        "headline": "No more homework battles",
+        "supporting": "Take back your evenings and turn them into quality time instead of nightly fights."
+      }
+    },
+    "scene": {
+      "learner": {
+        "card1": {
+          "learner": "I do not get this yet.",
+          "mentor": "Let's slow it down. What part feels confusing?"
+        },
+        "card2": {
+          "subjects": {
+            "math": "Math",
+            "history": "History",
+            "spanish": "Spanish"
+          },
+          "resume": {
+            "label": "Last time",
+            "body": "You wrapped up Cells & DNA basics"
+          }
+        },
+        "card3": {
+          "chips": {
+            "explain": "Clear explanation",
+            "think": "Think it through",
+            "practice": "Practice in context",
+            "remember": "Remember it later"
+          }
         }
       },
-      "card4": {
-        "chips": {
-          "explain": "Clear explanation",
-          "think": "Think it through",
-          "practice": "Practice in context",
-          "remember": "Remember it later"
+      "parent": {
+        "card1": {
+          "child": "I'm stuck on question 3.",
+          "mentor": "Let's start with what you've tried. Walk me through step one."
+        },
+        "card2": {
+          "thisWeek": {
+            "label": "This week",
+            "body": "4 sessions, 2 subjects"
+          },
+          "strong": {
+            "label": "Going well",
+            "body": "Fractions are clicking"
+          },
+          "review": {
+            "label": "Could use you",
+            "body": "Long division — stuck twice"
+          }
+        },
+        "card3": {
+          "chips": {
+            "evenings": "Calmer evenings",
+            "nagging": "Less nagging",
+            "quality": "Quality time"
+          }
         }
       }
     },

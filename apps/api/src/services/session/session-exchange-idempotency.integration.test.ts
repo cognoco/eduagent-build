@@ -8,9 +8,14 @@ import {
   learningSessions,
   profiles,
   subjects,
+  curricula,
+  curriculumBooks,
+  curriculumTopics,
+  sessionEvents,
   type Database,
 } from '@eduagent/database';
 import { persistExchangeResult } from './session-exchange';
+import { createBookmark, listBookmarks } from '../bookmarks';
 import { mapSessionRow } from './session-events';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -55,12 +60,18 @@ async function seedProfile(
   return { profileId: profile!.id, subjectId: subject!.id };
 }
 
-async function seedSession(db: Database, profileId: string, subjectId: string) {
+async function seedSession(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId?: string | null,
+) {
   const [sessionRow] = await db
     .insert(learningSessions)
     .values({
       profileId,
       subjectId,
+      topicId: topicId ?? null,
       sessionType: 'learning',
       inputMode: 'text',
       status: 'active',
@@ -81,6 +92,78 @@ async function readSessionMetadata(db: Database, sessionId: string) {
     .from(learningSessions)
     .where(eq(learningSessions.id, sessionId));
   return row!.metadata as Record<string, unknown>;
+}
+
+async function seedTopic(db: Database, subjectId: string): Promise<string> {
+  const [{ id: curriculumId }] = await db
+    .insert(curricula)
+    .values({
+      subjectId,
+    })
+    .returning({ id: curricula.id });
+
+  const [{ id: bookId }] = await db
+    .insert(curriculumBooks)
+    .values({
+      subjectId,
+      title: `Test Book ${generateUUIDv7()}`,
+      sortOrder: 1,
+    })
+    .returning({ id: curriculumBooks.id });
+
+  const [{ id: topicId }] = await db
+    .insert(curriculumTopics)
+    .values({
+      bookId,
+      curriculumId,
+      title: `Test Topic ${generateUUIDv7()}`,
+      description: 'test',
+      sortOrder: 1,
+      estimatedMinutes: 10,
+    })
+    .returning({ id: curriculumTopics.id });
+
+  return topicId;
+}
+
+async function readAiEventTopicId(
+  db: Database,
+  eventId: string,
+): Promise<string | null> {
+  const [row] = await db
+    .select({ topicId: sessionEvents.topicId })
+    .from(sessionEvents)
+    .where(eq(sessionEvents.id, eventId));
+  return row?.topicId ?? null;
+}
+
+async function persistAndBookmark(input: {
+  db: Database;
+  profileId: string;
+  session: ReturnType<typeof mapSessionRow>;
+  userMessage: string;
+  aiResponse: string;
+  clientId?: string;
+}) {
+  const result = await persistExchangeResult(
+    input.db,
+    input.profileId,
+    input.session.id,
+    input.session,
+    input.userMessage,
+    input.aiResponse,
+    1,
+    { isUnderstandingCheck: false },
+    input.clientId,
+  );
+  expect(result.persistedUserMessage).toBe(true);
+  expect(result.aiEventId).toBeDefined();
+  const bookmark = await createBookmark(
+    input.db,
+    input.profileId,
+    result.aiEventId!,
+  );
+  return { aiEventId: result.aiEventId!, bookmark };
 }
 
 describeIfDb('persistExchangeResult idempotency side effects', () => {
@@ -140,4 +223,79 @@ describeIfDb('persistExchangeResult idempotency side effects', () => {
       continuationDepth: 'high',
     });
   });
+
+  it('[WI-195] carries session.topicId into clientId ai_response events and bookmarks', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const topicId = await seedTopic(db, subjectId);
+    const session = await seedSession(db, profileId, subjectId, topicId);
+
+    const { aiEventId, bookmark } = await persistAndBookmark({
+      db,
+      profileId,
+      session,
+      userMessage: 'Explain linear equations',
+      aiResponse: 'A linear equation balances both sides.',
+      clientId: 'wi-195-client-topic',
+    });
+
+    await expect(readAiEventTopicId(db, aiEventId)).resolves.toBe(topicId);
+    expect(bookmark.topicId).toBe(topicId);
+
+    const listed = await listBookmarks(db, profileId, { topicId });
+    expect(listed.bookmarks.map((row) => row.id)).toContain(bookmark.id);
+    expect(
+      listed.bookmarks.find((row) => row.id === bookmark.id)!.topicId,
+    ).toBe(topicId);
+  });
+
+  it('[WI-195] carries session.topicId into paired ai_response events and bookmarks', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const topicId = await seedTopic(db, subjectId);
+    const session = await seedSession(db, profileId, subjectId, topicId);
+
+    const { aiEventId, bookmark } = await persistAndBookmark({
+      db,
+      profileId,
+      session,
+      userMessage: 'Explain photosynthesis',
+      aiResponse: 'Photosynthesis stores light energy as chemical energy.',
+    });
+
+    await expect(readAiEventTopicId(db, aiEventId)).resolves.toBe(topicId);
+    expect(bookmark.topicId).toBe(topicId);
+
+    const listed = await listBookmarks(db, profileId, { topicId });
+    expect(listed.bookmarks.map((row) => row.id)).toContain(bookmark.id);
+    expect(
+      listed.bookmarks.find((row) => row.id === bookmark.id)!.topicId,
+    ).toBe(topicId);
+  });
+
+  it.each([
+    ['clientId branch', 'wi-195-client-null'],
+    ['paired insert branch', undefined],
+  ] as const)(
+    '[WI-195] preserves null topicId for %s',
+    async (_label, clientId) => {
+      const { profileId, subjectId } = await seedProfile(db);
+      const session = await seedSession(db, profileId, subjectId, null);
+
+      const { aiEventId, bookmark } = await persistAndBookmark({
+        db,
+        profileId,
+        session,
+        userMessage: 'Open-ended question',
+        aiResponse: 'Here is a freeform answer.',
+        clientId,
+      });
+
+      await expect(readAiEventTopicId(db, aiEventId)).resolves.toBeNull();
+      expect(bookmark.topicId).toBeNull();
+
+      const listedWithoutTopicFilter = await listBookmarks(db, profileId, {});
+      expect(listedWithoutTopicFilter.bookmarks.map((row) => row.id)).toContain(
+        bookmark.id,
+      );
+    },
+  );
 });
