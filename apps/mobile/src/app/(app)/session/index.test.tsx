@@ -1,21 +1,18 @@
 import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
 import { Alert } from 'react-native';
-import {
-  render,
-  fireEvent,
-  waitFor,
-  act,
-  screen,
-  within,
-} from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   fetchCallsMatching,
   extractJsonBody,
   type RoutedMockFetch,
 } from '../../../test-utils/mock-api-routes';
+import {
+  renderScreen,
+  createTestProfile,
+  type RenderScreenResult,
+} from '../../../test-utils/screen-render';
 import SessionScreen from './index';
 
 // Real session-recovery module; tests spy on readSessionRecoveryMarker as
@@ -23,89 +20,141 @@ import SessionScreen from './index';
 import * as sessionRecoveryModule from '../../../lib/session-recovery';
 
 // ---------------------------------------------------------------------------
-// Fetch boundary mock — API-calling hooks run against this
+// Boundary mocks (external / native runtime only)
 // ---------------------------------------------------------------------------
 //
-// IMPORTANT: jest.mock() factories are hoisted above all module-level code by
-// babel-jest. That means `const mockFetch = createRoutedMockFetch(...)` would
-// run AFTER the factory, so `mockFetch` would be undefined inside the factory
-// (Temporal Dead Zone). To avoid this we create the mockFetch instance INSIDE
-// the factory and expose it via `global.__sessionTestMockFetch` so the rest of
-// the test file can reference it through a typed alias below.
+// CONVERTED in this file (now run for REAL against the routed mock fetch /
+// ProfileContext supplied by renderScreen): lib/profile, lib/api-client
+// (transport only — real error classes via requireActual), use-settings
+// (useCelebrationLevel / useNotifyParentSubscribe), use-api-reachability,
+// use-network-status (real hook over a mocked netinfo native module),
+// use-celebration, use-milestone-tracker, use-challenge-round (real raw-fetch
+// hook; request assertions via fetchCallsMatching).
+//
+// KEPT as boundaries (cannot run under the harness): hooks/use-sessions —
+// `useStreamMessage.stream` streams over XHR via streamSSEViaXHR, which
+// BYPASSES useApiClient and cannot be intercepted by the routed mock fetch; the
+// synthetic onChunk/onDone payloads (challengeRound / draftedNote / fallback)
+// are this test's control surface. components/session — the ChatShell stub is
+// the test's primary interaction surface; the real composer drags in native
+// voice/keyboard input. Plus the usual native/expo modules below.
 
-jest.mock('../../../lib/api-client' /* gc1-allow: unit test boundary */, () => {
-  const {
-    createRoutedMockFetch: _create,
-    mockApiClientFactory: _factory,
-  } = require('../../../test-utils/mock-api-routes');
-  // IMPORTANT: Routes are matched by url.includes(pattern) in insertion order.
-  // More-specific patterns must come BEFORE general ones to avoid shadowing.
-  const _mockFetch = _create({
-    '/streaks': { streak: { longestStreak: 1 } },
-    '/progress/overview': { totalTopicsCompleted: 0 },
-    '/progress/inventory': {
-      global: {
-        topicsAttempted: 0,
-        topicsMastered: 0,
-        vocabularyTotal: 0,
-        vocabularyMastered: 0,
-        totalSessions: 0,
-        totalActiveMinutes: 0,
-        totalWallClockMinutes: 0,
-        currentStreak: 0,
-        longestStreak: 0,
+// lib/api-client: route the Hono RPC client through a shared mock fetch so real
+// hooks (useCelebrationLevel, useChallengeRound's note path, useStreaks,
+// useSubjects, classify/resolve, filing, celebrations, …) actually run, while
+// keeping the REAL typed error classes (NotFoundError, QuotaExceededError, …)
+// so the screen's instanceof / name checks behave like production.
+//
+// jest.mock() factories are hoisted above module-level code, so we create the
+// routed fetch INSIDE the factory and expose it via global for the typed alias
+// below (avoids the Temporal Dead Zone a top-level const would hit).
+jest.mock(
+  '../../../lib/api-client' /* gc1-allow: transport boundary — routed mock fetch drives real hooks; real error classes preserved via requireActual */,
+  () => {
+    const actual = jest.requireActual('../../../lib/api-client');
+    const {
+      createRoutedMockFetch,
+    } = require('../../../test-utils/mock-api-routes');
+    const { hc } = require('hono/client');
+    // IMPORTANT: Routes are matched by url.includes(pattern) in insertion
+    // order. More-specific patterns must come BEFORE general ones.
+    const _mockFetch = createRoutedMockFetch({
+      // use-api-reachability hits /v1/health directly via global fetch; a 200
+      // keeps isApiReachable true.
+      '/health': { ok: true },
+      '/streaks': { streak: { longestStreak: 1 } },
+      '/progress/overview': { totalTopicsCompleted: 0 },
+      '/progress/inventory': {
+        global: {
+          topicsAttempted: 0,
+          topicsMastered: 0,
+          vocabularyTotal: 0,
+          vocabularyMastered: 0,
+          totalSessions: 0,
+          totalActiveMinutes: 0,
+          totalWallClockMinutes: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+        },
+        subjects: [],
       },
-      subjects: [],
-    },
-    // Default: no active session for topic (null = route not matched → empty 200)
-    // Per-test overrides use mockFetch.setRoute('/progress/topic', ...)
+      // Default: no active session for topic (null = empty 200).
+      // Per-test overrides use mockFetch.setRoute('/progress/topic', ...)
 
-    // --- Subject sub-resources (most specific first) ---
-    // Must precede '/subjects' so they are not shadowed by the general subjects route.
-    '/subjects/classify': { candidates: [], needsConfirmation: false },
-    '/subjects/resolve': {
-      suggestions: [],
-      displayMessage: 'Pick a subject that fits, or create your own.',
-    },
-    // curriculum: subjects/:id/curriculum — must precede '/subjects'
-    '/curriculum': {
-      curriculum: {
-        topics: [
-          {
-            id: 'topic-1',
-            title: 'Topic 1',
-            description: 'Desc',
-            skipped: false,
-          },
-        ],
+      // --- Subject sub-resources (most specific first) ---
+      '/subjects/classify': { candidates: [], needsConfirmation: false },
+      '/subjects/resolve': {
+        suggestions: [],
+        displayMessage: 'Pick a subject that fits, or create your own.',
       },
-    },
-    // sessions: subjects/:id/sessions — must precede '/subjects'
-    '/sessions': { session: { id: 'session-1' } },
-    // homework-state: sessions/:id/homework-state
-    '/homework-state': {
-      metadata: { problemCount: 2, currentProblemIndex: 0, problems: [] },
-    },
-    // General subjects list / create — must come after all /subjects/* specifics
-    '/subjects': {
-      subjects: [{ id: 'subject-1', name: 'Math', status: 'active' }],
-    },
+      '/curriculum': {
+        curriculum: {
+          topics: [
+            {
+              id: 'topic-1',
+              title: 'Topic 1',
+              description: 'Desc',
+              skipped: false,
+            },
+          ],
+        },
+      },
+      '/sessions': { session: { id: 'session-1' } },
+      '/homework-state': {
+        metadata: { problemCount: 2, currentProblemIndex: 0, problems: [] },
+      },
+      '/subjects': {
+        subjects: [{ id: 'subject-1', name: 'Math', status: 'active' }],
+      },
 
-    '/celebration-level': { celebrationLevel: 'full' },
-    // bookmarks/session must precede /bookmarks
-    '/bookmarks/session': { bookmarks: [] },
-    '/bookmarks': { bookmark: { id: 'bookmark-1' } },
-    '/filing': { shelfId: 'shelf-1', bookId: 'book-1' },
-    // direct apiClient calls (use-session-streaming)
-    '/celebrations/pending': { pendingCelebrations: [] },
-    '/celebrations/seen': { ok: true },
-  });
-  // Expose for test assertions — accessed via the `mockFetch` alias below
-  (
-    global as { __sessionTestMockFetch?: typeof _mockFetch }
-  ).__sessionTestMockFetch = _mockFetch;
-  return _factory(_mockFetch);
-});
+      // useLearnerProfile reads data.profile (?.accommodationMode); null keeps
+      // the query from returning undefined (React Query logs that as an error).
+      '/learner-profile': { profile: null },
+      // use-settings (real hooks now)
+      '/celebration-level': { celebrationLevel: 'full' },
+      '/notify-parent-subscribe': { sent: true, rateLimited: false },
+      // use-challenge-round (real raw-fetch hook now). The screen consumes the
+      // returned challengeRound state to dismiss the offer / drafted-note cards.
+      '/challenge-round/accept': {
+        challengeRound: {
+          state: 'accepted',
+          topicId: '11111111-1111-4111-8111-111111111111',
+          offerCount: 1,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      },
+      '/challenge-round/decline': {
+        challengeRound: {
+          state: 'declined',
+          topicId: '11111111-1111-4111-8111-111111111111',
+          offerCount: 1,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      },
+      '/challenge-round/abort': { challengeRound: undefined },
+      // useCreateNote (challenge-round saveNote path) → subjects/:id/topics/:id/notes
+      '/notes': { note: { id: 'note-1' } },
+
+      // bookmarks/session must precede /bookmarks
+      '/bookmarks/session': { bookmarks: [] },
+      '/bookmarks': { bookmark: { id: 'bookmark-1' } },
+      '/filing': { shelfId: 'shelf-1', bookId: 'book-1' },
+      // direct apiClient calls (use-session-streaming)
+      '/celebrations/pending': { pendingCelebrations: [] },
+      '/celebrations/seen': { ok: true },
+    });
+    // Expose for test assertions — accessed via the `mockFetch` alias below.
+    (
+      global as { __sessionTestMockFetch?: typeof _mockFetch }
+    ).__sessionTestMockFetch = _mockFetch;
+    return {
+      ...actual,
+      useApiClient: () => hc('http://localhost', { fetch: _mockFetch }),
+    };
+  },
+);
 
 // Typed alias so tests can call mockFetch.setRoute / fetchCallsMatching etc.
 // Safe to read here because jest.mock factories run synchronously before
@@ -113,25 +162,63 @@ jest.mock('../../../lib/api-client' /* gc1-allow: unit test boundary */, () => {
 const mockFetch = (global as { __sessionTestMockFetch?: RoutedMockFetch })
   .__sessionTestMockFetch!;
 
+// clerk + netinfo are native/external boundaries the real hooks
+// (use-challenge-round, useApiClient's useAuth, use-network-status) reach
+// through once they run for real. (react-i18next is left to the global init in
+// test-setup.ts — no per-file mock, matching the prior behavior of this suite.)
+jest.mock(
+  '@clerk/clerk-expo' /* gc1-allow: external auth provider — getToken is a network/native call */,
+  () => ({
+    useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
+  }),
+);
+
+jest.mock(
+  '@react-native-community/netinfo' /* gc1-allow: native module — requires device connectivity APIs */,
+  () => ({
+    fetch: jest.fn().mockResolvedValue({ isInternetReachable: true }),
+    addEventListener: jest.fn().mockReturnValue(() => undefined),
+  }),
+);
+
 // ---------------------------------------------------------------------------
-// QueryClient wrapper
+// renderScreen wrapper — provides a real ProfileContext (solo owner) + routed
+// fetch (installGlobalFetch so use-api-reachability / use-challenge-round /
+// useCreateNote raw-fetch and the streaming health checks resolve) + the same
+// QueryClient defaults the old wrapper used.
 // ---------------------------------------------------------------------------
 
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+const ACTIVE_PROFILE = createTestProfile({
+  id: 'profile-1',
+  accountId: 'test-account-id',
+  displayName: 'Test Learner',
+  isOwner: true,
+  hasPremiumLlm: false,
+  conversationLanguage: 'en',
+  pronouns: null,
+  consentStatus: null,
+});
+
+let activeRender: RenderScreenResult | null = null;
+
+function renderSessionScreen() {
+  // installGlobalFetch:false — the routed fetch is wired into lib/api-client's
+  // useApiClient above; we still install it globally for raw-fetch callers, so
+  // pass the same instance via routedFetch and let the harness install it.
+  activeRender = renderScreen(<SessionScreen />, {
+    profile: ACTIVE_PROFILE,
+    routedFetch: mockFetch,
   });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  };
+  return activeRender.result;
 }
 
 // ---------------------------------------------------------------------------
-// Session hook mocks (use-sessions stays mocked because useStreamMessage uses
-// XHR via streamSSEViaXHR, which bypasses useApiClient and cannot be
-// intercepted through mockFetch).
+// Session hook mocks (use-sessions stays mocked because useStreamMessage's
+// `stream` runs over XHR via streamSSEViaXHR — it bypasses useApiClient and
+// cannot be intercepted through the routed mock fetch. The synthetic
+// onChunk/onDone payloads driven through mockStream (challengeRound /
+// draftedNote / fallback / quota) are this suite's primary control surface, so
+// the whole use-sessions mutation/query set is kept together for consistency.)
 // ---------------------------------------------------------------------------
 
 const mockStartSession = jest.fn();
@@ -142,10 +229,6 @@ const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
-const mockChallengeAccept = jest.fn();
-const mockChallengeDecline = jest.fn();
-const mockChallengeSaveNote = jest.fn();
-const mockChallengeSkipNote = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 
@@ -173,7 +256,7 @@ const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
   () => ({ data: null }),
 );
 jest.mock(
-  '../../../hooks/use-sessions' /* gc1-allow: unit test boundary */,
+  '../../../hooks/use-sessions' /* gc1-allow: useStreamMessage streams over XHR (bypasses useApiClient); synthetic onDone payloads are the test control surface */,
   () => ({
     useSession: () => ({ data: null }),
     useStartSession: () => ({
@@ -200,62 +283,21 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../hooks/use-challenge-round' /* gc1-allow: screen test owns only rendering/wiring; hook tests cover request details */,
-  () => ({
-    useChallengeRound: () => ({
-      accept: mockChallengeAccept,
-      decline: mockChallengeDecline,
-      abort: jest.fn(),
-      saveNote: mockChallengeSaveNote,
-      skipNote: mockChallengeSkipNote,
-    }),
-  }),
-);
+// use-challenge-round, use-settings, use-network-status, use-api-reachability,
+// and use-celebration now run for REAL — see the boundary-mock note at the top
+// of this file. Challenge-round request details are asserted via
+// fetchCallsMatching.
 
-jest.mock(
-  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
-  () => ({
-    useCelebrationLevel: () => ({ data: 'all' }),
-    // QuotaExceededCard imports useNotifyParentSubscribe; must be present or
-    // the component crashes before the test can assert on quota-exceeded-card.
-    useNotifyParentSubscribe: () => ({
-      mutate: jest.fn(),
-      isPending: false,
-    }),
-  }),
-);
-
-// ---------------------------------------------------------------------------
-// Local-state / device hooks — no useApiClient(), keep as mocks
-// ---------------------------------------------------------------------------
-
-jest.mock(
-  '../../../hooks/use-network-status' /* gc1-allow: unit test boundary */,
-  () => ({
-    useNetworkStatus: () => ({ isOffline: false }),
-  }),
-);
-
-jest.mock(
-  '../../../hooks/use-api-reachability' /* gc1-allow: unit test boundary */,
-  () => ({
-    useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
-  }),
-);
-
-const mockTrigger = jest.fn();
-const mockCelebrationResult = {
-  CelebrationOverlay: null,
-  trigger: mockTrigger,
-};
-jest.mock(
-  '../../../hooks/use-celebration' /* gc1-allow: unit test boundary */,
-  () => ({
-    useCelebration: () => mockCelebrationResult,
-  }),
-);
-
+// use-milestone-tracker is a pure-React state hook (no fetch, no native dep),
+// but it is KEPT mocked deliberately, not because the harness can't run it:
+// the "hydrates milestone tracker state from the recovery marker" test verifies
+// hydration via the mockHydrate spy, and the only visible surface for milestone
+// state (MilestoneDots) is stubbed out by the components/session ChatShell mock
+// — so running the real tracker would leave that test with no observable signal
+// and force a weaker assertion. The deterministic trackExchange result also
+// keeps every send-a-message test from incidentally firing celebration
+// overlays. This is a test-design boundary, NOT a gc1 "can't run" boundary; if
+// the ChatShell mock ever renders MilestoneDots, convert this to the real hook.
 const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
 const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
 const mockHydrate = jest.fn();
@@ -268,13 +310,14 @@ const mockMilestoneTracker = {
   reset: mockResetMilestones,
 };
 jest.mock(
-  '../../../hooks/use-milestone-tracker' /* gc1-allow: unit test boundary */,
-  () => ({
-    celebrationForReason: jest.fn(),
-    createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
-    normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
-    useMilestoneTracker: () => mockMilestoneTracker,
-  }),
+  '../../../hooks/use-milestone-tracker' /* gc1-allow: test-design boundary — hydrate asserted via spy; MilestoneDots stubbed by ChatShell mock so the real hook has no observable surface here */,
+  () => {
+    const actual = jest.requireActual('../../../hooks/use-milestone-tracker');
+    return {
+      ...actual,
+      useMilestoneTracker: () => mockMilestoneTracker,
+    };
+  },
 );
 
 // ---------------------------------------------------------------------------
@@ -324,7 +367,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../../components/session' /* gc1-allow: unit test boundary */,
+  '../../../components/session' /* gc1-allow: ChatShell stub is the test's primary interaction surface (manual-send-button, mock-input-mode); the real composer pulls in native voice/keyboard input that can't render in JSDOM */,
   () => ({
     ChatShell: ({
       subtitle,
@@ -460,7 +503,7 @@ jest.mock(
 
 const secureStore: Record<string, string> = {};
 jest.mock(
-  '../../../lib/secure-storage' /* gc1-allow: unit test boundary */,
+  '../../../lib/secure-storage' /* gc1-allow: wraps Expo SecureStore native module (unavailable in JSDOM); in-memory map stands in for device keychain */,
   () => ({
     getItemAsync: jest.fn((key: string) =>
       Promise.resolve(secureStore[key] ?? null),
@@ -489,24 +532,7 @@ const mockReadSessionRecoveryMarker = jest.spyOn(
 // formatter — it's only invoked on stream failure paths where the produced
 // text is rendered, not inspected.
 
-jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
-  ...jest.requireActual('../../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: {
-      id: 'profile-1',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-    },
-  }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
-}));
+// lib/profile now runs for real — renderScreen provides the ProfileContext.
 
 // prettier-ignore
 jest.mock('../../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
@@ -588,6 +614,8 @@ describe('SessionScreen homework flow', () => {
   });
 
   afterEach(() => {
+    activeRender?.cleanup();
+    activeRender = null;
     jest.useRealTimers();
   });
 
@@ -606,9 +634,9 @@ describe('SessionScreen homework flow', () => {
       error: new NotFoundError('Session not found'),
     } as never);
 
-    render(<SessionScreen />, { wrapper: createWrapper() });
+    const testScreen = renderSessionScreen();
 
-    fireEvent.press(screen.getByTestId('session-expired-new-session'));
+    fireEvent.press(testScreen.getByTestId('session-expired-new-session'));
 
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/session',
@@ -623,8 +651,7 @@ describe('SessionScreen homework flow', () => {
   });
 
   it('keeps homework progress in one session when moving to the next problem', async () => {
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     await act(async () => {
       fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -686,8 +713,7 @@ describe('SessionScreen homework flow', () => {
       ]),
     });
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -734,8 +760,7 @@ describe('SessionScreen homework flow', () => {
       ]),
     });
 
-    const wrapper = createWrapper();
-    render(<SessionScreen />, { wrapper });
+    renderSessionScreen();
 
     await waitFor(() => {
       expect(mockReadAsStringAsync).toHaveBeenCalledWith(
@@ -781,8 +806,7 @@ describe('SessionScreen homework flow', () => {
       ]),
     });
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     // System message tells the learner the photo was dropped.
     await waitFor(() => {
@@ -838,8 +862,7 @@ describe('SessionScreen homework flow', () => {
       ]),
     });
 
-    const wrapper = createWrapper();
-    render(<SessionScreen />, { wrapper });
+    renderSessionScreen();
 
     await waitFor(() => {
       expect(mockStream).toHaveBeenCalled();
@@ -871,8 +894,7 @@ describe('SessionScreen homework flow', () => {
   });
 
   it('hides contextual chips on greeting but shows session tools above the composer', () => {
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     // Contextual quick chips should NOT appear before any user message
     expect(testScreen.queryByText('I know this')).toBeNull();
@@ -891,8 +913,7 @@ describe('SessionScreen homework flow', () => {
   });
 
   it('records quick chips and learner feedback with follow-up prompts', async () => {
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1008,15 +1029,8 @@ describe('SessionScreen homework flow', () => {
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
     });
-    mockChallengeAccept.mockResolvedValueOnce({
-      challengeRound: {
-        state: 'accepted',
-        topicId: '11111111-1111-4111-8111-111111111111',
-        offerCount: 1,
-        declinedDontAskAgain: false,
-        evaluations: [],
-      },
-    });
+    // /challenge-round/accept is routed to return state:'accepted' (see the
+    // lib/api-client mock above), so the real useChallengeRound.accept() runs.
     mockStream.mockImplementationOnce(
       async (
         _message: string,
@@ -1040,8 +1054,7 @@ describe('SessionScreen homework flow', () => {
       },
     );
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1055,7 +1068,9 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(mockChallengeAccept).toHaveBeenCalledTimes(1);
+      expect(
+        fetchCallsMatching(mockFetch, '/challenge-round/accept').length,
+      ).toBe(1);
       expect(testScreen.queryByTestId('challenge-offer-card')).toBeNull();
     });
   });
@@ -1068,15 +1083,9 @@ describe('SessionScreen homework flow', () => {
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
     });
-    mockChallengeDecline.mockResolvedValue({
-      challengeRound: {
-        state: 'declined',
-        topicId: '11111111-1111-4111-8111-111111111111',
-        offerCount: 1,
-        declinedDontAskAgain: false,
-        evaluations: [],
-      },
-    });
+    // /challenge-round/decline is routed (see lib/api-client mock) so the real
+    // useChallengeRound.decline(dontAskAgain) runs; we assert the dontAskAgain
+    // flag via the request body instead of a spy.
     mockStream.mockImplementation(
       async (
         _message: string,
@@ -1100,8 +1109,7 @@ describe('SessionScreen homework flow', () => {
       },
     );
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1112,7 +1120,12 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('challenge-offer-decline'));
     await flushAsyncWork();
     await waitFor(() => {
-      expect(mockChallengeDecline).toHaveBeenCalledWith(false);
+      const calls = fetchCallsMatching(mockFetch, '/challenge-round/decline');
+      expect(calls).toHaveLength(1);
+      expect(
+        extractJsonBody<{ dontAskAgain: boolean }>(calls[0]?.init)
+          ?.dontAskAgain,
+      ).toBe(false);
     });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -1124,7 +1137,12 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('challenge-offer-dont-ask'));
     await flushAsyncWork();
     await waitFor(() => {
-      expect(mockChallengeDecline).toHaveBeenCalledWith(true);
+      const calls = fetchCallsMatching(mockFetch, '/challenge-round/decline');
+      expect(calls).toHaveLength(2);
+      expect(
+        extractJsonBody<{ dontAskAgain: boolean }>(calls[1]?.init)
+          ?.dontAskAgain,
+      ).toBe(true);
     });
   });
 
@@ -1160,8 +1178,7 @@ describe('SessionScreen homework flow', () => {
       },
     );
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1182,7 +1199,9 @@ describe('SessionScreen homework flow', () => {
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
     });
-    mockChallengeSaveNote.mockResolvedValueOnce({ note: { id: 'note-1' } });
+    // /notes is routed to return the saved note (see lib/api-client mock), so
+    // the real useChallengeRound.saveNote → useCreateNote mutation runs; the
+    // note content is asserted from the request body.
     mockStream.mockImplementationOnce(
       async (
         _message: string,
@@ -1212,8 +1231,7 @@ describe('SessionScreen homework flow', () => {
       },
     );
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1229,7 +1247,11 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(mockChallengeSaveNote).toHaveBeenCalledWith(
+      const noteCalls = fetchCallsMatching(mockFetch, '/notes');
+      expect(noteCalls.length).toBeGreaterThan(0);
+      expect(
+        extractJsonBody<{ content: string }>(noteCalls[0]?.init)?.content,
+      ).toBe(
         'Linear equations stay balanced when you do the same thing to both sides.',
       );
       expect(testScreen.queryByTestId('drafted-note-review')).toBeNull();
@@ -1255,8 +1277,7 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const wrapper = createWrapper();
-    render(<SessionScreen />, { wrapper });
+    renderSessionScreen();
 
     await waitFor(() => {
       expect(mockReadSessionRecoveryMarker).toHaveBeenCalled();
@@ -1304,8 +1325,7 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -1327,8 +1347,7 @@ describe('SessionScreen homework flow', () => {
     // Return active session for this topic via fetch boundary
     mockFetch.setRoute('/progress/topic', { sessionId: 'session-resumed' });
 
-    const wrapper = createWrapper();
-    render(<SessionScreen />, { wrapper });
+    renderSessionScreen();
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -1348,8 +1367,7 @@ describe('SessionScreen homework flow', () => {
     });
     mockFetch.setRoute('/progress/topic', { sessionId: 'session-resumed' });
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1374,8 +1392,7 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'session-shouldnt-resume',
     });
 
-    const wrapper = createWrapper();
-    render(<SessionScreen />, { wrapper });
+    renderSessionScreen();
     await flushAsyncWork();
 
     expect(mockSetParams).not.toHaveBeenCalled();
@@ -1391,8 +1408,7 @@ describe('SessionScreen homework flow', () => {
     });
     // Default route already returns null for /progress/topic
 
-    const wrapper = createWrapper();
-    render(<SessionScreen />, { wrapper });
+    renderSessionScreen();
     await flushAsyncWork();
 
     expect(mockSetParams).not.toHaveBeenCalled();
@@ -1420,8 +1436,7 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
     await flushAsyncWork();
 
     const header = testScreen.getByTestId('session-topic-header');
@@ -1435,8 +1450,7 @@ describe('SessionScreen homework flow', () => {
   });
 
   it('persists input-mode changes once the session exists', async () => {
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1467,8 +1481,7 @@ describe('SessionScreen homework flow', () => {
       needsConfirmation: true,
     });
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1527,8 +1540,7 @@ describe('SessionScreen homework flow', () => {
       new Response(JSON.stringify({ error: 'Network error' }), { status: 500 }),
     );
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1553,8 +1565,7 @@ describe('SessionScreen homework flow', () => {
       needsConfirmation: true,
     });
 
-    const wrapper = createWrapper();
-    const testScreen = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
@@ -1587,8 +1598,7 @@ describe('SessionScreen homework flow', () => {
       // Spy on Alert.alert so we can invoke the "End Session" button callback
       const alertSpy = jest.spyOn(Alert, 'alert');
 
-      const wrapper = createWrapper();
-      const testScreen = render(<SessionScreen />, { wrapper });
+      const testScreen = renderSessionScreen();
 
       // Send a message to start the session and get exchangeCount > 0
       fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -1625,9 +1635,12 @@ describe('SessionScreen homework flow', () => {
       });
       await flushAsyncWork();
 
-      // Advance timers to let fetchFastCelebrations polling resolve
+      // Advance timers to let fetchFastCelebrations polling resolve. Bounded
+      // advance (the polling window is 3s of 500ms ticks) rather than
+      // runAllTimers() — the now-real useApiReachability installs a
+      // self-re-arming 60s interval, so runAllTimers() would loop forever.
       await act(async () => {
-        jest.runAllTimers();
+        await jest.advanceTimersByTimeAsync(3500);
       });
       await flushAsyncWork();
 
@@ -1700,29 +1713,28 @@ describe('voice mode persistence', () => {
   });
 
   afterEach(() => {
+    activeRender?.cleanup();
+    activeRender = null;
     jest.useRealTimers();
   });
 
   it('defaults to voice when SecureStore has voice preference', async () => {
     secureStore['voice-input-mode-profile-1'] = 'voice';
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<SessionScreen />, { wrapper });
+    const { getByTestId } = renderSessionScreen();
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
     });
   });
 
   it('defaults to text when SecureStore has no preference', async () => {
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<SessionScreen />, { wrapper });
+    const { getByTestId } = renderSessionScreen();
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('text');
     });
   });
 
   it('persists voice preference when mode changes to voice', async () => {
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<SessionScreen />, { wrapper });
+    const { getByTestId } = renderSessionScreen();
     await act(async () => {
       fireEvent.press(getByTestId('mock-set-voice-mode'));
     });
@@ -1733,8 +1745,7 @@ describe('voice mode persistence', () => {
 
   it('persists text preference when mode changes to text', async () => {
     secureStore['voice-input-mode-profile-1'] = 'voice';
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<SessionScreen />, { wrapper });
+    const { getByTestId } = renderSessionScreen();
     // Wait for initial voice mode to load
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
@@ -1763,8 +1774,7 @@ describe('voice mode persistence', () => {
       new QuotaExceededError('Quota exceeded', details),
     );
 
-    const wrapper = createWrapper();
-    const { unmount } = render(<SessionScreen />, { wrapper });
+    const testScreen = renderSessionScreen();
 
     // Flush startup async work
     await act(async () => {
@@ -1773,13 +1783,11 @@ describe('voice mode persistence', () => {
     });
 
     // Trigger a message send using the mock send button
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
 
     await waitFor(() => {
-      screen.getByTestId('quota-exceeded-card');
-      screen.getByTestId('input-disabled-banner');
+      testScreen.getByTestId('quota-exceeded-card');
+      testScreen.getByTestId('input-disabled-banner');
     });
-
-    unmount();
   });
 });

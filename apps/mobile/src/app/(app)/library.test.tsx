@@ -1,73 +1,46 @@
+import { createElement, type ReactNode } from 'react';
 import {
   act,
   fireEvent,
   render,
-  screen,
   waitFor,
+  type RenderAPI,
 } from '@testing-library/react-native';
-import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  ProfileContext,
+  type Profile,
+  type ProfileContextValue,
+} from '../../lib/profile';
+import { AppContextProvider } from '../../lib/app-context';
+import {
+  createTestProfile,
+  renderScreen,
+  cleanupScreen,
+  type RenderScreenResult,
+} from '../../test-utils/screen-render';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../test-utils/mock-api-routes';
 
-jest.mock('react-native', () => {
-  const ReactActual = require('react');
-  const RN = jest.requireActual('react-native');
-  const SectionList = ({
-    ListHeaderComponent,
-    renderItem,
-    renderSectionHeader,
-    sections,
-    testID,
-    initialNumToRender,
-    windowSize,
-  }: {
-    ListHeaderComponent?: React.ReactNode | React.ComponentType;
-    renderItem: (info: {
-      item: unknown;
-      index: number;
-      section: { status: string; data: unknown[] };
-    }) => React.ReactNode;
-    renderSectionHeader?: (info: {
-      section: { status: string; data: unknown[] };
-    }) => React.ReactNode;
-    sections: Array<{ status: string; data: unknown[] }>;
-    testID?: string;
-    initialNumToRender?: number;
-    windowSize?: number;
-  }) =>
-    ReactActual.createElement(
-      RN.View,
-      // Forward VirtualizedList props so break tests can assert on them.
-      // [BUG-NOTION-254] initialNumToRender/windowSize fingerprint the SectionList
-      // path; ScrollView.map() has neither.
-      { testID, initialNumToRender, windowSize, sections },
-      typeof ListHeaderComponent === 'function'
-        ? ReactActual.createElement(ListHeaderComponent)
-        : ListHeaderComponent,
-      sections.flatMap((section) => [
-        renderSectionHeader
-          ? ReactActual.createElement(
-              ReactActual.Fragment,
-              { key: `${section.status}-header` },
-              renderSectionHeader({ section }),
-            )
-          : null,
-        ...section.data.map((item, index) =>
-          ReactActual.createElement(
-            ReactActual.Fragment,
-            { key: `${section.status}-${index}` },
-            renderItem({ item, index, section }),
-          ),
-        ),
-      ]),
-    );
+import LibraryScreen from './library';
 
-  return new Proxy(RN, {
-    get(target, property, receiver) {
-      if (property === 'SectionList') return SectionList;
-      return Reflect.get(target, property, receiver);
-    },
-  });
-});
+// ─── Boundary mocks (external/native runtime only) ──────────────────────
+//
+// Everything else (lib/profile via ProfileContext, the subjects / progress /
+// all-books / library-retention / library-search / failed-filing hooks, the
+// api-client, ShelfRow / LibrarySearchBar / LibrarySearchResults / ShimmerSkeleton)
+// now runs for real against the routed mock fetch supplied by `renderScreen`
+// (or the local proxy-aware wrapper). See CONVERT notes in the diff.
+//
+// NOTE — previously this file mocked eleven internal modules:
+//   hooks/use-subjects, use-progress, use-all-books, use-library-search,
+//   use-sessions, use-navigation-contract, lib/profile, lib/api-client,
+//   components/common (ErrorFallback/animations), components/library/ShelfRow,
+//   components/common/ShimmerSkeleton. Those stubs are gone — the real hooks
+//   resolve against routed `/v1/...` responses and the real components render.
 
 // Use the shared mock-i18n util so assertions reference the rendered English
 // copy from en.json (what users actually see), not bare keys. A bare-key mock
@@ -75,437 +48,493 @@ jest.mock('react-native', () => {
 // wired correctly or that {{interpolation}} tokens resolve. See
 // apps/mobile/src/test-utils/mock-i18n.ts for the lookup behaviour.
 jest.mock(
-  'react-i18next',
+  'react-i18next' /* gc1-allow: i18n boundary — returns en.json strings */,
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
 const mockPush = jest.fn();
-const mockUseSubjects = jest.fn();
-const mockUseOverallProgress = jest.fn();
-const mockUseAllBooks = jest.fn();
-const mockUseLibrarySearch = jest.fn();
-const mockUpdateSubjectMutateAsync = jest.fn();
-const mockUseFailedFreeformLibraryFilingSessions = jest.fn();
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-
+const mockReplace = jest.fn();
 jest.mock(
-  '../../hooks/use-subjects' /* gc1-allow: hook boundary mocked to drive library screen states */,
+  'expo-router' /* gc1-allow: expo-router requires a native navigation container not available in JSDOM */,
   () => ({
-    useSubjects: (...args: unknown[]) => mockUseSubjects(...args),
-    useUpdateSubject: () => ({ mutateAsync: mockUpdateSubjectMutateAsync }),
+    useRouter: () => ({ push: mockPush, replace: mockReplace }),
   }),
 );
 
 jest.mock(
-  '../../hooks/use-progress' /* gc1-allow: hook boundary mocked to isolate retention UI */,
+  'react-native-safe-area-context' /* gc1-allow: native module that requires device/simulator to resolve insets */,
   () => ({
-    useOverallProgress: () => mockUseOverallProgress(),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   }),
 );
 
-// use-active-profile-role: real hook used. It reads useProfile() (mocked
-// below) and useParentProxy() (reads isExplicitProxyMode from the mocked
-// useProfile shape, defaulting to undefined → false). The tests only ever
-// exercise the 'owner' branch via { isOwner: true } profiles, so the real
-// resolver returns 'owner' as expected.
-
 jest.mock(
-  '../../hooks/use-all-books' /* gc1-allow: hook boundary mocked to isolate shelf rendering */,
-  () => ({
-    useAllBooks: () => mockUseAllBooks(),
-  }),
+  '../../lib/platform-alert' /* gc1-allow: wraps Alert.alert which is unavailable in JSDOM */,
+  () => ({ platformAlert: jest.fn() }),
 );
 
-// components/progress: RetentionSignal is not imported by library.tsx —
-// removing the previously-stale mock here. The barrel re-export was a
-// dead-mock leftover from an earlier shelf-card design.
-
+// SectionList native virtualization shim. The populated-subject path renders a
+// SectionList; in JSDOM the real VirtualizedList does not lay out, so we forward
+// the VirtualizedList prop surface (sections, initialNumToRender, windowSize)
+// onto a plain View and render every item eagerly. This keeps the
+// [BUG-NOTION-254] break test honest — it asserts those props exist, which the
+// old ScrollView.map() path lacked — while letting items render for the other
+// assertions. gc1-allow: react-native is a native boundary; SectionList layout
+// cannot run under JSDOM.
 jest.mock(
-  '../../components/common' /* gc1-allow: Reanimated worklets and SVG animations cannot run in JSDOM */,
-  () => ({
-    BookPageFlipAnimation: () => null,
-    BrandCelebration: () => null,
-    ErrorFallback: ({
-      message,
-      primaryAction,
-      secondaryAction,
+  'react-native' /* gc1-allow: SectionList native virtualization cannot lay out under JSDOM */,
+  () => {
+    const ReactActual = require('react');
+    const RN = jest.requireActual('react-native');
+    const SectionList = ({
+      ListHeaderComponent,
+      renderItem,
+      renderSectionHeader,
+      sections,
       testID,
+      initialNumToRender,
+      windowSize,
     }: {
-      message: string;
-      primaryAction: { label: string; onPress: () => void; testID?: string };
-      secondaryAction?: { label: string; onPress: () => void; testID?: string };
+      ListHeaderComponent?: React.ReactNode | React.ComponentType;
+      renderItem: (info: {
+        item: unknown;
+        index: number;
+        section: { status: string; data: unknown[] };
+      }) => React.ReactNode;
+      renderSectionHeader?: (info: {
+        section: { status: string; data: unknown[] };
+      }) => React.ReactNode;
+      sections: Array<{ status: string; data: unknown[] }>;
       testID?: string;
-    }) => {
-      const { Pressable, Text, View } = require('react-native');
-      return (
-        <View testID={testID ?? 'error-fallback'}>
-          <Text>{message}</Text>
-          <Pressable
-            onPress={primaryAction.onPress}
-            testID={primaryAction.testID}
-          >
-            <Text>{primaryAction.label}</Text>
-          </Pressable>
-          {secondaryAction ? (
-            <Pressable
-              onPress={secondaryAction.onPress}
-              testID={secondaryAction.testID}
-            >
-              <Text>{secondaryAction.label}</Text>
-            </Pressable>
-          ) : null}
-        </View>
+      initialNumToRender?: number;
+      windowSize?: number;
+    }) =>
+      ReactActual.createElement(
+        RN.View,
+        { testID, initialNumToRender, windowSize, sections },
+        typeof ListHeaderComponent === 'function'
+          ? ReactActual.createElement(ListHeaderComponent)
+          : ListHeaderComponent,
+        sections.flatMap((section) => [
+          renderSectionHeader
+            ? ReactActual.createElement(
+                ReactActual.Fragment,
+                { key: `${section.status}-header` },
+                renderSectionHeader({ section }),
+              )
+            : null,
+          ...section.data.map((item, index) =>
+            ReactActual.createElement(
+              ReactActual.Fragment,
+              { key: `${section.status}-${index}` },
+              renderItem({ item, index, section }),
+            ),
+          ),
+        ]),
       );
-    },
-  }),
-);
 
-// navigation: real module is pure functions wrapping expo-router (already mocked)
-
-// lib/theme: real hooks used. useTheme() reads ThemeContext (default
-// colorScheme: 'light') and useThemeColors() pulls colors from the static
-// design-tokens module — pure data, no native ColorScheme dependency.
-
-jest.mock(
-  '../../lib/api-client' /* gc1-allow: API client hook wraps Clerk useAuth external boundary */,
-  () => ({
-    useApiClient: () => ({
-      library: {
-        retention: {
-          $get: jest.fn().mockResolvedValue({
-            ok: true,
-            json: jest.fn().mockResolvedValue({ subjects: [] }),
-          }),
-        },
+    return new Proxy(RN, {
+      get(target, property, receiver) {
+        if (property === 'SectionList') return SectionList;
+        return Reflect.get(target, property, receiver);
       },
-    }),
-  }),
+    });
+  },
 );
 
-jest.mock(
-  '../../hooks/use-library-search' /* gc1-allow: hook boundary mocked to assert search states */,
-  () => ({
-    useLibrarySearch: (...args: unknown[]) => mockUseLibrarySearch(...args),
-  }),
-);
+// ─── Fixtures ───────────────────────────────────────────────────────────
 
-jest.mock(
-  '../../hooks/use-sessions' /* gc1-allow: hook boundary mocked to isolate Library failed-filing attention states */,
-  () => ({
-    useFailedFreeformLibraryFilingSessions: (...args: unknown[]) =>
-      mockUseFailedFreeformLibraryFilingSessions(...args),
-  }),
-);
+const ACTIVE_PROFILE_ID = 'profile-1';
 
-jest.mock(
-  '../../components/common/ShimmerSkeleton' /* gc1-allow: skeleton implementation is visual-only for these tests */,
-  () => ({
-    ShimmerSkeleton: ({
-      children,
-      testID,
-    }: {
-      children: React.ReactNode;
-      testID?: string;
-    }) => {
-      const { View } = require('react-native');
-      return <View testID={testID}>{children}</View>;
-    },
-  }),
-);
+const OWNER: Profile = createTestProfile({
+  id: ACTIVE_PROFILE_ID,
+  accountId: 'account-1',
+  displayName: 'Solo Learner',
+  isOwner: true,
+  birthYear: 1990,
+});
 
-jest.mock(
-  '../../components/library/ShelfRow' /* gc1-allow: shelf row visual details are outside library screen contract */,
-  () => ({
-    ShelfRow: ({
-      subjectId,
-      name,
-      onPress,
-      testID,
-    }: {
-      subjectId: string;
-      name: string;
-      onPress: (id: string) => void;
-      testID?: string;
-    }) => {
-      const { View, Text, Pressable } = require('react-native');
-      return (
-        <View>
-          <Pressable
-            testID={testID ?? `shelf-row-header-${subjectId}`}
-            onPress={() => onPress(subjectId)}
-            accessibilityRole="button"
-          >
-            <Text>{name}</Text>
-          </Pressable>
-        </View>
-      );
-    },
-  }),
-);
+type SubjectFixture = {
+  id: string;
+  name: string;
+  status: 'active' | 'paused' | 'archived';
+};
 
-// components/library/LibrarySearchBar: real component used. It is a plain
-// TextInput + Ionicons + Pressable composition reading useThemeColors() —
-// no native runtime dependency the test environment cannot provide.
-
-const mockUseProfile = jest.fn(() => ({
-  activeProfile: { id: 'profile-1', isOwner: true },
-  profiles: [{ id: 'profile-1', isOwner: true }],
-}));
-
-jest.mock(
-  '../../lib/profile' /* gc1-allow: ProfileProvider uses SecureStore native storage */,
-  () => ({
-    ...jest.requireActual('../../lib/profile'),
-    useProfile: () => mockUseProfile(),
-    isGuardianProfile: () => false,
-  }),
-);
-
-let mockIsParentProxy = false;
-jest.mock(
-  '../../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy + gates for proxy write-guard tests */,
-  () => ({
-    useNavigationContract: () => ({
-      isParentProxy: mockIsParentProxy,
-      gates: {},
-    }),
-  }),
-);
-
-interface AggregateLibRetention {
+type OverallProgress = {
   subjects: Array<{
     subjectId: string;
-    topics: unknown[];
+    name?: string;
+    topicsTotal?: number;
+    topicsCompleted?: number;
+    topicsVerified?: number;
+    urgencyScore?: number;
+    retentionStatus?: string;
+    lastSessionAt?: string | null;
+  }>;
+  totalTopicsCompleted?: number;
+  totalTopicsVerified?: number;
+};
+
+type RetentionPayload = {
+  subjects: Array<{
+    subjectId: string;
+    topics: unknown;
     reviewDueCount: number;
+  }>;
+};
+
+interface RouteOptions {
+  /** Value returned by GET /v1/subjects?includeInactive=true. */
+  subjects?: SubjectFixture[] | unknown;
+  /** Make the includeInactive subjects request hang (initial loading). */
+  subjectsLoading?: boolean;
+  /** Make the includeInactive subjects request fail (error path). */
+  subjectsError?: boolean;
+  /** Value returned by GET /v1/subjects (the active-only fallback). */
+  fallbackSubjects?: SubjectFixture[];
+  /** Make the active-only fallback request fail. */
+  fallbackSubjectsError?: boolean;
+  progress?: OverallProgress | undefined;
+  progressError?: boolean;
+  retention?: RetentionPayload;
+  allBooksError?: boolean;
+  search?: unknown;
+  /** Sessions surfaced by useFailedFreeformLibraryFilingSessions. */
+  failedFilingSessions?: Array<{
+    sessionId: string;
+    subjectId: string;
+    topicId: string | null;
+    startedAt: string;
   }>;
 }
 
-// The active profile ID used by the profile mock below.
-const ACTIVE_PROFILE_ID = 'profile-1';
+const NEVER = () => new Promise<never>(() => undefined);
 
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+function errorResponse(status = 503): Response {
+  return new Response(JSON.stringify({ code: 'UPSTREAM', message: 'down' }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
   });
-  function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+}
+
+/**
+ * Build the routes map the real library hooks hit. Endpoints discovered from
+ * hook sources:
+ *   useSubjects({includeInactive})      → GET /subjects?includeInactive=true → { subjects }
+ *   useSubjects({enabled}) (fallback)   → GET /subjects (no query)           → { subjects }
+ *   useOverallProgress                  → GET /progress/overview             → OverallProgressResponse
+ *   useAllBooks                         → GET /library/books                 → { subjects: [] }
+ *   useLibraryRetention                 → GET /library/retention             → { subjects }
+ *   useLibrarySearch                    → GET /library/search?q=             → LibrarySearchResult
+ *   useUpdateSubject                    → PATCH /subjects/:id                → { subject }
+ *   useFailedFreeformLibraryFilingSessions
+ *        → GET /progress/sessions?limit=50  → { sessions, nextCursor }
+ *          then GET /sessions/:id            → { session } (LearningSession)
+ */
+function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
+  const subjectsBody = { subjects: opts.subjects ?? [] };
+  const fallbackBody = { subjects: opts.fallbackSubjects ?? [] };
+  const progressBody = opts.progress ?? {
+    subjects: [],
+    totalTopicsCompleted: 0,
+    totalTopicsVerified: 0,
+  };
+  const retentionBody = opts.retention ?? { subjects: [] };
+
+  // Failed-filing detail: each session id resolves to a freeform,
+  // filing_failed LearningSession so the real hook surfaces it.
+  const failed = opts.failedFilingSessions ?? [];
+  const failedById = new Map(failed.map((s) => [s.sessionId, s]));
+
+  const routes: Record<
+    string,
+    unknown | ((url: string, init?: RequestInit) => unknown | Promise<unknown>)
+  > = {
+    // PATCH /subjects/:id and GET /subjects share the `/subjects` prefix; the
+    // detail route is matched first by inserting it earlier with a more
+    // specific predicate handler.
+    '/subjects': (url: string, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'PATCH') {
+        // PATCH /subjects/:id — echo back an updated subject.
+        const id = url.split('/subjects/')[1]?.split('?')[0] ?? 'sub-x';
+        return { subject: { id, name: 'Subject', status: 'archived' } };
+      }
+      if (url.includes('includeInactive=true')) {
+        if (opts.subjectsLoading) return NEVER();
+        if (opts.subjectsError) return errorResponse();
+        return subjectsBody;
+      }
+      // Active-only fallback (no query string).
+      if (opts.fallbackSubjectsError) return errorResponse();
+      return fallbackBody;
+    },
+    '/progress/sessions': {
+      // Shape validated by childSessionsPageResponseSchema in the real hook.
+      sessions: failed.map((s) => ({
+        sessionId: s.sessionId,
+        subjectId: s.subjectId,
+        subjectName: 'Subject',
+        topicId: s.topicId,
+        topicTitle: null,
+        sessionType: 'learning',
+        startedAt: s.startedAt,
+        endedAt: null,
+        exchangeCount: 0,
+        escalationRung: 1,
+        durationSeconds: 0,
+        wallClockSeconds: 0,
+        displayTitle: 'Session',
+        displaySummary: null,
+        homeworkSummary: null,
+        highlight: null,
+        narrative: null,
+        conversationPrompt: null,
+        engagementSignal: null,
+        drills: [],
+      })),
+      nextCursor: null,
+    },
+    '/progress/overview': opts.progressError
+      ? () => errorResponse()
+      : progressBody,
+    '/sessions/': (url: string) => {
+      const id = url.split('/sessions/')[1]?.split(/[?/]/)[0] ?? '';
+      const meta = failedById.get(id);
+      return {
+        session: {
+          id,
+          subjectId: meta?.subjectId ?? '22222222-2222-7222-8222-222222222222',
+          topicId: meta?.topicId ?? null,
+          sessionType: 'learning',
+          inputMode: 'text',
+          verificationType: null,
+          status: 'completed',
+          escalationRung: 1,
+          exchangeCount: 0,
+          startedAt: meta?.startedAt ?? '2026-05-25T10:00:00.000Z',
+          lastActivityAt: meta?.startedAt ?? '2026-05-25T10:00:00.000Z',
+          endedAt: null,
+          durationSeconds: 0,
+          wallClockSeconds: 0,
+          metadata: { effectiveMode: 'freeform' },
+          rawInput: null,
+          filedAt: null,
+          filingStatus: 'filing_failed',
+          filingRetryCount: 0,
+        },
+      };
+    },
+    '/library/retention': retentionBody,
+    '/library/books': opts.allBooksError
+      ? () => errorResponse()
+      : { subjects: [] },
+    '/library/search': opts.search ?? {
+      subjects: [],
+      books: [],
+      topics: [],
+      notes: [],
+      sessions: [],
+    },
+  };
+
+  return createRoutedMockFetch(routes);
+}
+
+// ─── Render helpers ─────────────────────────────────────────────────────
+
+function mount(opts: RouteOptions = {}): RenderScreenResult {
+  return renderScreen(<LibraryScreen />, {
+    profile: OWNER,
+    profiles: [OWNER],
+    routedFetch: buildRoutes(opts),
+  });
+}
+
+/**
+ * Proxy-aware render. `renderScreen` hard-codes `isExplicitProxyMode: false`;
+ * the proxy write-guard suite needs it true, so this composes the same
+ * primitives (routed fetch + ProfileContext + AppContextProvider + QueryClient)
+ * with the proxy flag exposed, plus a `rerender` that flips it.
+ */
+function renderProxyLibrary(opts: {
+  routeOptions?: RouteOptions;
+  isExplicitProxyMode: boolean;
+}): { result: RenderAPI; rerender: (proxy: boolean) => void } {
+  const routedFetch = buildRoutes(opts.routeOptions);
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    routedFetch as unknown as typeof fetch;
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
+
+  function buildProfileValue(proxy: boolean): ProfileContextValue {
+    return {
+      profiles: [OWNER],
+      activeProfile: OWNER,
+      isExplicitProxyMode: proxy,
+      switchProfile: async () => ({ success: true }),
+      isLoading: false,
+      profileLoadError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: () => undefined,
+    };
+  }
+
+  function Wrapper({
+    children,
+    proxy,
+  }: {
+    children: ReactNode;
+    proxy: boolean;
+  }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        ProfileContext.Provider,
+        { value: buildProfileValue(proxy) },
+        createElement(AppContextProvider, null, children),
+      ),
     );
   }
-  return { queryClient, Wrapper };
-}
 
-function setLibraryRetention(
-  queryClient: QueryClient,
-  payload: AggregateLibRetention | undefined,
-) {
-  queryClient.setQueryData(
-    ['library', 'retention', ACTIVE_PROFILE_ID],
-    payload,
+  const result = render(
+    <Wrapper proxy={opts.isExplicitProxyMode}>
+      <LibraryScreen />
+    </Wrapper>,
   );
-}
 
-const LibraryScreen = require('./library').default;
+  return {
+    result,
+    rerender: (proxy: boolean) =>
+      result.rerender(
+        <Wrapper proxy={proxy}>
+          <LibraryScreen />
+        </Wrapper>,
+      ),
+  };
+}
 
 describe('LibraryScreen', () => {
-  let testQueryClient: QueryClient;
-  let TestWrapper: React.ComponentType<{ children: React.ReactNode }>;
+  let active: RenderScreenResult | null = null;
+  let restoreFetch: (() => void) | null = null;
 
-  beforeEach(() => {
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    if (restoreFetch) restoreFetch();
+    restoreFetch = null;
+    cleanupScreen();
     jest.clearAllMocks();
-    mockIsParentProxy = false;
-    mockUseProfile.mockReturnValue({
-      activeProfile: { id: 'profile-1', isOwner: true },
-      profiles: [{ id: 'profile-1', isOwner: true }],
-    });
-    mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
-    const { queryClient, Wrapper } = createWrapper();
-    testQueryClient = queryClient;
-    TestWrapper = Wrapper;
-    setLibraryRetention(testQueryClient, { subjects: [] });
-    mockUseAllBooks.mockReturnValue({
-      books: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseLibrarySearch.mockReturnValue({
-      data: null,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseFailedFreeformLibraryFilingSessions.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  });
+
+  it('shows loading state', async () => {
+    active = mount({ subjectsLoading: true });
+
+    await waitFor(() => {
+      active!.result.getByTestId('library-loading');
     });
   });
 
-  it('shows loading state', () => {
-    mockUseSubjects.mockReturnValue({ data: undefined, isLoading: true });
-    mockUseOverallProgress.mockReturnValue({
-      data: undefined,
-      isLoading: true,
+  it('does not enable the active-subject fallback query during initial loading', async () => {
+    // The fallback query (useSubjects({ enabled })) is gated on
+    // subjectsQuery.isError. While the includeInactive request is still
+    // pending (loading), it must stay disabled — so the no-query /subjects
+    // GET never fires. Behavioral equivalent of the old call-arg assertion.
+    active = mount({ subjectsLoading: true });
+
+    await waitFor(() => {
+      active!.result.getByTestId('library-loading');
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    screen.getByTestId('library-loading');
+    const subjectCalls = fetchCallsMatching(active.routedFetch, '/subjects');
+    // Exactly the includeInactive request fired; the fallback (no query) did not.
+    expect(
+      subjectCalls.filter((c) => c.url.includes('includeInactive=true')).length,
+    ).toBeGreaterThan(0);
+    expect(
+      subjectCalls.filter(
+        (c) =>
+          !c.url.includes('includeInactive=true') &&
+          !c.url.match(/\/subjects\/[^?]/),
+      ),
+    ).toEqual([]);
   });
 
-  it('does not enable the active-subject fallback query during initial loading', () => {
-    mockUseSubjects.mockImplementation(
-      (options?: { includeInactive?: boolean; enabled?: boolean }) =>
-        options?.includeInactive
-          ? { data: undefined, isLoading: true, isError: false }
-          : {
-              data: undefined,
-              isLoading: false,
-              isError: false,
-              refetch: jest.fn(),
-            },
-    );
-    mockUseOverallProgress.mockReturnValue({
-      data: undefined,
-      isLoading: true,
+  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', async () => {
+    // Repro: the cached/returned value can be a non-array (schema drift, error
+    // payload). Without the Array.isArray guard the allTopics flatMap throws
+    // TypeError and the screen white-screens.
+    active = mount({ subjects: { unexpected: 'shape' } });
+
+    await waitFor(() => {
+      active!.result.getByTestId('library-empty');
     });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    expect(mockUseSubjects).toHaveBeenCalledWith({ includeInactive: true });
-    expect(mockUseSubjects).toHaveBeenCalledWith({ enabled: false });
-    expect(mockUseSubjects).not.toHaveBeenCalledWith({ enabled: true });
   });
 
-  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', () => {
-    // Repro: TanStack Query select transform is bypassed when enabled=false,
-    // so the cached value can be a non-array. Without the Array.isArray guard
-    // the allTopics flatMap throws TypeError and the screen white-screens.
-    mockUseSubjects.mockReturnValue({
-      data: { unexpected: 'shape' } as unknown as never,
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
+  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is null', async () => {
+    active = mount({ subjects: null });
 
-    expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
-    ).not.toThrow();
-  });
-
-  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is null', () => {
-    mockUseSubjects.mockReturnValue({
-      data: null as unknown as never,
-      isLoading: false,
+    await waitFor(() => {
+      active!.result.getByTestId('library-empty');
     });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-    expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
-    ).not.toThrow();
   });
 
   // [BUG-818] Repro: server returned a partial-success payload where
   // `topics` was undefined or a non-array value (schema drift, error
   // payload). Without an Array.isArray guard, `data.topics.map` threw and
   // white-screened the Library tab.
-  it('[BUG-818] does not crash when retentionQuery.data.topics is undefined', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
-        {
-          id: 'sub-1',
-          name: 'Math',
-          status: 'IN_PROGRESS',
-        },
-      ] as never,
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-    setLibraryRetention(testQueryClient, {
-      subjects: [
-        {
-          subjectId: 'sub-1',
-          topics: undefined as unknown as never,
-          reviewDueCount: 0,
-        },
-      ],
+  it('[BUG-818] does not crash when retentionQuery.data.topics is undefined', async () => {
+    active = mount({
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      retention: {
+        subjects: [
+          { subjectId: 'sub-1', topics: undefined, reviewDueCount: 0 },
+        ],
+      },
     });
 
-    expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
-    ).not.toThrow();
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-1');
+    });
   });
 
-  it('[BUG-818] does not crash when retentionQuery.data.topics is a non-array shape', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
-        {
-          id: 'sub-1',
-          name: 'Math',
-          status: 'IN_PROGRESS',
-        },
-      ] as never,
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-    setLibraryRetention(testQueryClient, {
-      subjects: [
-        {
-          subjectId: 'sub-1',
-          topics: 'unexpected' as unknown as never,
-          reviewDueCount: 0,
-        },
-      ],
+  it('[BUG-818] does not crash when retentionQuery.data.topics is a non-array shape', async () => {
+    active = mount({
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      retention: {
+        subjects: [
+          { subjectId: 'sub-1', topics: 'unexpected', reviewDueCount: 0 },
+        ],
+      },
     });
 
-    expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
-    ).not.toThrow();
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-1');
+    });
   });
 
-  it('shows empty state when there are no subjects', () => {
-    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+  it('shows empty state when there are no subjects', async () => {
+    active = mount({ subjects: [] });
 
     // New library v3 design: empty state uses library-empty testID
-    screen.getByTestId('library-empty');
-    screen.getByText('Your library will grow as you learn');
+    await waitFor(() => {
+      active!.result.getByTestId('library-empty');
+    });
+    active.result.getByText('Your library will grow as you learn');
   });
 
-  it('routes empty-state learners to subject creation', () => {
-    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
+  it('routes empty-state learners to subject creation', async () => {
+    active = mount({ subjects: [] });
+
+    await waitFor(() => {
+      active!.result.getByTestId('library-empty-go-home');
     });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    fireEvent.press(screen.getByTestId('library-empty-go-home'));
+    fireEvent.press(active.result.getByTestId('library-empty-go-home'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-subject',
@@ -513,13 +542,10 @@ describe('LibraryScreen', () => {
     });
   });
 
-  it('renders shelf rows for each subject', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'History', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: {
+  it('renders shelf rows for each subject', async () => {
+    active = mount({
+      subjects: [{ id: 'sub-1', name: 'History', status: 'active' }],
+      progress: {
         subjects: [
           {
             subjectId: 'sub-1',
@@ -535,33 +561,29 @@ describe('LibraryScreen', () => {
         totalTopicsCompleted: 3,
         totalTopicsVerified: 1,
       },
-      isLoading: false,
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
     // Library v3: subject is a shelf row, not a card
-    screen.getByTestId('shelf-row-header-sub-1');
-    screen.getByText('History');
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-1');
+    });
+    active.result.getByText('History');
   });
 
-  it('orders active subjects first, then paused, then archived', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
+  it('orders active subjects first, then paused, then archived', async () => {
+    active = mount({
+      subjects: [
         { id: 'sub-archived', name: 'Archived Spanish', status: 'archived' },
         { id: 'sub-paused', name: 'Paused History', status: 'paused' },
         { id: 'sub-active', name: 'Active Math', status: 'active' },
       ],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-active');
+    });
 
-    const orderedRowIds = screen
+    const orderedRowIds = active.result
       .UNSAFE_getAllByProps({ accessibilityRole: 'button' })
       .filter((row) => String(row.props.testID).startsWith('shelf-row-header-'))
       .map((row) => String(row.props.testID))
@@ -573,45 +595,38 @@ describe('LibraryScreen', () => {
     ]);
   });
 
-  it('has no top-level tabs — library opens subject detail as the next level', () => {
+  it('has no top-level tabs — library opens subject detail as the next level', async () => {
     // Library v3 redesign replaced Shelves/Books/Topics tabs with a subject
     // shelf list. There are no tab controls at the library level.
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
+    active = mount({
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    expect(screen.queryByTestId('library-tab-shelves')).toBeNull();
-    expect(screen.queryByTestId('library-tab-books')).toBeNull();
-    expect(screen.queryByTestId('library-tab-topics')).toBeNull();
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-1');
+    });
+    const { result } = active;
+    expect(result.queryByTestId('library-tab-shelves')).toBeNull();
+    expect(result.queryByTestId('library-tab-books')).toBeNull();
+    expect(result.queryByTestId('library-tab-topics')).toBeNull();
     // Instead, the subject list is the root navigation.
-    screen.getByTestId('shelves-list');
-    screen.getByTestId('shelf-row-header-sub-1');
-    expect(screen.queryByTestId('shelf-grid-row-active-0')).toBeNull();
-    expect(screen.queryByTestId('shelf-grid-plank-active-0')).toBeNull();
+    result.getByTestId('shelves-list');
+    result.getByTestId('shelf-row-header-sub-1');
+    expect(result.queryByTestId('shelf-grid-row-active-0')).toBeNull();
+    expect(result.queryByTestId('shelf-grid-plank-active-0')).toBeNull();
   });
 
-  it('opens the subject shelf when a subject row is pressed', () => {
+  it('opens the subject shelf when a subject row is pressed', async () => {
     // Library is subject-first: books and suggestions live on the subject
     // shelf screen instead of expanding inline inside the Library list.
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
+    active = mount({
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    fireEvent.press(screen.getByTestId('shelf-row-header-sub-1'));
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-1');
+    });
+    fireEvent.press(active.result.getByTestId('shelf-row-header-sub-1'));
 
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith({
@@ -621,80 +636,69 @@ describe('LibraryScreen', () => {
   });
 
   describe('failed Library filing attention', () => {
-    function arrangePopulatedLibrary() {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
-        isError: false,
-      });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
-      });
-    }
+    const POPULATED: SubjectFixture[] = [
+      { id: 'sub-1', name: 'Math', status: 'active' },
+    ];
 
-    it('renders a small attention row and count when failed freeform Library additions exist', () => {
-      arrangePopulatedLibrary();
-      mockUseFailedFreeformLibraryFilingSessions.mockReturnValue({
-        data: [
+    it('renders a small attention row and count when failed freeform Library additions exist', async () => {
+      active = mount({
+        subjects: POPULATED,
+        failedFilingSessions: [
           {
             sessionId: '11111111-1111-7111-8111-111111111111',
             subjectId: '22222222-2222-7222-8222-222222222222',
             topicId: null,
-            bookId: null,
             startedAt: '2026-05-25T10:00:00.000Z',
           },
           {
             sessionId: '33333333-3333-7333-8333-333333333333',
             subjectId: '22222222-2222-7222-8222-222222222222',
             topicId: null,
-            bookId: null,
             startedAt: '2026-05-25T10:05:00.000Z',
           },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-
-      screen.getByTestId('library-filing-attention-row');
-      screen.getByText('Topic placement needs attention');
+      await waitFor(() => {
+        active!.result.getByTestId('library-filing-attention-row');
+      });
+      active.result.getByText('Topic placement needs attention');
       expect(
-        screen.getByTestId('library-filing-attention-count').props.children,
+        active.result.getByTestId('library-filing-attention-count').props
+          .children,
       ).toBe(2);
     });
 
-    it('does not render the attention row when no failed freeform Library additions exist', () => {
-      arrangePopulatedLibrary();
+    it('does not render the attention row when no failed freeform Library additions exist', async () => {
+      active = mount({ subjects: POPULATED });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-
-      expect(screen.queryByTestId('library-filing-attention-row')).toBeNull();
+      await waitFor(() => {
+        active!.result.getByTestId('shelf-row-header-sub-1');
+      });
+      expect(
+        active.result.queryByTestId('library-filing-attention-row'),
+      ).toBeNull();
     });
 
-    it('routes the attention row to the first failed session summary so retry is available', () => {
-      arrangePopulatedLibrary();
-      mockUseFailedFreeformLibraryFilingSessions.mockReturnValue({
-        data: [
+    it('routes the attention row to the first failed session summary so retry is available', async () => {
+      active = mount({
+        subjects: POPULATED,
+        failedFilingSessions: [
           {
             sessionId: '11111111-1111-7111-8111-111111111111',
             subjectId: '22222222-2222-7222-8222-222222222222',
             topicId: null,
-            bookId: null,
             startedAt: '2026-05-25T10:00:00.000Z',
           },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-
-      fireEvent.press(screen.getByTestId('library-filing-attention-row'));
+      await waitFor(() => {
+        active!.result.getByTestId('library-filing-attention-row');
+      });
+      fireEvent.press(
+        active.result.getByTestId('library-filing-attention-row'),
+      );
 
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/session-summary/[sessionId]',
@@ -709,123 +713,65 @@ describe('LibraryScreen', () => {
   // -----------------------------------------------------------------------
   // BUG-82: allBooksQuery failure is non-fatal — library still renders [BUG-82]
   // -----------------------------------------------------------------------
-  it('does not show full-page error when only allBooksQuery fails', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('does not show full-page error when only allBooksQuery fails', async () => {
+    active = mount({
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      allBooksError: true,
     });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseAllBooks.mockReturnValue({
-      books: [],
-      isLoading: false,
-      isError: true,
-      refetch: jest.fn(),
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     // Library renders normally — subjects still visible as shelf rows
-    expect(screen.queryByTestId('library-error')).toBeNull();
-    screen.getByTestId('shelves-list');
+    await waitFor(() => {
+      active!.result.getByTestId('shelves-list');
+    });
+    expect(active.result.queryByTestId('library-error')).toBeNull();
   });
 
-  it('does not show full-page error when progress fails after subjects load', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Database temporarily unavailable'),
-      refetch: jest.fn(),
-    });
-    mockUseAllBooks.mockReturnValue({
-      books: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('does not show full-page error when progress fails after subjects load', async () => {
+    active = mount({
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      progressError: true,
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    expect(screen.queryByTestId('library-error')).toBeNull();
-    screen.getByTestId('shelf-row-header-sub-1');
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-1');
+    });
+    expect(active.result.queryByTestId('library-error')).toBeNull();
   });
 
-  it('renders cached active subjects when the include-inactive subject refresh fails', () => {
-    const refetchIncludeInactive = jest.fn();
-    const refetchActive = jest.fn();
-    mockUseSubjects.mockImplementation(
-      (options?: { includeInactive?: boolean }) =>
-        options?.includeInactive
-          ? {
-              data: undefined,
-              isLoading: false,
-              isError: true,
-              error: new Error('Database temporarily unavailable'),
-              refetch: refetchIncludeInactive,
-            }
-          : {
-              data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-              isLoading: false,
-              isError: false,
-              refetch: refetchActive,
-            },
-    );
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('renders cached active subjects when the include-inactive subject refresh fails', async () => {
+    // includeInactive request errors; the active-only fallback resolves and
+    // its data is shown instead of a full-page error.
+    active = mount({
+      subjectsError: true,
+      fallbackSubjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    expect(screen.queryByTestId('library-error')).toBeNull();
-    screen.getByText('1 subjects');
-    screen.getByTestId('shelf-row-header-sub-1');
-    expect(mockUseSubjects).toHaveBeenCalledWith({ includeInactive: true });
+    await waitFor(() => {
+      active!.result.getByTestId('shelf-row-header-sub-1');
+    });
+    expect(active.result.queryByTestId('library-error')).toBeNull();
+    active.result.getByText('1 subjects');
   });
 
   describe('Manage Subjects modal — backdrop close [BUG-510]', () => {
-    function arrangeWithOneSubject() {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
-    }
+    const ONE_SUBJECT: SubjectFixture[] = [
+      { id: 'sub-1', name: 'Math', status: 'active' },
+    ];
 
-    it('closes when the backdrop (outside the sheet) is tapped [BUG-510]', () => {
+    it('closes when the backdrop (outside the sheet) is tapped [BUG-510]', async () => {
       // Repro: on web the Close button sits behind the bottom tab bar so
       // pointer events never reach it; the modal had no other dismiss path
       // because the backdrop was a plain View with no onPress.
-      arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      active = mount({ subjects: ONE_SUBJECT });
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
 
-      fireEvent.press(screen.getByTestId('manage-subjects-button'));
-      screen.getByTestId('manage-subjects-backdrop');
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+      active.result.getByTestId('manage-subjects-backdrop');
 
       act(() => {
-        fireEvent.press(screen.getByTestId('manage-subjects-backdrop'));
+        fireEvent.press(active!.result.getByTestId('manage-subjects-backdrop'));
       });
 
       // The backdrop press calls setShowManageSubjects(false), which sets
@@ -834,71 +780,97 @@ describe('LibraryScreen', () => {
       // the tree, but the Modal host component reports visible=false.
       // animationType="slide" uniquely identifies the manage-subjects modal.
       expect(
-        screen.UNSAFE_queryByProps({ visible: false, animationType: 'slide' }),
+        active.result.UNSAFE_queryByProps({
+          visible: false,
+          animationType: 'slide',
+        }),
       ).not.toBeNull();
     });
 
-    it('exposes an accessible label so assistive tech can dismiss the modal [BUG-510]', () => {
-      arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+    it('exposes an accessible label so assistive tech can dismiss the modal [BUG-510]', async () => {
+      active = mount({ subjects: ONE_SUBJECT });
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
 
-      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
 
-      const backdrop = screen.getByTestId('manage-subjects-backdrop');
+      const backdrop = active.result.getByTestId('manage-subjects-backdrop');
       expect(backdrop.props.accessibilityRole).toBe('button');
       expect(backdrop.props.accessibilityLabel).toBe('Close manage subjects');
     });
 
     it('sends archived status when the Archive action is pressed', async () => {
-      arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-
-      fireEvent.press(screen.getByTestId('manage-subjects-button'));
-      await act(async () => {
-        fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+      active = mount({ subjects: ONE_SUBJECT });
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
       });
 
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+      await act(async () => {
+        fireEvent.press(active!.result.getByTestId('archive-subject-sub-1'));
+      });
+
+      // The real useUpdateSubject mutation fires PATCH /subjects/:id with the
+      // archived status in the JSON body.
       await waitFor(() => {
-        expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
-          subjectId: 'sub-1',
+        const calls = fetchCallsMatching(
+          active!.routedFetch,
+          '/subjects/sub-1',
+        );
+        expect(calls.length).toBeGreaterThan(0);
+        expect(calls[0]!.init?.method).toBe('PATCH');
+        expect(JSON.parse(String(calls[0]!.init?.body))).toEqual({
           status: 'archived',
         });
       });
     });
 
     it('disables other subject actions while one status update is saving', async () => {
+      // Hold the PATCH open so the in-flight pending state is observable.
       let finishUpdate!: () => void;
-      mockUpdateSubjectMutateAsync.mockReturnValue(
-        new Promise<void>((resolve) => {
-          finishUpdate = resolve;
-        }),
-      );
-      mockUseSubjects.mockReturnValue({
-        data: [
+      const routedFetch = buildRoutes({
+        subjects: [
           { id: 'sub-1', name: 'Math', status: 'active' },
           { id: 'sub-2', name: 'History', status: 'active' },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
+      routedFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (method === 'PATCH') {
+          return new Promise<unknown>((resolve) => {
+            finishUpdate = () =>
+              resolve({
+                subject: { id: 'sub-1', name: 'Math', status: 'archived' },
+              });
+          });
+        }
+        if (url.includes('includeInactive=true')) {
+          return {
+            subjects: [
+              { id: 'sub-1', name: 'Math', status: 'active' },
+              { id: 'sub-2', name: 'History', status: 'active' },
+            ],
+          };
+        }
+        return { subjects: [] };
       });
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-
-      fireEvent.press(screen.getByTestId('manage-subjects-button'));
-      fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+      active = renderScreen(<LibraryScreen />, {
+        profile: OWNER,
+        profiles: [OWNER],
+        routedFetch,
+      });
 
       await waitFor(() => {
-        expect(screen.getByTestId('archive-subject-sub-2')).toBeDisabled();
+        active!.result.getByTestId('manage-subjects-button');
       });
-      expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
-        subjectId: 'sub-1',
-        status: 'archived',
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
+      fireEvent.press(active.result.getByTestId('archive-subject-sub-1'));
+
+      await waitFor(() => {
+        expect(
+          active!.result.getByTestId('archive-subject-sub-2'),
+        ).toBeDisabled();
       });
       await act(async () => {
         finishUpdate();
@@ -914,78 +886,68 @@ describe('LibraryScreen', () => {
   // from topicCountsByBookId, so the header subtitle silently undercounted
   // those topics — visibly drifting from per-shelf topic totals.
   describe('Header topic count [BUG-971]', () => {
-    it('counts topics with null bookId in the header subtitle', () => {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
+    it('counts topics with null bookId in the header subtitle', async () => {
+      active = mount({
+        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        retention: {
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              topics: [
+                {
+                  topicId: 't-1',
+                  bookId: 'book-1',
+                  easeFactor: 2.5,
+                  repetitions: 0,
+                  lastReviewedAt: null,
+                  xpStatus: 'pending',
+                  failureCount: 0,
+                },
+                {
+                  topicId: 't-2',
+                  bookId: null,
+                  easeFactor: 2.5,
+                  repetitions: 0,
+                  lastReviewedAt: null,
+                  xpStatus: 'pending',
+                  failureCount: 0,
+                },
+                {
+                  topicId: 't-3',
+                  bookId: null,
+                  easeFactor: 2.5,
+                  repetitions: 0,
+                  lastReviewedAt: null,
+                  xpStatus: 'pending',
+                  failureCount: 0,
+                },
+              ],
+              reviewDueCount: 0,
+            },
+          ],
+        },
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-      });
-      setLibraryRetention(testQueryClient, {
-        subjects: [
-          {
-            subjectId: 'sub-1',
-            topics: [
-              {
-                topicId: 't-1',
-                bookId: 'book-1',
-                easeFactor: 2.5,
-                repetitions: 0,
-                lastReviewedAt: null,
-                xpStatus: 'pending',
-                failureCount: 0,
-              },
-              {
-                topicId: 't-2',
-                bookId: null,
-                easeFactor: 2.5,
-                repetitions: 0,
-                lastReviewedAt: null,
-                xpStatus: 'pending',
-                failureCount: 0,
-              },
-              {
-                topicId: 't-3',
-                bookId: null,
-                easeFactor: 2.5,
-                repetitions: 0,
-                lastReviewedAt: null,
-                xpStatus: 'pending',
-                failureCount: 0,
-              },
-            ],
-            reviewDueCount: 0,
-          },
-        ],
-      });
-
-      render(<LibraryScreen />, { wrapper: TestWrapper });
 
       // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
       // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
       // Match on the topic-count segment only — the subject-count segment's
       // grammar ("1 subject" vs "1 subjects") may shift if proper i18next
       // pluralization lands later, and that change is unrelated to BUG-971.
-      expect(screen.getByText(/· 3 topics\b/));
+      await waitFor(() => {
+        active!.result.getByText(/· 3 topics\b/);
+      });
     });
 
-    it('omits the topic count segment entirely when there are no topics', () => {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
+    it('omits the topic count segment entirely when there are no topics', async () => {
+      active = mount({
+        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        retention: { subjects: [] },
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-      });
-      setLibraryRetention(testQueryClient, { subjects: [] });
-
-      render(<LibraryScreen />, { wrapper: TestWrapper });
 
       // Header should read just "1 subjects" with no trailing " · N topics".
-      screen.getByText('1 subjects');
+      await waitFor(() => {
+        active!.result.getByText('1 subjects');
+      });
     });
   });
 
@@ -1037,14 +999,10 @@ describe('LibraryScreen', () => {
       ],
     };
 
-    function renderSearching() {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
-        isLoading: false,
-        isError: false,
-      });
-      mockUseOverallProgress.mockReturnValue({
-        data: {
+    async function renderSearching(): Promise<void> {
+      active = mount({
+        subjects: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
+        progress: {
           subjects: [
             {
               subjectId: 'sub-1',
@@ -1054,19 +1012,21 @@ describe('LibraryScreen', () => {
             },
           ],
         },
-        isLoading: false,
-        isError: false,
+        search: SEARCH_DATA,
       });
-      mockUseLibrarySearch.mockReturnValue({
-        data: SEARCH_DATA,
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
+      await waitFor(() => {
+        active!.result.getByTestId('shelf-row-header-sub-1');
       });
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-      fireEvent.changeText(screen.getByTestId('library-search-input'), 'test');
-      act(() => {
-        jest.runOnlyPendingTimers();
+      fireEvent.changeText(
+        active.result.getByTestId('library-search-input'),
+        'test',
+      );
+      // Debounce (300ms) + async /library/search resolution.
+      await act(async () => {
+        jest.advanceTimersByTime(350);
+      });
+      await waitFor(() => {
+        active!.result.getByTestId('search-subject-row-sub-1');
       });
     }
 
@@ -1078,9 +1038,9 @@ describe('LibraryScreen', () => {
       jest.useRealTimers();
     });
 
-    it('subject row tap calls router.push to shelf', () => {
-      renderSearching();
-      fireEvent.press(screen.getByTestId('search-subject-row-sub-1'));
+    it('subject row tap calls router.push to shelf', async () => {
+      await renderSearching();
+      fireEvent.press(active!.result.getByTestId('search-subject-row-sub-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]',
@@ -1089,9 +1049,9 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('book row tap pushes shelf then book', () => {
-      renderSearching();
-      fireEvent.press(screen.getByTestId('book-row-book-1'));
+    it('book row tap pushes shelf then book', async () => {
+      await renderSearching();
+      fireEvent.press(active!.result.getByTestId('book-row-book-1'));
       expect(mockPush).toHaveBeenCalledTimes(2);
       expect(mockPush).toHaveBeenNthCalledWith(
         1,
@@ -1112,9 +1072,9 @@ describe('LibraryScreen', () => {
     // [BUG-404] topic and note pushes must include subjectId + bookId so the
     // topic screen can skip the extra useResolveTopicSubject round-trip and the
     // back-button fallback resolves to the correct book screen.
-    it('topic row tap pushes to topic screen with subjectId and bookId context', () => {
-      renderSearching();
-      fireEvent.press(screen.getByTestId('topic-row-top-1'));
+    it('topic row tap pushes to topic screen with subjectId and bookId context', async () => {
+      await renderSearching();
+      fireEvent.press(active!.result.getByTestId('topic-row-top-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
@@ -1123,9 +1083,9 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('note row tap pushes to parent topic with subjectId and bookId context', () => {
-      renderSearching();
-      fireEvent.press(screen.getByTestId('note-row-note-1'));
+    it('note row tap pushes to parent topic with subjectId and bookId context', async () => {
+      await renderSearching();
+      fireEvent.press(active!.result.getByTestId('note-row-note-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
@@ -1134,9 +1094,9 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('session row tap pushes to root session-summary route', () => {
-      renderSearching();
-      fireEvent.press(screen.getByTestId('session-row-sess-1'));
+    it('session row tap pushes to root session-summary route', async () => {
+      await renderSearching();
+      fireEvent.press(active!.result.getByTestId('session-row-sess-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/session-summary/[sessionId]',
@@ -1154,129 +1114,108 @@ describe('LibraryScreen', () => {
   //
   // Library derives retention from /library/retention (useLibraryRetention),
   // NOT from useOverallProgress. These tests verify that:
-  //   1. The shimmer skeleton shows while libraryRetentionQuery is loading.
+  //   1. The screen still renders shelf rows while libraryRetentionQuery is
+  //      loading (subjects + curriculum already loaded).
   //   2. Shelf rows render correctly when /library/retention returns mixed
-  //      statuses (the query-cache path, not the overall-progress path).
+  //      statuses (the library-owned path, not the overall-progress path).
   // -------------------------------------------------------------------------
   describe('Library retention boundary [PR-4]', () => {
-    it('shows shimmer skeleton while libraryRetentionQuery is loading', async () => {
-      // Pre-emptively seed retention as undefined so the useApiClient mock
-      // returns a never-resolving promise — simulating a slow /library/retention.
-      // Leave the retention cache unseeded — useLibraryRetention starts in
-      // its loading state, and library.tsx must still render the shelf rows
-      // because subjects + curriculum are already loaded.
-      testQueryClient.setQueryData(
-        ['library', 'retention', ACTIVE_PROFILE_ID],
-        undefined,
-      );
-
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
-        isError: false,
+    it('renders shelf rows while libraryRetentionQuery is loading', async () => {
+      // /library/retention never resolves — subjects are loaded, so the shelf
+      // rows must still render (no overall-progress loading gate required).
+      const routedFetch = buildRoutes({
+        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
+      routedFetch.setRoute('/library/retention', () => NEVER());
+      active = renderScreen(<LibraryScreen />, {
+        profile: OWNER,
+        profiles: [OWNER],
+        routedFetch,
       });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-
-      // While retention query is pending, subjects are loaded — screen renders
-      // (no overall-progress loading gate required). ShelfRow for sub-1 is visible.
-      screen.getByTestId('shelf-row-header-sub-1');
+      await waitFor(() => {
+        active!.result.getByTestId('shelf-row-header-sub-1');
+      });
     });
 
     it('renders shelf rows when /library/retention returns subjects with mixed statuses', async () => {
-      // Seed the library retention cache with three subjects: strong, fading, forgotten.
-      // This tests the query-cache path that useLibraryRetention reads from.
+      // Seed the library retention payload with three subjects: strong,
+      // fading, forgotten. This tests the library-owned path that
+      // useLibraryRetention reads from.
       const FUTURE = new Date(
         Date.now() + 5 * 24 * 60 * 60 * 1000,
       ).toISOString();
       const NEAR = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString();
 
-      setLibraryRetention(testQueryClient, {
+      active = mount({
         subjects: [
-          {
-            subjectId: 'sub-strong',
-            topics: [
-              {
-                topicId: 't-s1',
-                easeFactor: 2.5,
-                repetitions: 3,
-                nextReviewAt: FUTURE,
-                lastReviewedAt: '2026-01-01T00:00:00.000Z',
-                xpStatus: 'verified',
-                failureCount: 0,
-              },
-            ],
-            reviewDueCount: 0,
-          },
-          {
-            subjectId: 'sub-fading',
-            topics: [
-              {
-                topicId: 't-f1',
-                easeFactor: 2.5,
-                repetitions: 2,
-                nextReviewAt: NEAR,
-                lastReviewedAt: '2026-01-01T00:00:00.000Z',
-                xpStatus: 'pending',
-                failureCount: 0,
-              },
-            ],
-            reviewDueCount: 1,
-          },
-          {
-            subjectId: 'sub-forgotten',
-            topics: [
-              {
-                topicId: 't-g1',
-                easeFactor: 2.5,
-                repetitions: 1,
-                nextReviewAt: null,
-                lastReviewedAt: null,
-                xpStatus: 'decayed',
-                failureCount: 0,
-              },
-            ],
-            reviewDueCount: 1,
-          },
-        ],
-      });
-
-      mockUseSubjects.mockReturnValue({
-        data: [
           { id: 'sub-strong', name: 'Strong Subject', status: 'active' },
           { id: 'sub-fading', name: 'Fading Subject', status: 'active' },
           { id: 'sub-forgotten', name: 'Forgotten Subject', status: 'active' },
         ],
-        isLoading: false,
-        isError: false,
+        retention: {
+          subjects: [
+            {
+              subjectId: 'sub-strong',
+              topics: [
+                {
+                  topicId: 't-s1',
+                  easeFactor: 2.5,
+                  repetitions: 3,
+                  nextReviewAt: FUTURE,
+                  lastReviewedAt: '2026-01-01T00:00:00.000Z',
+                  xpStatus: 'verified',
+                  failureCount: 0,
+                },
+              ],
+              reviewDueCount: 0,
+            },
+            {
+              subjectId: 'sub-fading',
+              topics: [
+                {
+                  topicId: 't-f1',
+                  easeFactor: 2.5,
+                  repetitions: 2,
+                  nextReviewAt: NEAR,
+                  lastReviewedAt: '2026-01-01T00:00:00.000Z',
+                  xpStatus: 'pending',
+                  failureCount: 0,
+                },
+              ],
+              reviewDueCount: 1,
+            },
+            {
+              subjectId: 'sub-forgotten',
+              topics: [
+                {
+                  topicId: 't-g1',
+                  easeFactor: 2.5,
+                  repetitions: 1,
+                  nextReviewAt: null,
+                  lastReviewedAt: null,
+                  xpStatus: 'decayed',
+                  failureCount: 0,
+                },
+              ],
+              reviewDueCount: 1,
+            },
+          ],
+        },
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
-      });
-
-      render(<LibraryScreen />, { wrapper: TestWrapper });
 
       // All three shelves render — data sourced exclusively from the library
-      // retention cache (not from useOverallProgress). The review badge is
-      // rendered by the real ShelfRow based on reviewDueCount, but since
-      // ShelfRow is mocked in this test file we assert on what the mock exposes:
-      // the three shelf-row headers derived from the three subjects in the
-      // library retention payload.
-      screen.getByTestId('shelf-row-header-sub-strong');
-      screen.getByTestId('shelf-row-header-sub-fading');
-      screen.getByTestId('shelf-row-header-sub-forgotten');
+      // retention payload (not from useOverallProgress).
+      await waitFor(() => {
+        active!.result.getByTestId('shelf-row-header-sub-strong');
+      });
+      active.result.getByTestId('shelf-row-header-sub-fading');
+      active.result.getByTestId('shelf-row-header-sub-forgotten');
 
       // All three subject names are visible
-      screen.getByText('Strong Subject');
-      screen.getByText('Fading Subject');
-      screen.getByText('Forgotten Subject');
+      active.result.getByText('Strong Subject');
+      active.result.getByText('Fading Subject');
+      active.result.getByText('Forgotten Subject');
     });
   });
 
@@ -1286,36 +1225,25 @@ describe('LibraryScreen', () => {
   // VirtualizedList prop set fingerprints the SectionList path; the
   // ScrollView.map() implementation lacks these props entirely.
   describe('virtualization [BUG-NOTION-254]', () => {
-    it('renders the subject list via a virtualized SectionList', () => {
+    it('renders the subject list via a virtualized SectionList', async () => {
       // 50 subjects — well above any plausible viewport window.
       const subjects = Array.from({ length: 50 }, (_, i) => ({
         id: `sub-${i}`,
         name: `Subject ${i}`,
         status: 'active' as const,
       }));
-      mockUseSubjects.mockReturnValue({
-        data: subjects,
-        isLoading: false,
-        isError: false,
-      });
-      mockUseOverallProgress.mockReturnValue({
-        data: {
-          subjects: [],
-          totalTopicsCompleted: 0,
-          totalTopicsVerified: 0,
-        },
-        isLoading: false,
-        isError: false,
-      });
+      active = mount({ subjects });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      await waitFor(() => {
+        active!.result.getByTestId('shelves-list');
+      });
 
       // The SectionList host carries `shelves-list` and exposes the
       // VirtualizedList prop surface (initialNumToRender, windowSize, sections).
       // ScrollView.map() — the old code path — has no `sections` prop and no
       // `initialNumToRender` prop. Asserting on these props is the precise
       // fingerprint of the virtualized path.
-      const list = screen.getByTestId('shelves-list');
+      const list = active.result.getByTestId('shelves-list');
       expect(list.props.initialNumToRender).toBeDefined();
       expect(list.props.windowSize).toBeDefined();
       expect(Array.isArray(list.props.sections)).toBe(true);
@@ -1328,69 +1256,79 @@ describe('LibraryScreen', () => {
   // WI-273: Proxy mode — write controls disabled, hint shown
   // -------------------------------------------------------------------------
   describe('proxy mode write guard [WI-273]', () => {
-    beforeEach(() => {
-      mockIsParentProxy = true;
-      mockUseProfile.mockReturnValue({
-        activeProfile: { id: 'profile-1', isOwner: true },
-        profiles: [{ id: 'profile-1', isOwner: true }],
+    const PROXY_ROUTES: RouteOptions = {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+    };
+
+    it('shows the proxy read-only hint when in proxy mode [WI-273]', async () => {
+      const { result } = renderProxyLibrary({
+        routeOptions: PROXY_ROUTES,
+        isExplicitProxyMode: true,
       });
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
+      restoreFetch = () => undefined;
+      await waitFor(() => {
+        result.getByTestId('library-proxy-hint');
       });
     });
 
-    it('shows the proxy read-only hint when in proxy mode [WI-273]', () => {
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-      screen.getByTestId('library-proxy-hint');
-    });
-
-    it('hides the Manage subjects button in proxy mode [WI-273]', () => {
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-      expect(screen.queryByTestId('manage-subjects-button')).toBeNull();
+    it('hides the Manage subjects button in proxy mode [WI-273]', async () => {
+      const { result } = renderProxyLibrary({
+        routeOptions: PROXY_ROUTES,
+        isExplicitProxyMode: true,
+      });
+      restoreFetch = () => undefined;
+      await waitFor(() => {
+        result.getByTestId('library-proxy-hint');
+      });
+      expect(result.queryByTestId('manage-subjects-button')).toBeNull();
     });
 
     it('does not dispatch updateSubject in proxy mode — manage-subjects button absent so modal interaction impossible [WI-273]', async () => {
       // The manage-subjects button is hidden in proxy mode (canWrite=false).
       // Without it, the modal cannot be opened and the status-change handler
       // cannot be invoked from the UI. This confirms the write path is blocked.
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      const { result } = renderProxyLibrary({
+        routeOptions: PROXY_ROUTES,
+        isExplicitProxyMode: true,
+      });
+      restoreFetch = () => undefined;
 
-      // Guard is active: proxy hint shown, manage button absent.
-      screen.getByTestId('library-proxy-hint');
-      expect(screen.queryByTestId('manage-subjects-button')).toBeNull();
-      expect(mockUpdateSubjectMutateAsync).not.toHaveBeenCalled();
+      await waitFor(() => {
+        result.getByTestId('library-proxy-hint');
+      });
+      expect(result.queryByTestId('manage-subjects-button')).toBeNull();
     });
 
     it('positive control — updateSubject IS reachable when not in proxy mode [WI-273]', async () => {
-      // Flip to non-proxy so the manage button appears and the mutation is
-      // callable. This proves the negative proxy test is non-vacuous: the
-      // mutation CAN be triggered when the guard is absent.
-      mockIsParentProxy = false;
-      mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
-
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      // Non-proxy so the manage button appears and the mutation is callable.
+      // This proves the negative proxy test is non-vacuous: the mutation CAN
+      // be triggered when the guard is absent.
+      const routedFetch = buildRoutes(PROXY_ROUTES);
+      active = renderScreen(<LibraryScreen />, {
+        profile: OWNER,
+        profiles: [OWNER],
+        routedFetch,
+      });
 
       // Manage button must be present in non-proxy mode.
-      screen.getByTestId('manage-subjects-button');
+      await waitFor(() => {
+        active!.result.getByTestId('manage-subjects-button');
+      });
 
       // Open the modal and press the archive action for the subject.
-      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      fireEvent.press(active.result.getByTestId('manage-subjects-button'));
       await act(async () => {
-        fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+        fireEvent.press(active!.result.getByTestId('archive-subject-sub-1'));
       });
 
       await waitFor(() => {
-        expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
-          subjectId: 'sub-1',
+        const calls = fetchCallsMatching(
+          active!.routedFetch,
+          '/subjects/sub-1',
+        );
+        expect(calls.length).toBeGreaterThan(0);
+        expect(calls[0]!.init?.method).toBe('PATCH');
+        expect(JSON.parse(String(calls[0]!.init?.body))).toEqual({
           status: 'archived',
         });
       });
@@ -1401,25 +1339,26 @@ describe('LibraryScreen', () => {
       // proxy mode: the modal is opened in non-proxy (the Manage button is
       // visible), then a profile switch flips the session to proxy while the
       // modal stays open. The controls must become disabled so the write is
-      // unreachable. (The in-handler `if (!canWrite) return` is belt-and-
-      // suspenders behind this disabled prop — a disabled Pressable does not
-      // forward the press to its handler, so the handler is not reachable from
-      // the UI once disabled; the disabled state below is the reachable gate,
-      // and the server-side assertNotProxyMode is the authoritative backstop.)
-      // Non-vacuous: drop `!canWrite` from the control's `disabled` prop and the
-      // toBeDisabled assertions fail.
-      mockIsParentProxy = false;
-      const { rerender } = render(<LibraryScreen />, { wrapper: TestWrapper });
-      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      // unreachable. Non-vacuous: drop `!canWrite` from the control's
+      // `disabled` prop and the toBeDisabled assertions fail.
+      const { result, rerender } = renderProxyLibrary({
+        routeOptions: PROXY_ROUTES,
+        isExplicitProxyMode: false,
+      });
+      restoreFetch = () => undefined;
+
+      await waitFor(() => {
+        result.getByTestId('manage-subjects-button');
+      });
+      fireEvent.press(result.getByTestId('manage-subjects-button'));
       // Controls are enabled while the modal is open in non-proxy mode.
-      expect(screen.getByTestId('archive-subject-sub-1')).not.toBeDisabled();
+      expect(result.getByTestId('archive-subject-sub-1')).not.toBeDisabled();
 
       // Proxy mode activates while the modal is still open (state persists).
-      mockIsParentProxy = true;
-      rerender(<LibraryScreen />);
+      rerender(true);
 
-      expect(screen.getByTestId('archive-subject-sub-1')).toBeDisabled();
-      expect(screen.getByTestId('pause-subject-sub-1')).toBeDisabled();
+      expect(result.getByTestId('archive-subject-sub-1')).toBeDisabled();
+      expect(result.getByTestId('pause-subject-sub-1')).toBeDisabled();
     });
   });
 });

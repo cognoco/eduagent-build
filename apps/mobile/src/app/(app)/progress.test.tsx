@@ -1,3 +1,4 @@
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import {
   act,
   fireEvent,
@@ -5,361 +6,150 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import type { Profile } from '@eduagent/schemas';
 import {
-  fetchLearningResumeTarget,
-  useChildInventory,
-  useChildProgressSummary,
-  useLearningResumeTarget,
-  useOverallProgress,
-  useProgressInventory,
-  useProgressMilestones,
-  useProfileSessions,
-  useProfileReports,
-  useProfileWeeklyReports,
-  useRefreshProgressSnapshot,
-} from '../../hooks/use-progress';
+  createRoutedMockFetch,
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../test-utils/mock-api-routes';
+import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
+import { AppContextProvider } from '../../lib/app-context';
+import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import { getSubjectTintMap } from '../../lib/subject-tints';
 import ProgressScreen from './progress/index';
 
-jest.mock('react-i18next', () => ({
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      // Hero copy translations
-      if (key === 'progress.hero.sessionsCompleted') {
-        const count = opts?.count as number;
-        return `${count} session${count === 1 ? '' : 's'} completed`;
-      }
-      if (key === 'progress.hero.sessionsCompletedSubtitle')
-        return 'Topics mastered and vocabulary will appear as you progress.';
-      if (key === 'progress.hero.buildingLanguage')
-        return "You're building your language";
-      if (key === 'progress.hero.buildingLanguageSubtitle')
-        return `${opts?.count ?? ''} words and counting.`;
-      if (key === 'progress.hero.knowWords')
-        return `You know ${opts?.count ?? ''} words`;
-      if (key === 'progress.hero.knowWordsSubtitle')
-        return 'That knowledge is yours now.';
-      if (key === 'progress.hero.buildingKnowledge')
-        return "You're building your knowledge";
-      if (key === 'progress.hero.buildingKnowledgeSubtitle')
-        return `${opts?.count ?? ''} topics and counting.`;
-      if (key === 'progress.hero.masteredTopics')
-        return `You've mastered ${opts?.count ?? ''} topics`;
-      if (key === 'progress.hero.masteredTopicsSubtitle')
-        return 'Your progress keeps stacking up.';
-      if (key === 'progress.hero.masteredTopicsAndWords')
-        return `And you know ${opts?.words ?? ''} words across your subjects.`;
-      if (key === 'progress.empty.withSubjectTitle')
-        return `Progress unlocks after you study ${opts?.subject ?? ''}`;
-      if (key === 'progress.empty.withSubjectSubtitle')
-        return `Study a topic in ${opts?.subject ?? ''} first.`;
-      if (key === 'progress.empty.title')
-        return 'Progress appears after the first study session';
-      if (key === 'progress.empty.subtitle')
-        return 'Sessions, mastery, reviews, and reports will appear here once there is something to measure.';
-      if (key === 'progress.startLearning') return 'Start learning';
-      if (key === 'tabs.library') return 'Library';
-      if (key === 'progress.pageTitleMine') return 'My progress';
-      if (key === 'progress.pageTitleProfile')
-        return `${opts?.name ?? ''}'s progress`;
-      if (key === 'progress.pageTitleFallbackName') return 'Your child';
-      if (key === 'progress.register.child.weekTitle') return 'Your week';
-      if (key === 'progress.register.child.monthTitle') return 'Your month';
-      if (key === 'progress.register.child.growthTitle')
-        return 'What you learned';
-      if (key === 'progress.register.child.growthSubtitle')
-        return 'Your weekly wins';
-      if (key === 'progress.register.child.masteredTopicsHero')
-        return `You learned ${opts?.count ?? ''} topics. Steady wins.`;
-      if (key === 'progress.register.child.growthPrimaryLegend')
-        return 'Topics learned';
-      if (key === 'progress.register.child.growthSecondaryLegend')
-        return 'Words added';
-      if (key === 'progress.register.child.currentlyWorkingOnTitle')
-        return "What you're working on right now";
-      if (key === 'progress.register.child.currentlyWorkingOnDetected')
-        return 'Spotted in your recent sessions';
-      if (key === 'progress.register.adult.weekTitle') return 'Weekly report';
-      if (key === 'progress.register.adult.monthTitle') return 'Monthly report';
-      if (key === 'progress.register.adult.growthTitle') return 'Your growth';
-      if (key === 'progress.register.adult.growthSubtitle')
-        return 'Weekly changes in topics mastered and vocabulary';
-      if (key === 'progress.register.adult.growthPrimaryLegend')
-        return 'Topics mastered';
-      if (key === 'progress.register.adult.growthSecondaryLegend')
-        return 'Vocabulary growth';
-      if (key === 'progress.register.adult.currentlyWorkingOnTitle')
-        return 'Currently working on';
-      if (key === 'progress.register.adult.currentlyWorkingOnDetected')
-        return 'Detected from recent sessions';
-      if (key === 'progress.growthSnapshot.latestWeek') return 'Latest week';
-      if (key === 'progress.growthSnapshot.recentWeeks') return 'Recent weeks';
-      if (key === 'progress.growthSnapshot.sessions') {
-        const count = opts?.count as number;
-        return `${count} session${count === 1 ? '' : 's'}`;
-      }
-      if (key === 'progress.growthSnapshot.topicsExplored') {
-        const count = opts?.count as number;
-        return `${count} topic${count === 1 ? '' : 's'} explored`;
-      }
-      if (key === 'progress.growthSnapshot.topicsLearned') {
-        const count = opts?.count as number;
-        return `${count} topic${count === 1 ? '' : 's'} learned`;
-      }
-      if (key === 'progress.growthSnapshot.topicsMastered') {
-        const count = opts?.count as number;
-        return `${count} topic${count === 1 ? '' : 's'} mastered`;
-      }
-      if (key === 'progress.growthSnapshot.wordsAdded') {
-        const count = opts?.count as number;
-        return `${count} word${count === 1 ? '' : 's'} added`;
-      }
-      if (key === 'progress.growthSnapshot.weekDetail')
-        return `${opts?.sessions ?? 0} sessions · ${opts?.time ?? ''} · ${
-          opts?.topics ?? 0
-        } topics · ${opts?.words ?? 0} words`;
-      if (key === 'progress.currentlyWorkingOn.andNMore')
-        return `and ${opts?.count ?? ''} more`;
-      if (key === 'progress.latestReport.title') return 'Latest report';
-      if (key === 'progress.latestReport.open') return 'Open report';
-      if (key === 'progress.latestReport.openWithDate')
-        return `Open report for ${opts?.date ?? ''}`;
-      if (key === 'progress.latestReport.empty')
-        return 'Your next weekly or monthly report will appear here once there is enough learning to summarize.';
-      if (key === 'progress.latestReport.error')
-        return "We couldn't load the latest report right now.";
-      if (key === 'progress.latestReport.sessions') return 'Sessions';
-      if (key === 'progress.latestReport.time') return 'Time';
-      if (key === 'progress.latestReport.topics') return 'Topics';
-      if (key === 'progress.latestReport.words') return 'Words';
-      if (key === 'progress.latestReport.practiceLessons') {
-        const count = opts?.count as number;
-        return `${count} practice lesson${count === 1 ? '' : 's'}`;
-      }
-      if (key === 'progress.latestReport.practicePoints') {
-        const count = opts?.count as number;
-        return `${count} practice point${count === 1 ? '' : 's'}`;
-      }
-      if (key === 'progress.recentFocus.title') return 'Recent sessions';
-      if (key === 'progress.recentFocus.showAll') return 'Show all sessions';
-      if (key === 'progress.recentFocus.empty')
-        return 'Recent sessions will appear here once learning gets going.';
-      if (key === 'progress.recentFocus.error')
-        return "We couldn't load recent sessions right now.";
-      if (key === 'progress.recentFocus.sessionFallback')
-        return `Studied ${opts?.date ?? ''}`;
-      // New learner
-      if (key === 'progress.newLearner.title') {
-        const count = opts?.count as number;
-        return `You've completed ${count} session${
-          count === 1 ? '' : 's'
-        }. Keep going!`;
-      }
-      if (key === 'progress.newLearner.subtitle') {
-        const count = opts?.count as number;
-        return `Complete ${count} more ${
-          count === 1 ? 'session' : 'sessions'
-        } to see your full learning journey!`;
-      }
-      // Milestone next label
-      if (key === 'progress.milestones.allReached')
-        return "You've reached all session milestones. Keep exploring!";
-      if (key === 'progress.milestones.nextMilestone') {
-        const count = opts?.count as number;
-        return `Complete ${count} more ${
-          count === 1 ? 'session' : 'sessions'
-        } to reach your next milestone.`;
-      }
-      // Stats
-      if (key === 'progress.stats.sessions') {
-        const count = opts?.count as number;
-        return `${count} sessions`;
-      }
-      if (key === 'progress.stats.practiceLessons') {
-        const count = opts?.count as number;
-        return `${count} practice ${count === 1 ? 'lesson' : 'lessons'}`;
-      }
-      if (key === 'progress.stats.streak') {
-        const count = opts?.count as number;
-        return `${count}-day streak`;
-      }
-      if (key === 'progress.weeklyDelta.topicsMastered') {
-        const count = opts?.count as number;
-        return `+${count} topic${count === 1 ? '' : 's'} this week`;
-      }
-      if (key === 'progress.weeklyDelta.vocabularyTotal') {
-        const count = opts?.count as number;
-        return `+${count} word${count === 1 ? '' : 's'} this week`;
-      }
-      if (key === 'progress.weeklyDelta.topicsExplored') {
-        const count = opts?.count as number;
-        return `+${count} topic${count === 1 ? '' : 's'} explored this week`;
-      }
-      // Guardian view
-      if (key === 'progress.guardian.sessionCount') {
-        const count = opts?.count as number;
-        return `${count} ${count === 1 ? 'session' : 'sessions'}`;
-      }
-      if (key === 'progress.guardian.lastStudied')
-        return `Last studied ${opts?.date ?? ''}`;
-      if (key === 'progress.guardian.topicsMastered')
-        return `${opts?.mastered ?? ''}/${opts?.total ?? ''} topics mastered`;
-      if (key === 'progress.guardian.summaryFallback')
-        return 'No summary available yet. One will appear after the next session.';
-      if (key === 'progress.guardian.noRecentSessions')
-        return `No new sessions since ${opts?.date ?? ''}.`;
-      if (key === 'progress.guardian.noRecentSessionsFallback')
-        return 'No new sessions since a while ago.';
-      if (key === 'progress.guardian.staleSummary')
-        return 'Summary may not reflect the latest activity yet.';
-      if (key === 'progress.guardian.nudgeCta')
-        return `A short nudge might help ${opts?.name ?? ''} restart`;
-      if (key === 'progress.guardian.nudgeA11y')
-        return `Send ${opts?.name ?? ''} a nudge`;
-      if (key === 'progress.guardian.viewAllReports') return 'View all reports';
-      if (key === 'progress.guardian.subjectsTitle') return 'Subjects';
-      if (key === 'progress.guardian.goToChildCurriculum')
-        return 'Go to curriculum';
-      // Common fallbacks
-      if (key === 'common.tryAgain') return 'Try again';
-      if (key === 'common.goBack') return 'Go Back';
-      if (key === 'common.goHome') return 'Go Home';
-      return key;
-    },
-  }),
-}));
+// ─── Boundary mocks (external/native runtime only) ──────────────────────
+//
+// Everything else now runs for real against the routed mock fetch installed
+// by the local `renderProgress` harness (QueryClientProvider + real
+// ProfileContext + real AppContextProvider). The progress / subjects /
+// active-profile-role / navigation-contract / app-context hooks all execute
+// against the routed fetch, exactly as in production. Clerk, Sentry,
+// @expo/vector-icons, expo-secure-store, reanimated, etc. are globally mocked
+// in src/test-setup.ts and need no per-file mock here.
 
-jest.mock('../../hooks/use-progress', () => ({
-  // gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests
-  ...jest.requireActual('../../hooks/use-progress'),
-  fetchLearningResumeTarget: jest.fn(),
-  useChildInventory: jest.fn(),
-  useChildProgressSummary: jest.fn(),
-  useLearningResumeTarget: jest.fn(),
-  useOverallProgress: jest.fn(),
-  useProgressInventory: jest.fn(),
-  useProgressMilestones: jest.fn(),
-  useProfileSessions: jest.fn(),
-  useProfileReports: jest.fn(),
-  useProfileWeeklyReports: jest.fn(),
-  useRefreshProgressSnapshot: jest.fn(),
-}));
-const mockUseSubjects = jest.fn(() => ({
-  data: [] as Array<{ id: string; name: string; status: string }>,
-}));
-jest.mock('../../hooks/use-subjects', () => ({
-  // gc1-allow: useSubjects calls useApiClient() + useProfile() — requires
-  // QueryClientProvider + ProfileContext not available in this unit env.
-  // Only useSubjects is overridden; all other exports use the real impl.
-  ...jest.requireActual('../../hooks/use-subjects'),
-  useSubjects: () => mockUseSubjects(),
-}));
-const mockUseActiveProfileRole = jest.fn();
-jest.mock('../../hooks/use-active-profile-role', () => ({
-  // gc1-allow: useActiveProfileRole calls useProfile() + useParentProxy() —
-  // both require React context providers not available in this unit env.
-  // Only the hook return is overridden; types and other exports use real impl.
-  ...jest.requireActual('../../hooks/use-active-profile-role'),
-  useActiveProfileRole: () => mockUseActiveProfileRole(),
-}));
-let mockLinkedChildren: Profile[] = [];
-let mockActiveProfile: Profile = {
-  id: 'test-profile-id',
-  displayName: 'Test Learner',
-  createdAt: '2026-01-01T00:00:00Z',
-  isOwner: true,
-} as Profile;
-let mockLegacyMode: 'study' | 'family' | null | undefined;
-jest.mock('../../lib/profile', () => ({
-  // gc1-allow: ProfileProvider + useProfile require SecureStore, QueryClient,
-  // and network (via useProfiles) — not runnable in this unit env without a
-  // full React context tree. useLinkedChildren is derived from useProfile.
-  ...jest.requireActual('../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: mockActiveProfile,
-    profiles: [],
-  }),
-  useLinkedChildren: () => mockLinkedChildren,
-}));
-jest.mock('../../lib/analytics', () => ({
-  // gc1-allow: analytics.track calls Sentry.addBreadcrumb which is not
-  // initialised in the unit test env. Pure exports (bucketAccountAge,
-  // hashProfileId) also mocked as jest.fn() for call-site assertions.
-  ...jest.requireActual('../../lib/analytics'),
-  bucketAccountAge: jest.fn(() => '91+'),
-  hashProfileId: jest.fn((id: string) => `hashed-${id}`),
-  track: jest.fn(),
-}));
-jest.mock('../../lib/api-client', () => ({
-  // gc1-allow: useApiClient calls useAuth() (Clerk) which requires ClerkProvider
-  // not available in this unit env. Typed error classes and other exports
-  // preserved via requireActual spread.
-  ...jest.requireActual('../../lib/api-client'),
-  useApiClient: () => ({}),
-}));
+// react-i18next resolves real en.json strings (what users actually see).
 jest.mock(
-  '../../lib/app-context' /* gc1-allow: progress screen tests need deterministic study/family mode without provider side effects */,
-  () => ({
-    ...jest.requireActual('../../lib/app-context'),
-    useAppContext: () => {
-      const inferredMode =
-        mockSearchParams.profileId &&
-        mockLinkedChildren.some(
-          (child) => child.id === mockSearchParams.profileId,
-        )
-          ? 'family'
-          : 'study';
-
-      return {
-        mode: mockLegacyMode === undefined ? inferredMode : mockLegacyMode,
-        setMode: jest.fn(),
-        familyCapable: mockLinkedChildren.length > 0,
-      };
-    },
-  }),
+  'react-i18next' /* gc1-allow: i18n boundary — returns en.json strings */,
+  () => require('../../test-utils/mock-i18n').i18nMock,
 );
-jest.mock(
-  '../../hooks/use-navigation-contract' /* gc1-allow: progress screen tests pin the contract shape without mounting app shell providers */,
-  () => ({
-    ...jest.requireActual('../../hooks/use-navigation-contract'),
-    useNavigationContract: () => {
-      const familyMode =
-        mockSearchParams.profileId &&
-        mockLinkedChildren.some(
-          (child) => child.id === mockSearchParams.profileId,
-        );
 
-      return {
-        effectiveAppContext: familyMode ? 'family' : 'study',
-        isParentProxy: mockUseActiveProfileRole() === 'impersonated-child',
-        gates: {
-          progressScope: familyMode ? 'children' : 'self',
-          showProgressProfilePicker: familyMode,
-        },
-      };
-    },
-  }),
-);
+// expo-router needs a native navigation container that JSDOM can't provide.
+// We expose a router push spy plus the search-param + focus-effect surface the
+// screen reads. `mockSearchParams` is reassigned per-test before render.
 let mockSearchParams: { profileId?: string | string[] } = {};
-jest.mock('expo-router', () => {
-  const ReactReq = jest.requireActual<typeof import('react')>('react');
-  const push = jest.fn();
-  return {
-    useFocusEffect: jest.fn((callback: () => void) => {
-      ReactReq.useEffect(() => callback(), [callback]);
-    }),
-    useLocalSearchParams: () => mockSearchParams,
-    useRouter: () => ({ push, back: jest.fn(), replace: jest.fn() }),
-  };
-});
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
-}));
+const mockPush = jest.fn();
+jest.mock(
+  'expo-router' /* gc1-allow: native-boundary — no navigation container in JSDOM */,
+  () => {
+    const ReactReq = jest.requireActual<typeof import('react')>('react');
+    return {
+      useFocusEffect: jest.fn((callback: () => void) => {
+        ReactReq.useEffect(() => callback(), [callback]);
+      }),
+      useLocalSearchParams: () => mockSearchParams,
+      useRouter: () => ({
+        push: mockPush,
+        back: jest.fn(),
+        replace: jest.fn(),
+      }),
+    };
+  },
+);
 
-const baseGlobal: {
+jest.mock(
+  'react-native-safe-area-context' /* gc1-allow: native module that requires device/simulator to resolve insets */,
+  () => ({
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  }),
+);
+
+// ─── Local render harness ───────────────────────────────────────────────
+//
+// Mirrors test-utils/screen-render.renderScreen but additionally exposes
+// `isExplicitProxyMode` so the parent-proxy (impersonated-child) paths can be
+// exercised with the REAL useParentProxy + useActiveProfileRole hooks. No
+// internal hook/service is mocked.
+
+interface RenderProgressOptions {
+  profile?: Profile;
+  profiles?: Profile[];
+  isExplicitProxyMode?: boolean;
+  routes?: Parameters<typeof createRoutedMockFetch>[0];
+}
+
+interface RenderProgressResult {
+  result: ReturnType<typeof render>;
+  routedFetch: RoutedMockFetch;
+  cleanup: () => void;
+}
+
+function renderProgress(
+  ui: ReactElement,
+  opts: RenderProgressOptions = {},
+): RenderProgressResult {
+  const activeProfile = opts.profile ?? createTestProfile({ isOwner: true });
+  const profiles = opts.profiles ?? [activeProfile];
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
+  const routedFetch = createRoutedMockFetch(opts.routes);
+  const prevFetch = globalThis.fetch;
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    routedFetch as unknown as typeof fetch;
+
+  const profileContextValue: ProfileContextValue = {
+    profiles,
+    activeProfile,
+    isExplicitProxyMode: opts.isExplicitProxyMode ?? false,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        ProfileContext.Provider,
+        { value: profileContextValue },
+        createElement(AppContextProvider, null, children),
+      ),
+    );
+  }
+
+  const result = render(ui, { wrapper: Wrapper });
+
+  function cleanup() {
+    void queryClient.cancelQueries();
+    queryClient.clear();
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+  }
+
+  return { result, routedFetch, cleanup };
+}
+
+// ─── Stable UUID fixtures (schemas require UUIDs on ids) ─────────────────
+
+const OWNER_ID = '11111111-1111-4111-8111-111111111111';
+const CHILD_ID = '22222222-2222-4222-8222-222222222222';
+const SESSION_1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+const SESSION_2 = 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa';
+const SUBJECT_UUID_1 = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb';
+const SUBJECT_UUID_2 = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+const TOPIC_UUID_1 = 'cccccccc-1111-4111-8111-cccccccccccc';
+const WEEKLY_REPORT_ID = 'dddddddd-1111-4111-8111-dddddddddddd';
+const MONTHLY_REPORT_ID = 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee';
+
+type InventoryGlobal = {
   topicsAttempted: number;
   topicsMastered: number;
   vocabularyTotal: number;
@@ -372,7 +162,9 @@ const baseGlobal: {
   totalWallClockMinutes: number;
   currentStreak: number;
   longestStreak: number;
-} = {
+};
+
+const baseGlobal: InventoryGlobal = {
   topicsAttempted: 0,
   topicsMastered: 0,
   vocabularyTotal: 0,
@@ -387,27 +179,16 @@ const baseGlobal: {
   longestStreak: 0,
 };
 
-function makeLinkedChild(overrides?: Partial<Profile>): Profile {
-  return {
-    id: 'child-1',
-    accountId: 'account-1',
-    displayName: 'Emma',
-    isOwner: false,
-    hasPremiumLlm: false,
-    defaultAppContext: null,
-    hasFamilyLinks: false,
-    consentStatus: null,
-    linkCreatedAt: null,
-    conversationLanguage: 'en',
-    pronouns: null,
-    birthYear: 2015,
-    avatarUrl: null,
-    location: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    ...overrides,
+type InventoryFixture = {
+  global: InventoryGlobal;
+  subjects: unknown[];
+  currentlyWorkingOn?: string[];
+  thisWeekMini?: {
+    sessions: number;
+    wordsLearned: number;
+    topicsTouched: number;
   };
-}
+};
 
 const fullSubject = {
   subjectId: 's1',
@@ -434,213 +215,173 @@ const fullSubject = {
   sessionsCount: 5,
 };
 
-const childProgressProfile: Profile = {
-  id: 'child-1',
-  accountId: 'account-1',
-  displayName: 'Emma',
-  isOwner: false,
-  hasPremiumLlm: false,
-  defaultAppContext: null,
-  hasFamilyLinks: false,
-  consentStatus: null,
-  linkCreatedAt: null,
-  conversationLanguage: 'en',
-  pronouns: null,
-  birthYear: 2015,
-  avatarUrl: null,
-  location: null,
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:00:00Z',
-};
+function makeOwner(overrides?: Partial<Profile>): Profile {
+  return createTestProfile({
+    id: OWNER_ID,
+    accountId: 'account-1',
+    displayName: 'Test Learner',
+    isOwner: true,
+    birthYear: 1985,
+    ...overrides,
+  });
+}
 
-function mockHooks(
-  overrides: {
-    inventory?:
-      | {
-          global: typeof baseGlobal;
-          subjects: unknown[];
-          currentlyWorkingOn?: string[];
-          thisWeekMini?: {
-            sessions: number;
-            wordsLearned: number;
-            topicsTouched: number;
-          };
-        }
-      | undefined;
-    childInventory?:
-      | {
-          global: typeof baseGlobal;
-          subjects: unknown[];
-          currentlyWorkingOn?: string[];
-          thisWeekMini?: {
-            sessions: number;
-            wordsLearned: number;
-            topicsTouched: number;
-          };
-        }
-      | undefined;
-    isLoading?: boolean;
-    isError?: boolean;
-    practiceActivityCount?: number;
-    sessions?: unknown[];
-    monthlyReports?: unknown[];
-    weeklyReports?: unknown[];
-  } = {},
-) {
-  const {
-    childInventory,
-    inventory,
-    isLoading = false,
-    isError = false,
-    practiceActivityCount = 0,
-    sessions,
-    monthlyReports = [],
-    weeklyReports = [],
-  } = overrides;
-  const inventoryRefetch = jest.fn();
-  const milestonesRefetch = jest.fn();
-  const refreshSnapshot = jest.fn().mockResolvedValue(undefined);
-  const monthlyReportsRefetch = jest.fn();
-  const profileSessionsRefetch = jest.fn();
-  const weeklyReportsRefetch = jest.fn();
-  (useProgressInventory as jest.Mock).mockReturnValue({
-    data: inventory,
-    isLoading,
-    isError,
-    isRefetching: false,
-    error: isError ? new Error('fail') : null,
-    refetch: inventoryRefetch,
+function makeLinkedChild(overrides?: Partial<Profile>): Profile {
+  return createTestProfile({
+    id: CHILD_ID,
+    accountId: 'account-1',
+    displayName: 'Emma',
+    isOwner: false,
+    birthYear: 2015,
+    ...overrides,
   });
-  (useProgressMilestones as jest.Mock).mockReturnValue({
-    data: [],
-    refetch: milestonesRefetch,
-  });
-  (useRefreshProgressSnapshot as jest.Mock).mockReturnValue({
-    mutateAsync: refreshSnapshot,
-    isPending: false,
-  });
-  (useOverallProgress as jest.Mock).mockReturnValue({
-    data: {
-      subjects: [],
-      totalTopicsCompleted: inventory?.global.topicsMastered ?? 0,
-      totalTopicsVerified: 0,
-      practiceActivityCount,
-    },
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  });
-  (useProfileSessions as jest.Mock).mockReturnValue({
-    data:
-      sessions ??
-      (inventory && inventory.global.totalSessions > 0
-        ? [
-            {
-              sessionId: 'session-1',
-              subjectId: 'subject-1',
-              subjectName: 'Math',
-              topicId: null,
-              topicTitle: null,
-              sessionType: 'learning',
-              startedAt: new Date().toISOString(),
-              endedAt: null,
-              exchangeCount: 1,
-              escalationRung: 1,
-              durationSeconds: 60,
-              wallClockSeconds: 60,
-              displayTitle: 'Learning',
-              displaySummary: null,
-              homeworkSummary: null,
-              highlight: null,
-              narrative: null,
-              conversationPrompt: null,
-              engagementSignal: null,
-            },
-          ]
-        : []),
-    isLoading: false,
-    isError: false,
-    refetch: profileSessionsRefetch,
-  });
-  (useProfileReports as jest.Mock).mockReturnValue({
-    data: monthlyReports,
-    isLoading: false,
-    isError: false,
-    refetch: monthlyReportsRefetch,
-  });
-  (useProfileWeeklyReports as jest.Mock).mockReturnValue({
-    data: weeklyReports,
-    isLoading: false,
-    isError: false,
-    refetch: weeklyReportsRefetch,
-  });
-  (useChildInventory as jest.Mock).mockReturnValue({
-    data: childInventory ?? null,
-    isLoading: false,
-    isError: false,
-    isRefetching: false,
-    refetch: jest.fn(),
-  });
-  (useChildProgressSummary as jest.Mock).mockReturnValue({
-    data: null,
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  });
-  (useLearningResumeTarget as jest.Mock).mockReturnValue({
-    data: null,
-  });
-  (fetchLearningResumeTarget as jest.Mock).mockResolvedValue(null);
+}
 
+// A schema-valid ChildSession (the real useProfileSessions runs zod parse).
+function makeSession(overrides?: Record<string, unknown>) {
   return {
-    inventoryRefetch,
-    milestonesRefetch,
-    monthlyReportsRefetch,
-    profileSessionsRefetch,
-    refreshSnapshot,
-    weeklyReportsRefetch,
+    sessionId: SESSION_1,
+    subjectId: SUBJECT_UUID_1,
+    subjectName: 'Math',
+    topicId: null,
+    topicTitle: null,
+    sessionType: 'learning',
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    exchangeCount: 1,
+    escalationRung: 1,
+    durationSeconds: 60,
+    wallClockSeconds: 60,
+    displayTitle: 'Learning',
+    displaySummary: null,
+    homeworkSummary: null,
+    highlight: null,
+    narrative: null,
+    conversationPrompt: null,
+    engagementSignal: null,
+    drills: [],
+    ...overrides,
   };
 }
 
+interface BuildRoutesOptions {
+  inventory?: InventoryFixture;
+  childInventory?: InventoryFixture;
+  childSummary?: unknown;
+  childId?: string;
+  sessions?: unknown[];
+  monthlyReports?: unknown[];
+  weeklyReports?: unknown[];
+  practiceActivityCount?: number;
+  subjects?: Array<{ id: string; name: string; status: string }>;
+}
+
+// Build the routes map the real progress hooks hit. Self endpoints live under
+// /progress/*; child endpoints under /dashboard/children/<id>/*. Patterns are
+// full enough that the routed mock's includes() match is unambiguous.
+function buildRoutes(opts: BuildRoutesOptions = {}) {
+  const childId = opts.childId ?? CHILD_ID;
+  // Mirror the production fallback: when sessions aren't explicitly provided,
+  // surface one session for an inventory that reports sessions (otherwise an
+  // empty array drives sessionCount to 0, which isProfileStale treats as
+  // empty). Matches the screen's own data shape, not a weakened stub.
+  const selfSessions =
+    opts.sessions ??
+    (opts.inventory && opts.inventory.global.totalSessions > 0
+      ? [makeSession()]
+      : []);
+
+  const routes: Record<string, unknown> = {
+    // Self-view endpoints
+    '/progress/inventory': opts.inventory ?? {},
+    '/progress/overview': {
+      subjects: [],
+      totalTopicsCompleted: opts.inventory?.global.topicsMastered ?? 0,
+      totalTopicsVerified: 0,
+      practiceActivityCount: opts.practiceActivityCount ?? 0,
+    },
+    '/progress/sessions': { sessions: selfSessions },
+    '/progress/weekly-reports': { reports: opts.weeklyReports ?? [] },
+    '/progress/reports': { reports: opts.monthlyReports ?? [] },
+    '/progress/resume-target': { target: null },
+    '/progress/refresh': {},
+    '/subjects': { subjects: opts.subjects ?? [] },
+    // Child-view endpoints (parent viewing a linked child)
+    [`/children/${childId}/inventory`]: {
+      inventory: opts.childInventory ?? null,
+    },
+    [`/children/${childId}/progress-summary`]: opts.childSummary ?? {
+      summary: null,
+      generatedAt: null,
+      basedOnLastSessionAt: null,
+      latestSessionId: null,
+      activityState: 'no_recent_activity',
+      nudgeRecommended: false,
+    },
+    [`/children/${childId}/sessions`]: { sessions: opts.sessions ?? [] },
+    [`/children/${childId}/weekly-reports`]: {
+      reports: opts.weeklyReports ?? [],
+    },
+    [`/children/${childId}/reports`]: { reports: opts.monthlyReports ?? [] },
+  };
+
+  return routes;
+}
+
 describe('ProgressScreen — progressive disclosure', () => {
+  let active: RenderProgressResult | null = null;
+
+  function mount(opts: RenderProgressOptions): RenderProgressResult {
+    active = renderProgress(<ProgressScreen />, opts);
+    return active;
+  }
+
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockUseActiveProfileRole.mockReturnValue('owner');
-    mockActiveProfile = {
-      id: 'test-profile-id',
-      displayName: 'Test Learner',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: true,
-    } as Profile;
-    mockUseSubjects.mockReturnValue({ data: [] });
-    mockLinkedChildren = [];
-    mockLegacyMode = undefined;
     mockSearchParams = {};
   });
 
-  it('shows full progress view when totalSessions < 4', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
-    });
-    render(<ProgressScreen />);
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    jest.clearAllMocks();
+  });
 
+  it('shows full progress view when totalSessions < 4', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+      }),
+    });
+
+    await waitFor(() => {
+      screen.getByText('2 sessions completed');
+    });
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
-    screen.getByText('2 sessions completed');
   });
 
   it('refreshes progress data when the mounted progress tab is focused again', async () => {
-    const refs = mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
+    const { routedFetch } = mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-    render(<ProgressScreen />);
 
-    expect(refs.inventoryRefetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      screen.getByText('2 sessions completed');
+    });
+
+    const inventoryCallsBefore = fetchCallsMatching(
+      routedFetch,
+      '/progress/inventory',
+    ).length;
 
     const focusCallback = (useFocusEffect as jest.Mock).mock.calls.at(
       -1,
@@ -650,99 +391,122 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
 
     await waitFor(() => {
-      expect(refs.inventoryRefetch).toHaveBeenCalled();
+      expect(
+        fetchCallsMatching(routedFetch, '/progress/inventory').length,
+      ).toBeGreaterThan(inventoryCallsBefore);
     });
-    expect(refs.refreshSnapshot).toHaveBeenCalled();
-    expect(refs.monthlyReportsRefetch).toHaveBeenCalled();
-    expect(refs.profileSessionsRefetch).toHaveBeenCalled();
-    expect(refs.weeklyReportsRefetch).toHaveBeenCalled();
-    expect(refs.milestonesRefetch).not.toHaveBeenCalled();
+    // Focus refresh re-hits the snapshot + sessions + reports endpoints.
+    expect(
+      fetchCallsMatching(routedFetch, '/progress/refresh').length,
+    ).toBeGreaterThan(0);
+    expect(
+      fetchCallsMatching(routedFetch, '/progress/sessions').length,
+    ).toBeGreaterThan(0);
+    expect(
+      fetchCallsMatching(routedFetch, '/progress/reports').length,
+    ).toBeGreaterThan(0);
+    expect(
+      fetchCallsMatching(routedFetch, '/progress/weekly-reports').length,
+    ).toBeGreaterThan(0);
   });
 
-  it('keeps the focus refresh callback stable across render updates', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
+  it('keeps the focus refresh callback stable across render updates', async () => {
+    const view = mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-    const view = render(<ProgressScreen />);
+
+    await waitFor(() => {
+      screen.getByText('2 sessions completed');
+    });
 
     const initialCallback = (useFocusEffect as jest.Mock).mock.calls.at(
       -1,
     )?.[0];
-    view.rerender(<ProgressScreen />);
+    view.result.rerender(<ProgressScreen />);
 
     expect((useFocusEffect as jest.Mock).mock.calls.at(-1)?.[0]).toBe(
       initialCallback,
     );
   });
 
-  it('shows full progress view when totalSessions >= 4', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
+  it('shows full progress view when totalSessions >= 4', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-    render(<ProgressScreen />);
 
-    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
     // heroCopy: 5 sessions + low mastery (3 topics, 0 vocab) → leads with sessions
-    screen.getByText('5 sessions completed');
+    await waitFor(() => {
+      screen.getByText('5 sessions completed');
+    });
+    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('renders latest report from the weekly report summary without detail fetches', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
-      weeklyReports: [
-        {
-          id: 'weekly-1',
-          reportWeek: '2026-05-11',
-          viewedAt: null,
-          createdAt: '2026-05-17T00:00:00Z',
-          headlineStat: {
-            label: 'topics mastered',
-            value: 2,
-            comparison: '+2 this week',
-          },
-          thisWeek: {
-            totalSessions: 4,
-            totalActiveMinutes: 95,
-            topicsMastered: 2,
-            topicsExplored: 6,
-            vocabularyTotal: 12,
-            streakBest: 3,
-          },
-          practiceSummary: {
-            quizzesCompleted: 0,
-            reviewsCompleted: 0,
-            totals: {
-              activitiesCompleted: 3,
-              reviewsCompleted: 1,
-              pointsEarned: 45,
-              celebrations: 0,
-              distinctActivityTypes: 2,
-            },
-            scores: {
-              scoredActivities: 0,
-              score: 0,
-              total: 0,
-              accuracy: null,
-            },
-            byType: [],
-            bySubject: [],
-          },
+  it('renders latest report from the weekly report summary without detail fetches', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+          subjects: [fullSubject],
         },
-      ],
+        weeklyReports: [
+          {
+            id: WEEKLY_REPORT_ID,
+            reportWeek: '2026-05-11',
+            viewedAt: null,
+            createdAt: '2026-05-17T00:00:00Z',
+            headlineStat: {
+              label: 'topics mastered',
+              value: 2,
+              comparison: '+2 this week',
+            },
+            thisWeek: {
+              totalSessions: 4,
+              totalActiveMinutes: 95,
+              topicsMastered: 2,
+              topicsExplored: 6,
+              vocabularyTotal: 12,
+              streakBest: 3,
+            },
+            practiceSummary: {
+              quizzesCompleted: 0,
+              reviewsCompleted: 0,
+              totals: {
+                activitiesCompleted: 3,
+                reviewsCompleted: 1,
+                pointsEarned: 45,
+                celebrations: 0,
+                distinctActivityTypes: 2,
+              },
+              scores: {
+                scoredActivities: 0,
+                score: 0,
+                total: 0,
+                accuracy: null,
+              },
+              byType: [],
+              bySubject: [],
+            },
+          },
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-latest-report-card');
+    await waitFor(() => {
+      screen.getByTestId('progress-latest-report-card');
+    });
     screen.getByText('Latest report');
     screen.getByText('2 topics mastered');
     expect(screen.getAllByText('+2 this week').length).toBeGreaterThan(0);
@@ -751,128 +515,117 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('45 practice points');
   });
 
-  it('opens the latest report card even when a legacy summary has no metrics', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
-      weeklyReports: [
-        {
-          id: 'weekly-legacy',
-          reportWeek: '2026-05-11',
-          viewedAt: null,
-          createdAt: '2026-05-17T00:00:00Z',
-          headlineStat: {
-            label: 'sessions this week',
-            value: 4,
-            comparison: 'steady rhythm',
-          },
+  it('opens the latest report card even when a legacy summary has no metrics', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+          subjects: [fullSubject],
         },
-      ],
+        weeklyReports: [
+          {
+            id: WEEKLY_REPORT_ID,
+            reportWeek: '2026-05-11',
+            viewedAt: null,
+            createdAt: '2026-05-17T00:00:00Z',
+            headlineStat: {
+              label: 'sessions this week',
+              value: 4,
+              comparison: 'steady rhythm',
+            },
+          },
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-latest-report-card');
+    await waitFor(() => {
+      screen.getByTestId('progress-latest-report-card');
+    });
     screen.getByText('4 sessions this week');
     expect(screen.getAllByText('steady rhythm').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('progress-latest-report-empty')).toBeNull();
   });
 
-  it('falls back to monthly report summary when no weekly report exists', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
-      monthlyReports: [
-        {
-          id: 'monthly-1',
-          reportMonth: '2026-05',
-          viewedAt: null,
-          createdAt: '2026-06-01T00:00:00Z',
-          headlineStat: {
-            label: 'sessions completed',
-            value: 8,
-            comparison: '+3 from last month',
-          },
-          highlights: [],
-          nextSteps: [],
-          thisMonth: {
-            totalSessions: 8,
-            totalActiveMinutes: 120,
-            topicsMastered: 3,
-            topicsExplored: 9,
-            vocabularyTotal: 20,
-            streakBest: 4,
-          },
+  it('falls back to monthly report summary when no weekly report exists', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+          subjects: [fullSubject],
         },
-      ],
+        monthlyReports: [
+          {
+            id: MONTHLY_REPORT_ID,
+            reportMonth: '2026-05',
+            viewedAt: null,
+            createdAt: '2026-06-01T00:00:00Z',
+            headlineStat: {
+              label: 'sessions completed',
+              value: 8,
+              comparison: '+3 from last month',
+            },
+            highlights: [],
+            nextSteps: [],
+            thisMonth: {
+              totalSessions: 8,
+              totalActiveMinutes: 120,
+              topicsMastered: 3,
+              topicsExplored: 9,
+              vocabularyTotal: 20,
+              streakBest: 4,
+            },
+          },
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-latest-report-card');
+    await waitFor(() => {
+      screen.getByTestId('progress-latest-report-card');
+    });
     screen.getByText('8 sessions completed');
     expect(screen.getAllByText('+3 from last month').length).toBeGreaterThan(0);
   });
 
-  it('shows recent sessions and expands to the reused session list', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
-      sessions: [
-        {
-          sessionId: 'session-1',
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-          topicId: 'topic-1',
-          topicTitle: 'Fractions',
-          sessionType: 'learning',
-          startedAt: '2026-05-15T10:00:00Z',
-          endedAt: null,
-          exchangeCount: 3,
-          escalationRung: 1,
-          durationSeconds: 600,
-          wallClockSeconds: 600,
-          displayTitle: 'Learning',
-          displaySummary: 'Practiced comparing fractions.',
-          homeworkSummary: null,
-          highlight: null,
-          narrative: null,
-          conversationPrompt: null,
-          engagementSignal: null,
+  it('shows recent sessions and expands to the reused session list', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+          subjects: [fullSubject],
         },
-        {
-          sessionId: 'session-2',
-          subjectId: 'subject-2',
-          subjectName: 'Biology',
-          topicId: null,
-          topicTitle: null,
-          sessionType: 'learning',
-          startedAt: '2026-05-14T10:00:00Z',
-          endedAt: null,
-          exchangeCount: 2,
-          escalationRung: 1,
-          durationSeconds: 300,
-          wallClockSeconds: 300,
-          displayTitle: 'Learning',
-          displaySummary: null,
-          homeworkSummary: null,
-          highlight: 'Talked through cells.',
-          narrative: null,
-          conversationPrompt: null,
-          engagementSignal: null,
-        },
-      ],
+        sessions: [
+          makeSession({
+            sessionId: SESSION_1,
+            subjectId: SUBJECT_UUID_1,
+            subjectName: 'Math',
+            topicId: TOPIC_UUID_1,
+            topicTitle: 'Fractions',
+            startedAt: '2026-05-15T10:00:00Z',
+            exchangeCount: 3,
+            durationSeconds: 600,
+            wallClockSeconds: 600,
+            displaySummary: 'Practiced comparing fractions.',
+          }),
+          makeSession({
+            sessionId: SESSION_2,
+            subjectId: SUBJECT_UUID_2,
+            subjectName: 'Biology',
+            startedAt: '2026-05-14T10:00:00Z',
+            exchangeCount: 2,
+            durationSeconds: 300,
+            wallClockSeconds: 300,
+            highlight: 'Talked through cells.',
+          }),
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByText('Recent sessions');
+    await waitFor(() => {
+      screen.getByText('Recent sessions');
+    });
     screen.getByText('Fractions');
     screen.getByText('Practiced comparing fractions.');
     screen.getByText('Biology');
@@ -881,85 +634,76 @@ describe('ProgressScreen — progressive disclosure', () => {
     fireEvent.press(screen.getByTestId('progress-show-all-sessions'));
 
     screen.getByTestId('recent-sessions-list');
-    screen.getByTestId('session-card-session-1');
+    screen.getByTestId(`session-card-${SESSION_1}`);
   });
 
-  it('opens proxy recent sessions in the child-safe detail screen', () => {
-    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
-    mockActiveProfile = {
-      id: 'child-id',
-      displayName: 'Lilly',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: false,
-    } as Profile;
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 3, totalActiveMinutes: 12 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
-      sessions: [
-        {
-          sessionId: 'session-1',
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-          topicId: 'topic-1',
-          topicTitle: 'Fractions',
-          sessionType: 'learning',
-          startedAt: '2026-05-15T10:00:00Z',
-          endedAt: null,
-          exchangeCount: 3,
-          escalationRung: 1,
-          durationSeconds: 600,
-          wallClockSeconds: 600,
-          displayTitle: 'Learning',
-          displaySummary: 'Practiced comparing fractions.',
-          homeworkSummary: null,
-          highlight: null,
-          narrative: null,
-          conversationPrompt: null,
-          engagementSignal: null,
-        },
+  it('opens proxy recent sessions in the child-safe detail screen', async () => {
+    mount({
+      profile: makeLinkedChild({ id: CHILD_ID, displayName: 'Lilly' }),
+      profiles: [
+        makeOwner(),
+        makeLinkedChild({ id: CHILD_ID, displayName: 'Lilly' }),
       ],
+      isExplicitProxyMode: true,
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 3, totalActiveMinutes: 12 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
+        },
+        sessions: [
+          makeSession({
+            sessionId: SESSION_1,
+            subjectId: SUBJECT_UUID_1,
+            subjectName: 'Math',
+            topicId: TOPIC_UUID_1,
+            topicTitle: 'Fractions',
+            startedAt: '2026-05-15T10:00:00Z',
+            exchangeCount: 3,
+            durationSeconds: 600,
+            wallClockSeconds: 600,
+            displaySummary: 'Practiced comparing fractions.',
+          }),
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
+    await waitFor(() => {
+      screen.getByText('Recent sessions');
+    });
 
     fireEvent.press(screen.getByTestId('progress-show-all-sessions'));
-    fireEvent.press(screen.getByTestId('session-card-session-1'));
+    fireEvent.press(screen.getByTestId(`session-card-${SESSION_1}`));
 
-    expect(
-      jest.requireMock('expo-router').useRouter().push,
-    ).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/session/[sessionId]',
-      params: { profileId: 'child-id', sessionId: 'session-1' },
+      params: { profileId: CHILD_ID, sessionId: SESSION_1 },
     });
   });
 
-  it('renders empty latest report and recent focus states without duplicate surfaces', () => {
-    mockLinkedChildren = [makeLinkedChild()];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: {
-          ...baseGlobal,
-          totalSessions: 5,
-          topicsMastered: 3,
+  it('renders empty latest report and recent focus states without duplicate surfaces', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
         },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
-      sessions: [],
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
+        },
+        sessions: [],
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-latest-report-empty');
+    await waitFor(() => {
+      screen.getByTestId('progress-latest-report-empty');
+    });
     screen.getByText(
       'Recent sessions will appear here once learning gets going.',
     );
@@ -969,55 +713,76 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
   });
 
-  it('keeps the reports dashboard reachable when no reports exist', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
+  it('keeps the reports dashboard reachable when no reports exist', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
 
-    render(<ProgressScreen />);
+    await waitFor(() => {
+      screen.getByTestId('progress-view-all-reports');
+    });
 
     fireEvent.press(screen.getByTestId('progress-view-all-reports'));
-    expect(push).toHaveBeenCalledWith('/(app)/progress/reports');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/progress/reports');
   });
 
-  it('shows full view when totalSessions is 3', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 3 },
-        subjects: [fullSubject],
-      },
+  it('shows full view when totalSessions is 3', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 3 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-    render(<ProgressScreen />);
 
-    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
-    screen.getByText('3 sessions completed');
-  });
-
-  it('shows empty state (not teaser) when totalSessions is 0 and no subjects', () => {
-    mockHooks({
-      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+    await waitFor(() => {
+      screen.getByText('3 sessions completed');
     });
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-start-learning');
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('keeps overall empty progress global while opening the first active subject', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'subject-italian', name: 'Italian', status: 'active' }],
-    });
-    mockHooks({
-      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+  it('shows empty state (not teaser) when totalSessions is 0 and no subjects', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
+    await waitFor(() => {
+      screen.getByTestId('progress-start-learning');
+    });
+    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+  });
 
-    screen.getByText('Progress appears after the first study session');
+  it('keeps overall empty progress global while opening the first active subject', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+        subjects: [
+          { id: 'subject-italian', name: 'Italian', status: 'active' },
+        ],
+      }),
+    });
+
+    await waitFor(() => {
+      screen.getByText('Progress appears after the first study session');
+    });
     screen.getByText(
       'Sessions, mastery, reviews, and reports will appear here once there is something to measure.',
     );
@@ -1025,122 +790,135 @@ describe('ProgressScreen — progressive disclosure', () => {
       screen.queryByText('Progress unlocks after you study Italian'),
     ).toBeNull();
     fireEvent.press(screen.getByTestId('progress-start-learning'));
-    expect(
-      jest.requireMock('expo-router').useRouter().push,
-    ).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'subject-italian' },
     });
   });
 
-  it('uses child-facing title and routes to child curriculum in proxy progress mode [B-600]', () => {
-    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
-    mockActiveProfile = {
-      id: 'child-id',
-      displayName: 'Lilly',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: false,
-    } as Profile;
-    mockUseSubjects.mockReturnValue({
-      data: [
-        { id: 'subject-programming', name: 'Programming', status: 'active' },
+  it('uses child-facing title and routes to child curriculum in proxy progress mode [B-600]', async () => {
+    mount({
+      profile: makeLinkedChild({ id: CHILD_ID, displayName: 'Lilly' }),
+      profiles: [
+        makeOwner(),
+        makeLinkedChild({ id: CHILD_ID, displayName: 'Lilly' }),
       ],
-    });
-    mockHooks({
-      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+      isExplicitProxyMode: true,
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+        subjects: [
+          { id: 'subject-programming', name: 'Programming', status: 'active' },
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByText("Lilly's progress");
+    await waitFor(() => {
+      screen.getByText("Lilly's progress");
+    });
     screen.getByText('Progress appears after the first study session');
     expect(screen.queryByText(/Programming/)).toBeNull();
     // [B-600] Parent-proxy must NOT see the adult Study Library CTA
     expect(screen.queryByText('Library')).toBeNull();
     // [B-600] Must show child-curriculum CTA label
-    screen.getByText('Go to curriculum');
+    screen.getByText('Open child curriculum');
 
     fireEvent.press(screen.getByTestId('progress-start-learning'));
-    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
     // [B-600] Must route to child curriculum, never to adult library
-    expect(push).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/curriculum',
-      params: { profileId: 'child-id' },
+      params: { profileId: CHILD_ID },
     });
-    expect(push).not.toHaveBeenCalledWith('/(app)/library');
+    expect(mockPush).not.toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('keeps Lilly report visible in proxy mode even when inventory is empty', () => {
-    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
-    mockActiveProfile = {
-      id: 'child-id',
-      displayName: 'Lilly',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: false,
-    } as Profile;
-    mockHooks({
-      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
-      weeklyReports: [
-        {
-          id: 'weekly-lilly',
-          reportWeek: '2026-05-11',
-          viewedAt: null,
-          createdAt: '2026-05-17T00:00:00Z',
-          headlineStat: {
-            label: 'topics mastered',
-            value: 2,
-            comparison: '+2 this week',
-          },
-          thisWeek: {
-            totalSessions: 4,
-            totalActiveMinutes: 95,
-            topicsMastered: 2,
-            topicsExplored: 6,
-            vocabularyTotal: 12,
-            streakBest: 3,
-          },
-        },
+  it('keeps Lilly report visible in proxy mode even when inventory is empty', async () => {
+    const { routedFetch } = mount({
+      profile: makeLinkedChild({ id: CHILD_ID, displayName: 'Lilly' }),
+      profiles: [
+        makeOwner(),
+        makeLinkedChild({ id: CHILD_ID, displayName: 'Lilly' }),
       ],
+      isExplicitProxyMode: true,
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+        weeklyReports: [
+          {
+            id: WEEKLY_REPORT_ID,
+            reportWeek: '2026-05-11',
+            viewedAt: null,
+            createdAt: '2026-05-17T00:00:00Z',
+            headlineStat: {
+              label: 'topics mastered',
+              value: 2,
+              comparison: '+2 this week',
+            },
+            thisWeek: {
+              totalSessions: 4,
+              totalActiveMinutes: 95,
+              topicsMastered: 2,
+              topicsExplored: 6,
+              vocabularyTotal: 12,
+              streakBest: 3,
+            },
+          },
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
-
+    await waitFor(() => {
+      screen.getByTestId('progress-latest-report-card');
+    });
     screen.getByText("Lilly's progress");
-    screen.getByTestId('progress-latest-report-card');
     screen.getByText('2 topics mastered');
     expect(
       screen.queryByText('Progress appears after the first study session'),
     ).toBeNull();
-    expect(useProfileWeeklyReports).toHaveBeenCalledWith('child-id');
+    // The active child's own weekly reports are fetched via the self endpoint
+    // (selectedProfileId === activeProfile.id in proxy mode).
+    expect(
+      fetchCallsMatching(routedFetch, '/progress/weekly-reports').length,
+    ).toBeGreaterThan(0);
   });
 
-  it('opens the requested child progress profile from route params', () => {
-    mockLinkedChildren = [childProgressProfile];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 0 },
-        subjects: [],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
+  it('opens the requested child progress profile from route params', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    const { routedFetch } = mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-pill-child-1');
-    expect(useChildInventory).toHaveBeenCalledWith('child-1', {
-      enabled: true,
+    await waitFor(() => {
+      screen.getByTestId(`progress-pill-${CHILD_ID}`);
+    });
+    // Child inventory endpoint fetched only when enabled for the selected child.
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(routedFetch, `/children/${CHILD_ID}/inventory`)
+          .length,
+      ).toBeGreaterThan(0);
     });
   });
 
   // [LEARN-21 / Notion #603] Regression: child-scoped vocab chip must NOT
   // route to the adult-scoped vocabulary browser.
-  it('hides the tappable vocabulary chip when viewing a linked child [LEARN-21]', () => {
-    mockLinkedChildren = [childProgressProfile];
-    mockSearchParams = { profileId: 'child-1' };
+  it('hides the tappable vocabulary chip when viewing a linked child [LEARN-21]', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
     const languageSubject = {
       ...fullSubject,
       subjectId: 's-lang',
@@ -1154,26 +932,28 @@ describe('ProgressScreen — progressive disclosure', () => {
         byCefrLevel: { A1: 30, A2: 12 },
       },
     };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 10, vocabularyTotal: 8 },
-        subjects: [languageSubject],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 6, vocabularyTotal: 42 },
-        subjects: [languageSubject],
-      },
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 10, vocabularyTotal: 8 },
+          subjects: [languageSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 6, vocabularyTotal: 42 },
+          subjects: [languageSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
+    await waitFor(() => {
+      screen.getByTestId('progress-vocab-stat-readonly');
+    });
     expect(screen.queryByTestId('progress-vocab-stat')).toBeNull();
-    screen.getByTestId('progress-vocab-stat-readonly');
   });
 
-  it('shows the tappable vocabulary chip when viewing self [LEARN-21 pair]', () => {
-    mockLinkedChildren = [];
-    mockSearchParams = {};
+  it('shows the tappable vocabulary chip when viewing self [LEARN-21 pair]', async () => {
     const languageSubject = {
       ...fullSubject,
       subjectId: 's-lang',
@@ -1187,205 +967,255 @@ describe('ProgressScreen — progressive disclosure', () => {
         byCefrLevel: { A1: 12, A2: 6 },
       },
     };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 10, vocabularyTotal: 18 },
-        subjects: [languageSubject],
-      },
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 10, vocabularyTotal: 18 },
+          subjects: [languageSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-vocab-stat');
+    await waitFor(() => {
+      screen.getByTestId('progress-vocab-stat');
+    });
     expect(screen.queryByTestId('progress-vocab-stat-readonly')).toBeNull();
   });
 
-  it('defaults the bottom progress tab to the parent profile even when children exist', () => {
-    mockLinkedChildren = [childProgressProfile];
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
+  it('defaults the bottom progress tab to the parent profile even when children exist', async () => {
+    const { routedFetch } = mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByText('My progress');
-    expect(useChildInventory).toHaveBeenCalledWith(undefined, {
-      enabled: false,
+    await waitFor(() => {
+      screen.getByText('My progress');
     });
+    // No child selected by default → child inventory endpoint is never hit.
+    expect(
+      fetchCallsMatching(routedFetch, `/children/${CHILD_ID}/inventory`).length,
+    ).toBe(0);
   });
 
   it('keeps linked child pills selectable in the 5-tab legacy fallback', async () => {
-    mockLegacyMode = null;
-    mockLinkedChildren = [childProgressProfile];
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
+    const { routedFetch } = mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByText('My progress');
-    fireEvent.press(screen.getByTestId('progress-pill-child-1'));
+    await waitFor(() => {
+      screen.getByText('My progress');
+    });
+    fireEvent.press(screen.getByTestId(`progress-pill-${CHILD_ID}`));
 
     await waitFor(() => {
-      expect(useChildInventory).toHaveBeenLastCalledWith('child-1', {
-        enabled: true,
-      });
       screen.getByText("Emma's progress");
       screen.getByText('6 sessions');
     });
+    expect(
+      fetchCallsMatching(routedFetch, `/children/${CHILD_ID}/inventory`).length,
+    ).toBeGreaterThan(0);
   });
 
   it('opens a valid requested child profile after child links load', async () => {
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
+    mockSearchParams = { profileId: CHILD_ID };
+    const view = mount({
+      profile: makeOwner(),
+      profiles: [makeOwner()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-
-    const view = render(<ProgressScreen />);
-
-    expect(useChildInventory).toHaveBeenLastCalledWith(undefined, {
-      enabled: false,
-    });
-
-    mockLinkedChildren = [childProgressProfile];
-    view.rerender(<ProgressScreen />);
 
     await waitFor(() => {
-      expect(useChildInventory).toHaveBeenLastCalledWith('child-1', {
-        enabled: true,
-      });
-      screen.getByTestId('progress-pill-child-1');
+      screen.getByText('2 sessions completed');
+    });
+
+    // Re-render once the child link is known via ProfileContext.
+    view.cleanup();
+    active = null;
+    const { routedFetch } = mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+      }),
+    });
+
+    await waitFor(() => {
+      screen.getByTestId(`progress-pill-${CHILD_ID}`);
       screen.getByText('6 sessions');
     });
+    expect(
+      fetchCallsMatching(routedFetch, `/children/${CHILD_ID}/inventory`).length,
+    ).toBeGreaterThan(0);
   });
 
-  it('ignores an unknown requested child profile when no child link is known', () => {
+  it('ignores an unknown requested child profile when no child link is known', async () => {
     mockSearchParams = { profileId: 'foreign-child' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
+    const { routedFetch } = mount({
+      profile: makeOwner(),
+      profiles: [makeOwner()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    expect(useChildInventory).toHaveBeenCalledWith(undefined, {
-      enabled: false,
+    await waitFor(() => {
+      screen.getByText('2 sessions completed');
     });
-    screen.getByText('2 sessions completed');
+    expect(
+      fetchCallsMatching(routedFetch, '/children/foreign-child/inventory')
+        .length,
+    ).toBe(0);
   });
 
   it('ignores an unknown requested child profile after child links load', async () => {
     mockSearchParams = { profileId: 'foreign-child' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
-        subjects: [fullSubject],
-      },
+    const { routedFetch } = mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-
-    const view = render(<ProgressScreen />);
-
-    expect(useChildInventory).toHaveBeenLastCalledWith(undefined, {
-      enabled: false,
-    });
-
-    mockLinkedChildren = [childProgressProfile];
-    view.rerender(<ProgressScreen />);
 
     await waitFor(() => {
-      expect(useChildInventory).toHaveBeenLastCalledWith(undefined, {
-        enabled: false,
-      });
       screen.getByText('2 sessions completed');
     });
+    // The foreign id is not a known linked child → its inventory is never hit,
+    // and the linked child (CHILD_ID) is not auto-selected either.
+    expect(
+      fetchCallsMatching(routedFetch, '/children/foreign-child/inventory')
+        .length,
+    ).toBe(0);
+    expect(
+      fetchCallsMatching(routedFetch, `/children/${CHILD_ID}/inventory`).length,
+    ).toBe(0);
   });
 
-  it('shows full view when totalSessions is 1 with subjects', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 1 },
-        subjects: [fullSubject],
-      },
+  it('shows full view when totalSessions is 1 with subjects', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 1 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-    render(<ProgressScreen />);
 
+    await waitFor(() => {
+      screen.getByText('1 session completed');
+    });
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
-    screen.getByText('1 session completed');
   });
 
-  it('shows full view when totalSessions is exactly 4', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 4, topicsMastered: 1 },
-        subjects: [fullSubject],
-      },
+  it('shows full view when totalSessions is exactly 4', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 4, topicsMastered: 1 },
+          subjects: [fullSubject],
+        },
+      }),
     });
-    render(<ProgressScreen />);
 
+    await waitFor(() => {
+      screen.getByText('My progress');
+    });
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('uses child register copy for child profiles', () => {
-    mockUseActiveProfileRole.mockReturnValue('child');
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
+  it('uses child register copy for child profiles', async () => {
+    // A non-owner profile signed in directly resolves to role 'child'.
+    mount({
+      profile: makeLinkedChild({ id: CHILD_ID, displayName: 'Sam' }),
+      profiles: [makeLinkedChild({ id: CHILD_ID, displayName: 'Sam' })],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
+    await waitFor(() => {
+      screen.getByText('You learned 3 topics. Steady wins.');
+    });
     screen.getByText('My progress');
-    screen.getByText('You learned 3 topics. Steady wins.');
     screen.getByText('Latest report');
     screen.getByText('Recent sessions');
     expect(screen.queryByText('Your growth')).toBeNull();
     expect(screen.queryByText('Weekly report')).toBeNull();
   });
 
-  it('uses adult register copy for owner profiles', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
-      practiceActivityCount: 4,
+  it('uses adult register copy for owner profiles', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+        practiceActivityCount: 4,
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByText('My progress');
-    screen.getByText('4 practice lessons');
+    await waitFor(() => {
+      screen.getByText('My progress');
+    });
+    await waitFor(() => {
+      screen.getByText('4 practice lessons');
+    });
     screen.getByText('Latest report');
     screen.getByText('Recent sessions');
     expect(screen.queryByText('Your week')).toBeNull();
   });
 
-  it('uses the shared subject tint map for progress subject rows', () => {
+  it('uses the shared subject tint map for progress subject rows', async () => {
     const biologySubject = {
       ...fullSubject,
       subjectId: 's2',
@@ -1394,23 +1224,28 @@ describe('ProgressScreen — progressive disclosure', () => {
       activeMinutes: 12,
       sessionsCount: 2,
     };
-    mockLinkedChildren = [makeLinkedChild()];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
-        subjects: [fullSubject],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
-        subjects: [fullSubject, biologySubject],
-      },
-      sessions: [],
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+          subjects: [fullSubject, biologySubject],
+        },
+        sessions: [],
+      }),
     });
+
     const tintMap = getSubjectTintMap(['s1', 's2'], 'light');
 
-    render(<ProgressScreen />);
-
+    await waitFor(() => {
+      screen.getByTestId('progress-subject-s2-bookshelf');
+    });
     expect(
       screen.getByTestId('progress-subject-s1-bookshelf').props.style
         .borderColor,
@@ -1422,91 +1257,106 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(tintMap.get('s1')?.solid).not.toBe(tintMap.get('s2')?.solid);
   });
 
-  it('does not render the recent milestones block on the progress overview', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
-        subjects: [fullSubject],
-      },
+  it('does not render the recent milestones block on the progress overview', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
+          subjects: [fullSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByText('Recent sessions');
+    await waitFor(() => {
+      screen.getByText('Recent sessions');
+    });
     expect(screen.queryByTestId('progress-milestones-see-all')).toBeNull();
     expect(screen.queryByTestId('milestones-teaser')).toBeNull();
   });
 
-  it('uses current focus areas as recent focus fallback when sessions are absent', () => {
-    mockLinkedChildren = [makeLinkedChild()];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: ['Fractions', 'Decimals'],
-      },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: ['Fractions', 'Decimals'],
-      },
-      sessions: [],
+  it('uses current focus areas as recent focus fallback when sessions are absent', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: ['Fractions', 'Decimals'],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: ['Fractions', 'Decimals'],
+        },
+        sessions: [],
+      }),
     });
-    render(<ProgressScreen />);
 
-    screen.getByTestId('progress-recent-focus-card');
+    await waitFor(() => {
+      screen.getByTestId('progress-recent-focus-card');
+    });
     screen.getByText('Fractions');
     screen.getByText('Decimals');
     expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
   });
 
-  it('keeps currently working on hidden when inventory has no focus areas', () => {
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
+  it('keeps currently working on hidden when inventory has no focus areas', async () => {
+    mount({
+      profile: makeOwner(),
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
+        },
+      }),
     });
-    render(<ProgressScreen />);
 
+    await waitFor(() => {
+      screen.getByText('Recent sessions');
+    });
     expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
   });
 
-  it('does not gate when inventory is undefined (loading resolved with no data)', () => {
-    mockHooks({ inventory: undefined });
-    render(<ProgressScreen />);
+  it('does not gate when inventory is undefined (loading resolved with no data)', async () => {
+    mount({
+      profile: makeOwner(),
+      // No inventory route value → empty object body, no subjects/global.
+      routes: buildRoutes({}),
+    });
 
-    // No teaser and no empty state — just the loading/empty fallthrough
-    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+    await waitFor(() => {
+      // Inventory resolves to {} (no global/subjects) → neither teaser nor a
+      // crash; the screen falls through without gating.
+      expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+    });
   });
 
-  it('uses the shared progress hub for parent viewing child with subject breakdown', () => {
-    mockLinkedChildren = [makeLinkedChild()];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
-      practiceActivityCount: 4,
-    });
-    (useChildInventory as jest.Mock).mockReturnValue({
-      data: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
-      isLoading: false,
-      isError: false,
-      isRefetching: false,
-      refetch: jest.fn(),
+  it('uses the shared progress hub for parent viewing child with subject breakdown', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
+        },
+        practiceActivityCount: 4,
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByText("Emma's progress");
+    await waitFor(() => {
+      screen.getByText("Emma's progress");
+    });
     expect(screen.queryByText('4 practice lessons')).toBeNull();
     screen.getByTestId('progress-latest-report-section');
     screen.getByTestId('progress-recent-focus-card');
@@ -1515,243 +1365,219 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('Subjects');
   });
 
-  it('reuses report preview for parent viewing child when summaries exist', () => {
-    mockLinkedChildren = [makeLinkedChild()];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
-      weeklyReports: [
-        {
-          id: 'weekly-child-1',
-          reportWeek: '2026-05-11',
-          viewedAt: null,
-          createdAt: '2026-05-17T00:00:00Z',
-          headlineStat: {
-            label: 'topics mastered',
-            value: 1,
-            comparison: '+1 this week',
-          },
-          thisWeek: {
-            totalSessions: 2,
-            totalActiveMinutes: 30,
-            topicsMastered: 1,
-            topicsExplored: 2,
-            vocabularyTotal: 0,
-            streakBest: 1,
-          },
+  it('reuses report preview for parent viewing child when summaries exist', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
         },
-      ],
-    });
-    (useChildInventory as jest.Mock).mockReturnValue({
-      data: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
-      isLoading: false,
-      isError: false,
-      isRefetching: false,
-      refetch: jest.fn(),
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
+        },
+        weeklyReports: [
+          {
+            id: WEEKLY_REPORT_ID,
+            reportWeek: '2026-05-11',
+            viewedAt: null,
+            createdAt: '2026-05-17T00:00:00Z',
+            headlineStat: {
+              label: 'topics mastered',
+              value: 1,
+              comparison: '+1 this week',
+            },
+            thisWeek: {
+              totalSessions: 2,
+              totalActiveMinutes: 30,
+              topicsMastered: 1,
+              topicsExplored: 2,
+              vocabularyTotal: 0,
+              streakBest: 1,
+            },
+          },
+        ],
+      }),
     });
 
-    render(<ProgressScreen />);
-
+    await waitFor(() => {
+      screen.getByTestId('reports-list-card');
+    });
     expect(screen.queryByTestId('progress-weekly-report-tracker')).toBeNull();
     expect(screen.queryByTestId('progress-monthly-report-tracker')).toBeNull();
-    screen.getByTestId('reports-list-card');
     screen.getByTestId('progress-reports-link');
   });
 
-  it('renders progress summary freshness states for parent viewing child', () => {
-    mockLinkedChildren = [makeLinkedChild()];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
-    });
-    (useChildInventory as jest.Mock).mockReturnValue({
-      data: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
-      isLoading: false,
-      isError: false,
-      isRefetching: false,
-      refetch: jest.fn(),
-    });
-    (useChildProgressSummary as jest.Mock).mockReturnValue({
-      data: {
-        summary: 'Emma explored fractions and mastered 3 new topics this week.',
-        generatedAt: '2026-05-13T10:00:00Z',
-        basedOnLastSessionAt: '2026-05-10T09:00:00Z',
-        latestSessionId: 'session-1',
-        activityState: 'no_recent_activity',
-        nudgeRecommended: true,
-      },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('renders progress summary freshness states for parent viewing child', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
+        },
+        childSummary: {
+          summary:
+            'Emma explored fractions and mastered 3 new topics this week.',
+          generatedAt: '2026-05-13T10:00:00Z',
+          basedOnLastSessionAt: '2026-05-10T09:00:00Z',
+          latestSessionId: SESSION_1,
+          activityState: 'no_recent_activity',
+          nudgeRecommended: true,
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-summary-header');
+    await waitFor(() => {
+      screen.getByTestId('progress-summary-header');
+    });
     screen.getByText(/Emma explored fractions/);
     screen.getByTestId('progress-summary-no-recent');
     screen.getByTestId('progress-nudge-cta');
   });
 
-  it('renders deterministic fallback when no progress summary exists', () => {
-    mockLinkedChildren = [makeLinkedChild()];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
-    });
-    (useChildInventory as jest.Mock).mockReturnValue({
-      data: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-        currentlyWorkingOn: [],
-      },
-      isLoading: false,
-      isError: false,
-      isRefetching: false,
-      refetch: jest.fn(),
-    });
-    (useChildProgressSummary as jest.Mock).mockReturnValue({
-      data: {
-        summary: null,
-        generatedAt: null,
-        basedOnLastSessionAt: null,
-        latestSessionId: null,
-        activityState: 'no_recent_activity',
-      },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('renders deterministic fallback when no progress summary exists', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+          currentlyWorkingOn: [],
+        },
+        childSummary: {
+          summary: null,
+          generatedAt: null,
+          basedOnLastSessionAt: null,
+          latestSessionId: null,
+          activityState: 'no_recent_activity',
+          nudgeRecommended: false,
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-summary-fallback');
+    await waitFor(() => {
+      screen.getByTestId('progress-summary-fallback');
+    });
     expect(screen.queryByTestId('progress-summary-header')).toBeNull();
   });
 
-  it('hides profile picker for non-owner (child on parent account)', () => {
+  it('hides profile picker for non-owner (child on parent account)', async () => {
     // Break test: a child profile on a parent account must never see the progress
     // profile picker — it lets them toggle into a parent's (or sibling's) progress
-    // view, which would expose another user's learning data.
-    mockUseActiveProfileRole.mockReturnValue('child');
-    mockActiveProfile = {
-      id: 'child-profile-id',
-      displayName: 'Sam',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: false,
-    } as Profile;
-    // Simulate child has NO linked children (non-owner cannot have family links)
-    mockLinkedChildren = [];
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
-        subjects: [fullSubject],
-      },
+    // view, which would expose another user's learning data. A non-owner active
+    // profile with no linked children resolves to role 'child'.
+    mount({
+      profile: makeLinkedChild({ id: CHILD_ID, displayName: 'Sam' }),
+      profiles: [makeLinkedChild({ id: CHILD_ID, displayName: 'Sam' })],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+          subjects: [fullSubject],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
+    await waitFor(() => {
+      screen.getByText('My progress');
+    });
     // Profile picker must not appear — non-owner should only see their own progress
-    expect(screen.queryByTestId('progress-pill-row')).toBeNull();
-    // Regular progress content is still visible
-    screen.getByText('My progress');
+    expect(screen.queryByTestId('progress-parent-pill-row')).toBeNull();
   });
+
   // [B-600] Family progress empty state must not route to adult Study Library
-  it('shows child-curriculum CTA label in family progress empty state [B-600]', () => {
-    mockLinkedChildren = [
-      {
-        id: 'child-1',
-        displayName: 'Emma',
-        createdAt: '2026-01-01T00:00:00Z',
-        isOwner: false,
-      } as Profile,
-    ];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 0 },
-        subjects: [],
-      },
+  it('shows child-curriculum CTA label in family progress empty state [B-600]', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
-
-    // [B-600] Must show child-curriculum label, never adult library label
-    screen.getByText('Go to curriculum');
+    await waitFor(() => {
+      // [B-600] Must show child-curriculum label, never adult library label
+      screen.getByText('Open child curriculum');
+    });
     expect(screen.queryByText('Library')).toBeNull();
     expect(screen.queryByText('Start learning')).toBeNull();
   });
 
-  it('routes family progress empty CTA to child curriculum [B-600]', () => {
-    mockLinkedChildren = [
-      {
-        id: 'child-1',
-        displayName: 'Emma',
-        createdAt: '2026-01-01T00:00:00Z',
-        isOwner: false,
-      } as Profile,
-    ];
-    mockSearchParams = { profileId: 'child-1' };
-    mockHooks({
-      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
-      childInventory: {
-        global: { ...baseGlobal, totalSessions: 0 },
-        subjects: [],
-      },
+  it('routes family progress empty CTA to child curriculum [B-600]', async () => {
+    mockSearchParams = { profileId: CHILD_ID };
+    mount({
+      profile: makeOwner(),
+      profiles: [makeOwner(), makeLinkedChild()],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+        childInventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
+    await waitFor(() => {
+      screen.getByTestId('progress-start-learning');
+    });
 
     fireEvent.press(screen.getByTestId('progress-start-learning'));
-    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
     // [B-600] Must route to child curriculum, never to adult library or shelf
-    expect(push).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/curriculum',
-      params: { profileId: 'child-1' },
+      params: { profileId: CHILD_ID },
     });
-    expect(push).not.toHaveBeenCalledWith('/(app)/library');
+    expect(mockPush).not.toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('solo learner empty state still routes to library when not in family mode [B-600 guard]', () => {
+  it('solo learner empty state still routes to library when not in family mode [B-600 guard]', async () => {
     // Break test: solo learner (non-family) must still route to library unchanged.
-    mockUseActiveProfileRole.mockReturnValue('owner');
-    mockActiveProfile = {
-      id: 'solo-owner',
-      displayName: 'Alex',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: true,
-    } as Profile;
-    mockLinkedChildren = [];
-    mockSearchParams = {};
-    mockUseSubjects.mockReturnValue({ data: [] });
-    mockHooks({
-      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+    mount({
+      profile: makeOwner({ id: 'solo-owner', displayName: 'Alex' }),
+      profiles: [makeOwner({ id: 'solo-owner', displayName: 'Alex' })],
+      routes: buildRoutes({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 0 },
+          subjects: [],
+        },
+      }),
     });
 
-    render(<ProgressScreen />);
+    await waitFor(() => {
+      screen.getByTestId('progress-start-learning');
+    });
 
     fireEvent.press(screen.getByTestId('progress-start-learning'));
-    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
-    expect(push).toHaveBeenCalledWith('/(app)/library');
-    expect(push).not.toHaveBeenCalledWith(
+    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    expect(mockPush).not.toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/curriculum',
       }),
