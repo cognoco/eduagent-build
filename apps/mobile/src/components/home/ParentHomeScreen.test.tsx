@@ -1,15 +1,24 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
+import { fireEvent, waitFor } from '@testing-library/react-native';
 import type { DashboardData, Profile } from '@eduagent/schemas';
+import {
+  cleanupScreen,
+  createTestProfile,
+  renderScreen,
+  type RenderScreenResult,
+} from '../../test-utils/screen-render';
+import { fetchCallsMatching } from '../../test-utils/mock-api-routes';
 
 import { ParentHomeScreen } from './ParentHomeScreen';
 
+// ─── Boundary mocks (external/native runtime only) ──────────────────────
+//
+// These five are true native/external boundaries the harness cannot run in
+// JSDOM. Everything else (profile context, dashboard / subscription /
+// notification / nudge / learner-profile hooks) now runs for real against the
+// routed mock fetch supplied by `renderScreen` — see CONVERT notes below.
+
 jest.mock(
-  'react-i18next',
+  'react-i18next' /* gc1-allow: i18n boundary — returns en.json strings */,
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
@@ -20,105 +29,12 @@ jest.mock(
   }),
 );
 
-let mockLinkedChildren: Profile[] = [];
-let mockDashboardData: DashboardData | undefined;
-let mockChildCapNotifications: Array<{
-  id: string;
-  ownerProfileId: string;
-  childProfileId: string;
-  childDisplayName: string;
-  kind: 'daily_exceeded' | 'monthly_exceeded';
-  occurredOn: string;
-  resetsAt: string;
-  createdAt: string;
-}> = [];
-const mockDismissChildCapNotification = jest.fn();
-let mockSubscription: { tier: 'free' | 'plus' | 'family' | 'pro' } | null = {
-  tier: 'family',
-};
-let mockFamilySubscription: {
-  profileCount: number;
-  maxProfiles: number;
-} | null = {
-  profileCount: 2,
-  maxProfiles: 5,
-};
-
-jest.mock(
-  '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
-  () => ({
-    ...jest.requireActual('../../lib/profile'),
-    useLinkedChildren: () => mockLinkedChildren,
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-active-profile-role' /* gc1-allow: external hook boundary — wraps profile context + family-links query */,
-  () => ({
-    useActiveProfileRole: () => 'owner',
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-dashboard' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useDashboard: () => ({ data: mockDashboardData }),
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useSubscription: () => ({ data: mockSubscription }),
-    useFamilySubscription: () => ({ data: mockFamilySubscription }),
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-child-cap-notifications' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useChildCapNotifications: () => ({ data: mockChildCapNotifications }),
-    useDismissChildCapNotification: () => ({
-      mutate: mockDismissChildCapNotification,
-      isPending: false,
-    }),
-  }),
-);
-
 const mockPush = jest.fn();
 jest.mock(
   'expo-router' /* gc1-allow: expo-router requires a native navigation container not available in JSDOM */,
   () => ({
     router: { push: mockPush },
     useRouter: () => ({ push: mockPush }),
-  }),
-);
-
-type BannerProps = {
-  childrenInGracePeriod: Array<{
-    profileId: string;
-    displayName: string;
-    respondedAt: string;
-  }>;
-};
-let capturedBannerProps: BannerProps | null = null;
-
-jest.mock(
-  '../family/WithdrawalCountdownBanner' /* gc1-allow: depends on its own hook tree — isolated here to keep test focused */,
-  () => ({
-    WithdrawalCountdownBanner: (props: BannerProps) => {
-      capturedBannerProps = props;
-      return null;
-    },
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-nudges' /* gc1-allow: external hook boundary — wraps TanStack mutation that requires QueryClient */,
-  () => ({
-    useSendNudge: () => ({
-      mutateAsync: jest.fn().mockResolvedValue(undefined),
-    }),
   }),
 );
 
@@ -134,55 +50,132 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../hooks/use-learner-profile' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useChildLearnerProfile: () => ({
-      data: { accommodationMode: 'none' },
-    }),
-  }),
-);
+// NOTE — previously this file also mocked seven internal modules
+// (lib/profile.useLinkedChildren, hooks/use-active-profile-role,
+// use-dashboard, use-subscription, use-child-cap-notifications,
+// use-learner-profile, use-nudges) plus the WithdrawalCountdownBanner. Those
+// stubs are gone: the real hooks now run against the routed mock fetch and
+// the real ProfileContext provided by `renderScreen`. The banner renders for
+// real and is asserted on its visible output.
 
-const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
-  id: 'profile-1',
-  accountId: 'account-1',
-  displayName: 'Alex Parent',
-  isOwner: true,
-  hasPremiumLlm: false,
-  defaultAppContext: null,
-  hasFamilyLinks: false,
-  consentStatus: null,
-  linkCreatedAt: null,
-  conversationLanguage: 'en',
-  pronouns: null,
-  birthYear: 1985,
-  avatarUrl: null,
-  location: null,
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
-  ...overrides,
-});
+// ─── Fixtures ───────────────────────────────────────────────────────────
+
+const makeProfile = (overrides: Partial<Profile> = {}): Profile =>
+  createTestProfile({
+    id: 'profile-1',
+    accountId: 'account-1',
+    displayName: 'Alex Parent',
+    isOwner: true,
+    birthYear: 1985,
+    ...overrides,
+  });
+
+const PARENT = makeProfile();
 
 const CHILD_A = makeProfile({
   id: 'child-a',
+  accountId: 'account-1',
   displayName: 'Emma',
   isOwner: false,
 });
 
 const CHILD_B = makeProfile({
   id: 'child-b',
+  accountId: 'account-1',
   displayName: 'Liam',
   isOwner: false,
 });
 
-async function waitForParentTransitionNotice(): Promise<void> {
-  await waitFor(() => {
-    screen.getByTestId('parent-transition-notice');
-  });
+type ChildCapNotificationFixture = {
+  id: string;
+  ownerProfileId: string;
+  childProfileId: string;
+  childDisplayName: string;
+  kind: 'daily_exceeded' | 'monthly_exceeded';
+  occurredOn: string;
+  resetsAt: string;
+  createdAt: string;
+};
+
+function subscriptionResponse(
+  tier: 'free' | 'plus' | 'family' | 'pro' = 'family',
+) {
+  return {
+    subscription: {
+      tier,
+      effectiveAccessTier: tier,
+      billingAccess: 'current',
+      status: 'active',
+      trialEndsAt: null,
+      currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+      cancelAtPeriodEnd: false,
+      monthlyLimit: 700,
+      usedThisMonth: 0,
+      remainingQuestions: 700,
+      dailyLimit: null,
+      usedToday: 0,
+      dailyRemainingQuestions: null,
+    },
+  };
 }
 
-function resolvedStyle(testID: string): Record<string, unknown> {
-  const style = screen.getByTestId(testID).props.style as unknown;
+interface RouteOptions {
+  dashboard?: DashboardData;
+  subscriptionTier?: 'free' | 'plus' | 'family' | 'pro';
+  family?: { profileCount: number; maxProfiles: number } | null;
+  childCapNotifications?: ChildCapNotificationFixture[];
+}
+
+/**
+ * Build the routes map the real hooks hit. Endpoints discovered from the hook
+ * sources:
+ *   - useDashboard          → GET /dashboard (+ GET /dashboard/demo fallback
+ *                             when children is empty)
+ *   - useSubscription       → GET /subscription
+ *   - useFamilySubscription → GET /subscription/family
+ *   - useChildCapNotifications     → GET /notifications/child-cap
+ *   - useDismissChildCapNotification → POST /notifications/child-cap/:id/dismiss
+ *   - useChildLearnerProfile (not called by ParentHomeScreen — no route needed)
+ *   - useSendNudge          → POST /nudges (fires only on press; no route
+ *                             needed because the nudge test never confirms send)
+ */
+function buildRoutes(opts: RouteOptions = {}) {
+  const dashboard: DashboardData = opts.dashboard ?? {
+    children: [],
+    pendingNotices: [],
+    demoMode: false,
+  };
+  const family =
+    opts.family === undefined
+      ? { profileCount: 2, maxProfiles: 5 }
+      : opts.family;
+
+  return {
+    // Dismiss must precede the list route: both URLs contain
+    // "/notifications/child-cap", and the routed mock returns the first
+    // includes() match in insertion order.
+    '/dismiss': { success: true },
+    '/notifications/child-cap': {
+      notifications: opts.childCapNotifications ?? [],
+    },
+    // The real useDashboard falls through to /dashboard/demo when the primary
+    // response has zero children — route both so the fallback never returns
+    // the empty default-200 body (which lacks `.children`).
+    '/dashboard/demo': dashboard,
+    '/dashboard': dashboard,
+    '/subscription/family':
+      family === null
+        ? new Response(JSON.stringify({ message: 'none' }), { status: 404 })
+        : { family },
+    '/subscription': subscriptionResponse(opts.subscriptionTier ?? 'family'),
+  };
+}
+
+function resolvedStyle(
+  result: RenderScreenResult['result'],
+  testID: string,
+): Record<string, unknown> {
+  const style = result.getByTestId(testID).props.style as unknown;
   const resolved = (
     typeof style === 'function' ? style({ pressed: false }) : style
   ) as
@@ -192,134 +185,171 @@ function resolvedStyle(testID: string): Record<string, unknown> {
   return Array.isArray(resolved) ? Object.assign({}, ...resolved) : resolved;
 }
 
+function dashboardChild(
+  overrides: Partial<DashboardData['children'][number]> & { profileId: string },
+): DashboardData['children'][number] {
+  return {
+    displayName: 'Emma',
+    consentStatus: null,
+    respondedAt: null,
+    summary: '',
+    sessionsThisWeek: 0,
+    sessionsLastWeek: 0,
+    totalTimeThisWeek: 0,
+    totalTimeLastWeek: 0,
+    exchangesThisWeek: 0,
+    exchangesLastWeek: 0,
+    trend: 'stable',
+    subjects: [],
+    guidedVsImmediateRatio: 0,
+    retentionTrend: 'stable',
+    totalSessions: 0,
+    weeklyHeadline: undefined,
+    currentlyWorkingOn: [],
+    progress: null,
+    currentStreak: 0,
+    longestStreak: 0,
+    totalXp: 0,
+    ...overrides,
+  };
+}
+
 describe('ParentHomeScreen', () => {
-  beforeEach(() => {
+  let active: RenderScreenResult | null = null;
+
+  function mount(
+    profiles: Profile[],
+    opts: RouteOptions = {},
+    activeProfile: Profile = PARENT,
+  ): RenderScreenResult {
+    active = renderScreen(<ParentHomeScreen activeProfile={activeProfile} />, {
+      profile: activeProfile,
+      profiles,
+      routes: buildRoutes(opts),
+    });
+    return active;
+  }
+
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
     jest.clearAllMocks();
-    mockLinkedChildren = [];
-    mockDashboardData = undefined;
-    mockChildCapNotifications = [];
-    mockSubscription = { tier: 'family' };
-    mockFamilySubscription = { profileCount: 2, maxProfiles: 5 };
-    capturedBannerProps = null;
   });
 
+  async function waitForParentTransitionNotice(
+    result: RenderScreenResult['result'],
+  ): Promise<void> {
+    await waitFor(() => {
+      result.getByTestId('parent-transition-notice');
+    });
+  }
+
   it('renders greeting with profile first name', () => {
-    render(
-      <ParentHomeScreen
-        activeProfile={makeProfile({ displayName: 'Alex Parent' })}
-      />,
+    const { result } = mount(
+      [PARENT],
+      {},
+      makeProfile({ displayName: 'Alex Parent' }),
     );
 
-    screen.getByText('Hey Alex');
+    result.getByText('Hey Alex');
   });
 
   it('renders one command card per linked child with actions inside it', async () => {
-    mockLinkedChildren = [CHILD_A, CHILD_B];
+    const { result } = mount([PARENT, CHILD_A, CHILD_B]);
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    screen.getByTestId('parent-home-check-child-child-a');
-    screen.getByTestId('parent-home-check-child-child-b');
-    screen.getByTestId('parent-home-child-progress-child-a');
-    screen.getByTestId('parent-home-weekly-report-child-a');
-    screen.getByTestId('parent-home-weekly-report-child-b');
-    screen.getByTestId('parent-home-send-nudge-child-a');
-    screen.getByTestId('parent-home-send-nudge-child-b');
-    screen.getByText('Children');
-    screen.getByText('Your family');
-    screen.getByTestId('parent-home-family-summary');
-    screen.getByText('Add profile');
-    expect(screen.queryByText('Continue your own learning')).toBeNull();
+    result.getByTestId('parent-home-check-child-child-a');
+    result.getByTestId('parent-home-check-child-child-b');
+    result.getByTestId('parent-home-child-progress-child-a');
+    result.getByTestId('parent-home-weekly-report-child-a');
+    result.getByTestId('parent-home-weekly-report-child-b');
+    result.getByTestId('parent-home-send-nudge-child-a');
+    result.getByTestId('parent-home-send-nudge-child-b');
+    result.getByText('Children');
+    result.getByText('Your family');
+    result.getByTestId('parent-home-family-summary');
+    result.getByText('Add profile');
+    expect(result.queryByText('Continue your own learning')).toBeNull();
     expect(
-      screen.queryByText("Show them how it's done: start a quick session."),
+      result.queryByText("Show them how it's done: start a quick session."),
     ).toBeNull();
-    expect(screen.queryByTestId('child-accommodation-row-child-a')).toBeNull();
-    expect(screen.queryByTestId('child-accommodation-row-child-b')).toBeNull();
+    expect(result.queryByTestId('child-accommodation-row-child-a')).toBeNull();
+    expect(result.queryByTestId('child-accommodation-row-child-b')).toBeNull();
   });
 
   it('routes the child card header to the child quick progress screen', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
+    fireEvent.press(result.getByTestId('parent-home-check-child-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith(
       '/(app)/child/child-a?mode=progress',
     );
   });
 
   it('routes the child initial to child profile settings', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    fireEvent.press(screen.getByTestId('parent-home-child-profile-child-a'));
+    fireEvent.press(result.getByTestId('parent-home-child-profile-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith(
       '/(app)/child/child-a?mode=settings',
     );
   });
 
   it('routes the progress action to the child quick progress screen', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
+    fireEvent.press(result.getByTestId('parent-home-child-progress-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith(
       '/(app)/child/child-a?mode=progress',
     );
   });
 
   it('does not render duplicate recent activity or own learning actions', async () => {
-    mockLinkedChildren = [CHILD_A];
-
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
 
     expect(
-      screen.queryByTestId('parent-home-recent-child-activity'),
+      result.queryByTestId('parent-home-recent-child-activity'),
     ).toBeNull();
-    expect(screen.queryByTestId('parent-home-study-activation')).toBeNull();
-    expect(screen.queryByText('Recent child activity')).toBeNull();
-    expect(screen.queryByText('Continue your own learning')).toBeNull();
+    expect(result.queryByTestId('parent-home-study-activation')).toBeNull();
+    expect(result.queryByText('Recent child activity')).toBeNull();
+    expect(result.queryByText('Continue your own learning')).toBeNull();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('routes the reports action to the child reports list', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    fireEvent.press(screen.getByTestId('parent-home-weekly-report-child-a'));
+    fireEvent.press(result.getByTestId('parent-home-weekly-report-child-a'));
 
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a/reports');
   });
 
   it('keeps parent learning out of the family summary when there is no parent activity', () => {
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    const { result } = mount([PARENT]);
 
-    expect(screen.queryByTestId('parent-home-own-learning')).toBeNull();
-    expect(screen.queryByText('Continue your own learning')).toBeNull();
-    expect(screen.queryByText('You: Fractions in Math')).toBeNull();
+    expect(result.queryByTestId('parent-home-own-learning')).toBeNull();
+    expect(result.queryByText('Continue your own learning')).toBeNull();
+    expect(result.queryByText('You: Fractions in Math')).toBeNull();
   });
 
   it('shows an add-first-child state when no children are linked', () => {
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    const { result } = mount([PARENT]);
 
-    screen.getByTestId('add-first-child-screen');
-    expect(screen.queryByTestId('parent-transition-notice')).toBeNull();
-    screen.getByText('Your family dashboard starts here');
-    screen.getByText(
+    result.getByTestId('add-first-child-screen');
+    expect(result.queryByTestId('parent-transition-notice')).toBeNull();
+    result.getByText('Your family dashboard starts here');
+    result.getByText(
       'Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.',
     );
 
-    fireEvent.press(screen.getByTestId('add-first-child-screen-primary'));
+    fireEvent.press(result.getByTestId('add-first-child-screen-primary'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-profile',
@@ -328,14 +358,13 @@ describe('ParentHomeScreen', () => {
   });
 
   it('routes Free owners with linked children directly to add another child', async () => {
-    mockSubscription = { tier: 'free' };
-    mockFamilySubscription = { profileCount: 2, maxProfiles: 2 };
-    mockLinkedChildren = [CHILD_A];
+    const { result } = mount([PARENT, CHILD_A], {
+      subscriptionTier: 'free',
+      family: { profileCount: 2, maxProfiles: 2 },
+    });
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    fireEvent.press(screen.getByTestId('parent-home-add-child'));
+    fireEvent.press(result.getByTestId('parent-home-add-child'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-profile',
@@ -344,58 +373,57 @@ describe('ParentHomeScreen', () => {
   });
 
   it('shows conversation prompts inside the child card with compact status from dashboard data', async () => {
-    mockLinkedChildren = [CHILD_A];
-    mockDashboardData = {
-      children: [
-        {
-          profileId: 'child-a',
-          displayName: 'Emma',
-          consentStatus: null,
-          respondedAt: null,
-          summary: 'Emma is building confidence.',
-          sessionsThisWeek: 2,
-          sessionsLastWeek: 1,
-          totalTimeThisWeek: 18,
-          totalTimeLastWeek: 8,
-          exchangesThisWeek: 10,
-          exchangesLastWeek: 5,
-          trend: 'up',
-          subjects: [
-            { subjectId: 'subject-a', name: 'Math', retentionStatus: 'strong' },
-          ],
-          guidedVsImmediateRatio: 0.5,
-          retentionTrend: 'improving',
-          totalSessions: 4,
-          weeklyHeadline: undefined,
-          currentlyWorkingOn: ['Fractions'],
-          progress: null,
-          currentStreak: 0,
-          longestStreak: 0,
-          totalXp: 0,
-        },
-      ],
-      pendingNotices: [],
-      demoMode: false,
-    };
+    const { result } = mount([PARENT, CHILD_A], {
+      dashboard: {
+        children: [
+          dashboardChild({
+            profileId: 'child-a',
+            displayName: 'Emma',
+            summary: 'Emma is building confidence.',
+            sessionsThisWeek: 2,
+            sessionsLastWeek: 1,
+            totalTimeThisWeek: 18,
+            totalTimeLastWeek: 8,
+            exchangesThisWeek: 10,
+            exchangesLastWeek: 5,
+            trend: 'up',
+            subjects: [
+              {
+                subjectId: 'subject-a',
+                name: 'Math',
+                retentionStatus: 'strong',
+              },
+            ],
+            guidedVsImmediateRatio: 0.5,
+            retentionTrend: 'improving',
+            totalSessions: 4,
+            currentlyWorkingOn: ['Fractions'],
+          }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+    });
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
+    await waitFor(() => {
+      result.getByTestId('parent-home-child-prompts-child-a');
+    });
 
-    expect(screen.queryByTestId('parent-home-tonight-section')).toBeNull();
-    screen.getByTestId('parent-home-child-prompts-child-a');
-    screen.getByText('Conversation starters');
-    screen.getByText('What felt clearer in Fractions this week?');
-    screen.getByText("What's the trickiest part of Fractions right now?");
-    screen.getByText('Want to pick one small Fractions goal for this week?');
+    expect(result.queryByTestId('parent-home-tonight-section')).toBeNull();
+    result.getByText('Conversation starters');
+    result.getByText('What felt clearer in Fractions this week?');
+    result.getByText("What's the trickiest part of Fractions right now?");
+    result.getByText('Want to pick one small Fractions goal for this week?');
     expect(
-      screen.queryByText('Emma: What felt clearer in Fractions this week?'),
+      result.queryByText('Emma: What felt clearer in Fractions this week?'),
     ).toBeNull();
-    expect(screen.queryByText('What made Fractions click today?')).toBeNull();
-    expect(screen.queryByText('What should we focus on tomorrow?')).toBeNull();
+    expect(result.queryByText('What made Fractions click today?')).toBeNull();
+    expect(result.queryByText('What should we focus on tomorrow?')).toBeNull();
     const promptCardStyles = [
-      resolvedStyle('parent-home-tonight-child-a-active-focus'),
-      resolvedStyle('parent-home-tonight-child-a-trickiest'),
-      resolvedStyle('parent-home-tonight-child-a-next-goal'),
+      resolvedStyle(result, 'parent-home-tonight-child-a-active-focus'),
+      resolvedStyle(result, 'parent-home-tonight-child-a-trickiest'),
+      resolvedStyle(result, 'parent-home-tonight-child-a-next-goal'),
     ];
     promptCardStyles.forEach((style) => {
       expect(style).toEqual(
@@ -413,25 +441,26 @@ describe('ParentHomeScreen', () => {
     expect(
       new Set(promptCardStyles.map((style) => style.backgroundColor)).size,
     ).toBe(1);
-    expect(resolvedStyle('parent-home-check-child-child-a')).toEqual(
+    expect(resolvedStyle(result, 'parent-home-check-child-child-a')).toEqual(
       expect.objectContaining({
         shadowColor: expect.any(String),
       }),
     );
-    const childAccent = resolvedStyle('parent-home-check-child-child-a')
+    const childAccent = resolvedStyle(result, 'parent-home-check-child-child-a')
       .shadowColor as string;
     const promptBorder = resolvedStyle(
+      result,
       'parent-home-tonight-child-a-active-focus',
     ).borderColor as string;
     expect(promptBorder.toLowerCase()).toMatch(
       new RegExp(`^${childAccent.toLowerCase()}`),
     );
     expect(
-      screen.getByTestId('parent-home-tonight-child-a-active-focus').props
+      result.getByTestId('parent-home-tonight-child-a-active-focus').props
         .accessibilityRole,
     ).toBeUndefined();
     expect(
-      resolvedStyle('parent-home-tonight-icon-child-a-active-focus'),
+      resolvedStyle(result, 'parent-home-tonight-icon-child-a-active-focus'),
     ).toEqual(
       expect.objectContaining({
         backgroundColor: expect.any(String),
@@ -442,6 +471,7 @@ describe('ParentHomeScreen', () => {
       }),
     );
     const promptTextStyle = resolvedStyle(
+      result,
       'parent-home-tonight-text-child-a-active-focus',
     );
     expect(promptTextStyle).toEqual(
@@ -462,312 +492,279 @@ describe('ParentHomeScreen', () => {
       /^#[0-9a-f]{8}$/i,
     );
     expect(
-      screen.getAllByText('Fractions · 18 min this week').length,
+      result.getAllByText('Fractions · 18 min this week').length,
     ).toBeGreaterThan(0);
-    screen.getByText('Emma · 18 min this week');
-    screen.getByText('2 of 5 profiles used');
+    result.getByText('Emma · 18 min this week');
+    result.getByText('2 of 5 profiles used');
   });
 
   it('uses restart prompts when a child has a focus but no activity this week', async () => {
-    mockLinkedChildren = [CHILD_A];
-    mockDashboardData = {
-      children: [
-        {
-          profileId: 'child-a',
-          displayName: 'Emma',
-          consentStatus: null,
-          respondedAt: null,
-          summary: '',
-          sessionsThisWeek: 0,
-          sessionsLastWeek: 1,
-          totalTimeThisWeek: 0,
-          totalTimeLastWeek: 12,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 6,
-          trend: 'stable',
-          subjects: [
-            {
-              subjectId: 'subject-programming',
-              name: 'Programming',
-              retentionStatus: 'strong',
-            },
-          ],
-          guidedVsImmediateRatio: 0,
-          retentionTrend: 'stable',
-          totalSessions: 3,
-          weeklyHeadline: undefined,
-          currentlyWorkingOn: ['Programming'],
-          progress: null,
-          currentStreak: 0,
-          longestStreak: 0,
-          totalXp: 0,
-        },
-      ],
-      pendingNotices: [],
-      demoMode: false,
-    };
+    const { result } = mount([PARENT, CHILD_A], {
+      dashboard: {
+        children: [
+          dashboardChild({
+            profileId: 'child-a',
+            displayName: 'Emma',
+            sessionsThisWeek: 0,
+            sessionsLastWeek: 1,
+            totalTimeThisWeek: 0,
+            totalTimeLastWeek: 12,
+            exchangesThisWeek: 0,
+            exchangesLastWeek: 6,
+            trend: 'stable',
+            subjects: [
+              {
+                subjectId: 'subject-programming',
+                name: 'Programming',
+                retentionStatus: 'strong',
+              },
+            ],
+            guidedVsImmediateRatio: 0,
+            retentionTrend: 'stable',
+            totalSessions: 3,
+            currentlyWorkingOn: ['Programming'],
+          }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+    });
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    screen.getByText('Want to pick one small Programming goal for this week?');
-    screen.getByText("What's the trickiest part of Programming right now?");
-    screen.getByText('Should we make Programming easier to restart?');
-    expect(screen.queryByText('What made Programming click today?')).toBeNull();
+    await waitFor(() => {
+      result.getByText(
+        'Want to pick one small Programming goal for this week?',
+      );
+    });
+    result.getByText("What's the trickiest part of Programming right now?");
+    result.getByText('Should we make Programming easier to restart?');
+    expect(result.queryByText('What made Programming click today?')).toBeNull();
     expect(
-      screen.queryByText('What felt clearer in Programming this week?'),
+      result.queryByText('What felt clearer in Programming this week?'),
     ).toBeNull();
   });
 
   it('keeps the family summary focused on child activity', async () => {
-    mockLinkedChildren = [CHILD_A];
-    mockDashboardData = {
-      children: [
-        {
-          profileId: 'child-a',
-          displayName: 'Emma',
-          consentStatus: null,
-          respondedAt: null,
-          summary: 'Emma is building confidence.',
-          sessionsThisWeek: 2,
-          sessionsLastWeek: 1,
-          totalTimeThisWeek: 18,
-          totalTimeLastWeek: 8,
-          exchangesThisWeek: 10,
-          exchangesLastWeek: 5,
-          trend: 'up',
-          subjects: [
-            { subjectId: 'subject-a', name: 'Math', retentionStatus: 'strong' },
-          ],
-          guidedVsImmediateRatio: 0.5,
-          retentionTrend: 'improving',
-          totalSessions: 4,
-          weeklyHeadline: undefined,
-          currentlyWorkingOn: ['Fractions'],
-          progress: null,
-          currentStreak: 0,
-          longestStreak: 0,
-          totalXp: 0,
-        },
-      ],
-      pendingNotices: [],
-      demoMode: false,
-    };
+    const { result } = mount([PARENT, CHILD_A], {
+      dashboard: {
+        children: [
+          dashboardChild({
+            profileId: 'child-a',
+            displayName: 'Emma',
+            summary: 'Emma is building confidence.',
+            sessionsThisWeek: 2,
+            sessionsLastWeek: 1,
+            totalTimeThisWeek: 18,
+            totalTimeLastWeek: 8,
+            exchangesThisWeek: 10,
+            exchangesLastWeek: 5,
+            trend: 'up',
+            subjects: [
+              {
+                subjectId: 'subject-a',
+                name: 'Math',
+                retentionStatus: 'strong',
+              },
+            ],
+            guidedVsImmediateRatio: 0.5,
+            retentionTrend: 'improving',
+            totalSessions: 4,
+            currentlyWorkingOn: ['Fractions'],
+          }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+    });
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    screen.getByText('Emma · 18 min this week');
-    screen.getByText('2 of 5 profiles used');
-    expect(screen.queryByText('You + Emma')).toBeNull();
-    expect(screen.queryByText('You: Fractions in Math')).toBeNull();
-    expect(screen.queryByText('You lead by example.')).toBeNull();
+    await waitFor(() => {
+      result.getByText('Emma · 18 min this week');
+    });
+    result.getByText('2 of 5 profiles used');
+    expect(result.queryByText('You + Emma')).toBeNull();
+    expect(result.queryByText('You: Fractions in Math')).toBeNull();
+    expect(result.queryByText('You lead by example.')).toBeNull();
   });
 
   it('shows one activity-based prompt inside each child card when multiple children are linked', async () => {
-    mockLinkedChildren = [CHILD_B, CHILD_A]; // intentionally reversed to verify sort
-    mockDashboardData = {
-      children: [
-        {
-          profileId: 'child-a',
-          displayName: 'Emma',
-          consentStatus: null,
-          respondedAt: null,
-          summary: '',
-          sessionsThisWeek: 5,
-          sessionsLastWeek: 3,
-          totalTimeThisWeek: 30,
-          totalTimeLastWeek: 20,
-          exchangesThisWeek: 15,
-          exchangesLastWeek: 10,
-          trend: 'up',
-          subjects: [
-            { subjectId: 'sub-a', name: 'Math', retentionStatus: 'strong' },
-          ],
-          guidedVsImmediateRatio: 0.5,
-          retentionTrend: 'improving',
-          totalSessions: 10,
-          weeklyHeadline: undefined,
-          currentlyWorkingOn: ['Math'],
-          progress: null,
-          currentStreak: 0,
-          longestStreak: 0,
-          totalXp: 0,
-        },
-        {
-          profileId: 'child-b',
-          displayName: 'Liam',
-          consentStatus: null,
-          respondedAt: null,
-          summary: '',
-          sessionsThisWeek: 0,
-          sessionsLastWeek: 0,
-          totalTimeThisWeek: 0,
-          totalTimeLastWeek: 0,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 0,
-          trend: 'stable',
-          subjects: [],
-          guidedVsImmediateRatio: 0,
-          retentionTrend: 'stable',
-          totalSessions: 3,
-          weeklyHeadline: undefined,
-          currentlyWorkingOn: [],
-          progress: null,
-          currentStreak: 0,
-          longestStreak: 0,
-          totalXp: 0,
-        },
-      ],
-      pendingNotices: [],
-      demoMode: false,
-    };
+    const { result } = mount([CHILD_B, CHILD_A], {
+      // intentionally reversed profiles to verify sort
+      dashboard: {
+        children: [
+          dashboardChild({
+            profileId: 'child-a',
+            displayName: 'Emma',
+            sessionsThisWeek: 5,
+            sessionsLastWeek: 3,
+            totalTimeThisWeek: 30,
+            totalTimeLastWeek: 20,
+            exchangesThisWeek: 15,
+            exchangesLastWeek: 10,
+            trend: 'up',
+            subjects: [
+              { subjectId: 'sub-a', name: 'Math', retentionStatus: 'strong' },
+            ],
+            guidedVsImmediateRatio: 0.5,
+            retentionTrend: 'improving',
+            totalSessions: 10,
+            currentlyWorkingOn: ['Math'],
+          }),
+          dashboardChild({
+            profileId: 'child-b',
+            displayName: 'Liam',
+            totalSessions: 3,
+          }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+    });
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    const emmaPrompt = screen.getByTestId(
+    await waitFor(() => {
+      result.getByTestId('parent-home-tonight-child-a-active-focus');
+    });
+    const emmaPrompt = result.getByTestId(
       'parent-home-tonight-child-a-active-focus',
     );
-    const liamPrompt = screen.getByTestId(
+    const liamPrompt = result.getByTestId(
       'parent-home-tonight-child-b-restart',
     );
-    screen.getByTestId('parent-home-child-prompts-child-a');
-    screen.getByTestId('parent-home-child-prompts-child-b');
-    screen.getByText('What felt clearer in Math this week?');
-    screen.getByText('What would make starting feel easy this week?');
+    result.getByTestId('parent-home-child-prompts-child-a');
+    result.getByTestId('parent-home-child-prompts-child-b');
+    result.getByText('What felt clearer in Math this week?');
+    result.getByText('What would make starting feel easy this week?');
     expect(
-      screen.queryByTestId('parent-home-tonight-child-a-trickiest'),
+      result.queryByTestId('parent-home-tonight-child-a-trickiest'),
     ).toBeNull();
     expect(
-      screen.queryByTestId('parent-home-tonight-child-b-restart-easier'),
+      result.queryByTestId('parent-home-tonight-child-b-restart-easier'),
     ).toBeNull();
     expect(
-      screen.queryByText('Emma: What felt clearer in Math this week?'),
+      result.queryByText('Emma: What felt clearer in Math this week?'),
     ).toBeNull();
     expect(
-      screen.queryByText('Liam: What would make starting feel easy this week?'),
+      result.queryByText('Liam: What would make starting feel easy this week?'),
     ).toBeNull();
     expect(
-      resolvedStyle('parent-home-tonight-child-a-active-focus').borderColor,
+      resolvedStyle(result, 'parent-home-tonight-child-a-active-focus')
+        .borderColor,
     ).not.toBe(
-      resolvedStyle('parent-home-tonight-child-b-restart').borderColor,
+      resolvedStyle(result, 'parent-home-tonight-child-b-restart').borderColor,
     );
     expect(
-      resolvedStyle('parent-home-check-child-child-a').shadowColor,
-    ).not.toBe(resolvedStyle('parent-home-check-child-child-b').shadowColor);
+      resolvedStyle(result, 'parent-home-check-child-child-a').shadowColor,
+    ).not.toBe(
+      resolvedStyle(result, 'parent-home-check-child-child-b').shadowColor,
+    );
     expect(emmaPrompt).toBeTruthy();
     expect(liamPrompt).toBeTruthy();
-    screen.getByText('Liam may need attention');
+    result.getByText('Liam may need attention');
   });
 
   it('shows ParentTransitionNotice after at least one child is linked', async () => {
-    mockLinkedChildren = [CHILD_A];
-
-    render(
-      <ParentHomeScreen
-        activeProfile={makeProfile({ id: 'profile-transition' })}
-      />,
+    const transitionParent = makeProfile({ id: 'profile-transition' });
+    const { result } = mount(
+      [transitionParent, { ...CHILD_A, accountId: transitionParent.accountId }],
+      {},
+      transitionParent,
     );
 
-    await waitForParentTransitionNotice();
+    await waitForParentTransitionNotice(result);
   });
 
   it('pressing nudge card opens NudgeActionSheet for that child', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
+    expect(result.queryByTestId('nudge-action-sheet-close')).toBeNull();
 
-    expect(screen.queryByTestId('nudge-action-sheet-close')).toBeNull();
+    fireEvent.press(result.getByTestId('parent-home-send-nudge-child-a'));
 
-    fireEvent.press(screen.getByTestId('parent-home-send-nudge-child-a'));
-
-    screen.getByTestId('nudge-action-sheet-close');
+    result.getByTestId('nudge-action-sheet-close');
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('derives childrenInGracePeriod from dashboard and passes it to WithdrawalCountdownBanner', () => {
+  it('derives childrenInGracePeriod from dashboard and renders the withdrawal countdown banner', async () => {
     const respondedAt = new Date(
       Date.now() - 2 * 24 * 60 * 60 * 1000,
     ).toISOString();
-    mockDashboardData = {
-      children: [
-        {
-          profileId: 'child-a',
-          displayName: 'Emma',
-          consentStatus: 'WITHDRAWN',
-          respondedAt,
-          summary: '',
-          sessionsThisWeek: 0,
-          sessionsLastWeek: 0,
-          totalTimeThisWeek: 0,
-          totalTimeLastWeek: 0,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 0,
-          trend: 'stable',
-          subjects: [],
-          guidedVsImmediateRatio: 0,
-          retentionTrend: 'stable',
-          totalSessions: 0,
-          currentlyWorkingOn: [],
-          progress: null,
-          currentStreak: 0,
-          longestStreak: 0,
-          totalXp: 0,
-        },
-      ],
-      pendingNotices: [],
-      demoMode: false,
-    };
-
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-
-    expect(capturedBannerProps).not.toBeNull();
-    expect(capturedBannerProps?.childrenInGracePeriod).toHaveLength(1);
-    expect(capturedBannerProps?.childrenInGracePeriod[0]).toMatchObject({
-      profileId: 'child-a',
-      displayName: 'Emma',
-      respondedAt,
+    const { result } = mount([PARENT, CHILD_A], {
+      dashboard: {
+        children: [
+          dashboardChild({
+            profileId: 'child-a',
+            displayName: 'Emma',
+            consentStatus: 'WITHDRAWN',
+            respondedAt,
+          }),
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
     });
+
+    // Real WithdrawalCountdownBanner renders only when the parent derives a
+    // non-empty childrenInGracePeriod from dashboard data — asserting its
+    // visible output (the banner + the per-child row) is a stronger check than
+    // the old prop-capture spy.
+    await waitFor(() => {
+      result.getByTestId('withdrawal-countdown-banner');
+      result.getByTestId('withdrawal-countdown-row-child-a');
+    });
+    // The row copy interpolates the child's display name.
+    result.getAllByText(/Emma/);
   });
 
   it('renders child-cap notifications with reset-time copy and dismiss action', async () => {
-    mockLinkedChildren = [CHILD_A];
-    mockChildCapNotifications = [
-      {
-        id: 'b0000000-0000-4000-8000-000000000001',
-        ownerProfileId: 'profile-1',
-        childProfileId: 'child-a',
-        childDisplayName: 'Emma',
-        kind: 'daily_exceeded',
-        occurredOn: '2026-05-26',
-        resetsAt: '2026-05-27T01:00:00.000Z',
-        createdAt: '2026-05-26T12:00:00.000Z',
-      },
-    ];
+    const notificationId = 'b0000000-0000-4000-8000-000000000001';
+    const { result, routedFetch } = mount([PARENT, CHILD_A], {
+      childCapNotifications: [
+        {
+          id: notificationId,
+          // Schema validates these as UUIDs (the real hook runs zod parse now,
+          // unlike the old hook-mock). Use valid UUIDs; the rendered banner is
+          // keyed by `id`, so the profile UUIDs don't affect assertions.
+          ownerProfileId: 'a0000000-0000-4000-8000-0000000000a1',
+          childProfileId: 'a0000000-0000-4000-8000-0000000000c1',
+          childDisplayName: 'Emma',
+          kind: 'daily_exceeded',
+          occurredOn: '2026-05-26',
+          resetsAt: '2026-05-27T01:00:00.000Z',
+          createdAt: '2026-05-26T12:00:00.000Z',
+        },
+      ],
+    });
+    await waitForParentTransitionNotice(result);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
-    await waitForParentTransitionNotice();
-
-    screen.getByTestId(
-      'parent-home-child-cap-notification-b0000000-0000-4000-8000-000000000001',
-    );
-    screen.getByText("Emma hit today's question limit");
-    const message = screen.getByTestId(
-      'parent-home-child-cap-notification-message-b0000000-0000-4000-8000-000000000001',
+    await waitFor(() => {
+      result.getByTestId(
+        `parent-home-child-cap-notification-${notificationId}`,
+      );
+    });
+    result.getByText("Emma hit today's question limit");
+    const message = result.getByTestId(
+      `parent-home-child-cap-notification-message-${notificationId}`,
     ).props.children;
     expect(String(message)).toContain('They can try again after');
     expect(String(message)).not.toMatch(/midnight|1st/i);
 
     fireEvent.press(
-      screen.getByTestId(
-        'parent-home-child-cap-notification-dismiss-b0000000-0000-4000-8000-000000000001',
+      result.getByTestId(
+        `parent-home-child-cap-notification-dismiss-${notificationId}`,
       ),
     );
 
-    expect(mockDismissChildCapNotification).toHaveBeenCalledWith(
-      'b0000000-0000-4000-8000-000000000001',
-    );
+    // The real useDismissChildCapNotification mutation fires the dismiss POST
+    // with the notification id in the URL path.
+    await waitFor(() => {
+      const dismissCalls = fetchCallsMatching(
+        routedFetch,
+        `/notifications/child-cap/${notificationId}/dismiss`,
+      );
+      expect(dismissCalls.length).toBeGreaterThan(0);
+      expect(dismissCalls[0]!.init?.method).toBe('POST');
+    });
   });
 });
