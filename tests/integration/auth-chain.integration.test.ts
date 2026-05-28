@@ -13,7 +13,7 @@
  * 4. Protected paths with invalid/malformed JWT → 401
  * 5. Protected paths with expired JWT → 401
  * 6. Protected paths with valid JWT → passes auth (not 401)
- * 7. Missing CLERK_JWKS_URL → 401 (config error caught gracefully)
+ * 7. Missing CLERK_JWKS_URL → 503 + Retry-After (auth infra unavailable)
  * 8. Deleted auth stub routes → 401 unauthenticated, 404 authenticated
  */
 
@@ -201,8 +201,9 @@ describe('Integration: Auth chain — protected paths', () => {
     expect(Array.isArray(body.profiles)).toBe(true);
   });
 
-  it('returns 401 when CLERK_JWKS_URL is missing', async () => {
-    // verifyClerkJWT throws "CLERK_JWKS_URL is not configured" for empty string
+  it('returns 503 with Retry-After when CLERK_JWKS_URL is missing', async () => {
+    // Missing JWKS config is an auth-infra availability failure, not proof the
+    // user's session is invalid. Returning 401 would force mobile sign-out.
     const res = await app.request(
       '/v1/profiles',
       {
@@ -215,7 +216,10 @@ describe('Integration: Auth chain — protected paths', () => {
       buildIntegrationEnv({ CLERK_JWKS_URL: '' }),
     );
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Retry-After')).toBe('30');
+    const body = await res.json();
+    expect(body.code).toBe('SERVICE_UNAVAILABLE');
   });
 });
 
