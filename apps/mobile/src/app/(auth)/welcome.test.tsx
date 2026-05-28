@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
 const mockMarkPreAuthIntroSeen = jest.fn();
+const mockMarkAudience = jest.fn();
 const mockTrack = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -70,6 +71,12 @@ jest.mock(
   }),
 );
 
+// Pattern A — preserve the real carrier surface while spying on the write.
+jest.mock('../../lib/pre-auth-audience', () => ({
+  ...jest.requireActual('../../lib/pre-auth-audience'),
+  markPreAuthAudienceSync: (...args: unknown[]) => mockMarkAudience(...args),
+}));
+
 // Pattern A — preserve the real analytics surface while spying on `track`.
 jest.mock('../../lib/analytics', () => ({
   ...jest.requireActual('../../lib/analytics'),
@@ -130,6 +137,7 @@ describe('<PreAuthWelcomeRoute /> — audience chooser', () => {
   beforeEach(() => {
     mockReplace.mockReset();
     mockMarkPreAuthIntroSeen.mockReset();
+    mockMarkAudience.mockReset();
     mockTrack.mockReset();
   });
 
@@ -173,6 +181,23 @@ describe('<PreAuthWelcomeRoute /> — audience chooser', () => {
     });
   });
 
+  it('persists the chosen audience across the signup wall ("I want to learn")', () => {
+    render(<PreAuthWelcomeRoute />);
+    chooseLearner();
+    expect(mockMarkAudience).toHaveBeenCalledWith('learner');
+  });
+
+  it('persists the chosen audience across the signup wall ("I\'m done fighting over homework")', () => {
+    render(<PreAuthWelcomeRoute />);
+    chooseParent();
+    expect(mockMarkAudience).toHaveBeenCalledWith('parent');
+  });
+
+  it('does not persist an audience until a choice is made', () => {
+    render(<PreAuthWelcomeRoute />);
+    expect(mockMarkAudience).not.toHaveBeenCalled();
+  });
+
   it('does not mark intro seen at the chooser or while viewing cards', () => {
     render(<PreAuthWelcomeRoute />);
     expect(mockMarkPreAuthIntroSeen).not.toHaveBeenCalled();
@@ -185,6 +210,7 @@ describe('<PreAuthWelcomeRoute /> — cards → bridge → auth', () => {
   beforeEach(() => {
     mockReplace.mockReset();
     mockMarkPreAuthIntroSeen.mockReset();
+    mockMarkAudience.mockReset();
     mockTrack.mockReset();
   });
 
