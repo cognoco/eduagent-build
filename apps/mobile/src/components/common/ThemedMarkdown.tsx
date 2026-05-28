@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { Text, type TextStyle } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useThemeColors } from '../../lib/theme';
@@ -96,7 +96,7 @@ export function ThemedMarkdown({
   children,
 }: {
   children: string;
-}): React.ReactElement {
+}): ReactElement {
   const colors = useThemeColors();
   const mdStyles = useMemo(
     () => buildMarkdownStyles(colors.textPrimary),
@@ -108,7 +108,7 @@ export function ThemedMarkdown({
       mergeStyle={false}
       style={mdStyles}
       rules={{
-        inline: (node: { key: string }, children: React.ReactNode) => (
+        inline: (node: { key: string }, children: ReactNode) => (
           <Text
             key={node.key}
             className="text-text-primary text-body leading-relaxed"
@@ -116,7 +116,7 @@ export function ThemedMarkdown({
             {children}
           </Text>
         ),
-        textgroup: (node: { key: string }, children: React.ReactNode) => (
+        textgroup: (node: { key: string }, children: ReactNode) => (
           <Text
             key={node.key}
             className="text-text-primary text-body leading-relaxed"

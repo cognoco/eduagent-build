@@ -14,19 +14,22 @@ type CapturedMarkdownProps = {
 
 const mockMarkdownRender = jest.fn();
 
-jest.mock('react-native-markdown-display', () => {
-  const React = require('react');
-  const { Text } = require('react-native');
+jest.mock(
+  'react-native-markdown-display' /* gc1-allow: third-party native renderer, cannot run in jsdom */,
+  () => {
+    const React = require('react');
+    const { Text } = require('react-native');
 
-  return (props: CapturedMarkdownProps) => {
-    mockMarkdownRender(props);
-    return React.createElement(
-      Text,
-      { testID: 'markdown-output' },
-      props.children,
-    );
-  };
-});
+    return (props: CapturedMarkdownProps) => {
+      mockMarkdownRender(props);
+      return React.createElement(
+        Text,
+        { testID: 'markdown-output' },
+        props.children,
+      );
+    };
+  },
+);
 
 function latestMarkdownProps(): CapturedMarkdownProps {
   expect(mockMarkdownRender).toHaveBeenCalled();
