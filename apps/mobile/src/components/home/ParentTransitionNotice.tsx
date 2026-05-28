@@ -56,9 +56,6 @@ export function ParentTransitionNotice({
       <Text className="text-body font-semibold text-text-primary">
         {t('home.parent.transitionNoticeTitle', { childNames })}
       </Text>
-      <Text className="text-body-sm text-text-secondary mt-1">
-        {t('home.parent.transitionNoticeBody')}
-      </Text>
       <Pressable
         onPress={dismiss}
         className="self-start mt-3"

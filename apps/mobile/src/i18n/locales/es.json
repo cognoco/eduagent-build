@@ -196,7 +196,6 @@
       },
       "encouragementNote": "Los nudges son ánimos suaves de una sola dirección.",
       "transitionNoticeTitle": "Ahora guías a {{childNames}}",
-      "transitionNoticeBody": "Prueba esta noche una de estas preguntas para iniciar la conversación.",
       "cards": {
         "checkChild": "Ver cómo le va a {{childName}}",
         "checkChildFallback": "Toca para ver el progreso de esta semana",

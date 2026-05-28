@@ -216,7 +216,6 @@
       },
       "encouragementNote": "Nudges are gentle one-way encouragements.",
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
-      "transitionNoticeBody": "Try one of these check-in questions tonight.",
       "cards": {
         "checkChild": "See how {{childName}} is doing",
         "checkChildFallback": "Tap to see this week's progress",

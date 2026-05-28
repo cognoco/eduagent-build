@@ -663,7 +663,14 @@ const ChildCommandCard = memo(function ChildCommandCard({
   );
 
   return (
-    <View className="rounded-card px-4 py-4 bg-surface">
+    <View
+      className="rounded-card px-4 py-4 bg-surface"
+      style={{
+        borderColor: withOpacity(accent, 0.14),
+        borderWidth: 1,
+      }}
+      testID={`parent-home-child-card-${child.id}`}
+    >
       <Pressable
         onPress={handleOpenProgress}
         className="flex-row items-center bg-background rounded-button px-3 py-3"

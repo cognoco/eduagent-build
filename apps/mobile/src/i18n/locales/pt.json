@@ -196,7 +196,6 @@
       },
       "encouragementNote": "Nudges sao incentivos breves e gentis, sem resposta obrigatoria.",
       "transitionNoticeTitle": "Agora você orienta {{childNames}}",
-      "transitionNoticeBody": "Experimente uma destas perguntas para puxar conversa hoje à noite.",
       "cards": {
         "checkChild": "Ver como {{childName}} esta indo",
         "checkChildFallback": "Toque para ver o progresso desta semana",
