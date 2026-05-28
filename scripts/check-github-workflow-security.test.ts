@@ -27,6 +27,43 @@ function jobIf(workflow: Record<string, unknown>, jobId: string): string {
   return String(jobs[jobId]?.if ?? '');
 }
 
+function normalizeExpression(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+const expectedCheckAffectedIf = [
+  "github.event_name == 'workflow_dispatch' ||",
+  '(',
+  "github.event.workflow_run.conclusion == 'success' &&",
+  "github.event.workflow_run.event == 'push' &&",
+  "github.event.workflow_run.head_branch == 'main' &&",
+  'github.event.workflow_run.head_repository.full_name == github.repository',
+  ')',
+].join(' ');
+
+const expectedBuildPreviewIf = [
+  'always() &&',
+  "github.event_name == 'workflow_run' &&",
+  "github.event.workflow_run.event == 'push' &&",
+  "github.event.workflow_run.head_branch == 'main' &&",
+  'github.event.workflow_run.head_repository.full_name == github.repository &&',
+  "needs.check-affected.result == 'success' &&",
+  "needs.check-affected.outputs.mobile-affected == 'true' &&",
+  "needs.check-affected.outputs.native-changed == 'true'",
+].join(' ');
+
+function expectSensitiveMobileIfExpressions(workflow: Record<string, unknown>) {
+  const checkAffectedIf = normalizeExpression(
+    jobIf(workflow, 'check-affected'),
+  );
+  expect(checkAffectedIf).toBe(expectedCheckAffectedIf);
+  expect(checkAffectedIf).not.toMatch(/\|\|\s*true\b|true\s*\|\|/);
+
+  const buildPreviewIf = normalizeExpression(jobIf(workflow, 'build-preview'));
+  expect(buildPreviewIf).toBe(expectedBuildPreviewIf);
+  expect(buildPreviewIf).not.toMatch(/\|\|\s*true\b|true\s*\|\|/);
+}
+
 function writeFixture(root: string, relativePath: string, content: string) {
   const filePath = join(root, relativePath);
   mkdirSync(dirname(filePath), { recursive: true });
@@ -588,39 +625,14 @@ describe('checkGithubWorkflowSecurity', () => {
       ).skip_tests?.type,
     ).toBe('boolean');
 
-    const checkAffectedIf = jobIf(workflow, 'check-affected');
-    expect(checkAffectedIf).toContain(
-      "github.event_name == 'workflow_dispatch'",
-    );
-    expect(checkAffectedIf).toContain(
-      "github.event.workflow_run.conclusion == 'success'",
-    );
-    expect(checkAffectedIf).toContain(
-      "github.event.workflow_run.event == 'push'",
-    );
-    expect(checkAffectedIf).toContain(
-      "github.event.workflow_run.head_branch == 'main'",
-    );
-    expect(checkAffectedIf).toContain(
-      'github.event.workflow_run.head_repository.full_name == github.repository',
-    );
+    expectSensitiveMobileIfExpressions(workflow);
+  });
 
-    const buildPreviewIf = jobIf(workflow, 'build-preview');
-    expect(buildPreviewIf).toContain("github.event_name == 'workflow_run'");
-    expect(buildPreviewIf).toContain(
-      "github.event.workflow_run.event == 'push'",
-    );
-    expect(buildPreviewIf).toContain(
-      "github.event.workflow_run.head_branch == 'main'",
-    );
-    expect(buildPreviewIf).toContain(
-      'github.event.workflow_run.head_repository.full_name == github.repository',
-    );
-    expect(buildPreviewIf).toContain(
-      "needs.check-affected.outputs.mobile-affected == 'true'",
-    );
-    expect(buildPreviewIf).toContain(
-      "needs.check-affected.outputs.native-changed == 'true'",
-    );
+  it('rejects bypassable mobile workflow_run guard expressions', () => {
+    const workflow = readWorkflow('.github/workflows/mobile-ci.yml');
+    const jobs = workflow.jobs as Record<string, { if?: unknown }>;
+    jobs['build-preview'].if = `${jobs['build-preview'].if} || true`;
+
+    expect(() => expectSensitiveMobileIfExpressions(workflow)).toThrow('toBe');
   });
 });
