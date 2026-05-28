@@ -10,6 +10,7 @@ import {
 } from '../../components/welcome/WelcomeIntro';
 import { GateContent, LightBulbAnimation } from '../../components/common';
 import { markPreAuthIntroSeenSync } from '../../lib/intro-state';
+import { markPreAuthAudienceSync } from '../../lib/pre-auth-audience';
 import { track } from '../../lib/analytics';
 import { useThemeColors } from '../../lib/theme';
 
@@ -46,6 +47,9 @@ export default function PreAuthWelcomeRoute(): React.ReactElement {
 
   const handleChoose = React.useCallback((picked: WelcomeAudience) => {
     track('intro_audience_selected', { audience: picked });
+    // Persist the choice so first-profile setup honours it after the signup
+    // wall — parent skips the Study/Family picker and lands on add-a-child.
+    markPreAuthAudienceSync(picked);
     setAudience(picked);
     setStep('cards');
   }, []);

@@ -1,6 +1,6 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12 (last refreshed 2026-05-25, post-Wave-6)
+**Date:** 2026-05-12 (last refreshed 2026-05-28, post-Wave-7)
 **Status:** Framework complete (Phases 0-4); P0 drained; bare-mock backlog collapsed from 131 → 23 → 6 → **0** between 2026-05-19 and 2026-05-25 via successive sweeps. Wave 5 (2026-05-25) landed the three classifier patches Wave 4 deferred (multi-line factory window, `^@expo-google-fonts/`, `^nativewind(?:\/|$)/` + `^metro-` boundaries). Wave 6 (2026-05-25) converted the `lib/profile` cluster from `gc1-allow`-only to `pattern-a; gc1-allow` — 32 of 35 files converted (3 reverted as legitimate native boundaries: i18n loads eagerly through `lib/profile` transitively in JSDOM). The forward-only GC1 ratchet has nothing left to clean — every remaining relative-path `jest.mock(...)` row is either `pattern-a` (requireActual + override) or `gc1-allow` annotated.
 
 > **Status (2026-05-25):** This plan's hard deliverables are DONE. P0 integration ratchet is live (`apps/api/src/test-utils/integration-mock-guard.test.ts`), the CSV regenerator is wired (`scripts/generate-internal-mock-cleanup-inventory.ts`), and the bare-mock backlog is drained. **What this plan does NOT cover:** the long-tail of internal-ish mocks that are already `gc1-allow`-labeled or `requireActual`-factored. Those are inventoried here for visibility but burn down via the **GC6 boy-scout rule in CLAUDE.md** ("remove internal mocks any time you edit a test file"), not via plan-driven sweeps. **Recommendation:** archive this plan as done; keep the CSV + generator script as a living tracking artifact that GC6 consumes opportunistically.
@@ -160,6 +160,38 @@ Five Sonnet agents (one per file batch) converted `gc1-allow`-only mocks of `../
 **No bugs found.** Every converted file passed without weakening any assertion. The 2 reverted files surfaced a real fact about the test environment (i18n is loaded eagerly through `lib/profile`'s transitive imports), validating the original `gc1-allow: native-boundary` annotation rather than refuting it.
 
 **Wave 6 follow-on candidates (not scheduled):** the `../lib/api-client` (~23 rows) and `../lib/navigation` (~22 rows) clusters use the same pattern-A conversion approach and would be the next obvious targets if a Wave 7 is ever queued.
+
+### Wave 7 (2026-05-28) — concentrated mobile screen tests → full `renderScreen` harness
+
+Beyond the Wave-6 `pattern-a` spread (which only swaps a hook stub for a `requireActual` override), Wave 7 did a **full harness conversion** on the most mock-concentrated mobile screen tests: removed the per-hook / `lib/profile` / `lib/api-client` stubs entirely and drove the screens through the real hooks against a routed mock fetch via `screen-render.tsx` (`renderScreen({ profile, profiles, routes })`). Internal hooks now run for real; only true native/external boundaries (`expo-*`, `react-native-*`, `@clerk/clerk-expo`, `react-i18next`, `lib/sentry`, `lib/platform-alert`) remain mocked.
+
+One Opus agent per file (pilot first to de-risk, then a 5-file fan-out). Each agent staged its file; the coordinator independently re-ran every suite.
+
+| File | gc1-allow before → after | Tests |
+| --- | ---: | --- |
+| `components/home/ParentHomeScreen.test.tsx` | 12 → 5 | 18/18 |
+| `app/(app)/session/index.test.tsx` | 12 → 8 | 29/29 |
+| `app/(app)/progress/[subjectId]/index.test.tsx` | 11 → 4 | 55/55 |
+| `app/(app)/library.test.tsx` | 11 → 6 | 37/37 |
+| `app/(app)/progress.test.tsx` | 8 → 3 | 41/41 |
+| `app/(app)/child/[profileId]/index.test.tsx` | 9 → 8 | 35/35 |
+
+**Real production bug found and fixed.** Converting `library.test.tsx` ran the real `useSubjects` hook, whose `refetchInterval` guarded only against falsy data (`if (!subjects) return false`) then called `subjects.some(...)`. A malformed `{ subjects: <non-array> }` payload (the exact "stale shape" scenario `[BUG-634 / M-2]` names) made the hook throw `TypeError: subjects.some is not a function` — invisible under the old hook-mock. Fixed at `apps/mobile/src/hooks/use-subjects.ts` (`!subjects` → `!Array.isArray(subjects)`); `use-subjects` consumer suites stay green (501 pass / 1 pre-existing skip across 17 suites).
+
+**Re-converted a Wave-6 revert.** `child/[profileId]/index.test.tsx` was reverted in Wave 6 as an i18n-transitive-load boundary. Wave 7 converted it successfully by keeping the `react-i18next` key-passthrough mock (plus an `initReactI18next`/`Trans` export) so `lib/profile` could go real — the transitive i18n load is satisfied by the boundary mock, not by stubbing profile.
+
+**Fixture defects corrected (not assertion weakenings).** Several files used placeholder IDs (`'session-1'`, `'profile-1'`, …) that the real response zod schemas reject as non-UUID; the old hook-mocks silently accepted them. IDs were upgraded to valid UUIDs and required schema fields added, preserving every asserted testID/copy/style. The `useNavigationContract` proxy-mode cases use a small local wrapper (same provider tree as `renderScreen`, exposing `isExplicitProxyMode`) because the harness hard-codes that flag `false` — the navigation contract stays real.
+
+`it()` counts unchanged in all six files; no `.skip`, `optional`, softened matcher, or removed assertion introduced. **gc1-allow total: 333 → 296.**
+
+**Wave 7 deferred (next obvious batch):** `subscription.test.tsx` (8), `recaps/[recapId].test.tsx` (8), `session-summary/[sessionId].test.tsx` (10), `practice/assessment/assessment-start.test.tsx` (10), and the remaining 8-row More/onboarding screens — same harness pattern.
+
+**Wave 7 post-review fixes (2026-05-28, claude-review CHANGES_REQUESTED).** Findings triaged against the diff:
+
+- *(should-fix)* `session/index.test.tsx` carried a spurious `gc1-allow: test-design boundary` on its `use-milestone-tracker` mock. The mock is a `jest.requireActual` **targeted override** (only `useMilestoneTracker` is replaced; `celebrationForReason`/`getMilestoneLabel` stay real) — i.e. the canonical `pattern-a` form, which does not take a `gc1-allow`. Annotation removed; the line reclassifies `pattern-a; gc1-allow → pattern-a`. **Full conversion to the real tracker is deferred** (tracked): the real `trackExchange` evaluates every exchange and would fire celebration overlays across the whole send-message suite, so converting needs separate celebration-isolation work, not a per-file edit.
+- *(should-fix — false positive)* The reviewer flagged a second `use-milestone-tracker` mock in `progress/[subjectId]/index.test.tsx`; that file has no such mock (its "milestone" references are CEFR language-milestone copy). No change.
+- *(consider — actioned)* Added a targeted regression test in `use-subjects.test.ts` (`refetchInterval tolerates a non-array payload without throwing [BUG-634 / M-2]`) that seeds a non-array `subjects` payload and asserts the guard returns `false` without throwing — locking in the `!Array.isArray` fix.
+- *(consider — deferred)* `progress.test.tsx`'s local `renderProgress()` helper duplicates the `renderScreen` provider stack because the shared harness hard-codes `isExplicitProxyMode: false`. Tracked as a follow-up: either extend `renderScreen` with a proxy-mode option or migrate the helper once the harness gains that knob.
 
 ### Wave 6 backlog (rest of softer-cleanup candidates) — `gc1-allow`-only rows that could become `pattern-a`
 

@@ -95,7 +95,7 @@ export function useSubjects(
     enabled: !!activeProfile && callerEnabled !== false,
     refetchInterval: (query) => {
       const subjects = query.state.data;
-      if (!subjects) return false;
+      if (!Array.isArray(subjects)) return false;
       const hasPreparing = subjects.some(
         (s) => s.curriculumStatus === 'preparing',
       );

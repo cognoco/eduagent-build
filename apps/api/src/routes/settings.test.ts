@@ -465,6 +465,10 @@ describe('[CR LOW] child celebration routes require owner gate', () => {
   const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440111';
 
   function asNonOwnerProfile() {
+    mockFamilyLinksFindFirst.mockResolvedValue({
+      parentProfileId: 'profile-1',
+      childProfileId: CHILD_PROFILE_ID,
+    });
     mockProfileFindFirst.mockResolvedValue({
       id: 'profile-1',
       accountId: 'test-account-id',

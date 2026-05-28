@@ -37,6 +37,32 @@ describe('InlineNoteCard', () => {
     expect(onLongPress).toHaveBeenCalledWith('note-1');
   });
 
+  it('does not toggle card expansion when kebab is pressed', () => {
+    const onLongPress = jest.fn();
+    const stopPropagation = jest.fn();
+    render(
+      <InlineNoteCard
+        {...baseProps}
+        defaultExpanded={false}
+        onLongPress={onLongPress}
+      />,
+    );
+
+    expect(
+      screen.getByTestId('note-card-note-1').props.accessibilityLabel,
+    ).toContain('Tap to expand');
+
+    fireEvent.press(screen.getByTestId('note-card-note-1-menu'), {
+      stopPropagation,
+    });
+
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(onLongPress).toHaveBeenCalledWith('note-1');
+    expect(
+      screen.getByTestId('note-card-note-1').props.accessibilityLabel,
+    ).toContain('Tap to expand');
+  });
+
   it('does not render the kebab when no menu handler is provided', () => {
     render(<InlineNoteCard {...baseProps} onLongPress={undefined} />);
     expect(screen.queryByTestId('note-card-note-1-menu')).toBeNull();

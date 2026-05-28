@@ -787,6 +787,7 @@ describe('resolveNavigationContract route predicates', () => {
     { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: false },
     { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: false },
     { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
+    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: true },
   ])(
     'never lets a proxy session enter or surface more/account or more/privacy (flags %o)',
     (flags) => {

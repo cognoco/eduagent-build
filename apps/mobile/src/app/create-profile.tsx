@@ -26,6 +26,11 @@ import {
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { useProfile, type Profile } from '../lib/profile';
+import {
+  readPreAuthAudienceSync,
+  readPreAuthAudience,
+  clearPreAuthAudience,
+} from '../lib/pre-auth-audience';
 import { useNavigationContract } from '../hooks/use-navigation-contract';
 import { useActiveProfileRole } from '../hooks/use-active-profile-role';
 import { useUpdateProfileAppContext } from '../hooks/use-profiles';
@@ -119,14 +124,20 @@ export default function CreateProfileScreen() {
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const requestSeqRef = useRef(0);
-  // [ACCOUNT-01] Capture Study/Family intent on first profile setup.
-  // Persisted via PATCH /profiles/:id/app-context immediately after creation.
-  // null = not chosen yet (gates submit for the first-profile flow).
-  // Skipped entirely for "adding a child" (intent is implicit), for the
-  // proxy/non-owner gate paths (those never reach POST anyway), and for
-  // adolescent first-profile users (the API rejects family mode for non-adult
-  // owners; forcing them through the picker would be a dead end).
-  const [intent, setIntent] = useState<'study' | 'family' | null>(null);
+  // Audience chosen at the pre-auth welcome chooser, carried across the signup
+  // wall. Drives first-profile setup: 'parent' (adult) sets family context and
+  // routes to the add-a-child screen; 'learner'/absent gets a clean solo setup.
+  // The old in-form Study/Family picker was removed — the chooser asks once.
+  const [audience, setAudience] = useState(() => readPreAuthAudienceSync());
+  useEffect(() => {
+    let active = true;
+    void readPreAuthAudience().then((resolved) => {
+      if (active && resolved) setAudience(resolved);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // [BUG-UX-PROFILE-TIMEOUT] Hard 30s UI timeout: if the profile-creation POST
   // hasn't resolved, surface an inline error and restore the form so the user
@@ -185,27 +196,23 @@ export default function CreateProfileScreen() {
     [error],
   );
 
-  // [ACCOUNT-01] First-profile setup is the *only* path where the Study/Family
-  // intent picker appears. Adding a child has implicit intent (the parent is
-  // already on a family-shape account), and once profiles exist the per-profile
-  // app-context can be flipped from More → Account / the mode switcher.
   const isFirstProfileSetup = !isAddingChild && profiles.length === 0;
-  // Only adult owners can pick 'family' — `familyCapable` in app-context.tsx
-  // requires `computeAgeBracket === 'adult'`. We still SHOW the picker so
-  // adolescent first-profile users get an explanation, but the family option
-  // is disabled with a hint. Birth date must be set before we can show the
-  // picker (we need the age bracket).
+  // Only adult owners can be guardians — `familyCapable` in app-context.tsx
+  // requires `computeAgeBracket === 'adult'`, and add-child is 18+.
   const isAdultBirthDate =
     birthDate !== null &&
     computeAgeBracket(birthDate.getFullYear()) === 'adult';
-  const showIntentPicker = isFirstProfileSetup && birthDate !== null;
-  const intentRequired = showIntentPicker && isAdultBirthDate;
+  // A parent (chosen at the chooser) old enough to be a guardian: set family
+  // context and route to the add-a-child screen after creating their own
+  // profile. A minor who tapped the parent option, or a 'learner'/absent
+  // audience, falls back to the clean solo learner path.
+  const wantsFamily =
+    isFirstProfileSetup && audience === 'parent' && isAdultBirthDate;
 
   const canSubmit =
     displayName.trim().length >= 1 &&
     displayName.trim().length <= 50 &&
     birthDate !== null &&
-    (!intentRequired || intent !== null) &&
     !loading;
 
   const onSubmit = useCallback(async () => {
@@ -274,17 +281,17 @@ export default function CreateProfileScreen() {
       }
       setCreatePostPending(false);
 
-      // [ACCOUNT-01] Persist Study/Family intent immediately after creation.
-      // The profile is created with defaultAppContext=null; setting it now
-      // means future sign-ins land the user in the correct mode the moment
-      // they add a child (family-mode UI activates as soon as
+      // Persist family context immediately after creation for a parent
+      // audience. The profile is created with defaultAppContext=null; setting
+      // it now means future sign-ins land the user in the correct mode the
+      // moment they add a child (family-mode UI activates as soon as
       // familyCapable === true, which requires hasFamilyLinks === true).
-      // Picking 'study' is the default — no PATCH needed for that branch.
+      // A learner audience leaves the default — no PATCH needed.
       // Wrapped in a non-throwing try so a flaky PATCH never blocks the
       // profile-created success path; the user can change mode later from
       // More → Account.
       let intentPersistedProfile: Profile | null = null;
-      if (isFirstProfileSetup && intent === 'family' && isAdultBirthDate) {
+      if (wantsFamily) {
         try {
           intentPersistedProfile = await updateAppContext.mutateAsync({
             profileId: result.profile.id,
@@ -293,7 +300,7 @@ export default function CreateProfileScreen() {
         } catch (intentErr) {
           if (__DEV__) {
             console.warn(
-              '[ACCOUNT-01] Failed to persist family intent on first profile setup; user can change later from More → Account.',
+              'Failed to persist family context on first profile setup; user can change later from More → Account.',
               intentErr,
             );
           }
@@ -360,9 +367,22 @@ export default function CreateProfileScreen() {
       // guard prevents CreateProfileGate from flashing during the switch window
       // (profiles.length > 0 && activeProfile === null stays true until the
       // switch completes).
-      if (!needsConsentFlow) {
+      if (!needsConsentFlow && wantsFamily) {
+        // Parent's own profile is created — take them straight to the
+        // add-a-child screen (skippable via its Cancel) instead of the learner
+        // home. Navigate FIRST (same remount-ordering reason as below), then
+        // switch to the new owner so the add-child route guard resolves.
+        router.replace({
+          pathname: '/create-profile',
+          params: { for: 'child' },
+        });
+      } else if (!needsConsentFlow) {
         handleClose();
       }
+
+      // Audience has served its purpose; clear the cross-signup carrier so a
+      // later profile add does not re-trigger the family redirect.
+      void clearPreAuthAudience();
 
       const switchResult = await switchProfile(result.profile.id);
       if (switchResult?.success === false) {
@@ -435,9 +455,7 @@ export default function CreateProfileScreen() {
     switchProfile,
     router,
     handleClose,
-    intent,
-    isFirstProfileSetup,
-    isAdultBirthDate,
+    wantsFamily,
     updateAppContext,
   ]);
 
@@ -664,75 +682,6 @@ export default function CreateProfileScreen() {
             onChange={onDateChange}
             testID="date-picker"
           />
-        )}
-
-        {/* [ACCOUNT-01] Intent picker — first-profile setup only.
-            Hidden when adding a child (implicit family intent), hidden until
-            the user has picked a birth date (we need the age bracket to know
-            whether family mode is even reachable), and hidden once any
-            profile exists (use the More → Account mode switcher instead). */}
-        {showIntentPicker && (
-          <View className="mt-2 mb-2" testID="create-profile-intent-picker">
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              How will you use MentoMate?
-            </Text>
-            <Text className="text-body-sm text-text-secondary mb-2">
-              {isAdultBirthDate
-                ? 'You can change this any time from More → Account.'
-                : 'You are set up as a learner. Adults can switch to Family mode once they add a child.'}
-            </Text>
-            <Pressable
-              onPress={() => {
-                setIntent('study');
-                if (error) setError('');
-              }}
-              className={
-                intent === 'study'
-                  ? 'bg-primary/15 border border-primary rounded-input px-4 py-3 mb-2'
-                  : 'bg-surface rounded-input px-4 py-3 mb-2'
-              }
-              accessibilityRole="radio"
-              accessibilityState={{ selected: intent === 'study' }}
-              testID="create-profile-intent-study"
-            >
-              <Text className="text-text-primary text-body font-semibold">
-                Just for me (Study)
-              </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                Personal learning. You will land on the learner home.
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                if (!isAdultBirthDate) return;
-                setIntent('family');
-                if (error) setError('');
-              }}
-              disabled={!isAdultBirthDate}
-              className={
-                intent === 'family'
-                  ? 'bg-primary/15 border border-primary rounded-input px-4 py-3 mb-2'
-                  : isAdultBirthDate
-                    ? 'bg-surface rounded-input px-4 py-3 mb-2'
-                    : 'bg-surface opacity-50 rounded-input px-4 py-3 mb-2'
-              }
-              accessibilityRole="radio"
-              accessibilityState={{
-                selected: intent === 'family',
-                disabled: !isAdultBirthDate,
-              }}
-              testID="create-profile-intent-family"
-            >
-              <Text className="text-text-primary text-body font-semibold">
-                For my family (Family)
-              </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {isAdultBirthDate
-                  ? 'Mentor children alongside your own learning. Family mode activates after you add a child.'
-                  : 'Available for adult account owners only.'}
-              </Text>
-            </Pressable>
-          </View>
         )}
 
         {/* Spacer before submit — persona is auto-detected from birth date */}

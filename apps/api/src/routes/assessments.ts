@@ -246,8 +246,8 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           forceReview,
         };
       });
-      // Alias for downstream code that read `assessment.*` after the update.
-      // The post-tx code uses snapshot for assessment.topicId / subjectId etc.
+      // Keep the transaction result explicit; post-tx activity still reads the
+      // pre-fetch `assessment` for immutable topic/subject fields.
       void lockedAssessment;
       void updatedHistory;
 
