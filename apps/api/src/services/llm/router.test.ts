@@ -21,6 +21,7 @@ import type {
   ModelConfig,
   StopReason,
 } from './types';
+import { SafetyFilterError } from '../../errors';
 
 // [IMP-1] Test helper — returns a ChatResult matching the LLMProvider
 // interface. Spies must not rely on the `normalizeChatResult` back-compat
@@ -86,6 +87,84 @@ function createTransientFailProvider(
         throw new Error(`Transient failure #${calls}`);
       }
       return base.chat(...args);
+    },
+  };
+}
+
+/** Mock provider whose chat() always throws a provider safety block. */
+function createSafetyFailProvider(
+  id: string,
+  message: string,
+): LLMProvider & { callCount: number } {
+  const base = createMockProvider(id);
+  let calls = 0;
+  return {
+    ...base,
+    get callCount() {
+      return calls;
+    },
+    async chat(): Promise<ChatResult> {
+      calls++;
+      throw new SafetyFilterError(message);
+    },
+  };
+}
+
+/** Mock provider whose stream throws a safety block before yielding bytes. */
+function createSafetyFailStreamProvider(
+  id: string,
+  message: string,
+): LLMProvider & { streamCallCount: number } {
+  const base = createMockProvider(id);
+  let calls = 0;
+  return {
+    ...base,
+    get streamCallCount() {
+      return calls;
+    },
+    chatStream(): ChatStreamResult {
+      calls++;
+      return makeChatStreamResult(
+        {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<string>> {
+                throw new SafetyFilterError(message);
+              },
+            };
+          },
+        },
+        Promise.resolve<StopReason>('filter'),
+      );
+    },
+  };
+}
+
+function createCountingProvider(id: string): LLMProvider & {
+  chatCallCount: number;
+  streamCallCount: number;
+} {
+  const base = createMockProvider(id);
+  let chatCalls = 0;
+  let streamCalls = 0;
+  return {
+    ...base,
+    get chatCallCount() {
+      return chatCalls;
+    },
+    get streamCallCount() {
+      return streamCalls;
+    },
+    async chat(
+      messages: ChatMessage[],
+      config: ModelConfig,
+    ): Promise<ChatResult> {
+      chatCalls++;
+      return base.chat(messages, config);
+    },
+    chatStream(messages: ChatMessage[], config: ModelConfig): ChatStreamResult {
+      streamCalls++;
+      return base.chatStream(messages, config);
     },
   };
 }
@@ -814,6 +893,162 @@ describe('LLM Router', () => {
 
       expect(flaky.callCount).toBe(4);
       warnSpy.mockRestore();
+    });
+  });
+
+  describe('WI-224 safety filter routing', () => {
+    afterEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('treats Gemini prompt-level safety blocks as terminal: no retry, no fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createSafetyFailProvider(
+        'gemini',
+        'Prompt blocked by safety filters',
+      );
+      const fallback = createCountingProvider('openai');
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        await expect(
+          routeAndCall([{ role: 'user', content: 'unsafe prompt' }], 1),
+        ).rejects.toBeInstanceOf(SafetyFilterError);
+
+        expect(primary.callCount).toBe(1);
+        expect(fallback.chatCallCount).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('treats Gemini candidate safety blocks as terminal: no retry, no fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createSafetyFailProvider(
+        'gemini',
+        'Candidate blocked by safety filters',
+      );
+      const fallback = createCountingProvider('openai');
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        await expect(
+          routeAndCall([{ role: 'user', content: 'ordinary prompt' }], 1),
+        ).rejects.toThrow('Candidate blocked by safety filters');
+
+        expect(primary.callCount).toBe(1);
+        expect(fallback.chatCallCount).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('treats fallback-provider safety blocks as terminal and does not retry the fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createTransientFailProvider('gemini', 5);
+      const fallback = createSafetyFailProvider(
+        'openai',
+        'Fallback provider blocked by safety filters',
+      );
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        await expect(
+          routeAndCall([{ role: 'user', content: 'test' }], 1),
+        ).rejects.toThrow('Fallback provider blocked by safety filters');
+
+        expect(primary.callCount).toBe(4);
+        expect(fallback.callCount).toBe(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('surfaces pre-first-byte stream safety blocks without fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createSafetyFailStreamProvider(
+        'gemini',
+        'Stream blocked by safety filters',
+      );
+      const fallback = createCountingProvider('openai');
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        const result = await routeAndStream(
+          [{ role: 'user', content: 'unsafe stream prompt' }],
+          1,
+        );
+
+        await expect(async () => {
+          for await (const _chunk of result.stream) {
+            // Drain the stream so the router observes the safety block.
+          }
+        }).rejects.toBeInstanceOf(SafetyFilterError);
+
+        expect(result.fallbackUsed).toBe(false);
+        expect(primary.streamCallCount).toBe(1);
+        expect(fallback.streamCallCount).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('does not count repeated stream safety blocks toward the provider circuit', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const safetyPrimary = createSafetyFailStreamProvider(
+        'gemini',
+        'Stream blocked by safety filters',
+      );
+      const fallback = createCountingProvider('openai');
+      registerProvider(safetyPrimary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await routeAndStream(
+            [{ role: 'user', content: `unsafe stream prompt ${attempt}` }],
+            1,
+          );
+          await expect(async () => {
+            for await (const _chunk of result.stream) {
+              // Drain the stream so the router observes the safety block.
+            }
+          }).rejects.toBeInstanceOf(SafetyFilterError);
+        }
+
+        const recoveredPrimary = createCountingProvider('gemini');
+        registerProvider(recoveredPrimary);
+
+        const recovered = await routeAndStream(
+          [{ role: 'user', content: 'safe follow-up' }],
+          1,
+        );
+        const chunks: string[] = [];
+        for await (const chunk of recovered.stream) chunks.push(chunk);
+
+        expect(recovered.provider).toBe('gemini');
+        expect(recovered.fallbackUsed).toBe(false);
+        expect(chunks.join('')).toContain('Mock streamed');
+        expect(fallback.streamCallCount).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 
