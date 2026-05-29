@@ -19,7 +19,8 @@ import {
   weeklyReportDetailResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
+import type { ProfileMeta } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import { notFound } from '../errors';
 import { listProfileSessions } from '../services/session/session-crud';
 import {
@@ -48,14 +49,14 @@ type ProgressRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
 export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get subject progress with topic breakdown
   .get('/subjects/:subjectId/progress', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const subjectId = c.req.param('subjectId');
 
     const progress = await getSubjectProgress(db, profileId, subjectId);
@@ -65,8 +66,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // Get detailed topic progress
   .get('/subjects/:subjectId/topics/:topicId/progress', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
@@ -77,8 +77,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // Get overall progress across all subjects
   .get('/progress/overview', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const overview = await getOverallProgress(db, profileId);
     return c.json(progressOverviewResponseSchema.parse(overview));
@@ -86,8 +85,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // Get total overdue review count across the active profile
   .get('/progress/review-summary', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const { overdueCount, nextReviewTopic, nextUpcomingReviewAt } =
       await getProfileOverdueCount(db, profileId);
@@ -101,8 +99,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   })
 
   .get('/progress/overdue-topics', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const result = await getOverdueTopicsGrouped(db, profileId);
     return c.json(overdueTopicsResponseSchema.parse(result));
@@ -113,8 +110,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     '/progress/sessions',
     zValidator('query', childSessionsQuerySchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { cursor, limit } = c.req.valid('query');
 
       const result = await listProfileSessions(db, profileId, {
@@ -128,8 +124,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // List monthly reports for the active profile. Parent-facing dashboard
   // routes still enforce parent-child access separately.
   .get('/progress/reports', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const reports = await listMonthlyReportsForProfile(db, profileId);
     return c.json(childReportsResponseSchema.parse({ reports }));
@@ -139,8 +134,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // childProfileId = active profile, so self-view links cannot read another
   // profile's report by guessing an ID.
   .get('/progress/reports/:reportId', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const reportId = c.req.param('reportId');
 
     const report = await getMonthlyReportForProfile(db, profileId, reportId);
@@ -150,8 +144,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // List weekly reports for the active profile.
   .get('/progress/weekly-reports', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const reports = await listWeeklyReportsForProfile(db, profileId);
     return c.json(weeklyReportsResponseSchema.parse({ reports }));
@@ -159,8 +152,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // Get a weekly report for the active profile.
   .get('/progress/weekly-reports/:weeklyReportId', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const reportId = c.req.param('weeklyReportId');
 
     const report = await getWeeklyReportForProfile(db, profileId, reportId);
@@ -170,8 +162,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // Get active/paused session for a specific topic [F-4]
   .get('/progress/topic/:topicId/active-session', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const topicId = c.req.param('topicId');
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
@@ -180,8 +171,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // [F-009] Resolve a topic's parent subject — enables deep-links with topicId only
   .get('/topics/:topicId/resolve', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const topicId = c.req.param('topicId');
 
     const result = await resolveTopicSubject(db, profileId, topicId);
@@ -191,8 +181,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // Get unified "continue learning" target for Home/Library/Progress.
   .get('/progress/resume-target', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const subjectId = c.req.query('subjectId');
     const bookId = c.req.query('bookId');
     const topicId = c.req.query('topicId');
@@ -207,8 +196,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   // Get "continue where I left off" suggestion
   .get('/progress/continue', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const suggestion = await getContinueSuggestion(db, profileId);
     return c.json(continueSuggestionResponseSchema.parse({ suggestion }));

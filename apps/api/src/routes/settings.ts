@@ -26,7 +26,8 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
-import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { requireAccount } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { assertOwnerProfile } from '../services/family-access';
 import {
@@ -75,8 +76,7 @@ const subjectParamSchema = z.object({
 export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get notification preferences
   .get('/settings/notifications', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const preferences = await getNotificationPrefs(db, profileId);
     return c.json(getNotificationsResponseSchema.parse({ preferences }));
   })
@@ -88,8 +88,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
@@ -107,8 +106,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/celebration-level',
     zValidator('query', celebrationLevelQuerySchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const query = c.req.valid('query');
       // [CR defense-in-depth] Parent-on-behalf child routes must require the
       // owner gate (matches consent / learner-profile / onboarding), not just
@@ -132,8 +130,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
@@ -161,8 +158,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   )
 
   .get('/settings/withdrawal-archive', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     // I5: mirror the PUT endpoint's owner gate — only account owners may read
     // the withdrawal-archive preference.
@@ -186,8 +182,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
@@ -212,8 +207,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   )
 
   .get('/settings/family-pool-breakdown-sharing', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const accountId = requireAccount(c.get('account')).id;
 
@@ -240,8 +234,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
@@ -272,8 +265,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
@@ -292,8 +284,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     // parent is impersonating the child rather than the child themselves
     // asking — block.
     assertNotProxyMode(c);
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     // API_ORIGIN must be set — falling back to c.req.url would allow Host header
     // injection (OWASP A03) since Cloudflare Workers populate it from the
     // attacker-supplied Host header.
@@ -318,8 +309,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/subjects/:subjectId/analogy-domain',
     zValidator('param', subjectParamSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { subjectId } = c.req.valid('param');
       const analogyDomain = await getAnalogyDomain(db, profileId, subjectId);
       return c.json(analogyDomainResponseSchema.parse({ analogyDomain }));
@@ -334,8 +324,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { subjectId } = c.req.valid('param');
       const body = c.req.valid('json');
 
@@ -359,8 +348,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     '/settings/subjects/:subjectId/native-language',
     zValidator('param', subjectParamSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { subjectId } = c.req.valid('param');
       const nativeLanguage = await getNativeLanguage(db, profileId, subjectId);
       return c.json(nativeLanguageResponseSchema.parse({ nativeLanguage }));
@@ -373,8 +361,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { subjectId } = c.req.valid('param');
       const body = c.req.valid('json');
 
