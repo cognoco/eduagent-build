@@ -8,6 +8,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
+  LLM_ASSESSMENT_PASS_THRESHOLD,
   llmAssessmentEvaluationSchema,
   parseAssessmentExchangeHistory,
   type VerificationDepth,
@@ -615,7 +616,7 @@ function parseAssessmentEvaluation(
       const passed =
         options.passMode === 'llm'
           ? evaluation.passed === true
-          : rawScore >= 0.7;
+          : rawScore >= LLM_ASSESSMENT_PASS_THRESHOLD;
       const availableNextDepth = getNextVerificationDepth(depth) ?? undefined;
       const shouldEscalateDepth =
         passed &&

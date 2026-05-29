@@ -102,7 +102,7 @@ export const llmSummaryEvaluationSchema = z
   );
 export type LlmSummaryEvaluation = z.infer<typeof llmSummaryEvaluationSchema>;
 
-const LLM_ASSESSMENT_PASS_THRESHOLD = 0.7;
+export const LLM_ASSESSMENT_PASS_THRESHOLD = 0.7;
 
 export const llmAssessmentEvaluationSchema = z
   .object({
