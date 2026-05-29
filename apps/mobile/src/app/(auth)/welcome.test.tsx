@@ -17,17 +17,22 @@ jest.mock(
       audience,
       onComplete,
       onCardAdvanced,
+      stageColors,
       onBackFromFirstCard,
     }: {
       audience: 'learner' | 'parent';
       onComplete: () => void;
       onCardAdvanced?: (n: number) => void;
+      stageColors?: { background?: string };
       onBackFromFirstCard?: () => void;
     }) => {
       const { View, Pressable, Text } = require('react-native');
       return (
         <View testID="welcome-intro-stub">
           <Text testID="welcome-intro-stub-audience">{audience}</Text>
+          <Text testID="welcome-intro-stub-stage-bg">
+            {stageColors?.background}
+          </Text>
           <Pressable
             testID="welcome-intro-stub-advance"
             onPress={() => onCardAdvanced?.(2)}
@@ -124,7 +129,10 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
   }),
 }));
 
-const PreAuthWelcomeRoute = require('./welcome').default;
+const {
+  default: PreAuthWelcomeRoute,
+  WELCOME_DARK_STAGE_COLORS,
+} = require('./welcome');
 
 function chooseLearner() {
   fireEvent.press(screen.getByTestId('welcome-chooser-learner'));
@@ -168,6 +176,14 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     expect(mockTrack).toHaveBeenCalledWith('intro_audience_selected', {
       audience: 'learner',
     });
+  });
+
+  it('injects the dark brand-stage palette into the card deck', () => {
+    render(<PreAuthWelcomeRoute />);
+    chooseLearner();
+    expect(
+      screen.getByTestId('welcome-intro-stub-stage-bg').props.children,
+    ).toBe(WELCOME_DARK_STAGE_COLORS.background);
   });
 
   it('"I\'m done fighting over homework" shows the parent deck and logs the choice', () => {

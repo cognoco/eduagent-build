@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   WelcomeIntro,
+  type WelcomeIntroStageColors,
   type WelcomeAudience,
 } from '../../components/welcome/WelcomeIntro';
 import { GateContent, LightBulbAnimation } from '../../components/common';
@@ -29,6 +30,26 @@ import { useThemeColors } from '../../lib/theme';
 //
 // Spec: docs/plans/2026-05-27-pre-auth-welcome-flow.md
 type Step = 'choose' | 'cards' | 'bridge';
+
+// brand-intent: welcome dark stage. This route is the pre-auth brand moment,
+// so it injects a fixed intro palette at the screen boundary while the shared
+// WelcomeIntro component stays token-driven by default.
+export const WELCOME_DARK_STAGE_COLORS = {
+  background: '#0b1226',
+  surface: '#172033',
+  surfaceElevated: '#111a2f',
+  textPrimary: '#f8fafc',
+  textSecondary: '#cbd5e1',
+  textInverse: '#ffffff',
+  primary: '#2dd4bf',
+  primarySoft: 'rgba(45, 212, 191, 0.18)',
+  secondary: '#a78bfa',
+  accent: '#a78bfa',
+  border: 'rgba(148, 163, 184, 0.28)',
+  muted: 'rgba(203, 213, 225, 0.62)',
+  practiceDarkTeal: '#0f172a',
+  shadow: '#000000',
+} as const satisfies WelcomeIntroStageColors;
 
 export default function PreAuthWelcomeRoute(): React.ReactElement {
   const router = useRouter();
@@ -99,6 +120,7 @@ export default function PreAuthWelcomeRoute(): React.ReactElement {
         audience={audience}
         onComplete={handleCardsComplete}
         onCardAdvanced={handleCardAdvanced}
+        stageColors={WELCOME_DARK_STAGE_COLORS}
         onBackFromFirstCard={handleBackToChooser}
       />
     );

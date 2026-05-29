@@ -19,6 +19,26 @@ export type WelcomeAudience = 'learner' | 'parent';
 type CardIndex = 0 | 1 | 2;
 
 type ThemeColors = ReturnType<typeof useThemeColors>;
+export type WelcomeIntroStageColors = Partial<
+  Pick<
+    ThemeColors,
+    | 'background'
+    | 'surface'
+    | 'surfaceElevated'
+    | 'textPrimary'
+    | 'textSecondary'
+    | 'textInverse'
+    | 'primary'
+    | 'primarySoft'
+    | 'secondary'
+    | 'accent'
+    | 'border'
+    | 'muted'
+    | 'practiceDarkTeal'
+  >
+> & {
+  shadow?: string;
+};
 
 interface CardSpec {
   readonly index: CardIndex;
@@ -30,30 +50,11 @@ interface CardSpec {
 const TOTAL_CARDS = 3;
 const LAST_INDEX: CardIndex = (TOTAL_CARDS - 1) as CardIndex;
 
-// brand-intent: welcome dark stage. The pre-auth intro is a deliberate
-// first-run brand moment, so it uses this fixed palette rather than mirroring
-// the user's in-app light/dark theme.
-export const WELCOME_DARK_STAGE_COLORS = {
-  background: '#0b1226',
-  surface: '#172033',
-  surfaceElevated: '#111a2f',
-  textPrimary: '#f8fafc',
-  textSecondary: '#cbd5e1',
-  textInverse: '#ffffff',
-  primary: '#2dd4bf',
-  primarySoft: 'rgba(45, 212, 191, 0.18)',
-  secondary: '#a78bfa',
-  accent: '#a78bfa',
-  border: 'rgba(148, 163, 184, 0.28)',
-  muted: 'rgba(203, 213, 225, 0.62)',
-  practiceDarkTeal: '#0f172a',
-  shadow: '#000000',
-} as const;
-
 export interface WelcomeIntroProps {
   audience: WelcomeAudience;
   onComplete: () => void;
   onCardAdvanced?: (cardIndex: number) => void;
+  stageColors?: WelcomeIntroStageColors;
   // Called when hardware-back is pressed on the first card. Lets a host
   // (e.g. the pre-auth route) step back to a preceding screen such as the
   // audience chooser. When omitted, back on card 0 is a no-op.
@@ -68,11 +69,13 @@ function SceneFrame({
   testID,
   colors,
   brandLabel,
+  shadowColor,
   children,
 }: {
   testID: string;
   colors: ThemeColors;
   brandLabel: string;
+  shadowColor: string;
   children: React.ReactNode;
 }): React.ReactElement {
   return (
@@ -85,7 +88,7 @@ function SceneFrame({
         alignSelf: 'center',
         backgroundColor: colors.surfaceElevated,
         borderColor: colors.border,
-        shadowColor: WELCOME_DARK_STAGE_COLORS.shadow,
+        shadowColor,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.22,
         shadowRadius: 24,
@@ -123,17 +126,24 @@ function ChatScene({
   testID,
   colors,
   brandLabel,
+  shadowColor,
   askText,
   replyText,
 }: {
   testID: string;
   colors: ThemeColors;
   brandLabel: string;
+  shadowColor: string;
   askText: string;
   replyText: string;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
+    <SceneFrame
+      testID={testID}
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
+    >
       <View
         className="self-end rounded-2xl px-4 py-3 mb-3"
         style={{ backgroundColor: colors.accent, maxWidth: '80%' }}
@@ -170,15 +180,22 @@ function ChipsScene({
   testID,
   colors,
   brandLabel,
+  shadowColor,
   chips,
 }: {
   testID: string;
   colors: ThemeColors;
   brandLabel: string;
+  shadowColor: string;
   chips: ReadonlyArray<string>;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
+    <SceneFrame
+      testID={testID}
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
+    >
       <View className="flex-row flex-wrap justify-center pt-3">
         {chips.map((label, index) => (
           <View
@@ -209,11 +226,13 @@ function RowsScene({
   testID,
   colors,
   brandLabel,
+  shadowColor,
   rows,
 }: {
   testID: string;
   colors: ThemeColors;
   brandLabel: string;
+  shadowColor: string;
   rows: ReadonlyArray<{
     key: string;
     label: string;
@@ -223,7 +242,12 @@ function RowsScene({
   }>;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
+    <SceneFrame
+      testID={testID}
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
+    >
       {rows.map((r) => {
         const isHighlighted = r.highlighted === true;
         return (
@@ -269,6 +293,7 @@ function SubjectsResumeScene({
   testID,
   colors,
   brandLabel,
+  shadowColor,
   subjects,
   resumeLabel,
   resumeBody,
@@ -276,6 +301,7 @@ function SubjectsResumeScene({
   testID: string;
   colors: ThemeColors;
   brandLabel: string;
+  shadowColor: string;
   subjects: ReadonlyArray<{
     key: string;
     label: string;
@@ -285,7 +311,12 @@ function SubjectsResumeScene({
   resumeBody: string;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
+    <SceneFrame
+      testID={testID}
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
+    >
       <View className="flex-row justify-between mb-3">
         {subjects.map((s, index) => (
           <View
@@ -353,6 +384,7 @@ function SubjectsResumeScene({
 function useLearnerCards(
   t: ReturnType<typeof useTranslation>['t'],
   colors: ThemeColors,
+  shadowColor: string,
 ): ReadonlyArray<CardSpec> {
   return React.useMemo(() => {
     // Narrow the t signature locally to avoid TS2589 (excessively deep i18n
@@ -374,6 +406,7 @@ function useLearnerCards(
             testID="welcome-card-1-scene"
             colors={colors}
             brandLabel={brandLabel}
+            shadowColor={shadowColor}
             askText={tr('welcomeIntro.scene.learner.card1.learner')}
             replyText={tr('welcomeIntro.scene.learner.card1.mentor')}
           />
@@ -388,6 +421,7 @@ function useLearnerCards(
             testID="welcome-card-2-scene"
             colors={colors}
             brandLabel={brandLabel}
+            shadowColor={shadowColor}
             subjects={[
               {
                 key: 'math',
@@ -419,6 +453,7 @@ function useLearnerCards(
             testID="welcome-card-3-scene"
             colors={colors}
             brandLabel={brandLabel}
+            shadowColor={shadowColor}
             chips={[
               tr('welcomeIntro.scene.learner.card3.chips.explain'),
               tr('welcomeIntro.scene.learner.card3.chips.think'),
@@ -429,12 +464,13 @@ function useLearnerCards(
         ),
       },
     ] as ReadonlyArray<CardSpec>;
-  }, [t, colors]);
+  }, [t, colors, shadowColor]);
 }
 
 function useParentCards(
   t: ReturnType<typeof useTranslation>['t'],
   colors: ThemeColors,
+  shadowColor: string,
 ): ReadonlyArray<CardSpec> {
   return React.useMemo(() => {
     // Same narrowing as useLearnerCards — prevents TS2589.
@@ -450,6 +486,7 @@ function useParentCards(
             testID="welcome-card-1-scene"
             colors={colors}
             brandLabel={brandLabel}
+            shadowColor={shadowColor}
             askText={tr('welcomeIntro.scene.parent.card1.child')}
             replyText={tr('welcomeIntro.scene.parent.card1.mentor')}
           />
@@ -464,6 +501,7 @@ function useParentCards(
             testID="welcome-card-2-scene"
             colors={colors}
             brandLabel={brandLabel}
+            shadowColor={shadowColor}
             rows={[
               {
                 key: 'thisWeek',
@@ -497,6 +535,7 @@ function useParentCards(
             testID="welcome-card-3-scene"
             colors={colors}
             brandLabel={brandLabel}
+            shadowColor={shadowColor}
             chips={[
               tr('welcomeIntro.scene.parent.card3.chips.evenings'),
               tr('welcomeIntro.scene.parent.card3.chips.nagging'),
@@ -506,13 +545,14 @@ function useParentCards(
         ),
       },
     ] as ReadonlyArray<CardSpec>;
-  }, [t, colors]);
+  }, [t, colors, shadowColor]);
 }
 
 export function WelcomeIntro({
   audience,
   onComplete,
   onCardAdvanced,
+  stageColors,
   onBackFromFirstCard,
 }: WelcomeIntroProps): React.ReactElement {
   const { t } = useTranslation();
@@ -520,27 +560,16 @@ export function WelcomeIntro({
   const welcomeColors = React.useMemo<ThemeColors>(
     () => ({
       ...colors,
-      background: WELCOME_DARK_STAGE_COLORS.background,
-      surface: WELCOME_DARK_STAGE_COLORS.surface,
-      surfaceElevated: WELCOME_DARK_STAGE_COLORS.surfaceElevated,
-      textPrimary: WELCOME_DARK_STAGE_COLORS.textPrimary,
-      textSecondary: WELCOME_DARK_STAGE_COLORS.textSecondary,
-      textInverse: WELCOME_DARK_STAGE_COLORS.textInverse,
-      primary: WELCOME_DARK_STAGE_COLORS.primary,
-      primarySoft: WELCOME_DARK_STAGE_COLORS.primarySoft,
-      secondary: WELCOME_DARK_STAGE_COLORS.secondary,
-      accent: WELCOME_DARK_STAGE_COLORS.accent,
-      border: WELCOME_DARK_STAGE_COLORS.border,
-      muted: WELCOME_DARK_STAGE_COLORS.muted,
-      practiceDarkTeal: WELCOME_DARK_STAGE_COLORS.practiceDarkTeal,
+      ...stageColors,
     }),
-    [colors],
+    [colors, stageColors],
   );
+  const sceneShadowColor = stageColors?.shadow ?? colors.muted;
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  const learnerCards = useLearnerCards(t, welcomeColors);
-  const parentCards = useParentCards(t, welcomeColors);
+  const learnerCards = useLearnerCards(t, welcomeColors, sceneShadowColor);
+  const parentCards = useParentCards(t, welcomeColors, sceneShadowColor);
   const CARDS = audience === 'parent' ? parentCards : learnerCards;
 
   const listRef = React.useRef<FlatList<CardSpec>>(null);
