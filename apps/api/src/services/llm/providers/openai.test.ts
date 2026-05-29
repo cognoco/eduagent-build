@@ -1,5 +1,6 @@
 import { createOpenAIProvider, toOpenAIContent } from './openai';
 import type { ChatMessage, MessagePart, ModelConfig } from '../types';
+import { SafetyFilterError } from '../../../errors';
 
 // ---------------------------------------------------------------------------
 // Mock fetch — OpenAI provider uses raw fetch() for CF Workers compatibility
@@ -93,6 +94,27 @@ describe('OpenAI Provider', () => {
       );
     });
 
+    it('preserves HTTP status on non-2xx response errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: async () => 'Forbidden',
+      });
+
+      let caughtError: unknown;
+      try {
+        await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error & { status?: number }).status).toBe(403);
+      expect((caughtError as Error & { statusCode?: number }).statusCode).toBe(
+        403,
+      );
+    });
+
     it('throws on data.error field in response body', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -131,6 +153,21 @@ describe('OpenAI Provider', () => {
       // Structured error fields must be preserved as cause for Sentry grouping.
       expect((caughtError as Error & { cause: unknown }).cause).toEqual(
         structuredError,
+      );
+    });
+
+    it('throws SafetyFilterError when OpenAI returns a content_filter finish reason without text', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: {}, finish_reason: 'content_filter' }],
+        }),
+        text: async () => '',
+      });
+
+      await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
+        SafetyFilterError,
       );
     });
 
@@ -203,6 +240,49 @@ describe('OpenAI Provider', () => {
           chunks.push(chunk);
         }
       }).rejects.toThrow('OpenAI API stream failed (500): Internal error');
+    });
+
+    it('preserves HTTP status on non-2xx stream response errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () => 'Bad request',
+      });
+
+      let caughtError: unknown;
+      try {
+        for await (const _chunk of provider.chatStream(
+          TEST_MESSAGES,
+          TEST_CONFIG,
+        )) {
+          // consume stream
+        }
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error & { status?: number }).status).toBe(400);
+      expect((caughtError as Error & { statusCode?: number }).statusCode).toBe(
+        400,
+      );
+    });
+
+    it('throws SafetyFilterError when OpenAI stream finishes with content_filter before text', async () => {
+      const body = createSseStream(
+        'data: {"choices":[{"delta":{},"finish_reason":"content_filter"}]}',
+        'data: [DONE]',
+      );
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
+
+      await expect(async () => {
+        for await (const _chunk of provider.chatStream(
+          TEST_MESSAGES,
+          TEST_CONFIG,
+        )) {
+          // consume stream
+        }
+      }).rejects.toThrow(SafetyFilterError);
     });
 
     it('throws when response body is null', async () => {

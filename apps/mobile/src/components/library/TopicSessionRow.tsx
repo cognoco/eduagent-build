@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 
 import { useThemeColors } from '../../lib/theme';
+import { useDurationLabel } from '../../hooks/use-time-format';
 
 interface TopicSessionRowProps {
   sessionId: string;
@@ -9,12 +10,6 @@ interface TopicSessionRowProps {
   durationSeconds: number | null;
   sessionType: string;
   onPress: (sessionId: string) => void;
-}
-
-function formatDuration(seconds: number | null): string {
-  if (seconds == null) return '—';
-  if (seconds < 60) return '<1 min';
-  return `${Math.floor(seconds / 60)} min`;
 }
 
 export function TopicSessionRow({
@@ -25,15 +20,15 @@ export function TopicSessionRow({
   onPress,
 }: TopicSessionRowProps) {
   const colors = useThemeColors();
+  const durationLabel = useDurationLabel();
+  const formattedDuration = durationLabel(durationSeconds);
 
   return (
     <Pressable
       testID={`session-row-${sessionId}`}
       onPress={() => onPress(sessionId)}
       accessibilityRole="button"
-      accessibilityLabel={`${sessionType}, ${date}, ${formatDuration(
-        durationSeconds,
-      )}`}
+      accessibilityLabel={`${sessionType}, ${date}, ${formattedDuration}`}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -110,7 +105,7 @@ export function TopicSessionRow({
           style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }}
           numberOfLines={1}
         >
-          {formatDuration(durationSeconds)}
+          {formattedDuration}
         </Text>
       </View>
       <Ionicons

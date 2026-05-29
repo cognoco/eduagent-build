@@ -1,5 +1,9 @@
-import { render, screen } from '@testing-library/react-native';
-import { useProgressMilestones } from '../../../hooks/use-progress';
+import { waitFor } from '@testing-library/react-native';
+import {
+  renderScreen,
+  cleanupScreen,
+  ERROR_RESPONSES,
+} from '../../../test-utils/screen-render';
 import MilestonesListScreen from './milestones';
 
 jest.mock('react-i18next', () => ({
@@ -27,11 +31,6 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../../hooks/use-progress', () => ({
-  // gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests
-  ...jest.requireActual('../../../hooks/use-progress'),
-  useProgressMilestones: jest.fn(),
-}));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
 }));
@@ -65,41 +64,39 @@ const mockMilestones = [
 ];
 
 describe('MilestonesListScreen', () => {
-  beforeEach(() => {
-    (useProgressMilestones as jest.Mock).mockReturnValue({
-      data: mockMilestones,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
+  let active: ReturnType<typeof renderScreen> | null = null;
+
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
   });
 
-  it('renders milestone cards', () => {
-    render(<MilestonesListScreen />);
-    screen.getByText('5 topics mastered');
-    screen.getByText('10 learning sessions completed');
-    screen.getByTestId('milestones-back');
+  it('renders milestone cards', async () => {
+    active = renderScreen(<MilestonesListScreen />, {
+      routes: { '/progress/milestones': { milestones: mockMilestones } },
+    });
+    await active.result.findByText('5 topics mastered');
+    active.result.getByText('10 learning sessions completed');
+    active.result.getByTestId('milestones-back');
   });
 
-  it('shows empty state when no milestones', () => {
-    (useProgressMilestones as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
+  it('shows empty state when no milestones', async () => {
+    active = renderScreen(<MilestonesListScreen />, {
+      routes: { '/progress/milestones': { milestones: [] } },
     });
-    render(<MilestonesListScreen />);
-    screen.getByTestId('milestones-empty');
+    await active.result.findByTestId('milestones-empty');
   });
 
-  it('shows error state with retry button', () => {
-    (useProgressMilestones as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network error'),
-      refetch: jest.fn(),
+  it('shows error state with retry button', async () => {
+    active = renderScreen(<MilestonesListScreen />, {
+      routes: {
+        '/progress/milestones': () =>
+          ERROR_RESPONSES.forbidden('Network error'),
+      },
     });
-    render(<MilestonesListScreen />);
-    screen.getByTestId('milestones-error');
+    await waitFor(() => {
+      active!.result.getByTestId('milestones-error');
+    });
   });
 });

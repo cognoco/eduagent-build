@@ -25,6 +25,7 @@ import {
   resolveProfileQuotaRole,
   type ProfileQuotaRole,
 } from './quota-provision';
+import type { SubscriptionTier } from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -74,6 +75,12 @@ async function emitOwnershipMismatchEvent(input: {
   await safeSend(
     () =>
       inngest.send({
+        // orphan-allow: structured telemetry signal required by CLAUDE.md
+        // ("silent recovery in billing must emit a structured metric"). The
+        // mismatch is handled in-line (the decrement/increment returns
+        // profile_mismatch). The event is a dashboard-queryable signal so ops
+        // can answer "how often is a stale/hostile profileId sent" — no
+        // remediation handler is needed.
         name: 'app/billing.ownership.mismatch',
         data: {
           flow: input.flow,
@@ -504,7 +511,7 @@ async function decrementProfileQuota(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  tier: 'free' | 'plus' | 'family' | 'pro',
+  tier: SubscriptionTier,
 ): Promise<DecrementResult> {
   const ownsProfile = await verifyProfileInSubscriptionAccount(
     db,
@@ -566,7 +573,7 @@ async function clampProfileQuotaLimits(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  tier: 'free' | 'plus' | 'family' | 'pro',
+  tier: SubscriptionTier,
 ): Promise<void> {
   const row = await db.query.profileQuotaUsage.findFirst({
     where: and(
@@ -692,7 +699,7 @@ async function attemptProfileDecrementInTx(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  tier: 'free' | 'plus' | 'family' | 'pro',
+  tier: SubscriptionTier,
   allowLazyProvision: boolean,
 ): Promise<DecrementResult> {
   const now = new Date();

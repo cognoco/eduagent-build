@@ -676,8 +676,6 @@
       "emptyTitle": "Nenhuma rodada jogada ainda",
       "emptyMessage": "Experimente um quiz para ver seu histórico aqui!",
       "tryQuiz": "Experimentar um Quiz",
-      "dateToday": "Hoje",
-      "dateYesterday": "Ontem",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "Rodada de {{label}} — {{theme}} — {{score}} de {{total}}. Abrir detalhes.",
       "activityLabels": {
@@ -1205,9 +1203,6 @@
     "pickerEmptyBody": "Começa uma sessão primeiro e depois volta para verificar o que ficou.",
     "pickerBrowseTopics": "Explorar temas",
     "pickerStartForTopic": "Iniciar avaliação de {{title}}",
-    "studiedToday": "Estudado hoje",
-    "studiedYesterday": "Estudado ontem",
-    "studiedDaysAgo": "Estudado há {{count}} dias",
     "topicPassedNote": "Bom trabalho: este tópico foi marcado como aprovado, e os pontos fracos voltarão na revisão quando precisarem de atenção.",
     "pickerLoadingBody": "Estamos a verificar que tópicos estão prontos para um teste justo.",
     "pickerLoadTimeoutTitle": "Os tópicos da avaliação estão a demorar muito a carregar",
@@ -1228,7 +1223,8 @@
     "pickerInProgress": "Em andamento",
     "qualityRating": "Qualidade: {{rating}}/5",
     "depthTransfer": "Compreensão aplicada",
-    "depthExplain": "Explicado com as próprias palavras"
+    "depthExplain": "Explicado com as próprias palavras",
+    "studiedWhen": "Estudado {{when}}"
   },
   "homework": {
     "permissionTitle": "É necessário acesso à câmera",
@@ -1421,10 +1417,6 @@
       "bookmarkLabel": "Marcador salvo de {{subject}}",
       "removeBookmark": "Remover marcador",
       "tapToExpand": "Toque para expandir",
-      "dateToday": "Hoje",
-      "dateYesterday": "Ontem",
-      "dateDaysAgo": "Há {{count}} dias",
-      "dateWeeksAgo": "Há {{count}} semanas",
       "deleteTitle": "Remover marcador?",
       "deleteMessage": "Esta explicação salva será removida.",
       "deleteConfirm": "Remover",
@@ -2500,5 +2492,21 @@
   },
   "profiles": {
     "title": "Perfis"
+  },
+  "time": {
+    "relative": {
+      "today": "Hoje",
+      "yesterday": "Ontem",
+      "daysAgo": "Há {{count}} dias",
+      "lastWeek": "semana passada",
+      "weeksAgo": "Há {{count}} semanas"
+    },
+    "duration": {
+      "under1": "<1 min",
+      "minutes": "{{count}} min",
+      "minutesOne": "1 min",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
+      "none": "—"
+    }
   }
 }

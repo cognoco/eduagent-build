@@ -1463,8 +1463,14 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
     );
 
     expect(res.status).toBe(403);
-    const body = (await res.json()) as { code: string };
-    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    // toEqual asserts the exact serialized body — proves the
+    // assertOwnerProfile message-passthrough (thrown ForbiddenError apiCode is
+    // undefined → dropped by JSON, so the body is exactly { code, message }).
+    const body = await res.json();
+    expect(body).toEqual({
+      code: ERROR_CODES.FORBIDDEN,
+      message: 'Only the account owner can manage child consent.',
+    });
   });
 
   it('[BREAK] PUT /v1/consent/:id/revoke returns 403 for non-owner profile', async () => {

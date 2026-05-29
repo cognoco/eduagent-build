@@ -19,6 +19,8 @@ import {
 import { useThemeColors } from '../../../../../lib/theme';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 import { AddToMyLearningButton } from '../../../../../components/family/AddToMyLearningButton';
+import { useDurationLabel } from '../../../../../hooks/use-time-format';
+import { getDurationParts } from '../../../../../lib/format-relative-date';
 
 const COMPLETION_STATUS_KEYS: Record<string, TranslateKey> = {
   not_started: 'parentView.topic.completionStatus.notStarted',
@@ -38,22 +40,19 @@ function formatSessionDate(iso: string): string {
   });
 }
 
-function formatDuration(seconds: number | null): string {
-  if (seconds === null || seconds === 0) return '--';
-  const mins = Math.round(seconds / 60);
-  if (mins < 1) return '<1 min';
-  return `${mins} min`;
-}
-
-function formatTimeOnApp(seconds: number | null, t: Translate): string {
-  const duration = formatDuration(seconds);
-  return duration === '--'
+function formatTimeOnApp(
+  seconds: number | null,
+  t: Translate,
+  durationLabel: (s: number | null | undefined) => string,
+): string {
+  return getDurationParts(seconds).unit === 'none'
     ? t('parentView.topic.timeOnAppUnavailable')
-    : t('parentView.topic.timeOnApp', { duration });
+    : t('parentView.topic.timeOnApp', { duration: durationLabel(seconds) });
 }
 
 export default function TopicDetailScreen() {
   const { t } = useTranslation();
+  const durationLabel = useDurationLabel();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -337,6 +336,7 @@ export default function TopicDetailScreen() {
                 {formatTimeOnApp(
                   session.wallClockSeconds ?? session.durationSeconds,
                   t,
+                  durationLabel,
                 )}
               </Text>
             </Pressable>

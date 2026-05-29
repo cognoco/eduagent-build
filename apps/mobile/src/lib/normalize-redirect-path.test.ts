@@ -57,6 +57,18 @@ describe('toInternalAppRedirectPath', () => {
   it('rejects open-redirect attempt and returns fallback', () => {
     expect(toInternalAppRedirectPath('//evil.example.com')).toBe('/(app)/home');
   });
+
+  it('uses the provided fallback when value is missing', () => {
+    expect(toInternalAppRedirectPath(undefined, '/(app)/quiz')).toBe(
+      '/(app)/quiz',
+    );
+  });
+
+  it('normalizes the provided fallback before wrapping it', () => {
+    expect(
+      toInternalAppRedirectPath(undefined, '/child/abc?mode=progress'),
+    ).toBe('/(app)/child/abc?mode=progress');
+  });
 });
 
 // [BUG-766] Direct deep-link to /child/{id}?mode=progress used to drop the

@@ -1,5 +1,10 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import {
+  createScreenWrapper,
+  createTestProfile,
+} from '../../../test-utils/screen-render';
+import type { Profile } from '../../../lib/profile';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -57,6 +62,9 @@ jest.mock(
   }),
 );
 
+// The real ProfileContext is supplied per-render via `createScreenWrapper`
+// (see `renderPronouns`). These holders describe the active profile + load
+// state the screen reads through the real `useProfile()` hook.
 let mockActiveProfile:
   | {
       id: string;
@@ -69,17 +77,6 @@ let mockActiveProfile:
   pronouns: null,
 };
 let mockProfileIsLoading = false;
-
-jest.mock(
-  '../../../lib/profile' /* gc1-allow: profile context requires full provider tree */,
-  () => ({
-    ...jest.requireActual('../../../lib/profile'),
-    useProfile: () => ({
-      activeProfile: mockActiveProfile,
-      isLoading: mockProfileIsLoading,
-    }),
-  }),
-);
 
 const mockUpdatePronounsMutate = jest.fn();
 let mockUpdatePronounsIsPending = false;
@@ -138,6 +135,26 @@ jest.mock('@expo/vector-icons', () => ({
 
 const PronounsScreen = require('./pronouns').default as React.ComponentType;
 
+// Render the screen against the REAL ProfileContext, projecting the current
+// `mockActiveProfile` / `mockProfileIsLoading` holders into a full Profile.
+// `createScreenWrapper` accepts `activeProfile: null` + `isLoading` so the
+// loading / not-yet-present cases (#6b) are exercised through the real hook.
+function renderPronouns() {
+  const activeProfile: Profile | null = mockActiveProfile
+    ? createTestProfile({
+        id: mockActiveProfile.id,
+        birthYear: mockActiveProfile.birthYear,
+        pronouns: mockActiveProfile.pronouns ?? null,
+      })
+    : null;
+  const { wrapper } = createScreenWrapper({
+    activeProfile,
+    profiles: activeProfile ? [activeProfile] : [],
+    isLoading: mockProfileIsLoading,
+  });
+  return render(<PronounsScreen />, { wrapper });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -161,7 +178,7 @@ describe('PronounsScreen', () => {
   });
 
   it('renders pronoun options and skip/continue buttons', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     getByTestId('pronouns-option-she-her');
     getByTestId('pronouns-option-he-him');
     getByTestId('pronouns-option-they-them');
@@ -171,7 +188,7 @@ describe('PronounsScreen', () => {
   });
 
   it('selects she/her option when pressed', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-option-she-her'));
     // Continue should now be enabled
     expect(
@@ -180,7 +197,7 @@ describe('PronounsScreen', () => {
   });
 
   it('shows custom input when "Other" is selected', () => {
-    const { getByTestId, queryByTestId } = render(<PronounsScreen />);
+    const { getByTestId, queryByTestId } = renderPronouns();
     // Initially no custom input
     expect(queryByTestId('pronouns-custom-input')).toBeNull();
     fireEvent.press(getByTestId('pronouns-option-other'));
@@ -188,7 +205,7 @@ describe('PronounsScreen', () => {
   });
 
   it('continue is disabled when "Other" selected but no custom text', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-option-other'));
     // No text entered — continue should be disabled
     expect(
@@ -197,7 +214,7 @@ describe('PronounsScreen', () => {
   });
 
   it('continue is enabled after typing custom pronouns', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-option-other'));
     fireEvent.changeText(getByTestId('pronouns-custom-input'), 'ze/zir');
     expect(
@@ -206,7 +223,7 @@ describe('PronounsScreen', () => {
   });
 
   it('calls updatePronouns.mutate with selected preset when continue pressed', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-option-she-her'));
     fireEvent.press(getByTestId('pronouns-continue'));
     expect(mockUpdatePronounsMutate).toHaveBeenCalledWith(
@@ -219,7 +236,7 @@ describe('PronounsScreen', () => {
   });
 
   it('calls updatePronouns.mutate with custom text when other + custom text continue pressed', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-option-other'));
     fireEvent.changeText(getByTestId('pronouns-custom-input'), 'ze/zir');
     fireEvent.press(getByTestId('pronouns-continue'));
@@ -230,7 +247,7 @@ describe('PronounsScreen', () => {
   });
 
   it('starts the next onboarding step before best-effort clearing pronouns on skip', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-skip'));
     expect(mockStartFirstCurriculumMutate).toHaveBeenCalledWith(
       { sessionType: 'learning', inputMode: 'text' },
@@ -249,7 +266,7 @@ describe('PronounsScreen', () => {
   });
 
   it('shows error alert on save failure', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-option-she-her'));
     fireEvent.press(getByTestId('pronouns-continue'));
     // Trigger the onError callback
@@ -262,7 +279,7 @@ describe('PronounsScreen', () => {
   });
 
   it('navigates back to home when back button pressed', () => {
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
@@ -272,7 +289,7 @@ describe('PronounsScreen', () => {
 
   it('redirects to settings return path when returnTo=settings on skip', () => {
     mockSearchParams = { returnTo: 'settings' };
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-skip'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
@@ -282,7 +299,7 @@ describe('PronounsScreen', () => {
 
   it('replaces home immediately on skip when no onboarding subject is present', () => {
     mockSearchParams = {};
-    const { getByTestId, queryByTestId } = render(<PronounsScreen />);
+    const { getByTestId, queryByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-skip'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     expect(mockUpdatePronounsMutate).toHaveBeenCalledWith({ pronouns: null });
@@ -295,7 +312,7 @@ describe('PronounsScreen', () => {
       birthYear: new Date().getFullYear() - 10, // 10 years old
       pronouns: null,
     };
-    const { queryByTestId } = render(<PronounsScreen />);
+    const { queryByTestId } = renderPronouns();
     // The pronoun options should NOT be rendered for under-13
     expect(queryByTestId('pronouns-option-she-her')).toBeNull();
     expect(queryByTestId('pronouns-continue')).toBeNull();
@@ -307,7 +324,7 @@ describe('PronounsScreen', () => {
       birthYear: 2005,
       pronouns: 'he/him',
     };
-    const { getByTestId } = render(<PronounsScreen />);
+    const { getByTestId } = renderPronouns();
     // he/him option should have selected state
     const heHim = getByTestId('pronouns-option-he-him');
     expect(heHim.props.accessibilityState?.selected).toBe(true);
@@ -319,7 +336,7 @@ describe('PronounsScreen', () => {
   it('[#6b] does NOT show the pronouns field while the profile is still loading', () => {
     mockProfileIsLoading = true;
     mockActiveProfile = undefined;
-    const { queryByTestId, getByTestId } = render(<PronounsScreen />);
+    const { queryByTestId, getByTestId } = renderPronouns();
     // Holding view is rendered instead of the form.
     getByTestId('pronouns-loading');
     expect(queryByTestId('pronouns-option-she-her')).toBeNull();
@@ -331,7 +348,7 @@ describe('PronounsScreen', () => {
   it('[#6b] does NOT show the pronouns field when activeProfile is not yet present', () => {
     mockProfileIsLoading = false;
     mockActiveProfile = undefined;
-    const { queryByTestId, getByTestId } = render(<PronounsScreen />);
+    const { queryByTestId, getByTestId } = renderPronouns();
     getByTestId('pronouns-loading');
     expect(queryByTestId('pronouns-option-she-her')).toBeNull();
   });
@@ -346,7 +363,7 @@ describe('PronounsScreen', () => {
       birthYear: new Date().getFullYear() - 10, // 10 years old — age-gated
       pronouns: null,
     };
-    const { rerender } = render(<PronounsScreen />);
+    const { rerender } = renderPronouns();
     // First render: age gate forwards once.
     expect(mockStartFirstCurriculumMutate).toHaveBeenCalledTimes(1);
     // Re-render (e.g. mutation hook returns a new object → navigateForward

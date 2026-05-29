@@ -1,3 +1,4 @@
+import type React from 'react';
 import {
   act,
   fireEvent,
@@ -5,6 +6,11 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import {
+  createScreenWrapper,
+  createTestProfile,
+} from '../../../test-utils/screen-render';
+import type { Profile } from '../../../lib/profile';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -16,7 +22,25 @@ let mockSearchParams: Record<string, string> = {};
 let mockOverdueTopicsReturn: Record<string, unknown> = {};
 let mockTeachingPreferenceReturn: Record<string, unknown> = {};
 let mockIsParentProxy = false;
-let mockLinkedChildren: Array<{ id: string; displayName: string }> = [];
+
+// Real ProfileContext fixtures. The owner uses the default birthYear (2010)
+// from createTestProfile — age-gating is not exercised in this suite.
+// The non-owner child "Ada" is what the real useLinkedChildren() derives
+// from profiles[].
+const OWNER_PROFILE: Profile = createTestProfile({
+  id: 'owner-id',
+  accountId: 'account-1',
+  displayName: 'Parent',
+  isOwner: true,
+});
+const ADA_CHILD: Profile = createTestProfile({
+  id: 'child-1',
+  accountId: 'account-1',
+  displayName: 'Ada',
+  isOwner: false,
+});
+// Per-test override for the linked-children set (mirrored into profiles[]).
+let mockLinkedChildren: Profile[] = [];
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -72,13 +96,11 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../lib/profile', () => ({
-  ...jest.requireActual('../../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: { id: 'owner-id', isOwner: true, birthYear: null },
-  }),
-  useLinkedChildren: () => mockLinkedChildren,
-}));
+// [GC6] lib/profile mock removed — the test now provides a REAL
+// ProfileContext.Provider via the shared `createScreenWrapper` harness.
+// `useProfile().activeProfile` and `useLinkedChildren()` (the only two reads
+// in relearn.tsx) derive from the real context value, so the linked-child
+// list is computed by the real hook from `profiles[]` instead of stubbed.
 
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
@@ -138,11 +160,24 @@ function makeOverdueData(totalOverdue = 4) {
 }
 
 describe('RelearnScreen', () => {
+  let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
+
+  // Render RelearnScreen against a real ProfileContext built from the current
+  // OWNER + mockLinkedChildren set.
+  function renderRelearn() {
+    const built = createScreenWrapper({
+      activeProfile: OWNER_PROFILE,
+      profiles: [OWNER_PROFILE, ...mockLinkedChildren],
+    });
+    Wrapper = built.wrapper;
+    return render(<RelearnScreen />, { wrapper: Wrapper });
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
     mockIsParentProxy = false;
-    mockLinkedChildren = [{ id: 'child-1', displayName: 'Ada' }];
+    mockLinkedChildren = [ADA_CHILD];
     mockOverdueTopicsReturn = {
       data: makeOverdueData(),
       isLoading: false,
@@ -167,7 +202,7 @@ describe('RelearnScreen', () => {
       refetch: mockRefetch,
     };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-subjects-phase');
@@ -178,7 +213,7 @@ describe('RelearnScreen', () => {
   });
 
   it('renders a flat grouped topic list when 10 or fewer topics are overdue', async () => {
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-topics-phase');
@@ -196,7 +231,7 @@ describe('RelearnScreen', () => {
       subjectName: 'Math',
     };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-method-phase');
@@ -216,7 +251,7 @@ describe('RelearnScreen', () => {
       childProfileId: 'child-1',
     };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-method-phase');
@@ -236,7 +271,7 @@ describe('RelearnScreen', () => {
       childProfileId: 'deleted-child',
     };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-method-phase');
@@ -246,7 +281,7 @@ describe('RelearnScreen', () => {
   });
 
   it('moves from the topic phase to the method phase when a topic is selected', async () => {
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-topics-phase');
@@ -286,7 +321,7 @@ describe('RelearnScreen', () => {
       },
     );
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
 
@@ -312,7 +347,7 @@ describe('RelearnScreen', () => {
   });
 
   it('goes back from method phase to topics phase', async () => {
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-topics-phase');
@@ -338,7 +373,7 @@ describe('RelearnScreen', () => {
       refetch: mockRefetch,
     };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-subjects-phase');
@@ -359,7 +394,7 @@ describe('RelearnScreen', () => {
   it('returns to practice when launched from the practice hub', async () => {
     mockSearchParams = { returnTo: 'practice' };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-topics-phase');
@@ -379,7 +414,7 @@ describe('RelearnScreen', () => {
       refetch: mockRefetch,
     };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     screen.getByTestId('relearn-overdue-error');
     fireEvent.press(screen.getByTestId('relearn-overdue-retry'));
@@ -394,7 +429,7 @@ describe('RelearnScreen', () => {
       refetch: mockRefetch,
     };
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     await waitFor(() => {
       screen.getByTestId('relearn-empty-state');
@@ -425,7 +460,7 @@ describe('RelearnScreen', () => {
       },
     );
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
     await waitFor(() => {
@@ -465,7 +500,7 @@ describe('RelearnScreen', () => {
       },
     );
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
     await waitFor(() => {
@@ -509,7 +544,7 @@ describe('RelearnScreen', () => {
       },
     );
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
     await waitFor(() => {
@@ -574,7 +609,7 @@ describe('RelearnScreen', () => {
       },
     );
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
     await waitFor(() => {
@@ -633,7 +668,7 @@ describe('RelearnScreen', () => {
       },
     );
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
     await waitFor(() => {
@@ -660,7 +695,7 @@ describe('RelearnScreen', () => {
   it('redirects in parent proxy mode', () => {
     mockIsParentProxy = true;
 
-    render(<RelearnScreen />);
+    renderRelearn();
 
     expect(screen.queryByTestId('relearn-topics-phase')).toBeNull();
     expect(screen.queryByTestId('relearn-method-phase')).toBeNull();

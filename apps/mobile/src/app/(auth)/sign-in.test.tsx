@@ -11,6 +11,7 @@ import * as Linking from 'expo-linking';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
+let mockLocalSearchParams: { redirectTo?: string | string[] } = {};
 
 // Mutable flag state so individual tests can toggle the two preview flags.
 // Defaults match the real feature-flags.ts: PREVIEW_ONBOARDING_ENABLED true,
@@ -36,7 +37,7 @@ jest.mock(
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockLocalSearchParams,
 }));
 
 jest.mock('expo-linking', () => ({
@@ -58,7 +59,11 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
 const signInModule = require('./sign-in');
 const SignInScreen = signInModule.default;
 const { clearTransitionState } = require('../../lib/auth-transition');
-const { clearPendingAuthRedirect } = require('../../lib/pending-auth-redirect');
+const {
+  clearPendingAuthRedirect,
+  peekPendingAuthRedirect,
+  rememberPendingAuthRedirect,
+} = require('../../lib/pending-auth-redirect');
 const {
   markSessionExpired,
   markSessionRevoked,
@@ -85,6 +90,11 @@ describe('SignInScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLocalSearchParams = {};
+    Object.defineProperty(globalThis, 'window', {
+      value: undefined,
+      configurable: true,
+    });
     clearTransitionState();
     clearPendingAuthRedirect();
     clearSessionExpiredNotice();
@@ -1167,6 +1177,63 @@ describe('SignInScreen', () => {
 
       expect(mockReplace).not.toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pending auth redirect preservation', () => {
+    async function completePasswordSignIn(): Promise<void> {
+      mockCreate.mockResolvedValue({
+        status: 'complete',
+        createdSessionId: 'sess_redirect',
+      });
+      mockSetActive.mockResolvedValue(undefined);
+
+      render(<SignInScreen />);
+
+      fireEvent.changeText(screen.getByTestId('sign-in-email'), 'a@b.com');
+      fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
+      fireEvent.press(screen.getByTestId('sign-in-button'));
+
+      await waitFor(() =>
+        expect(mockSetActive).toHaveBeenCalledWith({
+          session: 'sess_redirect',
+        }),
+      );
+    }
+
+    it('stores local redirectTo when present', async () => {
+      mockLocalSearchParams = { redirectTo: '/quiz' };
+
+      await completePasswordSignIn();
+
+      expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
+    });
+
+    it('stores browser redirectTo when present', async () => {
+      Object.defineProperty(globalThis, 'window', {
+        value: {
+          location: { search: '?redirectTo=%2Fchild%2Fabc%3Fmode%3Dprogress' },
+        },
+        configurable: true,
+      });
+
+      await completePasswordSignIn();
+
+      expect(peekPendingAuthRedirect()).toBe('/(app)/child/abc?mode=progress');
+    });
+
+    it('preserves pending redirect across a no-param remount', async () => {
+      rememberPendingAuthRedirect('/(app)/quiz');
+
+      await completePasswordSignIn();
+
+      expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
+    });
+
+    it('defaults fresh no-redirect sign-in to home', async () => {
+      await completePasswordSignIn();
+
+      expect(peekPendingAuthRedirect()).toBe('/(app)/home');
     });
   });
   // ---------------------------------------------------------------------------

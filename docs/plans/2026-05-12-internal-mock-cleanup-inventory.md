@@ -1,6 +1,6 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12 (last refreshed 2026-05-29, post-Wave-8)
+**Date:** 2026-05-12 (last refreshed 2026-05-29, post-Wave-9)
 **Status:** Framework complete (Phases 0-4); P0 drained; bare-mock backlog collapsed from 131 → 23 → 6 → **0** between 2026-05-19 and 2026-05-25 via successive sweeps. Wave 5 (2026-05-25) landed the three classifier patches Wave 4 deferred (multi-line factory window, `^@expo-google-fonts/`, `^nativewind(?:\/|$)/` + `^metro-` boundaries). Wave 6 (2026-05-25) converted the `lib/profile` cluster from `gc1-allow`-only to `pattern-a; gc1-allow` — 32 of 35 files converted (3 reverted as legitimate native boundaries: i18n loads eagerly through `lib/profile` transitively in JSDOM). The forward-only GC1 ratchet has nothing left to clean — every remaining relative-path `jest.mock(...)` row is either `pattern-a` (requireActual + override) or `gc1-allow` annotated.
 
 > **Status (2026-05-25):** This plan's hard deliverables are DONE. P0 integration ratchet is live (`apps/api/src/test-utils/integration-mock-guard.test.ts`), the CSV regenerator is wired (`scripts/generate-internal-mock-cleanup-inventory.ts`), and the bare-mock backlog is drained. **What this plan does NOT cover:** the long-tail of internal-ish mocks that are already `gc1-allow`-labeled or `requireActual`-factored. Those are inventoried here for visibility but burn down via the **GC6 boy-scout rule in CLAUDE.md** ("remove internal mocks any time you edit a test file"), not via plan-driven sweeps. **Recommendation:** archive this plan as done; keep the CSV + generator script as a living tracking artifact that GC6 consumes opportunistically.
@@ -208,6 +208,50 @@ Targeted the five test files that stubbed `lib/format-api-error` (`formatApiErro
 **Latent bug fixed (not the formatter — the test's own boundary mock).** Removing the `classifyApiError` stub in `weekly-report/[weeklyReportId].test.tsx` surfaced a crash: the file's local `react-i18next` mock omitted `initReactI18next`, so once the real formatter pulled in `../i18n`, that module's init IIFE called `i18next.use(undefined)` and threw "You are passing an undefined module". The stub had been masking an incomplete boundary mock, not a real i18n-init limitation. Fixed by converting the `react-i18next` mock to a `requireActual` spread (keeps the deterministic raw-key `useTranslation` override, restores the real `initReactI18next`).
 
 No `it()` counts changed; no `.skip`, `optional`, softened matcher, or removed assertion. **gc1-allow total: 296 → 293; `pattern-a; gc1-allow`: 328 → 327; `pattern-a`: 62 → 61. Inventory rows: 1324 → 1319. Bare: 0 → 0.** No remaining `jest.mock('…format-api-error')` anywhere in `apps/`.
+
+### Wave 9 (2026-05-29) — mobile screen/hook tests → `renderScreen`/`createScreenWrapper` harness
+
+Broadest mobile harness sweep to date: 27 test files converted across two passes (4 + 3 parallel Opus agents), driving real hooks/providers against a routed mock fetch + real `ProfileContext` instead of stubbing `lib/profile`, `lib/api-client`, and fetch-only query hooks. **54 internal-ish mock rows removed** (authoritative inventory delta; agents reported 56 raw `jest.mock` deletions — the 2-row gap is boundary-classified specifiers like `../lib/api` that the inventory does not count as internal-ish).
+
+| File | mocks removed | jest |
+| --- | ---: | --- |
+| `app/(app)/more/index.test.tsx` | 5 (`lib/profile`, `use-active-profile-role`, `use-parent-proxy`, `use-subscription`, `use-settings`) | 10/10 |
+| `app/(app)/more/privacy.test.tsx` | 5 (`lib/profile`, `use-active-profile-role`, `use-navigation-contract`, `use-account`, `use-settings`) | 14/14 |
+| `app/(app)/more/sign-out-cache-clear.test.tsx` | 4 (`lib/profile`, `use-parent-proxy`, `use-subscription`, `use-settings`) | 5/5 |
+| `app/(app)/more/celebrations.test.tsx` | 3 (`lib/profile`, `use-navigation-contract`, `use-settings`) | 8/8 |
+| `app/(app)/more/accommodation.test.tsx` | 3 (`lib/profile`, `use-navigation-contract`, `use-learner-profile`) | 16/16 |
+| `app/(app)/mentor-memory.test.tsx` | 2 (`lib/profile`, `lib/api-client`) | 19/19 |
+| `app/(app)/more/learning-preferences.test.tsx` | 2 (`lib/profile`, `use-learner-profile`) | 5/5 |
+| `app/(app)/practice/index.test.tsx` | 4 (`use-progress`, `use-quiz`, `use-subjects`, `use-assessments`) | 18/18 |
+| `app/(app)/quiz/history.test.tsx` | 2 (`use-quiz`, `extract-vocabulary-language`) | 7/7 |
+| `app/(app)/progress/milestones.test.tsx` | 1 (`use-progress`) | 3/3 |
+| `app/(app)/progress/vocabulary.test.tsx` | 1 (`use-progress`) | 7/7 |
+| `app/consent.test.tsx` | 1 (`lib/profile`) | 34/34 |
+| `app/(app)/child/[profileId]/session/[sessionId].test.tsx` | 1 (`use-dashboard`) | 11/11 |
+| `app/(app)/child/[profileId]/subjects/[subjectId].test.tsx` | 2 (`use-dashboard`, `use-progress`) | 3/3 |
+| `app/(app)/child/[profileId]/weekly-report/[weeklyReportId].test.tsx` | 1 (`use-progress`) | 20/20 |
+| `app/(app)/shelf/[subjectId]/index.test.tsx` | 1 (`lib/profile`) | 25/25 |
+| `app/(app)/topic/relearn.test.tsx` | 1 (`lib/profile`) | 18/18 |
+| `app/(app)/onboarding/pronouns.test.tsx` | 1 (`lib/profile`) | 17/17 |
+| `components/account-security.test.tsx` | 1 (`lib/profile`) | 5/5 |
+| `components/change-password.test.tsx` | 1 (`lib/profile`) | 11/11 |
+| `components/home/EarlyAdopterCard.test.tsx` | 2 (`lib/profile`, `FeedbackProvider`) | 7/7 |
+| `hooks/use-book-sessions.test.ts` | 2 (`lib/api-client`, `lib/profile`) | 12/12 |
+| `hooks/use-learner-profile.test.ts` | 2 (`lib/api-client`, `lib/profile`) | 31/31 |
+| `hooks/use-quiz.test.ts` | 2 (`lib/api-client`, `lib/profile`) | 26/26 |
+| `hooks/use-subject-sessions.test.ts` | 2 (`lib/api-client`, `lib/profile`) | 8/8 |
+| `hooks/use-topic-suggestions.test.ts` | 2 (`lib/api-client`, `lib/profile`) | 11/11 |
+| `providers/OutboxDrainProvider.test.tsx` | 2 (`lib/api-client`, `lib/api`) | 8/8 |
+
+**Coordinator verification:** all 27 files re-run together by exact path — **347/347 passing**. No `it()` removed, no `.skip`, no softened matcher. Three assertions in the hook tests were **strengthened**, not weakened — the removed `api-client` stub threw a fake `Error('API error <status>')`; the real boundary classifies into typed errors, so `message.toMatch(/500/)` → `(error).status === 500` and a 403 → `instanceof ForbiddenError` (verified against the real thrown type before changing). One `findByText`/`mockReturnValue` swap was needed where the real query renders async (same intent, not a weakening).
+
+**Files kept untouched (genuine KEEP, verified not assumed):** the agents declined to convert mocks that inject mutation/query control surfaces (captured `onSuccess`/`onError`, toggled `isPending`/`isError`/`refetch` spies asserted via `toHaveBeenCalled`, never-resolving promises for cancel/blur/timeout race tests) or `use-navigation-contract` gates set per-case — e.g. `quiz/play`, `quiz/launch`, `dictation/*`, `subscription`, `delete-account`, `session-summary` (`lib/profile` removal there diverts submit to a real `localhost` fetch — test-infra, reverted). Converting any of these would have required weakening assertions, so they were left mocked.
+
+**Product bug surfaced (NOT fixed here — test-only sweep):** `apps/mobile/src/lib/navigation-contract.ts` (~`200-206`, `324-330`) derives `showAddChild` from a LOCAL `isAdultOwner` calling `computeAgeBracket(birthYear)`. `computeAgeBracket` (`packages/schemas/src/age.ts:42-51`) does not null-guard, so `computeAgeBracket(null)` → `year - null >= 18` → `'adult'` → the real hook would SHOW "Add a child" for an owner with unknown/null birth year, contradicting the 18+ gate and the schemas-level `isAdultOwner` (`age.ts:53-64`, which guards `birthYear == null → false`). `more/index.test.tsx` keeps `use-navigation-contract` mocked to encode the intended rule rather than assert the buggy behavior. **Follow-up:** make `navigation-contract.ts`'s local `isAdultOwner` null-guard (or reuse `@eduagent/schemas` `isAdultOwner`).
+
+**Annotation totals: `pattern-a; gc1-allow` 327 → 311; `gc1-allow` 293 → 263; `pattern-a` 61 → 53. Inventory rows: 1319 → 1265 (1314 → 1260 `jest.mock`). Mobile internal-ish: 295 → 241. Bare: 0 → 0.**
+
+**Wave 9 scope note:** the remaining mobile internal-ish rows (241) are the deliberate KEEPs above. The remaining API internal-ish rows (146 Inngest + 147 route + 93 service/middleware) are overwhelmingly legitimate `@eduagent/database` (`gc1-allow: real Neon DB unavailable`) + sanctioned `pattern-a` service isolation; removing them safely requires unit→integration conversion against a real DB, which is out of scope for a harness sweep and tracked separately.
 
 ### Wave 6 backlog (rest of softer-cleanup candidates) — `gc1-allow`-only rows that could become `pattern-a`
 

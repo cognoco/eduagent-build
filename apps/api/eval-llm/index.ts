@@ -16,6 +16,10 @@
 //     Compare envelope signal metrics against baseline.json; exit 1 on drift.
 //   doppler run -- pnpm eval:llm -- --live --update-baseline
 //     Overwrite baseline.json with the current run's metrics (commit after).
+//   pnpm eval:llm -- --validate-baseline
+//     Deterministic, key-free structural check of baseline.json — fails if a
+//     placebo `{ "flows": {} }` baseline would make signal drift invisible.
+//     Safe to run in CI on every PR (no LLM calls, no Doppler).
 // ---------------------------------------------------------------------------
 
 import { promises as fs } from 'node:fs';
@@ -55,6 +59,7 @@ import {
   compareAgainstBaseline,
   formatDriftReport,
   parseBaseline,
+  validateBaselineStructure,
   type Baseline,
 } from './runner/metrics';
 import { bootstrapLlmProviders } from './runner/llm-bootstrap';
@@ -107,6 +112,39 @@ async function main(): Promise<void> {
   if (listOnly) {
     listFlows(FLOWS);
     return;
+  }
+
+  // Structural baseline validation — fully deterministic, makes NO LLM calls
+  // and needs no API keys. Runs before the harness matrix because it only
+  // inspects the checked-in baseline.json. CI uses this to catch a placebo
+  // `{ "flows": {} }` baseline that would otherwise make envelope-signal
+  // drift invisible. The aggregate signal-distribution comparison itself
+  // still requires the key-gated, non-deterministic `--check-baseline --live`.
+  if (options.validateBaseline) {
+    if (options.live || options.checkBaseline || options.updateBaseline) {
+      console.error(
+        '--validate-baseline is a standalone deterministic check; do not combine it with --live / --check-baseline / --update-baseline.',
+      );
+      process.exit(2);
+    }
+    const requiredFlows = FLOWS.filter((f) => f.emitsEnvelope).map((f) => f.id);
+    const baseline = await readBaseline();
+    const issues = validateBaselineStructure(baseline, requiredFlows);
+    if (issues.length === 0) {
+      console.log(
+        `Baseline structure OK — ${requiredFlows.length} envelope-emitting flow(s) present with samples (${BASELINE_PATH}).`,
+      );
+      return;
+    }
+    console.error(`Baseline validation failed (${BASELINE_PATH}):`);
+    for (const issue of issues) {
+      console.error(`  [${issue.flowId}] ${issue.message}`);
+    }
+    console.error('');
+    console.error(
+      'Seed a real baseline once with:\n  doppler run -- pnpm eval:llm -- --live --update-baseline\nthen commit the regenerated baseline.json. See apps/api/eval-llm/README.md.',
+    );
+    process.exit(1);
   }
 
   // Bootstrap LLM providers early so any missing-key errors surface before

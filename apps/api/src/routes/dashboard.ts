@@ -21,8 +21,8 @@ import {
   progressSummarySchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import {
   getChildrenForParent,
   getChildInventory,
@@ -77,8 +77,7 @@ const logger = createLogger();
 export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get parent dashboard data
   .get('/dashboard', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const [children, pendingNotices] = await Promise.all([
       getChildrenForParent(db, profileId),
@@ -95,8 +94,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
   // Get detailed child data
   .get('/dashboard/children/:profileId', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth: assert parent->child link at route entry.
@@ -117,8 +115,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   })
 
   .get('/dashboard/children/:profileId/inventory', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
@@ -134,8 +131,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   })
 
   .get('/dashboard/children/:profileId/progress-summary', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
@@ -154,8 +150,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     '/dashboard/children/:profileId/progress-history',
     zValidator('query', historyQuerySchema),
     async (c) => {
-      const db = c.get('db');
-      const parentProfileId = requireProfileId(c.get('profileId'));
+      const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       const query = c.req.valid('query');
 
@@ -175,8 +170,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
   // Get child's subject detail
   .get('/dashboard/children/:profileId/subjects/:subjectId', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     const subjectId = c.req.param('subjectId');
 
@@ -194,8 +188,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   })
 
   .get('/dashboard/children/:profileId/topics/:topicId/snapshot', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     const topicId = c.req.param('topicId');
 
@@ -245,8 +238,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
   // List child's sessions
   .get('/dashboard/children/:profileId/sessions', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
@@ -263,8 +255,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
   // Single session detail (summary only, no transcript)
   .get('/dashboard/children/:profileId/sessions/:sessionId', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     const sessionId = c.req.param('sessionId');
 
@@ -286,8 +277,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
   // Curated memory view for parent
   .get('/dashboard/children/:profileId/memory', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
@@ -324,8 +314,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   })
 
   .get('/dashboard/children/:profileId/reports', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
@@ -337,8 +326,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   })
 
   .get('/dashboard/children/:profileId/reports/:reportId', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     const reportId = c.req.param('reportId');
 
@@ -359,8 +347,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   })
 
   .post('/dashboard/children/:profileId/reports/:reportId/view', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     const reportId = c.req.param('reportId');
 
@@ -374,8 +361,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
   // [BUG-524] Weekly reports
   .get('/dashboard/children/:profileId/weekly-reports', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
 
     // [BUG-834] Defense-in-depth at route entry.
@@ -392,8 +378,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   })
 
   .get('/dashboard/children/:profileId/weekly-reports/:reportId', async (c) => {
-    const db = c.get('db');
-    const parentProfileId = requireProfileId(c.get('profileId'));
+    const { db, profileId: parentProfileId } = withProfile(c);
     const childProfileId = c.req.param('profileId');
     const reportId = c.req.param('reportId');
 
@@ -417,8 +402,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   .post(
     '/dashboard/children/:profileId/weekly-reports/:reportId/view',
     async (c) => {
-      const db = c.get('db');
-      const parentProfileId = requireProfileId(c.get('profileId'));
+      const { db, profileId: parentProfileId } = withProfile(c);
       const childProfileId = c.req.param('profileId');
       const reportId = c.req.param('reportId');
 

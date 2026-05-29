@@ -22,6 +22,7 @@ import { generateExport } from '../services/export';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import { NotFoundError, apiError } from '../errors';
+import { assertOwnerProfile } from '../services/family-access';
 
 type AccountRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -55,15 +56,7 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can schedule account deletion.
-    const activeProfileMetaDelete = c.get('profileMeta');
-    if (activeProfileMetaDelete?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can delete the account.',
-      );
-    }
+    assertOwnerProfile(c, 'Only the account owner can delete the account.');
 
     const { gracePeriodEnds, scheduledNow } = await scheduleDeletion(
       db,
@@ -127,15 +120,10 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can cancel account deletion.
-    const activeProfileMetaCancelDeletion = c.get('profileMeta');
-    if (activeProfileMetaCancelDeletion?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can cancel account deletion.',
-      );
-    }
+    assertOwnerProfile(
+      c,
+      'Only the account owner can cancel account deletion.',
+    );
 
     // [BUG-412] cancelDeletion now returns a typed result. Return 409 when
     // there is no active scheduled deletion to cancel — previously this path
@@ -159,15 +147,7 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can export account data.
-    const activeProfileMetaExport = c.get('profileMeta');
-    if (activeProfileMetaExport?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can export account data.',
-      );
-    }
+    assertOwnerProfile(c, 'Only the account owner can export account data.');
 
     const data = await generateExport(db, account.id);
     return c.json(dataExportSchema.parse(data));

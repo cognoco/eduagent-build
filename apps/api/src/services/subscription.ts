@@ -3,9 +3,11 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+
 export interface SubscriptionState {
-  tier: 'free' | 'plus' | 'family' | 'pro';
-  status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
 }

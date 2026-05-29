@@ -123,15 +123,17 @@ export const allNotesResponseSchema = z.object({
 });
 export type AllNotesResponse = z.infer<typeof allNotesResponseSchema>;
 
-/** GET /topics/:topicId/sessions — sessions associated with a topic. */
-const _topicSessionSchema = z.object({
+/** GET /topics/:topicId/sessions — one session entry associated with a topic. */
+export const topicSessionSchema = z.object({
   id: z.string().uuid(),
   sessionType: z.enum(['learning', 'homework', 'interleaved']),
   durationSeconds: z.number().nullable(),
   createdAt: isoDateField,
 });
+export type TopicSession = z.infer<typeof topicSessionSchema>;
+
 export const topicSessionsResponseSchema = z.object({
-  sessions: z.array(_topicSessionSchema),
+  sessions: z.array(topicSessionSchema),
 });
 export type TopicSessionsResponse = z.infer<typeof topicSessionsResponseSchema>;
 

@@ -146,9 +146,12 @@ export function assertOwnerProfile<
   E extends ProfileMetaContextEnv,
   P extends string,
   I extends Input,
->(c: Context<E, P, I>): void {
+>(
+  c: Context<E, P, I>,
+  message = 'Only the account owner can view this surface.',
+): void {
   const profileMeta = c.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
-    throw new ForbiddenError('Only the account owner can view this surface.');
+    throw new ForbiddenError(message);
   }
 }

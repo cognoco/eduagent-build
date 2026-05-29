@@ -297,10 +297,15 @@ export default function CameraScreen(): React.ReactNode {
                 action: 'auto-create-subject',
               },
             });
-            // [BUG-809] Surface the actual server error to the user instead
-            // of a generic "select your subject manually." line. formatApiError
-            // distinguishes quota / forbidden / network errors from each other,
-            // which is precisely the information the user needs to react.
+            // [BUG-809] Route the caught error through formatApiError so the
+            // alert shows classified, server-SAFE copy — quota / forbidden /
+            // network / rate-limit errors surface their specific actionable
+            // message, while a 5xx UpstreamError collapses to generic
+            // "Something went wrong on our end…" by design (formatApiError never
+            // leaks a raw server-internal 5xx body to the user — see CLAUDE.md
+            // "never surface raw runtime/internal error strings"). In every case
+            // we append the manual-picker recovery instruction so the learner is
+            // never stranded without an actionable next step.
             platformAlert(
               'Could not detect subject',
               `${formatApiError(

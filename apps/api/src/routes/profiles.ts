@@ -25,7 +25,7 @@ import {
   updateProfile,
   updateProfileAppContext,
   switchProfile,
-  countProfiles,
+  assertProfileCreationAllowed,
   ProfileValidationError,
   ProfileLimitError,
 } from '../services/profile';
@@ -61,45 +61,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const account = requireAccount(c.get('account'));
     const input = c.req.valid('json');
 
-    // [CR-2026-05-19-H1 / BUG-407] Only the account owner can create additional
-    // profiles. Two distinct cases:
-    //
-    // 1. profileMeta is present: straightforward — enforce isOwner === true.
-    // 2. profileMeta is absent: could be a first-profile creation (brand-new
-    //    account, no profiles yet) OR a broken/edge state where meta failed to
-    //    load despite existing profiles. The old heuristic treated "meta absent"
-    //    as "first profile" and allowed the request — this is wrong when the
-    //    account already has profiles but meta resolution failed silently.
-    //
-    //    Fix: do a real DB count. If 0 profiles exist, allow (first-profile
-    //    path). If 1+ exist, the owner must have been in meta — reject 403.
-    const activeProfileMetaCreate = c.get('profileMeta');
-    if (activeProfileMetaCreate) {
-      if (activeProfileMetaCreate.isOwner !== true) {
-        return apiError(
-          c,
-          403,
-          ERROR_CODES.FORBIDDEN,
-          'Only the account owner can create additional profiles.',
-        );
-      }
-    } else {
-      // profileMeta absent — check DB to determine if this is a first-profile creation.
-      // TODO(G1): move countProfiles+403 logic to services/profile.ts as assertProfileCreationAllowed(db, accountId)
-      const existingCount = await countProfiles(db, account.id);
-      if (existingCount > 0) {
-        // Profiles exist but no owner meta resolved — never allow (fail closed).
-        return apiError(
-          c,
-          403,
-          ERROR_CODES.FORBIDDEN,
-          'Only the account owner can create additional profiles.',
-        );
-      }
-      // existingCount === 0: brand-new account, first profile creation is always allowed.
-    }
-
+    // [CR-2026-05-19-H1 / BUG-407] Profile-creation authorization is owned by
+    // the service layer (assertProfileCreationAllowed). It throws ForbiddenError
+    // for the not-owner / fail-closed cases; the route translates that to 403.
     try {
+      await assertProfileCreationAllowed(db, account.id, c.get('profileMeta'));
+
       const profile = await createProfileWithLimitCheck(db, account.id, input, {
         // [OPT-C] Default 'true' when binding missing (safe default; matches config default).
         adultOwnerGateEnabled: c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
@@ -107,6 +74,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
 
       return c.json(profileResponseSchema.parse({ profile }), 201);
     } catch (err) {
+      if (err instanceof ForbiddenError) {
+        // Covers both the route-entry gate (assertProfileCreationAllowed) and
+        // the service-side adult-owner gate inside createProfileWithLimitCheck.
+        return apiError(c, 403, ERROR_CODES.FORBIDDEN, err.message);
+      }
       if (err instanceof ProfileLimitError) {
         // [FIX-API-7] 402 Payment Required is the correct status for a quota gate
         // that requires a subscription upgrade. 403 Forbidden implies a permissions

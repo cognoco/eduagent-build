@@ -36,6 +36,7 @@ import {
   ConsentRecordNotFoundError,
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
+import { assertOwnerProfile } from '../services/family-access';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
 
@@ -404,15 +405,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     const childProfileId = c.req.param('childProfileId');
 
     // [CR-2026-05-19-H1] Only the account owner can read child consent status.
-    const activeProfileMetaStatus = c.get('profileMeta');
-    if (activeProfileMetaStatus?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can manage child consent.',
-      );
-    }
+    assertOwnerProfile(c, 'Only the account owner can manage child consent.');
 
     try {
       const state = await getChildConsentForParent(
@@ -450,15 +443,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     const childProfileId = c.req.param('childProfileId');
 
     // [CR-2026-05-19-H1] Only the account owner can revoke child consent.
-    const activeProfileMetaRevoke = c.get('profileMeta');
-    if (activeProfileMetaRevoke?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can revoke child consent.',
-      );
-    }
+    assertOwnerProfile(c, 'Only the account owner can revoke child consent.');
 
     try {
       const state = await revokeConsent(db, childProfileId, parentProfileId);
@@ -502,15 +487,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     const childProfileId = c.req.param('childProfileId');
 
     // [CR-2026-05-19-H1] Only the account owner can restore child consent.
-    const activeProfileMetaRestore = c.get('profileMeta');
-    if (activeProfileMetaRestore?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can restore child consent.',
-      );
-    }
+    assertOwnerProfile(c, 'Only the account owner can restore child consent.');
 
     try {
       const state = await restoreConsent(db, childProfileId, parentProfileId);

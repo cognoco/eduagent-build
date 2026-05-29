@@ -6,6 +6,8 @@ import {
   extractJsonBody,
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
+import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
+import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 
 // [BUG-815] Regression test: when a legacy profile row has `interests`
 // undefined or null, the Interests section renders the empty placeholder
@@ -53,33 +55,9 @@ jest.mock('expo-router', () => ({
   Redirect: () => null,
 }));
 
-jest.mock('../../lib/profile', () => ({
-  ...jest.requireActual('../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-      get birthYear() {
-        return mockActiveProfileBirthYear;
-      },
-    },
-    get isExplicitProxyMode() {
-      return mockIsExplicitProxyMode;
-    },
-  }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
-}));
-
-// Fetch-boundary mock: intercepts all useApiClient() calls at the transport layer.
-// The route handler closes over `mockProfileData` by reference — update the
+// Fetch-boundary: the routed mock fetch is installed as globalThis.fetch by
+// `makeWrapper` so the REAL lib/api-client (useApiClient) runs against it. The
+// route handler closes over `mockProfileData` by reference — update the
 // variable before each test to change what useLearnerProfile() returns.
 const mockFetch = createRoutedMockFetch({
   'learner-profile/tell': () => ({
@@ -90,11 +68,6 @@ const mockFetch = createRoutedMockFetch({
   'onboarding/interests/context': () => ({ success: true }),
   'learner-profile': () => ({ profile: mockProfileData }),
 });
-
-jest.mock('../../lib/api-client', () =>
-  // gc1-allow: Clerk useAuth() external boundary
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
-);
 
 // use-active-profile-role is derived from useProfile + useParentProxy — no API calls.
 let mockActiveRole: 'owner' | 'child' | 'impersonated-child' | null = 'owner';
@@ -185,9 +158,40 @@ function makeWrapper() {
       mutations: { retry: false, gcTime: 0 },
     },
   });
+
+  // Install the routed mock fetch so the REAL lib/api-client runs against it.
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    mockFetch as unknown as typeof fetch;
+
+  // Real ProfileContext supplies the active profile the screen reads via
+  // useProfile() (displayName + birthYear). Proxy behavior is driven by the
+  // mocked useNavigationContract().isParentProxy, which the screen consults —
+  // not by isExplicitProxyMode here.
+  const activeProfile = createTestProfile({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Test Learner',
+    isOwner: true,
+    birthYear: mockActiveProfileBirthYear as number,
+  });
+  const profileContextValue: ProfileContextValue = {
+    profiles: [activeProfile],
+    activeProfile,
+    isExplicitProxyMode: mockIsExplicitProxyMode,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ProfileContext.Provider value={profileContextValue}>
+          {children}
+        </ProfileContext.Provider>
+      </QueryClientProvider>
     );
   };
 }

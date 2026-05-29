@@ -51,6 +51,7 @@ import { createStripeClient } from '../services/stripe';
 import { resolvePriceId } from '../services/billing-pricing';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
+import { assertOwnerProfile } from '../services/family-access';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
@@ -147,15 +148,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // could read parent's tier, status, trialEndsAt, currentPeriodEnd,
     // cancelAtPeriodEnd, monthlyLimit, dailyLimit — account-level billing
     // information that must not be exposed to children.
-    const activeProfileMetaSubscription = c.get('profileMeta');
-    if (activeProfileMetaSubscription?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can view subscription details.',
-      );
-    }
+    assertOwnerProfile(
+      c,
+      'Only the account owner can view subscription details.',
+    );
 
     const freeTier = getTierConfig('free');
 
@@ -345,15 +341,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can cancel a subscription.
-    const activeProfileMetaCancel = c.get('profileMeta');
-    if (activeProfileMetaCancel?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can cancel a subscription.',
-      );
-    }
+    assertOwnerProfile(c, 'Only the account owner can cancel a subscription.');
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription?.stripeSubscriptionId) {
@@ -422,15 +410,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const account = requireAccount(c.get('account'));
 
       // [CR-2026-05-19-H1] Only the account owner can purchase top-up credits.
-      const activeProfileMetaTopup = c.get('profileMeta');
-      if (activeProfileMetaTopup?.isOwner !== true) {
-        return apiError(
-          c,
-          403,
-          ERROR_CODES.FORBIDDEN,
-          'Only the account owner can purchase top-up credits.',
-        );
-      }
+      assertOwnerProfile(
+        c,
+        'Only the account owner can purchase top-up credits.',
+      );
 
       // Check tier eligibility -- Free tier cannot purchase top-ups
       const subscription = await getSubscriptionByAccountId(db, account.id);
@@ -684,15 +667,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const account = requireAccount(c.get('account'));
 
     // [CR-2026-05-19-H1] Only the account owner can access the billing portal.
-    const activeProfileMetaPortal = c.get('profileMeta');
-    if (activeProfileMetaPortal?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the account owner can access the billing portal.',
-      );
-    }
+    assertOwnerProfile(
+      c,
+      'Only the account owner can access the billing portal.',
+    );
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription?.stripeCustomerId) {
@@ -846,15 +824,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // read family pool status (tier/monthlyLimit/usedThisMonth/profileCount)
     // and the full members list — sibling identities and account-level
     // billing data. Sibling write routes already gate; the read route did not.
-    const activeProfileMetaFamily = c.get('profileMeta');
-    if (activeProfileMetaFamily?.isOwner !== true) {
-      return apiError(
-        c,
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Only the family owner can view family subscription details.',
-      );
-    }
+    assertOwnerProfile(
+      c,
+      'Only the family owner can view family subscription details.',
+    );
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription) {
@@ -889,20 +862,15 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
-      const activeProfileMeta = c.get('profileMeta');
 
       // [BUG-94 / A1-HIGH] isOwner gate parity with /family/remove. Without
       // this, a non-owner child active on the parent's account could add
       // arbitrary profiles to the family subscription while only the parent
       // (owner) can remove them -- asymmetric and exploitable.
-      if (activeProfileMeta?.isOwner !== true) {
-        return apiError(
-          c,
-          403,
-          ERROR_CODES.FORBIDDEN,
-          'Only the family owner can add a profile to the family subscription.',
-        );
-      }
+      assertOwnerProfile(
+        c,
+        'Only the family owner can add a profile to the family subscription.',
+      );
 
       const subscription = await getSubscriptionByAccountId(db, account.id);
       if (!subscription) {
@@ -945,16 +913,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
-      const activeProfileMeta = c.get('profileMeta');
 
-      if (activeProfileMeta?.isOwner !== true) {
-        return apiError(
-          c,
-          403,
-          ERROR_CODES.FORBIDDEN,
-          'Only the family owner can remove a profile from the family subscription.',
-        );
-      }
+      assertOwnerProfile(
+        c,
+        'Only the family owner can remove a profile from the family subscription.',
+      );
 
       const subscription = await getSubscriptionByAccountId(db, account.id);
       if (!subscription) {

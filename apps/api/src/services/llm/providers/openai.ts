@@ -10,6 +10,8 @@ import {
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
+import { SafetyFilterError } from '../../../errors';
+import { createProviderHttpError } from './errors';
 
 const logger = createLogger();
 
@@ -102,6 +104,16 @@ function mapModel(config: ModelConfig): string {
   return mapped ?? 'gpt-4o-mini';
 }
 
+function isContentFilterFinishReason(reason: string | undefined): boolean {
+  return reason === 'content_filter';
+}
+
+function createOpenAIContentFilterError(): SafetyFilterError {
+  return new SafetyFilterError(
+    'The response was blocked by content safety filters. Please try rephrasing your question.',
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Provider factory
 // ---------------------------------------------------------------------------
@@ -135,8 +147,10 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
 
       if (!res.ok) {
         const errorBody = await res.text();
-        throw new Error(
+        throw createProviderHttpError(
           `OpenAI API request failed (${res.status}): ${errorBody}`,
+          res.status,
+          errorBody,
         );
       }
 
@@ -150,16 +164,18 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
         });
       }
 
-      const text = data.choices?.[0]?.message?.content;
+      const choice = data.choices?.[0];
+      if (isContentFilterFinishReason(choice?.finish_reason)) {
+        throw createOpenAIContentFilterError();
+      }
+
+      const text = choice?.message?.content;
       if (!text) {
         throw new Error('OpenAI returned empty response');
       }
       return {
         content: text,
-        stopReason: normalizeStopReason(
-          'openai',
-          data.choices?.[0]?.finish_reason,
-        ),
+        stopReason: normalizeStopReason('openai', choice?.finish_reason),
       };
     },
 
@@ -194,8 +210,10 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
 
           if (!res.ok) {
             const errorBody = await res.text();
-            throw new Error(
+            throw createProviderHttpError(
               `OpenAI API stream failed (${res.status}): ${errorBody}`,
+              res.status,
+              errorBody,
             );
           }
 
@@ -210,6 +228,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           function processChunk(chunk: OpenAIResponse): string | undefined {
             const finish = chunk.choices?.[0]?.finish_reason;
             if (finish) rawFinishReason = finish;
+            if (isContentFilterFinishReason(finish)) {
+              throw createOpenAIContentFilterError();
+            }
             return chunk.choices?.[0]?.delta?.content;
           }
 
@@ -234,6 +255,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                   const text = processChunk(chunk);
                   if (text) yield text;
                 } catch (err) {
+                  if (err instanceof SafetyFilterError) {
+                    throw err;
+                  }
                   // [BUG-695] Previously an empty catch silently discarded
                   // malformed SSE chunks, leaving corrupt LLM responses
                   // invisible. Log structurally so we can query
@@ -262,6 +286,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                     const text = processChunk(chunk);
                     if (text) yield text;
                   } catch (err) {
+                    if (err instanceof SafetyFilterError) {
+                      throw err;
+                    }
                     // [BUG-695] Same as above — flush-buffer path.
                     logger.warn('[llm:openai] malformed SSE chunk discarded', {
                       event: 'openai.sse.malformed',

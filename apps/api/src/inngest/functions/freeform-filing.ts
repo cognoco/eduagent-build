@@ -125,6 +125,11 @@ async function runFreeformFiling({
       },
     });
     await step.sendEvent('notify-filing-retry-completed', {
+      // orphan-allow: consumed by filing-timed-out-observe.ts via
+      // step.waitForEvent('wait-for-retry-completion', { event:
+      // 'app/filing.retry_completed' }) — a real consumer that the orphan
+      // scanner cannot see because it only harvests inngest.createFunction
+      // triggers, not waitForEvent steps.
       name: 'app/filing.retry_completed',
       data: filingRetryCompletedEventSchema.parse({
         profileId,
@@ -190,6 +195,11 @@ async function runFreeformFiling({
     },
   });
   await step.sendEvent('notify-filing-retry-completed', {
+    // orphan-allow: consumed by filing-timed-out-observe.ts via
+    // step.waitForEvent('wait-for-retry-completion', { event:
+    // 'app/filing.retry_completed' }) — a real consumer that the orphan
+    // scanner cannot see because it only harvests inngest.createFunction
+    // triggers, not waitForEvent steps.
     name: 'app/filing.retry_completed',
     data: filingRetryCompletedEventSchema.parse({
       profileId,

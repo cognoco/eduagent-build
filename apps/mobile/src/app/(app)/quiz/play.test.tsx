@@ -245,8 +245,8 @@ describe('QuizPlayScreen', () => {
 
     const elapsed = screen.getByTestId('quiz-play-elapsed');
     // Initial render: timer started from Date.now() in this same tick, so
-    // the floored seconds value is 0.
-    expect(elapsed.props.children).toBe('0:00');
+    // the floored seconds value is 0. formatTimer zero-pads both sides.
+    expect(elapsed.props.children).toBe('00:00');
     // Aria-label includes a unit so screen-reader users hear "Elapsed time:
     // 0 seconds" instead of just "0s".
     expect(elapsed.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
@@ -1028,7 +1028,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     // We assert via accessibilityLabel which interpolates both values cleanly.
     const elapsedEl = screen.getByTestId('quiz-play-elapsed');
     expect(elapsedEl.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
-    expect(elapsedEl.props.children).toBe('0:00');
+    expect(elapsedEl.props.children).toBe('00:00');
   });
 });
 

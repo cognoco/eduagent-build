@@ -4,7 +4,13 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createScreenWrapper,
+  createTestProfile,
+  createRoutedMockFetch,
+  type RoutedMockFetch,
+} from '../test-utils/screen-render';
+import type { Profile } from '../lib/profile';
 import {
   useLearnerProfile,
   useChildLearnerProfile,
@@ -18,40 +24,35 @@ import {
   useUpdateAccommodationMode,
 } from './use-learner-profile';
 
-const mockFetch = jest.fn();
-
-// prettier-ignore
-jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-// prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: hook tests need a fixed active profile without provider setup
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id', isOwner: true },
-  }),
-}));
-
+// Real ProfileContext + real api-client (Clerk's useAuth is globally mocked in
+// test-setup), driven by a routed mock fetch installed as globalThis.fetch.
+// Per-call overrides via mockResolvedValueOnce take priority over the routed
+// default, preserving the original canned-response test flow.
+let mockFetch: RoutedMockFetch;
 let queryClient: QueryClient;
+let prevFetch: typeof globalThis.fetch;
 
-function createWrapper() {
-  const w = createQueryWrapper();
+const ownerProfile = createTestProfile({
+  id: 'test-profile-id',
+  isOwner: true,
+});
+
+beforeEach(() => {
+  prevFetch = globalThis.fetch;
+  mockFetch = createRoutedMockFetch();
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    mockFetch as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+});
+
+function createWrapper(activeProfile: Profile | null = ownerProfile) {
+  const w = createScreenWrapper({
+    activeProfile,
+    profiles: activeProfile ? [activeProfile] : [],
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
@@ -128,25 +129,14 @@ describe('useLearnerProfile', () => {
   });
 
   it('is disabled when there is no active profile — no fetch fires', async () => {
-    // Temporarily override the profile mock to return null activeProfile
-    const profileMod = require('../lib/profile') as {
-      useProfile: () => { activeProfile: null | { id: string } };
-    };
-    const original = profileMod.useProfile;
-    profileMod.useProfile = () => ({ activeProfile: null });
+    const { result } = renderHook(() => useLearnerProfile(), {
+      wrapper: createWrapper(null),
+    });
 
-    try {
-      const { result } = renderHook(() => useLearnerProfile(), {
-        wrapper: createWrapper(),
-      });
-
-      await new Promise((r) => setTimeout(r, 50));
-      // The hook is disabled (enabled: !!activeProfile), so fetchStatus stays idle
-      expect(result.current.fetchStatus).toBe('idle');
-      expect(mockFetch).not.toHaveBeenCalled();
-    } finally {
-      profileMod.useProfile = original;
-    }
+    await new Promise((r) => setTimeout(r, 50));
+    // The hook is disabled (enabled: !!activeProfile), so fetchStatus stays idle
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('refetches after manual invalidation (retry behavior)', async () => {
@@ -238,28 +228,19 @@ describe('useChildLearnerProfile', () => {
   });
 
   it('is disabled when activeProfile is not owner — no fetch fires', async () => {
-    // Override the profile mock to return a non-owner profile
-    const profileMod = require('../lib/profile') as {
-      useProfile: () => { activeProfile: { id: string; isOwner: boolean } };
-    };
-    const original = profileMod.useProfile;
-    profileMod.useProfile = () => ({
-      activeProfile: { id: 'test-profile-id', isOwner: false },
+    const nonOwner = createTestProfile({
+      id: 'test-profile-id',
+      isOwner: false,
     });
+    const { result } = renderHook(
+      () => useChildLearnerProfile('child-profile-id'),
+      { wrapper: createWrapper(nonOwner) },
+    );
 
-    try {
-      const { result } = renderHook(
-        () => useChildLearnerProfile('child-profile-id'),
-        { wrapper: createWrapper() },
-      );
-
-      await new Promise((r) => setTimeout(r, 50));
-      // enabled: !!activeProfile && activeProfile.isOwner === true && !!childProfileId
-      expect(result.current.fetchStatus).toBe('idle');
-      expect(mockFetch).not.toHaveBeenCalled();
-    } finally {
-      profileMod.useProfile = original;
-    }
+    await new Promise((r) => setTimeout(r, 50));
+    // enabled: !!activeProfile && activeProfile.isOwner === true && !!childProfileId
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('propagates API errors', async () => {

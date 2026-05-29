@@ -30,6 +30,7 @@ import { createLogger } from './logger';
 import { recordPracticeActivityEvent } from './practice-activity-events';
 import { buildAppHelpDirectReply, isAppHelpQuery } from './app-help-map';
 import { ConflictError, NotFoundError } from '../errors';
+import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
 
 // [BUG-665 / S-5] Structured logger for parse-fallback observability. Sentry
 // covers production aggregation, but the structured logger surfaces the same
@@ -776,32 +777,18 @@ export async function loadAssessmentTopicContext(
     | 'languageCode'
   >
 > {
-  // curriculumTopics has no profileId column; ownership is verified by joining
-  // through curricula → subjects where subjects.profileId = profileId.
-  // Raw drizzle JOIN is the correct approach here — the scoped repo only covers
-  // tables with a direct profileId column.
-  const query = db
-    .select({
-      topicTitle: curriculumTopics.title,
-      topicDescription: curriculumTopics.description,
-      subjectName: subjects.name,
-      pedagogyMode: subjects.pedagogyMode,
-      languageCode: subjects.languageCode,
-    })
-    .from(curriculumTopics)
-    .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
-    .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
-    .where(
-      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId)),
-    )
-    .limit(1);
-  const [topic] = await query;
+  // curriculumTopics has no profileId column; ownership is verified through the
+  // canonical findOwnedCurriculumTopic helper (dual-join curriculumTopics →
+  // curriculumBooks + curricula → subjects.profileId). Stricter than the prior
+  // curriculum-only join; T2 confirmed zero divergent topics so the resolved
+  // set is unchanged. Null result falls back to topicId, as before.
+  const owned = await findOwnedCurriculumTopic(db, { profileId, topicId });
   return {
-    topicTitle: topic?.topicTitle ?? topicId,
-    topicDescription: topic?.topicDescription ?? '',
-    subjectName: topic?.subjectName,
-    pedagogyMode: topic?.pedagogyMode,
-    languageCode: topic?.languageCode ?? null,
+    topicTitle: owned?.topicTitle ?? topicId,
+    topicDescription: owned?.topicDescription ?? '',
+    subjectName: owned?.subjectName,
+    pedagogyMode: owned?.subjectPedagogyMode,
+    languageCode: owned?.subjectLanguageCode ?? null,
   };
 }
 

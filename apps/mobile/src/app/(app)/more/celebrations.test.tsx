@@ -1,32 +1,28 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, act, waitFor } from '@testing-library/react-native';
+import {
+  renderScreen,
+  cleanupScreen,
+  createTestProfile,
+  ERROR_RESPONSES,
+} from '../../../test-utils/screen-render';
+import {
+  fetchCallsMatching,
+  extractJsonBody,
+} from '../../../test-utils/mock-api-routes';
+
+// ─── Boundary mocks (native/external runtime only) ──────────────────────
+//
+// The real ProfileContext drives the real useProfile and useNavigationContract
+// hooks; the real useCelebrationLevel / useChildCelebrationLevel /
+// useUpdateCelebrationLevel / useUpdateChildCelebrationLevel hooks run against
+// the routed mock fetch installed by renderScreen.
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn();
-const mockCelebrationLevelMutate = jest.fn();
-const mockChildCelebrationLevelMutate = jest.fn();
-const mockPlatformAlert = jest.fn();
-
-let mockActiveProfile = {
-  id: 'profile-1',
-  displayName: 'Alex',
-  isOwner: true,
-  birthYear: 1990,
-};
-let mockProfiles: Array<{
-  id: string;
-  displayName: string;
-  isOwner: boolean;
-  birthYear: number;
-}> = [mockActiveProfile];
-let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'big_only';
-let mockChildCelebrationLevel: 'all' | 'big_only' | 'off' | undefined =
-  'big_only';
-let mockCelebrationIsError = false;
-const mockCelebrationRefetch = jest.fn();
 let mockSearchParams: Record<string, string | undefined> = {};
 
-jest.mock('expo-router', () => ({
+jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useRouter: () => ({
     replace: mockReplace,
     back: mockBack,
@@ -35,68 +31,33 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams,
 }));
 
-jest.mock('@expo/vector-icons/Ionicons', () => {
-  const { Text } = require('react-native');
-  return function MockIonicons({ name }: { name: string }) {
-    return <Text>{name}</Text>;
-  };
-});
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-
-jest.mock('../../../lib/theme' /* gc1-allow: unit test boundary */, () => ({
-  useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
-}));
-
-jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
-  ...jest.requireActual('../../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: mockActiveProfile,
-    profiles: mockProfiles,
-  }),
-}));
+jest.mock(
+  '@expo/vector-icons/Ionicons' /* gc1-allow: native-boundary — bundles native font asset */,
+  () => {
+    const { Text } = require('react-native');
+    return function MockIonicons({ name }: { name: string }) {
+      return <Text>{name}</Text>;
+    };
+  },
+);
 
 jest.mock(
-  '../../../hooks/use-navigation-contract' /* gc1-allow: screen test pins contract gates without the full app provider tree */,
+  'react-native-safe-area-context' /* gc1-allow: native-boundary — requires native insets */,
   () => ({
-    useNavigationContract: () => ({
-      gates: {
-        showCelebrationsChildEditor: mockActiveProfile?.isOwner === true,
-      },
-    }),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   }),
 );
 
 jest.mock(
-  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
+  '../../../lib/theme' /* gc1-allow: native-boundary — theme hook requires native ColorScheme */,
   () => ({
-    useCelebrationLevel: () => ({
-      data: mockCelebrationLevel,
-      isLoading: false,
-      isError: mockCelebrationIsError,
-      refetch: mockCelebrationRefetch,
-    }),
-    useUpdateCelebrationLevel: () => ({
-      mutate: mockCelebrationLevelMutate,
-      isPending: false,
-    }),
-    useChildCelebrationLevel: () => ({
-      data: mockChildCelebrationLevel,
-      isLoading: false,
-      isError: false,
-      refetch: mockCelebrationRefetch,
-    }),
-    useUpdateChildCelebrationLevel: () => ({
-      mutate: mockChildCelebrationLevelMutate,
-      isPending: false,
-    }),
+    useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
   }),
 );
 
+const mockPlatformAlert = jest.fn();
 jest.mock(
-  '../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
+  '../../../lib/platform-alert' /* gc1-allow: native-boundary — wraps native Alert */,
   () => ({
     platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
   }),
@@ -104,83 +65,125 @@ jest.mock(
 
 const CelebrationsScreen = require('./celebrations').default;
 
+// ─── Fixtures ────────────────────────────────────────────────────────────
+
+const owner = createTestProfile({
+  id: 'profile-1',
+  accountId: 'account-1',
+  displayName: 'Alex',
+  isOwner: true,
+  birthYear: 1990,
+});
+
+const child = createTestProfile({
+  id: 'child-1',
+  accountId: 'account-1',
+  displayName: 'Mia',
+  isOwner: false,
+  birthYear: 2014,
+});
+
+function levelRoute(level: 'all' | 'big_only' | 'off' = 'big_only') {
+  return { '/settings/celebration-level': { celebrationLevel: level } };
+}
+
 describe('CelebrationsScreen', () => {
+  let active: ReturnType<typeof renderScreen> | null = null;
+
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockActiveProfile = {
-      id: 'profile-1',
-      displayName: 'Alex',
-      isOwner: true,
-      birthYear: 1990,
-    };
-    mockProfiles = [mockActiveProfile];
-    mockCelebrationLevel = 'big_only';
-    mockChildCelebrationLevel = 'big_only';
-    mockCelebrationIsError = false;
     mockSearchParams = {};
     mockCanGoBack.mockReturnValue(false);
   });
 
-  it('renders the central celebration level options', () => {
-    render(<CelebrationsScreen />);
-
-    screen.getByTestId('celebration-level-all');
-    screen.getByTestId('celebration-level-big-only');
-    screen.getByTestId('celebration-level-off');
-    screen.getByText('Big milestones only');
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
+    jest.clearAllMocks();
   });
 
-  it('updates the signed-in learner celebration level', () => {
-    render(<CelebrationsScreen />);
+  it('renders the central celebration level options', async () => {
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: owner,
+      routes: levelRoute('big_only'),
+    });
 
-    fireEvent.press(screen.getByTestId('celebration-level-off'));
-
-    expect(mockCelebrationLevelMutate).toHaveBeenCalledWith(
-      'off',
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
-    expect(mockChildCelebrationLevelMutate).not.toHaveBeenCalled();
+    await waitFor(() => {
+      active!.result.getByTestId('celebration-level-all');
+    });
+    active.result.getByTestId('celebration-level-big-only');
+    active.result.getByTestId('celebration-level-off');
+    active.result.getByText('Big milestones only');
   });
 
-  it('updates a child celebration level when childProfileId is present', () => {
-    mockProfiles = [
-      mockActiveProfile,
-      {
-        id: 'child-1',
-        displayName: 'Mia',
-        isOwner: false,
-        birthYear: 2014,
-      },
-    ];
+  it('updates the signed-in learner celebration level', async () => {
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: owner,
+      routes: levelRoute('big_only'),
+    });
+
+    await waitFor(() => {
+      active!.result.getByTestId('celebration-level-off');
+    });
+    await act(async () => {
+      fireEvent.press(active!.result.getByTestId('celebration-level-off'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const puts = fetchCallsMatching(
+        active!.routedFetch,
+        '/settings/celebration-level',
+      ).filter((c) => c.init?.method === 'PUT');
+      expect(puts.length).toBeGreaterThanOrEqual(1);
+      // Self mutation body has no childProfileId.
+      expect(extractJsonBody(puts[puts.length - 1]?.init)).toEqual({
+        celebrationLevel: 'off',
+      });
+    });
+  });
+
+  it('updates a child celebration level when childProfileId is present', async () => {
     mockSearchParams = { childProfileId: 'child-1' };
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: owner,
+      profiles: [owner, child],
+      routes: levelRoute('big_only'),
+    });
 
-    render(<CelebrationsScreen />);
+    await active.result.findByText("Mia's celebration settings");
+    await waitFor(() => {
+      active!.result.getByTestId('celebration-level-off');
+    });
+    await act(async () => {
+      fireEvent.press(active!.result.getByTestId('celebration-level-off'));
+      await Promise.resolve();
+    });
 
-    screen.getByText("Mia's celebration settings");
-    fireEvent.press(screen.getByTestId('celebration-level-off'));
-
-    expect(mockChildCelebrationLevelMutate).toHaveBeenCalledWith(
-      { childProfileId: 'child-1', celebrationLevel: 'off' },
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
-    expect(mockCelebrationLevelMutate).not.toHaveBeenCalled();
+    await waitFor(() => {
+      const puts = fetchCallsMatching(
+        active!.routedFetch,
+        '/settings/celebration-level',
+      ).filter((c) => c.init?.method === 'PUT');
+      expect(puts.length).toBeGreaterThanOrEqual(1);
+      // Child mutation body carries the childProfileId.
+      expect(extractJsonBody(puts[puts.length - 1]?.init)).toEqual({
+        childProfileId: 'child-1',
+        celebrationLevel: 'off',
+      });
+    });
   });
 
-  it('returns to the matching child accommodation screen when there is no back stack', () => {
-    mockProfiles = [
-      mockActiveProfile,
-      {
-        id: 'child-1',
-        displayName: 'Mia',
-        isOwner: false,
-        birthYear: 2014,
-      },
-    ];
+  it('returns to the matching child accommodation screen when there is no back stack', async () => {
     mockSearchParams = { childProfileId: 'child-1' };
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: owner,
+      profiles: [owner, child],
+      routes: levelRoute('big_only'),
+    });
 
-    render(<CelebrationsScreen />);
-
-    fireEvent.press(screen.getByTestId('celebrations-back'));
+    await active.result.findByTestId('celebrations-back');
+    fireEvent.press(active.result.getByTestId('celebrations-back'));
 
     expect(mockReplace).toHaveBeenCalledWith(
       '/(app)/more/accommodation?childProfileId=child-1',
@@ -188,59 +191,75 @@ describe('CelebrationsScreen', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
-  it('leaves child-editing mode when the active profile is not the owner', () => {
-    mockActiveProfile = {
-      id: 'child-1',
-      displayName: 'Mia',
-      isOwner: false,
-      birthYear: 2014,
-    };
-    mockProfiles = [
-      {
-        id: 'profile-1',
-        displayName: 'Alex',
-        isOwner: true,
-        birthYear: 1990,
-      },
-      mockActiveProfile,
-    ];
+  it('leaves child-editing mode when the active profile is not the owner', async () => {
     mockSearchParams = { childProfileId: 'child-1' };
+    // Active profile is the child (non-owner) — canEditChildPreferences is
+    // false, so the screen redirects back to /(app)/more.
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: child,
+      profiles: [owner, child],
+      routes: levelRoute('big_only'),
+    });
 
-    render(<CelebrationsScreen />);
-
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+    });
   });
 
-  it('renders an error block with retry and go-back when the celebration query fails', () => {
-    mockCelebrationLevel = undefined;
-    mockCelebrationIsError = true;
+  it('renders an error block with retry and go-back when the celebration query fails', async () => {
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: owner,
+      routes: {
+        '/settings/celebration-level': () =>
+          ERROR_RESPONSES.forbidden('nope', 'FORBIDDEN'),
+      },
+    });
 
-    render(<CelebrationsScreen />);
-
-    screen.getByTestId('celebrations-retry');
-    screen.getByTestId('celebrations-error-back');
-    expect(screen.queryByTestId('celebration-level-all')).toBeNull();
+    await active.result.findByTestId('celebrations-retry');
+    active.result.getByTestId('celebrations-error-back');
+    expect(active.result.queryByTestId('celebration-level-all')).toBeNull();
   });
 
-  it('calls refetch when the retry button is pressed in the error state', () => {
-    mockCelebrationLevel = undefined;
-    mockCelebrationIsError = true;
+  it('refetches when the retry button is pressed in the error state', async () => {
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: owner,
+      routes: {
+        '/settings/celebration-level': () =>
+          ERROR_RESPONSES.forbidden('nope', 'FORBIDDEN'),
+      },
+    });
 
-    render(<CelebrationsScreen />);
+    await active.result.findByTestId('celebrations-retry');
+    const before = fetchCallsMatching(
+      active.routedFetch,
+      '/settings/celebration-level',
+    ).length;
 
-    fireEvent.press(screen.getByTestId('celebrations-retry'));
+    await act(async () => {
+      fireEvent.press(active!.result.getByTestId('celebrations-retry'));
+      await Promise.resolve();
+    });
 
-    expect(mockCelebrationRefetch).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(active!.routedFetch, '/settings/celebration-level')
+          .length,
+      ).toBeGreaterThan(before);
+    });
   });
 
-  it('calls goBackOrReplace when the go-back button is pressed in the error state', () => {
-    mockCelebrationLevel = undefined;
-    mockCelebrationIsError = true;
+  it('calls goBackOrReplace when the go-back button is pressed in the error state', async () => {
     mockCanGoBack.mockReturnValue(false);
+    active = renderScreen(<CelebrationsScreen />, {
+      profile: owner,
+      routes: {
+        '/settings/celebration-level': () =>
+          ERROR_RESPONSES.forbidden('nope', 'FORBIDDEN'),
+      },
+    });
 
-    render(<CelebrationsScreen />);
-
-    fireEvent.press(screen.getByTestId('celebrations-error-back'));
+    await active.result.findByTestId('celebrations-error-back');
+    fireEvent.press(active.result.getByTestId('celebrations-error-back'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/more/accommodation');
     expect(mockBack).not.toHaveBeenCalled();
