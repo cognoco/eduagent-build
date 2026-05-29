@@ -664,6 +664,12 @@ export async function activateSubscriptionFromCheckout(
         await safeSend(
           () =>
             inngest.send({
+              // orphan-allow: structured telemetry required by CLAUDE.md
+              // (silent recovery in billing must emit a structured signal). The
+              // divergent-sub conflict is resolved in-line here and escalated
+              // via logger.warn + captureException(Sentry). The Inngest event is
+              // a dashboard-queryable signal for divergence frequency/resolution
+              // — no automated remediation handler is needed.
               name: 'app/billing.activate_checkout.divergent_sub',
               data: {
                 resolution: 'rejected_indeterminate_order',
@@ -772,6 +778,11 @@ export async function activateSubscriptionFromCheckout(
         await safeSend(
           () =>
             inngest.send({
+              // orphan-allow: structured telemetry required by CLAUDE.md (silent
+              // recovery in billing must emit a structured signal). Divergence is
+              // resolved in-line (row updated to incoming) + escalated via
+              // logger.warn + captureException; the event is a dashboard-
+              // queryable signal, no automated handler intended.
               name: 'app/billing.activate_checkout.divergent_sub',
               data: {
                 resolution,
@@ -794,6 +805,10 @@ export async function activateSubscriptionFromCheckout(
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // recovery in billing must emit a structured signal). Divergence is
+            // resolved in-line + escalated via logger.warn + captureException;
+            // the event is a dashboard-queryable signal, no handler intended.
             name: 'app/billing.activate_checkout.divergent_sub',
             data: {
               resolution,

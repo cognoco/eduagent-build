@@ -58,6 +58,7 @@ import { ForbiddenError } from '@eduagent/schemas';
 import {
   listProfiles,
   createProfile,
+  assertProfileCreationAllowed,
   findOwnerProfile,
   getProfile,
   updateProfile,
@@ -707,6 +708,69 @@ describe('switchProfile', () => {
     const result = await switchProfile(db, 'profile-123', 'account-123');
 
     expect(result).toEqual({ profileId: 'profile-123' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assertProfileCreationAllowed — [CR-2026-05-19-H1 / BUG-407]
+// Owner-only profile-creation authorization moved out of the route handler.
+// Allow / deny / fail-closed decision logic is unit-tested here directly.
+// ---------------------------------------------------------------------------
+
+describe('assertProfileCreationAllowed', () => {
+  /**
+   * Minimal DB whose select-count chain (`db.select().from().where()`) resolves
+   * to the supplied row count. Mirrors the shape countProfiles relies on.
+   */
+  function makeCountDb(count: number): Database {
+    return {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([{ count }]),
+        }),
+      }),
+    } as unknown as Database;
+  }
+
+  it('allows the owner (profileMeta present, isOwner true) without hitting the DB', async () => {
+    const db = makeCountDb(5);
+    await expect(
+      assertProfileCreationAllowed(db, 'account-123', { isOwner: true }),
+    ).resolves.toBeUndefined();
+    // Owner short-circuits — no count query needed.
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] denies a non-owner (profileMeta present, isOwner false) with ForbiddenError', async () => {
+    const db = makeCountDb(3);
+    await expect(
+      assertProfileCreationAllowed(db, 'account-123', { isOwner: false }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('allows first-profile creation when profileMeta is absent and the account has 0 profiles', async () => {
+    const db = makeCountDb(0);
+    await expect(
+      assertProfileCreationAllowed(db, 'account-123', undefined),
+    ).resolves.toBeUndefined();
+    // Fail-open only for the genuine first-profile path — count was consulted.
+    expect(db.select).toHaveBeenCalled();
+  });
+
+  it('[BREAK][BUG-407] fails closed: denies when profileMeta is absent but the account already has profiles', async () => {
+    const db = makeCountDb(1);
+    await expect(
+      assertProfileCreationAllowed(db, 'account-123', undefined),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.select).toHaveBeenCalled();
+  });
+
+  it('[BREAK][BUG-407] fails closed for any non-zero count when meta is absent', async () => {
+    const db = makeCountDb(7);
+    await expect(
+      assertProfileCreationAllowed(db, 'account-123', undefined),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 

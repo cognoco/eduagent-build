@@ -59,42 +59,36 @@ const ALLOWED_UNREGISTERED_PREFIXES: string[] = [
 ];
 
 /**
- * [BUG-760] Known-pending orphan event names captured at the time the ratchet
- * was introduced. Forward-only — this set freezes the current legacy state so
- * the test is stable today; ANY new orphan event name fails CI immediately.
+ * [BUG-760] Known-pending orphan event names. Forward-only — ANY new orphan
+ * event name not in this set fails CI immediately. DO NOT add to this list.
  *
- * Each entry here represents a telemetry/observability event that is fired
- * into Inngest with no registered handler. Their dispatches succeed (Inngest
- * stores the event) and they remain queryable via the Inngest dashboard, but
- * no function runs in response. That's the original intent for most of these
- * (lightweight ops markers, no downstream action needed), but a few of them
- * may indicate genuinely missing handlers — those should be triaged and
- * either:
- *   (a) given a handler (then remove from this list — the ratchet will hold),
- *   (b) replaced with a structured log + metric (then remove from this list +
- *       delete the dispatch site), or
- *   (c) explicitly opted out at the call site with `// orphan-allow: <reason>`
- *       and removed from this list.
+ * Triage history: the original baseline held 15 entries. 14 were resolved by
+ * adding a `// orphan-allow: <reason>` comment at the dispatch site once each
+ * was confirmed to be a genuine observability-only marker (structured-telemetry
+ * signals paired with logger.warn + captureException to satisfy CLAUDE.md's
+ * "silent recovery must emit a structured signal" rule, or — for
+ * app/filing.retry_completed — an event with a real `step.waitForEvent`
+ * consumer the scanner cannot see because it only harvests
+ * inngest.createFunction triggers). See the dispatch sites for per-event
+ * rationale.
  *
- * DO NOT add to this list. New orphans must fail CI.
+ * The 1 entry that remains is NOT acceptable steady state — it is tracked
+ * pending, annotated below with WHY no handler exists yet and what the
+ * eventual handler should do:
+ *
+ *   - app/billing.alias_received — dispatched from
+ *     services/billing/revenuecat-webhook-handler.ts when a RevenueCat
+ *     SUBSCRIBER_ALIAS arrives and the transferred_from identity still has an
+ *     active subscription (revenue-loss scenario). It is already escalated via
+ *     captureException(severity:'high'), so alerting is NOT silent. The MISSING
+ *     piece is an automated *remediation* handler that merges/transfers the two
+ *     subscriptions. That requires a product decision (which sub wins, refund
+ *     handling, proration) + a migration worker, so it is genuinely out of
+ *     scope for this triage. Left pending until the subscription-merge workflow
+ *     is specced. Do NOT orphan-allow it — its pending state is the signal that
+ *     a handler is still owed.
  */
-const KNOWN_PENDING_ORPHANS = new Set<string>([
-  'app/account.reclaim_attempt',
-  'app/account.trial_missing_repair_attempted',
-  'app/billing.activate_checkout.divergent_sub',
-  'app/billing.alias_received',
-  'app/billing.ownership.mismatch',
-  'app/filing.retry_completed',
-  'app/idempotency.assistant_turn_lookup_failed',
-  'app/idempotency.mark_failed',
-  'app/idempotency.preflight_lookup_failed',
-  'app/profile.no_owner_resolved',
-  'app/resend-webhook.dedup_db_missing',
-  'app/resend-webhook.dedup_db_unavailable',
-  'app/resend-webhook.dedup_kv_missing',
-  'app/resend-webhook.dedup_lookup_failed',
-  'app/resend-webhook.dedup_prewrite_failed',
-]);
+const KNOWN_PENDING_ORPHANS = new Set<string>(['app/billing.alias_received']);
 
 function shouldScanFile(absPath: string): boolean {
   const rel = path.relative(REPO_ROOT, absPath).replace(/\\/g, '/');

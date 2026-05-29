@@ -385,6 +385,11 @@ export const resendWebhookRoute = new Hono<{
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // recovery must emit a structured signal). The DB-dedup outage
+            // recovers in-line (falls back to KV) + escalates via logger.warn.
+            // The event is a dashboard-queryable signal for how often the weaker
+            // KV path is used — no remediation handler is needed.
             name: 'app/resend-webhook.dedup_db_unavailable',
             data: { webhookId, timestamp: new Date().toISOString() },
           }),
@@ -404,6 +409,11 @@ export const resendWebhookRoute = new Hono<{
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: structured telemetry required by CLAUDE.md (silent
+          // recovery must emit a structured signal). Missing DB binding in a
+          // deployed env means the atomic dedup gate is off — escalated via
+          // logger.warn. The event is a dashboard-queryable misconfiguration
+          // alarm; remediation is a deploy/config fix, not an Inngest handler.
           name: 'app/resend-webhook.dedup_db_missing',
           data: {
             environment: c.env.ENVIRONMENT,
@@ -432,6 +442,11 @@ export const resendWebhookRoute = new Hono<{
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // recovery must emit a structured signal). KV read failure recovers
+            // in-line (allows the request) + escalates via logger.warn +
+            // captureException(Sentry). The event is a dashboard-queryable
+            // failure-rate signal — no remediation handler is needed.
             name: 'app/resend-webhook.dedup_lookup_failed',
             data: {
               webhookId,
@@ -483,6 +498,11 @@ export const resendWebhookRoute = new Hono<{
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: structured telemetry required by CLAUDE.md (silent
+            // recovery must emit a structured signal). Dedup pre-write failure
+            // recovers in-line (continues with weakened protection) + escalates
+            // via logger.warn + captureException(Sentry). The event is a
+            // dashboard-queryable failure-rate signal — no handler is needed.
             name: 'app/resend-webhook.dedup_prewrite_failed',
             data: {
               webhookId,
@@ -508,6 +528,11 @@ export const resendWebhookRoute = new Hono<{
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: structured telemetry required by CLAUDE.md (silent
+          // recovery must emit a structured signal). Missing IDEMPOTENCY_KV
+          // binding in a deployed env disables svix-id replay protection —
+          // escalated via logger.warn. The event is a dashboard-queryable
+          // misconfiguration alarm; remediation is a deploy/config fix.
           name: 'app/resend-webhook.dedup_kv_missing',
           data: {
             environment: c.env.ENVIRONMENT,

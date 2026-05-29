@@ -47,6 +47,28 @@ pnpm eval:llm -- --flow dictation-generate --profile 06yo-fairytales
 doppler run -- pnpm eval:llm -- --live
 ```
 
+## Signal-distribution baseline (Layer 1 drift guard)
+
+The harness can detect *aggregate envelope-signal drift* — e.g. the model
+silently dropping valid JSON, or `partial_progress` collapsing from 20% to 2%
+after a prompt tweak. It does this by histogramming the live envelope
+responses of the `emitsEnvelope` flows (`exchanges`, `probes`) and comparing
+them to a checked-in `baseline.json`.
+
+| Command | LLM calls? | Deterministic? | Use |
+|---|---|---|---|
+| `pnpm eval:llm -- --validate-baseline` | **No** | **Yes** | CI/PR guard: fails if `baseline.json` is a placebo (`flows: {}` / `n=0`). No Doppler, no credits. |
+| `doppler run -- pnpm eval:llm -- --live --update-baseline` | Yes | No | **One-time seed / intentional re-baseline.** Writes real metrics to `baseline.json`; commit after. |
+| `doppler run -- pnpm eval:llm -- --live --check-baseline` | Yes | No | Compare a live run against the committed baseline; exits 1 on drift > tolerance (default 5pp). Run manually / on a schedule, never on every PR (it burns credits and is noisy by nature). |
+
+> **Why the split.** `--check-baseline` needs live, non-deterministic LLM
+> output, so it cannot run key-free on every PR without flakiness. The
+> deterministic `--validate-baseline` is the part CI *can* run on every PR: it
+> guarantees the committed baseline is real (not the empty stub that silently
+> hides drift). **`baseline.json` must be seeded once** with
+> `--live --update-baseline` against staging keys before `--validate-baseline`
+> will pass; until then it intentionally fails to flag the missing baseline.
+
 Snapshots land in `apps/api/eval-llm/snapshots/<flow-id>/<profile-id>.md`.
 
 ## Focused Live Gates

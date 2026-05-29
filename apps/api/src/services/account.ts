@@ -105,6 +105,11 @@ export async function findOrCreateAccount(
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: observability-only marker. Recovery is in-line (trial
+            // provisioned below); escalation already happens via logger.warn +
+            // (on failure) captureException. The Inngest event exists purely so
+            // ops can query repair-attempt frequency in the dashboard — no
+            // downstream handler is needed or intended.
             name: 'app/account.trial_missing_repair_attempted',
             data: {
               accountId: existing.id,
@@ -194,6 +199,13 @@ export async function findOrCreateAccount(
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: observability-only marker. The reclaim attempt is
+            // already BLOCKED in-line (ConflictError thrown below) and escalated
+            // via logger.warn + captureException(Sentry). The Inngest event is a
+            // queryable audit signal for the (future, out-of-band) reclaim flow;
+            // it intentionally has no automated handler — a real reclaim
+            // workflow requires email verification + confirmation tokens
+            // (TODO BUG-411 above) and is out of scope here.
             name: 'app/account.reclaim_attempt',
             data: {
               incomingClerkUserId: clerkUserId,
