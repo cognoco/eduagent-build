@@ -204,3 +204,59 @@ describe('createAnthropicProvider — data.error preserves cause', () => {
     );
   });
 });
+
+describe('createAnthropicProvider — HTTP status preservation', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('preserves HTTP status on non-2xx response errors', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      text: () => Promise.resolve('Forbidden'),
+    } as unknown as Response);
+
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+
+    let caughtError: unknown;
+    try {
+      await provider.chat(messages, baseConfig);
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error & { status?: number }).status).toBe(403);
+    expect((caughtError as Error & { statusCode?: number }).statusCode).toBe(
+      403,
+    );
+  });
+
+  it('preserves HTTP status on non-2xx stream response errors', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve('Bad request'),
+    } as unknown as Response);
+
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+
+    let caughtError: unknown;
+    try {
+      for await (const _chunk of provider.chatStream(messages, baseConfig)) {
+        // consume stream
+      }
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error & { status?: number }).status).toBe(400);
+    expect((caughtError as Error & { statusCode?: number }).statusCode).toBe(
+      400,
+    );
+  });
+});

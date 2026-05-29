@@ -184,6 +184,26 @@ describe('Gemini Provider', () => {
       ).rejects.toThrow('Gemini API request failed (429)');
     });
 
+    it('preserves HTTP status on non-200 response errors', async () => {
+      fetchSpy.mockResolvedValue(new Response('Forbidden', { status: 403 }));
+
+      let caughtError: unknown;
+      try {
+        await provider.chat(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG,
+        );
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error & { status?: number }).status).toBe(403);
+      expect((caughtError as Error & { statusCode?: number }).statusCode).toBe(
+        403,
+      );
+    });
+
     it('throws on empty response candidates', async () => {
       fetchSpy.mockResolvedValue(mockFetchResponse({ candidates: [] }));
 
@@ -426,6 +446,28 @@ describe('Gemini Provider', () => {
           // consume stream
         }
       }).rejects.toThrow('Gemini API stream failed (500)');
+    });
+
+    it('preserves HTTP status on non-200 stream response errors', async () => {
+      fetchSpy.mockResolvedValue(new Response('Bad request', { status: 400 }));
+
+      let caughtError: unknown;
+      try {
+        for await (const _ of provider.chatStream(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG,
+        )) {
+          // consume stream
+        }
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error & { status?: number }).status).toBe(400);
+      expect((caughtError as Error & { statusCode?: number }).statusCode).toBe(
+        400,
+      );
     });
 
     it('skips malformed SSE chunks gracefully', async () => {
