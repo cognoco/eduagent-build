@@ -31,13 +31,6 @@ jest.mock('../../lib/session-recovery', () => ({ // gc1-allow: uses Expo SecureS
     mockWriteRecoveryMarker(...args),
 }));
 
-// Mock format-api-error
-// prettier-ignore
-jest.mock('../../lib/format-api-error', () => ({ // gc1-allow: depends on i18next instance requiring full i18n init outside this hook test
-  formatApiError: (err: unknown) =>
-    err instanceof Error ? err.message : 'Unknown error',
-}));
-
 // Mock homework problem-cards
 jest.mock('../homework/problem-cards', () => ({
   ...jest.requireActual('../homework/problem-cards'),

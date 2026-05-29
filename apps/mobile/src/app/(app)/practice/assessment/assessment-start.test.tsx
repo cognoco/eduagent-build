@@ -57,15 +57,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../../lib/format-api-error' /* gc1-allow: pure formatter with no RN dependency, stubbed for clarity */,
-  () => ({
-    ...jest.requireActual('../../../../lib/format-api-error'),
-    formatApiError: (err: unknown) =>
-      err instanceof Error ? err.message : 'Unknown error',
-  }),
-);
-
-jest.mock(
   '../../../../lib/haptics' /* gc1-allow: wraps native Haptics module unavailable in JSDOM */,
   () => ({
     hapticSuccess: jest.fn(),
