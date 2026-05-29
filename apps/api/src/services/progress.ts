@@ -158,7 +158,15 @@ export async function getSubjectProgress(
     };
   }
 
-  // Get all topics for this curriculum
+  // Get all topics for this curriculum.
+  // [FCR-2026-05-23-L3.L3.4] No explicit profileId filter is needed here
+  // because ownership is enforced transitively: curriculumTopics belong to
+  // a curriculum, which belongs to a subject, which is profileId-scoped.
+  // The call to findOwnedCurriculumTopics below re-joins through that parent
+  // chain (curriculumTopics → curriculumBooks → curricula → subjects) and
+  // applies eq(subjects.profileId, profileId) in the WHERE clause — any topic
+  // that does not transitively belong to the caller's subject is filtered out.
+  // The initial unscoped fetch is therefore safe and intentional.
   const topics = await db.query.curriculumTopics.findMany({
     where: and(
       eq(curriculumTopics.curriculumId, curriculum.id),

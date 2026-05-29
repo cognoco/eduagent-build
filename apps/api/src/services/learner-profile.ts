@@ -1756,7 +1756,11 @@ export async function analyzeSessionTranscript(
   ];
 
   // conversationLanguage not threaded: output is JSON session-analysis inference
-  const result = await routeAndCall(messages, 1, {});
+  // [FCR-2026-05-23-L15.LOW3] flow label added so stop-reason telemetry can
+  // distinguish learner-profile truncations from other unlabeled call sites.
+  const result = await routeAndCall(messages, 1, {
+    flow: 'learner-profile-analysis',
+  });
   if (!result.response) return null;
 
   try {

@@ -1927,6 +1927,38 @@ describe('getSubjectProgress — profile isolation', () => {
 
     expect(createScopedRepository).toHaveBeenCalledWith(db, callerProfileId);
   });
+
+  it('[FCR-2026-05-23-L3.L3.4 break] excludes topics that do not belong to the caller profile via findOwnedCurriculumTopics', async () => {
+    // Break test for FCR-2026-05-23-L3.L3.4: the initial curriculumTopics.findMany
+    // fetches all topics for the curriculum without a profileId filter.
+    // Ownership is enforced transitively by findOwnedCurriculumTopics, which
+    // joins through subjects.profileId. This test verifies that when
+    // findOwnedCurriculumTopics returns zero owned topics (simulating a caller
+    // whose profileId does not match any topic's subject owner), the service
+    // reports zero topics — not the raw count from the unscoped fetch.
+    //
+    // Red-green proof:
+    //   RED  — if findOwnedCurriculumTopics is bypassed (ownedTopicRows defaults
+    //          to the raw topic list), topicsTotal would be 2, not 0.
+    //   GREEN — with ownedTopicRows: [] the scoped filter returns no owned topics
+    //           and topicsTotal is 0.
+    setupScopedRepo({ subjectFindFirst: mockSubjectRow() });
+    const topic1 = mockTopicRow({ id: 'topic-a' });
+    const topic2 = mockTopicRow({ id: 'topic-b' });
+    const db = createMockDb({
+      curriculumFindFirst: { id: curriculumId, subjectId },
+      topicsFindMany: [topic1, topic2],
+      // Simulate findOwnedCurriculumTopics returning nothing for this profile.
+      ownedTopicRows: [],
+    });
+
+    const result = await getSubjectProgress(db, profileId, subjectId);
+
+    // Must report zero topics — not 2 — because the caller owns none of them.
+    expect(result).not.toBeNull();
+    expect(result!.topicsTotal).toBe(0);
+    expect(result!.topicsCompleted).toBe(0);
+  });
 });
 
 describe('getOverallProgress — profile isolation', () => {
