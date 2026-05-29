@@ -30,6 +30,11 @@ export const topicNotes = pgTable(
   },
   (t) => [
     index('topic_notes_topic_profile_idx').on(t.topicId, t.profileId),
+    // [BUG-393 / migration 0086] Standalone profile_id FK index. NOT covered by
+    // topic_notes_topic_profile_idx (profile_id is the second column there).
+    // Created in the database by migration 0086_bug393_fk_indexes.sql; declared
+    // here to keep the schema in sync with the applied migration.
+    index('topic_notes_profile_id_idx').on(t.profileId),
     // Idempotency lookup in services/notes.ts insertNoteWithCap scans
     // (profileId, sessionId) on retry. Without this index the query is a
     // sequential scan within profile scope — fine while the per-topic note
