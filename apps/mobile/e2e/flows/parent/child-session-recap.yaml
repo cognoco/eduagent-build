@@ -29,9 +29,16 @@ tags:
     env:
       SEED_SCENARIO: "parent-session-with-recap"
 
-# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Parent owners with defaultAppContext='family' land on parent-home-screen
+#    after the nav contract resolves. open-family-dashboard.yaml is NOT used
+#    here because it taps parent-home-check-child-* itself (navigating to child
+#    detail) — a second tap below would double-navigate past child detail
+#    (BUG-70 pattern). Wait for parent-home-screen to settle instead, matching
+#    child-drill-down.yaml.
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 20000
 
 # 3. Tap primary action on the seeded child card
 - tapOn:

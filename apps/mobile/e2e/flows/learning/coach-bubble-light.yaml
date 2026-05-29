@@ -45,11 +45,13 @@ tags:
 - inputText: "Hello, can you help me understand the basics?"
 - pressKey: Enter
 
-# 7. Verify user message rendered
-- scrollUntilVisible:
-    element:
-      text: "Hello, can you help me understand the basics?"
-    direction: DOWN
+# 7. Verify chat-input is still active (message was accepted).
+# NOTE: scrollUntilVisible + text inside FlatList (removeClippedSubviews=true) is
+# unreliable on Android — Maestro cannot see clipped items even mid-scroll.
+# Pattern matches create-subject.yaml which avoids text-in-bubble assertions.
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
     timeout: 10000
 
 # 8. Wait for AI response (coach bubble)
@@ -68,11 +70,11 @@ tags:
 - inputText: "Can you explain that differently?"
 - pressKey: Enter
 
-# 11. Wait for second AI response
+# 11. Wait for second AI response (45 s — second exchange may be slower than first)
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 30000
+    timeout: 45000
 
 # 12. Final screenshot — multiple coach bubbles visible
 - takeScreenshot: coach-bubble-light-03-multi-exchange

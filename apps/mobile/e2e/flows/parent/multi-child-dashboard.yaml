@@ -20,16 +20,22 @@ tags:
       SEED_SCENARIO: 'parent-multi-child'
       API_URL: ${API_URL}
 
-# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Parent owners with defaultAppContext='family' land directly on parent-home-screen.
+#    open-family-dashboard.yaml is NOT used here because it navigates to a child detail
+#    screen via CHILD_PROFILE_ID (not set by parent-multi-child seed), causing
+#    double-navigation when this flow then asserts and taps child cards on the home screen.
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 15000
 
 # ── Visual integrity: parent home screen ───────────────────────────────
 - assertVisible:
     id: 'parent-home-screen'
 
+# home.parent.tonight.titleEvening = "Conversation starters" (en.json:166)
 - assertVisible:
-    text: 'Tonight'
+    text: 'Conversation starters'
 
 - assertVisible:
     text: 'Children'

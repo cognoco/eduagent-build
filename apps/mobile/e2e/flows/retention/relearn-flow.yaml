@@ -116,12 +116,15 @@ tags:
       id: "topic-detail-scroll"
     timeout: 10000
 
-# 13. Verify "Needs attention" indicator (3+ failures marker).
+# 13. Verify "practiced often" hint indicator (failureCount >= 3 marker).
 # The failed-recall-3x seed explicitly sets failureCount=3 for "Chemistry
 # Topic 1", which is above the threshold — this assertion is a contract gate
 # on the failed-recall scenario, not a probabilistic check.
+# testID updated 2026-05-29: "Needs attention" copy removed; topic detail now
+# renders t('library.topic.practicedOftenHint') with testID="topic-practiced-often-hint"
+# ([topicId].tsx:782). Old text selector: "Needs attention" (no longer in source).
 - assertVisible:
-    text: "Needs attention"
+    id: "topic-practiced-often-hint"
 
 # 14. Verify the study CTA is present
 - assertVisible:

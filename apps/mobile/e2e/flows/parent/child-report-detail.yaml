@@ -11,8 +11,15 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# open-family-dashboard.yaml is NOT used here: it taps parent-home-check-child-*
+# itself (navigating to child detail), and a second tap below would be a
+# double-navigation (double router.push past child detail — BUG-70 pattern).
+# Wait for parent-home-screen to settle after sign-in instead, then drive
+# the navigation from the dashboard directly (same pattern as child-drill-down.yaml).
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 20000
 
 - tapOn:
     id: "parent-home-check-child-${CHILD_PROFILE_ID}"

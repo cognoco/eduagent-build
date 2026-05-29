@@ -27,9 +27,14 @@ tags:
       SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
-# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Parent owners with defaultAppContext='family' land directly on
+#    parent-home-screen after sign-in (seed sets defaultAppContext='family').
+#    open-family-dashboard.yaml is NOT used here because it navigates all the
+#    way to child detail; this flow drives that navigation itself at step 5.
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 15000
 
 # 3. Verify a child summary card rendered.
 #    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard testID on ParentHomeScreen.

@@ -39,9 +39,18 @@ tags:
       SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
-# Parent home renders first; wait for the Recaps tab to be present in the
-# V1 guardian shape. If MODE_NAV_V1_ENABLED is off this fails loudly — which
-# is the intended signal that V0 mode does not expose this entry surface.
+# Wait for parent-home-screen first — the family navigation contract must
+# resolve (defaultAppContext='family' seed) before the V1 guardian tab bar
+# (with tab-recaps) is rendered. Without this wait, tab-recaps is not in the
+# hierarchy yet because the app is still on learner-screen.
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 15000
+
+# Recaps tab is now in the V1 guardian shape. If MODE_NAV_V1_ENABLED is off
+# this fails loudly — which is the intended signal that V0 mode does not
+# expose this entry surface.
 - extendedWaitUntil:
     visible:
       id: 'tab-recaps'

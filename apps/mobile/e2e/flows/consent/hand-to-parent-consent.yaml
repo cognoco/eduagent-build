@@ -24,7 +24,14 @@ tags:
 # SIGN IN with seeded pre-profile credentials
 # ============================================================
 
-# 1. Wait for sign-in screen
+# 1. Walk the welcome flow to sign-in.
+# Post 2026-05-27 welcome refactor: pm clear wipes preAuthIntroSeen.v1 so the
+# app always opens on welcome-chooser, not sign-in. Walk chooser → cards →
+# bridge → sign-in before waiting for sign-in-button.
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
+# 2. Wait for sign-in screen
 - extendedWaitUntil:
     visible:
       id: "sign-in-button"

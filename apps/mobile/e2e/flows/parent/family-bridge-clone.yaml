@@ -25,8 +25,15 @@ tags:
       SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# Wait for parent-home-screen once the family navigation contract resolves
+# (defaultAppContext='family' seed). open-family-dashboard.yaml is NOT used
+# here because it navigates all the way to child detail (tapOn child card +
+# wait for "Sessions"); this flow drives that navigation itself below —
+# using it would double-navigate past child detail (double router.push bug).
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 15000
 
 - tapOn:
     id: 'parent-home-check-child-${CHILD_PROFILE_ID}'

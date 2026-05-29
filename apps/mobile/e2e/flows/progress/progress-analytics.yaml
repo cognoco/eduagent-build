@@ -1,7 +1,7 @@
-# Progress analytics - index, subject detail, recent sessions expansion
+# Progress analytics - home subject tile → subject detail, then progress index recent-sessions expansion
 # Tags: nightly, progress
 # Seed: learning-active
-# Covers: progress index rendering, subject drill-down, recent sessions list
+# Covers: home-subject-card → progress/[subjectId] drill-down, progress-subject-bar, recent sessions list
 # Usage: ./scripts/seed-and-run.sh learning-active flows/progress/progress-analytics.yaml
 appId: com.mentomate.app
 tags:
@@ -11,18 +11,26 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-- tapOn:
-    id: "tab-progress"
-
+# journey-subject-${SUBJECT_ID} was removed in the progress-screen refactor
+# (d8b288011). Solo learners no longer have a subject list on the progress
+# tab index; the subject detail page is reached via the home-screen subject
+# tile (home-subject-card-${SUBJECT_ID} in LearnerScreen.tsx:638 →
+# progress/[subjectId]).
 - extendedWaitUntil:
     visible:
-      id: "journey-subject-${SUBJECT_ID}"
-    timeout: 15000
+      id: "learner-screen"
+    timeout: 10000
 
-- takeScreenshot: 01-progress-index
+- scrollUntilVisible:
+    element:
+      id: "home-subject-card-${SUBJECT_ID}"
+    direction: RIGHT
+    timeout: 10000
+
+- takeScreenshot: 01-home-subject-tile
 
 - tapOn:
-    id: "journey-subject-${SUBJECT_ID}"
+    id: "home-subject-card-${SUBJECT_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -36,6 +44,15 @@ tags:
 
 - tapOn:
     id: "progress-subject-back"
+
+# Now on progress index. Verify stats and sessions expansion.
+- tapOn:
+    id: "tab-progress"
+
+- extendedWaitUntil:
+    visible:
+      id: "progress-screen"
+    timeout: 10000
 
 - scrollUntilVisible:
     element:

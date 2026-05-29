@@ -53,10 +53,13 @@ tags:
 - inputText: "World"
 
 # 5. Wait past 300ms debounce + server round-trip.
-#    The seeded subject "World History" should remain in visibleSubjects.
+#    The seeded subject "World History" should appear in search results.
+#    When isSearching=true, shelves-list is unmounted and LibrarySearchResults
+#    renders each subject ShelfRow with testID="search-subject-row-${id}"
+#    (not shelf-row-header-${id}).  Source: LibrarySearchResults.tsx:414.
 - extendedWaitUntil:
     visible:
-      id: "shelf-row-header-${SUBJECT_ID}"
+      id: "search-subject-row-${SUBJECT_ID}"
     timeout: 5000
 
 - takeScreenshot: search-02-results-visible
@@ -68,7 +71,7 @@ tags:
 
 # 7. Verify the matching shelf is still present (search did not hide it)
 - assertVisible:
-    id: "shelf-row-header-${SUBJECT_ID}"
+    id: "search-subject-row-${SUBJECT_ID}"
 
 # 8. Clear the search using the X button in the search bar
 - tapOn:

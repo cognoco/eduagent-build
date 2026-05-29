@@ -20,6 +20,12 @@ tags:
 # ============================================================
 # SIGN IN (pre-profile: Clerk user + account, no profile)
 # ============================================================
+# Post 2026-05-27 welcome refactor: pm clear wipes preAuthIntroSeen.v1 so the
+# app always opens on welcome-chooser, not sign-in. Walk chooser → cards →
+# bridge → sign-in before waiting for sign-in-button.
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 - extendedWaitUntil:
     visible:
       id: "sign-in-button"

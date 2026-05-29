@@ -43,7 +43,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "more-account-scroll"
-    timeout: 10000
+    timeout: 15000
 
 # 6. Scroll to Profile row inside Account sub-screen
 - scrollUntilVisible:

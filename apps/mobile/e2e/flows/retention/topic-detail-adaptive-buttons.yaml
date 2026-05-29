@@ -53,8 +53,36 @@ tags:
     timeout: 10000
     optional: true  # justified: library-loading spinner may already be dismissed before this step runs
 
-# 6. Tap the first topic. learning-active seeds "World History" with 3 topics.
-#    Topic 1 has the session, so it will be in_progress.
+# 6. Navigate into the World History subject shelf, then into its book.
+#    The library tab shows subject-level shelf rows (ShelfRow, testID:
+#    shelf-row-header-${SUBJECT_ID} in ShelfRow.tsx:219) — individual
+#    topics are not visible until the user opens the book.
+#    learning-active seeds one book whose id is BOOK_ID; BookCard testID
+#    is book-card-${BOOK_ID} (BookCard.tsx:54).
+- scrollUntilVisible:
+    element:
+      id: "shelf-row-header-${SUBJECT_ID}"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "shelf-row-header-${SUBJECT_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 10000
+
+- tapOn:
+    id: "book-card-${BOOK_ID}"
+
+- extendedWaitUntil:
+    visible:
+      text: "World History Topic 1"
+    timeout: 10000
+
+# 6b. Tap the first topic. learning-active seeds "World History" with 3 topics.
+#     Topic 1 has the session, so it will be in_progress.
 - tapOn:
     text: "World History Topic 1"
 

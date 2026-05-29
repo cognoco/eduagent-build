@@ -23,20 +23,34 @@ tags:
 - runFlow:
     file: ../_setup/open-family-dashboard.yaml
 
-# 3. Navigate to profiles via More tab
+# 3. Navigate to profiles via More tab.
+#    more-row-profile lives in more/account.tsx (sub-screen), not more/index.tsx.
+#    Path: More tab → more-row-account (More index) → more-account-scroll
+#         → more-row-profile (Account sub-screen) → /profiles
+#    Source: apps/mobile/src/app/(app)/more/index.tsx:151 (more-row-account)
+#            apps/mobile/src/app/(app)/more/account.tsx:74  (more-row-profile)
 - tapOn: "More"
 - extendedWaitUntil:
     visible:
-      text: "More"
-    timeout: 5000
+      id: "more-row-learning-preferences"
+    timeout: 15000
+
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
+    timeout: 10000
 
 - scrollUntilVisible:
     element:
-      text: "Profile"
+      id: "more-row-profile"
     direction: DOWN
     timeout: 10000
 
-- tapOn: "Profile"
+- tapOn:
+    id: "more-row-profile"
 
 # 4. Verify profiles screen
 - extendedWaitUntil:

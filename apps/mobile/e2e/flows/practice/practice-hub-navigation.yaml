@@ -7,7 +7,7 @@
 #
 # testIDs verified against:
 #   - apps/mobile/src/components/home/LearnerScreen.tsx (home-action-practice)
-#   - apps/mobile/src/app/(app)/practice.tsx
+#   - apps/mobile/src/app/(app)/practice/index.tsx
 #       (practice-screen, practice-review, practice-recitation,
 #        practice-dictation, practice-quiz, practice-quiz-history, practice-back)
 #   - apps/mobile/src/app/(app)/topic/relearn.tsx (relearn-back)
@@ -68,10 +68,21 @@ tags:
     timeout: 5000
 
 # ── Arm 2: Recitation ──
+# practice-recitation is the SECOND card inside the "Other practice" horizontal
+# ScrollView (practice-other-practice-slider, practice/index.tsx:799).
+# Step 1: scroll the outer vertical container DOWN until the slider is visible
+# (practice-dictation is the first card and confirms the slider is in viewport).
+# Step 2: scroll RIGHT inside the slider to bring practice-recitation into view.
+- scrollUntilVisible:
+    element:
+      id: "practice-dictation"
+    direction: DOWN
+    timeout: 5000
+
 - scrollUntilVisible:
     element:
       id: "practice-recitation"
-    direction: DOWN
+    direction: RIGHT
     timeout: 5000
 
 - tapOn:

@@ -29,9 +29,17 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Parent owners land on parent-home-screen once the family navigation
+#    contract resolves (defaultAppContext='family' seed). Wait for it before
+#    tapping the child card.
+#    open-family-dashboard.yaml is NOT used here because it navigates all the
+#    way to child detail (tapOn child card + wait for "Sessions"); this flow
+#    drives that navigation itself in step 3 — using it would double-navigate
+#    past child detail (double router.push bug).
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 15000
 
 # 3. Tap child card (single tap — double-tap causes double navigation).
 #    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard on ParentHomeScreen.

@@ -11,33 +11,36 @@ tags:
 # Sign in
 - runFlow: ../_setup/seed-and-sign-in.yaml
 
-# Navigate to Learn Something New
+# Navigate to freeform chat via "Ask Anything" home action card.
+# The 2026-05-27 refactor removed the "Learn Something New" intermediate screen
+# (intent-learn-new / learn-new-screen / intent-freeform no longer exist).
+# home-ask-anything navigates directly to /(app)/session?mode=freeform.
+# Source: apps/mobile/src/components/home/LearnerScreen.tsx:80,84
+- scrollUntilVisible:
+    element:
+      id: "home-ask-anything"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
-    id: "intent-learn-new"
+    id: "home-ask-anything"
 - extendedWaitUntil:
     visible:
-      id: "learn-new-screen"
-    timeout: 15000
-
-# Start a freeform chat session
-- tapOn:
-    id: "intent-freeform"
-- extendedWaitUntil:
-    visible:
-      id: "session-chat-input"
+      id: "chat-input"
     timeout: 20000
 
 - takeScreenshot: bug236-01-chat-opened
 
 # Type a topic the classifier may not place
+# chat-input testID: apps/mobile/src/components/session/ChatShell.tsx:1044
 - tapOn:
-    id: "session-chat-input"
+    id: "chat-input"
 - inputText: "Tell me about Easter traditions"
 - hideKeyboard
 
 # Send the message — this triggers classification
+# send-button testID: apps/mobile/src/components/session/ChatShell.tsx:1091
 - tapOn:
-    id: "session-send-button"
+    id: "send-button"
 
 # Wait for subject resolution to appear (classifier couldn't auto-match)
 - extendedWaitUntil:
@@ -69,9 +72,10 @@ tags:
 
 # After subject creation, we should land back in the chat session —
 # NOT on the Library screen.
+# chat-input testID: apps/mobile/src/components/session/ChatShell.tsx:1044
 - extendedWaitUntil:
     visible:
-      id: "session-chat-input"
+      id: "chat-input"
     timeout: 30000
 
 - takeScreenshot: bug236-04-back-in-chat

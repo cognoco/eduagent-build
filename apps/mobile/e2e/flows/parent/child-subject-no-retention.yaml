@@ -8,8 +8,8 @@
 #
 # testIDs verified against:
 #   apps/mobile/src/app/(app)/child/[profileId]/subjects/[subjectId].tsx
-#     subject-topics-scroll          (line 150)
-#     subject-retention-badge        (added — only rendered when gating condition passes)
+#     subject-topics-scroll          (line 192)
+#     subject-retention-badge        (line 239 — only rendered when retentionStatus set + totalSessions>=1 + completionStatus!='not_started')
 appId: com.mentomate.app
 tags:
   - nightly
@@ -23,9 +23,14 @@ tags:
     env:
       SEED_SCENARIO: "parent-subject-no-retention"
 
-# 2. Wait for parent dashboard
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Wait for parent home screen (open-family-dashboard.yaml is NOT used here
+#    because it already taps parent-home-check-child-${CHILD_PROFILE_ID} and
+#    waits for child detail — using it then tapping the child card again would
+#    double-navigate and land on the wrong screen).
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 20000
 
 # 3. Tap primary action on the seeded child card
 - tapOn:

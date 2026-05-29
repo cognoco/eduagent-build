@@ -1,7 +1,7 @@
-# Flow: Nudge Rate Limit — 4th Nudge Shows Inline Error
-# Validates: after sending 3 nudges to the same child, the 4th attempt
-# renders the inline rate-limit error copy inside the action sheet
-# instead of sending. No "Nudge sent" alert appears.
+# Flow: Nudge Rate Limit — 5th Nudge Shows Inline Error
+# Validates: after sending 4 nudges to the same child (rate limit = 4),
+# the 5th attempt renders the inline rate-limit error copy inside the
+# action sheet instead of sending. No "Nudge sent" alert appears.
 # Tags: nightly, parent, nudge
 #
 # Journey: UX Journey 4 (Parent Oversight) — Nudge Rate Limit
@@ -9,8 +9,10 @@
 #               (scenario: parent-with-children)
 # Env vars: CHILD_PROFILE_ID (injected by seed)
 #
-# NOTE: The rate limit is 3 nudges per recipient per rolling 24h window.
-# This flow sends 3 successful nudges then attempts a 4th. Each send
+# NOTE: The rate limit is 4 nudges per recipient per rolling 24h window
+# (NUDGE_RATE_LIMIT = 4, apps/api/src/services/nudge.ts:19; condition
+# countRow.count >= 4 at line 123 means 4 sent → 5th is blocked).
+# This flow sends 4 successful nudges then attempts a 5th. Each send
 # requires opening the sheet, picking a template, dismissing the alert,
 # then re-opening the sheet.
 appId: com.mentomate.app
@@ -32,7 +34,7 @@ tags:
       id: "parent-home-screen"
     timeout: 15000
 
-# ── Nudge 1 of 3 ─────────────────────────────────────────────────────
+# ── Nudge 1 of 4 ─────────────────────────────────────────────────────
 - tapOn:
     id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
 - extendedWaitUntil:
@@ -54,7 +56,7 @@ tags:
       id: "parent-home-screen"
     timeout: 5000
 
-# ── Nudge 2 of 3 ─────────────────────────────────────────────────────
+# ── Nudge 2 of 4 ─────────────────────────────────────────────────────
 - tapOn:
     id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
 - extendedWaitUntil:
@@ -76,7 +78,7 @@ tags:
       id: "parent-home-screen"
     timeout: 5000
 
-# ── Nudge 3 of 3 ─────────────────────────────────────────────────────
+# ── Nudge 3 of 4 ─────────────────────────────────────────────────────
 - tapOn:
     id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
 - extendedWaitUntil:
@@ -98,23 +100,47 @@ tags:
       id: "parent-home-screen"
     timeout: 5000
 
-# ── Nudge 4: should be rate-limited ──────────────────────────────────
+# ── Nudge 4 of 4 (last successful one) ───────────────────────────────
 - tapOn:
     id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
 - extendedWaitUntil:
     visible:
       id: "nudge-template-thinking_of_you"
     timeout: 5000
-
-# 3. Screenshot: sheet open before 4th attempt
-- takeScreenshot: nudge-rate-limit-01-sheet-before-4th
-
-# 4. Tap 4th template — should trigger inline error, not success
 - tapOn:
     id: "nudge-template-thinking_of_you"
+- extendedWaitUntil:
+    visible:
+      text: "Nudge sent"
+    timeout: 5000
+    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
+- tapOn:
+    text: "OK"
+    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
+
+# ── Nudge 5: should be rate-limited (count is now 4, limit is 4) ─────
+- tapOn:
+    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "nudge-template-you_got_this"
+    timeout: 5000
+
+# 3. Screenshot: sheet open before 5th attempt
+- takeScreenshot: nudge-rate-limit-01-sheet-before-5th
+
+# 4. Tap template — should trigger inline error, not success
+- tapOn:
+    id: "nudge-template-you_got_this"
 
 # 5. Wait for the inline rate-limit error copy inside the sheet
-#    en.json: "You've sent enough encouragement for now"
+#    en.json nudge.error.rateLimit: "You've sent enough encouragement for now -
+#    {{childName}} will see it next time they open the app."
+#    (apps/mobile/src/i18n/locales/en.json:2253)
 - extendedWaitUntil:
     visible:
       text: "enough encouragement for now"
