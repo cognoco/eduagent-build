@@ -3,7 +3,7 @@
 Consolidated checklist of everything that must be done before MentoMate goes live.
 Items are grouped by category and ordered by priority within each group.
 
-Last updated: 2026-05-23
+Last updated: 2026-05-29
 
 ---
 
@@ -164,6 +164,18 @@ Ref: `docs/superpowers/plans/2026-04-19-pre-launch-ux-fixes.md`
 - [ ] **Sentry monitoring active**
   - Verify `SENTRY_DSN` is set in Doppler `prd`
   - Confirm error events flow to Sentry after a test error
+
+- [ ] **Seed the LLM eval signal baseline** (do this LAST, once prompts are frozen)
+  - The drift guard at `apps/api/eval-llm/baseline.json` is currently an empty stub (`"flows": {}`) — inert until seeded. Seeding earlier is wasted effort: any intentional prompt change re-seeds it, so it's only meaningful once prompt tuning has stopped.
+  - Run once locally (needs live LLM keys via Doppler; only `exchanges` + `probes` emit envelope metrics, so scope to them and raise the call cap above the default 20):
+    `C:/Tools/doppler/doppler.exe run -- pnpm eval:llm -- --live --update-baseline --flow exchanges --flow probes --max-live-calls 60`
+  - Confirm `"flows"` is now populated (not `{}`), then commit `baseline.json`.
+  - Run once more as a sanity check: `... --live --check-baseline` (same flags, swap the verb) — should pass against the just-seeded file.
+  - **Do NOT add `--live --check-baseline` to per-PR CI** — it costs LLM quota, is slow, and flakes on small sample sizes. Per-PR prompt-drift is already guarded for free by Tier-1 `pnpm eval:llm` (snapshot diff, no LLM calls) in `api-quality-gate.yml`. If you want ongoing live-drift coverage after launch, add it as a *nightly scheduled* GitHub Action, never a blocking PR step.
+
+- [ ] **Know the manual-remediation paths for queued-but-unhandled billing events**
+  - `app/billing.alias_received` (RevenueCat subscriber-merge) has **no automated worker by design** — it fires ~0×/month at launch volume. When the `revenuecat.alias.unhandled` Sentry alert fires, reconcile by hand toward the surviving (transferred_to) identity: keep the higher tier (tiebreak latest `currentPeriodEnd`), take the MAX of top-up balances (never sum), reset quota to the more generous cycle, never refund (stores own IAP billing), mark the old record superseded. Full policy lives at the dispatch site: `apps/api/src/services/billing/revenuecat-webhook-handler.ts:517`.
+  - Build an automated worker only if these alerts exceed ~a handful/week.
 
 - [ ] **GDPR compliance**
   - Privacy policy accessible at published URL
