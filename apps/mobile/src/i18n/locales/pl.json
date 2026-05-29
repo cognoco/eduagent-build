@@ -607,24 +607,24 @@
       "changeTopic": "Zmień"
     },
     "messageBubble": {
-      "thinking": "Myśli...",
+      "thinking": "Myślę...",
       "guidedResponse": "Odpowiedź z podpowiedzią",
       "pendingSync": "Wiadomość czeka na synchronizację",
-      "sending": "Wysyłanie...",
+      "sending": "Wysyłanie…",
       "escalation": {
         "stepByStep": "Krok po kroku",
         "letMeShowYou": "Pokażę ci",
         "teachingMode": "Tryb nauki"
       },
       "verificationBadge": {
-        "evaluate": "MYŚL-GŁĘBIEJ ZALICZONE",
-        "teachBack": "POWTÓRKA ZALICZONA"
+        "evaluate": "GŁĘBSZE MYŚLENIE ZALICZONE",
+        "teachBack": "ODPYTYWANIE ZALICZONE"
       }
     },
     "noteInput": {
       "cancel": "Anuluj",
       "save": "Zapisz",
-      "noteText": "Tekst notatki",
+      "noteText": "Treść notatki",
       "startRecording": "Rozpocznij nagrywanie",
       "stopRecording": "Zatrzymaj nagrywanie",
       "listening": "Słucham...",
@@ -712,8 +712,6 @@
       "emptyTitle": "Nie rozegrano jeszcze żadnych rund",
       "emptyMessage": "Spróbuj quizu, aby zobaczyć tutaj swoją historię!",
       "tryQuiz": "Spróbuj quizu",
-      "dateToday": "Dzisiaj",
-      "dateYesterday": "Wczoraj",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "Runda {{label}} — {{theme}} — {{score}} na {{total}}. Otwórz szczegóły.",
       "activityLabels": {
@@ -1251,9 +1249,6 @@
     "pickerEmptyBody": "Najpierw rozpocznij sesję, potem wróć, aby sprawdzić, co zapamiętałeś.",
     "pickerBrowseTopics": "Przeglądaj tematy",
     "pickerStartForTopic": "Rozpocznij sprawdzanie dla {{title}}",
-    "studiedToday": "Uczono się dzisiaj",
-    "studiedYesterday": "Uczono się wczoraj",
-    "studiedDaysAgo": "Uczono się {{count}} dni temu",
     "topicPassedNote": "Dobra robota - ten temat jest oznaczony jako zaliczony, a słabsze miejsca wrócą w powtórce, gdy będą wymagały uwagi.",
     "pickerLoadingBody": "Sprawdzamy, które tematy są gotowe do sprawiedliwego testu.",
     "pickerLoadTimeoutTitle": "Ładowanie tematów do oceny trwa zbyt długo",
@@ -1274,7 +1269,8 @@
     "pickerInProgress": "W toku",
     "qualityRating": "Jakość: {{rating}}/5",
     "depthTransfer": "Zastosowane rozumienie",
-    "depthExplain": "Wyjaśnione własnymi słowami"
+    "depthExplain": "Wyjaśnione własnymi słowami",
+    "studiedWhen": "Uczono się {{when}}"
   },
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",
@@ -1467,10 +1463,6 @@
       "bookmarkLabel": "Zapisana zakładka z {{subject}}",
       "removeBookmark": "Usuń zakładkę",
       "tapToExpand": "Stuknij, aby rozwinąć",
-      "dateToday": "Dzisiaj",
-      "dateYesterday": "Wczoraj",
-      "dateDaysAgo": "{{count}} dni temu",
-      "dateWeeksAgo": "{{count}} tygodni temu",
       "deleteTitle": "Usunąć zakładkę?",
       "deleteMessage": "To zapisane wyjaśnienie zostanie usunięte.",
       "deleteConfirm": "Usuń",
@@ -2547,9 +2539,25 @@
   "profiles": {
     "title": "Profile"
   },
+  "time": {
+    "relative": {
+      "today": "Dzisiaj",
+      "yesterday": "Wczoraj",
+      "daysAgo": "{{count}} dni temu",
+      "lastWeek": "w zeszłym tygodniu",
+      "weeksAgo": "{{count}} tygodni temu"
+    },
+    "duration": {
+      "under1": "<1 min",
+      "minutes": "{{count}} min",
+      "minutesOne": "1 min",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
+      "none": "—"
+    }
+  },
   "feedbackSheet": {
     "title": "Prześlij nam opinię",
-    "shakeHint": "Potrząśnij telefonem, by się z nami skontaktować.",
+    "shakeHint": "Potrząśnij telefonem, aby się z nami skontaktować.",
     "thankYouTitle": "Dziękujemy!",
     "thankYouMessage": "Otrzymaliśmy Twoją opinię i przyjrzymy się jej.",
     "categoryLabel": "Jaki to rodzaj opinii?",

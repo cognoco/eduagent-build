@@ -592,7 +592,7 @@
         "teachingMode": "Modo enseñanza"
       },
       "verificationBadge": {
-        "evaluate": "PIENSA-MÁS-ALLÁ SUPERADO",
+        "evaluate": "PIENSA-A-FONDO SUPERADO",
         "teachBack": "ENSEÑA-DE-VUELTA SUPERADO"
       }
     },
@@ -687,8 +687,6 @@
       "emptyTitle": "Aún no se han jugado rondas",
       "emptyMessage": "¡Prueba un quiz para ver tu historial aquí!",
       "tryQuiz": "Probar un Quiz",
-      "dateToday": "Hoy",
-      "dateYesterday": "Ayer",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "Ronda de {{label}} — {{theme}} — {{score}} de {{total}}. Abrir detalles.",
       "activityLabels": {
@@ -754,7 +752,7 @@
     },
     "guessWhoQuestion": {
       "typeAName": "Escribe un nombre",
-      "answerLabel": "Respuesta de Adivina quién",
+      "answerLabel": "Respuesta de Quién es quién",
       "submitGuess": "Enviar respuesta",
       "submitGuessLabel": "Enviar respuesta",
       "revealNextClue": "Revelar siguiente pista",
@@ -1226,9 +1224,6 @@
     "pickerEmptyBody": "Empieza una sesión primero y luego vuelve a comprobar lo que has retenido.",
     "pickerBrowseTopics": "Explorar temas",
     "pickerStartForTopic": "Iniciar evaluación de {{title}}",
-    "studiedToday": "Estudiado hoy",
-    "studiedYesterday": "Estudiado ayer",
-    "studiedDaysAgo": "Estudiado hace {{count}} días",
     "topicPassedNote": "Buen trabajo: este tema queda marcado como aprobado, y los puntos débiles volverán en el repaso cuando necesiten atención.",
     "pickerLoadingBody": "Estamos comprobando qué temas están listos para una prueba justa.",
     "pickerLoadTimeoutTitle": "Los temas de la evaluación tardan mucho en cargarse",
@@ -1249,7 +1244,8 @@
     "pickerInProgress": "En curso",
     "qualityRating": "Calidad: {{rating}}/5",
     "depthTransfer": "Comprensión aplicada",
-    "depthExplain": "Explicado con las propias palabras"
+    "depthExplain": "Explicado con las propias palabras",
+    "studiedWhen": "Estudiado {{when}}"
   },
   "homework": {
     "permissionTitle": "Se necesita acceso a la cámara",
@@ -1442,10 +1438,6 @@
       "bookmarkLabel": "Marcador guardado de {{subject}}",
       "removeBookmark": "Quitar marcador",
       "tapToExpand": "Toca para expandir",
-      "dateToday": "Hoy",
-      "dateYesterday": "Ayer",
-      "dateDaysAgo": "Hace {{count}} días",
-      "dateWeeksAgo": "Hace {{count}} semanas",
       "deleteTitle": "¿Quitar marcador?",
       "deleteMessage": "Esta explicación guardada será eliminada.",
       "deleteConfirm": "Quitar",
@@ -2547,6 +2539,22 @@
   "profiles": {
     "title": "Perfiles"
   },
+  "time": {
+    "relative": {
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "daysAgo": "Hace {{count}} días",
+      "lastWeek": "la semana pasada",
+      "weeksAgo": "Hace {{count}} semanas"
+    },
+    "duration": {
+      "under1": "<1 min",
+      "minutes": "{{count}} min",
+      "minutesOne": "1 min",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
+      "none": "—"
+    }
+  },
   "feedbackSheet": {
     "title": "Danos tu opinión",
     "shakeHint": "O agita tu teléfono en cualquier momento para contactarnos.",
@@ -2555,9 +2563,9 @@
     "categoryLabel": "¿Qué tipo de comentario?",
     "messageLabel": "Cuéntanos qué pasó",
     "messagePlaceholder": "Describe el problema o tu idea...",
-    "deviceInfoNote": "También incluiremos la versión de la app y la información de tu dispositivo para ayudarnos a investigar.",
-    "sendButton": "Enviar comentarios",
-    "sendButtonLabel": "Enviar comentarios",
+    "deviceInfoNote": "También incluiremos la versión de tu app y la información de tu dispositivo para ayudarnos a investigar.",
+    "sendButton": "Enviar comentario",
+    "sendButtonLabel": "Enviar comentario",
     "cancelButton": "Cancelar",
     "closeLabel": "Cerrar",
     "category": {

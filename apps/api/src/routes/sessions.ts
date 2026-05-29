@@ -33,11 +33,9 @@ import type { Database } from '@eduagent/database';
 import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
 import { idempotencyPreflight } from '../middleware/idempotency';
-import {
-  requireProfileId,
-  type ProfileMeta,
-} from '../middleware/profile-scope';
+import { type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { withProfile } from '../route-utils/route-context';
 import { streamSSEUtf8 } from '../route-utils/sse-utf8';
 import { addBreadcrumb, captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
@@ -181,8 +179,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     idempotencyPreflight({ flow: 'session' }),
   )
   .get('/sessions/resume-nudge', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const nudge = await getResumeNudgeCandidate(db, profileId);
     return c.json({ nudge });
   })
@@ -191,8 +188,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/subjects/:subjectId/sessions',
     zValidator('param', z.object({ subjectId: z.string().uuid() })),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { subjectId } = c.req.valid('param');
       const sessions = await getSubjectSessions(db, profileId, subjectId);
       return c.json(getSubjectSessionsResponseSchema.parse({ sessions }));
@@ -204,10 +200,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', firstCurriculumSessionStartSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
+      const { db, profileId } = withProfile(c);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
-      const profileId = requireProfileId(c.get('profileId'));
       try {
         const session = await startFirstCurriculumSession(
           db,
@@ -237,10 +232,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionStartSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
+      const { db, profileId } = withProfile(c);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
-      const profileId = requireProfileId(c.get('profileId'));
       try {
         const session = await startSession(db, profileId, subjectId, input);
         // [L8-F11] Validate response shape against the public contract.
@@ -262,8 +256,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const session = await getSession(db, profileId, c.req.param('sessionId'));
       if (!session) return notFound(c, 'Session not found');
       return c.json({ session });
@@ -275,8 +268,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const session = await clearContinuationDepth(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
@@ -289,8 +281,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
       const session = await getSession(db, profileId, sessionId);
@@ -361,8 +352,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/library-filing/keep-out',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
       const session = await markSessionKeptOutOfLibrary(
@@ -380,8 +370,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/library-filing/add',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
       const request = await requestSessionLibraryFiling(
@@ -408,8 +397,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/library-filing/restore',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
       const request = await restoreSessionForAutoFiling(
@@ -439,8 +427,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionMessageSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.param('sessionId');
       // [BUG-100 / A1-LOW] Defensive length check in addition to the middleware
@@ -532,8 +519,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/transcript',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const transcript = await getSessionTranscript(
         db,
         profileId,
@@ -549,8 +535,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const sessionId = c.req.param('sessionId');
       const transcript = await getSessionTranscript(db, profileId, sessionId);
       if (!transcript) return notFound(c, 'Session not found');
@@ -623,8 +608,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // (DeepSec Found-In lines 868, 924, 943, 956, 972, 991 — all inside
       // this handler's write paths).
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.param('sessionId');
       const input = c.req.valid('json');
@@ -1187,8 +1171,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // close persists session state + dispatches the completion event
       // (DeepSec Found-In lines 1020, 1056).
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const body = c.req.valid('json');
 
       // [ASSUMP-F5-sweep] Only 'pending' and 'skipped' are valid client-declared
@@ -1259,8 +1242,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', systemPromptIntentSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const intent = c.req.valid('json');
 
       // Server owns the prompt text: recordSystemPrompt resolves the intent to
@@ -1276,8 +1258,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionAnalyticsEventSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const body = c.req.valid('json');
 
       await recordSessionEvent(db, profileId, c.req.param('sessionId'), body);
@@ -1291,8 +1272,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionInputModeSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const session = await setSessionInputMode(
         db,
         profileId,
@@ -1310,8 +1290,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', homeworkStateSyncSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
 
       const result = await syncHomeworkState(
         db,
@@ -1331,8 +1310,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', contentFlagSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const result = await flagContent(
         db,
         profileId,
@@ -1348,8 +1326,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/summary',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const summary = await getSessionSummary(db, profileId, sessionId);
       return c.json({ summary });
@@ -1361,8 +1338,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
       const result = await skipSummary(db, profileId, sessionId);
@@ -1399,8 +1375,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', summarySubmitSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
       // i18n Phase 1 — thread conversation_language to summary evaluation.
@@ -1447,8 +1422,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', interleavedSessionStartSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const input = c.req.valid('json');
 
       try {
@@ -1469,8 +1443,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
       const session = await getSession(db, profileId, sessionId);

@@ -1,15 +1,9 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { type UseQueryResult } from '@tanstack/react-query';
+import type { TopicSession, TopicSessionsResponse } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
-import { assertOk } from '../lib/assert-ok';
-
-export interface TopicSession {
-  id: string;
-  sessionType: string;
-  durationSeconds: number | null;
-  createdAt: string;
-}
+import { queryKeys } from '../lib/query-keys';
+import { useApiQuery } from './use-api-query';
 
 export function useTopicSessions(
   subjectId: string | undefined,
@@ -18,26 +12,17 @@ export function useTopicSessions(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
-    queryKey: ['topic-sessions', subjectId, topicId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
+  return useApiQuery<TopicSessionsResponse, TopicSession[]>({
+    queryKey: queryKeys.topicSessions(subjectId, topicId, activeProfile?.id),
+    enabled: !!subjectId && !!topicId,
+    fetch: (signal) => {
       if (!subjectId || !topicId)
-        throw new Error('subjectId and topicId required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].topics[
-          ':topicId'
-        ].sessions.$get(
-          { param: { subjectId, topicId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { sessions: TopicSession[] };
-        return data.sessions;
-      } finally {
-        cleanup();
-      }
+        throw new Error('subjectId and topicId are required');
+      return client.subjects[':subjectId'].topics[':topicId'].sessions.$get(
+        { param: { subjectId, topicId } },
+        { init: { signal } },
+      );
     },
-    enabled: !!activeProfile && !!subjectId && !!topicId,
+    select: (data) => data.sessions,
   });
 }

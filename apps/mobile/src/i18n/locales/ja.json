@@ -583,17 +583,17 @@
     },
     "messageBubble": {
       "thinking": "考え中",
-      "guidedResponse": "ガイド付きの応答",
+      "guidedResponse": "ガイド付き応答",
       "pendingSync": "メッセージは同期待ちです",
       "sending": "送信中…",
       "escalation": {
         "stepByStep": "ステップバイステップ",
-        "letMeShowYou": "お手本を見せます",
+        "letMeShowYou": "やってみせます",
         "teachingMode": "ティーチングモード"
       },
       "verificationBadge": {
-        "evaluate": "シンクディーパー・クリア",
-        "teachBack": "ティーチバック・クリア"
+        "evaluate": "思考力アップクリア",
+        "teachBack": "ティーチバッククリア"
       }
     },
     "noteInput": {
@@ -610,7 +610,7 @@
       "sendVoiceMessage": "音声メッセージを送信",
       "reRecord": "再録音",
       "discardRecording": "録音を破棄",
-      "transcriptLabel": "音声の文字起こし — タップして編集",
+      "transcriptLabel": "音声テキスト - タップして編集",
       "startRecording": "録音開始",
       "stopRecording": "録音停止"
     }
@@ -687,8 +687,6 @@
       "emptyTitle": "まだラウンドがプレイされていません",
       "emptyMessage": "クイズを試して、ここに履歴を表示しましょう！",
       "tryQuiz": "クイズを試す",
-      "dateToday": "今日",
-      "dateYesterday": "昨日",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "{{label}}ラウンド — {{theme}} — {{total}}問中{{score}}問正解。詳細を開く。",
       "activityLabels": {
@@ -754,12 +752,12 @@
     },
     "guessWhoQuestion": {
       "typeAName": "名前を入力",
-      "answerLabel": "人物当ての答え",
+      "answerLabel": "だれでしょう？の答え",
       "submitGuess": "回答を送信",
       "submitGuessLabel": "回答を送信",
       "revealNextClue": "次のヒントを見る",
       "revealNextClueLabel": "次のヒントを見る",
-      "iDontKnow": "わからない",
+      "iDontKnow": "わかりません",
       "iDontKnowLabel": "答えがわかりません"
     }
   },
@@ -1226,9 +1224,6 @@
     "pickerEmptyBody": "まずセッションを始めてから、身についたかを確認に戻ってきてください。",
     "pickerBrowseTopics": "トピックを見る",
     "pickerStartForTopic": "{{title}} の確認を開始",
-    "studiedToday": "今日学習",
-    "studiedYesterday": "昨日学習",
-    "studiedDaysAgo": "{{count}}日前に学習",
     "topicPassedNote": "よくできました。このトピックは合格として記録され、弱いところは必要なタイミングで復習に戻ってきます。",
     "pickerLoadingBody": "適切なテストを実施できるトピックを確認しています。",
     "pickerLoadTimeoutTitle": "アセスメントのトピックの読み込みに時間がかかりすぎています",
@@ -1249,7 +1244,8 @@
     "pickerInProgress": "進行中",
     "qualityRating": "品質: {{rating}}/5",
     "depthTransfer": "応用した理解",
-    "depthExplain": "自分の言葉で説明した"
+    "depthExplain": "自分の言葉で説明した",
+    "studiedWhen": "{{when}}に学習"
   },
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",
@@ -1442,10 +1438,6 @@
       "bookmarkLabel": "{{subject}}から保存したブックマーク",
       "removeBookmark": "ブックマークを削除",
       "tapToExpand": "タップして展開",
-      "dateToday": "今日",
-      "dateYesterday": "昨日",
-      "dateDaysAgo": "{{count}}日前",
-      "dateWeeksAgo": "{{count}}週間前",
       "deleteTitle": "ブックマークを削除しますか？",
       "deleteMessage": "この保存された説明は削除されます。",
       "deleteConfirm": "削除",
@@ -2547,14 +2539,30 @@
   "profiles": {
     "title": "プロフィール"
   },
+  "time": {
+    "relative": {
+      "today": "今日",
+      "yesterday": "昨日",
+      "daysAgo": "{{count}}日前",
+      "lastWeek": "先週",
+      "weeksAgo": "{{count}}週間前"
+    },
+    "duration": {
+      "under1": "1分未満",
+      "minutes": "{{count}}分",
+      "minutesOne": "1分",
+      "hoursMinutes": "{{hours}}時間{{minutes}}分",
+      "none": "—"
+    }
+  },
   "feedbackSheet": {
     "title": "フィードバックを送信",
-    "shakeHint": "または、いつでもスマホをシェイクしてお問い合わせください。",
+    "shakeHint": "または、いつでもスマホを振ってご連絡ください。",
     "thankYouTitle": "ありがとうございます！",
     "thankYouMessage": "フィードバックを受け取りました。内容を確認いたします。",
     "categoryLabel": "フィードバックの種類は？",
     "messageLabel": "何が起きましたか？",
-    "messagePlaceholder": "問題やアイデアについてご記入ください...",
+    "messagePlaceholder": "問題やアイデアについてご記入ください…",
     "deviceInfoNote": "調査のため、アプリのバージョンとデバイス情報も送信されます。",
     "sendButton": "フィードバックを送信",
     "sendButtonLabel": "フィードバックを送信",

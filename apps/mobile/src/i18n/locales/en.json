@@ -1,4 +1,20 @@
 {
+  "time": {
+    "relative": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "daysAgo": "{{count}} days ago",
+      "lastWeek": "last week",
+      "weeksAgo": "{{count}} weeks ago"
+    },
+    "duration": {
+      "under1": "<1 min",
+      "minutes": "{{count}} min",
+      "minutesOne": "1 min",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
+      "none": "—"
+    }
+  },
   "common": {
     "cancel": "Cancel",
     "ok": "OK",
@@ -749,8 +765,6 @@
       "emptyTitle": "No rounds played yet",
       "emptyMessage": "Try a quiz to see your history here!",
       "tryQuiz": "Try a Quiz",
-      "dateToday": "Today",
-      "dateYesterday": "Yesterday",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "{{label}} round — {{theme}} — {{score}} out of {{total}}. Open details.",
       "activityLabels": {
@@ -1320,9 +1334,7 @@
     "pickerStartForTopic": "Start assessment for {{title}}",
     "pickerContinueForTopic": "Continue assessment for {{title}}",
     "pickerInProgress": "In progress",
-    "studiedToday": "Studied today",
-    "studiedYesterday": "Studied yesterday",
-    "studiedDaysAgo": "Studied {{count}} days ago",
+    "studiedWhen": "Studied {{when}}",
     "topicPassedNote": "Nice work - this topic is marked as passed, and weak spots will come back through review when they need attention.",
     "qualityRating": "Quality: {{rating}}/5",
     "depthTransfer": "Applied understanding",
@@ -1559,10 +1571,6 @@
       "bookmarkLabel": "Saved bookmark from {{subject}}",
       "removeBookmark": "Remove bookmark",
       "tapToExpand": "Tap to expand",
-      "dateToday": "Today",
-      "dateYesterday": "Yesterday",
-      "dateDaysAgo": "{{count}} days ago",
-      "dateWeeksAgo": "{{count}} weeks ago",
       "deleteTitle": "Remove bookmark?",
       "deleteMessage": "This saved explanation will be removed.",
       "deleteConfirm": "Remove",

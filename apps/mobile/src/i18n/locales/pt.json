@@ -538,8 +538,8 @@
       "screenReaderVoiceNote": "O leitor de tela está ativado. A entrada de voz não está disponível. Use a entrada de texto abaixo.",
       "stepProgress": "Passo {{current}} de {{total}}",
       "voicePermissionErrorTitle": "Erro na entrada de voz",
-      "voicePermissionErrorMessage": "É necessário acesso ao microfone para a entrada de voz. Ative-o nas Definições.",
-      "voicePermissionOpenSettings": "Abrir Definições"
+      "voicePermissionErrorMessage": "É necessário acesso ao microfone para a entrada de voz. Ative-o nas Configurações.",
+      "voicePermissionOpenSettings": "Abrir Configurações"
     },
     "filingFailed": {
       "retryInProgress": "Uma nova tentativa já está em andamento.",
@@ -609,7 +609,7 @@
     "messageBubble": {
       "thinking": "A pensar",
       "guidedResponse": "Resposta guiada",
-      "pendingSync": "Mensagem pendente",
+      "pendingSync": "Mensagem pendente de sincronização",
       "sending": "A enviar…",
       "escalation": {
         "stepByStep": "Passo a passo",
@@ -625,8 +625,8 @@
       "cancel": "Cancelar",
       "save": "Guardar",
       "noteText": "Texto da nota",
-      "startRecording": "Iniciar gravação",
-      "stopRecording": "Parar gravação",
+      "startRecording": "Começar a gravar",
+      "stopRecording": "Parar de gravar",
       "listening": "A ouvir...",
       "noteTooLong": "A tua nota está a ficar longa! ({{length}}/{{max}})"
     },
@@ -635,9 +635,9 @@
       "sendVoiceMessage": "Enviar mensagem de voz",
       "reRecord": "Gravar novamente",
       "discardRecording": "Descartar gravação",
-      "transcriptLabel": "Transcrição de voz — toca para editar",
-      "startRecording": "Iniciar gravação",
-      "stopRecording": "Parar gravação"
+      "transcriptLabel": "Transcrição de voz — toque para editar",
+      "startRecording": "Começar a gravar",
+      "stopRecording": "Parar de gravar"
     }
   },
   "quiz": {
@@ -712,8 +712,6 @@
       "emptyTitle": "Nenhuma rodada jogada ainda",
       "emptyMessage": "Experimente um quiz para ver seu histórico aqui!",
       "tryQuiz": "Experimentar um Quiz",
-      "dateToday": "Hoje",
-      "dateYesterday": "Ontem",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "Rodada de {{label}} — {{theme}} — {{score}} de {{total}}. Abrir detalhes.",
       "activityLabels": {
@@ -1251,9 +1249,6 @@
     "pickerEmptyBody": "Começa uma sessão primeiro e depois volta para verificar o que ficou.",
     "pickerBrowseTopics": "Explorar temas",
     "pickerStartForTopic": "Iniciar avaliação de {{title}}",
-    "studiedToday": "Estudado hoje",
-    "studiedYesterday": "Estudado ontem",
-    "studiedDaysAgo": "Estudado há {{count}} dias",
     "topicPassedNote": "Bom trabalho: este tópico foi marcado como aprovado, e os pontos fracos voltarão na revisão quando precisarem de atenção.",
     "pickerLoadingBody": "Estamos a verificar que tópicos estão prontos para um teste justo.",
     "pickerLoadTimeoutTitle": "Os tópicos da avaliação estão a demorar muito a carregar",
@@ -1274,7 +1269,8 @@
     "pickerInProgress": "Em andamento",
     "qualityRating": "Qualidade: {{rating}}/5",
     "depthTransfer": "Compreensão aplicada",
-    "depthExplain": "Explicado com as próprias palavras"
+    "depthExplain": "Explicado com as próprias palavras",
+    "studiedWhen": "Estudado {{when}}"
   },
   "homework": {
     "permissionTitle": "É necessário acesso à câmera",
@@ -1467,10 +1463,6 @@
       "bookmarkLabel": "Marcador salvo de {{subject}}",
       "removeBookmark": "Remover marcador",
       "tapToExpand": "Toque para expandir",
-      "dateToday": "Hoje",
-      "dateYesterday": "Ontem",
-      "dateDaysAgo": "Há {{count}} dias",
-      "dateWeeksAgo": "Há {{count}} semanas",
       "deleteTitle": "Remover marcador?",
       "deleteMessage": "Esta explicação salva será removida.",
       "deleteConfirm": "Remover",
@@ -2547,21 +2539,37 @@
   "profiles": {
     "title": "Perfis"
   },
+  "time": {
+    "relative": {
+      "today": "Hoje",
+      "yesterday": "Ontem",
+      "daysAgo": "Há {{count}} dias",
+      "lastWeek": "semana passada",
+      "weeksAgo": "Há {{count}} semanas"
+    },
+    "duration": {
+      "under1": "<1 min",
+      "minutes": "{{count}} min",
+      "minutesOne": "1 min",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
+      "none": "—"
+    }
+  },
   "feedbackSheet": {
-    "title": "Dá-nos o teu feedback",
-    "shakeHint": "Ou abana o telemóvel a qualquer momento para nos contactares.",
+    "title": "Dê-nos o seu feedback",
+    "shakeHint": "Ou abane o telemóvel a qualquer momento para nos contactar.",
     "thankYouTitle": "Obrigado!",
-    "thankYouMessage": "Recebemos o teu feedback e vamos analisá-lo.",
+    "thankYouMessage": "Recebemos o seu feedback e vamos analisá-lo.",
     "categoryLabel": "Que tipo de feedback?",
-    "messageLabel": "Diz-nos o que aconteceu",
-    "messagePlaceholder": "Descreve o problema ou a tua ideia...",
-    "deviceInfoNote": "Também incluiremos a versão da app e as informações do teu dispositivo para nos ajudar a investigar.",
+    "messageLabel": "Diga-nos o que aconteceu",
+    "messagePlaceholder": "Descreva o problema ou a sua ideia...",
+    "deviceInfoNote": "Também incluiremos a versão da sua aplicação e as informações do dispositivo para nos ajudar a investigar.",
     "sendButton": "Enviar Feedback",
     "sendButtonLabel": "Enviar feedback",
     "cancelButton": "Cancelar",
     "closeLabel": "Fechar",
     "category": {
-      "bug": "Erro",
+      "bug": "Bug",
       "suggestion": "Sugestão",
       "other": "Outro"
     }

@@ -1,9 +1,9 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { type UseQueryResult } from '@tanstack/react-query';
 import type { BookSession, GetBookSessionsResponse } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
-import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
+import { useApiQuery } from './use-api-query';
 
 export type { BookSession } from '@eduagent/schemas';
 
@@ -14,23 +14,17 @@ export function useBookSessions(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
-    queryKey: ['book-sessions', subjectId, bookId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
+  return useApiQuery<GetBookSessionsResponse, BookSession[]>({
+    queryKey: queryKeys.bookSessions(subjectId, bookId, activeProfile?.id),
+    enabled: !!subjectId && !!bookId,
+    fetch: (signal) => {
       if (!subjectId || !bookId)
         throw new Error('subjectId and bookId are required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].books[
-          ':bookId'
-        ].sessions.$get({ param: { subjectId, bookId } }, { init: { signal } });
-        await assertOk(res);
-        const data = (await res.json()) as GetBookSessionsResponse;
-        return data.sessions;
-      } finally {
-        cleanup();
-      }
+      return client.subjects[':subjectId'].books[':bookId'].sessions.$get(
+        { param: { subjectId, bookId } },
+        { init: { signal } },
+      );
     },
-    enabled: !!activeProfile && !!subjectId && !!bookId,
+    select: (data) => data.sessions,
   });
 }

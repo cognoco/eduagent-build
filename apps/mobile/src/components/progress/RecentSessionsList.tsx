@@ -8,6 +8,7 @@ import { EmptyStateCard } from '../common/EmptyStateCard';
 import { useProfile } from '../../lib/profile';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
+import { useDurationLabel } from '../../hooks/use-time-format';
 
 type ReportingComponentProps = {
   profileId: string;
@@ -24,18 +25,12 @@ function formatSessionDate(iso: string): string {
   });
 }
 
-function formatDuration(seconds: number | null): string {
-  if (seconds === null || seconds === 0) return '--';
-  const mins = Math.round(seconds / 60);
-  if (mins < 1) return '<1 min';
-  return `${mins} min`;
-}
-
 export function RecentSessionsList({
   profileId,
   sessionsQuery,
 }: ReportingComponentProps): React.ReactElement {
   const { t } = useTranslation();
+  const durationLabel = useDurationLabel();
   const router = useRouter();
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRole();
@@ -146,7 +141,7 @@ export function RecentSessionsList({
               </Text>
             ) : null}
             <Text className="text-caption text-text-secondary">
-              {formatDuration(
+              {durationLabel(
                 session.wallClockSeconds ?? session.durationSeconds,
               )}
             </Text>

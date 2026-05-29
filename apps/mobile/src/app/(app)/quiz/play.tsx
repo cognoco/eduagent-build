@@ -32,6 +32,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { formatApiError } from '../../../lib/format-api-error';
 import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
+import { formatTimer } from '../../../lib/format-relative-date';
 import { Sentry } from '../../../lib/sentry';
 import { useQuizFlow } from './_layout';
 import {
@@ -47,13 +48,6 @@ type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 interface SubmitRoundOptions {
   results?: QuestionResult[];
   navigateOnSuccess?: boolean;
-}
-
-function formatElapsedTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function appendFirstQuestionResult(
@@ -741,7 +735,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         ? t('quiz.play.titleCapitals')
         : t('quiz.play.titleVocabulary');
   const elapsedSeconds = Math.floor(elapsedMs / 1000);
-  const elapsedLabel = formatElapsedTime(elapsedMs);
+  const elapsedLabel = formatTimer(elapsedSeconds);
   const revealedAnswer =
     question.type === 'guess_who'
       ? selectedAnswer || correctAnswer

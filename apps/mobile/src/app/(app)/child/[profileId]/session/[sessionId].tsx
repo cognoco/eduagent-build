@@ -24,6 +24,7 @@ import { EngagementChip } from '../../../../../components/parent/EngagementChip'
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 import { useThemeColors } from '../../../../../lib/theme';
 import { AddToMyLearningButton } from '../../../../../components/family/AddToMyLearningButton';
+import { useDurationLabel } from '../../../../../hooks/use-time-format';
 let Clipboard: typeof import('expo-clipboard') | null = null;
 try {
   Clipboard = require('expo-clipboard');
@@ -40,14 +41,9 @@ function formatDate(iso: string): string {
   });
 }
 
-function formatDuration(seconds: number | null): string {
-  if (!seconds) return '';
-  const mins = Math.round(seconds / 60);
-  return mins === 1 ? '1 min' : `${mins} min`;
-}
-
 export default function SessionDetailScreen() {
   const { t } = useTranslation();
+  const durationLabel = useDurationLabel();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -167,7 +163,7 @@ export default function SessionDetailScreen() {
   // Per project_session_lifecycle_decisions.md, active time is the correct
   // parent-facing aggregate; wall-clock is a fallback for legacy rows that
   // never recorded active seconds.
-  const duration = formatDuration(
+  const duration = durationLabel(
     session.durationSeconds ?? session.wallClockSeconds,
   );
   const hasRecap = Boolean(

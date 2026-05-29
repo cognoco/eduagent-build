@@ -14,6 +14,8 @@ import {
 import { Button } from '../../../../../components/common/Button';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { isNewLearner } from '../../../../../lib/progressive-disclosure';
+import { useDurationLabel } from '../../../../../hooks/use-time-format';
+import { getDurationParts } from '../../../../../lib/format-relative-date';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -44,15 +46,9 @@ function formatSessionDate(iso: string): string {
   });
 }
 
-function formatDuration(seconds: number | null): string | null {
-  if (seconds === null || seconds <= 0) return null;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 1) return '<1 min';
-  return `${minutes} min`;
-}
-
 export default function SubjectTopicsScreen() {
   const { t } = useTranslation();
+  const durationLabel = useDurationLabel();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
@@ -320,9 +316,12 @@ export default function SubjectTopicsScreen() {
               })}
             </Text>
             {subjectSessions.slice(0, 5).map((session) => {
-              const duration = formatDuration(
-                session.wallClockSeconds ?? session.durationSeconds,
-              );
+              const durationSeconds =
+                session.wallClockSeconds ?? session.durationSeconds;
+              const duration =
+                getDurationParts(durationSeconds).unit === 'none'
+                  ? null
+                  : durationLabel(durationSeconds);
               return (
                 <Pressable
                   key={session.sessionId}

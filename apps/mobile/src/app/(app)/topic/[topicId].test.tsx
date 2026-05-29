@@ -635,7 +635,7 @@ describe('TopicDetailScreen rendering details', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('Last studied yesterday');
+      screen.getByText('Last studied Yesterday');
     });
     expect(screen.queryByText('Never studied')).toBeNull();
   });
@@ -647,7 +647,7 @@ describe('TopicDetailScreen rendering details', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('Last studied yesterday');
+      screen.getByText('Last studied Yesterday');
     });
   });
 

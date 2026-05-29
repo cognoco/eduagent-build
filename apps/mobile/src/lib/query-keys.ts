@@ -409,4 +409,27 @@ export const queryKeys = {
     root: (profileId: string | undefined) =>
       ['resume-nudge', profileId] as const,
   },
+
+  // ------------------------------------------------------------------
+  // scoped session lists (book / topic / subject)
+  //
+  // Byte-identical to the inline literals the three session hooks used, so
+  // TanStack cache identity and invalidation are unchanged.
+  // ------------------------------------------------------------------
+  bookSessions: (
+    subjectId: string | undefined,
+    bookId: string | undefined,
+    profileId: string | undefined,
+  ) => ['book-sessions', subjectId, bookId, profileId] as const,
+
+  topicSessions: (
+    subjectId: string | undefined,
+    topicId: string | undefined,
+    profileId: string | undefined,
+  ) => ['topic-sessions', subjectId, topicId, profileId] as const,
+
+  subjectSessions: (
+    subjectId: string | undefined,
+    profileId: string | undefined,
+  ) => ['subject-sessions', subjectId, profileId] as const,
 } as const;

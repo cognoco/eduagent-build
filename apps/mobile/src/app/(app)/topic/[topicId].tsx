@@ -36,6 +36,7 @@ import {
   useDeleteNoteById,
 } from '../../../hooks/use-notes';
 import { useTopicSessions } from '../../../hooks/use-topic-sessions';
+import { useRelativeDate } from '../../../hooks/use-time-format';
 import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { withOpacity } from '../../../lib/color-opacity';
 import { useThemeColors } from '../../../lib/theme';
@@ -63,26 +64,6 @@ import { buildSessionDetailHref } from '../../../lib/session-detail-navigation';
 
 function noop() {
   // intentional no-op for disabled button
-}
-
-function formatLastStudiedText(
-  lastReviewedAt: string | null | undefined,
-): string {
-  if (!lastReviewedAt) return 'Never studied';
-  const date = new Date(lastReviewedAt);
-  const now = Date.now();
-  const diffMs = now - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'Last studied today';
-  if (diffDays === 1) return 'Last studied yesterday';
-  if (diffDays < 7) return `Last studied ${diffDays} days ago`;
-  if (diffDays < 14) return 'Last studied last week';
-  if (diffDays < 30)
-    return `Last studied ${Math.floor(diffDays / 7)} weeks ago`;
-  return `Last studied ${date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })}`;
 }
 
 function getMostRecentSessionCreatedAt(
@@ -271,6 +252,7 @@ export default function TopicDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const relativeDate = useRelativeDate();
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRole();
   const proxyChildProfileId =
@@ -404,11 +386,13 @@ export default function TopicDetailScreen() {
   // Signal 3: Practiced-often hint (failureCount >= 3 on retention card)
   const showPracticedOftenHint = (retentionCard?.failureCount ?? 0) >= 3;
 
-  const lastStudiedText = formatLastStudiedText(
+  const lastReviewedAt =
     retentionCard?.lastReviewedAt ??
-      getMostRecentSessionCreatedAt(topicSessions) ??
-      null,
-  );
+    getMostRecentSessionCreatedAt(topicSessions) ??
+    null;
+  const lastStudiedText = lastReviewedAt
+    ? `Last studied ${relativeDate(lastReviewedAt)}`
+    : 'Never studied';
   const sessionsSummary = formatSessionsSummary(topicSessions);
   const topicBookmarks = useMemo(
     () =>

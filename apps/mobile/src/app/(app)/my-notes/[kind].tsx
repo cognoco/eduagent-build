@@ -19,6 +19,11 @@ import { OWN_LEARNING_RETURN_TO } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../../lib/session-detail-navigation';
+import {
+  useRelativeDate,
+  useDurationLabel,
+} from '../../../hooks/use-time-format';
+import { getDurationParts } from '../../../lib/format-relative-date';
 
 type MyNotesKind = 'sessions' | 'notes' | 'bookmarks';
 type GroupMode = 'date' | 'subject';
@@ -79,38 +84,11 @@ function subtitleForKind(kind: MyNotesKind, count: number): string {
   return `${count} ${label}`;
 }
 
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  const today = new Date();
-  const startToday = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
-  const startDate = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  );
-  const diffDays = Math.round(
-    (startToday.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
 function formatInlineDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
   });
-}
-
-function formatMinutes(seconds: number | null): string | null {
-  if (seconds == null) return null;
-  if (seconds > 0 && seconds < 60) return '<1 min';
-  return `${Math.max(1, Math.round(seconds / 60))} min`;
 }
 
 function normalizeSessionType(type: string): string {
@@ -177,12 +155,16 @@ function bookmarkToItem(bookmark: Bookmark): ArchiveItem {
   };
 }
 
-function groupItems(items: ArchiveItem[], mode: GroupMode): ListRow[] {
+function groupItems(
+  items: ArchiveItem[],
+  mode: GroupMode,
+  relativeDate: (iso: string) => string,
+): ListRow[] {
   const rows: ListRow[] = [];
   const seen = new Set<string>();
 
   for (const item of items) {
-    const group = mode === 'date' ? formatDate(item.date) : item.subjectName;
+    const group = mode === 'date' ? relativeDate(item.date) : item.subjectName;
     if (!seen.has(group)) {
       seen.add(group);
       rows.push({ type: 'header', id: `header-${group}`, title: group });
@@ -251,7 +233,11 @@ function ArchiveCard({
   onPress: (item: ArchiveItem) => void;
 }) {
   const colors = useThemeColors();
-  const duration = formatMinutes(item.durationSeconds);
+  const durationLabel = useDurationLabel();
+  const duration =
+    getDurationParts(item.durationSeconds).unit === 'none'
+      ? null
+      : durationLabel(item.durationSeconds);
   const meta = [item.topicTitle, item.typeLabel, formatInlineDate(item.date)]
     .filter(Boolean)
     .join(' · ');
@@ -327,6 +313,7 @@ export default function MyNotesListScreen(): React.ReactElement {
   const returnTo = myNotesReturnTo(params.returnTo);
   const [groupMode, setGroupMode] = useState<GroupMode>('date');
   const [query, setQuery] = useState('');
+  const relativeDate = useRelativeDate();
 
   const sessionsQuery = useProfileSessionsArchive(activeProfile?.id, {
     limit: 20,
@@ -359,7 +346,10 @@ export default function MyNotesListScreen(): React.ReactElement {
     () => rawItems.filter((item) => matchesQuery(item, query)),
     [query, rawItems],
   );
-  const rows = useMemo(() => groupItems(items, groupMode), [groupMode, items]);
+  const rows = useMemo(
+    () => groupItems(items, groupMode, relativeDate),
+    [groupMode, items, relativeDate],
+  );
 
   const activeQuery =
     kind === 'sessions'
