@@ -612,8 +612,8 @@ function isTransientError(err: unknown): boolean {
 
   const status = findHttpStatus(err);
   if (status != null) {
-    // 429 (rate limit) is transient; other 4xx are client errors
-    if (status === 429) return true;
+    // 408 (timeout) and 429 (rate limit) are transient; other 4xx are client errors
+    if (status === 408 || status === 429) return true;
     if (status >= 400 && status < 500) return false;
     // 5xx is transient
     return true;

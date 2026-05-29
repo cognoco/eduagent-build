@@ -1118,6 +1118,29 @@ describe('LLM Router', () => {
       }
     });
 
+    it('keeps provider HTTP 408 timeouts transient so they retry and fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createHttpStatusFailProvider('gemini', 408);
+      const fallback = createCountingProvider('openai');
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        const recovered = await routeAndCall(
+          [{ role: 'user', content: 'test' }],
+          1,
+        );
+
+        expect(recovered.provider).toBe('openai');
+        expect(primary.callCount).toBe(4);
+        expect(fallback.chatCallCount).toBe(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     it('treats non-429 provider 4xx errors as terminal: no retry, no fallback, no circuit failure', async () => {
       _clearProviders();
       _resetCircuits();

@@ -8,6 +8,9 @@ non-429 HTTP 4xx responses as terminal non-transient errors.
 nested provider `Error.cause` details for HTTP status and validation/policy error
 types.
 
+`pnpm eval:llm` was run a final time after preserving HTTP 408 timeout responses
+as transient retry/fallback candidates.
+
 The change affects retry, failover, and circuit-breaker classification only. It
 does not alter prompt construction, model request payloads, or response text
 projection. The eval harness rewrote prompt snapshots with no tracked snapshot
