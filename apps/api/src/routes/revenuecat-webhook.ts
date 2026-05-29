@@ -187,6 +187,26 @@ export const revenuecatWebhookRoute = new Hono<{
   }
 
   const { event } = parsed.data;
+
+  // [WI-170 / DS-081] Production SANDBOX events must be rejected immediately
+  // after payload validation, before account lookup, idempotency checks, free
+  // subscription provisioning, handler dispatch, KV writes, or any other
+  // billing-state mutation.
+  if (event.environment === 'SANDBOX' && c.env.ENVIRONMENT === 'production') {
+    logger.warn(
+      '[revenuecat] Rejected SANDBOX webhook event in production environment',
+      {
+        eventType: event.type,
+        eventId: event.id,
+      },
+    );
+    return c.json({
+      received: true,
+      skipped: true,
+      reason: 'sandbox_in_production',
+    });
+  }
+
   const db = c.get('db');
   const kv = c.env.SUBSCRIPTION_KV;
 
@@ -236,27 +256,9 @@ export const revenuecatWebhookRoute = new Hono<{
     return c.json({ received: true, skipped: true });
   }
 
-  // [CR-2026-05-19-H6/H7] SANDBOX guard MUST run before ensureFreeSubscription
-  // so that sandbox-in-prod events do not provision subscription rows / quota
-  // pools for accounts that should not have them in production. Ordering:
-  // resolveAccountId → isRevenuecatEventProcessed (idempotency) → SANDBOX guard
-  // → ensureFreeSubscription → event-type dispatch.
+  // Non-production SANDBOX events continue through the normal webhook flow so
+  // staging/dev can exercise RevenueCat QA paths.
   if (event.environment === 'SANDBOX') {
-    if (c.env.ENVIRONMENT === 'production') {
-      logger.warn(
-        '[revenuecat] Rejected SANDBOX webhook event in production environment',
-        {
-          eventType: event.type,
-          eventId: event.id,
-          accountId,
-        },
-      );
-      return c.json({
-        received: true,
-        skipped: true,
-        reason: 'sandbox_in_production',
-      });
-    }
     logger.warn(
       '[revenuecat] Received SANDBOX webhook event — verify this is intentional',
       {
