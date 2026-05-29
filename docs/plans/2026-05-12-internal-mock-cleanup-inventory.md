@@ -1,6 +1,6 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12 (last refreshed 2026-05-28, post-Wave-7)
+**Date:** 2026-05-12 (last refreshed 2026-05-29, post-Wave-8)
 **Status:** Framework complete (Phases 0-4); P0 drained; bare-mock backlog collapsed from 131 → 23 → 6 → **0** between 2026-05-19 and 2026-05-25 via successive sweeps. Wave 5 (2026-05-25) landed the three classifier patches Wave 4 deferred (multi-line factory window, `^@expo-google-fonts/`, `^nativewind(?:\/|$)/` + `^metro-` boundaries). Wave 6 (2026-05-25) converted the `lib/profile` cluster from `gc1-allow`-only to `pattern-a; gc1-allow` — 32 of 35 files converted (3 reverted as legitimate native boundaries: i18n loads eagerly through `lib/profile` transitively in JSDOM). The forward-only GC1 ratchet has nothing left to clean — every remaining relative-path `jest.mock(...)` row is either `pattern-a` (requireActual + override) or `gc1-allow` annotated.
 
 > **Status (2026-05-25):** This plan's hard deliverables are DONE. P0 integration ratchet is live (`apps/api/src/test-utils/integration-mock-guard.test.ts`), the CSV regenerator is wired (`scripts/generate-internal-mock-cleanup-inventory.ts`), and the bare-mock backlog is drained. **What this plan does NOT cover:** the long-tail of internal-ish mocks that are already `gc1-allow`-labeled or `requireActual`-factored. Those are inventoried here for visibility but burn down via the **GC6 boy-scout rule in CLAUDE.md** ("remove internal mocks any time you edit a test file"), not via plan-driven sweeps. **Recommendation:** archive this plan as done; keep the CSV + generator script as a living tracking artifact that GC6 consumes opportunistically.
@@ -192,6 +192,22 @@ One Opus agent per file (pilot first to de-risk, then a 5-file fan-out). Each ag
 - *(should-fix — false positive)* The reviewer flagged a second `use-milestone-tracker` mock in `progress/[subjectId]/index.test.tsx`; that file has no such mock (its "milestone" references are CEFR language-milestone copy). No change.
 - *(consider — actioned)* Added a targeted regression test in `use-subjects.test.ts` (`refetchInterval tolerates a non-array payload without throwing [BUG-634 / M-2]`) that seeds a non-array `subjects` payload and asserts the guard returns `false` without throwing — locking in the `!Array.isArray` fix.
 - *(consider — deferred)* `progress.test.tsx`'s local `renderProgress()` helper duplicates the `renderScreen` provider stack because the shared harness hard-codes `isExplicitProxyMode: false`. Tracked as a follow-up: either extend `renderScreen` with a proxy-mode option or migrate the helper once the harness gains that knob.
+
+### Wave 8 (2026-05-29) — T3 stale `format-api-error` mocks (pure formatter, runnable)
+
+Targeted the five test files that stubbed `lib/format-api-error` (`formatApiError` / `classifyApiError`). Every one cited a now-false justification — "depends on i18next instance requiring full i18n init — cannot run in JSDOM", "pure formatter … stubbed for clarity", "error formatting is covered separately". The formatter imports only `i18next` + a type and is pure; `apps/mobile/src/test-setup.ts:11` synchronously initializes the i18next singleton with the real `en.json` catalog before every test (`setupFilesAfterEach`), so the real `formatApiError`/`classifyApiError` (which call the singleton's `t()` directly, not via `react-i18next`) return real English strings in every suite. The mocks were stale T3 backlog, not genuine boundaries.
+
+| File | mock removed | tests | assertion change |
+| --- | --- | ---: | --- |
+| `components/session/SessionFooter.test.tsx` | `formatApiError: String(e)` | 9/9 | one assertion updated from raw `'Error: network down'` → real `errors.networkError` copy (matches real render; not a weakening) |
+| `components/session/use-session-streaming.test.ts` | `formatApiError: err.message` | 47/47 | none — output only feeds the non-reconnectable branch, which no test asserts |
+| `app/(app)/child/[profileId]/weekly-report/[weeklyReportId].test.tsx` | `classifyApiError` full stub | 8/8 | none — output only flows to the `ErrorFallback` prop, which the test stubs to `null` |
+| `app/(app)/shelf/[subjectId]/index.test.tsx` | `formatApiError` + `classifyApiError` pattern-a override | 25/25 | none — 500s flow through the real api-client → `UpstreamError` → real classifier returns `recovery:'retry'`, matching the asserted `recovery-retry`/`recovery-go-home` testIDs |
+| `app/(app)/practice/assessment/assessment-start.test.tsx` | `formatApiError` pattern-a override | 9/9 | none — the asserted ErrorFallback copy already came from the un-mocked real `classifyApiError`; only the un-asserted in-chat string used `formatApiError` |
+
+**Latent bug fixed (not the formatter — the test's own boundary mock).** Removing the `classifyApiError` stub in `weekly-report/[weeklyReportId].test.tsx` surfaced a crash: the file's local `react-i18next` mock omitted `initReactI18next`, so once the real formatter pulled in `../i18n`, that module's init IIFE called `i18next.use(undefined)` and threw "You are passing an undefined module". The stub had been masking an incomplete boundary mock, not a real i18n-init limitation. Fixed by converting the `react-i18next` mock to a `requireActual` spread (keeps the deterministic raw-key `useTranslation` override, restores the real `initReactI18next`).
+
+No `it()` counts changed; no `.skip`, `optional`, softened matcher, or removed assertion. **gc1-allow total: 296 → 293; `pattern-a; gc1-allow`: 328 → 327; `pattern-a`: 62 → 61. Inventory rows: 1324 → 1319. Bare: 0 → 0.** No remaining `jest.mock('…format-api-error')` anywhere in `apps/`.
 
 ### Wave 6 backlog (rest of softer-cleanup candidates) — `gc1-allow`-only rows that could become `pattern-a`
 
