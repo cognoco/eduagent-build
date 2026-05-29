@@ -712,6 +712,9 @@
       "disputeLabel": "Bestrid dette svaret",
       "dismissLabel": "Lukk",
       "saveAndFinishLabel": "Lagre fremdrift og avslutt runden"
+    },
+    "results": {
+      "viewHistory": "Vis historikk"
     }
   },
   "dictation": {

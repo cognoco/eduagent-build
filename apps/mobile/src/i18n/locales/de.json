@@ -712,6 +712,9 @@
       "disputeLabel": "Diese Antwort anfechten",
       "dismissLabel": "Schließen",
       "saveAndFinishLabel": "Fortschritt speichern und Runde beenden"
+    },
+    "results": {
+      "viewHistory": "Verlauf ansehen"
     }
   },
   "dictation": {

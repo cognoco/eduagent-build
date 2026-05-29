@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
@@ -11,6 +12,7 @@ import { useQuizFlow } from './_layout';
 import { rewardVariantForActivity } from './_quiz-utils';
 
 export default function QuizResultsScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -292,7 +294,9 @@ export default function QuizResultsScreen(): React.ReactElement {
             } as Href)
           }
         >
-          <Text className="text-primary mt-2">View History</Text>
+          <Text className="text-primary mt-2">
+            {t('quiz.results.viewHistory')}
+          </Text>
         </Pressable>
       </View>
     </ScrollView>

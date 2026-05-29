@@ -712,6 +712,9 @@
       "disputeLabel": "この回答に異議を唱える",
       "dismissLabel": "閉じる",
       "saveAndFinishLabel": "進捗を保存してラウンドを終了"
+    },
+    "results": {
+      "viewHistory": "履歴を見る"
     }
   },
   "dictation": {
