@@ -1084,5 +1084,29 @@ describe('learner-profile routes', () => {
       expect((await res.json()).code).toBe('PROXY_MODE');
       expect(mockUnsuppressInference).not.toHaveBeenCalled();
     });
+
+    // [SEC-L2-ACCMODE] The accommodation-mode self route was the lone
+    // unguarded self-write in this file, and is NOT in the metering allowlist,
+    // so the metering middleware's assertNotProxyMode never covered it. A proxy
+    // (parent-as-child, isOwner === false) session could mutate the child's
+    // accommodation mode through the self route, bypassing the owner +
+    // parent-link verification on /:profileId/accommodation-mode.
+    // Red: 200 (handler calls updateAccommodationMode) before the guard.
+    // Green: 403 PROXY_MODE after the guard.
+    it('[BREAK] PATCH /learner-profile/accommodation-mode returns 403 PROXY_MODE for a non-owner (proxy) profile', async () => {
+      const res = await makeProxyApp().request(
+        '/learner-profile/accommodation-mode',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accommodationMode: 'short-burst' }),
+        },
+      );
+
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe('PROXY_MODE');
+      // Guard must fire before the service mutation is reached.
+      expect(mockUpdateAccommodationMode).not.toHaveBeenCalled();
+    });
   });
 });

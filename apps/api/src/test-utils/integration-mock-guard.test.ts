@@ -120,8 +120,11 @@ function isInternalMockSpecifier(specifier: string): boolean {
     normalized.startsWith('@/') ||
     normalized.includes('/apps/api/src/') ||
     normalized.includes('apps/api/src/') ||
-    normalized === '@eduagent/database' ||
-    normalized.startsWith('@eduagent/database/')
+    // All @eduagent/* workspace packages are internal — mocking any of them in
+    // an integration test hides real contract drift between the package and the
+    // app code under test. Previously only @eduagent/database was listed; the
+    // broader pattern catches @eduagent/schemas, @eduagent/api, etc.
+    normalized.startsWith('@eduagent/')
   );
 }
 
@@ -184,6 +187,14 @@ describe('integration tests — internal mock guard', () => {
     expect(
       sourceInternalMockSpecifiers(mockCallSnippet('@eduagent/database')),
     ).toEqual(['@eduagent/database']);
+    // All @eduagent/* workspace packages are internal — extend coverage beyond
+    // the previously @eduagent/database-only check.
+    expect(
+      sourceInternalMockSpecifiers(mockCallSnippet('@eduagent/schemas')),
+    ).toEqual(['@eduagent/schemas']);
+    expect(
+      sourceInternalMockSpecifiers(mockCallSnippet('@eduagent/api')),
+    ).toEqual(['@eduagent/api']);
   });
 
   it('allows Inngest transport capture stubs (BUG-307)', () => {

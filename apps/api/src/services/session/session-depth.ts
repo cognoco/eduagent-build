@@ -124,15 +124,22 @@ async function callWithTimeout(
   timeoutMs: number,
   ageBracket?: AgeBracket,
 ): Promise<string> {
+  // Clear the timeout when the race settles. Without this, the happy path
+  // (llmPromise wins) leaves a dangling timer that later rejects a
+  // handler-less Promise<never> -> unhandled rejection, and keeps the worker
+  // event loop alive for up to timeoutMs after the request resolved.
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('timeout')), timeoutMs);
+    timeoutId = setTimeout(() => reject(new Error('timeout')), timeoutMs);
   });
   // rung 1: Flash routing by design — depth analysis is latency-sensitive and doesn't need advanced model capabilities.
   // conversationLanguage not threaded: depth-analysis JSON, internal metric
   const llmPromise = routeAndCall(messages, 1, { ageBracket }).then(
     (result) => result.response,
   );
-  return Promise.race([llmPromise, timeoutPromise]);
+  return Promise.race([llmPromise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
 }
 
 async function detectTopicsOnly(
