@@ -156,6 +156,18 @@ export async function buildLibraryIndex(
         }
       }
     }
+
+    // [FCR-2026-05-23-L1.C1.9] The proportional truncation above can slice a
+    // chapter down to zero topics once a shelf exhausts its budget. A
+    // zero-topic chapter inflates the chapter list (and the formatted prompt)
+    // without contributing any context, so drop them after the truncation
+    // pass. Books left with no chapters are dropped too for the same reason.
+    for (const shelf of shelves) {
+      for (const book of shelf.books) {
+        book.chapters = book.chapters.filter((ch) => ch.topics.length > 0);
+      }
+      shelf.books = shelf.books.filter((book) => book.chapters.length > 0);
+    }
   }
 
   return { shelves };
