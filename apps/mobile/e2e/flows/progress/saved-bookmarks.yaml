@@ -36,8 +36,21 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "progress-saved-link"
+      id: "progress-screen"
     timeout: 10000
+
+# progress-saved-link is below the fold inside the progress ScrollView;
+# scroll to it before asserting (pattern from progress-analytics.yaml).
+- scrollUntilVisible:
+    element:
+      id: "progress-saved-link"
+    direction: DOWN
+    timeout: 10000
+
+- extendedWaitUntil:
+    visible:
+      id: "progress-saved-link"
+    timeout: 5000
 
 - takeScreenshot: bookmarks-01-progress-screen
 

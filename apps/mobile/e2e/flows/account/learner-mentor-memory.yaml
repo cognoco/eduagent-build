@@ -35,13 +35,23 @@ tags:
 - tapOn:
     id: "more-row-mentor-memory"
 
+# memory-status-text is always above the fold (status card renders unconditionally).
+# Wait for it first as the screen-loaded signal before scrolling to the empty-state
+# marker below.
+# Source: apps/mobile/src/app/(app)/mentor-memory.tsx:389
 - extendedWaitUntil:
     visible:
-      id: "mentor-memory-all-empty"
+      id: "memory-status-text"
     timeout: 10000
 
-- assertVisible:
-    id: "memory-status-text"
+# mentor-memory-all-empty renders below TellMentorInput (below the fold on 5.8"
+# screens); scroll to it rather than waiting with extendedWaitUntil.
+# Source: apps/mobile/src/app/(app)/mentor-memory.tsx:525
+- scrollUntilVisible:
+    element:
+      id: "mentor-memory-all-empty"
+    direction: DOWN
+    timeout: 10000
 
 - takeScreenshot: 01-learner-memory-empty
 
