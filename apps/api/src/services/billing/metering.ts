@@ -75,6 +75,12 @@ async function emitOwnershipMismatchEvent(input: {
   await safeSend(
     () =>
       inngest.send({
+        // orphan-allow: structured telemetry signal required by CLAUDE.md
+        // ("silent recovery in billing must emit a structured metric"). The
+        // mismatch is handled in-line (the decrement/increment returns
+        // profile_mismatch). The event is a dashboard-queryable signal so ops
+        // can answer "how often is a stale/hostile profileId sent" — no
+        // remediation handler is needed.
         name: 'app/billing.ownership.mismatch',
         data: {
           flow: input.flow,

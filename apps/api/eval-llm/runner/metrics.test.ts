@@ -5,6 +5,7 @@ import {
   extractSampleMetrics,
   formatDriftReport,
   parseBaseline,
+  validateBaselineStructure,
   type Baseline,
   type FlowAggregate,
 } from './metrics';
@@ -23,7 +24,7 @@ describe('extractSampleMetrics', () => {
           note_prompt: { show: true, post_session: false },
         },
         confidence: 'medium',
-      })
+      }),
     );
     expect(s.envelopeOk).toBe(true);
     expect(s.hasReply).toBe(true);
@@ -67,7 +68,7 @@ describe('extractSampleMetrics', () => {
       JSON.stringify({
         reply: 'Ready?',
         ui_hints: { fluency_drill: { active: true, duration_s: 45 } },
-      })
+      }),
     );
     expect(s.uiHints.fluencyDrillActive).toBe(true);
   });
@@ -80,7 +81,7 @@ describe('extractSampleMetrics', () => {
     // the runtime normalizer cleans this for the user, the metric should
     // still report it so prompt regressions are visible.
     const s = extractSampleMetrics(
-      '{"reply": "That\'s it!\\\\nNow we move on."}'
+      '{"reply": "That\'s it!\\\\nNow we move on."}',
     );
     expect(s.envelopeOk).toBe(true);
     expect(s.replyHasLiteralEscape).toBe(true);
@@ -95,10 +96,10 @@ describe('extractSampleMetrics', () => {
 
   it('[LITERAL-ESCAPE] flags literal `\\t` and `\\r` too', () => {
     expect(
-      extractSampleMetrics('{"reply": "a\\\\tb"}').replyHasLiteralEscape
+      extractSampleMetrics('{"reply": "a\\\\tb"}').replyHasLiteralEscape,
     ).toBe(true);
     expect(
-      extractSampleMetrics('{"reply": "a\\\\rb"}').replyHasLiteralEscape
+      extractSampleMetrics('{"reply": "a\\\\rb"}').replyHasLiteralEscape,
     ).toBe(true);
   });
 
@@ -123,10 +124,10 @@ describe('aggregateFlowSamples', () => {
       extractSampleMetrics('{"reply":"a","signals":{"partial_progress":true}}'),
       extractSampleMetrics('{"reply":"b","signals":{"partial_progress":true}}'),
       extractSampleMetrics(
-        '{"reply":"c","signals":{"partial_progress":false}}'
+        '{"reply":"c","signals":{"partial_progress":false}}',
       ),
       extractSampleMetrics(
-        '{"reply":"d","signals":{"partial_progress":false}}'
+        '{"reply":"d","signals":{"partial_progress":false}}',
       ),
     ];
     const agg = aggregateFlowSamples(samples);
@@ -149,7 +150,7 @@ describe('aggregateFlowSamples', () => {
 describe('compareAgainstBaseline', () => {
   function makeAggregate(
     overrides: Partial<FlowAggregate['rates']> = {},
-    n = 20
+    n = 20,
   ): FlowAggregate {
     return {
       n,
@@ -182,7 +183,7 @@ describe('compareAgainstBaseline', () => {
     const drifts = compareAgainstBaseline(
       { exchanges: makeAggregate({ partialProgress: 0.22 }) },
       base,
-      0.05
+      0.05,
     );
     expect(drifts).toEqual([]);
   });
@@ -193,7 +194,7 @@ describe('compareAgainstBaseline', () => {
       // partialProgress dropped from 20% to 2% (18pp) — huge regression.
       { exchanges: makeAggregate({ partialProgress: 0.02 }) },
       base,
-      0.05
+      0.05,
     );
     expect(drifts).toHaveLength(1);
     expect(drifts[0]).toMatchObject({
@@ -209,7 +210,7 @@ describe('compareAgainstBaseline', () => {
       // Model started dropping JSON format on half the turns.
       { exchanges: makeAggregate({ envelopeOk: 0.5 }) },
       base,
-      0.05
+      0.05,
     );
     const envelopeDrift = drifts.find((d) => d.metric === 'envelopeOk');
     expect(envelopeDrift).not.toBeUndefined();
@@ -222,7 +223,7 @@ describe('compareAgainstBaseline', () => {
       // Flow disappeared entirely (or ran zero samples).
       {},
       base,
-      0.05
+      0.05,
     );
     // Every non-trivial metric (>tolerance) with a baseline should appear.
     expect(drifts.length).toBeGreaterThan(0);
@@ -235,12 +236,12 @@ describe('compareAgainstBaseline', () => {
     const drifts = compareAgainstBaseline(
       { 'new-flow': makeAggregate({ partialProgress: 0.3 }) },
       base,
-      0.05
+      0.05,
     );
     expect(
       drifts.some(
-        (d) => d.flowId === 'new-flow' && d.metric === 'partialProgress'
-      )
+        (d) => d.flowId === 'new-flow' && d.metric === 'partialProgress',
+      ),
     ).toBe(true);
   });
 
@@ -256,7 +257,7 @@ describe('compareAgainstBaseline', () => {
         }),
       },
       base,
-      0.05
+      0.05,
     );
     expect(drifts[0]?.metric).toBe('notePromptShow');
     expect(drifts[1]?.metric).toBe('partialProgress');
@@ -298,6 +299,63 @@ describe('buildBaseline + parseBaseline', () => {
 
   it('returns null for non-JSON input', () => {
     expect(parseBaseline('not json')).toBeNull();
+  });
+});
+
+describe('validateBaselineStructure', () => {
+  function aggregate(n: number): FlowAggregate {
+    return {
+      n,
+      rates: {
+        envelopeOk: 1,
+        hasReply: 1,
+        replyHasLiteralEscape: 0,
+        partialProgress: 0.2,
+        needsDeepening: 0.05,
+        understandingCheck: 0.3,
+        readyToFinish: 0,
+        notePromptShow: 0.1,
+        fluencyDrillActive: 0,
+        confidenceLow: 0.05,
+      },
+    };
+  }
+  function baselineWith(flows: Record<string, FlowAggregate>): Baseline {
+    return { version: 1, updatedAt: '2026-05-29T00:00:00.000Z', flows };
+  }
+
+  it('reports an issue when the baseline is null (missing/unparseable)', () => {
+    const issues = validateBaselineStructure(null, ['exchanges', 'probes']);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.flowId).toBe('baseline');
+  });
+
+  it('flags the placebo empty-flows baseline (the bug this guards)', () => {
+    // `{ "flows": {} }` is the false-confidence stub: --check-baseline finds a
+    // file so it does not error, but zero signal distribution is captured.
+    const issues = validateBaselineStructure(baselineWith({}), [
+      'exchanges',
+      'probes',
+    ]);
+    expect(issues).toHaveLength(2);
+    expect(issues.map((i) => i.flowId).sort()).toEqual(['exchanges', 'probes']);
+  });
+
+  it('flags a flow present but with n=0 samples', () => {
+    const issues = validateBaselineStructure(
+      baselineWith({ exchanges: aggregate(20), probes: aggregate(0) }),
+      ['exchanges', 'probes'],
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.flowId).toBe('probes');
+  });
+
+  it('returns no issues when every required flow has samples', () => {
+    const issues = validateBaselineStructure(
+      baselineWith({ exchanges: aggregate(20), probes: aggregate(18) }),
+      ['exchanges', 'probes'],
+    );
+    expect(issues).toEqual([]);
   });
 });
 

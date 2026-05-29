@@ -342,6 +342,12 @@ async function maybeReplayIdempotentSessionRequest(
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: structured telemetry signal required by CLAUDE.md
+          // ("silent recovery in billing must emit a structured metric"). The
+          // KV-outage recovery is in-line (returns null → request processed
+          // without replay protection); escalation is via logger.warn. The
+          // event is a dashboard-queryable signal for KV-outage frequency — no
+          // remediation handler is needed.
           name: 'app/idempotency.preflight_lookup_failed',
           data: {
             accountId: account?.id ?? null,

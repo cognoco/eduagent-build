@@ -87,6 +87,11 @@ export async function markPersisted(params: {
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: structured telemetry signal required by CLAUDE.md
+          // (silent recovery must emit a structured metric/Inngest event). The
+          // mark failure recovers in-line and escalates via logger.warn +
+          // captureException(Sentry). The event is a dashboard-queryable
+          // failure-rate signal — no remediation handler is needed.
           name: 'app/idempotency.mark_failed',
           data: { profileId, flow },
         }),

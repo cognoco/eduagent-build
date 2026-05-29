@@ -189,6 +189,55 @@ export async function countProfiles(
 }
 
 /**
+ * Authorizes a POST /profiles request before any write occurs.
+ *
+ * [CR-2026-05-19-H1 / BUG-407] Only the account owner can create additional
+ * profiles. Two distinct cases:
+ *
+ * 1. profileMeta is present: straightforward — enforce isOwner === true.
+ * 2. profileMeta is absent: could be a first-profile creation (brand-new
+ *    account, no profiles yet) OR a broken/edge state where meta failed to
+ *    load despite existing profiles. The old heuristic treated "meta absent"
+ *    as "first profile" and allowed the request — this is wrong when the
+ *    account already has profiles but meta resolution failed silently.
+ *
+ *    Fix: do a real DB count. If 0 profiles exist, allow (first-profile
+ *    path). If 1+ exist, the owner must have been in meta — reject.
+ *
+ * Throws {@link ForbiddenError} (mapped by the route to 403 / FORBIDDEN) when
+ * the caller is not allowed to create a profile. Resolves silently when the
+ * request is authorized. This is the route-entry gate; per-tier limit
+ * enforcement still happens inside {@link createProfileWithLimitCheck}.
+ *
+ * Note: this is intentionally decoupled from the full `ProfileMeta` shape —
+ * the only field the authorization decision reads is `isOwner`.
+ */
+export async function assertProfileCreationAllowed(
+  db: Database,
+  accountId: string,
+  profileMeta: { isOwner: boolean } | undefined,
+): Promise<void> {
+  if (profileMeta) {
+    if (profileMeta.isOwner !== true) {
+      throw new ForbiddenError(
+        'Only the account owner can create additional profiles.',
+      );
+    }
+    return;
+  }
+
+  // profileMeta absent — check DB to determine if this is a first-profile creation.
+  const existingCount = await countProfiles(db, accountId);
+  if (existingCount > 0) {
+    // Profiles exist but no owner meta resolved — never allow (fail closed).
+    throw new ForbiddenError(
+      'Only the account owner can create additional profiles.',
+    );
+  }
+  // existingCount === 0: brand-new account, first profile creation is always allowed.
+}
+
+/**
  * Finds the owner profile for an account.
  * Used by profile-scope middleware to auto-resolve profileId when X-Profile-Id
  * header is absent, preventing the broken `account.id` fallback.
@@ -249,6 +298,11 @@ export async function findOwnerProfile(
   });
   await safeSend(
     () =>
+      // orphan-allow: observability-only marker. The data-integrity anomaly
+      // (no isOwner row) is already recovered in-line (fall back to the oldest
+      // profile, return actual isOwner=false) and escalated via logger.warn +
+      // captureException above. This Inngest dispatch exists purely as a
+      // dashboard-queryable signal; no remediation handler is required.
       inngest.send({
         name: 'app/profile.no_owner_resolved',
         data: { accountId, fallbackProfileId: fallbackRow.id },

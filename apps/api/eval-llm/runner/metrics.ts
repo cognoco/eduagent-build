@@ -233,7 +233,7 @@ export function aggregateFlowSamples(samples: SampleMetrics[]): FlowAggregate {
 export function compareAgainstBaseline(
   current: Record<string, FlowAggregate>,
   baseline: Baseline,
-  tolerancePp: number
+  tolerancePp: number,
 ): BaselineDrift[] {
   const drifts: BaselineDrift[] = [];
   const flowIds = new Set<string>([
@@ -308,7 +308,7 @@ export function compareAgainstBaseline(
     (a, b) =>
       b.deltaPp - a.deltaPp ||
       a.flowId.localeCompare(b.flowId) ||
-      a.metric.localeCompare(b.metric)
+      a.metric.localeCompare(b.metric),
   );
 }
 
@@ -318,7 +318,7 @@ export function compareAgainstBaseline(
  */
 export function buildBaseline(
   flows: Record<string, FlowAggregate>,
-  meta?: { ref?: string }
+  meta?: { ref?: string },
 ): Baseline {
   return {
     version: 1,
@@ -347,6 +347,56 @@ export function parseBaseline(raw: string): Baseline | null {
   }
 }
 
+/** One problem found while structurally validating a baseline file. */
+export interface BaselineValidationIssue {
+  /** Flow id the issue concerns, or 'baseline' for whole-file problems. */
+  flowId: string;
+  message: string;
+}
+
+/**
+ * Structurally validate a parsed baseline WITHOUT any LLM call. Asserts that
+ * every flow id in `requiredFlows` (the envelope-emitting flows) is present in
+ * the baseline with at least one contributing sample (`n > 0`). A baseline
+ * with `flows: {}` — the placebo state that makes envelope-signal drift
+ * invisible — fails here, so CI can catch it deterministically and key-free.
+ *
+ * Returns an empty array when the baseline is healthy.
+ */
+export function validateBaselineStructure(
+  baseline: Baseline | null,
+  requiredFlows: string[],
+): BaselineValidationIssue[] {
+  if (baseline === null) {
+    return [
+      {
+        flowId: 'baseline',
+        message:
+          'baseline.json is missing, unparseable, or has the wrong version (expected version: 1).',
+      },
+    ];
+  }
+
+  const issues: BaselineValidationIssue[] = [];
+  for (const flowId of requiredFlows) {
+    const agg = baseline.flows[flowId];
+    if (!agg) {
+      issues.push({
+        flowId,
+        message: `envelope-emitting flow "${flowId}" is absent from the baseline — signal drift for this flow is invisible.`,
+      });
+      continue;
+    }
+    if (agg.n <= 0) {
+      issues.push({
+        flowId,
+        message: `envelope-emitting flow "${flowId}" has n=${agg.n} samples — the baseline is a placebo and would not catch drift.`,
+      });
+    }
+  }
+  return issues;
+}
+
 /**
  * Render a short human-readable drift report. Returns an empty string when
  * `drifts` is empty so CI logs stay quiet in the happy path.
@@ -362,7 +412,7 @@ export function formatDriftReport(drifts: BaselineDrift[]): string {
     const before = (d.baselineRate * 100).toFixed(1);
     const after = (d.currentRate * 100).toFixed(1);
     lines.push(
-      `  [${d.flowId}] ${d.metric}: ${before}% → ${after}% (Δ${delta}pp)`
+      `  [${d.flowId}] ${d.metric}: ${before}% → ${after}% (Δ${delta}pp)`,
     );
   }
   return lines.join('\n');
