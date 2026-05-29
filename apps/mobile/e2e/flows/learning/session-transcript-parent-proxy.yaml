@@ -1,3 +1,8 @@
+# PARKED (2026-05-29): Asserts the isParentProxy=true gate, but no UI entry currently
+# reaches parent-proxy mode (see [ACCOUNT-04]; proxy returns with a redesigned entry).
+# Proxy logic is unit-tested. This flow stays here, OUT of the run manifest, until the
+# new proxy entry ships — then re-point the switch-to-child setup at it.
+#
 # Flow LEARN-23 (Step 2): Session transcript — parent-proxy privacy gate.
 # Validates: [CR-PR129-M5] view-transcript-cta is hidden when isParentProxy=true.
 # Parent switches to child profile (proxy mode) and confirms no transcript link on session summary.

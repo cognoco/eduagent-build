@@ -1,3 +1,8 @@
+# PARKED (2026-05-29): Reaches ChildPaywall only after switching to a child profile
+# in parent-proxy mode, for which no UI entry currently exists (see [ACCOUNT-04];
+# proxy returns with a redesigned entry). Proxy logic is unit-tested. This flow stays
+# here, OUT of the run manifest, until the new proxy entry ships.
+#
 # Flow: Child Paywall — Expired Trial Child-Friendly Paywall
 # Validates: when a child profile's trial has expired, the subscription screen
 # renders the ChildPaywall instead of the normal subscription UI. Verifies
