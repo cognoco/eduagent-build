@@ -855,6 +855,16 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
       const pushResult = prepared.shouldSendPush
         ? await step.run('send-weekly-progress-push', async () => {
             const db = getStepDatabase();
+            const activeParent = await db.query.profiles.findFirst({
+              where: and(
+                eq(profiles.id, parentId),
+                isNull(profiles.archivedAt),
+              ),
+              columns: { id: true },
+            });
+            if (!activeParent) {
+              return { sent: false, reason: 'profile_archived' as const };
+            }
             return sendPushNotification(db, {
               profileId: parentId,
               title: 'Weekly learning progress',
@@ -874,6 +884,17 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         const emailResult = await step.run(
           'send-weekly-progress-email',
           async () => {
+            const db = getStepDatabase();
+            const activeParent = await db.query.profiles.findFirst({
+              where: and(
+                eq(profiles.id, parentId),
+                isNull(profiles.archivedAt),
+              ),
+              columns: { id: true },
+            });
+            if (!activeParent) {
+              return { sent: false, reason: 'profile_archived' as const };
+            }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,
               prepared.childSummaries,

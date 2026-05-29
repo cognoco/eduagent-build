@@ -540,6 +540,13 @@ export const monthlyReportGenerate = inngest.createFunction(
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' as const };
       }
+      const activeParent = await db.query.profiles.findFirst({
+        where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
+        columns: { id: true },
+      });
+      if (!activeParent) {
+        return { sent: false, reason: 'profile_archived' as const };
+      }
       await sendPushNotification(
         db,
         {
@@ -567,7 +574,11 @@ export const monthlyReportGenerate = inngest.createFunction(
     //
     // Email channel: send when monthly_progress_email = true AND parent has
     // accounts.email.
-    if (!('reason' in pushResult) || pushResult.reason !== 'dedup_24h') {
+    if (
+      !('reason' in pushResult) ||
+      (pushResult.reason !== 'dedup_24h' &&
+        pushResult.reason !== 'profile_archived')
+    ) {
       await step.run('send-monthly-email', async () => {
         const db = getStepDatabase();
         const prefs = await db.query.notificationPreferences.findFirst({

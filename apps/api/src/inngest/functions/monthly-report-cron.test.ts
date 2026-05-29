@@ -512,7 +512,9 @@ beforeEach(() => {
   (mockMonthlyReportDb.query.accounts.findFirst as jest.Mock).mockResolvedValue(
     null,
   );
+  mockGetSnapshotsInRange.mockReset();
   mockGetSnapshotsInRange.mockResolvedValue([]);
+  mockFilterProgressMetricsToActiveSubjects.mockReset();
   mockFilterProgressMetricsToActiveSubjects.mockImplementation(
     async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
   );
@@ -1010,6 +1012,7 @@ describe('monthlyReportGenerate', () => {
       (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
         .mockResolvedValueOnce({ displayName: 'Emma' })
         .mockResolvedValueOnce({ id: 'parent-001' })
+        .mockResolvedValueOnce({ id: 'parent-001' })
         .mockResolvedValueOnce({ accountId: 'account-parent' });
       (
         mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
@@ -1275,6 +1278,33 @@ describe('monthlyReportGenerate', () => {
       await executeGenerateSteps(makeGenerateEvent());
 
       expect(mockSendPushNotification).toHaveBeenCalled();
+    });
+
+    it('[WI-86] skips monthly push and email when parent is archived after report generation', async () => {
+      mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValue(null);
+
+      const { result } = await executeGenerateSteps(makeGenerateEvent(), {
+        runResults: {
+          'generate-monthly-report': {
+            status: 'completed',
+            childDisplayName: 'Emma',
+            reportMonth: '2026-03-01',
+            struggleTopics: [],
+            isSelfReport: false,
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: 'parent-001',
+        childId: 'child-001',
+      });
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
     });
 
     it('runs the dedup check against the parentId, not the childId', async () => {
@@ -1700,6 +1730,7 @@ describe('monthlyReportGenerate', () => {
       ).mockResolvedValueOnce(null); // null → monthlyProgressEmail defaults to true
       (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
         .mockResolvedValueOnce({ displayName: 'Emma' })
+        .mockResolvedValueOnce({ id: 'parent-001' })
         .mockResolvedValueOnce({ id: 'parent-001' })
         .mockResolvedValueOnce({ accountId: 'account-parent' });
       (

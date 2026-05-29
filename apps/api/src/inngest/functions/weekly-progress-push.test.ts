@@ -260,12 +260,13 @@ const PREVIOUS_METRICS = {
 
 async function executeGenerateSteps(
   eventData: Record<string, unknown>,
+  stepOptions?: Parameters<typeof createInngestStepRunner>[0],
 ): Promise<{
   status: string;
   parentId?: string;
   reason?: string;
 }> {
-  const { step } = createInngestStepRunner();
+  const { step } = createInngestStepRunner(stepOptions);
   const handler = (
     weeklyProgressPushGenerate as unknown as {
       fn: (ctx: {
@@ -303,6 +304,7 @@ beforeEach(() => {
   mockGetPracticeActivitySummary.mockResolvedValue(
     emptyPracticeActivitySummary,
   );
+  mockFilterProgressMetricsToActiveSubjects.mockReset();
   mockFilterProgressMetricsToActiveSubjects.mockImplementation(
     async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
   );
@@ -740,6 +742,32 @@ describe('weekly progress generate practice summary', () => {
       filteredPrevious,
       emptyPracticeActivitySummary,
     );
+  });
+
+  it('[WI-86] skips weekly push and email when parent is archived after preparation', async () => {
+    mockDb.query.profiles.findFirst.mockResolvedValue(null);
+
+    const result = await executeGenerateSteps(
+      { parentId: PARENT_ID },
+      {
+        runResults: {
+          'prepare-weekly-progress-digest': {
+            status: 'prepared',
+            parentId: PARENT_ID,
+            reportWeek: '2026-05-11',
+            childSummaries: ['Alex: +1 topics'],
+            struggleLines: [],
+            shouldSendPush: true,
+            shouldSendEmail: true,
+            parentEmail: 'parent@example.com',
+          },
+        },
+      },
+    );
+
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'throttled', parentId: PARENT_ID });
   });
 
   it('persists a self report without child links when includeSelfReport is set', async () => {

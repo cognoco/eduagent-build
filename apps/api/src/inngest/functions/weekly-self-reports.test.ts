@@ -249,6 +249,7 @@ describe('weeklySelfReportGenerate', () => {
     mockDb.query.consentStates.findFirst.mockResolvedValue(null);
     mockDb.query.familyLinks.findFirst.mockResolvedValue(null);
     mockDb.query.profiles.findFirst.mockResolvedValue({ displayName: 'Alex' });
+    mockFilterProgressMetricsToActiveSubjects.mockReset();
     mockFilterProgressMetricsToActiveSubjects.mockImplementation(
       async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
     );
