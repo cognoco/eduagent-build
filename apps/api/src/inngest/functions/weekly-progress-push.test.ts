@@ -207,6 +207,7 @@ import {
 
 const PARENT_ID = '11111111-1111-4111-8111-111111111111';
 const CHILD_ID = '22222222-2222-4222-8222-222222222222';
+const CHILD_ID_2 = '22222222-2222-4222-8222-222222222223';
 const CURRENT_METRICS = {
   totalSessions: 3,
   totalActiveMinutes: 45,
@@ -782,6 +783,78 @@ describe('weekly progress generate practice summary', () => {
     );
   });
 
+  it('[WI-86] records only digest-contributing child ids for delivery rechecks', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { childProfileId: CHILD_ID },
+      { childProfileId: CHILD_ID_2 },
+    ]);
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      displayName: 'Alex',
+    });
+    mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
+      pushEnabled: true,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: false,
+    });
+    mockDb.query.learningProfiles.findFirst.mockResolvedValue({
+      struggles: [],
+    });
+    mockGetLatestSnapshot
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
+      })
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
+      });
+    mockGetLatestSnapshotOnOrBefore
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-06',
+        metrics: PREVIOUS_METRICS,
+      });
+
+    let prepared: unknown;
+    const stopAfterPrepare = new Error('stop after prepare');
+    const step = {
+      run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+        if (name === 'prepare-weekly-progress-digest') {
+          prepared = await fn();
+          throw stopAfterPrepare;
+        }
+        return fn();
+      }),
+    };
+    const handler = (
+      weeklyProgressPushGenerate as unknown as {
+        fn: (ctx: {
+          event: { data: Record<string, unknown>; name: string };
+          step: typeof step;
+        }) => Promise<unknown>;
+      }
+    ).fn;
+
+    await expect(
+      handler({
+        event: {
+          data: { parentId: PARENT_ID },
+          name: 'app/weekly-progress-push.generate',
+        },
+        step,
+      }),
+    ).rejects.toThrow(stopAfterPrepare);
+
+    expect(prepared).toEqual(
+      expect.objectContaining({
+        status: 'prepared',
+        childProfileIds: [CHILD_ID_2],
+        childSummaries: [expect.stringContaining('Alex:')],
+      }),
+    );
+  });
+
   it('[WI-86] skips weekly push and email when parent is archived after preparation', async () => {
     mockDb.query.profiles.findFirst.mockResolvedValue(null);
 
@@ -838,6 +911,58 @@ describe('weekly progress generate practice summary', () => {
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(mockSendEmail).not.toHaveBeenCalled();
     expect(result).toEqual({ status: 'throttled', parentId: PARENT_ID });
+  });
+
+  it('[WI-86] ignores archived children that did not render into the prepared digest', async () => {
+    const nonRenderedChildId = '33333333-3333-4333-8333-333333333333';
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { childProfileId: CHILD_ID },
+      { childProfileId: nonRenderedChildId },
+    ]);
+    mockDb.query.profiles.findFirst
+      .mockResolvedValueOnce({ id: PARENT_ID })
+      .mockResolvedValueOnce({ displayName: 'Alex' })
+      .mockResolvedValueOnce({ displayName: 'Noah' })
+      .mockResolvedValueOnce({ id: PARENT_ID })
+      .mockResolvedValueOnce({ id: CHILD_ID })
+      .mockResolvedValueOnce(null);
+    mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
+      pushEnabled: true,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: false,
+    });
+    mockGetLatestSnapshot
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
+      })
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-13',
+        metrics: CURRENT_METRICS,
+      });
+    mockGetLatestSnapshotOnOrBefore
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-06',
+        metrics: PREVIOUS_METRICS,
+      })
+      .mockResolvedValueOnce(null);
+
+    const result = await executeGenerateSteps({ parentId: PARENT_ID });
+
+    expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        profileId: PARENT_ID,
+        body: expect.stringContaining('Alex:'),
+        type: 'weekly_progress',
+      }),
+    );
+    expect(mockSendPushNotification.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        body: expect.not.stringContaining('Noah'),
+      }),
+    );
   });
 
   it('persists a self report without child links when includeSelfReport is set', async () => {

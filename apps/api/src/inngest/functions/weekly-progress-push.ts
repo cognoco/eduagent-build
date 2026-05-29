@@ -632,7 +632,6 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
 
             const latest = await getLatestSnapshot(db, link.childProfileId);
             if (!latest) continue;
-            childProfileIds.push(link.childProfileId);
             const latestMetrics = await filterProgressMetricsToActiveSubjects(
               db,
               link.childProfileId,
@@ -722,6 +721,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               })
               .onConflictDoNothing();
 
+            const summaryCountBeforeChild = childSummaries.length;
             if (
               latestMetrics.totalSessions === 0 ||
               (topicDelta === 0 && vocabDelta === 0 && exploredDelta === 0)
@@ -745,6 +745,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
 
             // Read current struggles for the watch-line (path A: topic names only).
             // Malformed JSONB is skipped gracefully; digest still sends.
+            let hasStruggleTopics = false;
             try {
               const learningProfile = await db.query.learningProfiles.findFirst(
                 {
@@ -761,6 +762,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                     )
                     .slice(0, 2)
                 : [];
+              hasStruggleTopics = topics.length > 0;
               struggleLines.push({ childName: name, topics });
             } catch (err) {
               captureException(err, {
@@ -770,6 +772,12 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 },
               });
               struggleLines.push({ childName: name, topics: [] });
+            }
+            if (
+              childSummaries.length > summaryCountBeforeChild ||
+              hasStruggleTopics
+            ) {
+              childProfileIds.push(link.childProfileId);
             }
           }
 
