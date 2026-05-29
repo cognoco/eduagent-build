@@ -1,12 +1,7 @@
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-} from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import React from 'react';
 
+import { renderScreen, cleanupScreen } from '../test-utils/screen-render';
 import { ChangePassword } from './change-password';
 
 const mockUpdatePassword = jest.fn();
@@ -28,45 +23,38 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-// Stub useProfile so the centralized signOutWithCleanup has profileIds to
-// pass to SecureStore cleanup without needing a full ProfileProvider tree.
-// The real useProfile transitively pulls in SecureStore, api-client, and
-// the TanStack Query provider — instantiating that whole shell in a
-// component-only password test would mask the behaviour under test.
-jest.mock('../lib/profile', () => ({
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({ profiles: [] }),
-})); // gc1-allow: see comment above
-
 function renderWithProviders(ui: React.ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
+  return renderScreen(ui);
 }
 
 describe('ChangePassword', () => {
+  let active: ReturnType<typeof renderScreen> | null = null;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdatePassword.mockResolvedValue({});
   });
 
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
+  });
+
   it('renders all three password fields', () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     screen.getByTestId('current-password');
     screen.getByTestId('new-password');
     screen.getByTestId('confirm-password');
   });
 
   it('shows requirements hint on new password field', () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     screen.getByTestId('new-password-hint');
   });
 
   it('shows mismatch error when confirm differs from new password', () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     // [BUG-129] currentPassword is now required — fill it in so the test
     // exercises the mismatch path rather than failing at the new
     // empty-current-password gate.
@@ -78,7 +66,7 @@ describe('ChangePassword', () => {
   });
 
   it('does not submit when new password is too short', () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
     fireEvent.changeText(screen.getByTestId('new-password'), 'short');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'short');
@@ -94,7 +82,7 @@ describe('ChangePassword', () => {
   // current password" message.
   // -------------------------------------------------------------------------
   it('[BREAK / BUG-129] does not call updatePassword when current password is empty', () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     // Leave current-password blank — fill only new + confirm.
     fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
@@ -104,7 +92,7 @@ describe('ChangePassword', () => {
   });
 
   it('[BREAK / BUG-129] does not call updatePassword when current password is too short', () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     fireEvent.changeText(screen.getByTestId('current-password'), 'short');
     fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
@@ -114,7 +102,7 @@ describe('ChangePassword', () => {
   });
 
   it('calls user.updatePassword on valid submission', async () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
     fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
@@ -131,7 +119,7 @@ describe('ChangePassword', () => {
     mockUpdatePassword.mockRejectedValue({
       errors: [{ longMessage: 'Password is incorrect.' }],
     });
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     fireEvent.changeText(screen.getByTestId('current-password'), 'WrongPass!');
     fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
@@ -142,7 +130,7 @@ describe('ChangePassword', () => {
   });
 
   it('clears form and shows success after password update', async () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
     fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
@@ -153,12 +141,12 @@ describe('ChangePassword', () => {
   });
 
   it('renders forgot password link', () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     screen.getByText('Forgot your password?');
   });
 
   it('signs out and redirects when forgot password is tapped', async () => {
-    renderWithProviders(<ChangePassword />);
+    active = renderWithProviders(<ChangePassword />);
     fireEvent.press(screen.getByText('Forgot your password?'));
     await waitFor(() => {
       expect(mockSignOut).toHaveBeenCalled();

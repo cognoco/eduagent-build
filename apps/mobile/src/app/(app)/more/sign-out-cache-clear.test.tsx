@@ -14,22 +14,24 @@
  *     src/app/\(app\)/more/sign-out-cache-clear.test.tsx --no-coverage
  */
 
-import React from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createRoutedMockFetch } from '../../../test-utils/mock-api-routes';
+import { ProfileContext, type ProfileContextValue } from '../../../lib/profile';
+import { AppContextProvider } from '../../../lib/app-context';
+import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
 
 // ---------------------------------------------------------------------------
-// Controlled signOutWithCleanup mock — this IS the break test for the leak
+// Controlled signOutWithCleanup mock — this IS the break test for the leak.
+// sign-out coordinates SecureStore + cache wipe + Clerk signOut; it is the
+// external boundary under assertion here and stays stubbed.
 // ---------------------------------------------------------------------------
 
 const mockSignOutWithCleanup = jest.fn().mockResolvedValue(undefined);
 
-// [BUG-771] more/index.tsx now also imports ClerkSignOutTimeoutError from
-// sign-out to branch on the timeout case (force-redirect to /sign-in). The
-// real class must pass through so `instanceof` checks in production code
-// resolve correctly; only the wrapper function is stubbed.
 jest.mock(
-  '../../../lib/sign-out' /* gc1-allow: external-boundary sign-out coordinates SecureStore + cache — needs stub in unit tests */,
+  '../../../lib/sign-out' /* gc1-allow: external-boundary sign-out coordinates SecureStore + cache — the break test asserts on its call args */,
   () => ({
     ...jest.requireActual('../../../lib/sign-out'),
     signOutWithCleanup: (...args: unknown[]) => mockSignOutWithCleanup(...args),
@@ -37,132 +39,117 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
-// Other mocks (same pattern as more/index.test.tsx)
+// Boundary mocks (native/external runtime only). The real ProfileContext +
+// AppContextProvider drive the real useProfile / useParentProxy /
+// useNavigationContract / useSubscription / useFamilyPoolBreakdownSharing
+// hooks against a routed mock fetch.
 // ---------------------------------------------------------------------------
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-}));
-
-jest.mock('@expo/vector-icons/Ionicons', () => {
-  const { Text } = require('react-native');
-  return function MockIonicons({ name }: { name: string }) {
-    return <Text>{name}</Text>;
-  };
-});
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-
-jest.mock('../../../lib/theme' /* gc1-allow: unit test boundary */, () => ({
-  useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
-}));
-
-const ownerProfile = {
-  id: 'owner-1',
-  displayName: 'Jørn',
-  isOwner: true,
-  birthYear: 1985,
-};
-const childProfile = {
-  id: 'child-1',
-  displayName: 'Wife',
-  isOwner: false,
-  birthYear: 2010,
-};
-
-jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
-  ...jest.requireActual('../../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: ownerProfile,
-    profiles: [ownerProfile, childProfile],
-  }),
+jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
 }));
 
 jest.mock(
-  '../../../hooks/use-parent-proxy' /* gc1-allow: unit test boundary */,
+  '@expo/vector-icons/Ionicons' /* gc1-allow: native-boundary — bundles native font asset */,
+  () => {
+    const { Text } = require('react-native');
+    return function MockIonicons({ name }: { name: string }) {
+      return <Text>{name}</Text>;
+    };
+  },
+);
+
+jest.mock(
+  'react-native-safe-area-context' /* gc1-allow: native-boundary — requires native insets */,
   () => ({
-    useParentProxy: () => ({
-      isParentProxy: false,
-      childProfile: null,
-      parentProfile: null,
-    }),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   }),
 );
 
 jest.mock(
-  '../../../hooks/use-subscription' /* gc1-allow: unit test boundary */,
+  '../../../lib/theme' /* gc1-allow: native-boundary — theme hook requires native ColorScheme */,
   () => ({
-    useSubscription: () => ({
-      data: {
-        tier: 'family',
-        effectiveAccessTier: 'family',
-        billingAccess: 'current',
-      },
-    }),
-    useSubscriptionStatus: () => ({
-      data: {
-        tier: 'family',
-        effectiveAccessTier: 'family',
-        billingAccess: 'current',
-        status: 'active',
-        monthlyLimit: 700,
-        usedThisMonth: 0,
-      },
-    }),
-    useFamilySubscription: () => ({
-      data: { profileCount: 2, maxProfiles: 4 },
-    }),
+    useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
   }),
 );
 
 jest.mock(
-  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
-  () => ({
-    useFamilyPoolBreakdownSharing: () => ({
-      data: false,
-      isLoading: false,
-    }),
-    useUpdateFamilyPoolBreakdownSharing: () => ({
-      mutate: jest.fn(),
-      isPending: false,
-    }),
-  }),
-);
-
-jest.mock(
-  '../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
+  '../../../lib/platform-alert' /* gc1-allow: native-boundary — wraps native Alert */,
   () => ({
     platformAlert: jest.fn(),
   }),
 );
 
 const mockClerkSignOut = jest.fn().mockResolvedValue(undefined);
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: () => ({ signOut: mockClerkSignOut }),
+jest.mock('@clerk/clerk-expo' /* gc1-allow: external auth provider */, () => ({
+  useAuth: () => ({ signOut: mockClerkSignOut, userId: 'owner-1' }),
 }));
 
 // ---------------------------------------------------------------------------
-// Wrapper — QueryClient is injected so we can spy on .clear()
+// Fixtures + wrapper. QueryClient is injected so we can spy on .clear() and
+// assert the same instance is forwarded to signOutWithCleanup.
 // ---------------------------------------------------------------------------
 
-let testQueryClient: QueryClient;
+const ownerProfile = createTestProfile({
+  id: 'owner-1',
+  accountId: 'account-1',
+  displayName: 'Jørn',
+  isOwner: true,
+  birthYear: 1985,
+});
+const childProfile = createTestProfile({
+  id: 'child-1',
+  accountId: 'account-1',
+  displayName: 'Wife',
+  isOwner: false,
+  birthYear: 2010,
+});
 
-function createWrapper() {
+let testQueryClient: QueryClient;
+let prevFetch: typeof globalThis.fetch;
+
+function renderMore(ui: ReactElement) {
   testQueryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   jest.spyOn(testQueryClient, 'clear');
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
+
+  const routedFetch = createRoutedMockFetch({
+    '/subscription': { subscription: { tier: 'family' } },
+    '/subscription/family': { family: { profileCount: 2, maxProfiles: 4 } },
+    '/settings/family-pool-breakdown-sharing': { value: false },
+  });
+  prevFetch = globalThis.fetch;
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    routedFetch as unknown as typeof fetch;
+
+  const profileContextValue: ProfileContextValue = {
+    profiles: [ownerProfile, childProfile],
+    activeProfile: ownerProfile,
+    isExplicitProxyMode: false,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
       QueryClientProvider,
       { client: testQueryClient },
-      children,
+      createElement(
+        ProfileContext.Provider,
+        { value: profileContextValue },
+        createElement(AppContextProvider, null, children),
+      ),
     );
-  };
+  }
+
+  return render(ui, { wrapper: Wrapper });
 }
 
 const MoreScreen = require('./index').default;
@@ -178,9 +165,12 @@ describe('Sign out — cross-account leak prevention [SEC-10-05-2026]', () => {
     mockClerkSignOut.mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+  });
+
   it('calls signOutWithCleanup (not bare clerkSignOut) when Sign Out pressed', async () => {
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<MoreScreen />, { wrapper });
+    const { getByTestId } = renderMore(<MoreScreen />);
 
     await act(async () => {
       fireEvent.press(getByTestId('sign-out-button'));
@@ -191,15 +181,11 @@ describe('Sign out — cross-account leak prevention [SEC-10-05-2026]', () => {
     expect(mockSignOutWithCleanup).toHaveBeenCalledTimes(1);
     // Bare Clerk signOut must NOT be called directly from the screen —
     // only signOutWithCleanup wraps it, ensuring cache + SecureStore are wiped.
-    // BUG-CANDIDATE: P0 — if this assertion fails, the screen is calling bare
-    // Clerk signOut and bypassing the cache/SecureStore cleanup that prevents
-    // the cross-account profileId leak.
     expect(mockClerkSignOut).not.toHaveBeenCalled();
   });
 
   it('passes the clerkSignOut function to signOutWithCleanup', async () => {
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<MoreScreen />, { wrapper });
+    const { getByTestId } = renderMore(<MoreScreen />);
 
     await act(async () => {
       fireEvent.press(getByTestId('sign-out-button'));
@@ -216,11 +202,7 @@ describe('Sign out — cross-account leak prevention [SEC-10-05-2026]', () => {
   });
 
   it('passes ALL profile IDs to signOutWithCleanup (owner + linked children)', async () => {
-    // This ensures per-profile SecureStore keys are wiped for the child
-    // profile too — the leak path is the child profile ID surviving in
-    // SecureStore and being restored by ProfileProvider on next sign-in.
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<MoreScreen />, { wrapper });
+    const { getByTestId } = renderMore(<MoreScreen />);
 
     await act(async () => {
       fireEvent.press(getByTestId('sign-out-button'));
@@ -239,8 +221,7 @@ describe('Sign out — cross-account leak prevention [SEC-10-05-2026]', () => {
   });
 
   it('passes the queryClient to signOutWithCleanup (cache clear path)', async () => {
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<MoreScreen />, { wrapper });
+    const { getByTestId } = renderMore(<MoreScreen />);
 
     await act(async () => {
       fireEvent.press(getByTestId('sign-out-button'));
@@ -263,8 +244,7 @@ describe('Sign out — cross-account leak prevention [SEC-10-05-2026]', () => {
     const mockPlatformAlert =
       require('../../../lib/platform-alert').platformAlert;
 
-    const wrapper = createWrapper();
-    const { getByTestId } = render(<MoreScreen />, { wrapper });
+    const { getByTestId } = renderMore(<MoreScreen />);
 
     await act(async () => {
       fireEvent.press(getByTestId('sign-out-button'));

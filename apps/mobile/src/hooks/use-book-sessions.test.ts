@@ -4,43 +4,39 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createScreenWrapper,
+  createTestProfile,
+  createRoutedMockFetch,
+  type RoutedMockFetch,
+} from '../test-utils/screen-render';
+import type { Profile } from '../lib/profile';
 import { useBookSessions } from './use-book-sessions';
 
-const mockFetch = jest.fn();
-
-// prettier-ignore
-jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-// prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: hook tests need a fixed active profile without provider setup
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
-
+// Real ProfileContext + real api-client (Clerk's useAuth is globally mocked in
+// test-setup), driven by a routed mock fetch installed as globalThis.fetch.
+// `mockFetch` keeps the same name the assertions below use; per-call overrides
+// via mockResolvedValueOnce take priority over the routed default.
+let mockFetch: RoutedMockFetch;
 let queryClient: QueryClient;
+let prevFetch: typeof globalThis.fetch;
 
-function createWrapper() {
-  const w = createQueryWrapper();
+beforeEach(() => {
+  prevFetch = globalThis.fetch;
+  mockFetch = createRoutedMockFetch();
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    mockFetch as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+});
+
+function createWrapper(activeProfile: Profile | null = createTestProfile()) {
+  const w = createScreenWrapper({
+    activeProfile,
+    profiles: activeProfile ? [activeProfile] : [],
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
@@ -81,13 +77,8 @@ const mockSessions = [
 // ---------------------------------------------------------------------------
 
 describe('useBookSessions', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
   afterEach(() => {
-    queryClient.clear();
+    queryClient?.clear();
   });
 
   it('fetches and returns sessions for a given subject and book', async () => {
@@ -142,25 +133,14 @@ describe('useBookSessions', () => {
   });
 
   it('is disabled when there is no active profile — no fetch fires', async () => {
-    // Override the profile mock to return null activeProfile for this test
-    const profileMod = require('../lib/profile') as {
-      useProfile: () => { activeProfile: null | { id: string } };
-    };
-    const original = profileMod.useProfile;
-    profileMod.useProfile = () => ({ activeProfile: null });
+    const { result } = renderHook(
+      () => useBookSessions('subject-1', 'book-1'),
+      { wrapper: createWrapper(null) },
+    );
 
-    try {
-      const { result } = renderHook(
-        () => useBookSessions('subject-1', 'book-1'),
-        { wrapper: createWrapper() },
-      );
-
-      await new Promise((r) => setTimeout(r, 50));
-      expect(result.current.fetchStatus).toBe('idle');
-      expect(mockFetch).not.toHaveBeenCalled();
-    } finally {
-      profileMod.useProfile = original;
-    }
+    await new Promise((r) => setTimeout(r, 50));
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('propagates API errors into error state', async () => {

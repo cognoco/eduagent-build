@@ -1,4 +1,13 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { screen, fireEvent, waitFor } from '@testing-library/react-native';
+import {
+  renderScreen,
+  NAMED_PROFILES,
+  type RenderScreenResult,
+} from '../../../../../test-utils/screen-render';
+import {
+  createRoutedMockFetch,
+  type RoutedMockFetch,
+} from '../../../../../test-utils/mock-api-routes';
 
 jest.mock('react-i18next', () => ({
   ...jest.requireActual('react-i18next'),
@@ -56,20 +65,45 @@ jest.mock('../../../../../components/nudge/NudgeActionSheet', () => ({ // gc1-al
   },
 }));
 
-const mockUseChildWeeklyReportDetail = jest.fn();
-const mockMarkViewedMutateAsync = jest.fn();
-
-jest.mock('../../../../../hooks/use-progress', () => ({
-  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
-  useChildWeeklyReportDetail: (...args: unknown[]) =>
-    mockUseChildWeeklyReportDetail(...args),
-  useMarkWeeklyReportViewed: () => ({
-    mutateAsync: mockMarkViewedMutateAsync,
-  }),
-}));
-
 const ChildWeeklyReportDetailScreen = require('./[weeklyReportId]')
   .default as React.ComponentType;
+
+// Guardian (owner) profile so the real useChildWeeklyReportDetail hook's
+// `canAccessFamilyChildData` gate (legacyMode !== 'study' && isOwner) opens and
+// the routed GET fires. profileId param is child-001 (see expo-router mock).
+const guardianProfile = {
+  ...NAMED_PROFILES.guardian,
+  id: 'parent-001',
+  isOwner: true,
+  hasFamilyLinks: true,
+};
+
+let mockFetch: RoutedMockFetch;
+
+/**
+ * Configure the real-hook endpoints. The detail hook reads
+ *   GET /dashboard/children/:profileId/weekly-reports/:reportId → { report }
+ * and the best-effort mark-viewed mutation fires
+ *   POST /dashboard/children/:profileId/weekly-reports/:reportId/view.
+ */
+function setReport(report: ReturnType<typeof makeReport>): void {
+  mockFetch.setRoute(
+    '/dashboard/children/child-001/weekly-reports/wr-001',
+    (url: string, init?: RequestInit) => {
+      if (url.includes('/view')) return { viewed: true };
+      if (init?.method && init.method !== 'GET') return { viewed: true };
+      return { report };
+    },
+  );
+}
+
+function renderWeeklyReport(): RenderScreenResult {
+  return renderScreen(<ChildWeeklyReportDetailScreen />, {
+    profile: guardianProfile,
+    profiles: [guardianProfile],
+    routedFetch: mockFetch,
+  });
+}
 
 function makeReport(
   overrides?: Partial<{
@@ -134,22 +168,26 @@ const PRACTICE_SUMMARY = {
 };
 
 describe('ChildWeeklyReportDetailScreen', () => {
+  let active: RenderScreenResult | null = null;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockMarkViewedMutateAsync.mockResolvedValue({});
+    mockFetch = createRoutedMockFetch();
   });
 
-  it('renders headline + metrics for a normal week', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport(),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+  });
+
+  it('renders headline + metrics for a normal week', async () => {
+    setReport(makeReport());
+
+    active = renderWeeklyReport();
+
+    await waitFor(() => {
+      screen.getByTestId('child-weekly-report-hero');
     });
-
-    render(<ChildWeeklyReportDetailScreen />);
-
-    screen.getByTestId('child-weekly-report-hero');
     expect(
       screen.getByTestId('child-weekly-report-metric-sessions'),
     ).toBeTruthy();
@@ -164,49 +202,41 @@ describe('ChildWeeklyReportDetailScreen', () => {
     ).toBeTruthy();
   });
 
-  it('renders the practice summary card when practice data is present', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport({ practiceSummary: PRACTICE_SUMMARY }),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('renders the practice summary card when practice data is present', async () => {
+    setReport(makeReport({ practiceSummary: PRACTICE_SUMMARY }));
+
+    active = renderWeeklyReport();
+
+    await waitFor(() => {
+      screen.getByTestId('child-weekly-report-practice-summary');
     });
-
-    render(<ChildWeeklyReportDetailScreen />);
-
-    screen.getByTestId('child-weekly-report-practice-summary');
   });
 
-  it('hides the practice summary card when practice data is absent', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport(),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('hides the practice summary card when practice data is absent', async () => {
+    setReport(makeReport());
+
+    active = renderWeeklyReport();
+
+    await waitFor(() => {
+      screen.getByTestId('child-weekly-report-hero');
     });
-
-    render(<ChildWeeklyReportDetailScreen />);
-
     expect(
       screen.queryByTestId('child-weekly-report-practice-summary'),
     ).toBeNull();
   });
 
   // BUG-903 (c): Heading must show the full date range, not just weekStart.
-  it('[BUG-903] header shows the full week date range (start – end)', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport({ weekStart: '2026-04-27' }),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
+  it('[BUG-903] header shows the full week date range (start – end)', async () => {
+    setReport(makeReport({ weekStart: '2026-04-27' }));
 
-    render(<ChildWeeklyReportDetailScreen />);
+    active = renderWeeklyReport();
 
     // 7-day window (inclusive): Apr 27 -> May 3, 2026.
     // Locale order/separator/punctuation vary across CI runners, so just
     // assert both endpoints + the year + a dash separator are present.
-    screen.getByText(/27\s*Apr|Apr\s*27/);
+    await waitFor(() => {
+      screen.getByText(/27\s*Apr|Apr\s*27/);
+    });
     screen.getByText(/3\s*May|May\s*3/);
     screen.getByText(/2026/);
     screen.getByText(/[–-]/);
@@ -214,25 +244,22 @@ describe('ChildWeeklyReportDetailScreen', () => {
 
   // BUG-903 (b): Every report must have at least one CTA. The "Open child"
   // CTA reroutes a parent who sees zeros so they never hit a dead end.
-  it('[BUG-903] always renders at least one CTA', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport(),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('[BUG-903] always renders at least one CTA', async () => {
+    setReport(makeReport());
+
+    active = renderWeeklyReport();
+
+    await waitFor(() => {
+      screen.getByTestId('child-weekly-report-ctas');
     });
-
-    render(<ChildWeeklyReportDetailScreen />);
-
-    screen.getByTestId('child-weekly-report-ctas');
     screen.getByTestId('child-weekly-report-open-child');
   });
 
   // BUG-903 (d): Empty week shows friendly empty-state copy AND nudge CTA,
   // not "0 / 0 / 0 / 0" cards alone.
-  it('[BUG-903] empty week shows nudge CTA and empty-state copy', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport({
+  it('[BUG-903] empty week shows nudge CTA and empty-state copy', async () => {
+    setReport(
+      makeReport({
         thisWeek: {
           totalSessions: 0,
           totalActiveMinutes: 0,
@@ -245,20 +272,19 @@ describe('ChildWeeklyReportDetailScreen', () => {
           comparison: "No activity this week — that's OK. A nudge can help.",
         },
       }),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+    );
+
+    active = renderWeeklyReport();
+
+    await waitFor(() => {
+      screen.getByTestId('child-weekly-report-empty-note');
     });
-
-    render(<ChildWeeklyReportDetailScreen />);
-
-    screen.getByTestId('child-weekly-report-empty-note');
     screen.getByText('parentView.weeklyReport.sendNudge:{"name":"Emma"}');
   });
 
-  it('[BUG-903] empty week CTA opens the nudge sheet instead of navigating', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport({
+  it('[BUG-903] empty week CTA opens the nudge sheet instead of navigating', async () => {
+    setReport(
+      makeReport({
         thisWeek: {
           totalSessions: 0,
           totalActiveMinutes: 0,
@@ -271,30 +297,26 @@ describe('ChildWeeklyReportDetailScreen', () => {
           comparison: "No activity this week — that's OK. A nudge can help.",
         },
       }),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
+    );
 
-    render(<ChildWeeklyReportDetailScreen />);
-    fireEvent.press(screen.getByTestId('child-weekly-report-open-child'));
+    active = renderWeeklyReport();
+    fireEvent.press(
+      await waitFor(() => screen.getByTestId('child-weekly-report-open-child')),
+    );
 
     screen.getByTestId('nudge-action-sheet');
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   // BUG-903 (b): "Open child" CTA navigates to /(app)/child/[id].
-  it('[BUG-903] CTA navigates to the child profile detail', () => {
-    mockUseChildWeeklyReportDetail.mockReturnValue({
-      data: makeReport(),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
+  it('[BUG-903] CTA navigates to the child profile detail', async () => {
+    setReport(makeReport());
 
-    render(<ChildWeeklyReportDetailScreen />);
+    active = renderWeeklyReport();
 
-    fireEvent.press(screen.getByTestId('child-weekly-report-open-child'));
+    fireEvent.press(
+      await waitFor(() => screen.getByTestId('child-weekly-report-open-child')),
+    );
 
     expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-001');
   });

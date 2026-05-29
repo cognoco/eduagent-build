@@ -1,11 +1,15 @@
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import {
   fetchCallsMatching,
   type RoutedMockFetch,
 } from '../../../../test-utils/mock-api-routes';
+import {
+  createScreenWrapper,
+  createTestProfile,
+} from '../../../../test-utils/screen-render';
 import ShelfScreen from './index';
 
 jest.mock(
@@ -30,24 +34,10 @@ jest.mock('../../../../lib/api-client', () => {
   return mockApiClientFactory(mockFetch);
 });
 
-jest.mock('../../../../lib/profile', () => ({
-  ...jest.requireActual('../../../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-    },
-  }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
-}));
+// [GC6] lib/profile mock removed — the test now provides a REAL
+// ProfileContext.Provider via the shared `createScreenWrapper` harness, so
+// `useProfile()` (read by useBooks / useSubjects for the active profile id)
+// runs against an actual context value instead of a stub.
 
 // ---------------------------------------------------------------------------
 // External / rendering mocks (kept — not API hooks)
@@ -187,18 +177,26 @@ function resetRoutes() {
 }
 
 // ---------------------------------------------------------------------------
-// QueryClient wrapper
+// QueryClient + real ProfileContext wrapper (via shared harness)
 // ---------------------------------------------------------------------------
+
+const TEST_PROFILE = createTestProfile({
+  id: 'test-profile-id',
+  accountId: 'test-account-id',
+  displayName: 'Test Learner',
+  isOwner: true,
+  birthYear: 1990,
+});
 
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  }
+  const { wrapper: Wrapper } = createScreenWrapper({
+    activeProfile: TEST_PROFILE,
+    profiles: [TEST_PROFILE],
+    queryClient,
+  });
   return { queryClient, Wrapper };
 }
 

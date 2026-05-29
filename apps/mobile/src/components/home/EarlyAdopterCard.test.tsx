@@ -1,19 +1,18 @@
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
+import {
+  renderScreen,
+  cleanupScreen,
+  createTestProfile,
+} from '../../test-utils/screen-render';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
-
-jest.mock('../../lib/profile', () => ({
-  ...jest.requireActual('../../lib/profile'),
-  useProfile: () => ({ activeProfile: { id: 'profile-1' } }),
-}));
 
 // lib/secure-storage wraps expo-secure-store, which is
 // globally stubbed in test-setup.ts; using the real wrapper here keeps the
 // sanitizeSecureStoreKey logic exercised and avoids duplicating the in-memory store.
-
-jest.mock('../feedback/FeedbackProvider', () => ({
-  ...jest.requireActual('../feedback/FeedbackProvider'),
-  useFeedbackContext: () => ({ openFeedback: jest.fn() }),
-}));
+//
+// The real useFeedbackContext() resolves to its default noop value when no
+// FeedbackProvider is mounted — no test asserts openFeedback is invoked — so
+// the real context runs without an internal mock.
 
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
@@ -33,9 +32,22 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+const cardProfile = createTestProfile({ id: 'profile-1', isOwner: true });
+
 describe('EarlyAdopterCard', () => {
+  let active: ReturnType<typeof renderScreen> | null = null;
+
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
+  });
+
   function renderCard(totalSessions = 2) {
-    return render(<EarlyAdopterCard totalSessions={totalSessions} />);
+    active = renderScreen(<EarlyAdopterCard totalSessions={totalSessions} />, {
+      profile: cardProfile,
+    });
+    return active.result;
   }
 
   it('renders the card when not dismissed and under session cap', async () => {

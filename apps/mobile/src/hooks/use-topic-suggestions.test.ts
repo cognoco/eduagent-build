@@ -4,43 +4,40 @@
 
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createScreenWrapper,
+  createTestProfile,
+  createRoutedMockFetch,
+  type RoutedMockFetch,
+} from '../test-utils/screen-render';
+import type { ApiResponseError } from '../lib/assert-ok';
+import { ForbiddenError } from '../lib/api-errors';
 import { useTopicSuggestions } from './use-topic-suggestions';
 
-const mockFetch = jest.fn();
-
-// prettier-ignore
-jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-// prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: hook tests need a fixed active profile without provider setup
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
-
+// Real ProfileContext + real api-client (Clerk's useAuth is globally mocked in
+// test-setup), driven by a routed mock fetch installed as globalThis.fetch.
+// Per-call overrides via mockResolvedValueOnce take priority over the routed
+// default, preserving the original canned-response test flow.
+let mockFetch: RoutedMockFetch;
 let queryClient: QueryClient;
+let prevFetch: typeof globalThis.fetch;
+
+beforeEach(() => {
+  prevFetch = globalThis.fetch;
+  mockFetch = createRoutedMockFetch();
+  (globalThis as unknown as { fetch: typeof fetch }).fetch =
+    mockFetch as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+});
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createScreenWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+    profiles: [createTestProfile({ id: 'test-profile-id' })],
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
@@ -61,13 +58,8 @@ const mockSuggestions = [
 ];
 
 describe('useTopicSuggestions', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
   afterEach(() => {
-    queryClient.clear();
+    queryClient?.clear();
   });
 
   it('returns topic suggestions on success', async () => {
@@ -159,7 +151,8 @@ describe('useTopicSuggestions', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
-    expect((result.current.error as Error).message).toMatch(/500/);
+    // assertOk maps 5xx → UpstreamError with the status attached as a field.
+    expect((result.current.error as ApiResponseError).status).toBe(500);
   });
 
   it('does not retry on API error (retry: false)', async () => {
@@ -237,7 +230,9 @@ describe('useTopicSuggestions', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect((result.current.error as Error).message).toMatch(/403/);
+    // The api-client boundary classifies 403 into a typed ForbiddenError so
+    // screens switch on error type rather than parsing status codes.
+    expect(result.current.error).toBeInstanceOf(ForbiddenError);
   });
 
   it('returns stale data while revalidating', async () => {

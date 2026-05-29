@@ -1,7 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, fireEvent } from '@testing-library/react-native';
 import React from 'react';
 
+import { renderScreen, cleanupScreen } from '../test-utils/screen-render';
 import { AccountSecurity } from './account-security';
 
 let mockUser: Record<string, unknown> = {};
@@ -15,13 +15,6 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: jest.fn() }),
 }));
 
-// ChangePassword (rendered when the row is expanded) calls useQueryClient()
-// and useProfile() — both need providers. Pattern mirrors change-password.test.tsx.
-jest.mock('../lib/profile', () => ({
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({ profiles: [] }),
-})); // gc1-allow: external boundary stub for QueryClient-dependent child component
-
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
   useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
@@ -30,15 +23,12 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
 }));
 
 function renderWithProviders(ui: React.ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
+  return renderScreen(ui);
 }
 
 describe('AccountSecurity', () => {
+  let active: ReturnType<typeof renderScreen> | null = null;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockUser = {
@@ -47,8 +37,14 @@ describe('AccountSecurity', () => {
     };
   });
 
+  afterEach(() => {
+    if (active) active.cleanup();
+    active = null;
+    cleanupScreen();
+  });
+
   it('renders Change Password row for password users', () => {
-    renderWithProviders(<AccountSecurity visible />);
+    active = renderWithProviders(<AccountSecurity visible />);
     screen.getByText('Change Password');
   });
 
@@ -57,7 +53,7 @@ describe('AccountSecurity', () => {
       passwordEnabled: false,
       externalAccounts: [{ provider: 'google' }],
     };
-    renderWithProviders(<AccountSecurity visible />);
+    active = renderWithProviders(<AccountSecurity visible />);
     screen.getByText(/Secured via Google/);
     expect(screen.queryByText('Change Password')).toBeNull();
   });
@@ -67,18 +63,18 @@ describe('AccountSecurity', () => {
       passwordEnabled: false,
       externalAccounts: [{ provider: 'apple' }],
     };
-    renderWithProviders(<AccountSecurity visible />);
+    active = renderWithProviders(<AccountSecurity visible />);
     screen.getByText(/Secured via Apple/);
   });
 
   it('expands password form when Change Password is tapped', () => {
-    renderWithProviders(<AccountSecurity visible />);
+    active = renderWithProviders(<AccountSecurity visible />);
     fireEvent.press(screen.getByText('Change Password'));
     screen.getByTestId('current-password');
   });
 
   it('does not render when visible is false', () => {
-    const { toJSON } = renderWithProviders(<AccountSecurity visible={false} />);
-    expect(toJSON()).toBeNull();
+    active = renderWithProviders(<AccountSecurity visible={false} />);
+    expect(active.result.toJSON()).toBeNull();
   });
 });

@@ -2,52 +2,41 @@
  * Break tests for OutboxDrainProvider bugs #540, #541, #542.
  *
  * Strategy:
- * - Real message-outbox with the AsyncStorage mock from test-setup.ts (no gc1 issue).
+ * - Real message-outbox with the AsyncStorage mock from test-setup.ts.
+ * - Real api-client + getApiUrl: Clerk's useAuth is globally mocked in
+ *   test-setup, and importing screen-render sets EXPO_PUBLIC_API_URL, so the
+ *   real Hono client and URL resolver run. The provider's escalation $post
+ *   resolves against the routed mock fetch installed below (default 200).
  * - Fake XHR replacing global.XMLHttpRequest (same technique as sse.test.ts) so
  *   streamSSEViaXHR is exercised for real — no internal mock of the sse module.
- * - useProfile, useApiClient, getApiUrl, Sentry are mocked (gc1-allow below).
+ * - useProfile is mocked as a per-render control surface: the bug scenarios
+ *   switch the active profile mid-drain while the provider stays mounted, which
+ *   a static ProfileContext wrapper cannot express (rerender keeps the wrapper
+ *   value fixed). KEEP.
+ * - lib/sentry is the local re-export of the external @sentry/react-native
+ *   boundary (mocked globally in test-setup); mocked here so addBreadcrumb /
+ *   captureException are observable. KEEP.
  */
 
 import { render, act, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// Importing screen-render sets EXPO_PUBLIC_API_URL so the real getApiUrl()
+// returns a usable base URL for the provider's XHR/Hono calls.
+import { createRoutedMockFetch } from '../test-utils/screen-render';
 import { enqueue } from '../lib/message-outbox';
 
 import { OutboxDrainProvider } from './OutboxDrainProvider';
 import { useProfile } from '../lib/profile';
-import { useApiClient } from '../lib/api-client';
 import { Sentry } from '../lib/sentry';
 
-// gc1-allow: useProfile drives the entire provider behaviour; the real
-// implementation pulls in Clerk, SecureStore, QueryClient, and full profile
-// state machine — instantiating that tree here would exercise auth/storage
-// internals unrelated to the three outbox bugs under test.
+// gc1-allow: useProfile is a per-render control surface here. The bug scenarios
+// switch the active profile mid-drain while the provider stays mounted; a
+// static ProfileContext wrapper cannot change its value across rerender, so the
+// real provider would never see the switch the tests assert on.
 // prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: auth tree
+jest.mock('../lib/profile', () => ({ // gc1-allow: mid-drain profile-switch control surface
   ...jest.requireActual('../lib/profile'),
   useProfile: jest.fn(),
-}));
-
-// gc1-allow: useApiClient, getProxyMode, withIdempotencyKey are Hono-RPC
-// wrappers; building a real client requires a running Hono server.  The
-// provider only calls client.support['outbox-spillover'].$post for escalation,
-// which is exercised through postToSupport and is irrelevant to these 3 bugs.
-// prettier-ignore
-jest.mock('../lib/api-client', () => ({ // gc1-allow: Hono client
-  useApiClient: jest.fn(),
-  getProxyMode: jest.fn().mockReturnValue(false),
-  withIdempotencyKey: jest.fn(
-    (headers: Record<string, string>, key: string) => ({
-      ...headers,
-      'Idempotency-Key': key,
-    }),
-  ),
-}));
-
-// gc1-allow: getApiUrl is a thin env-var reader; real implementation reads
-// EXPO_PUBLIC_API_URL from the environment, which is not set in Jest.
-// prettier-ignore
-jest.mock('../lib/api', () => ({ // gc1-allow: env URL
-  getApiUrl: jest.fn().mockReturnValue('http://localhost:8787'),
 }));
 
 // gc1-allow: Sentry.captureException / addBreadcrumb are side-effect sinks;
@@ -58,6 +47,8 @@ jest.mock('../lib/api', () => ({ // gc1-allow: env URL
 jest.mock('../lib/sentry', () => ({ // gc1-allow: native Sentry
   Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
 }));
+
+let prevFetch: typeof globalThis.fetch;
 
 // ---------------------------------------------------------------------------
 // Fake XHR helpers (mirrors pattern from sse.test.ts)
@@ -175,11 +166,6 @@ function setupMocks(profileId: string) {
   (useProfile as jest.Mock).mockReturnValue({
     activeProfile: makeProfile(profileId),
   });
-  const mockPost = jest.fn().mockResolvedValue({ ok: true });
-  (useApiClient as jest.Mock).mockReturnValue({
-    support: { 'outbox-spillover': { $post: mockPost } },
-  });
-  return { mockPost };
 }
 
 // Kept for parity with the implementation file's renderProvider helper, but
@@ -203,6 +189,11 @@ describe('OutboxDrainProvider', () => {
     originalXhr = (global as unknown as { XMLHttpRequest?: unknown })
       .XMLHttpRequest;
     getXhrInstances = installFakeXhr();
+    // Route the real api-client's escalation $post through a default-200 mock
+    // fetch so the Hono client resolves without a live server.
+    prevFetch = globalThis.fetch;
+    (globalThis as unknown as { fetch: typeof fetch }).fetch =
+      createRoutedMockFetch() as unknown as typeof fetch;
     await AsyncStorage.clear();
     jest.clearAllMocks();
   });
@@ -210,6 +201,7 @@ describe('OutboxDrainProvider', () => {
   afterEach(() => {
     (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest =
       originalXhr;
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
   });
 
   // -------------------------------------------------------------------------
@@ -402,13 +394,6 @@ describe('OutboxDrainProvider', () => {
       (useProfile as jest.Mock).mockReturnValue({
         activeProfile: makeProfile('profile-G'),
       });
-      (useApiClient as jest.Mock).mockReturnValue({
-        support: {
-          'outbox-spillover': {
-            $post: jest.fn().mockResolvedValue({ ok: true }),
-          },
-        },
-      });
 
       const { rerender } = render(
         <OutboxDrainProvider>{null}</OutboxDrainProvider>,
@@ -451,13 +436,6 @@ describe('OutboxDrainProvider', () => {
     it('adds a Sentry breadcrumb when drain is skipped due to missing activeProfile (CR-2026-05-21-152)', async () => {
       // Arrange: no active profile (simulates mid-sign-out race).
       (useProfile as jest.Mock).mockReturnValue({ activeProfile: undefined });
-      (useApiClient as jest.Mock).mockReturnValue({
-        support: {
-          'outbox-spillover': {
-            $post: jest.fn().mockResolvedValue({ ok: true }),
-          },
-        },
-      });
 
       render(<OutboxDrainProvider>{null}</OutboxDrainProvider>);
 
@@ -489,13 +467,6 @@ describe('OutboxDrainProvider', () => {
 
       (useProfile as jest.Mock).mockReturnValue({
         activeProfile: makeProfile('profile-H'),
-      });
-      (useApiClient as jest.Mock).mockReturnValue({
-        support: {
-          'outbox-spillover': {
-            $post: jest.fn().mockResolvedValue({ ok: true }),
-          },
-        },
       });
 
       const { rerender } = render(
