@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../lib/platform-alert';
-import { useRouter, type Href } from 'expo-router';
+import { Redirect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
@@ -57,6 +57,8 @@ interface SubjectRetentionResponse {
   topics: LibraryRetentionTopic[];
   reviewDueCount: number;
 }
+
+type NavigationContract = ReturnType<typeof useNavigationContract>;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -140,13 +142,25 @@ function SubjectStatusPill({
 // ---------------------------------------------------------------------------
 
 export default function LibraryScreen() {
+  const navigationContract = useNavigationContract();
+  if (!navigationContract.canEnter('library')) {
+    return <Redirect href="/(app)/home" />;
+  }
+
+  return <LibraryScreenContent navigationContract={navigationContract} />;
+}
+
+function LibraryScreenContent({
+  navigationContract,
+}: {
+  navigationContract: NavigationContract;
+}) {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const { colorScheme } = useTheme();
   const { activeProfile, profiles } = useProfile();
-  const navigationContract = useNavigationContract();
   const canWrite = !navigationContract.isParentProxy;
   const isGuardian = isGuardianProfile(activeProfile, profiles);
   const activeProfileRole = useActiveProfileRole();
