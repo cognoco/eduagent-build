@@ -107,6 +107,33 @@ describe('OpenAI Provider', () => {
       );
     });
 
+    it('[FCR-2026-05-23-L11.F11] data.error preserves structured cause chain', async () => {
+      const structuredError = {
+        message: 'Rate limit exceeded',
+        type: 'rate_limit_error',
+        code: 'rate_limit_exceeded',
+      };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ error: structuredError }),
+      });
+
+      let caughtError: unknown;
+      try {
+        await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error).message).toContain('Rate limit exceeded');
+      // Structured error fields must be preserved as cause for Sentry grouping.
+      expect((caughtError as Error & { cause: unknown }).cause).toEqual(
+        structuredError,
+      );
+    });
+
     it('throws on empty choices array', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

@@ -204,6 +204,28 @@ describe('Gemini Provider', () => {
       ).rejects.toThrow('Gemini API error: Invalid API key');
     });
 
+    it('[FCR-2026-05-23-L11.F11] data.error preserves structured cause chain', async () => {
+      const structuredError = { message: 'Quota exceeded', code: 429 };
+      fetchSpy.mockResolvedValue(mockFetchResponse({ error: structuredError }));
+
+      let caughtError: unknown;
+      try {
+        await provider.chat(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG,
+        );
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error).message).toContain('Quota exceeded');
+      // Structured error fields must be preserved as cause for Sentry grouping.
+      expect((caughtError as Error & { cause: unknown }).cause).toEqual(
+        structuredError,
+      );
+    });
+
     it('concatenates initial contiguous system messages into systemInstruction', async () => {
       fetchSpy.mockResolvedValue(mockFetchResponse(geminiResponse('response')));
 

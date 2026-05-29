@@ -143,7 +143,11 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
       const data = (await res.json()) as OpenAIResponse;
 
       if (data.error) {
-        throw new Error(`OpenAI API error: ${data.error.message}`);
+        // [FCR-2026-05-23-L11.F11] Preserve structured error as cause so Sentry
+        // captures type/code fields for grouping (rate-limit, auth, content-filter).
+        throw new Error(`OpenAI API error: ${data.error.message}`, {
+          cause: data.error,
+        });
       }
 
       const text = data.choices?.[0]?.message?.content;
