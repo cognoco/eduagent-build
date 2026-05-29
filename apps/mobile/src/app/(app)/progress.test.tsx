@@ -264,6 +264,13 @@ function makeSession(overrides?: Record<string, unknown>) {
   };
 }
 
+// Relative timestamps keep "recent" sessions inside the 14-day
+// isProfileStale window regardless of when the suite runs. Absolute dates
+// here previously aged out, flipping the self view to the stale/empty state
+// and hiding the Recent sessions surface. SESSION_1 stays newer than SESSION_2.
+const RECENT_SESSION_AT = new Date(Date.now() - 2 * 86_400_000).toISOString();
+const OLDER_SESSION_AT = new Date(Date.now() - 3 * 86_400_000).toISOString();
+
 interface BuildRoutesOptions {
   inventory?: InventoryFixture;
   childInventory?: InventoryFixture;
@@ -603,7 +610,7 @@ describe('ProgressScreen — progressive disclosure', () => {
             subjectName: 'Math',
             topicId: TOPIC_UUID_1,
             topicTitle: 'Fractions',
-            startedAt: '2026-05-15T10:00:00Z',
+            startedAt: RECENT_SESSION_AT,
             exchangeCount: 3,
             durationSeconds: 600,
             wallClockSeconds: 600,
@@ -613,7 +620,7 @@ describe('ProgressScreen — progressive disclosure', () => {
             sessionId: SESSION_2,
             subjectId: SUBJECT_UUID_2,
             subjectName: 'Biology',
-            startedAt: '2026-05-14T10:00:00Z',
+            startedAt: OLDER_SESSION_AT,
             exchangeCount: 2,
             durationSeconds: 300,
             wallClockSeconds: 300,
@@ -658,7 +665,7 @@ describe('ProgressScreen — progressive disclosure', () => {
             subjectName: 'Math',
             topicId: TOPIC_UUID_1,
             topicTitle: 'Fractions',
-            startedAt: '2026-05-15T10:00:00Z',
+            startedAt: RECENT_SESSION_AT,
             exchangeCount: 3,
             durationSeconds: 600,
             wallClockSeconds: 600,
