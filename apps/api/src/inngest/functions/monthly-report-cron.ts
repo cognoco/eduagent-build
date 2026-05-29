@@ -547,6 +547,13 @@ export const monthlyReportGenerate = inngest.createFunction(
       if (!activeParent) {
         return { sent: false, reason: 'profile_archived' as const };
       }
+      const activeChild = await db.query.profiles.findFirst({
+        where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
+        columns: { id: true },
+      });
+      if (!activeChild) {
+        return { sent: false, reason: 'profile_archived' as const };
+      }
       await sendPushNotification(
         db,
         {
@@ -599,7 +606,14 @@ export const monthlyReportGenerate = inngest.createFunction(
             })
           : null;
         const parentEmail = parentAccount?.email ?? null;
+        const childProfile = await db.query.profiles.findFirst({
+          where: and(eq(profiles.id, childId), isNull(profiles.archivedAt)),
+          columns: { id: true },
+        });
 
+        if (!childProfile) {
+          return { sent: false, reason: 'profile_archived' };
+        }
         if (!parentEmail) {
           // Expected: OAuth-only accounts or Clerk not exposing email field.
           return { sent: false, reason: 'no_email' };

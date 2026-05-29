@@ -88,6 +88,7 @@ type PreparedWeeklyProgressDigest =
       status: 'prepared';
       parentId: string;
       reportWeek: string;
+      childProfileIds: string[];
       childSummaries: string[];
       struggleLines: ChildStruggleLine[];
       shouldSendPush: boolean;
@@ -327,9 +328,11 @@ export const weeklyProgressPushCron = inngest.createFunction(
       );
 
       // 3. Keep only parents whose local time is 09:00 right now. [FR239.1 UX-9]
-      return eligibleProfileIds.filter((id) =>
-        isLocalHour9(timezoneByProfileId.get(id) ?? null, nowUtc),
-      );
+      return profileTimezones
+        .map((row) => row.profileId)
+        .filter((id) =>
+          isLocalHour9(timezoneByProfileId.get(id) ?? null, nowUtc),
+        );
     });
 
     // [CR-2026-05-21-189] nowUtc/currentWeekStart computed INSIDE a dedicated
@@ -601,6 +604,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           const reportWeek = reportWeekStart;
 
           const childSummaries: string[] = [];
+          const childProfileIds: string[] = [];
           const struggleLines: ChildStruggleLine[] = [];
           for (const link of links) {
             // Consent gate (parity with sendStruggleNotification and ParentDashboardSummary):
@@ -625,6 +629,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               columns: { displayName: true },
             });
             if (!child) continue;
+            childProfileIds.push(link.childProfileId);
 
             const latest = await getLatestSnapshot(db, link.childProfileId);
             if (!latest) continue;
@@ -839,6 +844,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             status: 'prepared' as const,
             parentId,
             reportWeek,
+            childProfileIds,
             childSummaries,
             struggleLines,
             shouldSendPush,
@@ -864,6 +870,18 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             });
             if (!activeParent) {
               return { sent: false, reason: 'profile_archived' as const };
+            }
+            for (const childProfileId of prepared.childProfileIds) {
+              const activeChild = await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, childProfileId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { id: true },
+              });
+              if (!activeChild) {
+                return { sent: false, reason: 'profile_archived' as const };
+              }
             }
             return sendPushNotification(db, {
               profileId: parentId,
@@ -894,6 +912,18 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             });
             if (!activeParent) {
               return { sent: false, reason: 'profile_archived' as const };
+            }
+            for (const childProfileId of prepared.childProfileIds) {
+              const activeChild = await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, childProfileId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { id: true },
+              });
+              if (!activeChild) {
+                return { sent: false, reason: 'profile_archived' as const };
+              }
             }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,

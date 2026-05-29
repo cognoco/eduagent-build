@@ -286,6 +286,7 @@ beforeEach(() => {
   mockInngestTransport.clear();
   mockDb.query.familyLinks.findMany.mockResolvedValue([]);
   mockDb.query.consentStates.findFirst.mockResolvedValue(null);
+  mockDb.query.profiles.findFirst.mockReset();
   mockDb.query.profiles.findFirst.mockResolvedValue(null);
   mockDb.query.learningProfiles.findFirst.mockResolvedValue({ struggles: [] });
   mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
@@ -538,6 +539,10 @@ describe('weekly progress parent eligibility', () => {
     mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('queues an email-only parent even when push is disabled', async () => {
     mockDb.query.familyLinks.findMany.mockResolvedValue([
       { parentProfileId: 'parent-email-only' },
@@ -580,6 +585,39 @@ describe('weekly progress parent eligibility', () => {
           expect.objectContaining({
             name: 'app/weekly-progress-push.generate',
             data: expect.objectContaining({ parentId: 'parent-email-only' }),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('[WI-86] does not queue parents missing from the active-profile timezone query', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-11T09:00:00.000Z') });
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { parentProfileId: 'parent-archived' },
+    ]);
+    mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
+    mockDb.select.mockReturnValue({
+      from: () => ({
+        innerJoin: () => ({ where: async () => [] }),
+      }),
+    });
+
+    const { step, sendEventCalls } = createInngestStepRunner();
+    const handler = (
+      weeklyProgressPushCron as unknown as {
+        fn: (ctx: { step: typeof step }) => Promise<unknown>;
+      }
+    ).fn;
+
+    const result = (await handler({ step })) as { queuedParents: number };
+
+    expect(result.queuedParents).toBe(0);
+    expect(sendEventCalls).not.toContainEqual(
+      expect.objectContaining({
+        payload: expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.objectContaining({ parentId: 'parent-archived' }),
           }),
         ]),
       }),
@@ -755,6 +793,38 @@ describe('weekly progress generate practice summary', () => {
             status: 'prepared',
             parentId: PARENT_ID,
             reportWeek: '2026-05-11',
+            childProfileIds: [CHILD_ID],
+            childSummaries: ['Alex: +1 topics'],
+            struggleLines: [],
+            shouldSendPush: true,
+            shouldSendEmail: true,
+            parentEmail: 'parent@example.com',
+          },
+        },
+      },
+    );
+
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'throttled', parentId: PARENT_ID });
+  });
+
+  it('[WI-86] skips weekly push and email when a child is archived after preparation', async () => {
+    mockDb.query.profiles.findFirst
+      .mockResolvedValueOnce({ id: PARENT_ID })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: PARENT_ID })
+      .mockResolvedValueOnce(null);
+
+    const result = await executeGenerateSteps(
+      { parentId: PARENT_ID },
+      {
+        runResults: {
+          'prepare-weekly-progress-digest': {
+            status: 'prepared',
+            parentId: PARENT_ID,
+            reportWeek: '2026-05-11',
+            childProfileIds: [CHILD_ID],
             childSummaries: ['Alex: +1 topics'],
             struggleLines: [],
             shouldSendPush: true,
