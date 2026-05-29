@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { FlatList, ScrollView, Text, View, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
@@ -132,6 +132,18 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
         ? t('progress.vocabulary.emptyMessageMany')
         : t('progress.vocabulary.emptyMessageNone');
 
+  const vocabKeyExtractor = useCallback(
+    (s: SubjectInventory) => s.subjectId,
+    [],
+  );
+
+  const vocabRenderItem = useCallback(
+    ({ item }: { item: SubjectInventory }) => (
+      <SubjectVocabSection subject={item} />
+    ),
+    [],
+  );
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
@@ -175,8 +187,8 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
             <FlatList
               className="flex-1 px-5"
               data={subjectsWithVocab}
-              keyExtractor={(s) => s.subjectId}
-              renderItem={({ item }) => <SubjectVocabSection subject={item} />}
+              keyExtractor={vocabKeyExtractor}
+              renderItem={vocabRenderItem}
               contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
               initialNumToRender={8}
               maxToRenderPerBatch={8}

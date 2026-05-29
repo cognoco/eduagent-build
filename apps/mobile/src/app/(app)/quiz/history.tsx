@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -43,6 +44,81 @@ export default function QuizHistoryScreen() {
   const isPracticeReturn = returnTo === 'practice';
   const backHref = isPracticeReturn ? '/(app)/practice' : '/(app)/quiz';
   const returnParams = isPracticeReturn ? { returnTo } : {};
+
+  const keyExtractor = useCallback(
+    (section: { date: string }) => section.date,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({
+      item: section,
+    }: {
+      item: { date: string; items: NonNullable<typeof rounds> };
+    }) => (
+      <View className="mb-4">
+        <Text className="text-on-surface-muted px-4 py-2 text-sm font-medium">
+          {formatDateHeader(section.date)}
+        </Text>
+        {section.items.map((round) => {
+          const activityLabelMap: Record<string, string> = {
+            capitals: t('quiz.history.activityLabels.capitals'),
+            guess_who: t('quiz.history.activityLabels.guessWho'),
+            vocabulary: t('quiz.history.activityLabels.vocabulary'),
+          };
+          const baseLabel =
+            activityLabelMap[round.activityType] ??
+            round.activityType.replace(/_/g, ' ');
+          // [BUG-930] Vocabulary rounds are otherwise indistinguishable
+          // by language at a glance — quiz_rounds has no languageCode
+          // column yet, so we extract the language word from the theme
+          // when one is detectable. Falls back to plain "Vocabulary"
+          // when no known language prefix is found, so we never invent
+          // a language attribution for non-language quizzes.
+          const detectedLanguage =
+            round.activityType === 'vocabulary'
+              ? extractLanguageFromTheme(round.theme)
+              : null;
+          const label = detectedLanguage
+            ? `${baseLabel}: ${detectedLanguage}`
+            : baseLabel;
+          return (
+            <Pressable
+              key={round.id}
+              testID={`quiz-history-row-${round.id}`}
+              className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/quiz/[roundId]',
+                  params: { roundId: round.id },
+                } as Href)
+              }
+              accessibilityRole="button"
+              accessibilityLabel={t('quiz.history.rowLabel', {
+                label,
+                theme: round.theme,
+                score: round.score,
+                total: round.total,
+              })}
+            >
+              <Text className="text-on-surface font-semibold">{label}</Text>
+              <Text className="text-on-surface-muted text-sm">
+                {round.theme}
+              </Text>
+              <Text className="text-on-surface mt-1">
+                {t('quiz.history.score', {
+                  score: round.score,
+                  total: round.total,
+                  xp: round.xpEarned,
+                })}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    ),
+    [t, router],
+  );
 
   if (isLoading) {
     return (
@@ -176,69 +252,8 @@ export default function QuizHistoryScreen() {
       </View>
       <FlatList
         data={sections}
-        keyExtractor={(section) => section.date}
-        renderItem={({ item: section }) => (
-          <View className="mb-4">
-            <Text className="text-on-surface-muted px-4 py-2 text-sm font-medium">
-              {formatDateHeader(section.date)}
-            </Text>
-            {section.items.map((round) => {
-              const activityLabelMap: Record<string, string> = {
-                capitals: t('quiz.history.activityLabels.capitals'),
-                guess_who: t('quiz.history.activityLabels.guessWho'),
-                vocabulary: t('quiz.history.activityLabels.vocabulary'),
-              };
-              const baseLabel =
-                activityLabelMap[round.activityType] ??
-                round.activityType.replace(/_/g, ' ');
-              // [BUG-930] Vocabulary rounds are otherwise indistinguishable
-              // by language at a glance — quiz_rounds has no languageCode
-              // column yet, so we extract the language word from the theme
-              // when one is detectable. Falls back to plain "Vocabulary"
-              // when no known language prefix is found, so we never invent
-              // a language attribution for non-language quizzes.
-              const detectedLanguage =
-                round.activityType === 'vocabulary'
-                  ? extractLanguageFromTheme(round.theme)
-                  : null;
-              const label = detectedLanguage
-                ? `${baseLabel}: ${detectedLanguage}`
-                : baseLabel;
-              return (
-                <Pressable
-                  key={round.id}
-                  testID={`quiz-history-row-${round.id}`}
-                  className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(app)/quiz/[roundId]',
-                      params: { roundId: round.id },
-                    } as Href)
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel={t('quiz.history.rowLabel', {
-                    label,
-                    theme: round.theme,
-                    score: round.score,
-                    total: round.total,
-                  })}
-                >
-                  <Text className="text-on-surface font-semibold">{label}</Text>
-                  <Text className="text-on-surface-muted text-sm">
-                    {round.theme}
-                  </Text>
-                  <Text className="text-on-surface mt-1">
-                    {t('quiz.history.score', {
-                      score: round.score,
-                      total: round.total,
-                      xp: round.xpEarned,
-                    })}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
       />
     </View>
   );

@@ -145,6 +145,19 @@ export default function SavedBookmarksScreen() {
     [deleteBookmark, t],
   );
 
+  const keyExtractor = useCallback((item: Bookmark) => item.id, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: Bookmark }) => (
+      <BookmarkRow
+        bookmark={item}
+        onDelete={handleDelete}
+        canDelete={canDelete}
+      />
+    ),
+    [handleDelete, canDelete],
+  );
+
   return (
     <View className="flex-1 bg-background">
       <View className="px-4 pt-4 pb-2 flex-row items-center">
@@ -171,14 +184,8 @@ export default function SavedBookmarksScreen() {
 
       <FlatList
         data={bookmarks}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <BookmarkRow
-            bookmark={item}
-            onDelete={handleDelete}
-            canDelete={canDelete}
-          />
-        )}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 8,
