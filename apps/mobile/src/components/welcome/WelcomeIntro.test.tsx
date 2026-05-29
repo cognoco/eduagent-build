@@ -125,6 +125,13 @@ describe('<WelcomeIntro audience="learner" />', () => {
     expect(screen.getByTestId('welcome-card-3-scene')).toBeTruthy();
   });
 
+  it('frames each learner scene as a mini app screen', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
+    expect(screen.getByTestId('welcome-card-1-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-2-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-3-scene-frame')).toBeTruthy();
+  });
+
   it('learner card 1 shows the mentor-chat exchange', () => {
     render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     expect(screen.getByText('I do not get this yet.')).toBeTruthy();
@@ -188,6 +195,13 @@ describe('<WelcomeIntro audience="parent" />', () => {
         "Let's start with what you've tried. Walk me through step one.",
       ),
     ).toBeTruthy();
+  });
+
+  it('frames each parent scene as a mini app screen', () => {
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
+    expect(screen.getByTestId('welcome-card-1-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-2-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-3-scene-frame')).toBeTruthy();
   });
 
   it('parent card 2 shows a progress overview', () => {

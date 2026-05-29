@@ -44,6 +44,52 @@ export interface WelcomeIntroProps {
 // Each deck composes its scenes from these so the locale surface stays small
 // and the visuals share one set of theme-driven styles.
 
+function SceneFrame({
+  testID,
+  children,
+}: {
+  testID: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const colors = useThemeColors();
+
+  return (
+    <View
+      testID={`${testID}-frame`}
+      className="w-full rounded-3xl border px-5 py-5 mb-7"
+      style={{
+        minHeight: 218,
+        backgroundColor: colors.practiceDarkTeal,
+        borderColor: colors.primary,
+      }}
+    >
+      <View className="flex-row items-center justify-between mb-4">
+        <Text
+          className="text-caption font-bold"
+          style={{ color: colors.textInverse }}
+        >
+          MentoMate
+        </Text>
+        <View className="flex-row items-center">
+          <View
+            className="rounded-full mr-1"
+            style={{ width: 5, height: 5, backgroundColor: colors.primary }}
+          />
+          <View
+            className="rounded-full mr-1"
+            style={{ width: 5, height: 5, backgroundColor: colors.accent }}
+          />
+          <View
+            className="rounded-full"
+            style={{ width: 5, height: 5, backgroundColor: colors.muted }}
+          />
+        </View>
+      </View>
+      <View testID={testID}>{children}</View>
+    </View>
+  );
+}
+
 function ChatScene({
   testID,
   colors,
@@ -56,23 +102,26 @@ function ChatScene({
   replyText: string;
 }): React.ReactElement {
   return (
-    <View testID={testID} className="w-full mb-8">
+    <SceneFrame testID={testID}>
       <View
-        className="self-end rounded-2xl px-4 py-3 mb-2"
+        className="self-end rounded-2xl px-4 py-3 mb-3"
         style={{ backgroundColor: colors.accent, maxWidth: '80%' }}
       >
-        <Text className="text-body-sm" style={{ color: colors.textInverse }}>
+        <Text
+          className="text-body-sm font-semibold"
+          style={{ color: colors.textInverse }}
+        >
           {askText}
         </Text>
       </View>
       <View
         className="self-start rounded-2xl px-4 py-3 flex-row items-start"
-        style={{ backgroundColor: colors.surfaceElevated, maxWidth: '85%' }}
+        style={{ backgroundColor: colors.surface, maxWidth: '88%' }}
       >
         <Ionicons
           name="sparkles"
           size={14}
-          color={colors.accent}
+          color={colors.primary}
           style={{ marginRight: 6, marginTop: 3 }}
         />
         <Text
@@ -82,7 +131,7 @@ function ChatScene({
           {replyText}
         </Text>
       </View>
-    </View>
+    </SceneFrame>
   );
 }
 
@@ -96,22 +145,31 @@ function ChipsScene({
   chips: ReadonlyArray<string>;
 }): React.ReactElement {
   return (
-    <View
-      testID={testID}
-      className="w-full flex-row flex-wrap justify-center mb-8"
-    >
-      {chips.map((label) => (
-        <View
-          key={label}
-          className="rounded-full px-3 py-2 mr-2 mb-2"
-          style={{ backgroundColor: colors.surfaceElevated }}
-        >
-          <Text className="text-body-sm" style={{ color: colors.textPrimary }}>
-            {label}
-          </Text>
-        </View>
-      ))}
-    </View>
+    <SceneFrame testID={testID}>
+      <View className="flex-row flex-wrap justify-center pt-3">
+        {chips.map((label, index) => (
+          <View
+            key={label}
+            className="rounded-full px-3 py-2 mr-2 mb-2"
+            style={{
+              backgroundColor:
+                index === 0 ? colors.primarySoft : colors.surface,
+              borderWidth: 1,
+              borderColor: index === 0 ? colors.primary : colors.border,
+            }}
+          >
+            <Text
+              className="text-body-sm font-semibold"
+              style={{
+                color: index === 0 ? colors.textInverse : colors.textPrimary,
+              }}
+            >
+              {label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </SceneFrame>
   );
 }
 
@@ -130,17 +188,31 @@ function RowsScene({
   }>;
 }): React.ReactElement {
   return (
-    <View testID={testID} className="w-full mb-8">
+    <SceneFrame testID={testID}>
       {rows.map((r) => (
         <View
           key={r.key}
           className="flex-row items-start rounded-2xl px-4 py-3 mb-2"
-          style={{ backgroundColor: colors.surfaceElevated }}
+          style={{
+            backgroundColor:
+              r.key === 'strong' || r.key === 'next'
+                ? colors.primarySoft
+                : colors.surface,
+            borderWidth: 1,
+            borderColor:
+              r.key === 'strong' || r.key === 'next'
+                ? colors.primary
+                : colors.border,
+          }}
         >
           <Ionicons
             name={r.icon}
             size={18}
-            color={colors.accent}
+            color={
+              r.key === 'strong' || r.key === 'next'
+                ? colors.primary
+                : colors.accent
+            }
             style={{ marginRight: 10, marginTop: 1 }}
           />
           <View className="flex-1">
@@ -151,7 +223,7 @@ function RowsScene({
               {r.label}
             </Text>
             <Text
-              className="text-body-sm mt-0.5"
+              className="text-body-sm font-semibold mt-0.5"
               style={{ color: colors.textPrimary }}
             >
               {r.body}
@@ -159,7 +231,7 @@ function RowsScene({
           </View>
         </View>
       ))}
-    </View>
+    </SceneFrame>
   );
 }
 
@@ -181,17 +253,27 @@ function SubjectsResumeScene({
   resumeBody: string;
 }): React.ReactElement {
   return (
-    <View testID={testID} className="w-full mb-8">
+    <SceneFrame testID={testID}>
       <View className="flex-row justify-between mb-3">
-        {subjects.map((s) => (
+        {subjects.map((s, index) => (
           <View
             key={s.key}
             className="rounded-2xl items-center justify-center px-3 py-3"
-            style={{ backgroundColor: colors.surfaceElevated, width: '31%' }}
+            style={{
+              backgroundColor:
+                index === 0 ? colors.primarySoft : colors.surface,
+              borderWidth: 1,
+              borderColor: index === 0 ? colors.primary : colors.border,
+              width: '31%',
+            }}
           >
-            <Ionicons name={s.icon} size={24} color={colors.accent} />
+            <Ionicons
+              name={s.icon}
+              size={24}
+              color={index === 0 ? colors.primary : colors.accent}
+            />
             <Text
-              className="text-caption mt-2"
+              className="text-caption font-semibold mt-2"
               style={{ color: colors.textPrimary }}
             >
               {s.label}
@@ -201,7 +283,11 @@ function SubjectsResumeScene({
       </View>
       <View
         className="flex-row items-start rounded-2xl px-4 py-3"
-        style={{ backgroundColor: colors.surface }}
+        style={{
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
       >
         <Ionicons
           name="play-back-circle-outline"
@@ -224,7 +310,7 @@ function SubjectsResumeScene({
           </Text>
         </View>
       </View>
-    </View>
+    </SceneFrame>
   );
 }
 
