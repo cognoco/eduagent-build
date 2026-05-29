@@ -78,12 +78,15 @@ describe('buildAppHelpPromptBlock', () => {
     expect(block).toMatch(/learning accommodation/i);
   });
 
-  it('contains Explorer mode explanation', () => {
-    expect(block).toMatch(/explorer/i);
+  it('describes Challenge Round (the per-round successor to the removed mode toggle)', () => {
+    expect(block).toMatch(/challenge round/i);
+    expect(block).toMatch(/per round/i);
   });
 
-  it('contains Challenge mode explanation', () => {
-    expect(block).toMatch(/challenge/i);
+  it('does NOT advertise the removed Explorer/Challenge mode toggle', () => {
+    expect(block).not.toMatch(/explorer mode/i);
+    expect(block).not.toMatch(/challenge mode/i);
+    expect(block).not.toMatch(/mode button/i);
   });
 
   it('contains core More destinations', () => {
@@ -102,10 +105,14 @@ describe('buildAppHelpPromptBlock', () => {
 
   it('contains parent-specific destinations', () => {
     expect(block).toMatch(/child/i);
-    expect(block).toMatch(/child's card/i);
+    expect(block).toMatch(/open progress/i);
     expect(block).toMatch(/learning preferences/i);
     expect(block).not.toMatch(/profile selector/i);
     expect(block).not.toMatch(/Switch to the child's profile/i);
+    // V0/V1-neutral wording: parents reach a child's surfaces via Progress,
+    // not via "tap the child's card" (which is a V1-only Family home pattern
+    // and not the production default while MODE_NAV_V1_ENABLED is off).
+    expect(block).not.toMatch(/child's card/i);
   });
 
   it('does not contain Expo route strings', () => {
@@ -139,12 +146,14 @@ describe('buildAppHelpPromptBlock', () => {
     expect(block).toContain(en.more.privacy.privacyAndData);
     expect(block).toContain(en.more.notifications.sectionHeader);
     expect(block).toContain(en.more.accommodation.sectionHeader);
-    expect(block).toContain(
-      en.more.accommodation.childScreenTitle.replace(
-        '{{name}}',
-        '<child name>',
-      ),
+    // The map uses V0/V1-neutral prose ("their learning preferences row")
+    // rather than the childScreenTitle label verbatim; verify the
+    // childScreenTitle key still exists in i18n and that the map contains
+    // "learning preferences" as a substring.
+    expect(en.more.accommodation.childScreenTitle).toContain(
+      'learning preferences',
     );
+    expect(block).toMatch(/learning preferences/i);
     expect(block).toContain(en.more.account.profile);
   });
 
