@@ -12,6 +12,7 @@ import {
 import type { StopReason } from './stop-reason';
 import { sanitizeXmlValue } from './sanitize';
 import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
+import { SafetyFilterError } from '../../errors';
 import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
 
@@ -607,18 +608,107 @@ function recordFailure(providerId: string): void {
 
 // R-02: only transient errors should trip the circuit
 function isTransientError(err: unknown): boolean {
-  const status =
-    (err as { status?: number }).status ??
-    (err as { statusCode?: number }).statusCode;
+  if (isSafetyPolicyError(err)) return false;
+
+  const status = findHttpStatus(err);
   if (status != null) {
-    // 429 (rate limit) is transient; other 4xx are client errors
-    if (status === 429) return true;
+    // 408 (timeout) and 429 (rate limit) are transient; other 4xx are client errors
+    if (status === 408 || status === 429) return true;
     if (status >= 400 && status < 500) return false;
     // 5xx is transient
     return true;
   }
+  if (isValidationPolicyError(err)) return false;
   // Network errors, timeouts, unknown — treat as transient
   return true;
+}
+
+function findHttpStatus(err: unknown): number | undefined {
+  if (typeof err !== 'object' || err === null) return undefined;
+
+  const candidate = err as {
+    cause?: unknown;
+    code?: unknown;
+    status?: unknown;
+    statusCode?: unknown;
+  };
+  const status = readHttpStatus(candidate.status);
+  if (status != null) return status;
+
+  const statusCode = readHttpStatus(candidate.statusCode);
+  if (statusCode != null) return statusCode;
+
+  const code = readHttpStatus(candidate.code);
+  if (code != null) return code;
+
+  return findHttpStatus(candidate.cause);
+}
+
+function readHttpStatus(value: unknown): number | undefined {
+  if (typeof value !== 'number') return undefined;
+  if (!Number.isInteger(value)) return undefined;
+  if (value < 100 || value > 599) return undefined;
+  return value;
+}
+
+function isSafetyPolicyError(err: unknown): boolean {
+  if (err instanceof SafetyFilterError) return true;
+  if (err instanceof Error && isSafetyPolicyError(err.cause)) return true;
+  if (typeof err !== 'object' || err === null) return false;
+
+  const candidate = err as {
+    code?: unknown;
+    errorCode?: unknown;
+    name?: unknown;
+    type?: unknown;
+  };
+  const safetyMarkers = new Set([
+    'SafetyFilterError',
+    'ContentFilterError',
+    'ContentPolicyError',
+    'SAFETY_FILTER',
+    'safety_filter',
+    'CONTENT_FILTER',
+    'content_filter',
+    'content_policy_violation',
+  ]);
+
+  return [candidate.name, candidate.errorCode, candidate.code, candidate.type]
+    .filter((value): value is string => typeof value === 'string')
+    .some((value) => safetyMarkers.has(value));
+}
+
+function isValidationPolicyError(err: unknown): boolean {
+  if (err instanceof Error && isValidationPolicyError(err.cause)) return true;
+  if (typeof err !== 'object' || err === null) return false;
+
+  const candidate = err as {
+    code?: unknown;
+    errorCode?: unknown;
+    name?: unknown;
+    type?: unknown;
+  };
+  const validationMarkers = new Set([
+    'authentication_error',
+    'bad_request',
+    'failed_precondition',
+    'forbidden',
+    'invalid_api_key',
+    'invalid_argument',
+    'invalid_request',
+    'invalid_request_error',
+    'not_found',
+    'not_found_error',
+    'permission_denied',
+    'permission_error',
+    'policy_violation',
+    'unauthenticated',
+  ]);
+
+  return [candidate.name, candidate.errorCode, candidate.code, candidate.type]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.toLowerCase())
+    .some((value) => validationMarkers.has(value));
 }
 
 function canAttempt(providerId: string): boolean {
@@ -714,6 +804,9 @@ async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastError = err;
+      if (!isTransientError(err)) {
+        throw err;
+      }
       if (attempt < maxRetries) {
         const jitter = Math.random() * 500;
         const delay = INITIAL_RETRY_DELAY_MS * 2 ** attempt + jitter;
@@ -819,7 +912,8 @@ export async function routeAndCall(
       };
     } catch (err) {
       // R-02: only count transient errors toward circuit trips
-      if (isTransientError(err)) {
+      const transient = isTransientError(err);
+      if (transient) {
         recordFailure(circuitKey);
       } else {
         getCircuit(circuitKey).probeInFlight = false;
@@ -831,9 +925,11 @@ export async function routeAndCall(
         conversationLanguage: _options?.conversationLanguage,
         flow: _options?.flow,
         sessionId: _options?.sessionId,
-        transient: isTransientError(err),
+        transient,
         ...getErrorDiagnostics(err),
       });
+      if (!transient) throw err;
+
       // Fall through to fallback
       const fallbackConfig = getFallbackConfig(
         config,
@@ -939,7 +1035,8 @@ async function attemptProvider(
       stopReason: result.stopReason,
     };
   } catch (err) {
-    if (isTransientError(err)) {
+    const transient = isTransientError(err);
+    if (transient) {
       recordFailure(circuitKey);
     } else {
       getCircuit(circuitKey).probeInFlight = false;
@@ -951,7 +1048,7 @@ async function attemptProvider(
       conversationLanguage: metricContext.conversationLanguage,
       flow: metricContext.flow,
       sessionId: metricContext.sessionId,
-      transient: isTransientError(err),
+      transient,
       ...getErrorDiagnostics(err),
     });
     throw err;
@@ -1060,7 +1157,8 @@ async function* wrapStreamWithCircuitBreaker(
     onStopReason(await innerStopReasonPromise);
     forwardedStopReason = true;
   } catch (err) {
-    if (isTransientError(err)) {
+    const transient = isTransientError(err);
+    if (transient) {
       recordFailure(circuitKey);
     } else {
       getCircuit(circuitKey).probeInFlight = false;
@@ -1072,13 +1170,13 @@ async function* wrapStreamWithCircuitBreaker(
       conversationLanguage: metricContext.conversationLanguage,
       flow: metricContext.flow,
       sessionId: metricContext.sessionId,
-      transient: isTransientError(err),
+      transient,
       chunksYielded,
       ...getErrorDiagnostics(err),
     });
 
     // Pre-first-byte failure with available fallback → try fallback stream
-    if (chunksYielded === 0 && fallbackConfig) {
+    if (transient && chunksYielded === 0 && fallbackConfig) {
       const fallbackProvider = providers.get(fallbackConfig.provider);
       const fallbackCircuitKey = getCircuitKey(
         fallbackConfig.provider,
