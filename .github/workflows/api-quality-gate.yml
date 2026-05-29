@@ -36,3 +36,21 @@ jobs:
 
       - name: Typecheck API
         run: pnpm exec nx run api:typecheck
+
+      # [M13] Detect whether LLM prompt or eval-harness files changed.
+      # Tier-1 eval (pnpm eval:llm) is free — it builds prompt strings and
+      # compares snapshots without making any real LLM calls. Run it whenever
+      # prompt builders or the harness itself are touched so prompt drift is
+      # caught on PRs rather than only when a developer manually remembers.
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590  # v3
+        id: prompt-changes
+        with:
+          filters: |
+            prompts:
+              - 'apps/api/eval-llm/**'
+              - 'apps/api/src/services/**/*-prompts.ts'
+              - 'apps/api/src/services/llm/**'
+
+      - name: LLM eval harness — Tier 1 (prompt snapshots)
+        if: steps.prompt-changes.outputs.prompts == 'true'
+        run: pnpm eval:llm
