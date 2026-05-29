@@ -20,8 +20,9 @@
 #   - apps/mobile/src/app/(app)/quiz/launch.tsx:219  (quiz-launch-error-fallback)
 #   - apps/mobile/src/app/(app)/quiz/launch.tsx:270  (quiz-launch-back)
 #   - apps/mobile/src/app/(app)/quiz/launch.tsx:263  (quiz-launch-retry — must be ABSENT)
-#   - apps/mobile/src/app/(app)/quiz/index.tsx:179   (quiz-index-screen)
-#   - apps/mobile/src/app/(app)/quiz/index.tsx:241   (quiz-capitals)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx:197   (quiz-index-screen)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx:277   (quiz-capitals)
+#   - apps/mobile/src/app/(app)/practice/index.tsx   (practice-screen — back lands here, not quiz-index)
 #   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen)
 #   - apps/mobile/src/app/(app)/practice.tsx          (practice-screen, practice-quiz)
 appId: com.mentomate.app
@@ -114,13 +115,19 @@ tags:
 
 - takeScreenshot: quiz-quota-04-retry-suppressed
 
-# 11. Tap Go Back → should return to quiz index
+# 11. Tap Go Back → returns to practice screen.
+#     The quiz index was entered from practice.tsx via openQuiz() which passes
+#     returnTo: PRACTICE_RETURN_TO ('practice'). index.tsx forwards that param
+#     to launch.tsx, so exitHref = homeHrefForReturnTo('practice') = '/(app)/practice'.
+#     router.replace('/(app)/practice') renders practice-screen, NOT quiz-index-screen.
+#     Source: apps/mobile/src/lib/navigation.ts:45 (homeHrefForReturnTo)
+#             apps/mobile/src/app/(app)/quiz/launch.tsx:117 (exitHref)
 - tapOn:
     id: "quiz-launch-back"
 
 - extendedWaitUntil:
     visible:
-      id: "quiz-index-screen"
+      id: "practice-screen"
     timeout: 10000
 
-- takeScreenshot: quiz-quota-05-returned-to-index
+- takeScreenshot: quiz-quota-05-returned-to-practice
