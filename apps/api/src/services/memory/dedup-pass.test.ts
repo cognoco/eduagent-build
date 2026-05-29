@@ -116,7 +116,9 @@ function makeArgs(opts: {
           : [],
       ),
     findManyActive: jest.fn().mockResolvedValue([]),
-    findCascadeAncestry: jest.fn().mockResolvedValue({ rows: [] }),
+    // findCascadeAncestry now returns MemoryFactRow[] directly (no .rows wrapper)
+    // following the CR-2026-05-21-168 fix that validates rows via memoryFactsRowSchema.
+    findCascadeAncestry: jest.fn().mockResolvedValue([]),
   };
 
   const fakeScoped = {
