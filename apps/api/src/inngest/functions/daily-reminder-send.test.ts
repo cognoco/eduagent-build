@@ -64,22 +64,6 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
 
-jest.mock(
-  '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
-  () => ({
-    profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
-  }),
-);
-
-jest.mock(
-  'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
-  () => ({
-    and: jest.fn(),
-    eq: jest.fn(),
-    isNull: jest.fn(),
-  }),
-);
-
 import { dailyReminderSend } from './daily-reminder-send';
 
 async function executeHandler(

@@ -883,10 +883,8 @@ export async function filterProgressMetricsToActiveSubjects(
   profileId: string,
   metrics: ProgressMetrics,
 ): Promise<ProgressMetrics> {
-  const subjectRows = await db.query.subjects.findMany({
-    where: eq(subjects.profileId, profileId),
-    columns: { id: true, status: true },
-  });
+  const repo = createScopedRepository(db, profileId);
+  const subjectRows = await repo.subjects.findMany();
   const liveSubjectIds = new Set(
     subjectRows
       .filter((subject) => subject.status !== 'archived')
