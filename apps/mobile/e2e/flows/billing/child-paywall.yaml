@@ -1,7 +1,20 @@
-# PARKED (2026-05-29): Reaches ChildPaywall only after switching to a child profile
-# in parent-proxy mode, for which no UI entry currently exists (see [ACCOUNT-04];
-# proxy returns with a redesigned entry). Proxy logic is unit-tested. This flow stays
-# here, OUT of the run manifest, until the new proxy entry ships.
+# PARKED (audit re-verified 2026-05-29): Reaches ChildPaywall only after switching
+# to a child profile in parent-proxy mode (isParentProxy=true). After the [ACCOUNT-04]
+# / BUG-774 refactor of `apps/mobile/src/app/profiles.tsx:185-202`, tapping a child
+# from the owner account routes to `childProfileHref(...'settings')`
+# (child-detail-scroll), NOT proxy mode. Proxy mode is now only reachable via
+# `switchProfile(id, { proxyMode: true })` from internal/test code
+# (see `apps/mobile/src/lib/profile.ts:71,84,373`). Until a user-facing proxy
+# entry ships, this flow stays OUT of the run manifest. Proxy + ChildPaywall
+# rendering remain unit-tested (apps/mobile/src/app/(app)/subscription.test.tsx
+# lines 1778, 1827, 1856, 1887, 1932).
+#
+# UNBLOCK CONDITION: when a user-facing affordance invokes
+# `switchProfile(id, { proxyMode: true })` (currently zero call sites in
+# `apps/mobile/src/` outside of tests), update `_setup/switch-to-child.yaml`
+# to drive that affordance and re-add this flow to the run manifest. The
+# `mode-switcher-*` testIDs in `components/chrome/ModeSwitcher.tsx` are
+# study↔family mode toggles, NOT child impersonation — not the right entry.
 #
 # Flow: Child Paywall — Expired Trial Child-Friendly Paywall
 # Validates: when a child profile's trial has expired, the subscription screen
@@ -12,13 +25,31 @@
 # Journey: UX Journey 5 (Billing & Subscription) + Consent Lifecycle
 # Epics: Epic 5, Epic 9 (RevenueCat IAP), UX Persona Walkthrough
 # Prerequisite: Seeded parent+child account with expired trial
-#               (scenario: trial-expired-child)
+#               (scenario: trial-expired-child — apps/api/src/services/test-seed.ts:5414
+#               → seedTrialExpiredChild at line 1955; child displayName "Paywall Teen"
+#               at line 1971; child isOwner:false at line 1973).
+#
+# testIDs verified 2026-05-29 against current source:
+#   - child-paywall ............ apps/mobile/src/app/(app)/_subscription/_components/ChildPaywall.tsx:209
+#   - notify-parent-button ..... ChildPaywall.tsx:252
+#   - browse-library-button .... ChildPaywall.tsx:302
+#   - more-row-learning-preferences .... apps/mobile/src/app/(app)/more/index.tsx:133
+#   - more-row-account ......... apps/mobile/src/app/(app)/more/index.tsx:151
+#   - more-account-scroll ...... apps/mobile/src/app/(app)/more/account.tsx:67
+#   ChildPaywall render gate: deriveChildPaywallGate in subscription.tsx:187
+#   (showPaywall = !isOwnerProfile && trialOrExpired) — unchanged.
 #
 # BUG-52: The trial-expired-child seed creates a parent-owned account.
 # Sign-in authenticates as the parent (account owner), landing on the parent
 # dashboard. The ChildPaywall only renders for non-owner profiles with an
 # expired trial. Fix: switch to the child profile before navigating to
 # the Subscription screen.
+#
+# KNOWN BREAK (re-enable work): step 3 below waits for `learner-screen`, but
+# switch-to-child.yaml now lands on `child-detail-scroll` post-ACCOUNT-04.
+# When unblocking, either point switch-to-child at a proxy-mode entry that
+# does land on the learner shell, or rewrite steps 3-7 to navigate from
+# child-detail-scroll back into the child's learner shell.
 appId: com.mentomate.app
 tags:
   - nightly

@@ -30,6 +30,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../../lib/format-relative-date', () => ({
+  ...jest.requireActual('../../../lib/format-relative-date'),
   formatRelativeDate: (iso: string) => `relative(${iso})`,
 }));
 
