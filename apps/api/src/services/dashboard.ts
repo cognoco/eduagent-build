@@ -1348,7 +1348,10 @@ export async function getChildSubjectTopics(
 }
 
 // ---------------------------------------------------------------------------
-// Child session list + transcript (parent trust feature)
+// Child session list + recap (parent trust feature)
+// Parents see DERIVED data only — LLM recap (narrative/highlight/prompt/
+// engagement), metadata, and drill scores. The raw conversation transcript
+// (sessionEvents.content) is never selected here or returned to a parent.
 // ChildSessionDrillScore, ChildSession, getProfileSessions moved to
 // ./session/session-crud (PR-2 surface-ownership-boundaries). Re-exported below.
 // ---------------------------------------------------------------------------
