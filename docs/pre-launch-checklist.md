@@ -46,9 +46,10 @@ Last updated: 2026-05-23
   - [ ] `DATABASE_URL_STAGING_HOST`
   - [ ] `DATABASE_URL_PRODUCTION_HOST`
   - [ ] `EXPO_TOKEN`
-  - [ ] `DOPPLER_TOKEN` (needed for automatic secret sync in deploy workflow)
-  - [ ] `STAGING_API_URL` — optional override; defaults to `https://api-stg.mentomate.com`
-  - [ ] `PRODUCTION_API_URL` — optional override; defaults to `https://api.mentomate.com`
+  - [ ] `DOPPLER_TOKEN_STG` — config-scoped Doppler service token for staging; used by `deploy.yml` Doppler→Worker sync step
+  - [ ] `DOPPLER_TOKEN_PRD` — config-scoped Doppler service token for production; used by `deploy.yml` Doppler→Worker sync step
+  - [ ] `STAGING_API_URL` — optional smoke-test override; defaults to `https://api-stg.mentomate.com` (set only if the custom domain differs)
+  - [ ] `PRODUCTION_API_URL` — optional smoke-test override; defaults to `https://api.mentomate.com` (set only if the custom domain differs)
 
 - [ ] **Verify production database migration path**
   - `deploy.yml` runs committed migrations against the selected target after DB host verification and before `wrangler deploy`

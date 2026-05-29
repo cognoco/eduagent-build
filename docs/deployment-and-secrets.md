@@ -615,11 +615,12 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `DOPPLER_TOKEN_STG` | `deploy.yml`, `e2e-web.yml` — staging Doppler service token for Worker secret sync |
 | `DOPPLER_TOKEN_PRD` | `deploy.yml` — production Doppler service token for Worker secret sync |
 | `SKIP_DOPPLER_SYNC` | `deploy.yml` — opt-out flag when Doppler→Worker sync was run locally before dispatch |
-| `STAGING_API_URL` | Optional deploy smoke override; defaults to `https://api-stg.mentomate.com` |
-| `PRODUCTION_API_URL` | Optional deploy smoke override; defaults to `https://api.mentomate.com` |
+| `STAGING_API_URL` | Optional smoke-test override for `deploy.yml` `api-smoke-test` job; defaults to `https://api-stg.mentomate.com`. Set only when the staging custom domain differs (e.g. during a domain migration). |
+| `PRODUCTION_API_URL` | Optional smoke-test override for `deploy.yml` `api-production-smoke-test` job; defaults to `https://api.mentomate.com`. Set only when the production custom domain differs. |
 | `EXPO_TOKEN` | `deploy.yml`, `mobile-ci.yml`, `ci.yml` — authenticates EAS CLI |
 | `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW` | `ci.yml` (OTA update step), `e2e-ci.yml`, `e2e-web.yml` — Clerk publishable key for preview/staging |
 | `EXPO_PUBLIC_SENTRY_DSN` | `ci.yml` — Sentry DSN injected into preview OTA updates |
+| `EXPO_PUBLIC_GIT_SHA` | Not a GitHub secret — injected as `${{ github.sha }}` directly in `ci.yml` OTA update step env block. Enables `contract-drift-check.ts` to compare the mobile bundle's commit against the deployed API SHA. |
 | `TEST_SEED_SECRET` | `e2e-ci.yml`, `e2e-web.yml`, `e2e-web-cleanup.yml` — auth for test seed endpoint |
 | `CLAUDE_CODE_OAUTH_TOKEN` (+ `_2`, `_3`) | `claude.yml`, `claude-code-review.yml` — AI review |
 

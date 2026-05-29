@@ -362,6 +362,11 @@ jobs:
       - name: Resolve staging API URL
         id: resolve-url
         run: |
+          # [FCR-2026-05-23-L14.F13] STAGING_API_URL is an optional GitHub Actions
+          # secret. If unset the step uses the default custom domain below. Set the
+          # secret only when the staging deployment target differs from the default
+          # (e.g. during a domain migration or blue/green rollout). Document it in
+          # docs/deployment-and-secrets.md under "GitHub Actions secrets".
           # Use the STAGING_API_URL secret if configured; default to the custom
           # domain routed in apps/api/wrangler.toml.
           if [ -n "${{ secrets.STAGING_API_URL }}" ]; then
@@ -487,6 +492,11 @@ jobs:
       - name: Resolve production API URL
         id: resolve-url
         run: |
+          # [FCR-2026-05-23-L14.F13] PRODUCTION_API_URL is an optional GitHub Actions
+          # secret. If unset the step uses the default custom domain below. Set the
+          # secret only when the production deployment target differs from the default
+          # (e.g. during a domain migration or blue/green rollout). Document it in
+          # docs/deployment-and-secrets.md under "GitHub Actions secrets".
           if [ -n "${{ secrets.PRODUCTION_API_URL }}" ]; then
             RESOLVED_URL="${{ secrets.PRODUCTION_API_URL }}"
           else
