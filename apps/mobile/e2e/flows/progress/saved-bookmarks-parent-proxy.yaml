@@ -1,3 +1,8 @@
+# PARKED (2026-05-29): Asserts the isParentProxy=true gate, but no UI entry currently
+# reaches parent-proxy mode (see [ACCOUNT-04]; proxy returns with a redesigned entry).
+# Proxy logic is unit-tested. This flow stays here, OUT of the run manifest, until the
+# new proxy entry ships — then re-point the switch-to-child setup at it.
+#
 # Flow LEARN-24 (Step 2): Saved bookmarks — parent-proxy view-only gate.
 # Validates: in parent-proxy mode (active=child, owner=parent), bookmark-delete
 # button is NOT rendered — isParentProxy=true suppresses the trash icon in BookmarkRow.
@@ -36,13 +41,20 @@ tags:
     env:
       CHILD_NAME: "Proxy Child"
 
-# 3. Wait for learner home in child (proxy) context
+# 3. [ACCOUNT-04] switch-to-child now lands on child-detail-scroll (parent-native
+#    child settings view), NOT learner-screen. Proxy mode (isParentProxy=true) is
+#    no longer activated by this navigation path — the ACCOUNT-04 refactor removed
+#    the proxy entry point from profiles.tsx. The core assertion (bookmark-delete
+#    hidden when isParentProxy=true) cannot be verified via this flow as designed.
+#    NEEDS-HUMAN: redesign this flow to either use a different proxy entry point or
+#    pivot to testing the bookmark gate from the parent-native child route.
+#    Source: apps/mobile/src/app/profiles.tsx:185-202
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "child-detail-scroll"
     timeout: 15000
 
-- takeScreenshot: proxy-bookmarks-01-learner-home
+- takeScreenshot: proxy-bookmarks-01-child-detail
 
 # 4. Navigate to Progress tab
 - tapOn:

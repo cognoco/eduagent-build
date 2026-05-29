@@ -44,7 +44,10 @@ tags:
     id: "sign-up-google-sso"
     optional: true  # justified: sign-up-google-sso testID may not be found by Maestro on Android Pressable (BUG-4 pattern); text assertion below is the reliable fallback
 - assertVisible: "Continue with Google"
-- assertVisible: "Continue with Apple"
+# Apple SSO is gated to Platform.OS === 'ios' (sign-up.tsx:557).
+# On Android (this suite) it MUST NOT appear — assert absence.
+- assertNotVisible:
+    id: "sign-up-apple-sso"
 
 # Divider
 - assertVisible: "or continue with email"

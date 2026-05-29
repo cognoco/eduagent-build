@@ -1,3 +1,10 @@
+# PARKED (2026-05-29): No UI entry point currently reaches parent-proxy mode.
+# Per [ACCOUNT-04] the user-facing "tap child → impersonate" entry was removed;
+# proxy returns later with a redesigned entry ("used differently"). The proxy LOGIC
+# is intact and covered by unit tests (profile.test.tsx ACCOUNT-04 BREAK,
+# use-parent-proxy.test.ts). This flow stays here, OUT of the run manifest, until
+# the new proxy entry ships — then re-point the switch-to-child setup at it.
+#
 # ACCOUNT-30: Impersonated-child More guard [BUG-915]
 #
 # Signs in as a parent, switches to a child profile via the Profiles screen,

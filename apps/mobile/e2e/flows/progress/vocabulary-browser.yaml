@@ -14,11 +14,18 @@ tags:
 - tapOn:
     id: "tab-progress"
 
+# progress-screen is the root testID of the progress tab (progress/index.tsx:486).
+# journey-subject-${SUBJECT_ID} no longer exists — the progress index for a learner
+# shows a stats-chips card, not per-subject journey rows.
+# Source: apps/mobile/src/app/(app)/progress/index.tsx:486
 - extendedWaitUntil:
     visible:
-      id: "journey-subject-${SUBJECT_ID}"
+      id: "progress-screen"
     timeout: 15000
 
+# progress-vocab-stat is inside the ProgressStatsChips card; scroll down in case
+# the stats card is partially below the fold.
+# Source: apps/mobile/src/app/(app)/progress/_components/ProgressStatsChips.tsx:91
 - scrollUntilVisible:
     element:
       id: "progress-vocab-stat"

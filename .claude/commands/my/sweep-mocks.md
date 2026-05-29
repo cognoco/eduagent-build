@@ -3,6 +3,7 @@
 Proactive, breadth-first sweep that addresses **all forms of internal mock backlog** — not just the GC1 forward-only ratchet. For the **reactive** loop where you're running a failing suite and clean mocks only on files you touch, use `/my:run-tests` instead. Both skills share the same canonical replacement pattern, the same shared harnesses, and the same "never weaken assertions" rule — keep them in sync.
 
 A sweep that returns "bare count is 0 — nothing to do" while a single file carries 17 `gc1-allow` mocks all citing the same boundary reason is missing the point. Bare elimination is one of four target categories below; the skill triggers work on all of them.
+When you are done create a PR and follow it through until checks pass. 
 
 ## Target categories
 

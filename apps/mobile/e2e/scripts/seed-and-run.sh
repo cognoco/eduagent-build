@@ -364,10 +364,34 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
     # Dump is empty or shows home/crashed state: force-stop + relaunch once before giving up.
     # This handles WHPX emulator stalls where the app silently fails to render on first launch.
     DUMP_TEXTS=$(echo "$LAST_DUMP" | dump_visible_texts 10 || true)
+    # A crashing system app ("Bluetooth keeps stopping" / ANR / "Close app")
+    # can cover the dev-client launcher so DEVELOPMENT never appears. Dismiss
+    # it with Back and re-check BEFORE the heavier force-stop+relaunch. On this
+    # AVD the Bluetooth service crash-loops intermittently and blocks launch.
+    LAUNCHER_RECOVERED=0
+    if echo "$LAST_DUMP" | grep -q "keeps stopping\|isn't responding\|Close app\|Bluetooth"; then
+      echo "[seed-and-run] System crash dialog over launcher — dismissing (dump: [${DUMP_TEXTS:-empty}]) ..." >&2
+      for _i in 1 2 3; do
+        $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK 2>/dev/null || true
+        sleep 1
+      done
+      if wait_for_text "DEVELOPMENT" 20; then
+        echo "[seed-and-run] Launcher visible after dismissing crash dialog — continuing."
+        LAUNCHER_RECOVERED=1
+      fi
+    fi
+    if [ $LAUNCHER_RECOVERED -eq 1 ]; then
+      : # launcher recovered above; fall through to Metro/bundle handling
+    elif true; then
     echo "[seed-and-run] Launcher not found (dump: [${DUMP_TEXTS:-empty}]). Force-stopping and relaunching ..." >&2
     $ADB $DEVICE_FLAG shell am force-stop "$APP_ID" 2>/dev/null || true
     sleep 3
     $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
+    # Dismiss any crash dialog that re-covers the launcher after relaunch.
+    for _i in 1 2; do
+      $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK 2>/dev/null || true
+      sleep 1
+    done
     if wait_for_text "DEVELOPMENT" 20; then
       echo "[seed-and-run] Launcher appeared after relaunch — continuing."
     else
@@ -386,6 +410,7 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
         echo "[seed-and-run] Dump contents: $(echo "$RETRY_DUMP" | dump_visible_texts 10 || true)" >&2
         exit 1
       fi
+    fi
     fi
   fi
 fi

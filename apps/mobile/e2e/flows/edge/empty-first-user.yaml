@@ -51,11 +51,15 @@ tags:
     # PostApprovalLanding only appears after SecureStore wipe — genuinely optional
     optional: true  # justified: PostApprovalLanding only appears when SecureStore was wiped (pm clear) and profile has CONSENTED status; not shown on every run
 
-# Dismiss PostApprovalLanding if it appeared
+# Dismiss PostApprovalLanding if it appeared.
+# Tap by testID (not text) — the button label is t('tabs.postApproval.letsGo')
+# which renders as "Let's go!" (lowercase g, exclamation), not "Let's Go".
+# Source: apps/mobile/src/app/(app)/_components/PostApprovalLanding.tsx:42
+#         apps/mobile/src/i18n/locales/en.json:2022 ("letsGo": "Let's go!")
 - tapOn:
-    text: "Let's Go"
+    id: "post-approval-continue"
     # Only present if PostApprovalLanding appeared (see step above)
-    optional: true  # justified: "Let's Go" button only present when PostApprovalLanding screen appeared above
+    optional: true  # justified: post-approval-continue only present when PostApprovalLanding screen appeared above
 
 # 2. Wait for the LearnerScreen to render after PostApproval dismiss.
 - extendedWaitUntil:

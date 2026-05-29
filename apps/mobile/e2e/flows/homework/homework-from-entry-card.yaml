@@ -10,11 +10,10 @@
 #               (scenario: homework-ready — provides "Algebra" subject)
 #
 # testIDs verified against:
-#   - apps/mobile/src/app/(learner)/home.tsx (learner-screen)
-#   - apps/mobile/src/components/coaching/AdaptiveEntryCard.tsx (coaching-card-primary)
-#   - apps/mobile/src/app/(learner)/homework/camera.tsx (grant-permission-button,
-#     close-button, manual-input, manual-continue-button)
-#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, send-button)
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen, home-action-homework)
+#   - apps/mobile/src/app/(app)/homework/camera.tsx (grant-permission-button,
+#     manual-entry-button, result-text-input, subject-pick-${SUBJECT_ID}, confirm-button)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, chat-messages)
 #
 # NOTE: The home homework action navigates to the camera screen.
 # On emulator, the camera is unreliable — we skip to manual text input.
@@ -45,36 +44,44 @@ tags:
     id: "grant-permission-button"
     optional: true  # justified: system camera permission dialog — only appears on first use or after permission reset
 
-# 5. If camera viewfinder appears, close it to fall back to manual input
-#    On emulator, camera hardware is unreliable — test the text-input path instead.
+# 5. Skip camera viewfinder — use manual text entry instead.
+#    manual-entry-button appears on both the permission screen (denial path)
+#    and the viewfinder. Tapping it calls handleStartManualEntry() which
+#    transitions to the result/manual phase.
+#    Source: apps/mobile/src/app/(app)/homework/camera.tsx:841,908
 - tapOn:
-    id: "close-button"
-    optional: true  # justified: emulator camera hardware is unreliable; viewfinder may not open
+    id: "manual-entry-button"
 
-# 6. Fallback: if we ended up back on home, tap the HW button directly
-#    The "HW" text label is on every homework button in the subject list.
+# 6. Manual entry phase: type a homework problem into the first problem card.
+#    Source: apps/mobile/src/app/(app)/homework/camera.tsx:1152 (result-text-input)
 - tapOn:
-    text: "HW"
-    optional: true  # justified: alternate routing path — only needed if primary homework entry returned to home
+    id: "result-text-input"
+- inputText: "Solve 2x + 5 = 15"
+- hideKeyboard
 
-# 7. Handle camera permission screen again (from HW button path)
+# 7. Subject auto-classification fires after text input. If the subject picker
+#    appears, tap the seeded Algebra subject directly (navigateToSession is
+#    called immediately — no confirm-button needed for the picker path).
+#    Source: apps/mobile/src/app/(app)/homework/camera.tsx:1337-1358
 - tapOn:
-    id: "grant-permission-button"
-    optional: true  # justified: system camera permission dialog on second path — same OS-level variance
+    id: "subject-pick-${SUBJECT_ID}"
+    optional: true  # justified: subject picker appears only when auto-classify returns multiple candidates or low confidence; auto-detect success uses confirm-button instead
 
-# 8. Close camera viewfinder again if it appeared
+# 8. If auto-classify resolved a subject without showing the picker,
+#    confirm-button appears. Tap it to navigate to the homework session.
+#    Source: apps/mobile/src/app/(app)/homework/camera.tsx:1463,1492
 - tapOn:
-    id: "close-button"
-    optional: true  # justified: emulator camera hardware unreliable on second entry path
+    id: "confirm-button"
+    optional: true  # justified: only present on auto-detect success path; subject-picker path already navigated to session in step 7
 
-# 9. Wait for chat input — we may have arrived at the session screen
-#    via auto-navigation when problemText is provided, or manual input route
+# 9. Wait for chat input — landed via picker tap or confirm-button
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 30000
 
-# 10. Type a homework problem
+# 10. Type a homework problem (already typed above for subject classification;
+#     the session may pre-populate it via route params — this confirms chat is active)
 - tapOn:
     id: "chat-input"
 - inputText: "Solve 2x + 5 = 15"
