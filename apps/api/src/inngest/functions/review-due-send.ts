@@ -6,11 +6,12 @@
 
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   curriculumBooks,
   curriculumTopics,
   curricula,
+  profiles,
   subjects,
 } from '@eduagent/database';
 import {
@@ -34,6 +35,18 @@ export const reviewDueSend = inngest.createFunction(
 
     const result = await step.run('send-review-reminder', async () => {
       const db = getStepDatabase();
+
+      const activeProfile = await db.query.profiles.findFirst({
+        where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
+        columns: { id: true },
+      });
+      if (!activeProfile) {
+        return {
+          status: 'skipped' as const,
+          reason: 'profile_archived',
+          profileId,
+        };
+      }
 
       // [BUG-699-FOLLOWUP] 24h notification-log dedup. Same pattern as the
       // other cron-driven push paths: idempotency covers same-event.id
@@ -84,6 +97,7 @@ export const reviewDueSend = inngest.createFunction(
             and(
               eq(subjects.id, curriculumBooks.subjectId),
               eq(subjects.id, curricula.subjectId),
+              ne(subjects.status, 'archived'),
             ),
           )
           .where(

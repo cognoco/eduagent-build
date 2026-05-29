@@ -17,7 +17,7 @@
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
 
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   accounts,
@@ -41,6 +41,7 @@ import {
   logNotification,
 } from '../../services/settings';
 import {
+  filterProgressMetricsToActiveSubjects,
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
 } from '../../services/snapshot-aggregation';
@@ -87,6 +88,7 @@ type PreparedWeeklyProgressDigest =
       status: 'prepared';
       parentId: string;
       reportWeek: string;
+      childProfileIds: string[];
       childSummaries: string[];
       struggleLines: ChildStruggleLine[];
       shouldSendPush: boolean;
@@ -154,7 +156,7 @@ async function persistWeeklySelfReportForProfile(
   }
 
   const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
+    where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
     columns: { displayName: true },
   });
   if (!profile) {
@@ -179,6 +181,11 @@ async function persistWeeklySelfReportForProfile(
   if (!latest) {
     return { status: 'skipped', reason: 'self_no_snapshot' };
   }
+  const latestMetrics = await filterProgressMetricsToActiveSubjects(
+    db,
+    profileId,
+    latest.metrics,
+  );
 
   const previous = await getLatestSnapshotOnOrBefore(
     db,
@@ -193,6 +200,13 @@ async function persistWeeklySelfReportForProfile(
         new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
       : 0;
   const cappedPrevious = snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+  const cappedPreviousMetrics = cappedPrevious
+    ? await filterProgressMetricsToActiveSubjects(
+        db,
+        profileId,
+        cappedPrevious.metrics,
+      )
+    : null;
 
   const practiceSummary = await getPracticeActivitySummary(db, {
     profileId,
@@ -208,8 +222,8 @@ async function persistWeeklySelfReportForProfile(
   const reportData = generateWeeklyReportData(
     profile.displayName,
     reportWeekStart,
-    latest.metrics,
-    cappedPrevious?.metrics ?? null,
+    latestMetrics,
+    cappedPreviousMetrics,
     practiceSummary,
   );
 
@@ -302,16 +316,23 @@ export const weeklyProgressPushCron = inngest.createFunction(
         .select({ profileId: profiles.id, timezone: accounts.timezone })
         .from(profiles)
         .innerJoin(accounts, eq(profiles.accountId, accounts.id))
-        .where(inArray(profiles.id, eligibleProfileIds));
+        .where(
+          and(
+            inArray(profiles.id, eligibleProfileIds),
+            isNull(profiles.archivedAt),
+          ),
+        );
 
       const timezoneByProfileId = new Map(
         profileTimezones.map((r) => [r.profileId, r.timezone]),
       );
 
       // 3. Keep only parents whose local time is 09:00 right now. [FR239.1 UX-9]
-      return eligibleProfileIds.filter((id) =>
-        isLocalHour9(timezoneByProfileId.get(id) ?? null, nowUtc),
-      );
+      return profileTimezones
+        .map((row) => row.profileId)
+        .filter((id) =>
+          isLocalHour9(timezoneByProfileId.get(id) ?? null, nowUtc),
+        );
     });
 
     // [CR-2026-05-21-189] nowUtc/currentWeekStart computed INSIDE a dedicated
@@ -539,6 +560,18 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         'prepare-weekly-progress-digest',
         async () => {
           const db = getStepDatabase();
+          const parentProfile = await db.query.profiles.findFirst({
+            where: and(eq(profiles.id, parentId), isNull(profiles.archivedAt)),
+            columns: { id: true },
+          });
+          if (!parentProfile) {
+            return {
+              status: 'skipped' as const,
+              reason: 'parent_missing',
+              parentId,
+            };
+          }
+
           const selfReportResult = includeSelfReport
             ? await persistWeeklySelfReportForProfile(
                 db,
@@ -571,6 +604,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           const reportWeek = reportWeekStart;
 
           const childSummaries: string[] = [];
+          const childProfileIds: string[] = [];
           const struggleLines: ChildStruggleLine[] = [];
           for (const link of links) {
             // Consent gate (parity with sendStruggleNotification and ParentDashboardSummary):
@@ -587,8 +621,22 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               continue;
             }
 
+            const child = await db.query.profiles.findFirst({
+              where: and(
+                eq(profiles.id, link.childProfileId),
+                isNull(profiles.archivedAt),
+              ),
+              columns: { displayName: true },
+            });
+            if (!child) continue;
+
             const latest = await getLatestSnapshot(db, link.childProfileId);
             if (!latest) continue;
+            const latestMetrics = await filterProgressMetricsToActiveSubjects(
+              db,
+              link.childProfileId,
+              latest.metrics,
+            );
 
             const previous = await getLatestSnapshotOnOrBefore(
               db,
@@ -609,32 +657,34 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 : 0;
             const cappedPrevious =
               snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
-
-            const child = await db.query.profiles.findFirst({
-              where: eq(profiles.id, link.childProfileId),
-              columns: { displayName: true },
-            });
+            const cappedPreviousMetrics = cappedPrevious
+              ? await filterProgressMetricsToActiveSubjects(
+                  db,
+                  link.childProfileId,
+                  cappedPrevious.metrics,
+                )
+              : null;
 
             const name = child?.displayName ?? 'Your learner';
             const topicDelta = cappedPrevious
               ? Math.max(
                   0,
-                  latest.metrics.topicsMastered -
-                    cappedPrevious.metrics.topicsMastered,
+                  latestMetrics.topicsMastered -
+                    (cappedPreviousMetrics?.topicsMastered ?? 0),
                 )
               : null;
             const vocabDelta = cappedPrevious
               ? Math.max(
                   0,
-                  latest.metrics.vocabularyTotal -
-                    cappedPrevious.metrics.vocabularyTotal,
+                  latestMetrics.vocabularyTotal -
+                    (cappedPreviousMetrics?.vocabularyTotal ?? 0),
                 )
               : null;
             const exploredDelta = cappedPrevious
               ? Math.max(
                   0,
-                  sumTopicsExplored(latest.metrics) -
-                    sumTopicsExplored(cappedPrevious.metrics),
+                  sumTopicsExplored(latestMetrics) -
+                    sumTopicsExplored(cappedPreviousMetrics ?? latestMetrics),
                 )
               : null;
 
@@ -657,8 +707,8 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             const reportData = generateWeeklyReportData(
               name,
               reportWeek,
-              latest.metrics,
-              cappedPrevious?.metrics ?? null,
+              latestMetrics,
+              cappedPreviousMetrics,
               practiceSummary,
             );
             await db
@@ -671,12 +721,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               })
               .onConflictDoNothing();
 
+            const summaryCountBeforeChild = childSummaries.length;
             if (
-              latest.metrics.totalSessions === 0 ||
+              latestMetrics.totalSessions === 0 ||
               (topicDelta === 0 && vocabDelta === 0 && exploredDelta === 0)
             ) {
               childSummaries.push(
-                `${name} took a quieter week and still kept ${latest.metrics.topicsMastered} topics.`,
+                `${name} took a quieter week and still kept ${latestMetrics.topicsMastered} topics.`,
               );
             } else {
               const parts = [
@@ -694,6 +745,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
 
             // Read current struggles for the watch-line (path A: topic names only).
             // Malformed JSONB is skipped gracefully; digest still sends.
+            let hasStruggleTopics = false;
             try {
               const learningProfile = await db.query.learningProfiles.findFirst(
                 {
@@ -710,6 +762,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                     )
                     .slice(0, 2)
                 : [];
+              hasStruggleTopics = topics.length > 0;
               struggleLines.push({ childName: name, topics });
             } catch (err) {
               captureException(err, {
@@ -719,6 +772,12 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 },
               });
               struggleLines.push({ childName: name, topics: [] });
+            }
+            if (
+              childSummaries.length > summaryCountBeforeChild ||
+              hasStruggleTopics
+            ) {
+              childProfileIds.push(link.childProfileId);
             }
           }
 
@@ -774,7 +833,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           let parentEmail: string | null = null;
           if (shouldSendEmail) {
             const parentProfile = await db.query.profiles.findFirst({
-              where: eq(profiles.id, parentId),
+              where: and(
+                eq(profiles.id, parentId),
+                isNull(profiles.archivedAt),
+              ),
               columns: { accountId: true },
             });
             const parentAccount = parentProfile?.accountId
@@ -790,6 +852,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             status: 'prepared' as const,
             parentId,
             reportWeek,
+            childProfileIds,
             childSummaries,
             struggleLines,
             shouldSendPush,
@@ -806,6 +869,28 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
       const pushResult = prepared.shouldSendPush
         ? await step.run('send-weekly-progress-push', async () => {
             const db = getStepDatabase();
+            const activeParent = await db.query.profiles.findFirst({
+              where: and(
+                eq(profiles.id, parentId),
+                isNull(profiles.archivedAt),
+              ),
+              columns: { id: true },
+            });
+            if (!activeParent) {
+              return { sent: false, reason: 'profile_archived' as const };
+            }
+            for (const childProfileId of prepared.childProfileIds) {
+              const activeChild = await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, childProfileId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { id: true },
+              });
+              if (!activeChild) {
+                return { sent: false, reason: 'profile_archived' as const };
+              }
+            }
             return sendPushNotification(db, {
               profileId: parentId,
               title: 'Weekly learning progress',
@@ -825,6 +910,29 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         const emailResult = await step.run(
           'send-weekly-progress-email',
           async () => {
+            const db = getStepDatabase();
+            const activeParent = await db.query.profiles.findFirst({
+              where: and(
+                eq(profiles.id, parentId),
+                isNull(profiles.archivedAt),
+              ),
+              columns: { id: true },
+            });
+            if (!activeParent) {
+              return { sent: false, reason: 'profile_archived' as const };
+            }
+            for (const childProfileId of prepared.childProfileIds) {
+              const activeChild = await db.query.profiles.findFirst({
+                where: and(
+                  eq(profiles.id, childProfileId),
+                  isNull(profiles.archivedAt),
+                ),
+                columns: { id: true },
+              });
+              if (!activeChild) {
+                return { sent: false, reason: 'profile_archived' as const };
+              }
+            }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,
               prepared.childSummaries,

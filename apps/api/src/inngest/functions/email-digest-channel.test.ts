@@ -111,6 +111,11 @@ jest.mock( /* gc1-allow: pattern-a conversion */
     const actual = jest.requireActual('../../services/snapshot-aggregation') as typeof import('../../services/snapshot-aggregation');
     return {
       ...actual,
+      filterProgressMetricsToActiveSubjects: async (
+        _db: unknown,
+        _profileId: unknown,
+        metrics: unknown,
+      ) => metrics,
       getSnapshotsInRange: (...args: unknown[]) =>
         mockGetSnapshotsInRange(...args),
       getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),

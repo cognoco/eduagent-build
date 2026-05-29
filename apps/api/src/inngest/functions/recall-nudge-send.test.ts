@@ -85,6 +85,8 @@ jest.mock(
     and: jest.fn(),
     eq: jest.fn(),
     inArray: jest.fn(),
+    isNull: jest.fn(),
+    ne: jest.fn(),
   }),
 );
 
@@ -95,8 +97,8 @@ jest.mock(
     curricula: {},
     curriculumTopics: {},
     familyLinks: {},
-    profiles: {},
-    subjects: {},
+    profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
+    subjects: { status: 'subjects.status' },
   }),
 );
 
@@ -135,7 +137,7 @@ describe('recallNudgeSend', () => {
     query: {
       curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
-      profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+      profiles: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
     },
     select: createOwnedTopicSelect(),
   };
@@ -143,6 +145,7 @@ describe('recallNudgeSend', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatRecallNudge.mockReturnValue({
       title: 'Topics fading',
       body: 'You have 2 fading topics.',
@@ -206,6 +209,48 @@ describe('recallNudgeSend', () => {
       });
     });
 
+    it('[WI-86] skips stale send events for archived profiles', async () => {
+      mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
+
+      const { result } = await executeHandler({
+        profileId: 'p-archived',
+        fadingCount: 2,
+        topTopicIds: [],
+      });
+
+      expect(mockGetRecentNotificationCount).not.toHaveBeenCalled();
+      expect(mockFormatRecallNudge).not.toHaveBeenCalled();
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'profile_archived',
+        profileId: 'p-archived',
+      });
+    });
+
+    it('[WI-86] does not format guardian nudges with an archived child name', async () => {
+      mockResolveProfileRole.mockResolvedValueOnce('guardian');
+      mockDb.query.familyLinks.findFirst.mockResolvedValueOnce({
+        childProfileId: 'child-archived',
+      });
+      mockDb.query.profiles.findFirst
+        .mockResolvedValueOnce({ id: 'guardian-active' })
+        .mockResolvedValueOnce(null);
+
+      await executeHandler({
+        profileId: 'guardian-active',
+        fadingCount: 2,
+        topTopicIds: [],
+      });
+
+      expect(mockFormatRecallNudge).toHaveBeenCalledWith(
+        2,
+        'your fading topic',
+        'guardian',
+        undefined,
+      );
+    });
+
     it('[WI-80] does not format a nudge with an unowned topic title from event data', async () => {
       mockDb.query.curriculumTopics.findMany.mockResolvedValueOnce([
         { id: 'topic-foreign', title: 'Victim Secret Topic' },
@@ -242,7 +287,7 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
     query: {
       curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
-      profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+      profiles: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
     },
     select: createOwnedTopicSelect(),
   };
@@ -250,6 +295,7 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockResolveProfileRole.mockResolvedValue('learner');
     mockFormatRecallNudge.mockReturnValue({
       title: 'Fading',
@@ -311,7 +357,7 @@ describe('[CR-RECALL-DEDUP-GUARD] getRecentNotificationCount DB failure — fail
     query: {
       curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
       familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
-      profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+      profiles: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }) },
     },
     select: createOwnedTopicSelect(),
   };
@@ -319,6 +365,7 @@ describe('[CR-RECALL-DEDUP-GUARD] getRecentNotificationCount DB failure — fail
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockResolveProfileRole.mockResolvedValue('learner');
     mockFormatRecallNudge.mockReturnValue({
       title: 'Fading',

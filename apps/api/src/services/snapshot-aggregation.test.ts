@@ -76,6 +76,7 @@ import {
   buildSubjectInventory,
   buildSubjectMetric,
   countCompletedBooks,
+  filterProgressMetricsToLiveSubjects,
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
   getSnapshotsInRange,
@@ -781,6 +782,66 @@ describe('buildKnowledgeInventory', () => {
     const result = await buildKnowledgeInventory(db, profileId);
 
     expect(result.currentlyWorkingOn).toEqual(['fractions']);
+  });
+});
+
+describe('filterProgressMetricsToLiveSubjects', () => {
+  it('[WI-86] removes cached subjects that are no longer live and recomputes subject-derived totals', () => {
+    const liveSubjectId = '550e8400-e29b-41d4-a716-446655440010';
+    const archivedSubjectId = '550e8400-e29b-41d4-a716-446655440099';
+    const metrics = makeMetrics({
+      totalSessions: 7,
+      totalActiveMinutes: 70,
+      totalWallClockMinutes: 90,
+      topicsAttempted: 8,
+      topicsMastered: 5,
+      topicsInProgress: 3,
+      vocabularyTotal: 22,
+      vocabularyMastered: 9,
+      subjects: [
+        {
+          ...makeSubjectMetric(liveSubjectId),
+          sessionsCount: 2,
+          activeMinutes: 20,
+          wallClockMinutes: 30,
+          topicsAttempted: 3,
+          topicsMastered: 2,
+          vocabularyTotal: 10,
+          vocabularyMastered: 4,
+        },
+        {
+          ...makeSubjectMetric(archivedSubjectId),
+          sessionsCount: 5,
+          activeMinutes: 50,
+          wallClockMinutes: 60,
+          topicsAttempted: 5,
+          topicsMastered: 3,
+          vocabularyTotal: 12,
+          vocabularyMastered: 5,
+        },
+      ],
+    });
+
+    const result = filterProgressMetricsToLiveSubjects(
+      metrics,
+      new Set([liveSubjectId]),
+    );
+
+    expect(result.subjects.map((subject) => subject.subjectId)).toEqual([
+      liveSubjectId,
+    ]);
+    expect(result).toEqual(
+      expect.objectContaining({
+        totalSessions: 2,
+        totalActiveMinutes: 20,
+        totalWallClockMinutes: 30,
+        topicsAttempted: 3,
+        topicsMastered: 2,
+        topicsInProgress: 1,
+        vocabularyTotal: 10,
+        vocabularyMastered: 4,
+      }),
+    );
   });
 });
 

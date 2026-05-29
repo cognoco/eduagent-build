@@ -59,6 +59,8 @@ jest.mock(
     and: jest.fn(),
     eq: jest.fn(),
     inArray: jest.fn(),
+    isNull: jest.fn(),
+    ne: jest.fn(),
   }),
 );
 
@@ -68,7 +70,8 @@ jest.mock(
     curriculumBooks: {},
     curriculumTopics: {},
     curricula: {},
-    subjects: {},
+    profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
+    subjects: { status: 'subjects.status' },
   }),
 );
 
@@ -91,6 +94,11 @@ async function executeHandler(eventData: {
 describe('reviewDueSend', () => {
   const mockSelectResult: unknown[] = [];
   const mockDb = {
+    query: {
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
+    },
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
         innerJoin: jest.fn().mockReturnValue({
@@ -107,6 +115,7 @@ describe('reviewDueSend', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue(
       'You have 2 topics to review.',
     );
@@ -168,6 +177,25 @@ describe('reviewDueSend', () => {
       });
     });
 
+    it('[WI-86] skips stale send events for archived profiles', async () => {
+      mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
+
+      const { result } = await executeHandler({
+        profileId: 'p-archived',
+        overdueCount: 2,
+        topTopicIds: [],
+      });
+
+      expect(mockGetRecentNotificationCount).not.toHaveBeenCalled();
+      expect(mockFormatReviewReminderBody).not.toHaveBeenCalled();
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'profile_archived',
+        profileId: 'p-archived',
+      });
+    });
+
     it('[WI-80-sweep] does not format review reminder with an unowned subject name from event topic IDs', async () => {
       (mockDb.select as jest.Mock).mockReturnValueOnce({
         from: jest.fn().mockReturnValue({
@@ -203,6 +231,11 @@ describe('reviewDueSend', () => {
 
 describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
   const mockDb = {
+    query: {
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
+    },
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
         innerJoin: jest.fn().mockReturnValue({
@@ -219,6 +252,7 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 
@@ -278,6 +312,11 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
 
 describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fail closed', () => {
   const mockDb = {
+    query: {
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
+    },
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
         innerJoin: jest.fn().mockReturnValue({
@@ -292,6 +331,7 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 

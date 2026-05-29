@@ -61,6 +61,7 @@ const profilesTableMock = {
   id: col('id'),
   displayName: col('displayName'),
   conversationLanguage: col('conversationLanguage'),
+  archivedAt: col('archivedAt'),
 };
 const familyLinksTableMock = {
   parentProfileId: col('parentProfileId'),
@@ -89,6 +90,7 @@ const mockMonthlyReportDb = createTransactionalMockDb({
     },
     profiles: {
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     // Consent gate added by email digest channel spec (2026-05-08).
     // Default: null row → no restriction (pre-consent-flow accounts, CONSENTED presumed).
@@ -233,6 +235,9 @@ jest.mock(
 );
 
 const mockGetSnapshotsInRange = jest.fn().mockResolvedValue([]);
+const mockFilterProgressMetricsToActiveSubjects = jest.fn(
+  async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
+);
 
 jest.mock(
   '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion — drives CURRENT/PREVIOUS snapshot pair via mockResolvedValueOnce ordering; integration sibling covers real DB path */,
@@ -242,6 +247,11 @@ jest.mock(
     ) as typeof import('../../services/snapshot-aggregation');
     return {
       ...actual,
+      filterProgressMetricsToActiveSubjects: (
+        db: unknown,
+        profileId: unknown,
+        metrics: unknown,
+      ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
       getSnapshotsInRange: (...args: unknown[]) =>
         mockGetSnapshotsInRange(...args),
     };
@@ -465,8 +475,27 @@ beforeEach(() => {
     );
     return allLinks.filter((l) => activeChildIds.has(l.childProfileId));
   });
+  (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockReset();
   (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockResolvedValue(
     null,
+  );
+  (mockMonthlyReportDb.query.profiles.findMany as jest.Mock).mockImplementation(
+    async () => {
+      const links = (await (
+        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
+      )()) as Array<{ parentProfileId: string; childProfileId: string }>;
+      const ids = new Set<string>();
+      for (const link of links) {
+        ids.add(link.parentProfileId);
+        ids.add(link.childProfileId);
+      }
+      const selfProfileIds =
+        (await mockListEligibleSelfReportProfileIds()) as string[];
+      for (const profileId of selfProfileIds) {
+        ids.add(profileId);
+      }
+      return Array.from(ids).map((id) => ({ id }));
+    },
   );
   // Consent gate: null row = no restriction (pre-consent-flow / CONSENTED presumed).
   (
@@ -484,7 +513,12 @@ beforeEach(() => {
   (mockMonthlyReportDb.query.accounts.findFirst as jest.Mock).mockResolvedValue(
     null,
   );
+  mockGetSnapshotsInRange.mockReset();
   mockGetSnapshotsInRange.mockResolvedValue([]);
+  mockFilterProgressMetricsToActiveSubjects.mockReset();
+  mockFilterProgressMetricsToActiveSubjects.mockImplementation(
+    async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
+  );
   mockOnConflictDoNothing.mockResolvedValue(undefined);
   mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
 });
@@ -876,6 +910,44 @@ describe('monthlyReportGenerate', () => {
       );
     });
 
+    it('[WI-86] generates monthly reports from active-subject-filtered cached metrics', async () => {
+      const filteredCurrentMetrics = {
+        ...SAMPLE_METRICS,
+        totalSessions: 1,
+        subjects: [],
+      };
+      const filteredPreviousMetrics = {
+        ...SAMPLE_METRICS,
+        totalSessions: 0,
+        subjects: [],
+      };
+      mockFilterProgressMetricsToActiveSubjects
+        .mockResolvedValueOnce(filteredCurrentMetrics)
+        .mockResolvedValueOnce(filteredPreviousMetrics);
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
+        1,
+        mockMonthlyReportDb,
+        'child-001',
+        SAMPLE_METRICS,
+      );
+      expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
+        2,
+        mockMonthlyReportDb,
+        'child-001',
+        SAMPLE_METRICS,
+      );
+      expect(mockGenerateMonthlyReportData).toHaveBeenCalledWith(
+        'Emma',
+        expect.any(String),
+        filteredCurrentMetrics,
+        filteredPreviousMetrics,
+        expect.anything(),
+      );
+    });
+
     it('loads practice summary for the prior month and adjacent previous month', async () => {
       await executeGenerateSteps(makeGenerateEvent());
 
@@ -940,7 +1012,11 @@ describe('monthlyReportGenerate', () => {
       ).mockResolvedValueOnce(null);
       (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
         .mockResolvedValueOnce({ displayName: 'Emma' })
-        .mockResolvedValueOnce({ accountId: 'account-parent' });
+        .mockResolvedValueOnce({ id: 'parent-001' })
+        .mockResolvedValueOnce({ id: 'parent-001' })
+        .mockResolvedValueOnce({ id: 'child-001' })
+        .mockResolvedValueOnce({ accountId: 'account-parent' })
+        .mockResolvedValueOnce({ id: 'child-001' });
       (
         mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });
@@ -1207,6 +1283,60 @@ describe('monthlyReportGenerate', () => {
       expect(mockSendPushNotification).toHaveBeenCalled();
     });
 
+    it('[WI-86] skips monthly push and email when parent is archived after report generation', async () => {
+      mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValue(null);
+
+      const { result } = await executeGenerateSteps(makeGenerateEvent(), {
+        runResults: {
+          'generate-monthly-report': {
+            status: 'completed',
+            childDisplayName: 'Emma',
+            reportMonth: '2026-03-01',
+            struggleTopics: [],
+            isSelfReport: false,
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: 'parent-001',
+        childId: 'child-001',
+      });
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it('[WI-86] skips monthly push and email when child is archived after report generation', async () => {
+      mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+      (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ id: 'parent-001' })
+        .mockResolvedValueOnce(null);
+
+      const { result } = await executeGenerateSteps(makeGenerateEvent(), {
+        runResults: {
+          'generate-monthly-report': {
+            status: 'completed',
+            childDisplayName: 'Emma',
+            reportMonth: '2026-03-01',
+            struggleTopics: [],
+            isSelfReport: false,
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: 'parent-001',
+        childId: 'child-001',
+      });
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
     it('runs the dedup check against the parentId, not the childId', async () => {
       mockGetRecentNotificationCount.mockResolvedValueOnce(0);
 
@@ -1253,7 +1383,10 @@ describe('monthlyReportGenerate', () => {
       ).mockResolvedValue(null); // null → monthlyProgressEmail defaults to true
       (
         mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
-      ).mockResolvedValueOnce({ accountId: 'account-parent' });
+      ).mockResolvedValue({
+        id: 'active-profile',
+        accountId: 'account-parent',
+      });
       (
         mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });
@@ -1630,7 +1763,11 @@ describe('monthlyReportGenerate', () => {
       ).mockResolvedValueOnce(null); // null → monthlyProgressEmail defaults to true
       (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
         .mockResolvedValueOnce({ displayName: 'Emma' })
-        .mockResolvedValueOnce({ accountId: 'account-parent' });
+        .mockResolvedValueOnce({ id: 'parent-001' })
+        .mockResolvedValueOnce({ id: 'parent-001' })
+        .mockResolvedValueOnce({ id: 'child-001' })
+        .mockResolvedValueOnce({ accountId: 'account-parent' })
+        .mockResolvedValueOnce({ id: 'child-001' });
       (
         mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });

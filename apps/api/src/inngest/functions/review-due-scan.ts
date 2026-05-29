@@ -16,7 +16,17 @@
 // and fans out per-profile events for independent notification delivery.
 // ---------------------------------------------------------------------------
 
-import { sql, eq, lt, and, or, exists, notExists } from 'drizzle-orm';
+import {
+  sql,
+  eq,
+  lt,
+  and,
+  or,
+  exists,
+  notExists,
+  isNull,
+  ne,
+} from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -72,6 +82,7 @@ export const reviewDueScan = inngest.createFunction(
             eq(subjects.id, curriculumBooks.subjectId),
             eq(subjects.id, curricula.subjectId),
             eq(subjects.profileId, profiles.id),
+            ne(subjects.status, 'archived'),
           ),
         )
         .innerJoin(
@@ -84,6 +95,7 @@ export const reviewDueScan = inngest.createFunction(
         )
         .where(
           and(
+            isNull(profiles.archivedAt),
             // Consent: CONSENTED record exists, or no consent records at all (adults)
             or(
               exists(

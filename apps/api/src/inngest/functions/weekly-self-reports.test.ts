@@ -3,6 +3,9 @@ const mockListEligibleSelfReportProfileIdsAtLocalHour9 = jest
   .fn()
   .mockResolvedValue([]);
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
+const mockFilterProgressMetricsToActiveSubjects = jest.fn(
+  async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
+);
 const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
   quizzesCompleted: 2,
   reviewsCompleted: 3,
@@ -87,6 +90,11 @@ jest.mock(
     ) as typeof import('../../services/snapshot-aggregation');
     return {
       ...actual,
+      filterProgressMetricsToActiveSubjects: (
+        db: unknown,
+        profileId: unknown,
+        metrics: unknown,
+      ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
       getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
         mockGetLatestSnapshotOnOrBefore(...args),
     };
@@ -241,6 +249,10 @@ describe('weeklySelfReportGenerate', () => {
     mockDb.query.consentStates.findFirst.mockResolvedValue(null);
     mockDb.query.familyLinks.findFirst.mockResolvedValue(null);
     mockDb.query.profiles.findFirst.mockResolvedValue({ displayName: 'Alex' });
+    mockFilterProgressMetricsToActiveSubjects.mockReset();
+    mockFilterProgressMetricsToActiveSubjects.mockImplementation(
+      async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
+    );
     mockGetLatestSnapshotOnOrBefore
       .mockResolvedValueOnce({
         snapshotDate: '2026-05-10',
@@ -301,6 +313,36 @@ describe('weeklySelfReportGenerate', () => {
         childProfileId: PROFILE_A,
         reportWeek: '2026-05-11',
       }),
+    );
+  });
+
+  it('[WI-86] generates weekly self reports from active-subject-filtered cached metrics', async () => {
+    const filteredMetrics = { totalSessions: 1, subjects: [] };
+    mockFilterProgressMetricsToActiveSubjects.mockResolvedValueOnce(
+      filteredMetrics,
+    );
+
+    await (weeklySelfReportGenerate as any).fn({
+      event: {
+        name: 'app/weekly-self-report.generate',
+        data: { profileId: PROFILE_A },
+      },
+      step: {
+        run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      },
+    });
+
+    expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenCalledWith(
+      mockDb,
+      PROFILE_A,
+      expect.objectContaining({ totalSessions: 2 }),
+    );
+    expect(mockGenerateWeeklyReportData).toHaveBeenCalledWith(
+      'Alex',
+      '2026-05-11',
+      filteredMetrics,
+      null,
+      expect.anything(),
     );
   });
 });
