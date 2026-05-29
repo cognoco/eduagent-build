@@ -86,7 +86,15 @@ tags:
 - assertVisible:
     id: "no-offerings"
 
-# 11. Verify static Plus tier card is highlighted as current plan
+# 11. Scroll to and verify static Plus tier card is highlighted as current plan
+# static-tier-plus is a child of no-offerings but may still be below fold
+# when no-offerings container is only partially in view (small-screen S10e).
+# subscription.tsx:1032 — testID=`static-tier-${entry.tier}` for entry.tier='plus'
+- scrollUntilVisible:
+    element:
+      id: "static-tier-plus"
+    direction: DOWN
+    timeout: 10000
 - assertVisible:
     id: "static-tier-plus"
 

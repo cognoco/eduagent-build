@@ -64,13 +64,15 @@ tags:
       text: "Trial"
     timeout: 10000
 
-# 9. Verify trial status is displayed
+# 9. Verify trial-active banner is displayed (trial-active seed: tier=plus, status=trial)
+# subscription.tsx:751-776 renders testID="trial-banner" when status === 'trial'
 - assertVisible:
-    text: "trial"
+    id: "trial-banner"
 
-# 10. Look for upgrade/subscribe option
+# 10. Verify current-plan card is present (trial-active is Plus tier, so no free-upgrade-button)
+# subscription.tsx:783-787 — current-plan renders for all logged-in owners
 - assertVisible:
-    text: "Upgrade"
+    id: "current-plan"
 
 # 11. Screenshot
 - takeScreenshot: subscription-flow-complete
