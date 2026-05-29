@@ -89,10 +89,17 @@ export const llmSummaryEvaluationSchema = z
   .object({
     feedback: z.string().trim().min(1).max(2000),
     hasUnderstandingGaps: z.boolean(),
-    gapAreas: z.array(z.string().min(1).max(200)).max(12).optional(),
+    gapAreas: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
     isAccepted: z.boolean(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (evaluation) => !(evaluation.hasUnderstandingGaps && evaluation.isAccepted),
+    {
+      message: 'Accepted summaries cannot have understanding gaps',
+      path: ['isAccepted'],
+    },
+  );
 export type LlmSummaryEvaluation = z.infer<typeof llmSummaryEvaluationSchema>;
 
 const LLM_ASSESSMENT_PASS_THRESHOLD = 0.7;

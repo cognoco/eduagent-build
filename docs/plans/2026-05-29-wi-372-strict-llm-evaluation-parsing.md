@@ -67,12 +67,24 @@ T4:
 - Review loop 3 targeted API tests passed after rejecting contradictory pass state and over-wide weak areas:
   - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/assessments.test.ts --no-coverage`
   - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/summaries.test.ts apps/api/src/services/assessments.test.ts apps/api/src/services/evaluate.test.ts --no-coverage`
+- Review loop 4 targeted API test passed after rejecting contradictory summary gap state:
+  - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/summaries.test.ts --no-coverage`
 - Targeted schema tests passed with `.worktrees` ignore override:
   - `NX_DAEMON=false rtk pnpm exec jest --config packages/schemas/jest.config.cjs --testPathIgnorePatterns '/node_modules/' --testMatch '<rootDir>/src/**/*.test.ts' --runTestsByPath packages/schemas/src/llm-envelope.test.ts --no-coverage`
 - Review loop 2 targeted schema tests passed after tightening assessment state booleans and blank summary feedback:
   - `NX_DAEMON=false rtk pnpm exec jest --config packages/schemas/jest.config.cjs --testPathIgnorePatterns '/node_modules/' --testMatch '<rootDir>/src/**/*.test.ts' --runTestsByPath packages/schemas/src/llm-envelope.test.ts --no-coverage`
 - Review loop 3 targeted schema tests passed after rejecting contradictory pass state and over-wide weak areas:
   - `NX_DAEMON=false rtk pnpm exec jest --config packages/schemas/jest.config.cjs --testPathIgnorePatterns '/node_modules/' --testMatch '<rootDir>/src/**/*.test.ts' --runTestsByPath packages/schemas/src/llm-envelope.test.ts --no-coverage`
+- Review loop 4 targeted schema tests passed after rejecting contradictory summary gap state and blank gap labels:
+  - `NX_DAEMON=false rtk pnpm exec jest --config packages/schemas/jest.config.cjs --testPathIgnorePatterns '/node_modules/' --testMatch '<rootDir>/src/**/*.test.ts' --runTestsByPath packages/schemas/src/llm-envelope.test.ts --no-coverage`
+- Review loop 4 affected API/schema validation passed:
+  - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/summaries.test.ts apps/api/src/services/assessments.test.ts apps/api/src/services/evaluate.test.ts --no-coverage`
+  - `NX_DAEMON=false rtk pnpm exec nx run api:typecheck`
+  - `NX_DAEMON=false rtk pnpm exec nx run @eduagent/schemas:typecheck`
+  - `NX_DAEMON=false rtk pnpm exec nx run api:lint`
+  - `NX_DAEMON=false rtk pnpm exec nx run @eduagent/schemas:lint`
+  - `rtk pnpm exec prettier --check docs/plans/2026-05-29-wi-372-strict-llm-evaluation-parsing.md packages/schemas/src/llm-envelope.ts packages/schemas/src/llm-envelope.test.ts apps/api/src/services/summaries.test.ts`
+  - `rtk git diff --check`
 - API lint passed:
   - `NX_DAEMON=false rtk pnpm exec nx run api:lint`
 - API typecheck passed:
@@ -105,3 +117,5 @@ T4:
 - Review loop 2 included a consider-level finding that blank summary feedback passed `z.string().min(1)`. Because loop 2 already required a must-fix commit, fixed it by trimming summary feedback before the nonblank check, with schema and service fallback tests.
 - Review loop 3 found a valid must-fix issue: assessment payloads with contradictory `rawScore` and `passed` state could still pass schema, then state could be derived from the high raw score. Fixed by requiring `passed` to match the `rawScore >= 0.7` threshold, with schema and service fallback tests.
 - Review loop 3 found a valid should-fix issue: `weakAreas` accepted entries up to 200 characters while the downstream assessment response contract caps them at 120. Fixed by trimming and capping LLM `weakAreas` entries at 120 characters, with schema and service fallback tests.
+- Review loop 4 found a valid must-fix issue: summary payloads with `hasUnderstandingGaps: true` and `isAccepted: true` could pass schema, then accept a summary despite contradictory state. Fixed by rejecting that combination in `llmSummaryEvaluationSchema`, with schema and service fallback tests.
+- Review loop 4 included a consider-level finding that whitespace-only `gapAreas` passed validation. Because loop 4 already required a must-fix commit, fixed it by trimming gap labels before the nonblank check, with schema coverage.

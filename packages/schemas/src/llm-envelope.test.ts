@@ -367,6 +367,28 @@ describe('discrete LLM evaluation schemas', () => {
 
       expect(result.success).toBe(false);
     });
+
+    it('[WI-372] rejects accepted summaries with understanding gaps', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: 'You missed the core idea, but this is accepted.',
+        hasUnderstandingGaps: true,
+        gapAreas: ['core concept'],
+        isAccepted: true,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] rejects blank gap areas', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: 'You have not got the core idea yet.',
+        hasUnderstandingGaps: true,
+        gapAreas: ['   '],
+        isAccepted: false,
+      });
+
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('llmAssessmentEvaluationSchema', () => {
