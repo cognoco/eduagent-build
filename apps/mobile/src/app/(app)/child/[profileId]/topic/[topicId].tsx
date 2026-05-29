@@ -116,9 +116,22 @@ export default function TopicDetailScreen() {
     ? parsedTotalSessions
     : 0;
 
-  const mastery =
+  // [BUG-801] Guard against NaN from a malformed `masteryScore` query param
+  // (e.g. a stale deep link sending "abc"). Without the Number.isFinite check
+  // the understanding card renders "NaN%" as the percentage label and
+  // `width: "NaN%"` on the progress bar. Fix mirrors the totalSessions guard
+  // above: treat any non-finite or out-of-range value as absent (null) so the
+  // card is hidden rather than showing broken output.
+  const parsedMasteryScore =
     masteryScore !== undefined && masteryScore !== ''
       ? Number(masteryScore)
+      : null;
+  const mastery =
+    parsedMasteryScore !== null &&
+    Number.isFinite(parsedMasteryScore) &&
+    parsedMasteryScore >= 0 &&
+    parsedMasteryScore <= 1
+      ? parsedMasteryScore
       : null;
   const masteryPercent = mastery !== null ? Math.round(mastery * 100) : null;
 

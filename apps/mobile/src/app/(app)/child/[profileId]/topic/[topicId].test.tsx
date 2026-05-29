@@ -136,4 +136,48 @@ describe('TopicDetailScreen', () => {
     // The screen should render normally; "NaN" must not appear anywhere.
     expect(screen.queryByText(/NaN/)).toBeNull();
   });
+
+  // [BUG-801] Repro: a malformed `masteryScore` URL param (e.g. from a stale
+  // deep link or notification sending "abc") made Number("abc") = NaN. The
+  // understanding card then rendered "NaN%" as the percentage label and
+  // `width: "NaN%"` on the progress bar — both broken. Fix mirrors the
+  // totalSessions guard: Number.isFinite + clamp 0..1; non-finite treated as
+  // absent (null), which hides the card entirely rather than showing garbage.
+  it('[BUG-801] hides understanding card and renders no NaN% when masteryScore param is non-numeric', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      topicId: 'topic-1',
+      profileId: 'child-1',
+      title: 'Fractions',
+      completionStatus: 'in_progress',
+      masteryScore: 'abc',
+      retentionStatus: 'strong',
+      totalSessions: '3',
+      subjectId: 'subject-1',
+      subjectName: 'Mathematics',
+    });
+
+    expect(() => render(<TopicDetailScreen />)).not.toThrow();
+    // Understanding card must be hidden when masteryScore is non-numeric.
+    expect(screen.queryByTestId('topic-understanding-card')).toBeNull();
+    // "NaN%" must not appear anywhere in the rendered output.
+    expect(screen.queryByText(/NaN/)).toBeNull();
+  });
+
+  it('[BUG-801] hides understanding card and renders no NaN% when masteryScore param is absent', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      topicId: 'topic-1',
+      profileId: 'child-1',
+      title: 'Fractions',
+      completionStatus: 'in_progress',
+      // masteryScore intentionally omitted
+      retentionStatus: 'strong',
+      totalSessions: '3',
+      subjectId: 'subject-1',
+      subjectName: 'Mathematics',
+    });
+
+    expect(() => render(<TopicDetailScreen />)).not.toThrow();
+    expect(screen.queryByTestId('topic-understanding-card')).toBeNull();
+    expect(screen.queryByText(/NaN/)).toBeNull();
+  });
 });
