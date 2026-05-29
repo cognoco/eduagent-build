@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { isoDateField, isoDateSchema } from './common.ts';
-
-const pedagogyModeSchema = z.enum(['socratic', 'four_strands']);
+// [SC-01] Import canonical enum — do not redefine locally (silent enum drift risk).
+import { pedagogyModeSchema } from './language.ts';
 
 export const subjectProgressMetricsSchema = z.object({
   subjectId: z.string().uuid(),
