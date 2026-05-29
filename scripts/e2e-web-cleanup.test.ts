@@ -26,9 +26,15 @@ function loadWorkflow(name: string): unknown {
 describe('[BUG-979] e2e-web cleanup wiring', () => {
   describe('e2e-web.yml — per-run cleanup step', () => {
     const workflow = loadWorkflow('e2e-web.yml') as {
-      jobs: { 'run-smoke': { steps: Array<Record<string, unknown>> } };
+      jobs: {
+        'run-smoke': {
+          env?: Record<string, unknown>;
+          steps: Array<Record<string, unknown>>;
+        };
+      };
     };
-    const steps = workflow.jobs['run-smoke'].steps;
+    const runSmoke = workflow.jobs['run-smoke'];
+    const steps = runSmoke.steps;
 
     function findStep(prefix: string) {
       return steps.find((s) =>
@@ -45,6 +51,12 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(step.if).toBe('always()');
     });
 
+    it('declares a deterministic PLAYWRIGHT_RUN_ID shared by tests and cleanup', () => {
+      const runId = String(runSmoke.env?.PLAYWRIGHT_RUN_ID ?? '');
+      expect(runId).toContain('github.run_id');
+      expect(runId).toContain('github.run_attempt');
+    });
+
     it('reset step calls POST /v1/__test/reset against the configured API', () => {
       const step = findStep('Reset seeded staging accounts')!;
       const run = String(step.run ?? '');
@@ -56,6 +68,14 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       const step = findStep('Reset seeded staging accounts')!;
       const run = String(step.run ?? '');
       expect(run).toMatch(/X-Test-Secret/);
+    });
+
+    it('reset step refuses an unknown prefix instead of using a fallback prefix', () => {
+      const step = findStep('Reset seeded staging accounts')!;
+      const run = String(step.run ?? '');
+      expect(run).not.toContain('fallback');
+      expect(run).toMatch(/PLAYWRIGHT_RUN_ID/);
+      expect(run).toMatch(/::error::/);
     });
 
     it('reset step runs before the Upload Playwright artifacts step', () => {
