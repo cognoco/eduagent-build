@@ -6,6 +6,7 @@ import {
   buildBaselineForKeys,
   commitPrunedLocaleAndBaseline,
   commitTranslatedLocaleAndBaseline,
+  expandSourceBaselineFile,
   hashSourceString,
   selectGeminiDiffKeys,
 } from './translate-gemini';
@@ -181,9 +182,10 @@ describe('committed source-baseline.json', () => {
     const source = JSON.parse(
       fs.readFileSync(path.join(REAL_LOCALES_DIR, 'en.json'), 'utf-8'),
     ) as NestedStrings;
-    const baselineFile = JSON.parse(
+    const baselineJson = JSON.parse(
       fs.readFileSync(REAL_SOURCE_BASELINE_PATH, 'utf-8'),
-    ) as Record<string, Record<string, string>>;
+    );
+    const baselineFile = expandSourceBaselineFile(baselineJson);
 
     expect(Object.keys(baselineFile).sort()).toEqual(
       EXPECTED_TARGET_LANGUAGES.toSorted(),
@@ -234,7 +236,13 @@ describe('commitTranslatedLocaleAndBaseline', () => {
     expect(JSON.parse(fs.readFileSync(targetPath, 'utf-8'))).toEqual(
       translated,
     );
-    expect(JSON.parse(fs.readFileSync(baselinePath, 'utf-8'))).toEqual({
+    const baselineJson = JSON.parse(fs.readFileSync(baselinePath, 'utf-8'));
+    expect(baselineJson).toEqual({
+      version: 1,
+      sourceHashes: { 'common.save': hashSourceString('Save') },
+      locales: { de: 'allSourceKeys' },
+    });
+    expect(expandSourceBaselineFile(baselineJson)).toEqual({
       de: { 'common.save': hashSourceString('Save') },
     });
   });
@@ -256,6 +264,30 @@ describe('commitTranslatedLocaleAndBaseline', () => {
     ).toThrow();
 
     expect(fs.existsSync(baselinePath)).toBe(false);
+  });
+});
+
+describe('expandSourceBaselineFile', () => {
+  it('reads the compact sidecar format into per-locale source hashes', () => {
+    expect(
+      expandSourceBaselineFile({
+        version: 1,
+        sourceHashes: {
+          'common.save': hashSourceString('Save'),
+          'common.cancel': hashSourceString('Cancel'),
+        },
+        locales: {
+          de: ['common.save'],
+          nb: 'allSourceKeys',
+        },
+      }),
+    ).toEqual({
+      de: { 'common.save': hashSourceString('Save') },
+      nb: {
+        'common.save': hashSourceString('Save'),
+        'common.cancel': hashSourceString('Cancel'),
+      },
+    });
   });
 });
 

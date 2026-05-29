@@ -6,6 +6,11 @@ import { validateTranslation } from './translate';
 type NestedStrings = { [k: string]: string | NestedStrings };
 type SourceBaseline = Record<string, string>;
 type SourceBaselineFile = Record<string, SourceBaseline>;
+interface CompactSourceBaselineFile {
+  version: 1;
+  sourceHashes: SourceBaseline;
+  locales: Record<string, 'allSourceKeys' | string[]>;
+}
 
 const TARGET_LANGUAGES = ['nb', 'de', 'es', 'pt', 'pl', 'ja'] as const;
 const LOCALES_DIR = path.resolve(__dirname, '../apps/mobile/src/i18n/locales');
@@ -73,8 +78,34 @@ function normalizeSourceBaseline(input: unknown): SourceBaseline {
   return baseline;
 }
 
-function normalizeSourceBaselineFile(input: unknown): SourceBaselineFile {
+export function expandSourceBaselineFile(input: unknown): SourceBaselineFile {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const compact = input as {
+    sourceHashes?: unknown;
+    locales?: unknown;
+  };
+  const sourceHashes = normalizeSourceBaseline(compact.sourceHashes);
+  if (
+    Object.keys(sourceHashes).length > 0 &&
+    compact.locales &&
+    typeof compact.locales === 'object' &&
+    !Array.isArray(compact.locales)
+  ) {
+    const allSourceKeys = Object.keys(sourceHashes);
+    const baselineFile: SourceBaselineFile = {};
+    for (const [lang, keys] of Object.entries(compact.locales)) {
+      const localeKeys = keys === 'allSourceKeys' ? allSourceKeys : keys;
+      if (!Array.isArray(localeKeys)) continue;
+      baselineFile[lang] = {};
+      for (const key of localeKeys) {
+        if (typeof key === 'string' && typeof sourceHashes[key] === 'string') {
+          baselineFile[lang][key] = sourceHashes[key];
+        }
+      }
+    }
+    return baselineFile;
+  }
+
   const baselineFile: SourceBaselineFile = {};
   for (const [lang, baseline] of Object.entries(input)) {
     baselineFile[lang] = normalizeSourceBaseline(baseline);
@@ -85,12 +116,39 @@ function normalizeSourceBaselineFile(input: unknown): SourceBaselineFile {
 function readSourceBaselineFile(filePath: string): SourceBaselineFile {
   if (!fs.existsSync(filePath)) return {};
   try {
-    return normalizeSourceBaselineFile(
+    return expandSourceBaselineFile(
       JSON.parse(fs.readFileSync(filePath, 'utf-8')),
     );
   } catch {
     return {};
   }
+}
+
+function compactSourceBaselineFile(
+  baselineFile: SourceBaselineFile,
+): CompactSourceBaselineFile {
+  const sourceHashes: SourceBaseline = {};
+  const locales: Record<string, 'allSourceKeys' | string[]> = {};
+  for (const lang of Object.keys(baselineFile).sort()) {
+    const keys = Object.keys(baselineFile[lang]).sort();
+    for (const key of keys) {
+      sourceHashes[key] = baselineFile[lang][key];
+    }
+  }
+  const sourceKeys = Object.keys(sourceHashes).sort();
+  for (const lang of Object.keys(baselineFile).sort()) {
+    const keys = Object.keys(baselineFile[lang]).sort();
+    locales[lang] =
+      keys.length === sourceKeys.length &&
+      keys.every((key, index) => key === sourceKeys[index])
+        ? 'allSourceKeys'
+        : keys;
+  }
+  return {
+    version: 1,
+    sourceHashes: Object.fromEntries(Object.entries(sourceHashes).sort()),
+    locales,
+  };
 }
 
 function writeJsonAtomic(filePath: string, value: unknown): void {
@@ -168,7 +226,10 @@ export function commitTranslatedLocaleAndBaseline(args: {
     args.source,
     args.translated,
   );
-  writeJsonAtomic(args.baselinePath, args.baselineFile);
+  writeJsonAtomic(
+    args.baselinePath,
+    compactSourceBaselineFile(args.baselineFile),
+  );
 }
 
 export function commitPrunedLocaleAndBaseline(args: {
