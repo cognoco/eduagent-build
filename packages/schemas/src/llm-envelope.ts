@@ -77,6 +77,40 @@ const privateSourcesSchema = z.preprocess(
 );
 
 // ---------------------------------------------------------------------------
+// Discrete evaluation outputs
+//
+// These are not conversational exchange envelopes: their prompts ask for a
+// single JSON object that directly scores a learner artifact. They still drive
+// state, so callers must validate with strict booleans/numbers instead of
+// coercing stringified LLM output.
+// ---------------------------------------------------------------------------
+
+export const llmSummaryEvaluationSchema = z
+  .object({
+    feedback: z.string().min(1).max(2000),
+    hasUnderstandingGaps: z.boolean(),
+    gapAreas: z.array(z.string().min(1).max(200)).max(12).optional(),
+    isAccepted: z.boolean(),
+  })
+  .strict();
+export type LlmSummaryEvaluation = z.infer<typeof llmSummaryEvaluationSchema>;
+
+export const llmAssessmentEvaluationSchema = z
+  .object({
+    feedback: z.string().min(1).max(2000).optional(),
+    reply: z.string().min(1).max(2000).optional(),
+    rawScore: z.number().min(0).max(1),
+    qualityRating: z.number().min(0).max(5),
+    passed: z.boolean().optional(),
+    shouldEscalateDepth: z.boolean().optional(),
+    weakAreas: z.array(z.string().min(1).max(200)).max(8).optional(),
+  })
+  .strict();
+export type LlmAssessmentEvaluation = z.infer<
+  typeof llmAssessmentEvaluationSchema
+>;
+
+// ---------------------------------------------------------------------------
 // EVALUATE assessment signal — Devil's Advocate verification result (FR128-133)
 // Replaces the legacy free-text trailing JSON block that violated the envelope
 // contract. The LLM emits this inside signals; the learner-visible prose lives

@@ -1,5 +1,7 @@
 import {
+  llmAssessmentEvaluationSchema,
   llmResponseEnvelopeSchema,
+  llmSummaryEvaluationSchema,
   normaliseSignals,
   type NormalisedEnvelopeSignals,
 } from './llm-envelope.js';
@@ -339,6 +341,50 @@ describe('llmResponseEnvelopeSchema', () => {
       signals: { retrieval_score: 1.5 },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('discrete LLM evaluation schemas', () => {
+  describe('llmSummaryEvaluationSchema', () => {
+    it('[WI-372] rejects stringified boolean state fields', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: 'Looks fine.',
+        hasUnderstandingGaps: 'false',
+        gapAreas: [],
+        isAccepted: 'false',
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('llmAssessmentEvaluationSchema', () => {
+    it('[WI-372] rejects stringified booleans and numeric scores', () => {
+      const result = llmAssessmentEvaluationSchema.safeParse({
+        feedback: 'Good enough.',
+        rawScore: '0.8',
+        qualityRating: '4',
+        passed: 'false',
+        shouldEscalateDepth: 'false',
+        weakAreas: [],
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] accepts the strict discrete assessment shape', () => {
+      const parsed = llmAssessmentEvaluationSchema.parse({
+        reply: 'Good enough.',
+        rawScore: 0.8,
+        qualityRating: 4,
+        passed: false,
+        shouldEscalateDepth: false,
+        weakAreas: ['examples'],
+      });
+
+      expect(parsed.reply).toBe('Good enough.');
+      expect(parsed.passed).toBe(false);
+    });
   });
 });
 

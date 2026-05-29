@@ -266,6 +266,15 @@ describe('parseEvaluateAssessment', () => {
     const event = eventWithEnvelopeSignal({ quality: 4 });
     expect(parseEvaluateAssessment(event)).toBeNull();
   });
+
+  it('[WI-372] returns null when envelope challenge_passed is a string', () => {
+    const event = eventWithEnvelopeSignal({
+      challenge_passed: 'false',
+      quality: 4,
+    });
+
+    expect(parseEvaluateAssessment(event)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

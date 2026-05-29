@@ -7,6 +7,19 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import {
+  llmAssessmentEvaluationSchema,
+  parseAssessmentExchangeHistory,
+  type VerificationDepth,
+  type QuickCheckContext,
+  type QuickCheckResult,
+  type AssessmentContext,
+  type AssessmentEvaluation,
+  type AssessmentRecord,
+  type AssessmentStatus,
+  type ChatExchange,
+  type ConversationLanguage,
+} from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
@@ -16,18 +29,6 @@ import { createLogger } from './logger';
 import { recordPracticeActivityEvent } from './practice-activity-events';
 import { buildAppHelpDirectReply, isAppHelpQuery } from './app-help-map';
 import { ConflictError, NotFoundError } from '../errors';
-import type {
-  VerificationDepth,
-  QuickCheckContext,
-  QuickCheckResult,
-  AssessmentContext,
-  AssessmentEvaluation,
-  AssessmentRecord,
-  AssessmentStatus,
-  ChatExchange,
-  ConversationLanguage,
-} from '@eduagent/schemas';
-import { parseAssessmentExchangeHistory } from '@eduagent/schemas';
 
 // [BUG-665 / S-5] Structured logger for parse-fallback observability. Sentry
 // covers production aggregation, but the structured logger surfaces the same
@@ -577,34 +578,52 @@ function parseAssessmentEvaluation(
   const jsonStr = extractFirstJsonObject(response);
   if (jsonStr) {
     try {
-      const parsed = JSON.parse(jsonStr);
-      const feedback =
-        typeof parsed.feedback === 'string' && parsed.feedback.trim().length > 0
-          ? parsed.feedback
-          : typeof parsed.reply === 'string' && parsed.reply.trim().length > 0
-            ? parsed.reply
-            : ASSESSMENT_FALLBACK_FEEDBACK;
-      const rawScore = Math.max(0, Math.min(1, Number(parsed.rawScore ?? 0)));
-      const masteryScore = calculateMasteryScore(depth, rawScore);
-      const qualityRating = Math.max(
-        0,
-        Math.min(5, Number(parsed.qualityRating ?? 0)),
+      const parsed = llmAssessmentEvaluationSchema.safeParse(
+        JSON.parse(jsonStr),
       );
+      if (!parsed.success) {
+        captureException(parsed.error, {
+          extra: {
+            surface: 'assessments-evaluation',
+            reason: 'invalid_schema',
+            jsonStrSample: jsonStr.slice(0, 200),
+          },
+        });
+        assessmentsLogger.warn(
+          '[parseAssessmentEvaluation] invalid schema — falling back to canned feedback',
+          { reason: 'invalid_schema' },
+        );
+        return {
+          feedback: ASSESSMENT_FALLBACK_FEEDBACK,
+          passed: false,
+          shouldEscalateDepth: false,
+          masteryScore: 0,
+          qualityRating: 0,
+        };
+      }
+
+      const evaluation = parsed.data;
+      const feedback =
+        evaluation.feedback !== undefined
+          ? evaluation.feedback
+          : evaluation.reply !== undefined
+            ? evaluation.reply
+            : ASSESSMENT_FALLBACK_FEEDBACK;
+      const rawScore = evaluation.rawScore;
+      const masteryScore = calculateMasteryScore(depth, rawScore);
+      const qualityRating = evaluation.qualityRating;
       const passed =
-        options.passMode === 'llm' ? Boolean(parsed.passed) : rawScore >= 0.7;
+        options.passMode === 'llm'
+          ? evaluation.passed === true
+          : rawScore >= 0.7;
       const availableNextDepth = getNextVerificationDepth(depth) ?? undefined;
       const shouldEscalateDepth =
         passed &&
         availableNextDepth !== undefined &&
         (options.forceDepthProgression === true ||
-          Boolean(parsed.shouldEscalateDepth));
+          evaluation.shouldEscalateDepth === true);
       const nextDepth = shouldEscalateDepth ? availableNextDepth : undefined;
-      const weakAreas = Array.isArray(parsed.weakAreas)
-        ? parsed.weakAreas
-            .map((area: unknown) => String(area).trim())
-            .filter((area: string) => area.length > 0)
-            .slice(0, 8)
-        : undefined;
+      const weakAreas = evaluation.weakAreas;
 
       // [BUG-670 / S-16] Never use the raw response as feedback. A parsed
       // `reply` field is accepted because some LLMs reuse the session-envelope
