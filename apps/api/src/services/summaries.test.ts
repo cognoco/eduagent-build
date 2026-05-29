@@ -192,4 +192,67 @@ describe('evaluateSummary', () => {
     expect(result.feedback).toContain("couldn't provide AI feedback");
     expect(result.isAccepted).toBe(false);
   });
+
+  it('[WI-372] rejects stringified boolean state fields and falls back closed', async () => {
+    registerLlmProviderFixture({
+      chatResponse: llmStructuredJson({
+        feedback: 'Looks acceptable.',
+        hasUnderstandingGaps: 'false',
+        gapAreas: [],
+        isAccepted: 'false',
+      }),
+    });
+
+    const result = await evaluateSummary(
+      'Arrays',
+      'Arrays hold ordered values.',
+      'Arrays are a list of values.',
+    );
+
+    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.hasUnderstandingGaps).toBe(false);
+    expect(result.isAccepted).toBe(false);
+  });
+
+  it('[WI-372] rejects blank feedback and falls back closed', async () => {
+    registerLlmProviderFixture({
+      chatResponse: llmStructuredJson({
+        feedback: '   ',
+        hasUnderstandingGaps: false,
+        gapAreas: [],
+        isAccepted: true,
+      }),
+    });
+
+    const result = await evaluateSummary(
+      'Arrays',
+      'Arrays hold ordered values.',
+      'Arrays are a list of values.',
+    );
+
+    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.hasUnderstandingGaps).toBe(false);
+    expect(result.isAccepted).toBe(false);
+  });
+
+  it('[WI-372] rejects contradictory accepted summary gaps and falls back closed', async () => {
+    registerLlmProviderFixture({
+      chatResponse: llmStructuredJson({
+        feedback: 'You missed the core idea, but this is accepted.',
+        hasUnderstandingGaps: true,
+        gapAreas: ['core concept'],
+        isAccepted: true,
+      }),
+    });
+
+    const result = await evaluateSummary(
+      'Arrays',
+      'Arrays hold ordered values.',
+      'Arrays are values.',
+    );
+
+    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.hasUnderstandingGaps).toBe(false);
+    expect(result.isAccepted).toBe(false);
+  });
 });

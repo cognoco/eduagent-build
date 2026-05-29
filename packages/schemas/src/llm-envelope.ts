@@ -77,6 +77,65 @@ const privateSourcesSchema = z.preprocess(
 );
 
 // ---------------------------------------------------------------------------
+// Discrete evaluation outputs
+//
+// These are not conversational exchange envelopes: their prompts ask for a
+// single JSON object that directly scores a learner artifact. They still drive
+// state, so callers must validate with strict booleans/numbers instead of
+// coercing stringified LLM output.
+// ---------------------------------------------------------------------------
+
+export const llmSummaryEvaluationSchema = z
+  .object({
+    feedback: z.string().trim().min(1).max(2000),
+    hasUnderstandingGaps: z.boolean(),
+    gapAreas: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
+    isAccepted: z.boolean(),
+  })
+  .strict()
+  .refine(
+    (evaluation) => !(evaluation.hasUnderstandingGaps && evaluation.isAccepted),
+    {
+      message: 'Accepted summaries cannot have understanding gaps',
+      path: ['isAccepted'],
+    },
+  );
+export type LlmSummaryEvaluation = z.infer<typeof llmSummaryEvaluationSchema>;
+
+export const LLM_ASSESSMENT_PASS_THRESHOLD = 0.7;
+
+export const llmAssessmentEvaluationSchema = z
+  .object({
+    feedback: z.string().trim().min(1).max(2000).optional(),
+    reply: z.string().trim().min(1).max(2000).optional(),
+    rawScore: z.number().min(0).max(1),
+    qualityRating: z.number().int().min(0).max(5),
+    passed: z.boolean(),
+    shouldEscalateDepth: z.boolean(),
+    weakAreas: z.array(z.string().trim().min(1).max(120)).max(8).optional(),
+  })
+  .strict()
+  .refine((evaluation) => evaluation.feedback ?? evaluation.reply, {
+    message: 'Assessment evaluation requires feedback or reply',
+    path: ['feedback'],
+  })
+  .refine(
+    (evaluation) => {
+      return (
+        evaluation.passed ===
+        evaluation.rawScore >= LLM_ASSESSMENT_PASS_THRESHOLD
+      );
+    },
+    {
+      message: 'Assessment pass state must match raw score threshold',
+      path: ['passed'],
+    },
+  );
+export type LlmAssessmentEvaluation = z.infer<
+  typeof llmAssessmentEvaluationSchema
+>;
+
+// ---------------------------------------------------------------------------
 // EVALUATE assessment signal — Devil's Advocate verification result (FR128-133)
 // Replaces the legacy free-text trailing JSON block that violated the envelope
 // contract. The LLM emits this inside signals; the learner-visible prose lives

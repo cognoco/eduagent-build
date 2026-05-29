@@ -82,6 +82,26 @@ function createAssessmentEvalMockProvider(evaluation: {
   };
 }
 
+function createRawAssessmentEvalMockProvider(
+  evaluation: Record<string, unknown>,
+): LLMProvider {
+  return {
+    id: 'gemini',
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: JSON.stringify(evaluation),
+        stopReason: 'stop' as StopReason,
+      };
+    },
+    chatStream() {
+      const s = (async function* () {
+        yield JSON.stringify(evaluation);
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared fixtures
 // ---------------------------------------------------------------------------
@@ -237,7 +257,7 @@ describe('evaluateAssessmentAnswer', () => {
     registerProvider(
       createAssessmentEvalMockProvider({
         feedback: 'OK',
-        passed: true,
+        passed: false,
         shouldEscalateDepth: false,
         rawScore: 0.4,
         qualityRating: 3,
@@ -256,7 +276,7 @@ describe('evaluateAssessmentAnswer', () => {
     registerProvider(
       createAssessmentEvalMockProvider({
         feedback: 'OK',
-        passed: true,
+        passed: false,
         shouldEscalateDepth: false,
         rawScore: 0.4,
         qualityRating: 3,
@@ -515,7 +535,7 @@ describe('evaluateAssessmentAnswer', () => {
             'Here is my evaluation:\n' +
             JSON.stringify({
               feedback: 'Solid recall of the key concepts.',
-              passed: true,
+              passed: false,
               shouldEscalateDepth: false,
               rawScore: 0.45,
               qualityRating: 4,
@@ -615,7 +635,7 @@ describe('evaluateAssessmentAnswer', () => {
     expect(result.passed).toBe(false);
   });
 
-  it('uses parsed reply as feedback when the LLM returns a session-envelope shape', async () => {
+  it('[WI-372] rejects session-envelope-shaped output for discrete assessment evaluation', async () => {
     const envelopeProvider: LLMProvider = {
       id: 'gemini',
       async chat() {
@@ -653,10 +673,201 @@ describe('evaluateAssessmentAnswer', () => {
     );
 
     expect(result.feedback).toBe(
-      'Not yet. You named a useful phrase; now add what it means and when you would use it.',
+      "We couldn't evaluate your answer right now — please try again.",
     );
-    expect(result.feedback).not.toContain("couldn't evaluate");
     expect(result.passed).toBe(false);
+    expect(result.masteryScore).toBe(0);
+  });
+
+  it('[WI-372] rejects stringified llm pass boolean', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Looks passing.',
+        passed: 'false',
+        shouldEscalateDepth: false,
+        rawScore: 0.9,
+        qualityRating: 4,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.masteryScore).toBe(0);
+  });
+
+  it('[WI-372] rejects stringified escalation boolean', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Good recall.',
+        passed: true,
+        shouldEscalateDepth: 'false',
+        rawScore: 0.9,
+        qualityRating: 4,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'recall' },
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.shouldEscalateDepth).toBe(false);
+    expect(result.nextDepth).toBeUndefined();
+  });
+
+  it('[WI-372] falls back when numeric scores are malformed strings', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Looks passing.',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 'abc',
+        qualityRating: 'four',
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.masteryScore).toBe(0);
+    expect(result.qualityRating).toBe(0);
+  });
+
+  it('[WI-372] falls back closed when high-score output has no learner feedback', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        passed: true,
+        shouldEscalateDepth: true,
+        rawScore: 0.95,
+        qualityRating: 5,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'recall' },
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.shouldEscalateDepth).toBe(false);
+    expect(result.nextDepth).toBeUndefined();
+    expect(result.masteryScore).toBe(0);
+  });
+
+  it('[WI-372] falls back closed when high-score output omits state booleans', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Good recall.',
+        rawScore: 0.95,
+        qualityRating: 5,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'recall' },
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.shouldEscalateDepth).toBe(false);
+    expect(result.nextDepth).toBeUndefined();
+    expect(result.masteryScore).toBe(0);
+  });
+
+  it('[WI-372] falls back closed when quality rating is decimal', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Looks passing.',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.9,
+        qualityRating: 4.5,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.masteryScore).toBe(0);
+    expect(result.qualityRating).toBe(0);
+  });
+
+  it('[WI-372] falls back closed when pass state contradicts raw score', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Good recall.',
+        passed: false,
+        shouldEscalateDepth: false,
+        rawScore: 0.95,
+        qualityRating: 5,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'recall' },
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.shouldEscalateDepth).toBe(false);
+    expect(result.nextDepth).toBeUndefined();
+    expect(result.masteryScore).toBe(0);
+  });
+
+  it('[WI-372] falls back when weak areas exceed the response contract', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Needs another pass.',
+        passed: false,
+        shouldEscalateDepth: false,
+        rawScore: 0.4,
+        qualityRating: 2,
+        weakAreas: ['x'.repeat(121)],
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.weakAreas).toBeUndefined();
+    expect(result.passed).toBe(false);
+    expect(result.masteryScore).toBe(0);
   });
 });
 

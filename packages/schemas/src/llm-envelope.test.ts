@@ -1,5 +1,7 @@
 import {
+  llmAssessmentEvaluationSchema,
   llmResponseEnvelopeSchema,
+  llmSummaryEvaluationSchema,
   normaliseSignals,
   type NormalisedEnvelopeSignals,
 } from './llm-envelope.js';
@@ -339,6 +341,170 @@ describe('llmResponseEnvelopeSchema', () => {
       signals: { retrieval_score: 1.5 },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('discrete LLM evaluation schemas', () => {
+  describe('llmSummaryEvaluationSchema', () => {
+    it('[WI-372] rejects stringified boolean state fields', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: 'Looks fine.',
+        hasUnderstandingGaps: 'false',
+        gapAreas: [],
+        isAccepted: 'false',
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] rejects blank learner-visible feedback', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: '   ',
+        hasUnderstandingGaps: false,
+        gapAreas: [],
+        isAccepted: true,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] rejects accepted summaries with understanding gaps', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: 'You missed the core idea, but this is accepted.',
+        hasUnderstandingGaps: true,
+        gapAreas: ['core concept'],
+        isAccepted: true,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] rejects blank gap areas', () => {
+      const result = llmSummaryEvaluationSchema.safeParse({
+        feedback: 'You have not got the core idea yet.',
+        hasUnderstandingGaps: true,
+        gapAreas: ['   '],
+        isAccepted: false,
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('llmAssessmentEvaluationSchema', () => {
+    it('[WI-372] rejects stringified booleans and numeric scores', () => {
+      const result = llmAssessmentEvaluationSchema.safeParse({
+        feedback: 'Good enough.',
+        rawScore: '0.8',
+        qualityRating: '4',
+        passed: 'false',
+        shouldEscalateDepth: 'false',
+        weakAreas: [],
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] rejects missing state booleans', () => {
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          feedback: 'Good recall.',
+          rawScore: 0.95,
+          qualityRating: 5,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          feedback: 'Good recall.',
+          rawScore: 0.95,
+          qualityRating: 5,
+          passed: true,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('[WI-372] rejects missing or blank learner-visible feedback', () => {
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          rawScore: 0.95,
+          qualityRating: 5,
+          passed: true,
+          shouldEscalateDepth: true,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          feedback: '   ',
+          rawScore: 0.95,
+          qualityRating: 5,
+          passed: true,
+          shouldEscalateDepth: true,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('[WI-372] rejects decimal quality ratings', () => {
+      const result = llmAssessmentEvaluationSchema.safeParse({
+        reply: 'Good enough.',
+        rawScore: 0.8,
+        qualityRating: 4.5,
+        passed: true,
+        shouldEscalateDepth: false,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] rejects pass state that contradicts raw score', () => {
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          reply: 'Good enough.',
+          rawScore: 0.8,
+          qualityRating: 4,
+          passed: false,
+          shouldEscalateDepth: false,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          reply: 'Not enough detail yet.',
+          rawScore: 0.4,
+          qualityRating: 2,
+          passed: true,
+          shouldEscalateDepth: false,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('[WI-372] rejects weak areas wider than the assessment response contract', () => {
+      const result = llmAssessmentEvaluationSchema.safeParse({
+        reply: 'Not enough detail yet.',
+        rawScore: 0.4,
+        qualityRating: 2,
+        passed: false,
+        shouldEscalateDepth: false,
+        weakAreas: ['x'.repeat(121)],
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-372] accepts the strict discrete assessment shape', () => {
+      const parsed = llmAssessmentEvaluationSchema.parse({
+        reply: 'Good enough.',
+        rawScore: 0.8,
+        qualityRating: 4,
+        passed: true,
+        shouldEscalateDepth: false,
+        weakAreas: ['examples'],
+      });
+
+      expect(parsed.reply).toBe('Good enough.');
+      expect(parsed.passed).toBe(true);
+    });
   });
 });
 

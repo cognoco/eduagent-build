@@ -4,7 +4,11 @@ import {
   type Database,
 } from '@eduagent/database';
 import { and, eq } from 'drizzle-orm';
-import type { ConversationLanguage, SummaryStatus } from '@eduagent/schemas';
+import {
+  llmSummaryEvaluationSchema,
+  type ConversationLanguage,
+  type SummaryStatus,
+} from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
@@ -144,16 +148,33 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
   const jsonStr = extractFirstJsonObject(response);
   if (jsonStr) {
     try {
-      const parsed = JSON.parse(jsonStr);
+      const parsed = llmSummaryEvaluationSchema.safeParse(JSON.parse(jsonStr));
+      if (!parsed.success) {
+        captureException(parsed.error, {
+          extra: {
+            surface: 'summary-evaluation',
+            reason: 'invalid_schema',
+            jsonStrSample: jsonStr.slice(0, 200),
+          },
+        });
+        summariesLogger.warn(
+          '[parseSummaryEvaluation] invalid schema — falling back to canned feedback',
+          { reason: 'invalid_schema' },
+        );
+        return {
+          feedback: SUMMARY_FALLBACK_FEEDBACK,
+          hasUnderstandingGaps: false,
+          isAccepted: false,
+        };
+      }
+
+      const evaluation = parsed.data;
       // [BUG-670 / S-16] Use safe canned fallback rather than `?? response`.
       return {
-        feedback:
-          typeof parsed.feedback === 'string' && parsed.feedback.length > 0
-            ? parsed.feedback
-            : SUMMARY_FALLBACK_FEEDBACK,
-        hasUnderstandingGaps: Boolean(parsed.hasUnderstandingGaps),
-        gapAreas: Array.isArray(parsed.gapAreas) ? parsed.gapAreas : undefined,
-        isAccepted: Boolean(parsed.isAccepted),
+        feedback: evaluation.feedback,
+        hasUnderstandingGaps: evaluation.hasUnderstandingGaps,
+        gapAreas: evaluation.gapAreas,
+        isAccepted: evaluation.isAccepted,
       };
     } catch (err) {
       // [BUG-665 / S-5] Surface degraded LLM via Sentry + structured logger so

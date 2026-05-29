@@ -56,7 +56,7 @@ function installAssessmentLlmMock(): void {
       feedback: 'Good reasoning!',
       passed: true,
       shouldEscalateDepth: false,
-      rawScore: 0.45,
+      rawScore: 0.9,
       qualityRating: 4,
     }),
   );
