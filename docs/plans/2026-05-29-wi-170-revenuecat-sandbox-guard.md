@@ -71,4 +71,4 @@ cd apps/api && pnpm exec jest --config jest.config.cjs src/routes/revenuecat-web
 - GREEN focused suite: full `revenuecat-webhook.test.ts` passed 91/91.
 - GREEN lint: `pnpm exec nx run api:lint` passed.
 - GREEN typecheck: `pnpm exec nx reset && pnpm exec nx run api:typecheck` passed.
-- BLOCKED environment validation: `pnpm exec nx test:integration api` failed before product assertions because `DATABASE_URL` is unset; the worktree setup's `pnpm env:sync` reported Doppler is not configured.
+- GREEN integration: after copying the ignored local `.env.development.local` into the isolated worktree, `pnpm exec nx test:integration api` passed 51/51 suites and 389/389 tests in 401.402s.
