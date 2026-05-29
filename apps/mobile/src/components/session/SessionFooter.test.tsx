@@ -13,11 +13,6 @@ jest.mock('../session', () => ({
   LibraryPrompt: () => null,
 }));
 
-jest.mock('../../lib/format-api-error', () => ({
-  // gc1-allow: error formatting is covered separately; this test asserts footer recovery behavior
-  formatApiError: (e: unknown) => String(e),
-}));
-
 jest.mock('../../hooks/use-speech-recognition', () => ({
   // gc1-allow: native speech recognition is an external device boundary for NoteInput rendering
   useSpeechRecognition: () => ({
@@ -170,7 +165,7 @@ describe('SessionFooter', () => {
     );
     expect(Alert.alert).toHaveBeenCalledWith(
       'Could not save note',
-      'Error: network down',
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
       undefined,
       undefined,
     );

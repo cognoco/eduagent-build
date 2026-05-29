@@ -106,22 +106,6 @@ jest.mock('../../../../lib/theme', () => ({
   }),
 }));
 
-jest.mock('../../../../lib/format-api-error', () => {
-  const actual = jest.requireActual(
-    '../../../../lib/format-api-error',
-  ) as Record<string, unknown>;
-  return {
-    ...actual,
-    formatApiError: (err: unknown) =>
-      err instanceof Error ? err.message : 'Unknown error',
-    classifyApiError: (err: unknown) => ({
-      message: err instanceof Error ? err.message : 'Unknown error',
-      category: 'unknown' as const,
-      recovery: 'retry' as const,
-    }),
-  };
-});
-
 jest.mock('../../../../components/library/BookCard', () => ({
   ...jest.requireActual('../../../../components/library/BookCard'),
   BookCard: ({

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
 jest.mock('react-i18next', () => ({
+  ...jest.requireActual('react-i18next'),
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
       if (opts && typeof opts === 'object') {
@@ -40,13 +41,6 @@ jest.mock('@sentry/react-native', () => ({
 jest.mock('../../../../../lib/navigation', () => ({
   // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
-
-jest.mock('../../../../../lib/format-api-error', () => ({
-  // gc1-allow: depends on i18next instance requiring full i18n init — cannot run in JSDOM without setup
-  classifyApiError: (e: unknown) => ({
-    message: (e as Error)?.message ?? 'error',
-  }),
 }));
 
 jest.mock('../../../../../components/common', () => ({
