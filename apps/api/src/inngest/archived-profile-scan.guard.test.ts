@@ -32,6 +32,46 @@ function readsSubjects(text: string): boolean {
   );
 }
 
+function findProfileReadSegments(text: string): string[] {
+  const reads =
+    /\b(?:from|innerJoin)\(\s*profiles\b|\bdb\.query\.profiles\.(?:findFirst|findMany)\b/g;
+  return Array.from(text.matchAll(reads), (match) => readSegment(text, match));
+}
+
+function findSubjectReadSegments(text: string): string[] {
+  const reads =
+    /\b(?:from|innerJoin)\(\s*subjects\b|\bdb\.query\.subjects\.(?:findFirst|findMany)\b/g;
+  return Array.from(text.matchAll(reads), (match) => readSegment(text, match));
+}
+
+function readSegment(text: string, match: RegExpMatchArray): string {
+  const index = match.index ?? 0;
+  const lineStart = text.lastIndexOf('\n', index);
+  const previousLineStart = text.lastIndexOf('\n', Math.max(0, lineStart - 1));
+  const currentLineStart = lineStart === -1 ? 0 : lineStart + 1;
+  const previousLine =
+    lineStart === -1 ? '' : text.slice(previousLineStart + 1, lineStart);
+  const start = /^\/\/\s*archived-(?:subject-)?exempt:\s+\S.+$/.test(
+    previousLine,
+  )
+    ? previousLineStart + 1
+    : currentLineStart;
+  const end = text.indexOf(';', index);
+  return text.slice(start, end === -1 ? text.length : end + 1);
+}
+
+function hasArchivedProfileFilter(text: string): boolean {
+  return text.includes('isNull(profiles.archivedAt)');
+}
+
+function hasArchivedProfileExemption(text: string): boolean {
+  return /^\/\/\s*archived-exempt:\s+\S.+$/m.test(text);
+}
+
+function hasArchivedSubjectExemption(text: string): boolean {
+  return /^\/\/\s*archived-subject-exempt:\s+\S.+$/m.test(text);
+}
+
 function hasArchivedSubjectSuppression(text: string): boolean {
   return (
     text.includes('subjects.status') &&
@@ -41,6 +81,34 @@ function hasArchivedSubjectSuppression(text: string): boolean {
 }
 
 describe('cross-profile Inngest archived profile guard', () => {
+  it('catches an unguarded profile scan even when another scan in the same file is guarded', () => {
+    const text = `
+// @inngest-admin: cross-profile
+await db.select().from(profiles).where(isNull(profiles.archivedAt));
+await db.select().from(profiles).where(eq(profiles.role, 'student'));
+`;
+
+    const unguardedReads = findProfileReadSegments(text).filter(
+      (segment) => !hasArchivedProfileFilter(segment),
+    );
+
+    expect(unguardedReads).toHaveLength(1);
+  });
+
+  it('catches subject joins that rely on unrelated archived-subject suppression', () => {
+    const text = `
+// @inngest-admin: cross-profile
+await db.select().from(subjects).where(ne(subjects.status, 'archived'));
+await db.select().from(subjects).where(eq(subjects.profileId, profileId));
+`;
+
+    const unguardedReads = findSubjectReadSegments(text).filter(
+      (segment) => !hasArchivedSubjectSuppression(segment),
+    );
+
+    expect(unguardedReads).toHaveLength(1);
+  });
+
   it('requires archived-profile handling in every cross-profile profile scan', () => {
     const offenders = walkTsFiles(FUNCTIONS_DIR)
       .map((absPath) => ({
@@ -50,12 +118,18 @@ describe('cross-profile Inngest archived profile guard', () => {
       }))
       .filter(({ text }) => text.includes('@inngest-admin: cross-profile'))
       .filter(({ text }) => readsProfiles(text))
-      .filter(
-        ({ text }) =>
-          !text.includes('profiles.archivedAt') &&
-          !/^\/\/\s*archived-exempt:\s+\S.+$/m.test(text),
-      )
-      .map(({ relPath }) => relPath);
+      .flatMap(({ relPath, text }) =>
+        findProfileReadSegments(text)
+          .filter(
+            (segment) =>
+              !hasArchivedProfileFilter(segment) &&
+              !hasArchivedProfileExemption(segment),
+          )
+          .map((segment) => ({
+            relPath,
+            segment: segment.trim().split('\n')[0],
+          })),
+      );
 
     expect(offenders).toEqual([]);
   });
@@ -69,12 +143,18 @@ describe('cross-profile Inngest archived profile guard', () => {
       }))
       .filter(({ text }) => text.includes('@inngest-admin: cross-profile'))
       .filter(({ text }) => readsSubjects(text))
-      .filter(
-        ({ text }) =>
-          !hasArchivedSubjectSuppression(text) &&
-          !/^\/\/\s*archived-subject-exempt:\s+\S.+$/m.test(text),
-      )
-      .map(({ relPath }) => relPath);
+      .flatMap(({ relPath, text }) =>
+        findSubjectReadSegments(text)
+          .filter(
+            (segment) =>
+              !hasArchivedSubjectSuppression(segment) &&
+              !hasArchivedSubjectExemption(segment),
+          )
+          .map((segment) => ({
+            relPath,
+            segment: segment.trim().split('\n')[0],
+          })),
+      );
 
     expect(offenders).toEqual([]);
   });
