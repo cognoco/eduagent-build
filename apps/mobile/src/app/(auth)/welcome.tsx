@@ -14,6 +14,7 @@ import { markPreAuthIntroSeenSync } from '../../lib/intro-state';
 import { markPreAuthAudienceSync } from '../../lib/pre-auth-audience';
 import { track } from '../../lib/analytics';
 import { useThemeColors } from '../../lib/theme';
+import { tokens } from '../../lib/design-tokens';
 
 // Pre-auth welcome route. Owns the chooser → cards → LightBulb-bridge mini
 // state machine that sits in front of /(auth)/sign-up and /(auth)/sign-in.
@@ -34,21 +35,22 @@ type Step = 'choose' | 'cards' | 'bridge';
 // brand-intent: welcome dark stage. This route is the pre-auth brand moment,
 // so it injects a fixed intro palette at the screen boundary while the shared
 // WelcomeIntro component stays token-driven by default.
+const darkStageColors = tokens.dark.colors;
 export const WELCOME_DARK_STAGE_COLORS = {
-  background: '#0b1226',
-  surface: '#172033',
-  surfaceElevated: '#111a2f',
-  textPrimary: '#f8fafc',
-  textSecondary: '#cbd5e1',
-  textInverse: '#ffffff',
-  primary: '#2dd4bf',
-  primarySoft: 'rgba(45, 212, 191, 0.18)',
-  secondary: '#a78bfa',
-  accent: '#a78bfa',
-  border: 'rgba(148, 163, 184, 0.28)',
-  muted: 'rgba(203, 213, 225, 0.62)',
-  practiceDarkTeal: '#0f172a',
-  shadow: '#000000',
+  background: darkStageColors.background,
+  surface: darkStageColors.surface,
+  surfaceElevated: darkStageColors.surfaceElevated,
+  textPrimary: darkStageColors.textPrimary,
+  textSecondary: darkStageColors.textSecondary,
+  textInverse: darkStageColors.textInverse,
+  primary: darkStageColors.primary,
+  primarySoft: darkStageColors.primarySoft,
+  secondary: darkStageColors.secondary,
+  accent: darkStageColors.accent,
+  border: darkStageColors.border,
+  muted: darkStageColors.muted,
+  practiceDarkTeal: darkStageColors.practiceDarkTeal,
+  shadow: darkStageColors.background,
 } as const satisfies WelcomeIntroStageColors;
 
 export default function PreAuthWelcomeRoute(): React.ReactElement {
