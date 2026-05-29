@@ -95,6 +95,8 @@ export const llmSummaryEvaluationSchema = z
   .strict();
 export type LlmSummaryEvaluation = z.infer<typeof llmSummaryEvaluationSchema>;
 
+const LLM_ASSESSMENT_PASS_THRESHOLD = 0.7;
+
 export const llmAssessmentEvaluationSchema = z
   .object({
     feedback: z.string().trim().min(1).max(2000).optional(),
@@ -103,13 +105,25 @@ export const llmAssessmentEvaluationSchema = z
     qualityRating: z.number().int().min(0).max(5),
     passed: z.boolean(),
     shouldEscalateDepth: z.boolean(),
-    weakAreas: z.array(z.string().min(1).max(200)).max(8).optional(),
+    weakAreas: z.array(z.string().trim().min(1).max(120)).max(8).optional(),
   })
   .strict()
   .refine((evaluation) => evaluation.feedback ?? evaluation.reply, {
     message: 'Assessment evaluation requires feedback or reply',
     path: ['feedback'],
-  });
+  })
+  .refine(
+    (evaluation) => {
+      return (
+        evaluation.passed ===
+        evaluation.rawScore >= LLM_ASSESSMENT_PASS_THRESHOLD
+      );
+    },
+    {
+      message: 'Assessment pass state must match raw score threshold',
+      path: ['passed'],
+    },
+  );
 export type LlmAssessmentEvaluation = z.infer<
   typeof llmAssessmentEvaluationSchema
 >;

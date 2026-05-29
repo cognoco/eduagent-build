@@ -257,7 +257,7 @@ describe('evaluateAssessmentAnswer', () => {
     registerProvider(
       createAssessmentEvalMockProvider({
         feedback: 'OK',
-        passed: true,
+        passed: false,
         shouldEscalateDepth: false,
         rawScore: 0.4,
         qualityRating: 3,
@@ -276,7 +276,7 @@ describe('evaluateAssessmentAnswer', () => {
     registerProvider(
       createAssessmentEvalMockProvider({
         feedback: 'OK',
-        passed: true,
+        passed: false,
         shouldEscalateDepth: false,
         rawScore: 0.4,
         qualityRating: 3,
@@ -535,7 +535,7 @@ describe('evaluateAssessmentAnswer', () => {
             'Here is my evaluation:\n' +
             JSON.stringify({
               feedback: 'Solid recall of the key concepts.',
-              passed: true,
+              passed: false,
               shouldEscalateDepth: false,
               rawScore: 0.45,
               qualityRating: 4,
@@ -818,6 +818,56 @@ describe('evaluateAssessmentAnswer', () => {
     expect(result.passed).toBe(false);
     expect(result.masteryScore).toBe(0);
     expect(result.qualityRating).toBe(0);
+  });
+
+  it('[WI-372] falls back closed when pass state contradicts raw score', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Good recall.',
+        passed: false,
+        shouldEscalateDepth: false,
+        rawScore: 0.95,
+        qualityRating: 5,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      { ...assessmentContext, currentDepth: 'recall' },
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.passed).toBe(false);
+    expect(result.shouldEscalateDepth).toBe(false);
+    expect(result.nextDepth).toBeUndefined();
+    expect(result.masteryScore).toBe(0);
+  });
+
+  it('[WI-372] falls back when weak areas exceed the response contract', async () => {
+    registerProvider(
+      createRawAssessmentEvalMockProvider({
+        feedback: 'Needs another pass.',
+        passed: false,
+        shouldEscalateDepth: false,
+        rawScore: 0.4,
+        qualityRating: 2,
+        weakAreas: ['x'.repeat(121)],
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Variables store values.',
+    );
+
+    expect(result.feedback).toBe(
+      "We couldn't evaluate your answer right now — please try again.",
+    );
+    expect(result.weakAreas).toBeUndefined();
+    expect(result.passed).toBe(false);
+    expect(result.masteryScore).toBe(0);
   });
 });
 

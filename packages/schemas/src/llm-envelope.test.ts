@@ -435,18 +435,53 @@ describe('discrete LLM evaluation schemas', () => {
       expect(result.success).toBe(false);
     });
 
+    it('[WI-372] rejects pass state that contradicts raw score', () => {
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          reply: 'Good enough.',
+          rawScore: 0.8,
+          qualityRating: 4,
+          passed: false,
+          shouldEscalateDepth: false,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        llmAssessmentEvaluationSchema.safeParse({
+          reply: 'Not enough detail yet.',
+          rawScore: 0.4,
+          qualityRating: 2,
+          passed: true,
+          shouldEscalateDepth: false,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('[WI-372] rejects weak areas wider than the assessment response contract', () => {
+      const result = llmAssessmentEvaluationSchema.safeParse({
+        reply: 'Not enough detail yet.',
+        rawScore: 0.4,
+        qualityRating: 2,
+        passed: false,
+        shouldEscalateDepth: false,
+        weakAreas: ['x'.repeat(121)],
+      });
+
+      expect(result.success).toBe(false);
+    });
+
     it('[WI-372] accepts the strict discrete assessment shape', () => {
       const parsed = llmAssessmentEvaluationSchema.parse({
         reply: 'Good enough.',
         rawScore: 0.8,
         qualityRating: 4,
-        passed: false,
+        passed: true,
         shouldEscalateDepth: false,
         weakAreas: ['examples'],
       });
 
       expect(parsed.reply).toBe('Good enough.');
-      expect(parsed.passed).toBe(false);
+      expect(parsed.passed).toBe(true);
     });
   });
 });
