@@ -9,6 +9,32 @@ import {
   selectGeminiDiffKeys,
 } from './translate-gemini';
 
+type NestedStrings = { [k: string]: string | NestedStrings };
+
+const REAL_I18N_DIR = path.resolve(__dirname, '../apps/mobile/src/i18n');
+const REAL_LOCALES_DIR = path.join(REAL_I18N_DIR, 'locales');
+const REAL_SOURCE_BASELINE_PATH = path.join(
+  REAL_I18N_DIR,
+  'source-baseline.json',
+);
+const EXPECTED_TARGET_LANGUAGES = ['nb', 'de', 'es', 'pt', 'pl', 'ja'];
+
+function flattenFixtureKeys(
+  obj: NestedStrings,
+  prefix = '',
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === 'string') {
+      result[fullKey] = value;
+    } else {
+      Object.assign(result, flattenFixtureKeys(value, fullKey));
+    }
+  }
+  return result;
+}
+
 describe('selectGeminiDiffKeys', () => {
   it('selects an existing key when its English source string changed', () => {
     const source = {
@@ -146,6 +172,32 @@ describe('selectGeminiDiffKeys', () => {
       translateKeys: ['common.cancel'],
       removedKeys: [],
     });
+  });
+});
+
+describe('committed source-baseline.json', () => {
+  it('contains current source hashes for every committed target locale key', () => {
+    const source = JSON.parse(
+      fs.readFileSync(path.join(REAL_LOCALES_DIR, 'en.json'), 'utf-8'),
+    ) as NestedStrings;
+    const baselineFile = JSON.parse(
+      fs.readFileSync(REAL_SOURCE_BASELINE_PATH, 'utf-8'),
+    ) as Record<string, Record<string, string>>;
+
+    expect(Object.keys(baselineFile).sort()).toEqual(
+      EXPECTED_TARGET_LANGUAGES.toSorted(),
+    );
+
+    for (const lang of EXPECTED_TARGET_LANGUAGES) {
+      const target = JSON.parse(
+        fs.readFileSync(path.join(REAL_LOCALES_DIR, `${lang}.json`), 'utf-8'),
+      ) as NestedStrings;
+      const targetKeys = Object.keys(flattenFixtureKeys(target));
+
+      expect(baselineFile[lang]).toEqual(
+        buildBaselineForKeys(source, targetKeys),
+      );
+    }
   });
 });
 

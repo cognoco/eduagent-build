@@ -4,7 +4,7 @@ date: 2026-05-29
 profile: code
 work_items: [WI-325]
 spec: https://www.notion.so/3678bce91f7c81ee994de26c11c8aa07
-status: in-progress
+status: done
 ---
 
 # WI-325 i18n source baseline — Implementation Plan
@@ -16,7 +16,7 @@ status: in-progress
 In scope:
 - `scripts/translate-gemini.ts` — source-hash baseline helpers, diff selection, CLI write flow.
 - `scripts/translate-gemini.test.ts` — focused red/green tests for selection and baseline-write timing.
-- `apps/mobile/src/i18n/source-baseline.json` — generated sidecar baseline manifest, if produced by a successful translation run.
+- `apps/mobile/src/i18n/source-baseline.json` — generated sidecar baseline manifest for current committed target locales.
 - `docs/plans/2026-05-29-wi-325-i18n-source-baseline.md` — this plan.
 
 Out of scope:
@@ -26,11 +26,12 @@ Out of scope:
 - API/mobile product code.
 
 ## Tasks
-- [ ] T1: Add red tests for pure diff selection — done when `pnpm exec jest --config scripts/jest.config.cjs translate-gemini.test.ts --runInBand` fails because `selectGeminiDiffKeys` is missing or key-presence-only behavior skips changed-source keys.
-- [ ] T2: Implement `selectGeminiDiffKeys` and stable source hashing — done when focused tests pass for changed, added, removed, unchanged, full, missing baseline, corrupt baseline, and manual target edit preservation.
-- [ ] T3: Add red tests for sidecar write timing — done when tests fail showing baseline updates would occur before validation/write success or omit prune/full refresh behavior.
-- [ ] T4: Wire the CLI flow to load/write `source-baseline.json` — done when tests prove successful diff/full/prune operations update the per-locale baseline, failed validation leaves baseline unchanged, and runtime locale JSON files receive no metadata.
-- [ ] T5: Run verification — done when focused script tests pass, `pnpm run check:i18n`, `pnpm check:i18n:orphans`, and `bash scripts/check-change-class.sh --run --fast` complete successfully or any environment-only blocker is documented with exact output.
+- [x] T1: Add red tests for pure diff selection — done when `pnpm exec jest --config scripts/jest.config.cjs translate-gemini.test.ts --runInBand` fails because `selectGeminiDiffKeys` is missing or key-presence-only behavior skips changed-source keys.
+- [x] T2: Implement `selectGeminiDiffKeys` and stable source hashing — done when focused tests pass for changed, added, removed, unchanged, full, missing baseline, corrupt baseline, and manual target edit preservation.
+- [x] T3: Add red tests for sidecar write timing — done when tests fail showing baseline updates would occur before validation/write success or omit prune/full refresh behavior.
+- [x] T4: Wire the CLI flow to load/write `source-baseline.json` — done when tests prove successful diff/full/prune operations update the per-locale baseline, failed validation leaves baseline unchanged, and runtime locale JSON files receive no metadata.
+- [x] T5: Run verification — done when focused script tests pass, `pnpm run check:i18n`, `pnpm check:i18n:orphans`, and `bash scripts/check-change-class.sh --run --fast` complete successfully or any environment-only blocker is documented with exact output.
+- [x] T6: Commit initial sidecar baseline — done when `apps/mobile/src/i18n/source-baseline.json` contains current source hashes for every committed target locale key and a test fails if the sidecar is missing/stale.
 
 ## Tests
 T1/T2:
