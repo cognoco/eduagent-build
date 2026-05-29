@@ -17,13 +17,15 @@ appId: com.mentomate.app
 tags:
   - smoke
   - learning
-# DEMOTED 2026-05-19: same BUG-35 flake as first-session.yaml — `pressKey:
-# Enter` is not reliably triggering `onSubmitEditing` in the dev-client
-# build on WHPX. Re-promote after BUG-35 is resolved.
+# Re-promoted 2026-05-29: already uses hideKeyboard + tapOn send-button
+# (BUG-35 fix pattern). Added SEED_SCENARIO + API_URL env vars to runFlow.
 ---
 # 1. Seed, launch dev-client, sign in.
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
 
 # The coach band continue button starts a session (replaced intent-continue card
 # in home UI redesign). learning-active seed → coach band is shown.

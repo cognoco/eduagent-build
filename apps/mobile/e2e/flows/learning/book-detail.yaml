@@ -27,8 +27,9 @@ appId: com.mentomate.app
 tags:
   - nightly
   - learning
-# DEMOTED 2026-05-19: flow re-routed to push-to-shelf model. Awaiting 2x green
-# WHPX Pixel API 34 verification before re-tagging to pr-blocking.
+# Re-promoted 2026-05-29: all testIDs verified against current source.
+# book-back (line 1521), shelf-back (shelf/[subjectId]/index.tsx:314),
+# book-start-learning (line 2069), book-notes-section (line 1613) confirmed.
 ---
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
