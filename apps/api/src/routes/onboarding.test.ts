@@ -316,6 +316,14 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(403);
+      // toEqual asserts the exact serialized body — proves the
+      // assertOwnerProfile message-passthrough (thrown ForbiddenError apiCode
+      // is undefined → dropped by JSON, so the body is exactly { code, message }).
+      const body = await res.json();
+      expect(body).toEqual({
+        code: 'FORBIDDEN',
+        message: 'Only the account owner can change the conversation language.',
+      });
       expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
     });
 

@@ -25,6 +25,7 @@ import {
   resolveProfileQuotaRole,
   type ProfileQuotaRole,
 } from './quota-provision';
+import type { SubscriptionTier } from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -504,7 +505,7 @@ async function decrementProfileQuota(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  tier: 'free' | 'plus' | 'family' | 'pro',
+  tier: SubscriptionTier,
 ): Promise<DecrementResult> {
   const ownsProfile = await verifyProfileInSubscriptionAccount(
     db,
@@ -566,7 +567,7 @@ async function clampProfileQuotaLimits(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  tier: 'free' | 'plus' | 'family' | 'pro',
+  tier: SubscriptionTier,
 ): Promise<void> {
   const row = await db.query.profileQuotaUsage.findFirst({
     where: and(
@@ -692,7 +693,7 @@ async function attemptProfileDecrementInTx(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  tier: 'free' | 'plus' | 'family' | 'pro',
+  tier: SubscriptionTier,
   allowLazyProvision: boolean,
 ): Promise<DecrementResult> {
   const now = new Date();

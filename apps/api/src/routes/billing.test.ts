@@ -7,6 +7,7 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const mockDbInsert = jest.fn().mockReturnValue({
   values: jest.fn().mockReturnValue({
@@ -452,6 +453,13 @@ describe('billing routes', () => {
       // Body must not leak any account-level subscription detail.
       const body = await res.json();
       expect(body).not.toHaveProperty('subscription');
+      // toEqual asserts the exact serialized body — proves the
+      // assertOwnerProfile message-passthrough and that the only keys are
+      // { code, message } (thrown ForbiddenError apiCode is undefined → dropped).
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can view subscription details.',
+      });
       // Subscription service should never be consulted once gate trips.
       expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
       expect(mockGetQuotaPool).not.toHaveBeenCalled();

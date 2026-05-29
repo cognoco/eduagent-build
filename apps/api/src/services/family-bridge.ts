@@ -21,6 +21,10 @@ import type {
 
 import { NotFoundError } from '../errors';
 import { assertParentAccess } from './family-access';
+import {
+  findOwnedCurriculumTopic,
+  type OwnedCurriculumTopic,
+} from './curriculum-topic-ownership';
 
 const REQUEST_CACHE_TTL_MS = 60_000;
 const cloneRequestCache = new Map<
@@ -542,17 +546,8 @@ async function topicBelongsToProfile(
   db: Database,
   profileId: string,
   topicId: string,
-): Promise<typeof curriculumTopics.$inferSelect | undefined> {
-  const [topic] = await db
-    .select({ topic: curriculumTopics })
-    .from(curriculumTopics)
-    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
-    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
-    .where(
-      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId)),
-    )
-    .limit(1);
-  return topic?.topic;
+): Promise<OwnedCurriculumTopic | null> {
+  return findOwnedCurriculumTopic(db, { profileId, topicId });
 }
 
 export async function undoCloneFromChild(
@@ -569,7 +564,7 @@ export async function undoCloneFromChild(
     adultProfileId,
     createdIds.topicId,
   );
-  if (!topic || topic.source !== 'parent_bridge') {
+  if (!topic || topic.topicSource !== 'parent_bridge') {
     return { deleted: { topic: false } };
   }
 
@@ -577,12 +572,12 @@ export async function undoCloneFromChild(
     .delete(curriculumTopics)
     .where(
       and(
-        eq(curriculumTopics.id, topic.id),
+        eq(curriculumTopics.id, topic.topicId),
         sql`NOT EXISTS (
           SELECT 1
           FROM ${learningSessions}
           WHERE ${learningSessions.profileId} = ${adultProfileId}
-            AND ${learningSessions.topicId} = ${topic.id}
+            AND ${learningSessions.topicId} = ${topic.topicId}
         )`,
       ),
     )
@@ -598,7 +593,7 @@ export async function undoCloneFromChild(
     .where(
       and(
         eq(learningSessions.profileId, adultProfileId),
-        eq(learningSessions.topicId, topic.id),
+        eq(learningSessions.topicId, topic.topicId),
       ),
     )
     .limit(1);

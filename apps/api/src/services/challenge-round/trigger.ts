@@ -3,6 +3,7 @@ import type {
   RetentionStatus,
   SessionType,
   StruggleStatus,
+  SubscriptionTier,
 } from '@eduagent/schemas';
 
 /**
@@ -44,7 +45,7 @@ export interface ChallengeReadinessInput {
   struggleStatus: StruggleStatus;
   recentCorrectStreak: number;
   currentSessionSolidAnswerCount: number;
-  subscriptionTier?: 'free' | 'plus' | 'family' | 'pro' | 'trial';
+  subscriptionTier?: SubscriptionTier;
   quotaRemainingTurns: number;
   quotaFractionRemaining: number;
   challengeRoundState: ChallengeRoundSessionState | undefined;

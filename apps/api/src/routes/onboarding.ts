@@ -23,8 +23,11 @@ import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { assertOwnerAndParentAccess } from '../services/family-access';
-import { notFound, forbidden } from '../errors';
+import {
+  assertOwnerAndParentAccess,
+  assertOwnerProfile,
+} from '../services/family-access';
+import { notFound } from '../errors';
 import {
   updateConversationLanguage,
   updatePronouns,
@@ -58,13 +61,10 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       // [CR-2026-05-21-011] conversationLanguage is owner-gated: a child on a
       // parent's account must not unilaterally change the AI tutor language.
-      const activeProfileMetaLanguage = c.get('profileMeta');
-      if (activeProfileMetaLanguage?.isOwner !== true) {
-        return forbidden(
-          c,
-          'Only the account owner can change the conversation language.',
-        );
-      }
+      assertOwnerProfile(
+        c,
+        'Only the account owner can change the conversation language.',
+      );
       const { conversationLanguage } = c.req.valid('json');
       try {
         await updateConversationLanguage(
