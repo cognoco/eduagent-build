@@ -85,6 +85,13 @@ T4:
   - `NX_DAEMON=false rtk pnpm exec nx run @eduagent/schemas:lint`
   - `rtk pnpm exec prettier --check docs/plans/2026-05-29-wi-372-strict-llm-evaluation-parsing.md packages/schemas/src/llm-envelope.ts packages/schemas/src/llm-envelope.test.ts apps/api/src/services/summaries.test.ts`
   - `rtk git diff --check`
+- Review loop 5 affected API/schema validation passed after sharing the assessment pass threshold and aligning the assessment integration fixture:
+  - `NX_DAEMON=false rtk pnpm exec jest --config packages/schemas/jest.config.cjs --testPathIgnorePatterns '/node_modules/' --testMatch '<rootDir>/src/**/*.test.ts' --runTestsByPath packages/schemas/src/llm-envelope.test.ts --no-coverage`
+  - `NX_DAEMON=false rtk pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/services/assessments.test.ts apps/api/src/services/summaries.test.ts apps/api/src/services/evaluate.test.ts --no-coverage`
+  - `NX_DAEMON=false rtk pnpm exec nx run api:typecheck`
+- Review loop 5 targeted integration test was attempted:
+  - `rtk pnpm exec jest --config tests/integration/jest.config.cjs --runTestsByPath tests/integration/assessments-routes.integration.test.ts --runInBand --no-coverage`
+  - Result: failed before exercising code because local `DATABASE_URL` is unset and Doppler/env sync is not configured in this worktree.
 - API lint passed:
   - `NX_DAEMON=false rtk pnpm exec nx run api:lint`
 - API typecheck passed:
@@ -119,3 +126,5 @@ T4:
 - Review loop 3 found a valid should-fix issue: `weakAreas` accepted entries up to 200 characters while the downstream assessment response contract caps them at 120. Fixed by trimming and capping LLM `weakAreas` entries at 120 characters, with schema and service fallback tests.
 - Review loop 4 found a valid must-fix issue: summary payloads with `hasUnderstandingGaps: true` and `isAccepted: true` could pass schema, then accept a summary despite contradictory state. Fixed by rejecting that combination in `llmSummaryEvaluationSchema`, with schema and service fallback tests.
 - Review loop 4 included a consider-level finding that whitespace-only `gapAreas` passed validation. Because loop 4 already required a must-fix commit, fixed it by trimming gap labels before the nonblank check, with schema coverage.
+- Review loop 5 found a valid should-fix issue: the assessment pass threshold was local to `llm-envelope.ts` while the assessment parser fallback hardcoded the same `0.7` threshold. Fixed by exporting `LLM_ASSESSMENT_PASS_THRESHOLD` from `@eduagent/schemas` and importing it in `assessments.ts`.
+- Review loop 5 also surfaced that `tests/integration/assessments-routes.integration.test.ts` had a mocked assessment payload with `passed: true` and `rawScore: 0.45`, which is invalid under the strict schema. Fixed by aligning the fixture score with the pass state.
