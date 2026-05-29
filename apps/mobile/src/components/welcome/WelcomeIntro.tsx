@@ -29,7 +29,26 @@ interface CardSpec {
 
 const TOTAL_CARDS = 3;
 const LAST_INDEX: CardIndex = (TOTAL_CARDS - 1) as CardIndex;
-const WELCOME_BACKGROUND = '#0b1226';
+
+// brand-intent: welcome dark stage. The pre-auth intro is a deliberate
+// first-run brand moment, so it uses this fixed palette rather than mirroring
+// the user's in-app light/dark theme.
+export const WELCOME_DARK_STAGE_COLORS = {
+  background: '#0b1226',
+  surface: '#172033',
+  surfaceElevated: '#111a2f',
+  textPrimary: '#f8fafc',
+  textSecondary: '#cbd5e1',
+  textInverse: '#ffffff',
+  primary: '#2dd4bf',
+  primarySoft: 'rgba(45, 212, 191, 0.18)',
+  secondary: '#a78bfa',
+  accent: '#a78bfa',
+  border: 'rgba(148, 163, 184, 0.28)',
+  muted: 'rgba(203, 213, 225, 0.62)',
+  practiceDarkTeal: '#0f172a',
+  shadow: '#000000',
+} as const;
 
 export interface WelcomeIntroProps {
   audience: WelcomeAudience;
@@ -66,7 +85,7 @@ function SceneFrame({
         alignSelf: 'center',
         backgroundColor: colors.surfaceElevated,
         borderColor: colors.border,
-        shadowColor: '#000000',
+        shadowColor: WELCOME_DARK_STAGE_COLORS.shadow,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.22,
         shadowRadius: 24,
@@ -501,19 +520,19 @@ export function WelcomeIntro({
   const welcomeColors = React.useMemo<ThemeColors>(
     () => ({
       ...colors,
-      background: WELCOME_BACKGROUND,
-      surface: '#172033',
-      surfaceElevated: '#111a2f',
-      textPrimary: '#f8fafc',
-      textSecondary: '#cbd5e1',
-      textInverse: '#ffffff',
-      primary: '#2dd4bf',
-      primarySoft: 'rgba(45, 212, 191, 0.18)',
-      secondary: '#a78bfa',
-      accent: '#a78bfa',
-      border: 'rgba(148, 163, 184, 0.28)',
-      muted: 'rgba(203, 213, 225, 0.62)',
-      practiceDarkTeal: '#0f172a',
+      background: WELCOME_DARK_STAGE_COLORS.background,
+      surface: WELCOME_DARK_STAGE_COLORS.surface,
+      surfaceElevated: WELCOME_DARK_STAGE_COLORS.surfaceElevated,
+      textPrimary: WELCOME_DARK_STAGE_COLORS.textPrimary,
+      textSecondary: WELCOME_DARK_STAGE_COLORS.textSecondary,
+      textInverse: WELCOME_DARK_STAGE_COLORS.textInverse,
+      primary: WELCOME_DARK_STAGE_COLORS.primary,
+      primarySoft: WELCOME_DARK_STAGE_COLORS.primarySoft,
+      secondary: WELCOME_DARK_STAGE_COLORS.secondary,
+      accent: WELCOME_DARK_STAGE_COLORS.accent,
+      border: WELCOME_DARK_STAGE_COLORS.border,
+      muted: WELCOME_DARK_STAGE_COLORS.muted,
+      practiceDarkTeal: WELCOME_DARK_STAGE_COLORS.practiceDarkTeal,
     }),
     [colors],
   );

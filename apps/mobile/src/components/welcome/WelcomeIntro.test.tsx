@@ -1,7 +1,7 @@
 import { BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import { WelcomeIntro } from './WelcomeIntro';
+import { WELCOME_DARK_STAGE_COLORS, WelcomeIntro } from './WelcomeIntro';
 
 const translations: Record<string, string> = {
   // Learner deck
@@ -235,7 +235,7 @@ describe('<WelcomeIntro /> shared behaviour', () => {
     const style = StyleSheet.flatten(
       screen.getByTestId('welcome-intro').props.style,
     );
-    expect(style.backgroundColor).toBe('#0b1226');
+    expect(style.backgroundColor).toBe(WELCOME_DARK_STAGE_COLORS.background);
   });
 
   it('uses the translated brand label inside the mini app scene frame', () => {
