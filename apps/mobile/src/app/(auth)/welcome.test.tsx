@@ -117,18 +117,6 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-// prettier-ignore
-jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({
-    background: '#000',
-    accent: '#0af',
-    surfaceElevated: '#222',
-    textPrimary: '#fff',
-    textSecondary: '#aaa',
-    textInverse: '#000',
-  }),
-}));
-
 const {
   default: PreAuthWelcomeRoute,
   WELCOME_DARK_STAGE_COLORS,
@@ -156,6 +144,20 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     expect(screen.getByTestId('welcome-chooser-parent')).toBeTruthy();
     expect(screen.queryByTestId('welcome-intro-stub')).toBeNull();
     expect(screen.queryByTestId('pre-auth-bridge')).toBeNull();
+  });
+
+  it('renders the chooser on the dark brand-stage palette', () => {
+    render(<PreAuthWelcomeRoute />);
+    expect(screen.getByTestId('welcome-chooser').props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: WELCOME_DARK_STAGE_COLORS.background,
+      }),
+    );
+    expect(screen.getByTestId('welcome-chooser-learner').props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: WELCOME_DARK_STAGE_COLORS.surfaceElevated,
+      }),
+    );
   });
 
   it('emits intro_started exactly once on mount', () => {
@@ -250,6 +252,11 @@ describe('<PreAuthWelcomeRoute /> - cards -> bridge -> auth', () => {
     render(<PreAuthWelcomeRoute />);
     chooseParent();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
+    expect(screen.getByTestId('pre-auth-bridge').props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: WELCOME_DARK_STAGE_COLORS.background,
+      }),
+    );
     expect(
       screen.getByText(/Turn "I don't get it" into "I've got this."/),
     ).toBeTruthy();
