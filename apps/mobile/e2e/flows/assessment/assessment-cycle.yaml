@@ -24,6 +24,16 @@ tags:
     timeout: 15000
 
 # 3. Create a new subject — tap Learn intent card (replaced add-subject-button)
+# home-action-study-new is the 3rd intent action inside LearnerScreen's
+# ScrollView (LearnerScreen.tsx:574); must scroll to make it visible first,
+# matching the pattern already used in dictation-full-flow.yaml for
+# home-action-practice (the 2nd action, which also needs scrolling).
+- scrollUntilVisible:
+    element:
+      id: "home-action-study-new"
+    direction: DOWN
+    timeout: 5000
+
 - tapOn:
     id: "home-action-study-new"
 
