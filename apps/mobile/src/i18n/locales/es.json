@@ -2388,29 +2388,29 @@
     "learner": {
       "card1": {
         "headline": "A mentor you can talk to",
-        "supporting": "Ask when you are stuck, explain what you do not get, and get help that adapts to how you learn."
+        "supporting": "Ask where you are stuck. Get help that adapts to how you learn."
       },
       "card2": {
         "headline": "Remembers you, picks up where you left off",
-        "supporting": "Your subjects, notes, and pace stay in one place, and your mentor adapts every time you come back."
+        "supporting": "Subjects, notes, and pace stay together so you can come back smoothly."
       },
       "card3": {
         "headline": "Built for real learning",
-        "supporting": "Clear explanations, guided questions, and practice that sticks help you think, practice, and remember."
+        "supporting": "Clear explanations, guided questions, and practice that sticks."
       }
     },
     "parent": {
       "card1": {
         "headline": "A personal mentor for your child",
-        "supporting": "Teaches at their pace and helps with homework by teaching the method and checking their work — never just handing over answers to copy."
+        "supporting": "Guides the method and checks their work, without handing over answers to copy."
       },
       "card2": {
         "headline": "Stay in the loop, step in when it matters",
-        "supporting": "Watch your child's progress and get involved exactly when they need you — not a moment sooner."
+        "supporting": "See progress and step in when your child actually needs you."
       },
       "card3": {
         "headline": "No more homework battles",
-        "supporting": "Take back your evenings and turn them into quality time instead of nightly fights."
+        "supporting": "Turn nightly fights into calmer, more useful study time."
       }
     },
     "scene": {
@@ -2466,6 +2466,9 @@
           }
         }
       }
+    },
+    "sceneFrame": {
+      "brandLabel": "MentoMate"
     },
     "bridge": {
       "headline": "Turn \"I don't get it\" into \"I've got this.\"",

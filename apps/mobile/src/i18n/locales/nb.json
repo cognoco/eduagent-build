@@ -2388,29 +2388,29 @@
     "learner": {
       "card1": {
         "headline": "En mentor du kan snakke med",
-        "supporting": "Spør når du står fast, forklar hva du ikke forstår, og få hjelp som tilpasser seg måten du lærer på."
+        "supporting": "Spør der du står fast. Få hjelp som tilpasser seg måten du lærer på."
       },
       "card2": {
         "headline": "Husker deg og tar opp tråden der du slapp",
-        "supporting": "Fagene, notatene og tempoet ditt er samlet på ett sted, og mentoren tilpasser seg hver gang du kommer tilbake."
+        "supporting": "Fag, notater og tempo henger sammen, så du lett kan fortsette."
       },
       "card3": {
         "headline": "Bygd for ekte læring",
-        "supporting": "Tydelige forklaringer, veiledende spørsmål og øvelser som setter seg hjelper deg å tenke, øve og huske."
+        "supporting": "Tydelige forklaringer, veiledende spørsmål og øving som setter seg."
       }
     },
     "parent": {
       "card1": {
         "headline": "En personlig mentor for barnet ditt",
-        "supporting": "Underviser i deres eget tempo og hjelper med lekser ved å lære bort metoden og sjekke arbeidet — uten å bare gi bort svar de kan kopiere."
+        "supporting": "Veileder metoden og sjekker arbeidet, uten å gi bort svar de kan kopiere."
       },
       "card2": {
         "headline": "Følg med, og bidra når det trengs",
-        "supporting": "Se fremgangen til barnet ditt og bli involvert akkurat når de trenger deg — ikke et øyeblikk før."
+        "supporting": "Se fremgangen og bidra når barnet faktisk trenger deg."
       },
       "card3": {
         "headline": "Slutt på leksekrangler",
-        "supporting": "Ta tilbake kveldene dine og gjør dem til kvalitetstid i stedet for daglige krangler."
+        "supporting": "Gjør daglige krangler til roligere og mer nyttig studietid."
       }
     },
     "scene": {
@@ -2466,6 +2466,9 @@
           }
         }
       }
+    },
+    "sceneFrame": {
+      "brandLabel": "MentoMate"
     },
     "bridge": {
       "headline": "Gjør «Jeg forstår det ikke» til «Dette har jeg.»",

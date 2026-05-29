@@ -29,6 +29,7 @@ interface CardSpec {
 
 const TOTAL_CARDS = 3;
 const LAST_INDEX: CardIndex = (TOTAL_CARDS - 1) as CardIndex;
+const WELCOME_BACKGROUND = '#0b1226';
 
 export interface WelcomeIntroProps {
   audience: WelcomeAudience;
@@ -46,21 +47,30 @@ export interface WelcomeIntroProps {
 
 function SceneFrame({
   testID,
+  colors,
+  brandLabel,
   children,
 }: {
   testID: string;
+  colors: ThemeColors;
+  brandLabel: string;
   children: React.ReactNode;
 }): React.ReactElement {
-  const colors = useThemeColors();
-
   return (
     <View
       testID={`${testID}-frame`}
-      className="w-full rounded-3xl border px-5 py-5 mb-7"
+      className="w-full rounded-3xl border px-5 py-5 mb-6"
       style={{
-        minHeight: 218,
-        backgroundColor: colors.practiceDarkTeal,
-        borderColor: colors.primary,
+        minHeight: 230,
+        maxWidth: 360,
+        alignSelf: 'center',
+        backgroundColor: colors.surfaceElevated,
+        borderColor: colors.border,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.22,
+        shadowRadius: 24,
+        elevation: 8,
       }}
     >
       <View className="flex-row items-center justify-between mb-4">
@@ -68,7 +78,7 @@ function SceneFrame({
           className="text-caption font-bold"
           style={{ color: colors.textInverse }}
         >
-          MentoMate
+          {brandLabel}
         </Text>
         <View className="flex-row items-center">
           <View
@@ -93,16 +103,18 @@ function SceneFrame({
 function ChatScene({
   testID,
   colors,
+  brandLabel,
   askText,
   replyText,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
   askText: string;
   replyText: string;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID}>
+    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
       <View
         className="self-end rounded-2xl px-4 py-3 mb-3"
         style={{ backgroundColor: colors.accent, maxWidth: '80%' }}
@@ -138,22 +150,23 @@ function ChatScene({
 function ChipsScene({
   testID,
   colors,
+  brandLabel,
   chips,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
   chips: ReadonlyArray<string>;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID}>
+    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
       <View className="flex-row flex-wrap justify-center pt-3">
         {chips.map((label, index) => (
           <View
             key={label}
             className="rounded-full px-3 py-2 mr-2 mb-2"
             style={{
-              backgroundColor:
-                index === 0 ? colors.primarySoft : colors.surface,
+              backgroundColor: index === 0 ? colors.primary : colors.surface,
               borderWidth: 1,
               borderColor: index === 0 ? colors.primary : colors.border,
             }}
@@ -161,7 +174,7 @@ function ChipsScene({
             <Text
               className="text-body-sm font-semibold"
               style={{
-                color: index === 0 ? colors.textInverse : colors.textPrimary,
+                color: index === 0 ? colors.background : colors.textPrimary,
               }}
             >
               {label}
@@ -176,61 +189,59 @@ function ChipsScene({
 function RowsScene({
   testID,
   colors,
+  brandLabel,
   rows,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
   rows: ReadonlyArray<{
     key: string;
     label: string;
     body: string;
     icon: keyof typeof Ionicons.glyphMap;
+    highlighted?: boolean;
   }>;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID}>
-      {rows.map((r) => (
-        <View
-          key={r.key}
-          className="flex-row items-start rounded-2xl px-4 py-3 mb-2"
-          style={{
-            backgroundColor:
-              r.key === 'strong' || r.key === 'next'
+    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
+      {rows.map((r) => {
+        const isHighlighted = r.highlighted === true;
+        return (
+          <View
+            key={r.key}
+            className="flex-row items-start rounded-2xl px-4 py-3 mb-2"
+            style={{
+              backgroundColor: isHighlighted
                 ? colors.primarySoft
                 : colors.surface,
-            borderWidth: 1,
-            borderColor:
-              r.key === 'strong' || r.key === 'next'
-                ? colors.primary
-                : colors.border,
-          }}
-        >
-          <Ionicons
-            name={r.icon}
-            size={18}
-            color={
-              r.key === 'strong' || r.key === 'next'
-                ? colors.primary
-                : colors.accent
-            }
-            style={{ marginRight: 10, marginTop: 1 }}
-          />
-          <View className="flex-1">
-            <Text
-              className="text-caption font-semibold"
-              style={{ color: colors.textSecondary }}
-            >
-              {r.label}
-            </Text>
-            <Text
-              className="text-body-sm font-semibold mt-0.5"
-              style={{ color: colors.textPrimary }}
-            >
-              {r.body}
-            </Text>
+              borderWidth: 1,
+              borderColor: isHighlighted ? colors.primary : colors.border,
+            }}
+          >
+            <Ionicons
+              name={r.icon}
+              size={18}
+              color={isHighlighted ? colors.primary : colors.accent}
+              style={{ marginRight: 10, marginTop: 1 }}
+            />
+            <View className="flex-1">
+              <Text
+                className="text-caption font-semibold"
+                style={{ color: colors.textSecondary }}
+              >
+                {r.label}
+              </Text>
+              <Text
+                className="text-body-sm font-semibold mt-0.5"
+                style={{ color: colors.textPrimary }}
+              >
+                {r.body}
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </SceneFrame>
   );
 }
@@ -238,12 +249,14 @@ function RowsScene({
 function SubjectsResumeScene({
   testID,
   colors,
+  brandLabel,
   subjects,
   resumeLabel,
   resumeBody,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
   subjects: ReadonlyArray<{
     key: string;
     label: string;
@@ -253,7 +266,7 @@ function SubjectsResumeScene({
   resumeBody: string;
 }): React.ReactElement {
   return (
-    <SceneFrame testID={testID}>
+    <SceneFrame testID={testID} colors={colors} brandLabel={brandLabel}>
       <View className="flex-row justify-between mb-3">
         {subjects.map((s, index) => (
           <View
@@ -331,6 +344,7 @@ function useLearnerCards(
     // pre-push/CI and (b) the copy-assertion unit tests in WelcomeIntro.test.tsx
     // — NOT by the type system. Keep both guards green.
     const tr = t as unknown as (key: string) => string;
+    const brandLabel = tr('welcomeIntro.sceneFrame.brandLabel');
     return [
       {
         index: 0,
@@ -340,6 +354,7 @@ function useLearnerCards(
           <ChatScene
             testID="welcome-card-1-scene"
             colors={colors}
+            brandLabel={brandLabel}
             askText={tr('welcomeIntro.scene.learner.card1.learner')}
             replyText={tr('welcomeIntro.scene.learner.card1.mentor')}
           />
@@ -353,6 +368,7 @@ function useLearnerCards(
           <SubjectsResumeScene
             testID="welcome-card-2-scene"
             colors={colors}
+            brandLabel={brandLabel}
             subjects={[
               {
                 key: 'math',
@@ -383,6 +399,7 @@ function useLearnerCards(
           <ChipsScene
             testID="welcome-card-3-scene"
             colors={colors}
+            brandLabel={brandLabel}
             chips={[
               tr('welcomeIntro.scene.learner.card3.chips.explain'),
               tr('welcomeIntro.scene.learner.card3.chips.think'),
@@ -403,6 +420,7 @@ function useParentCards(
   return React.useMemo(() => {
     // Same narrowing as useLearnerCards — prevents TS2589.
     const tr = t as unknown as (key: string) => string;
+    const brandLabel = tr('welcomeIntro.sceneFrame.brandLabel');
     return [
       {
         index: 0,
@@ -412,6 +430,7 @@ function useParentCards(
           <ChatScene
             testID="welcome-card-1-scene"
             colors={colors}
+            brandLabel={brandLabel}
             askText={tr('welcomeIntro.scene.parent.card1.child')}
             replyText={tr('welcomeIntro.scene.parent.card1.mentor')}
           />
@@ -425,6 +444,7 @@ function useParentCards(
           <RowsScene
             testID="welcome-card-2-scene"
             colors={colors}
+            brandLabel={brandLabel}
             rows={[
               {
                 key: 'thisWeek',
@@ -437,6 +457,7 @@ function useParentCards(
                 label: tr('welcomeIntro.scene.parent.card2.strong.label'),
                 body: tr('welcomeIntro.scene.parent.card2.strong.body'),
                 icon: 'trending-up-outline',
+                highlighted: true,
               },
               {
                 key: 'review',
@@ -456,6 +477,7 @@ function useParentCards(
           <ChipsScene
             testID="welcome-card-3-scene"
             colors={colors}
+            brandLabel={brandLabel}
             chips={[
               tr('welcomeIntro.scene.parent.card3.chips.evenings'),
               tr('welcomeIntro.scene.parent.card3.chips.nagging'),
@@ -476,11 +498,30 @@ export function WelcomeIntro({
 }: WelcomeIntroProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const welcomeColors = React.useMemo<ThemeColors>(
+    () => ({
+      ...colors,
+      background: WELCOME_BACKGROUND,
+      surface: '#172033',
+      surfaceElevated: '#111a2f',
+      textPrimary: '#f8fafc',
+      textSecondary: '#cbd5e1',
+      textInverse: '#ffffff',
+      primary: '#2dd4bf',
+      primarySoft: 'rgba(45, 212, 191, 0.18)',
+      secondary: '#a78bfa',
+      accent: '#a78bfa',
+      border: 'rgba(148, 163, 184, 0.28)',
+      muted: 'rgba(203, 213, 225, 0.62)',
+      practiceDarkTeal: '#0f172a',
+    }),
+    [colors],
+  );
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  const learnerCards = useLearnerCards(t, colors);
-  const parentCards = useParentCards(t, colors);
+  const learnerCards = useLearnerCards(t, welcomeColors);
+  const parentCards = useParentCards(t, welcomeColors);
   const CARDS = audience === 'parent' ? parentCards : learnerCards;
 
   const listRef = React.useRef<FlatList<CardSpec>>(null);
@@ -542,8 +583,12 @@ export function WelcomeIntro({
 
   return (
     <View
-      className="flex-1 bg-background"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      className="flex-1"
+      style={{
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+        backgroundColor: welcomeColors.background,
+      }}
       testID="welcome-intro"
     >
       <FlatList
@@ -572,14 +617,14 @@ export function WelcomeIntro({
                   do not shift headline/body placement. */}
               {item.scene}
               <Text
-                className="text-display-sm font-bold text-center text-textPrimary mb-4"
-                style={{ color: colors.textPrimary }}
+                className="text-h1 font-bold text-center mb-3"
+                style={{ color: welcomeColors.textPrimary, maxWidth: 340 }}
               >
                 {headline}
               </Text>
               <Text
-                className="text-body text-center"
-                style={{ color: colors.textSecondary }}
+                className="text-body-sm text-center"
+                style={{ color: welcomeColors.textSecondary, maxWidth: 330 }}
               >
                 {supporting}
               </Text>
@@ -605,7 +650,9 @@ export function WelcomeIntro({
                 width: c.index === currentIndex ? 24 : 8,
                 height: 8,
                 backgroundColor:
-                  c.index === currentIndex ? colors.accent : colors.border,
+                  c.index === currentIndex
+                    ? welcomeColors.accent
+                    : welcomeColors.border,
               }}
             />
           ))}
@@ -624,7 +671,7 @@ export function WelcomeIntro({
             <Ionicons
               name="chevron-back"
               size={28}
-              color={colors.textSecondary}
+              color={welcomeColors.textSecondary}
             />
           </Pressable>
 
@@ -639,7 +686,7 @@ export function WelcomeIntro({
               <Ionicons
                 name="chevron-forward"
                 size={28}
-                color={colors.textSecondary}
+                color={welcomeColors.textSecondary}
               />
             </Pressable>
           )}
@@ -650,12 +697,12 @@ export function WelcomeIntro({
           onPress={handleNext}
           accessibilityRole="button"
           className="rounded-2xl py-4 items-center"
-          style={{ backgroundColor: colors.accent }}
+          style={{ backgroundColor: welcomeColors.accent }}
           testID={isLast ? 'welcome-start-button' : 'welcome-next-button'}
         >
           <Text
             className="text-body font-semibold"
-            style={{ color: colors.textInverse }}
+            style={{ color: welcomeColors.textInverse }}
           >
             {isLast ? t('welcomeIntro.letsStart') : t('welcomeIntro.next')}
           </Text>
