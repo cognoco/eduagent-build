@@ -21,14 +21,13 @@ tags:
   - nightly
   - consent
 ---
-# 1. Wait for sign-in screen.
-#    seed-and-run.sh already handled: pm clear (resets SecureStore so
-#    postApprovalSeen is fresh), app launch, dev-client launcher,
-#    bundle loading, and "Continue" overlay dismissal.
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-button"
-    timeout: 120000
+# 1. Walk the pre-auth welcome flow to the sign-in screen.
+#    Post 2026-05-27 refactor, pm clear lands on welcome-chooser (not sign-in).
+#    seed-and-run.sh handled: pm clear, app launch, dev-client launcher,
+#    bundle loading, and "Continue" overlay dismissal — but the first
+#    rendered screen is now welcome-chooser, not sign-in.
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
 
 # 2. Sign in with seeded credentials (from seed-and-run.sh env vars)
 - tapOn:
