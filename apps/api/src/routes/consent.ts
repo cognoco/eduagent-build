@@ -15,6 +15,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import type { Context } from 'hono';
 import { getProfile } from '../services/profile';
@@ -173,7 +174,7 @@ async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
   db: Database,
   childProfileId: string,
 ): Promise<void> {
-  const activeProfileId = requireProfileId(c.get('profileId'));
+  const { profileId: activeProfileId } = withProfile(c);
 
   // Self-service: acting on the caller's own profile.
   if (childProfileId === activeProfileId) {
