@@ -429,10 +429,13 @@ export async function handleBillingIssue(
   // dispatch below depend on it), but past_due + a future currentPeriodEnd now
   // resolves to `current` access until grace expiry.
   //
-  // We only write currentPeriodEnd when the grace expiry is genuinely in the
-  // future. A missing or already-expired grace timestamp leaves currentPeriodEnd
-  // untouched, so resolveEffectiveAccessTier falls back to Free immediately —
-  // the conservative default for "no valid grace remaining".
+  // We OWN currentPeriodEnd on BILLING_ISSUE: write the grace expiry when grace
+  // is genuinely in the future, and explicitly null otherwise. Leaving the
+  // column untouched would let a stale future value from a prior successful
+  // RENEWAL satisfy the resolver's `past_due && currentPeriodEnd > now` branch
+  // and grant unintended paid access during a payment failure with no grace
+  // (caught by Claude Code Review on PR #609). The new past_due branch reads
+  // currentPeriodEnd; the write must own that column's state.
   const graceExpiryMs = event.grace_period_expiration_at_ms;
   const hasFutureGrace = graceExpiryMs != null && graceExpiryMs > Date.now();
 
@@ -440,9 +443,10 @@ export async function handleBillingIssue(
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
     status: 'past_due',
-    ...(hasFutureGrace && graceExpiryMs != null
-      ? { currentPeriodEnd: new Date(graceExpiryMs).toISOString() }
-      : {}),
+    currentPeriodEnd:
+      hasFutureGrace && graceExpiryMs != null
+        ? new Date(graceExpiryMs).toISOString()
+        : null,
   });
 
   const shouldDispatchBillingIssue =

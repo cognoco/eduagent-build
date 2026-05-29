@@ -211,11 +211,15 @@ describe('handleBillingIssue', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [BUG-792] App-store grace period handling. The webhook must persist a
-  // FUTURE grace_period_expiration_at_ms into currentPeriodEnd so the
-  // effective-access resolver keeps the learner on their paid tier during the
-  // platform-managed grace window. A missing or already-expired grace must NOT
-  // write currentPeriodEnd (so access falls back to Free immediately).
+  // [BUG-792] App-store grace period handling. The webhook OWNS currentPeriodEnd
+  // on BILLING_ISSUE: writes the future grace_period_expiration_at_ms when grace
+  // is granted (so the effective-access resolver keeps the learner on paid tier
+  // during the platform grace window), and EXPLICITLY clears it to null on no
+  // / expired grace. Clearing is required: PR #609 review caught that leaving
+  // the column untouched would let a stale future currentPeriodEnd from a prior
+  // successful RENEWAL satisfy the resolver's `past_due && currentPeriodEnd >
+  // now` branch and grant unintended paid access during a payment failure with
+  // no grace.
   // -------------------------------------------------------------------------
   describe('[BUG-792] app-store grace period', () => {
     const NOW_MS = 1_800_000_000_000; // fixed "now" for deterministic future/past
@@ -256,7 +260,7 @@ describe('handleBillingIssue', () => {
       );
     });
 
-    it('does NOT write currentPeriodEnd when grace is MISSING (fall back to Free)', async () => {
+    it('CLEARS currentPeriodEnd to null when grace is MISSING (PR #609 review: prevent stale future cpe from prior renewal granting access)', async () => {
       await handleBillingIssue(
         mockDb,
         mockKv,
@@ -269,14 +273,14 @@ describe('handleBillingIssue', () => {
       expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
         mockDb,
         'acc-1',
-        expect.objectContaining({ status: 'past_due' }),
+        expect.objectContaining({
+          status: 'past_due',
+          currentPeriodEnd: null,
+        }),
       );
-      const callArgs = (updateSubscriptionFromRevenuecatWebhook as jest.Mock)
-        .mock.calls[0][2];
-      expect(callArgs).not.toHaveProperty('currentPeriodEnd');
     });
 
-    it('does NOT write currentPeriodEnd when grace has ALREADY EXPIRED (fall back to Free)', async () => {
+    it('CLEARS currentPeriodEnd to null when grace has ALREADY EXPIRED (PR #609 review)', async () => {
       const expiredGraceMs = NOW_MS - 60 * 1000; // 1 minute in the past
 
       await handleBillingIssue(
@@ -288,10 +292,14 @@ describe('handleBillingIssue', () => {
         }),
       );
 
-      const callArgs = (updateSubscriptionFromRevenuecatWebhook as jest.Mock)
-        .mock.calls[0][2];
-      expect(callArgs).toMatchObject({ status: 'past_due' });
-      expect(callArgs).not.toHaveProperty('currentPeriodEnd');
+      expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+        mockDb,
+        'acc-1',
+        expect.objectContaining({
+          status: 'past_due',
+          currentPeriodEnd: null,
+        }),
+      );
     });
   });
 });
