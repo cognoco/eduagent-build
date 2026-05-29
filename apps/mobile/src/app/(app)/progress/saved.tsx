@@ -7,7 +7,6 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { Translate } from '../../../i18n';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { Bookmark } from '@eduagent/schemas';
@@ -16,23 +15,7 @@ import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
-
-function formatRelativeDate(dateStr: string, t: Translate): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 0) return t('progress.saved.dateToday');
-  if (diffDays === 1) return t('progress.saved.dateYesterday');
-  if (diffDays < 7) return t('progress.saved.dateDaysAgo', { count: diffDays });
-  if (diffDays < 30)
-    return t('progress.saved.dateWeeksAgo', {
-      count: Math.floor(diffDays / 7),
-    });
-
-  return date.toLocaleDateString();
-}
+import { useRelativeDate } from '../../../hooks/use-time-format';
 
 function BookmarkRow({
   bookmark,
@@ -44,6 +27,7 @@ function BookmarkRow({
   canDelete: boolean;
 }) {
   const { t } = useTranslation();
+  const relativeDate = useRelativeDate();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -63,7 +47,7 @@ function BookmarkRow({
             {bookmark.topicTitle ? ` · ${bookmark.topicTitle}` : ''}
           </Text>
           <Text className="text-caption text-text-tertiary mt-0.5">
-            {formatRelativeDate(bookmark.createdAt, t)}
+            {relativeDate(bookmark.createdAt)}
           </Text>
         </View>
         {canDelete && (

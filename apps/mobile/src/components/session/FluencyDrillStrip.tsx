@@ -2,12 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { FluencyDrillEvent } from '../../lib/sse';
-
-function formatCountdown(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
+import { formatTimer } from '../../lib/format-relative-date';
 
 export interface FluencyDrillStripProps {
   drill: FluencyDrillEvent;
@@ -104,9 +99,7 @@ export function FluencyDrillStrip({
       className="flex-row items-center justify-between bg-surface-elevated mx-4 my-1.5 px-4 py-2.5 rounded-button"
       testID="fluency-drill-timer"
       accessibilityRole="timer"
-      accessibilityLabel={`Fluency drill: ${formatCountdown(
-        remaining,
-      )} remaining`}
+      accessibilityLabel={`Fluency drill: ${formatTimer(remaining)} remaining`}
     >
       <View className="flex-row items-center gap-2">
         <Text className="text-caption font-semibold text-primary">
@@ -119,7 +112,7 @@ export function FluencyDrillStrip({
             isUrgent ? 'text-error' : 'text-text-primary'
           }`}
         >
-          {formatCountdown(remaining)}
+          {formatTimer(remaining)}
         </Text>
         {/* M7: Skip button so users can exit a drill they don't want to complete */}
         {onSkipDrill && (

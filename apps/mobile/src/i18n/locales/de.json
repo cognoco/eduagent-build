@@ -651,8 +651,6 @@
       "emptyTitle": "Noch keine Runden gespielt",
       "emptyMessage": "Probiere ein Quiz aus, um hier deinen Verlauf zu sehen!",
       "tryQuiz": "Quiz ausprobieren",
-      "dateToday": "Heute",
-      "dateYesterday": "Gestern",
       "score": "{{score}}/{{total}} · {{xp}} XP",
       "rowLabel": "{{label}}-Runde – {{theme}} – {{score}} von {{total}}. Details öffnen.",
       "activityLabels": {
@@ -1180,9 +1178,6 @@
     "pickerEmptyBody": "Starte zuerst eine Sitzung und komm zurück, um zu prüfen, was du behalten hast.",
     "pickerBrowseTopics": "Themen durchsuchen",
     "pickerStartForTopic": "Überprüfung für {{title}} starten",
-    "studiedToday": "Heute gelernt",
-    "studiedYesterday": "Gestern gelernt",
-    "studiedDaysAgo": "Vor {{count}} Tagen gelernt",
     "topicPassedNote": "Gut gemacht - dieses Thema ist als bestanden markiert, und Schwachstellen kommen in der Wiederholung zurück, wenn sie Aufmerksamkeit brauchen.",
     "pickerLoadingBody": "Wir prüfen, welche Themen für einen fairen Test bereit sind.",
     "pickerLoadTimeoutTitle": "Das Laden der Testthemen dauert zu lange",
@@ -1203,7 +1198,8 @@
     "pickerInProgress": "In Bearbeitung",
     "qualityRating": "Qualität: {{rating}}/5",
     "depthTransfer": "Angewandtes Verständnis",
-    "depthExplain": "Mit eigenen Worten erklärt"
+    "depthExplain": "Mit eigenen Worten erklärt",
+    "studiedWhen": "{{when}} gelernt"
   },
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",
@@ -1396,10 +1392,6 @@
       "bookmarkLabel": "Gespeichertes Lesezeichen aus {{subject}}",
       "removeBookmark": "Lesezeichen entfernen",
       "tapToExpand": "Zum Erweitern tippen",
-      "dateToday": "Heute",
-      "dateYesterday": "Gestern",
-      "dateDaysAgo": "Vor {{count}} Tagen",
-      "dateWeeksAgo": "Vor {{count}} Wochen",
       "deleteTitle": "Lesezeichen entfernen?",
       "deleteMessage": "Diese gespeicherte Erklärung wird entfernt.",
       "deleteConfirm": "Entfernen",
@@ -2500,5 +2492,21 @@
   },
   "profiles": {
     "title": "Profile"
+  },
+  "time": {
+    "relative": {
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "daysAgo": "vor {{count}} Tagen",
+      "lastWeek": "letzte Woche",
+      "weeksAgo": "vor {{count}} Wochen"
+    },
+    "duration": {
+      "under1": "<1 Min.",
+      "minutes": "{{count}} Min.",
+      "minutesOne": "1 Min.",
+      "hoursMinutes": "{{hours}} h {{minutes}} m",
+      "none": "—"
+    }
   }
 }

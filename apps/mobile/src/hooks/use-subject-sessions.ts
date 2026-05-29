@@ -1,12 +1,12 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { useApiClient } from '../lib/api-client';
-import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
-import { assertOk } from '../lib/assert-ok';
+import { type UseQueryResult } from '@tanstack/react-query';
 import type {
   GetSubjectSessionsResponse,
   SubjectSession,
 } from '@eduagent/schemas';
+import { useApiClient } from '../lib/api-client';
+import { useProfile } from '../lib/profile';
+import { queryKeys } from '../lib/query-keys';
+import { useApiQuery } from './use-api-query';
 
 export function useSubjectSessions(
   subjectId: string | undefined,
@@ -14,23 +14,16 @@ export function useSubjectSessions(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
-    queryKey: ['subject-sessions', subjectId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
+  return useApiQuery<GetSubjectSessionsResponse, SubjectSession[]>({
+    queryKey: queryKeys.subjectSessions(subjectId, activeProfile?.id),
+    enabled: !!subjectId,
+    fetch: (signal) => {
       if (!subjectId) throw new Error('subjectId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].sessions.$get(
-          { param: { subjectId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as GetSubjectSessionsResponse;
-        return data.sessions;
-      } finally {
-        cleanup();
-      }
+      return client.subjects[':subjectId'].sessions.$get(
+        { param: { subjectId } },
+        { init: { signal } },
+      );
     },
-    enabled: !!activeProfile && !!subjectId,
+    select: (data) => data.sessions,
   });
 }
