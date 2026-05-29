@@ -517,7 +517,14 @@ describe('account routes', () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      // toEqual (not toMatchObject): assert the exact serialized body so the
+      // assertOwnerProfile message-passthrough is proven. The thrown
+      // ForbiddenError's apiCode is undefined → dropped by JSON, so the body
+      // is exactly { code, message }.
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can delete the account.',
+      });
     });
 
     it('[BREAK] POST /v1/account/cancel-deletion returns 403 for non-owner profile', async () => {
@@ -529,7 +536,10 @@ describe('account routes', () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can cancel account deletion.',
+      });
     });
 
     it('[BREAK] GET /v1/account/export returns 403 for non-owner profile', async () => {
@@ -541,7 +551,10 @@ describe('account routes', () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can export account data.',
+      });
     });
   });
 });

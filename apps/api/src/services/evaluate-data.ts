@@ -7,9 +7,6 @@
 import { eq, and, desc } from 'drizzle-orm';
 import {
   retentionCards,
-  curriculumTopics,
-  curriculumBooks,
-  subjects,
   learningSessions,
   sessionEvents,
   createScopedRepository,
@@ -20,6 +17,7 @@ import {
   handleEvaluateFailure,
   type EvaluateFailureAction,
 } from './evaluate';
+import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
 import type { EvaluateEligibility } from '@eduagent/schemas';
 
 export type { EvaluateEligibility };
@@ -52,21 +50,13 @@ export async function checkEvaluateEligibility(
     eq(retentionCards.topicId, topicId),
   );
 
-  // Look up topic title — scoped through parent chain so a caller supplying a
-  // foreign topicId cannot exfiltrate another profile's topic content via the
-  // topicTitle field.  Chain: curriculumTopics → curriculumBooks → subjects.
-  // [BUG-354] Without this join, GET /topics/:id/evaluate-eligibility accepted
-  // any topicId and returned the foreign topic title in the response body.
-  const [topicRow] = await db
-    .select({ title: curriculumTopics.title })
-    .from(curriculumTopics)
-    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
-    .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
-    .where(
-      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId)),
-    )
-    .limit(1);
-  const topicTitle = topicRow?.title ?? topicId;
+  // Look up topic title — scoped through the canonical ownership helper so a
+  // caller supplying a foreign topicId cannot exfiltrate another profile's
+  // topic content via the topicTitle field.
+  // [BUG-354] Without this ownership check, GET /topics/:id/evaluate-eligibility
+  // accepted any topicId and returned the foreign topic title in the response.
+  const owned = await findOwnedCurriculumTopic(db, { profileId, topicId });
+  const topicTitle = owned?.topicTitle ?? topicId;
 
   if (!card) {
     return {

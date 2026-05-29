@@ -17,6 +17,10 @@ export interface OwnedCurriculumTopic {
   bookTitle: string;
   curriculumId: string;
   subjectId: string;
+  topicSource: (typeof curriculumTopics.$inferSelect)['source'];
+  subjectName: string;
+  subjectPedagogyMode: (typeof subjects.$inferSelect)['pedagogyMode'];
+  subjectLanguageCode: (typeof subjects.$inferSelect)['languageCode'];
 }
 
 export async function findOwnedCurriculumTopic(
@@ -41,6 +45,10 @@ export async function findOwnedCurriculumTopic(
       bookTitle: curriculumBooks.title,
       curriculumId: curriculumTopics.curriculumId,
       subjectId: subjects.id,
+      topicSource: curriculumTopics.source,
+      subjectName: subjects.name,
+      subjectPedagogyMode: subjects.pedagogyMode,
+      subjectLanguageCode: subjects.languageCode,
     })
     .from(curriculumTopics)
     .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
@@ -82,6 +90,10 @@ export async function findOwnedCurriculumTopics(
       bookTitle: curriculumBooks.title,
       curriculumId: curriculumTopics.curriculumId,
       subjectId: subjects.id,
+      topicSource: curriculumTopics.source,
+      subjectName: subjects.name,
+      subjectPedagogyMode: subjects.pedagogyMode,
+      subjectLanguageCode: subjects.languageCode,
     })
     .from(curriculumTopics)
     .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))

@@ -52,18 +52,26 @@ function createMockDb(overrides?: {
   const updateSet = jest.fn().mockReturnValue({ where: updateSetWhere });
   const updateMock = jest.fn().mockReturnValue({ set: updateSet });
 
-  // checkEvaluateEligibility now uses db.select().from().innerJoin()…limit(1)
-  // for the topic title lookup (parent-chain join for BUG-354 fix).
-  // Chain each builder method so the final .limit() resolves to the topic row.
+  // checkEvaluateEligibility now resolves the topic title via the canonical
+  // findOwnedCurriculumTopic helper (BUG-354 ownership fix). The real helper
+  // runs against this mock db and emits
+  //   db.select().from().innerJoin().innerJoin().innerJoin().where().limit(1)
+  // (curriculumTopics → curriculumBooks → curricula → subjects dual-join).
+  // Chain three innerJoins so the final .limit() resolves to the topic row.
+  // The mock ignores the projection, so the row literal must already use the
+  // helper's output key (`topicTitle`).
   const topicRows =
     overrides?.queryResults?.topic != null
       ? [overrides.queryResults.topic]
       : [];
   const selectLimitMock = jest.fn().mockResolvedValue(topicRows);
   const selectWhereMock = jest.fn().mockReturnValue({ limit: selectLimitMock });
-  const selectInnerJoin2Mock = jest
+  const selectInnerJoin3Mock = jest
     .fn()
     .mockReturnValue({ where: selectWhereMock });
+  const selectInnerJoin2Mock = jest
+    .fn()
+    .mockReturnValue({ innerJoin: selectInnerJoin3Mock });
   const selectInnerJoin1Mock = jest
     .fn()
     .mockReturnValue({ innerJoin: selectInnerJoin2Mock });
@@ -116,7 +124,7 @@ describe('checkEvaluateEligibility', () => {
   it('returns not eligible when no retention card exists', async () => {
     createMockRepo({ retentionCard: null });
     const db = createMockDb({
-      queryResults: { topic: { id: topicId, title: 'Photosynthesis' } },
+      queryResults: { topic: { topicTitle: 'Photosynthesis' } },
     });
 
     const result = await checkEvaluateEligibility(db, profileId, topicId);
@@ -137,7 +145,7 @@ describe('checkEvaluateEligibility', () => {
     createMockRepo({ retentionCard: card });
     (shouldTriggerEvaluate as jest.Mock).mockReturnValue(true);
     const db = createMockDb({
-      queryResults: { topic: { id: topicId, title: 'Photosynthesis' } },
+      queryResults: { topic: { topicTitle: 'Photosynthesis' } },
     });
 
     const result = await checkEvaluateEligibility(db, profileId, topicId);
@@ -160,7 +168,7 @@ describe('checkEvaluateEligibility', () => {
     createMockRepo({ retentionCard: card });
     (shouldTriggerEvaluate as jest.Mock).mockReturnValue(false);
     const db = createMockDb({
-      queryResults: { topic: { id: topicId, title: 'Algebra' } },
+      queryResults: { topic: { topicTitle: 'Algebra' } },
     });
 
     const result = await checkEvaluateEligibility(db, profileId, topicId);
@@ -202,7 +210,7 @@ describe('checkEvaluateEligibility', () => {
     createMockRepo({ retentionCard: card });
     (shouldTriggerEvaluate as jest.Mock).mockReturnValue(true);
     const db = createMockDb({
-      queryResults: { topic: { id: topicId, title: 'Test Topic' } },
+      queryResults: { topic: { topicTitle: 'Test Topic' } },
     });
 
     const result = await checkEvaluateEligibility(db, profileId, topicId);
