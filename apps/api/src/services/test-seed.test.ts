@@ -262,6 +262,32 @@ describe('seedScenario', () => {
     expect(result.accountId.length).toBeGreaterThan(0);
   });
 
+  it.each([
+    ['parent-with-children', 'Test Parent'],
+    ['parent-multi-child', 'Test Parent'],
+    ['mentor-audit-family-at-profile-limit', 'Capped Parent'],
+    ['mentor-audit-rich-child-history', 'Rich-History Parent'],
+  ] as const)(
+    'seeds %s owners into Family mode by default',
+    async (scenario, parentName) => {
+      const db = createMockDb();
+      await seedScenario(db, scenario, 'test@example.com');
+
+      const firstInsertResult = (db.insert as unknown as jest.Mock).mock
+        .results[0];
+      const valuesMock = firstInsertResult?.value.values as jest.Mock;
+      const parentProfileInsert = valuesMock.mock.calls
+        .map(([value]) => value as { displayName?: string })
+        .find((value) => value.displayName === parentName);
+
+      expect(parentProfileInsert).toEqual(
+        expect.objectContaining({
+          defaultAppContext: 'family',
+        }),
+      );
+    },
+  );
+
   it('[WI-84 DS-091] does not delete an existing non-seed Clerk account with the same email', async () => {
     const db = createMockDb();
     (db.query.accounts.findMany as jest.Mock).mockResolvedValueOnce([
@@ -304,6 +330,91 @@ describe('seedScenario', () => {
       expect.stringContaining('/users/user_real_production_account'),
       expect.objectContaining({ method: 'PATCH' }),
     );
+  });
+
+  it('retries transient Clerk user lookup failures before seeding', async () => {
+    const db = createMockDb();
+    let lookupAttempts = 0;
+    const clerkUser = {
+      id: 'user_seeded',
+      primary_email_address_id: 'email_seeded',
+      email_addresses: [
+        { id: 'email_seeded', email_address: 'seed@example.com' },
+      ],
+      external_id: 'clerk_seed_created',
+    };
+    const fetchMock = jest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? 'GET';
+
+        if (url.includes('/users?')) {
+          lookupAttempts += 1;
+          if (lookupAttempts === 1) {
+            return {
+              ok: false,
+              status: 500,
+              text: async () => '{"code":"internal_clerk_error"}',
+            } as Response;
+          }
+          return {
+            ok: true,
+            json: async () => [],
+          } as Response;
+        }
+
+        if (url.endsWith('/users') && method === 'POST') {
+          return {
+            ok: true,
+            json: async () => clerkUser,
+          } as Response;
+        }
+
+        if (url.includes('/users/user_seeded') && method === 'PATCH') {
+          return {
+            ok: true,
+            json: async () => ({}),
+          } as Response;
+        }
+
+        if (url.includes('/users/user_seeded')) {
+          return {
+            ok: true,
+            json: async () => clerkUser,
+          } as Response;
+        }
+
+        if (
+          url.includes('/email_addresses/email_seeded') &&
+          method === 'PATCH'
+        ) {
+          return {
+            ok: true,
+            json: async () => ({}),
+          } as Response;
+        }
+
+        return {
+          ok: false,
+          status: 404,
+          text: async () => `Unexpected Clerk mock call: ${method} ${url}`,
+        } as Response;
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await seedScenario(
+      db,
+      'onboarding-complete',
+      'seed@example.com',
+      {
+        CLERK_SECRET_KEY: 'sk_test',
+      },
+    );
+
+    expect(result.email).toBe('seed@example.com');
+    expect(lookupAttempts).toBeGreaterThanOrEqual(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toEqual(fetchMock.mock.calls[1]?.[0]);
   });
 });
 

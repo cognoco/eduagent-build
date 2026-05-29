@@ -62,6 +62,9 @@ const DEFAULT_SEED_PASSWORD = 'Mentomate2026xK';
 
 /** Clerk REST API base URL */
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
+const CLERK_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const CLERK_FETCH_MAX_ATTEMPTS = 4;
+const CLERK_FETCH_BASE_DELAY_MS = 500;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -200,6 +203,32 @@ function isSeedManagedClerkUserId(
 
 function isSeedManagedClerkUser(user: ClerkUser): boolean {
   return user.external_id?.startsWith(SEED_CLERK_PREFIX) === true;
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchClerkWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  action: string,
+): Promise<Response> {
+  let lastDetail = '';
+
+  for (let attempt = 0; attempt < CLERK_FETCH_MAX_ATTEMPTS; attempt++) {
+    const response = await fetch(input, init);
+    if (response.ok || !CLERK_RETRYABLE_STATUSES.has(response.status)) {
+      return response;
+    }
+
+    lastDetail = await response.text().catch(() => '');
+    if (attempt < CLERK_FETCH_MAX_ATTEMPTS - 1) {
+      await sleep(CLERK_FETCH_BASE_DELAY_MS * Math.pow(2, attempt));
+    }
+  }
+
+  throw new Error(`${action} failed after retries: ${lastDetail}`);
 }
 
 /**
@@ -350,9 +379,13 @@ async function findClerkUserByEmail(
   if (!env.CLERK_SECRET_KEY) return null;
 
   const params = new URLSearchParams({ email_address: email });
-  const res = await fetch(`${CLERK_API_BASE}/users?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-  });
+  const res = await fetchClerkWithRetry(
+    `${CLERK_API_BASE}/users?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    },
+    `Clerk user lookup`,
+  );
 
   if (!res.ok) {
     const body = await res.text();
@@ -3843,10 +3876,17 @@ async function seedMentorAuditFamilyAtProfileLimit(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
-  const parentProfileId = await createBaseProfile(db, accountId, {
+  // Parent profile — direct insert to set defaultAppContext='family'
+  // (createBaseProfile does not pass defaultAppContext through; see
+  // seedParentWithChildren for the rationale).
+  const parentProfileId = generateUUIDv7();
+  await db.insert(profiles).values({
+    id: parentProfileId,
+    accountId,
     displayName: 'Capped Parent',
     birthYear: 1985,
     isOwner: true,
+    defaultAppContext: 'family',
   });
 
   await db.insert(consentStates).values({
@@ -4221,10 +4261,17 @@ async function seedMentorAuditRichChildHistory(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
-  const parentProfileId = await createBaseProfile(db, accountId, {
+  // Parent profile — direct insert to set defaultAppContext='family'
+  // (createBaseProfile does not pass defaultAppContext through; see
+  // seedParentWithChildren for the rationale).
+  const parentProfileId = generateUUIDv7();
+  await db.insert(profiles).values({
+    id: parentProfileId,
+    accountId,
     displayName: 'Rich-History Parent',
     birthYear: 1985,
     isOwner: true,
+    defaultAppContext: 'family',
   });
 
   await db.insert(consentStates).values({
