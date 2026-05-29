@@ -30,13 +30,28 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load
+# 4. Wait for More index screen to load (more-row-learning-preferences is the
+#    stable anchor on more/index.tsx — same as nav-to-more.yaml)
 - extendedWaitUntil:
     visible:
-      text: "More"
+      id: "more-row-learning-preferences"
+    timeout: 15000
+
+# 5. Tap the Account row to open the Account sub-screen.
+#    more-row-profile lives in more/account.tsx (sub-screen), NOT more/index.tsx.
+#    more/index.tsx has more-row-account which navigates to more/account.tsx.
+#    Source: apps/mobile/src/app/(app)/more/index.tsx:151 (more-row-account)
+#            apps/mobile/src/app/(app)/more/account.tsx:74 (more-row-profile)
+- tapOn:
+    id: "more-row-account"
+
+# 5a. Wait for Account sub-screen to load
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
     timeout: 10000
 
-# 5. Scroll to find and tap Profile row to open profile switcher
+# 5b. Scroll to find and tap Profile row to open profile switcher
 - scrollUntilVisible:
     element:
       id: "more-row-profile"

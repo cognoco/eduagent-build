@@ -30,9 +30,15 @@ tags:
       SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
-# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Parent owners with defaultAppContext='family' land on parent-home-screen.
+#    Do NOT use open-family-dashboard.yaml here — that helper taps
+#    parent-home-check-child-${CHILD_PROFILE_ID} itself (navigating to child
+#    detail), which would double-navigate when step 4 taps the same card again.
+#    Instead just wait for the parent home to be ready.
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 15000
 
 # 3. Screenshot: parent dashboard
 - takeScreenshot: raw-input-audit-01-dashboard

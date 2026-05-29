@@ -1148,11 +1148,20 @@ async function seedParentWithChildren(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
-  // Parent profile
-  const parentProfileId = await createBaseProfile(db, accountId, {
+  // Parent profile — must use direct insert because createBaseProfile() does not
+  // pass defaultAppContext through. With MODE_NAV_V1_ENABLED=true (eas.json
+  // development + preview builds), showFamilyHome requires familyShape=true
+  // which requires defaultAppContext='family'. Without this, the parent lands on
+  // learner-screen (study mode) and open-family-dashboard.yaml cannot find
+  // parent-home-check-child-* (only rendered inside ParentHomeScreen).
+  const parentProfileId = generateUUIDv7();
+  await db.insert(profiles).values({
+    id: parentProfileId,
+    accountId,
     displayName: 'Test Parent',
     birthYear: 1990,
     isOwner: true,
+    defaultAppContext: 'family',
   });
 
   // Child profile (teen)
@@ -1239,11 +1248,20 @@ async function seedParentMultiChild(
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
-  // Parent profile
-  const parentProfileId = await createBaseProfile(db, accountId, {
+  // Parent profile — direct insert to set defaultAppContext='family' (see
+  // seedParentWithChildren: under MODE_NAV_V1_ENABLED=true, showFamilyHome
+  // requires familyShape=true which requires defaultAppContext='family';
+  // otherwise the parent lands on learner-screen and parent-home-screen /
+  // parent-home-check-child-* never render). createBaseProfile does not pass
+  // defaultAppContext through, so a direct insert is required.
+  const parentProfileId = generateUUIDv7();
+  await db.insert(profiles).values({
+    id: parentProfileId,
+    accountId,
     displayName: 'Test Parent',
     birthYear: 1990,
     isOwner: true,
+    defaultAppContext: 'family',
   });
 
   // Parent also gets a subject so the inline "Learn something" view works

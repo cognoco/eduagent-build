@@ -60,19 +60,21 @@ tags:
 # 6. Send message (keyboard Enter, per BUG-35)
 - pressKey: Enter
 
-# 7. Wait for the daily quota exceeded error message to appear
-# The metering middleware returns: "You've reached your daily question limit.
-# Come back tomorrow for more!" — this is passed through formatApiError
-# and rendered as a chat message via animateResponse.
+# 7. Wait for the QuotaExceededCard to appear (rendered via SessionMessageActions
+# when the stream returns a 402 quota-exceeded response).
+# QuotaExceededCard.tsx:40 — testID="quota-exceeded-card"
+# QuotaExceededCard.tsx:43-46 — heading is t('session.quota.dailyLimitReached')
+#   = "Daily limit reached" (en.json:465)
+# The old plain-text "daily question limit" copy was replaced by the structured
+# QuotaExceededCard component in the session streaming refactor.
 - extendedWaitUntil:
     visible:
-      text: "daily question limit"
+      id: "quota-exceeded-card"
     timeout: 15000
 
-# 7b. Alternative: check for the shorter variant
+# 7b. Verify the daily-limit heading text is present inside the card
 - assertVisible:
-    text: "Come back tomorrow"
-    optional: true  # justified: "Come back tomorrow" is a substring fallback in case the full error text renders differently on some devices
+    text: "Daily limit reached"
 
 # 8. Screenshot of quota exceeded state
 - takeScreenshot: daily-quota-exceeded-chat

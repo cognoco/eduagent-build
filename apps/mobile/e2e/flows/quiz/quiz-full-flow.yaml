@@ -89,6 +89,11 @@ tags:
 
 - takeScreenshot: quiz-03-play
 
+# [FIX-quiz-navigation] After commit e63daf8d0 the quiz body changed from a
+# tap-anywhere Pressable to a plain View. Advancing to the next question now
+# requires an explicit tap on quiz-next-question (hidden on the final question).
+# The capitals round has 8 questions (QUIZ_CONFIG.perActivity.capitals.roundSize);
+# 12 iterations covers all 8 plus margin for transition frames.
 - repeat:
     times: 12
     commands:
@@ -106,8 +111,18 @@ tags:
           timeout: 5000
           optional: true  # justified: dispute button timing varies — may not appear between rapid answer transitions
       - tapOn:
-          id: "quiz-play-screen"
-          optional: true  # justified: advance tap needed only when quiz-play-screen requires explicit continuation
+          id: "quiz-next-question"
+          optional: true  # justified: only present for non-final questions; final question shows quiz-final-see-results instead
+
+# After the 8-question round the play screen shows quiz-final-see-results.
+# Tap it to navigate to the results screen (router.replace → quiz/results).
+- extendedWaitUntil:
+    visible:
+      id: "quiz-final-see-results"
+    timeout: 10000
+
+- tapOn:
+    id: "quiz-final-see-results"
 
 - extendedWaitUntil:
     visible:

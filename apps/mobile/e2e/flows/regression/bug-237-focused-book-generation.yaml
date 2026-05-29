@@ -12,28 +12,20 @@ tags:
 #    to the sign-in screen before Maestro starts).
 - runFlow: ../_setup/seed-and-sign-in.yaml
 
-# 2. Navigate to create subject via Library tab → empty state add button.
-#    library-tab → tab-library (tabBarButtonTestID in _layout.tsx).
-#    library-screen → removed; use Library heading text.
-#    library-add-subject (from curriculum-complete banner) → not available for
-#    fresh sessions; use intent-learn on home screen which navigates to create-subject.
-- tapOn:
-    id: "tab-library"
-- extendedWaitUntil:
-    visible:
-      text: "Library"
+# 2. Navigate to create subject via the home "Study something new" action card.
+#    The 2026-05-27 refactor removed library-add-subject-empty; the real
+#    empty-state button is library-empty-go-home (only visible when 0 subjects),
+#    but the onboarding-complete seed always has subjects, so that path is
+#    unreachable here. Use the same pattern as create-subject.yaml and
+#    create-subject-resolve.yaml: scrollUntilVisible + tap home-action-study-new.
+#    Source: apps/mobile/src/components/home/LearnerScreen.tsx:94
+- scrollUntilVisible:
+    element:
+      id: "home-action-study-new"
+    direction: DOWN
     timeout: 10000
-# Tap "Add subject" from Library empty state (fresh session has no subjects)
-- tapOn:
-    id: "library-add-subject-empty"
-    optional: true  # justified: library-add-subject-empty only renders in empty-state; if subjects exist this button is absent
-# Fallback: if user already has subjects, return home and use intent-learn
-- tapOn:
-    id: "tab-home"
-    optional: true  # justified: tab-home tap only needed when library had subjects (empty-state button absent); Maestro has no if-else
 - tapOn:
     id: "home-action-study-new"
-    optional: true  # justified: home-action-study-new only tapped when subjects-present fallback path is taken
 
 # 3. Type a specific topic
 - extendedWaitUntil:

@@ -45,6 +45,12 @@ tags:
   - nightly
   - quiz
 ---
+# Post 2026-05-27 welcome refactor: pm clear wipes preAuthIntroSeen.v1 so the
+# app always opens on welcome-chooser, not sign-in. Walk chooser → cards →
+# bridge → sign-in before waiting for sign-in-button.
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # 1. Seed & sign in (consent-pending scenario)
 # NOTE: seed-and-sign-in.yaml waits for learner-screen (optional) — consent-pending
 # users land on ConsentPendingGate before the tab navigator loads, so learner-screen

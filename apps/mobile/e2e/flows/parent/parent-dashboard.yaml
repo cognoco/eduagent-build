@@ -25,13 +25,15 @@ tags:
       id: 'parent-home-screen'
     timeout: 15000
 
-# ── Visual integrity: parent tab bar ───────────────────────────────────
+# ── Visual integrity: parent tab bar (V1 guardian FAMILY_TABS) ─────────
+# V1 guardian tabs = home, recaps, progress, more
+# (apps/mobile/src/lib/navigation-contract.ts:152-157 FAMILY_TABS)
+# own-learning and library are removed; tab-recaps replaces them.
+# tabBarButtonTestID values from apps/mobile/src/app/(app)/_layout.tsx:663,692,718,726
 - assertVisible:
     id: 'tab-home'
 - assertVisible:
-    id: 'tab-my-learning'
-- assertVisible:
-    id: 'tab-library'
+    id: 'tab-recaps'
 - assertVisible:
     id: 'tab-progress'
 - assertVisible:

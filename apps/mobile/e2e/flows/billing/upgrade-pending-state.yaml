@@ -96,11 +96,26 @@ tags:
 
 - takeScreenshot: upgrade-pending-no-offerings
 
-# 11. Verify static Free tier card is present and highlighted as current plan
+# 11. Scroll to and verify static Free tier card is present and highlighted as current plan
+# static-tier-free may be below fold even after no-offerings is visible
+# (small-screen S10e: the no-offerings container is partially in view but
+#  its children start below the visible area).
+# subscription.tsx:1032 — testID=`static-tier-${entry.tier}` for entry.tier='free'
+- scrollUntilVisible:
+    element:
+      id: "static-tier-free"
+    direction: DOWN
+    timeout: 10000
 - assertVisible:
     id: "static-tier-free"
 
-# 12. Verify static Plus tier card is present as the upgrade target
+# 12. Scroll to and verify static Plus tier card is present as the upgrade target
+# subscription.tsx:1032 — testID=`static-tier-${entry.tier}` for entry.tier='plus'
+- scrollUntilVisible:
+    element:
+      id: "static-tier-plus"
+    direction: DOWN
+    timeout: 10000
 - assertVisible:
     id: "static-tier-plus"
 

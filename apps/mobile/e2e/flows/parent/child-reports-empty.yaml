@@ -11,8 +11,14 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# open-family-dashboard.yaml navigates to child detail via CHILD_PROFILE_ID which is
+# not set by the parent-multi-child seed (it provides CHILD1/2/3_PROFILE_ID). Using
+# it here would cause double-navigation (dashboard -> child detail, then this flow
+# taps again). Replace with a bare wait for parent-home-screen, then tap CHILD1.
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 15000
 
 - takeScreenshot: 01-parent-dashboard
 

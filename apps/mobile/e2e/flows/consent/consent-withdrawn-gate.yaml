@@ -22,6 +22,12 @@ tags:
   - consent
   - gdpr
 ---
+# Post 2026-05-27 welcome refactor: pm clear wipes preAuthIntroSeen.v1 so the
+# app always opens on welcome-chooser, not sign-in. Walk chooser → cards →
+# bridge → sign-in before waiting for sign-in-button.
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # 1. Wait for sign-in screen.
 #    seed-and-run.sh already handled: pm clear, app launch, dev-client
 #    launcher, bundle loading, and "Continue" overlay dismissal.

@@ -11,10 +11,16 @@ tags:
       SEED_SCENARIO: "onboarding-complete"
       API_URL: ${API_URL}
 
-- extendedWaitUntil:
-    visible:
+# The carousel sits below the intent-action chips on the current LearnerScreen
+# layout — scroll it into view before asserting (same pattern as create-subject.yaml).
+- scrollUntilVisible:
+    element:
       id: "home-subject-carousel"
+    direction: DOWN
     timeout: 15000
+
+- assertVisible:
+    id: "home-subject-carousel"
 
 - tapOn:
     id: "home-action-study-new"

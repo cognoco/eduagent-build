@@ -34,11 +34,15 @@ tags:
     timeout: 15000
 
 # Navigate to Practice → Quiz
+# Timeout raised from 5000 → 15000: the learning-active scenario has an active
+# session which triggers a CoachBand via resumeTarget API (async). While loading,
+# the intent actions render below the CoachBand placeholder and may require more
+# scroll time. Source: apps/mobile/src/components/home/LearnerScreen.tsx:87,568
 - scrollUntilVisible:
     element:
       id: "home-action-practice"
     direction: DOWN
-    timeout: 5000
+    timeout: 15000
 
 - tapOn:
     id: "home-action-practice"
