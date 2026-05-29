@@ -3,7 +3,14 @@ import i18next from 'i18next';
 
 import { useMentorLanguageSync } from './use-mentor-language-sync';
 
-const mockMutate = jest.fn();
+// Default implementation: simulates a successful mutation by calling onSuccess.
+// Tests that need to simulate failure should use mockMutate.mockImplementationOnce
+// and intentionally NOT call onSuccess.
+const mockMutate = jest.fn(
+  (_vars: unknown, opts?: { onSuccess?: () => void }) => {
+    opts?.onSuccess?.();
+  },
+);
 let mockIsPending = false;
 let mockActiveProfile: { id: string; conversationLanguage: string } | null = {
   id: 'p1',
@@ -33,7 +40,13 @@ jest.mock(
 
 describe('useMentorLanguageSync', () => {
   beforeEach(async () => {
-    mockMutate.mockClear();
+    // mockReset clears call history AND restores the default success implementation.
+    mockMutate.mockReset();
+    mockMutate.mockImplementation(
+      (_vars: unknown, opts?: { onSuccess?: () => void }) => {
+        opts?.onSuccess?.();
+      },
+    );
     mockIsPending = false;
     mockActiveProfile = { id: 'p1', conversationLanguage: 'en' };
     await i18next.changeLanguage('en');
@@ -45,7 +58,10 @@ describe('useMentorLanguageSync', () => {
     renderHook(() => useMentorLanguageSync());
 
     await waitFor(() =>
-      expect(mockMutate).toHaveBeenCalledWith({ conversationLanguage: 'nb' }),
+      expect(mockMutate).toHaveBeenCalledWith(
+        { conversationLanguage: 'nb' },
+        expect.any(Object),
+      ),
     );
   });
 
@@ -55,7 +71,10 @@ describe('useMentorLanguageSync', () => {
     await i18next.changeLanguage('ja');
 
     await waitFor(() =>
-      expect(mockMutate).toHaveBeenCalledWith({ conversationLanguage: 'ja' }),
+      expect(mockMutate).toHaveBeenCalledWith(
+        { conversationLanguage: 'ja' },
+        expect.any(Object),
+      ),
     );
   });
 
@@ -108,6 +127,39 @@ describe('useMentorLanguageSync', () => {
 
     // Give any async effects a chance to settle.
     await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+  });
+
+  it('[BUG-800] retries after a failed mutation — does not permanently suppress retry', async () => {
+    // First mutate call simulates a network failure: it receives the onSuccess
+    // callback but never calls it (the real useMutation omits onSuccess on
+    // error). This means lastSyncedRef must NOT be set after the first call.
+    let firstCallDone = false;
+    mockMutate.mockImplementationOnce((_vars: unknown, _opts: unknown) => {
+      // Intentionally do NOT call opts.onSuccess — simulates a failed patch.
+      firstCallDone = true;
+    });
+
+    await i18next.changeLanguage('nb');
+    mockActiveProfile = { id: 'p1', conversationLanguage: 'en' };
+
+    const { rerender } = renderHook(() => useMentorLanguageSync());
+
+    // First call should fire (language 'nb' !== profile 'en').
+    await waitFor(() => expect(firstCallDone).toBe(true));
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+
+    // Re-fire languageChanged with the same language — because onSuccess was
+    // never invoked, lastSyncedRef is still null, so a second attempt must occur.
+    await i18next.changeLanguage('nb');
+    // Force rerender so the effect re-registers (isPending may have changed).
+    rerender(undefined);
+
+    await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(2));
+    expect(mockMutate).toHaveBeenNthCalledWith(
+      2,
+      { conversationLanguage: 'nb' },
+      expect.any(Object),
+    );
   });
 
   it('[B-599] syncs newly active profile even when app language has not changed (profile-switch regression)', async () => {

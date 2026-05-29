@@ -1198,10 +1198,106 @@ function stripUnsupportedSourceBoundSentences(
   };
 }
 
+// A reply is "procedural / non-factual" when it asserts no source-bound
+// factual content of its own: a pure understanding-check / prompt question, a
+// short acknowledgement or transition, or instructional scaffolding that asks
+// the learner to act rather than stating facts. Such replies are safe to show
+// even without auditable provenance because there is no unsupported factual
+// claim to leak. This reuses the existing understanding-check detector
+// (`detectUnderstandingCheckFromProse`) rather than inventing a fresh
+// factual-claim NLP heuristic: anything that is NOT classified procedural is
+// treated as a (potentially unsupported) factual reply and degraded safely.
+const PROCEDURAL_REPLY_PATTERNS: RegExp[] = [
+  /\bwhat (?:do you|would you|can you)\b/i,
+  /\bcan you (?:tell me|explain|describe|try|show me|share)\b/i,
+  /\bcould you (?:tell me|explain|describe|try|show me|share)\b/i,
+  /\b(?:go ahead and|try to|let'?s|why don'?t you|how about you|see if you can)\b/i,
+  /\bwhat'?s (?:your|the) (?:next step|first step|guess|thinking)\b/i,
+  /\bwhere (?:would|do) you (?:start|begin)\b/i,
+  /\b(?:share|send|upload|paste) (?:the|your|that)\b/i,
+  /\bwhich part\b/i,
+];
+
+function replySentences(response: string): string[] {
+  return (response.match(/[^.?!]+[.?!]?/g) ?? [response])
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
+}
+
+/**
+ * True when the learner-visible reply contains no source-bound factual
+ * assertion of its own. Used by the `missing_private_sources` recovery branch
+ * to decide whether an un-provenanced reply may be shown as-is (procedural /
+ * non-factual) or must be hard-fallbacked (it carries unsupported facts).
+ *
+ * Conservative by construction: a reply is procedural ONLY when EVERY
+ * declarative sentence is also a recognised understanding-check / prompt /
+ * acknowledgement. Any sentence that is neither a question nor a known
+ * procedural prompt is assumed to be a factual claim — so the default for an
+ * ambiguous reply is "unsafe", which is the safe direction for this contract.
+ */
+export function isProceduralOrNonFactualReply(response: string): boolean {
+  const trimmed = response.replace(/\s+/g, ' ').trim();
+  if (!trimmed) return true; // empty reply has no factual claim to leak
+
+  const sentences = replySentences(trimmed);
+  return sentences.every((sentence) => {
+    if (sentence.endsWith('?')) return true; // a question asserts no fact
+    if (detectUnderstandingCheckFromProse(sentence)) return true;
+    if (PROCEDURAL_REPLY_PATTERNS.some((pattern) => pattern.test(sentence))) {
+      return true;
+    }
+    // A bare acknowledgement / transition with no clause longer than a few
+    // words carries no factual assertion (e.g. "Okay.", "Good — let's keep
+    // going"). Reuse the learner-side acknowledgement clause check, which is
+    // already tuned for ack/transition phrasing.
+    return isAcknowledgementOnlyTurn(sentence, true);
+  });
+}
+
 export function applySourceAuditSafetyFallback(
   response: string,
   sourceAudit: ExchangeSourceAudit,
 ): { response: string; sourceAudit: ExchangeSourceAudit } {
+  // [BUG-798] `missing_private_sources` (plain prose with no private_sources)
+  // and `parse_failed` (malformed JSON whose `reply` text was recovered) both
+  // mean the model produced usable learner-visible text but emitted NO
+  // auditable provenance. The private-provenance contract requires source-bound
+  // factual claims to carry provenance or degrade safely. The phrase-scrub path
+  // below only removes claims that match the fixed SOURCE_BOUND_SENTENCE_TERMS
+  // list, so an unsupported factual claim OUTSIDE that list would otherwise be
+  // shown and persisted with zero provenance. Treat both un-provenanced
+  // statuses as UNSAFE for factual replies and hard-fallback — UNLESS the reply
+  // is procedural / non-factual (a question, prompt, or acknowledgement that
+  // asserts no facts of its own), which carries nothing to leak.
+  if (
+    sourceAudit.status === 'missing_private_sources' ||
+    sourceAudit.status === 'parse_failed'
+  ) {
+    // App-help turns inject the server-owned `app_help_map` as reliable
+    // evidence. App navigation guidance ("you can find your notes in Library")
+    // is grounded in that server content by construction, not a learner-
+    // supplied source, and `applyAppHelpSignalGuard` already neutralizes its
+    // learning signals upstream. Exempt it from the source-bound hard-fallback
+    // so the existing app-help behavior does not regress.
+    const isAppHelpGrounded =
+      sourceAudit.availableReliableSourceIds.includes('app_help_map');
+    if (isAppHelpGrounded || isProceduralOrNonFactualReply(response)) {
+      return { response, sourceAudit };
+    }
+    return {
+      response: buildUnsupportedFactualReply(sourceAudit),
+      sourceAudit: {
+        ...sourceAudit,
+        insufficient: true,
+        reason: appendAuditReason(
+          sourceAudit.reason,
+          `Server hard-fell-back because the reply made source-bound factual claims with no auditable private_sources (${sourceAudit.status}).`,
+        ),
+      },
+    };
+  }
+
   const reliedOnGeneralKnowledge =
     sourceAudit.reliableReliedOnSourceIds.includes(GENERAL_KNOWLEDGE_SOURCE_ID);
   const onlyGeneralKnowledgeAvailable =

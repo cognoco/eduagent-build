@@ -15,7 +15,9 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import type { Context } from 'hono';
 import { getProfile } from '../services/profile';
 import {
   requestConsent,
@@ -36,7 +38,10 @@ import {
   ConsentRecordNotFoundError,
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertOwnerAndParentAccess,
+} from '../services/family-access';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
 
@@ -143,6 +148,45 @@ function maskEmail(email: string | null): string | null {
   return `${local[0]}***${local[local.length - 1]}@${domain}`;
 }
 
+// [BUG-791] Authorization gate for /consent/request and /consent/resend.
+//
+// Account-level ownership of childProfileId (the previous getProfile() check)
+// is NOT sufficient: every profile on a family account shares the account, so a
+// non-owner sibling could post another child's profileId (and, on /request, an
+// arbitrary parentEmail) and disrupt that child's consent state. We gate on the
+// ACTIVE profile, not just the account:
+//
+//   - Self-service: the active profile is requesting consent for ITSELF
+//     (input.childProfileId === activeProfileId). A minor mid-onboarding
+//     legitimately triggers their own parent's consent email. The terminal-
+//     status guard in requestConsent/resendConsent prevents reviving an
+//     already-decided (CONSENTED/WITHDRAWN) row, so self-service can only act on
+//     a pending/requested row.
+//   - Parent-on-behalf: the active profile is the account OWNER and has a
+//     family link to the target child. Reuses assertOwnerAndParentAccess
+//     (isOwner gate + IDOR parent-link check) — the same guard used by the
+//     dashboard / learner-profile parent-admin routes.
+//
+// Any other caller (non-owner sibling targeting another profile) is rejected
+// with 403 before the service runs.
+async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
+  c: Context<E>,
+  db: Database,
+  childProfileId: string,
+): Promise<void> {
+  const { profileId: activeProfileId } = withProfile(c);
+
+  // Self-service: acting on the caller's own profile.
+  if (childProfileId === activeProfileId) {
+    return;
+  }
+
+  // Parent-on-behalf: owner with a family link to the target child.
+  // assertOwnerAndParentAccess throws ForbiddenError (→ 403) for a non-owner
+  // profile or an owner with no link to this child (IDOR).
+  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId);
+}
+
 type ConsentRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
@@ -182,6 +226,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
+      // [BUG-791] Account ownership alone is insufficient — gate on the active
+      // profile (self-service for own profile, or owner-with-parent-link for a
+      // child). Throws ForbiddenError → 403 for a non-owner sibling targeting
+      // another profile.
+      await assertCanRequestConsentForChild(c, db, input.childProfileId);
+
       if (
         account.email.toLowerCase() === input.parentEmail.trim().toLowerCase()
       ) {
@@ -218,6 +268,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           error instanceof ConsentRecipientChangeLimitError
         ) {
           return apiError(c, 429, ERROR_CODES.RATE_LIMITED, error.message);
+        }
+        // [BUG-791] An already-decided (CONSENTED/WITHDRAWN) consent cannot be
+        // re-requested — the service surfaces this as ConsentRequestNotFoundError.
+        if (error instanceof ConsentRequestNotFoundError) {
+          return notFound(c, error.message);
         }
         if (error instanceof EmailDeliveryError) {
           return apiError(c, 502, ERROR_CODES.INTERNAL_ERROR, error.message);
@@ -273,6 +328,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           'Not authorized to request consent for this profile',
         );
       }
+
+      // [BUG-791] Account ownership alone is insufficient — gate on the active
+      // profile (self-service for own profile, or owner-with-parent-link for a
+      // child). Throws ForbiddenError → 403 for a non-owner sibling targeting
+      // another profile.
+      await assertCanRequestConsentForChild(c, db, input.childProfileId);
 
       const apiOrigin = c.env.API_ORIGIN;
       if (!apiOrigin) {

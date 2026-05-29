@@ -86,6 +86,16 @@ export default function PronounsScreen(): React.ReactElement {
   const [customPronouns, setCustomPronouns] = useState(
     initialChoice === OTHER_KEY ? (activeProfile?.pronouns ?? '') : '',
   );
+  // BUG-799: The screen can first render while the profile is still loading
+  // (activeProfile undefined → initialChoice null). useState only reads the
+  // initializer on first mount, so when the profile later resolves with an
+  // existing `pronouns` value, `choice` would stay null and pressing Continue
+  // would submit `pronouns: null` — silently CLEARING the user's stored value.
+  // We sync local `choice`/`customPronouns` from the profile the first time it
+  // resolves, but a `userChangedRef` dirty guard ensures a late profile resolve
+  // can never clobber an explicit in-session edit.
+  const userChangedRef = useRef(false);
+  const hasSyncedFromProfileRef = useRef(activeProfile != null);
   const [isForwarding, setIsForwarding] = useState(false);
   // In-flight guard mirroring ExplainedRedirect's hasNavigatedRef: navigateForward
   // can fire startFirstCurriculumSession.mutate (a server side-effect that creates
@@ -141,6 +151,23 @@ export default function PronounsScreen(): React.ReactElement {
     }
   }, [ageGated, navigateForward]);
 
+  // BUG-799: When the profile resolves after the initial (loading) render,
+  // adopt its existing pronouns into local state — but only once, and never
+  // over an explicit user change. Without this, a late profile resolve would
+  // leave `choice` at its loading-time null and Continue would clear stored
+  // pronouns. The dirty guard (`userChangedRef`) makes an explicit in-session
+  // edit win over the late resolve.
+  useEffect(() => {
+    if (hasSyncedFromProfileRef.current) return;
+    if (activeProfile == null) return;
+    hasSyncedFromProfileRef.current = true;
+    if (userChangedRef.current) return;
+    setChoice(initialChoice);
+    setCustomPronouns(
+      initialChoice === OTHER_KEY ? (activeProfile.pronouns ?? '') : '',
+    );
+  }, [activeProfile, initialChoice]);
+
   const handleBack = useCallback(() => {
     goBackOrReplace(router, '/(app)/home' as const);
   }, [router]);
@@ -162,10 +189,16 @@ export default function PronounsScreen(): React.ReactElement {
     return choice;
   }, [choice, customPronouns]);
 
+  // BUG-799: Continue must SET a pronoun, never accidentally clear one.
+  // A still-null `choice` (e.g. the form rendered before the profile resolved,
+  // or the user simply hasn't picked) is NOT a valid Continue submission — it
+  // would write `pronouns: null` and wipe any stored value. The explicit-clear
+  // path is the Skip button (`handleSkip`), which intentionally sends null.
   const canContinue =
-    choice !== OTHER_KEY ||
-    (customPronouns.trim().length > 0 &&
-      customPronouns.length <= PRONOUNS_MAX_LENGTH);
+    choice !== null &&
+    (choice !== OTHER_KEY ||
+      (customPronouns.trim().length > 0 &&
+        customPronouns.length <= PRONOUNS_MAX_LENGTH));
 
   const handleContinue = useCallback(() => {
     updatePronouns.mutate(
@@ -245,6 +278,7 @@ export default function PronounsScreen(): React.ReactElement {
                     : 'border-border bg-surface-elevated'
                 }`}
                 onPress={() => {
+                  userChangedRef.current = true;
                   setChoice(p);
                   setCustomPronouns('');
                 }}
@@ -274,7 +308,10 @@ export default function PronounsScreen(): React.ReactElement {
                 ? 'border-primary bg-primary-soft'
                 : 'border-border bg-surface-elevated'
             }`}
-            onPress={() => setChoice(OTHER_KEY)}
+            onPress={() => {
+              userChangedRef.current = true;
+              setChoice(OTHER_KEY);
+            }}
           >
             <View className="flex-row items-center">
               <Text className="flex-1 text-body font-semibold text-text-primary">
@@ -293,7 +330,10 @@ export default function PronounsScreen(): React.ReactElement {
                 testID="pronouns-custom-input"
                 className="mt-3 bg-surface rounded-input px-3 py-2 text-body text-text-primary"
                 value={customPronouns}
-                onChangeText={setCustomPronouns}
+                onChangeText={(text) => {
+                  userChangedRef.current = true;
+                  setCustomPronouns(text);
+                }}
                 placeholder={t('onboarding.pronouns.customPlaceholder')}
                 placeholderTextColor={colors.textSecondary}
                 maxLength={PRONOUNS_MAX_LENGTH}

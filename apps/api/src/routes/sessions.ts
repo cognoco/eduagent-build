@@ -131,6 +131,56 @@ function isSafetyFilterError(err: unknown): boolean {
   );
 }
 
+/**
+ * [BUG-797] Structural shape of the completion/UI fields that a `processMessage`
+ * (non-streaming) or `onComplete` (streaming) result carries through to the
+ * SSE `done` frame. All three done-frame writers (normal streaming completion,
+ * mid-stream non-streaming fallback, pre-stream non-streaming fallback) MUST
+ * emit the same set of fields — otherwise interview/onboarding closure and UI
+ * hint delivery (`readyToFinish`, `notePrompt`, `notePromptPostSession`,
+ * `fluencyDrill`, `confidence`) silently vanish on the degradation paths while
+ * the normal path keeps working, making the regression nearly invisible.
+ */
+interface DoneFrameSource {
+  exchangeCount: number;
+  escalationRung: number;
+  expectedResponseMinutes?: number;
+  aiEventId?: string;
+  notePrompt?: boolean;
+  notePromptPostSession?: boolean;
+  fluencyDrill?: unknown;
+  confidence?: 'low' | 'medium' | 'high';
+  readyToFinish?: boolean;
+  challengeRound?: unknown;
+  challengeOffer?: { pitch: string };
+  draftedNote?: unknown;
+}
+
+/**
+ * [BUG-797] Single source of truth for the SSE `done` frame payload so the
+ * normal streaming completion and both non-streaming fallback paths cannot
+ * drift in which completion/UI signals they forward to the client.
+ */
+function buildDoneFramePayload(source: DoneFrameSource) {
+  return {
+    type: 'done' as const,
+    exchangeCount: source.exchangeCount,
+    escalationRung: source.escalationRung,
+    expectedResponseMinutes: source.expectedResponseMinutes ?? 0,
+    aiEventId: source.aiEventId,
+    notePrompt: source.notePrompt || undefined,
+    notePromptPostSession: source.notePromptPostSession || undefined,
+    fluencyDrill: source.fluencyDrill || undefined,
+    confidence: source.confidence || undefined,
+    // [#419] Propagate the server-side readyToFinish flag so the streaming /
+    // fallback paths reach parity with processMessage (non-streaming).
+    readyToFinish: source.readyToFinish ?? undefined,
+    challengeRound: source.challengeRound,
+    challengeOffer: source.challengeOffer,
+    draftedNote: source.draftedNote,
+  };
+}
+
 // [BUG-CONT-DEPTH-SWEEP] Follow-up: apply zValidator('param', sessionIdParamsSchema)
 // to ALL /:sessionId endpoints in this file (GET /sessions/:sessionId,
 // /transcript, /evaluate-depth, /recall-bridge, /close, etc.) for consistent
@@ -732,18 +782,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     content: fallback.response,
                   }),
                 });
+                // [BUG-797] Mirror the full completion/UI signal set the
+                // normal streaming done frame sends — readyToFinish, notePrompt,
+                // notePromptPostSession, fluencyDrill, confidence — so
+                // interview/onboarding closure and UI hints survive the
+                // mid-stream non-streaming fallback path.
                 await sseStream.writeSSE({
-                  data: JSON.stringify({
-                    type: 'done',
-                    exchangeCount: fallback.exchangeCount,
-                    escalationRung: fallback.escalationRung,
-                    expectedResponseMinutes:
-                      fallback.expectedResponseMinutes ?? 0,
-                    aiEventId: fallback.aiEventId,
-                    challengeRound: fallback.challengeRound,
-                    challengeOffer: fallback.challengeOffer,
-                    draftedNote: fallback.draftedNote,
-                  }),
+                  data: JSON.stringify(buildDoneFramePayload(fallback)),
                 });
                 await markPersisted({
                   kv: c.env.IDEMPOTENCY_KV,
@@ -940,24 +985,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             }
 
             await sseStream.writeSSE({
-              data: JSON.stringify({
-                type: 'done',
-                exchangeCount: result.exchangeCount,
-                escalationRung: result.escalationRung,
-                expectedResponseMinutes: result.expectedResponseMinutes,
-                aiEventId: result.aiEventId,
-                notePrompt: result.notePrompt || undefined,
-                notePromptPostSession:
-                  result.notePromptPostSession || undefined,
-                fluencyDrill: result.fluencyDrill || undefined,
-                confidence: result.confidence || undefined,
-                // [#419] Propagate the server-side readyToFinish flag so the
-                // streaming path parity with processMessage (non-streaming).
-                readyToFinish: result.readyToFinish ?? undefined,
-                challengeRound: result.challengeRound,
-                challengeOffer: result.challengeOffer,
-                draftedNote: result.draftedNote,
-              }),
+              data: JSON.stringify(buildDoneFramePayload(result)),
             });
             await markPersisted({
               kv: c.env.IDEMPOTENCY_KV,
@@ -1093,18 +1121,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   content: fallback.response,
                 }),
               });
+              // [BUG-797] Mirror the full completion/UI signal set the normal
+              // streaming done frame sends so interview/onboarding closure and
+              // UI hints survive the pre-stream non-streaming fallback path.
               await sseStream.writeSSE({
-                data: JSON.stringify({
-                  type: 'done',
-                  exchangeCount: fallback.exchangeCount,
-                  escalationRung: fallback.escalationRung,
-                  expectedResponseMinutes:
-                    fallback.expectedResponseMinutes ?? 0,
-                  aiEventId: fallback.aiEventId,
-                  challengeRound: fallback.challengeRound,
-                  challengeOffer: fallback.challengeOffer,
-                  draftedNote: fallback.draftedNote,
-                }),
+                data: JSON.stringify(buildDoneFramePayload(fallback)),
               });
               await markPersisted({
                 kv: c.env.IDEMPOTENCY_KV,
