@@ -354,6 +354,135 @@ function collectNamesFromPayload(
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// [BUG-795] Dynamic-name dispatches. A dispatch whose `name:` is a *computed*
+// expression (`name: e.name`, `name: someVar`) rather than a string literal is
+// invisible to the literal-name harvest above — the orphan check cannot verify
+// it has a handler because the actual event name lives somewhere else (often a
+// helper that pushes `{ name, data }` tuples, e.g. the memory dedup pass). The
+// real BUG-795 failure mode: sessionCompleted fanned dedup tuples out via
+//   step.sendEvent('dedup-events', dedupResult.events.map((e) => ({ name: e.name, data: e.data })))
+// so the orphaned memory.dedup.* events were never caught. We treat a
+// dynamic-name dispatch as a hard violation unless it carries a
+// `// orphan-allow: <reason>` (e.g. a genuine pass-through relay with a known
+// out-of-band consumer). The fix for pure observability is to NOT dispatch at
+// all — emit a structured log instead.
+// ---------------------------------------------------------------------------
+
+interface DynamicNameSite {
+  file: string;
+  line: number;
+}
+
+/** Is this `name:` initializer a non-literal (computed) event name? */
+function isDynamicNameInitializer(init: ts.Expression): boolean {
+  // Unwrap `... as const` / `... as T`.
+  let expr: ts.Expression = init;
+  if (ts.isAsExpression(expr)) expr = expr.expression;
+  // String literal / template with no substitutions are static — not dynamic.
+  if (ts.isStringLiteral(expr)) return false;
+  if (ts.isNoSubstitutionTemplateLiteral(expr)) return false;
+  return true;
+}
+
+/** Find a `name:` property with a dynamic (non-literal) initializer. */
+function findDynamicNameNode(obj: ts.ObjectLiteralExpression): ts.Node | null {
+  for (const prop of obj.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    let propKey: string | null = null;
+    if (ts.isIdentifier(prop.name)) propKey = prop.name.text;
+    else if (ts.isStringLiteral(prop.name)) propKey = prop.name.text;
+    if (propKey !== 'name') continue;
+    if (isDynamicNameInitializer(prop.initializer)) return prop;
+  }
+  return null;
+}
+
+/**
+ * Walk a dispatch payload the same way collectNamesFromPayload does, but
+ * collect object literals whose `name:` is dynamic. Mirrors the object /
+ * array / `.map(cb)` forms.
+ */
+function collectDynamicNameNodes(arg: ts.Expression): ts.Node[] {
+  const out: ts.Node[] = [];
+  const pushIfDynamic = (obj: ts.ObjectLiteralExpression): void => {
+    const node = findDynamicNameNode(obj);
+    if (node) out.push(node);
+  };
+  if (ts.isObjectLiteralExpression(arg)) {
+    pushIfDynamic(arg);
+  } else if (ts.isArrayLiteralExpression(arg)) {
+    for (const el of arg.elements) {
+      if (ts.isObjectLiteralExpression(el)) pushIfDynamic(el);
+    }
+  }
+  if (ts.isCallExpression(arg)) {
+    for (const a of arg.arguments) {
+      if (ts.isArrowFunction(a) || ts.isFunctionExpression(a)) {
+        const body = a.body;
+        if (ts.isParenthesizedExpression(body)) {
+          const inner = body.expression;
+          if (ts.isObjectLiteralExpression(inner)) pushIfDynamic(inner);
+        } else if (ts.isObjectLiteralExpression(body)) {
+          pushIfDynamic(body);
+        } else if (ts.isBlock(body)) {
+          const visit = (node: ts.Node): void => {
+            if (ts.isReturnStatement(node) && node.expression) {
+              if (ts.isObjectLiteralExpression(node.expression)) {
+                pushIfDynamic(node.expression);
+              } else if (ts.isParenthesizedExpression(node.expression)) {
+                const inner = node.expression.expression;
+                if (ts.isObjectLiteralExpression(inner)) pushIfDynamic(inner);
+              }
+            }
+            ts.forEachChild(node, visit);
+          };
+          visit(body);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function scanFileForDynamicDispatches(absPath: string): DynamicNameSite[] {
+  const sourceFile = parseSourceFile(absPath);
+  const sites: DynamicNameSite[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      let payloadArg: ts.Expression | undefined;
+      let callNode: ts.Node | undefined;
+      if (isInngestSendCall(node)) {
+        payloadArg = node.arguments[0];
+        callNode = node;
+      } else if (isStepSendEventCall(node)) {
+        payloadArg = node.arguments[1];
+        callNode = node;
+      }
+      if (payloadArg && callNode) {
+        for (const dynNode of collectDynamicNameNodes(payloadArg)) {
+          if (
+            hasOrphanAllowCommentAbove(sourceFile, dynNode) ||
+            hasOrphanAllowCommentAbove(sourceFile, callNode)
+          ) {
+            continue;
+          }
+          const { line } = sourceFile.getLineAndCharacterOfPosition(
+            dynNode.getStart(sourceFile),
+          );
+          sites.push({
+            file: path.relative(REPO_ROOT, absPath).replace(/\\/g, '/'),
+            line: line + 1,
+          });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return sites;
+}
+
 function scanFileForDispatches(absPath: string): DispatchSite[] {
   const sourceFile = parseSourceFile(absPath);
   const sites: DispatchSite[] = [];
@@ -420,6 +549,12 @@ describe('orphan dispatcher ratchet', () => {
     for (const d of scanFileForDispatches(f)) allDispatches.push(d);
   }
 
+  const allDynamicDispatches: DynamicNameSite[] = [];
+  for (const f of apiFiles) {
+    for (const d of scanFileForDynamicDispatches(f))
+      allDynamicDispatches.push(d);
+  }
+
   it('scans at least one inngest function file (sanity check)', () => {
     expect(triggerFiles.length).toBeGreaterThan(20);
   });
@@ -474,6 +609,26 @@ describe('orphan dispatcher ratchet', () => {
       );
     }
     expect(orphans).toEqual([]);
+  });
+
+  it('[BUG-795] no dispatch uses a dynamically computed event name', () => {
+    // A dispatch whose `name:` is computed (e.g. `name: e.name` from a helper
+    // that returns `{ name, data }` tuples) is invisible to the literal-name
+    // orphan harvest above, so an orphaned event can slip through. If the
+    // payload is pure observability, emit a structured log instead of
+    // dispatching. If it is a genuine pass-through relay with a known
+    // out-of-band consumer, add `// orphan-allow: <reason>` above the call.
+    if (allDynamicDispatches.length > 0) {
+      const lines = allDynamicDispatches.map((s) => `    ${s.file}:${s.line}`);
+      throw new Error(
+        `Found ${allDynamicDispatches.length} dispatch site(s) with a dynamically computed event name — ` +
+          `the orphan check cannot verify these have handlers (BUG-795).\n` +
+          `Either dispatch with a string-literal name + register a handler, emit a structured log instead, ` +
+          `OR add a "// orphan-allow: <reason>" comment above the dispatch.\n` +
+          `\n${lines.join('\n')}`,
+      );
+    }
+    expect(allDynamicDispatches).toEqual([]);
   });
 
   it('KNOWN_PENDING_ORPHANS contains no stale entries (no event in this set has gained a handler)', () => {
@@ -718,6 +873,101 @@ describe('orphan dispatcher ratchet', () => {
     `);
     const names = sites_to_names(collectDispatchesFromSynthetic(sf));
     expect(names).not.toContain('app/synth.allowed2');
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-795] Self-checks for the dynamic-name dispatch detector.
+  // -------------------------------------------------------------------------
+
+  function collectDynamicFromSynthetic(sf: ts.SourceFile): DynamicNameSite[] {
+    const out: DynamicNameSite[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node)) {
+        let payloadArg: ts.Expression | undefined;
+        let callNode: ts.Node | undefined;
+        if (isInngestSendCall(node)) {
+          payloadArg = node.arguments[0];
+          callNode = node;
+        } else if (isStepSendEventCall(node)) {
+          payloadArg = node.arguments[1];
+          callNode = node;
+        }
+        if (payloadArg && callNode) {
+          for (const dynNode of collectDynamicNameNodes(payloadArg)) {
+            if (
+              hasOrphanAllowCommentAbove(sf, dynNode) ||
+              hasOrphanAllowCommentAbove(sf, callNode)
+            ) {
+              continue;
+            }
+            const { line } = sf.getLineAndCharacterOfPosition(
+              dynNode.getStart(sf),
+            );
+            out.push({ file: sf.fileName, line: line + 1 });
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    return out;
+  }
+
+  it('self-check: detects the exact BUG-795 pattern (step.sendEvent map with name: e.name)', () => {
+    const sf = parseSynthetic(`
+      export async function inner(step: any, dedupResult: any) {
+        await step.sendEvent(
+          'dedup-events',
+          dedupResult.events.map((e: any) => ({ name: e.name, data: e.data })),
+        );
+      }
+    `);
+    expect(collectDynamicFromSynthetic(sf).length).toBe(1);
+  });
+
+  it('self-check: detects dynamic name in a direct inngest.send object', () => {
+    const sf = parseSynthetic(`
+      import { inngest } from './client';
+      export async function fire(evt: { name: string }) {
+        await inngest.send({ name: evt.name, data: {} });
+      }
+    `);
+    expect(collectDynamicFromSynthetic(sf).length).toBe(1);
+  });
+
+  it('self-check: string-literal name is NOT flagged as dynamic', () => {
+    const sf = parseSynthetic(`
+      import { inngest } from './client';
+      export async function fire() {
+        await inngest.send({ name: 'app/synth.literal', data: {} });
+      }
+    `);
+    expect(collectDynamicFromSynthetic(sf)).toEqual([]);
+  });
+
+  it('self-check: `as const` literal name is NOT flagged as dynamic', () => {
+    const sf = parseSynthetic(`
+      export async function inner(step: any, ids: string[]) {
+        await step.sendEvent(
+          'fan-out',
+          ids.map((id) => ({ name: 'app/synth.constmapped' as const, data: { id } })),
+        );
+      }
+    `);
+    expect(collectDynamicFromSynthetic(sf)).toEqual([]);
+  });
+
+  it('self-check: orphan-allow above the dynamic dispatch suppresses it', () => {
+    const sf = parseSynthetic(`
+      export async function inner(step: any, dedupResult: any) {
+        // orphan-allow: relayed to external pipeline
+        await step.sendEvent(
+          'dedup-events',
+          dedupResult.events.map((e: any) => ({ name: e.name, data: e.data })),
+        );
+      }
+    `);
+    expect(collectDynamicFromSynthetic(sf)).toEqual([]);
   });
 });
 

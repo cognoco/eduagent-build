@@ -1584,11 +1584,22 @@ export const sessionCompleted = inngest.createFunction(
     });
     if (dedupResult) {
       outcomes.push({ step: 'dedup-new-facts', status: 'ok' });
-      if (dedupResult.events.length > 0) {
-        await step.sendEvent(
-          'dedup-events',
-          dedupResult.events.map((e) => ({ name: e.name, data: e.data })),
-        );
+      // [BUG-795] Dedup outcome tuples (skipped_no_embedding, suppressed_skip,
+      // capped_skip, failed, merged, cap_hit) are pure observability markers —
+      // no Inngest handler consumes them. They were previously dispatched via
+      // step.sendEvent with a *dynamically computed* name (`name: e.name`),
+      // which (a) created orphan queue records nobody handled and (b) was
+      // invisible to the orphan-dispatcher guard because the guard only sees
+      // string-literal event names. Emit them as structured logs instead,
+      // matching the cascade-delete `emit` -> logger.info convention
+      // (services/learner-profile.ts:1451). The dedup pass already mirrors
+      // every event into DedupPassReport counters, so the per-event log is the
+      // observability surface, not a control signal.
+      for (const event of dedupResult.events) {
+        logger.info('[memory_facts] dedup outcome', {
+          event: event.name,
+          ...event.data,
+        });
       }
     }
 

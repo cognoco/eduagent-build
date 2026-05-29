@@ -415,10 +415,34 @@ export async function handleBillingIssue(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
+  // [BUG-792] Honor an app-store-managed billing grace period. Apple and Google
+  // grant a grace window after a renewal failure, surfaced by RevenueCat as
+  // `grace_period_expiration_at_ms`. During that window the learner must keep
+  // paid access — the store is still attempting to collect, and downgrading to
+  // Free mid-grace strands a paying customer.
+  //
+  // We persist a FUTURE grace expiry into `currentPeriodEnd` so the effective-
+  // access resolver (services/subscription.ts → resolveEffectiveAccessTier) caps
+  // paid access at the grace boundary, exactly as it already does for a
+  // cancelled-but-not-yet-expired subscription. Status still moves to `past_due`
+  // (the payment really did fail — billing observability + the payment.failed
+  // dispatch below depend on it), but past_due + a future currentPeriodEnd now
+  // resolves to `current` access until grace expiry.
+  //
+  // We only write currentPeriodEnd when the grace expiry is genuinely in the
+  // future. A missing or already-expired grace timestamp leaves currentPeriodEnd
+  // untouched, so resolveEffectiveAccessTier falls back to Free immediately —
+  // the conservative default for "no valid grace remaining".
+  const graceExpiryMs = event.grace_period_expiration_at_ms;
+  const hasFutureGrace = graceExpiryMs != null && graceExpiryMs > Date.now();
+
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
     eventTimestampMs: event.event_timestamp_ms,
     status: 'past_due',
+    ...(hasFutureGrace && graceExpiryMs != null
+      ? { currentPeriodEnd: new Date(graceExpiryMs).toISOString() }
+      : {}),
   });
 
   const shouldDispatchBillingIssue =

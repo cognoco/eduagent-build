@@ -594,6 +594,80 @@ describe('[WI-374] request-keyed resend + capped recipient change (integration)'
     expect(row!.resendCount).toBe(0);
   });
 
+  it('[BUG-791 break] requestConsent CANNOT revive a terminal CONSENTED row with a null parentEmail', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    // A parent-created child profile: the consent row is CONSENTED inline with
+    // NO parentEmail on record (createGrantedConsentState clears parentEmail to
+    // null). Pre-fix, the request upsert matched the `parentEmail IS NULL`
+    // branch in setWhere and flipped this decided consent back to
+    // PARENTAL_CONSENT_REQUESTED — letting a same-account sibling disrupt the
+    // consent state and re-email an arbitrary address.
+    await db.insert(consentStates).values({
+      profileId: childId,
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: null,
+      respondedAt: new Date(),
+      resendCount: 0,
+      recipientChangeCount: 0,
+    });
+
+    await expect(
+      requestConsent(
+        db,
+        {
+          childProfileId: childId,
+          parentEmail: 'attacker@example.com',
+          consentType: 'GDPR',
+        },
+        APP_URL,
+      ),
+    ).rejects.toBeInstanceOf(ConsentRequestNotFoundError);
+
+    // The decided consent is untouched: status stays CONSENTED and the
+    // attacker-supplied recipient was never written.
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(row!.status).toBe('CONSENTED');
+    expect(row!.parentEmail).toBeNull();
+  });
+
+  it('[BUG-791 break] requestConsent CANNOT revive a terminal WITHDRAWN row', async () => {
+    const db = createIntegrationDb();
+    const childId = await seedChild(db);
+
+    await db.insert(consentStates).values({
+      profileId: childId,
+      consentType: 'GDPR',
+      status: 'WITHDRAWN',
+      parentEmail: 'former-parent@example.com',
+      respondedAt: new Date(),
+      resendCount: 0,
+      recipientChangeCount: 0,
+    });
+
+    await expect(
+      requestConsent(
+        db,
+        {
+          childProfileId: childId,
+          parentEmail: 'attacker@example.com',
+          consentType: 'GDPR',
+        },
+        APP_URL,
+      ),
+    ).rejects.toBeInstanceOf(ConsentRequestNotFoundError);
+
+    const row = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, childId),
+    });
+    expect(row!.status).toBe('WITHDRAWN');
+    expect(row!.parentEmail).toBe('former-parent@example.com');
+  });
+
   it('the first real email after a PENDING (null-recipient) row is the initial request, not a recipient change', async () => {
     const db = createIntegrationDb();
     const childId = await seedChild(db);
