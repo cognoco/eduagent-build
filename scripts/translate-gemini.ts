@@ -1,13 +1,20 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { validateTranslation } from './translate';
 
 type NestedStrings = { [k: string]: string | NestedStrings };
+type SourceBaseline = Record<string, string>;
+type SourceBaselineFile = Record<string, SourceBaseline>;
 
 const TARGET_LANGUAGES = ['nb', 'de', 'es', 'pt', 'pl', 'ja'] as const;
 const LOCALES_DIR = path.resolve(__dirname, '../apps/mobile/src/i18n/locales');
 const GLOSSARY_PATH = path.resolve(__dirname, 'i18n-glossary.json');
 const EN_PATH = path.join(LOCALES_DIR, 'en.json');
+const SOURCE_BASELINE_PATH = path.resolve(
+  __dirname,
+  '../apps/mobile/src/i18n/source-baseline.json',
+);
 const MAX_CONCURRENCY = 3;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 4000, 16000];
@@ -53,18 +60,115 @@ function pickSourceKeys(
   return unflattenKeys(picked);
 }
 
-function getMissingAndExtraKeys(
+export function hashSourceString(value: string): string {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
+
+function normalizeSourceBaseline(input: unknown): SourceBaseline {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const baseline: SourceBaseline = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value === 'string') baseline[key] = value;
+  }
+  return baseline;
+}
+
+function normalizeSourceBaselineFile(input: unknown): SourceBaselineFile {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const baselineFile: SourceBaselineFile = {};
+  for (const [lang, baseline] of Object.entries(input)) {
+    baselineFile[lang] = normalizeSourceBaseline(baseline);
+  }
+  return baselineFile;
+}
+
+function readSourceBaselineFile(filePath: string): SourceBaselineFile {
+  if (!fs.existsSync(filePath)) return {};
+  try {
+    return normalizeSourceBaselineFile(
+      JSON.parse(fs.readFileSync(filePath, 'utf-8')),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeJsonAtomic(filePath: string, value: unknown): void {
+  const tmpPath = `${filePath}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmpPath, filePath);
+}
+
+export function buildBaselineForKeys(
   source: NestedStrings,
-  previous: NestedStrings,
-): { missingKeys: string[]; extraKeys: string[] } {
+  keys: readonly string[],
+): SourceBaseline {
   const sourceFlat = flattenKeys(source);
-  const previousFlat = flattenKeys(previous);
-  return {
-    missingKeys: Object.keys(sourceFlat).filter(
-      (key) => !(key in previousFlat),
-    ),
-    extraKeys: Object.keys(previousFlat).filter((key) => !(key in sourceFlat)),
-  };
+  const baseline: SourceBaseline = {};
+  for (const key of keys) {
+    if (key in sourceFlat) {
+      baseline[key] = hashSourceString(sourceFlat[key]);
+    }
+  }
+  return baseline;
+}
+
+export function selectGeminiDiffKeys(args: {
+  source: NestedStrings;
+  target: NestedStrings;
+  baseline: unknown;
+  full: boolean;
+}): { translateKeys: string[]; removedKeys: string[] } {
+  const sourceFlat = flattenKeys(args.source);
+  const targetFlat = flattenKeys(args.target);
+  const baseline = normalizeSourceBaseline(args.baseline);
+  const removedKeys = Object.keys(targetFlat).filter(
+    (key) => !(key in sourceFlat),
+  );
+
+  if (args.full) {
+    return {
+      translateKeys: Object.keys(sourceFlat),
+      removedKeys,
+    };
+  }
+
+  const translateKeys = Object.keys(sourceFlat).filter((key) => {
+    if (!(key in targetFlat)) return true;
+    return baseline[key] !== hashSourceString(sourceFlat[key]);
+  });
+
+  return { translateKeys, removedKeys };
+}
+
+function updateLocaleBaseline(
+  baselineFile: SourceBaselineFile,
+  lang: string,
+  source: NestedStrings,
+  translated: NestedStrings,
+): void {
+  baselineFile[lang] = buildBaselineForKeys(
+    source,
+    Object.keys(flattenKeys(translated)),
+  );
+}
+
+export function commitTranslatedLocaleAndBaseline(args: {
+  targetPath: string;
+  baselinePath: string;
+  baselineFile: SourceBaselineFile;
+  lang: string;
+  source: NestedStrings;
+  translated: NestedStrings;
+}): void {
+  writeJsonAtomic(args.targetPath, args.translated);
+  updateLocaleBaseline(
+    args.baselineFile,
+    args.lang,
+    args.source,
+    args.translated,
+  );
+  writeJsonAtomic(args.baselinePath, args.baselineFile);
 }
 
 function buildSystemPrompt(
@@ -250,6 +354,7 @@ async function main(): Promise<void> {
   const source: NestedStrings = JSON.parse(fs.readFileSync(EN_PATH, 'utf-8'));
   const glossary = JSON.parse(fs.readFileSync(GLOSSARY_PATH, 'utf-8'));
   delete glossary._meta;
+  const sourceBaseline = readSourceBaselineFile(SOURCE_BASELINE_PATH);
 
   const failed: string[] = [];
   const succeeded: string[] = [];
@@ -299,11 +404,13 @@ async function main(): Promise<void> {
           } keys)`,
         );
       } else {
-        const { missingKeys, extraKeys } = getMissingAndExtraKeys(
+        const { translateKeys, removedKeys } = selectGeminiDiffKeys({
           source,
-          previous,
-        );
-        if (missingKeys.length === 0 && extraKeys.length === 0) {
+          target: previous,
+          baseline: sourceBaseline[lang] ?? null,
+          full: false,
+        });
+        if (translateKeys.length === 0 && removedKeys.length === 0) {
           console.log(`[${lang}] No changes detected, skipping`);
           succeeded.push(lang);
           return;
@@ -311,32 +418,54 @@ async function main(): Promise<void> {
 
         previousFlat = flattenKeys(previous);
         const sourceFlat = flattenKeys(source);
-        for (const key of extraKeys) {
+        for (const key of removedKeys) {
           delete previousFlat[key];
         }
 
-        if (missingKeys.length === 0) {
+        if (translateKeys.length === 0) {
           const pruned = unflattenKeys(previousFlat);
-          fs.writeFileSync(
-            targetPath,
-            JSON.stringify(pruned, null, 2) + '\n',
-            'utf-8',
+          const validation = validateTranslation(
+            source,
+            pruned,
+            lang,
+            glossary,
           );
+          if (!validation.valid) {
+            console.error(`[${lang}] Validation FAILED after pruning:`);
+            for (const e of validation.errors) {
+              console.error(
+                `  ${e.type}: ${e.key}${
+                  e.variable ? ` (${e.variable})` : ''
+                }${e.detail ? ` — ${e.detail}` : ''}`,
+              );
+            }
+            console.error(`[${lang}] Skipping — previous file preserved`);
+            failed.push(lang);
+            return;
+          }
+          commitTranslatedLocaleAndBaseline({
+            targetPath,
+            baselinePath: SOURCE_BASELINE_PATH,
+            baselineFile: sourceBaseline,
+            lang,
+            source,
+            translated: pruned,
+          });
           console.log(
-            `[${lang}] Pruned ${extraKeys.length} removed key(s), no translation needed`,
+            `[${lang}] Pruned ${removedKeys.length} removed key(s), no translation needed`,
           );
           succeeded.push(lang);
           return;
         }
 
         const missingFlat: Record<string, string> = {};
-        for (const key of missingKeys) {
+        for (const key of translateKeys) {
           missingFlat[key] = sourceFlat[key];
         }
         toTranslate = unflattenKeys(missingFlat);
-        validationSource = pickSourceKeys(source, missingKeys);
+        validationSource = pickSourceKeys(source, translateKeys);
         console.log(
-          `[${lang}] Diff-mode: ${missingKeys.length} missing key(s), ${extraKeys.length} extra key(s)`,
+          `[${lang}] Diff-mode: ${translateKeys.length} changed/missing key(s), ${removedKeys.length} removed key(s)`,
         );
       }
 
@@ -438,13 +567,14 @@ async function main(): Promise<void> {
         }
       }
 
-      const tmpPath = `${targetPath}.tmp`;
-      fs.writeFileSync(
-        tmpPath,
-        JSON.stringify(translated, null, 2) + '\n',
-        'utf-8',
-      );
-      fs.renameSync(tmpPath, targetPath);
+      commitTranslatedLocaleAndBaseline({
+        targetPath,
+        baselinePath: SOURCE_BASELINE_PATH,
+        baselineFile: sourceBaseline,
+        lang,
+        source,
+        translated,
+      });
       console.log(`[${lang}] Written to ${targetPath}`);
       succeeded.push(lang);
     } catch (err) {
