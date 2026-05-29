@@ -1919,14 +1919,11 @@ describe('sandbox events [BUG-624 / A-8]', () => {
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
   });
 
-  // BREAK TEST [CR-2026-05-19-H6/H7]: sandbox-in-production rejection must
-  // happen BEFORE ensureFreeSubscription. If the SANDBOX guard runs after
-  // ensureFreeSubscription (the bug being fixed), a SANDBOX webhook delivered
-  // to production would auto-provision a free subscription row + quota pool
-  // for an account that should never have been touched, even though the
-  // event itself is rejected. Reverting the fix (moving ensureFreeSubscription
-  // back ABOVE the SANDBOX guard) makes this test fail.
-  it('does NOT call ensureFreeSubscription when rejecting a SANDBOX event in production', async () => {
+  // BREAK TEST [WI-170 / DS-081]: production SANDBOX rejection must happen
+  // immediately after payload validation, before account resolution,
+  // idempotency, free-subscription provisioning, handler dispatch, or KV writes.
+  // If any billing-state path runs before the guard, this test catches it.
+  it('[WI-170] rejects production SANDBOX before any billing lookup or mutation', async () => {
     const payload = makeWebhookPayload('INITIAL_PURCHASE', {
       environment: 'SANDBOX',
     });
@@ -1937,12 +1934,11 @@ describe('sandbox events [BUG-624 / A-8]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ reason: 'sandbox_in_production' });
-    // The break: ensureFreeSubscription must not run for a rejected sandbox
-    // event. If this fails, sandbox webhooks are mutating production state.
+    expect(findAccountByClerkId).not.toHaveBeenCalled();
+    expect(isRevenuecatEventProcessed).not.toHaveBeenCalled();
     expect(ensureFreeSubscription).not.toHaveBeenCalled();
-    // Idempotency check still runs before the guard (we want sandbox replays
-    // to be deduplicated too), so isRevenuecatEventProcessed IS expected.
-    expect(isRevenuecatEventProcessed).toHaveBeenCalled();
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+    expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
 
   it('accepts SANDBOX events in non-production (staging/dev) so QA can drive flows', async () => {
