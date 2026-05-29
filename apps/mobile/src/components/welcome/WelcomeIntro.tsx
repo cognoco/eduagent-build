@@ -19,6 +19,26 @@ export type WelcomeAudience = 'learner' | 'parent';
 type CardIndex = 0 | 1 | 2;
 
 type ThemeColors = ReturnType<typeof useThemeColors>;
+export type WelcomeIntroStageColors = Partial<
+  Pick<
+    ThemeColors,
+    | 'background'
+    | 'surface'
+    | 'surfaceElevated'
+    | 'textPrimary'
+    | 'textSecondary'
+    | 'textInverse'
+    | 'primary'
+    | 'primarySoft'
+    | 'secondary'
+    | 'accent'
+    | 'border'
+    | 'muted'
+    | 'practiceDarkTeal'
+  >
+> & {
+  shadow?: string;
+};
 
 interface CardSpec {
   readonly index: CardIndex;
@@ -34,6 +54,7 @@ export interface WelcomeIntroProps {
   audience: WelcomeAudience;
   onComplete: () => void;
   onCardAdvanced?: (cardIndex: number) => void;
+  stageColors?: WelcomeIntroStageColors;
   // Called when hardware-back is pressed on the first card. Lets a host
   // (e.g. the pre-auth route) step back to a preceding screen such as the
   // audience chooser. When omitted, back on card 0 is a no-op.
@@ -44,35 +65,104 @@ export interface WelcomeIntroProps {
 // Each deck composes its scenes from these so the locale surface stays small
 // and the visuals share one set of theme-driven styles.
 
+function SceneFrame({
+  testID,
+  colors,
+  brandLabel,
+  shadowColor,
+  children,
+}: {
+  testID: string;
+  colors: ThemeColors;
+  brandLabel: string;
+  shadowColor: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <View
+      testID={`${testID}-frame`}
+      className="w-full rounded-3xl border px-5 py-5 mb-6"
+      style={{
+        minHeight: 230,
+        maxWidth: 360,
+        alignSelf: 'center',
+        backgroundColor: colors.surfaceElevated,
+        borderColor: colors.border,
+        shadowColor,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.22,
+        shadowRadius: 24,
+        elevation: 8,
+      }}
+    >
+      <View className="flex-row items-center justify-between mb-4">
+        <Text
+          className="text-caption font-bold"
+          style={{ color: colors.textInverse }}
+        >
+          {brandLabel}
+        </Text>
+        <View className="flex-row items-center">
+          <View
+            className="rounded-full mr-1"
+            style={{ width: 5, height: 5, backgroundColor: colors.primary }}
+          />
+          <View
+            className="rounded-full mr-1"
+            style={{ width: 5, height: 5, backgroundColor: colors.accent }}
+          />
+          <View
+            className="rounded-full"
+            style={{ width: 5, height: 5, backgroundColor: colors.muted }}
+          />
+        </View>
+      </View>
+      <View testID={testID}>{children}</View>
+    </View>
+  );
+}
+
 function ChatScene({
   testID,
   colors,
+  brandLabel,
+  shadowColor,
   askText,
   replyText,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
+  shadowColor: string;
   askText: string;
   replyText: string;
 }): React.ReactElement {
   return (
-    <View testID={testID} className="w-full mb-8">
+    <SceneFrame
+      testID={testID}
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
+    >
       <View
-        className="self-end rounded-2xl px-4 py-3 mb-2"
+        className="self-end rounded-2xl px-4 py-3 mb-3"
         style={{ backgroundColor: colors.accent, maxWidth: '80%' }}
       >
-        <Text className="text-body-sm" style={{ color: colors.textInverse }}>
+        <Text
+          className="text-body-sm font-semibold"
+          style={{ color: colors.textInverse }}
+        >
           {askText}
         </Text>
       </View>
       <View
         className="self-start rounded-2xl px-4 py-3 flex-row items-start"
-        style={{ backgroundColor: colors.surfaceElevated, maxWidth: '85%' }}
+        style={{ backgroundColor: colors.surface, maxWidth: '88%' }}
       >
         <Ionicons
           name="sparkles"
           size={14}
-          color={colors.accent}
+          color={colors.primary}
           style={{ marginRight: 6, marginTop: 3 }}
         />
         <Text
@@ -82,96 +172,136 @@ function ChatScene({
           {replyText}
         </Text>
       </View>
-    </View>
+    </SceneFrame>
   );
 }
 
 function ChipsScene({
   testID,
   colors,
+  brandLabel,
+  shadowColor,
   chips,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
+  shadowColor: string;
   chips: ReadonlyArray<string>;
 }): React.ReactElement {
   return (
-    <View
+    <SceneFrame
       testID={testID}
-      className="w-full flex-row flex-wrap justify-center mb-8"
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
     >
-      {chips.map((label) => (
-        <View
-          key={label}
-          className="rounded-full px-3 py-2 mr-2 mb-2"
-          style={{ backgroundColor: colors.surfaceElevated }}
-        >
-          <Text className="text-body-sm" style={{ color: colors.textPrimary }}>
-            {label}
-          </Text>
-        </View>
-      ))}
-    </View>
+      <View className="flex-row flex-wrap justify-center pt-3">
+        {chips.map((label, index) => (
+          <View
+            key={label}
+            className="rounded-full px-3 py-2 mr-2 mb-2"
+            style={{
+              backgroundColor: index === 0 ? colors.primary : colors.surface,
+              borderWidth: 1,
+              borderColor: index === 0 ? colors.primary : colors.border,
+            }}
+          >
+            <Text
+              className="text-body-sm font-semibold"
+              style={{
+                color: index === 0 ? colors.background : colors.textPrimary,
+              }}
+            >
+              {label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </SceneFrame>
   );
 }
 
 function RowsScene({
   testID,
   colors,
+  brandLabel,
+  shadowColor,
   rows,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
+  shadowColor: string;
   rows: ReadonlyArray<{
     key: string;
     label: string;
     body: string;
     icon: keyof typeof Ionicons.glyphMap;
+    highlighted?: boolean;
   }>;
 }): React.ReactElement {
   return (
-    <View testID={testID} className="w-full mb-8">
-      {rows.map((r) => (
-        <View
-          key={r.key}
-          className="flex-row items-start rounded-2xl px-4 py-3 mb-2"
-          style={{ backgroundColor: colors.surfaceElevated }}
-        >
-          <Ionicons
-            name={r.icon}
-            size={18}
-            color={colors.accent}
-            style={{ marginRight: 10, marginTop: 1 }}
-          />
-          <View className="flex-1">
-            <Text
-              className="text-caption font-semibold"
-              style={{ color: colors.textSecondary }}
-            >
-              {r.label}
-            </Text>
-            <Text
-              className="text-body-sm mt-0.5"
-              style={{ color: colors.textPrimary }}
-            >
-              {r.body}
-            </Text>
+    <SceneFrame
+      testID={testID}
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
+    >
+      {rows.map((r) => {
+        const isHighlighted = r.highlighted === true;
+        return (
+          <View
+            key={r.key}
+            className="flex-row items-start rounded-2xl px-4 py-3 mb-2"
+            style={{
+              backgroundColor: isHighlighted
+                ? colors.primarySoft
+                : colors.surface,
+              borderWidth: 1,
+              borderColor: isHighlighted ? colors.primary : colors.border,
+            }}
+          >
+            <Ionicons
+              name={r.icon}
+              size={18}
+              color={isHighlighted ? colors.primary : colors.accent}
+              style={{ marginRight: 10, marginTop: 1 }}
+            />
+            <View className="flex-1">
+              <Text
+                className="text-caption font-semibold"
+                style={{ color: colors.textSecondary }}
+              >
+                {r.label}
+              </Text>
+              <Text
+                className="text-body-sm font-semibold mt-0.5"
+                style={{ color: colors.textPrimary }}
+              >
+                {r.body}
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
-    </View>
+        );
+      })}
+    </SceneFrame>
   );
 }
 
 function SubjectsResumeScene({
   testID,
   colors,
+  brandLabel,
+  shadowColor,
   subjects,
   resumeLabel,
   resumeBody,
 }: {
   testID: string;
   colors: ThemeColors;
+  brandLabel: string;
+  shadowColor: string;
   subjects: ReadonlyArray<{
     key: string;
     label: string;
@@ -181,17 +311,32 @@ function SubjectsResumeScene({
   resumeBody: string;
 }): React.ReactElement {
   return (
-    <View testID={testID} className="w-full mb-8">
+    <SceneFrame
+      testID={testID}
+      colors={colors}
+      brandLabel={brandLabel}
+      shadowColor={shadowColor}
+    >
       <View className="flex-row justify-between mb-3">
-        {subjects.map((s) => (
+        {subjects.map((s, index) => (
           <View
             key={s.key}
             className="rounded-2xl items-center justify-center px-3 py-3"
-            style={{ backgroundColor: colors.surfaceElevated, width: '31%' }}
+            style={{
+              backgroundColor:
+                index === 0 ? colors.primarySoft : colors.surface,
+              borderWidth: 1,
+              borderColor: index === 0 ? colors.primary : colors.border,
+              width: '31%',
+            }}
           >
-            <Ionicons name={s.icon} size={24} color={colors.accent} />
+            <Ionicons
+              name={s.icon}
+              size={24}
+              color={index === 0 ? colors.primary : colors.accent}
+            />
             <Text
-              className="text-caption mt-2"
+              className="text-caption font-semibold mt-2"
               style={{ color: colors.textPrimary }}
             >
               {s.label}
@@ -201,7 +346,11 @@ function SubjectsResumeScene({
       </View>
       <View
         className="flex-row items-start rounded-2xl px-4 py-3"
-        style={{ backgroundColor: colors.surface }}
+        style={{
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
       >
         <Ionicons
           name="play-back-circle-outline"
@@ -224,7 +373,7 @@ function SubjectsResumeScene({
           </Text>
         </View>
       </View>
-    </View>
+    </SceneFrame>
   );
 }
 
@@ -235,6 +384,7 @@ function SubjectsResumeScene({
 function useLearnerCards(
   t: ReturnType<typeof useTranslation>['t'],
   colors: ThemeColors,
+  shadowColor: string,
 ): ReadonlyArray<CardSpec> {
   return React.useMemo(() => {
     // Narrow the t signature locally to avoid TS2589 (excessively deep i18n
@@ -245,6 +395,7 @@ function useLearnerCards(
     // pre-push/CI and (b) the copy-assertion unit tests in WelcomeIntro.test.tsx
     // — NOT by the type system. Keep both guards green.
     const tr = t as unknown as (key: string) => string;
+    const brandLabel = tr('welcomeIntro.sceneFrame.brandLabel');
     return [
       {
         index: 0,
@@ -254,6 +405,8 @@ function useLearnerCards(
           <ChatScene
             testID="welcome-card-1-scene"
             colors={colors}
+            brandLabel={brandLabel}
+            shadowColor={shadowColor}
             askText={tr('welcomeIntro.scene.learner.card1.learner')}
             replyText={tr('welcomeIntro.scene.learner.card1.mentor')}
           />
@@ -267,6 +420,8 @@ function useLearnerCards(
           <SubjectsResumeScene
             testID="welcome-card-2-scene"
             colors={colors}
+            brandLabel={brandLabel}
+            shadowColor={shadowColor}
             subjects={[
               {
                 key: 'math',
@@ -297,6 +452,8 @@ function useLearnerCards(
           <ChipsScene
             testID="welcome-card-3-scene"
             colors={colors}
+            brandLabel={brandLabel}
+            shadowColor={shadowColor}
             chips={[
               tr('welcomeIntro.scene.learner.card3.chips.explain'),
               tr('welcomeIntro.scene.learner.card3.chips.think'),
@@ -307,16 +464,18 @@ function useLearnerCards(
         ),
       },
     ] as ReadonlyArray<CardSpec>;
-  }, [t, colors]);
+  }, [t, colors, shadowColor]);
 }
 
 function useParentCards(
   t: ReturnType<typeof useTranslation>['t'],
   colors: ThemeColors,
+  shadowColor: string,
 ): ReadonlyArray<CardSpec> {
   return React.useMemo(() => {
     // Same narrowing as useLearnerCards — prevents TS2589.
     const tr = t as unknown as (key: string) => string;
+    const brandLabel = tr('welcomeIntro.sceneFrame.brandLabel');
     return [
       {
         index: 0,
@@ -326,6 +485,8 @@ function useParentCards(
           <ChatScene
             testID="welcome-card-1-scene"
             colors={colors}
+            brandLabel={brandLabel}
+            shadowColor={shadowColor}
             askText={tr('welcomeIntro.scene.parent.card1.child')}
             replyText={tr('welcomeIntro.scene.parent.card1.mentor')}
           />
@@ -339,6 +500,8 @@ function useParentCards(
           <RowsScene
             testID="welcome-card-2-scene"
             colors={colors}
+            brandLabel={brandLabel}
+            shadowColor={shadowColor}
             rows={[
               {
                 key: 'thisWeek',
@@ -351,6 +514,7 @@ function useParentCards(
                 label: tr('welcomeIntro.scene.parent.card2.strong.label'),
                 body: tr('welcomeIntro.scene.parent.card2.strong.body'),
                 icon: 'trending-up-outline',
+                highlighted: true,
               },
               {
                 key: 'review',
@@ -370,6 +534,8 @@ function useParentCards(
           <ChipsScene
             testID="welcome-card-3-scene"
             colors={colors}
+            brandLabel={brandLabel}
+            shadowColor={shadowColor}
             chips={[
               tr('welcomeIntro.scene.parent.card3.chips.evenings'),
               tr('welcomeIntro.scene.parent.card3.chips.nagging'),
@@ -379,22 +545,31 @@ function useParentCards(
         ),
       },
     ] as ReadonlyArray<CardSpec>;
-  }, [t, colors]);
+  }, [t, colors, shadowColor]);
 }
 
 export function WelcomeIntro({
   audience,
   onComplete,
   onCardAdvanced,
+  stageColors,
   onBackFromFirstCard,
 }: WelcomeIntroProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const welcomeColors = React.useMemo<ThemeColors>(
+    () => ({
+      ...colors,
+      ...stageColors,
+    }),
+    [colors, stageColors],
+  );
+  const sceneShadowColor = stageColors?.shadow ?? colors.muted;
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  const learnerCards = useLearnerCards(t, colors);
-  const parentCards = useParentCards(t, colors);
+  const learnerCards = useLearnerCards(t, welcomeColors, sceneShadowColor);
+  const parentCards = useParentCards(t, welcomeColors, sceneShadowColor);
   const CARDS = audience === 'parent' ? parentCards : learnerCards;
 
   const listRef = React.useRef<FlatList<CardSpec>>(null);
@@ -456,8 +631,12 @@ export function WelcomeIntro({
 
   return (
     <View
-      className="flex-1 bg-background"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      className="flex-1"
+      style={{
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+        backgroundColor: welcomeColors.background,
+      }}
       testID="welcome-intro"
     >
       <FlatList
@@ -486,14 +665,14 @@ export function WelcomeIntro({
                   do not shift headline/body placement. */}
               {item.scene}
               <Text
-                className="text-display-sm font-bold text-center text-textPrimary mb-4"
-                style={{ color: colors.textPrimary }}
+                className="text-h1 font-bold text-center mb-3"
+                style={{ color: welcomeColors.textPrimary, maxWidth: 340 }}
               >
                 {headline}
               </Text>
               <Text
-                className="text-body text-center"
-                style={{ color: colors.textSecondary }}
+                className="text-body-sm text-center"
+                style={{ color: welcomeColors.textSecondary, maxWidth: 330 }}
               >
                 {supporting}
               </Text>
@@ -519,7 +698,9 @@ export function WelcomeIntro({
                 width: c.index === currentIndex ? 24 : 8,
                 height: 8,
                 backgroundColor:
-                  c.index === currentIndex ? colors.accent : colors.border,
+                  c.index === currentIndex
+                    ? welcomeColors.accent
+                    : welcomeColors.border,
               }}
             />
           ))}
@@ -538,7 +719,7 @@ export function WelcomeIntro({
             <Ionicons
               name="chevron-back"
               size={28}
-              color={colors.textSecondary}
+              color={welcomeColors.textSecondary}
             />
           </Pressable>
 
@@ -553,7 +734,7 @@ export function WelcomeIntro({
               <Ionicons
                 name="chevron-forward"
                 size={28}
-                color={colors.textSecondary}
+                color={welcomeColors.textSecondary}
               />
             </Pressable>
           )}
@@ -564,12 +745,12 @@ export function WelcomeIntro({
           onPress={handleNext}
           accessibilityRole="button"
           className="rounded-2xl py-4 items-center"
-          style={{ backgroundColor: colors.accent }}
+          style={{ backgroundColor: welcomeColors.accent }}
           testID={isLast ? 'welcome-start-button' : 'welcome-next-button'}
         >
           <Text
             className="text-body font-semibold"
-            style={{ color: colors.textInverse }}
+            style={{ color: welcomeColors.textInverse }}
           >
             {isLast ? t('welcomeIntro.letsStart') : t('welcomeIntro.next')}
           </Text>

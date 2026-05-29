@@ -11,23 +11,28 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../components/welcome/WelcomeIntro' /* gc1-allow: WelcomeIntro is covered by its own focused unit test; stub here exposes audience + onComplete + onCardAdvanced so this route test can drive the state machine without simulating swipes */,
+  '../../components/welcome/WelcomeIntro', // gc1-allow: route state-machine test; real deck swipes are covered in WelcomeIntro.test.tsx
   () => ({
     WelcomeIntro: ({
       audience,
       onComplete,
       onCardAdvanced,
+      stageColors,
       onBackFromFirstCard,
     }: {
       audience: 'learner' | 'parent';
       onComplete: () => void;
       onCardAdvanced?: (n: number) => void;
+      stageColors?: { background?: string };
       onBackFromFirstCard?: () => void;
     }) => {
       const { View, Pressable, Text } = require('react-native');
       return (
         <View testID="welcome-intro-stub">
           <Text testID="welcome-intro-stub-audience">{audience}</Text>
+          <Text testID="welcome-intro-stub-stage-bg">
+            {stageColors?.background}
+          </Text>
           <Pressable
             testID="welcome-intro-stub-advance"
             onPress={() => onCardAdvanced?.(2)}
@@ -112,19 +117,10 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-// prettier-ignore
-jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({
-    background: '#000',
-    accent: '#0af',
-    surfaceElevated: '#222',
-    textPrimary: '#fff',
-    textSecondary: '#aaa',
-    textInverse: '#000',
-  }),
-}));
-
-const PreAuthWelcomeRoute = require('./welcome').default;
+const {
+  default: PreAuthWelcomeRoute,
+  WELCOME_DARK_STAGE_COLORS,
+} = require('./welcome');
 
 function chooseLearner() {
   fireEvent.press(screen.getByTestId('welcome-chooser-learner'));
@@ -150,6 +146,20 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     expect(screen.queryByTestId('pre-auth-bridge')).toBeNull();
   });
 
+  it('renders the chooser on the dark brand-stage palette', () => {
+    render(<PreAuthWelcomeRoute />);
+    expect(screen.getByTestId('welcome-chooser').props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: WELCOME_DARK_STAGE_COLORS.background,
+      }),
+    );
+    expect(screen.getByTestId('welcome-chooser-learner').props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: WELCOME_DARK_STAGE_COLORS.surfaceElevated,
+      }),
+    );
+  });
+
   it('emits intro_started exactly once on mount', () => {
     render(<PreAuthWelcomeRoute />);
     const started = mockTrack.mock.calls.filter(
@@ -168,6 +178,14 @@ describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
     expect(mockTrack).toHaveBeenCalledWith('intro_audience_selected', {
       audience: 'learner',
     });
+  });
+
+  it('injects the dark brand-stage palette into the card deck', () => {
+    render(<PreAuthWelcomeRoute />);
+    chooseLearner();
+    expect(
+      screen.getByTestId('welcome-intro-stub-stage-bg').props.children,
+    ).toBe(WELCOME_DARK_STAGE_COLORS.background);
   });
 
   it('"I\'m done fighting over homework" shows the parent deck and logs the choice', () => {
@@ -234,6 +252,11 @@ describe('<PreAuthWelcomeRoute /> - cards -> bridge -> auth', () => {
     render(<PreAuthWelcomeRoute />);
     chooseParent();
     fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
+    expect(screen.getByTestId('pre-auth-bridge').props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: WELCOME_DARK_STAGE_COLORS.background,
+      }),
+    );
     expect(
       screen.getByText(/Turn "I don't get it" into "I've got this."/),
     ).toBeTruthy();

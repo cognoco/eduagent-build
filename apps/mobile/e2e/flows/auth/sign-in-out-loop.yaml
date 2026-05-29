@@ -37,6 +37,11 @@ tags:
 env:
   ITERATIONS: 5
 ---
+# Walk the pre-auth welcome flow to the sign-in screen (2026-05-27 refactor:
+# a pm-clear'd app lands on the audience chooser, not directly on sign-in).
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 # Wait for the sign-in screen on first launch.
 - extendedWaitUntil:
     visible:

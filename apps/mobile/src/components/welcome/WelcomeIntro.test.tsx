@@ -1,31 +1,35 @@
-import { BackHandler } from 'react-native';
+import { BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import { WelcomeIntro } from './WelcomeIntro';
+import { WelcomeIntro, type WelcomeIntroStageColors } from './WelcomeIntro';
+
+const TEST_STAGE_COLORS = {
+  background: 'test-stage-background',
+} as const satisfies WelcomeIntroStageColors;
 
 const translations: Record<string, string> = {
   // Learner deck
   'welcomeIntro.learner.card1.headline': 'A mentor you can talk to',
   'welcomeIntro.learner.card1.supporting':
-    'Ask when you are stuck, explain what you do not get, and get help that adapts to how you learn.',
+    'Ask where you are stuck. Get help that adapts to how you learn.',
   'welcomeIntro.learner.card2.headline':
     'Remembers you, picks up where you left off',
   'welcomeIntro.learner.card2.supporting':
-    'Your subjects, notes, and pace stay in one place, and your mentor adapts every time you come back.',
+    'Subjects, notes, and pace stay together so you can come back smoothly.',
   'welcomeIntro.learner.card3.headline': 'Built for real learning',
   'welcomeIntro.learner.card3.supporting':
-    'Clear explanations, guided questions, and practice that sticks help you think, practice, and remember.',
+    'Clear explanations, guided questions, and practice that sticks.',
   // Parent deck
   'welcomeIntro.parent.card1.headline': 'A personal mentor for your child',
   'welcomeIntro.parent.card1.supporting':
-    'Teaches at their pace and helps with homework by teaching the method and checking their work — never just handing over answers to copy.',
+    'Guides the method and checks their work, without handing over answers to copy.',
   'welcomeIntro.parent.card2.headline':
     'Stay in the loop, step in when it matters',
   'welcomeIntro.parent.card2.supporting':
-    "Watch your child's progress and get involved exactly when they need you — not a moment sooner.",
+    'See progress and step in when your child actually needs you.',
   'welcomeIntro.parent.card3.headline': 'No more homework battles',
   'welcomeIntro.parent.card3.supporting':
-    'Take back your evenings and turn them into quality time instead of nightly fights.',
+    'Turn nightly fights into calmer, more useful study time.',
   // Learner scenes
   'welcomeIntro.scene.learner.card1.learner': 'I do not get this yet.',
   'welcomeIntro.scene.learner.card1.mentor':
@@ -53,6 +57,7 @@ const translations: Record<string, string> = {
   'welcomeIntro.scene.parent.card3.chips.evenings': 'Calmer evenings',
   'welcomeIntro.scene.parent.card3.chips.nagging': 'Less nagging',
   'welcomeIntro.scene.parent.card3.chips.quality': 'Quality time',
+  'welcomeIntro.sceneFrame.brandLabel': 'StudyShell',
   // Shared
   'welcomeIntro.next': 'Next',
   'welcomeIntro.letsStart': "Let's start",
@@ -125,6 +130,13 @@ describe('<WelcomeIntro audience="learner" />', () => {
     expect(screen.getByTestId('welcome-card-3-scene')).toBeTruthy();
   });
 
+  it('frames each learner scene as a mini app screen', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
+    expect(screen.getByTestId('welcome-card-1-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-2-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-3-scene-frame')).toBeTruthy();
+  });
+
   it('learner card 1 shows the mentor-chat exchange', () => {
     render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     expect(screen.getByText('I do not get this yet.')).toBeTruthy();
@@ -176,7 +188,7 @@ describe('<WelcomeIntro audience="parent" />', () => {
   it('parent card 1 supporting copy is truthful about homework help (no answer hand-over)', () => {
     render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
     expect(
-      screen.getByText(/never just handing over answers to copy/),
+      screen.getByText(/without handing over answers to copy/),
     ).toBeTruthy();
   });
 
@@ -188,6 +200,13 @@ describe('<WelcomeIntro audience="parent" />', () => {
         "Let's start with what you've tried. Walk me through step one.",
       ),
     ).toBeTruthy();
+  });
+
+  it('frames each parent scene as a mini app screen', () => {
+    render(<WelcomeIntro audience="parent" onComplete={jest.fn()} />);
+    expect(screen.getByTestId('welcome-card-1-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-2-scene-frame')).toBeTruthy();
+    expect(screen.getByTestId('welcome-card-3-scene-frame')).toBeTruthy();
   });
 
   it('parent card 2 shows a progress overview', () => {
@@ -215,6 +234,26 @@ describe('<WelcomeIntro audience="parent" />', () => {
 });
 
 describe('<WelcomeIntro /> shared behaviour', () => {
+  it('uses the supplied brand-stage background for the welcome moment', () => {
+    render(
+      <WelcomeIntro
+        audience="learner"
+        onComplete={jest.fn()}
+        stageColors={TEST_STAGE_COLORS}
+      />,
+    );
+    const style = StyleSheet.flatten(
+      screen.getByTestId('welcome-intro').props.style,
+    );
+    expect(style.backgroundColor).toBe(TEST_STAGE_COLORS.background);
+  });
+
+  it('uses the translated brand label inside the mini app scene frame', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
+    expect(screen.getAllByText('StudyShell').length).toBeGreaterThan(0);
+    expect(screen.queryByText('MentoMate')).toBeNull();
+  });
+
   it('hardware-back on card 1 is a no-op (returns true)', () => {
     const addSpy = jest.spyOn(BackHandler, 'addEventListener');
     render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);

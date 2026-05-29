@@ -484,11 +484,14 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
   fi
 
   if [ $DUMP_OK -eq 1 ]; then
-    # Already on sign-in screen?
-    # Match either first-time ("Welcome to MentoMate") or returning ("Welcome back")
-    # heading, OR the sign-in-button testID in the UI dump.
-    if echo "$DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button"; then
-      echo "[seed-and-run] Sign-in screen reached after ${BUNDLE_ELAPSED}s!"
+    # App shell is up — bundle has loaded. Match any of:
+    #   - sign-in screen: "Welcome to MentoMate" / "Welcome back" / sign-in-button
+    #   - pre-auth welcome flow (2026-05-27 refactor): welcome-chooser /
+    #     pre-auth-bridge. A pm-clear'd app now lands on the audience chooser
+    #     BEFORE sign-in, so the sign-in markers never appear here; the Maestro
+    #     setup flow (nav-welcome-to-sign-in.yaml) walks chooser → sign-in.
+    if echo "$DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button\|welcome-chooser\|pre-auth-bridge"; then
+      echo "[seed-and-run] App shell reached after ${BUNDLE_ELAPSED}s!"
       break
     fi
 
