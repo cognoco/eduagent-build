@@ -11,7 +11,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../components/welcome/WelcomeIntro' /* gc1-allow: WelcomeIntro is covered by its own focused unit test; stub here exposes audience + onComplete + onCardAdvanced so this route test can drive the state machine without simulating swipes */,
+  '../../components/welcome/WelcomeIntro', // gc1-allow: route state-machine test; real deck swipes are covered in WelcomeIntro.test.tsx
   () => ({
     WelcomeIntro: ({
       audience,
