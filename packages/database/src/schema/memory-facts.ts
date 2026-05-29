@@ -85,3 +85,15 @@ export const memoryFacts = pgTable(
       .where(sql`${table.supersededBy} IS NULL`),
   ],
 );
+
+/**
+ * Compile-time row type for `memory_facts` rows returned from raw
+ * `db.execute()` calls (e.g. the recursive CTE in `findCascadeAncestry`).
+ * Derived from drizzle's `$inferSelect` so it stays in sync with the table
+ * definition automatically — no separate schema to maintain.
+ *
+ * CR-2026-05-21-168: Added so callers can cast `result.rows as MemoryFactRow[]`
+ * with a real type rather than `unknown[]`, matching the idiom used by other
+ * raw-query methods in repository.ts.
+ */
+export type MemoryFactRow = typeof memoryFacts.$inferSelect;
