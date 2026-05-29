@@ -629,10 +629,10 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               columns: { displayName: true },
             });
             if (!child) continue;
-            childProfileIds.push(link.childProfileId);
 
             const latest = await getLatestSnapshot(db, link.childProfileId);
             if (!latest) continue;
+            childProfileIds.push(link.childProfileId);
             const latestMetrics = await filterProgressMetricsToActiveSubjects(
               db,
               link.childProfileId,

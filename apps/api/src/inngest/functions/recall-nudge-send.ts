@@ -122,7 +122,10 @@ export const recallNudgeSend = inngest.createFunction(
         });
         if (childLink) {
           const childProfile = await db.query.profiles.findFirst({
-            where: eq(profiles.id, childLink.childProfileId),
+            where: and(
+              eq(profiles.id, childLink.childProfileId),
+              isNull(profiles.archivedAt),
+            ),
           });
           childName = childProfile?.displayName ?? undefined;
         }

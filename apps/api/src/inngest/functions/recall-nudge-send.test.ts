@@ -228,6 +228,29 @@ describe('recallNudgeSend', () => {
       });
     });
 
+    it('[WI-86] does not format guardian nudges with an archived child name', async () => {
+      mockResolveProfileRole.mockResolvedValueOnce('guardian');
+      mockDb.query.familyLinks.findFirst.mockResolvedValueOnce({
+        childProfileId: 'child-archived',
+      });
+      mockDb.query.profiles.findFirst
+        .mockResolvedValueOnce({ id: 'guardian-active' })
+        .mockResolvedValueOnce(null);
+
+      await executeHandler({
+        profileId: 'guardian-active',
+        fadingCount: 2,
+        topTopicIds: [],
+      });
+
+      expect(mockFormatRecallNudge).toHaveBeenCalledWith(
+        2,
+        'your fading topic',
+        'guardian',
+        undefined,
+      );
+    });
+
     it('[WI-80] does not format a nudge with an unowned topic title from event data', async () => {
       mockDb.query.curriculumTopics.findMany.mockResolvedValueOnce([
         { id: 'topic-foreign', title: 'Victim Secret Topic' },
