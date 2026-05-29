@@ -515,6 +515,23 @@ export async function handleSubscriberAlias(
       );
 
       // Dispatch alias_received so a future migration worker can consume it.
+      //
+      // MANUAL REMEDIATION POLICY (no automated worker by design — see below).
+      // This fires ~0×/month at current volume, so the queued event is handled
+      // by hand from the Sentry alert. When it does fire, reconcile toward the
+      // surviving (transferred_to) identity using "best of both, user-favorable,
+      // never refund":
+      //   - Subscription: keep the more valuable of the two — higher tier
+      //     (free < plus < family < pro), tiebreak by latest currentPeriodEnd.
+      //     Never downgrade a paying user as a merge side effect.
+      //   - Top-up credits: take the MAX of the two balances, not the sum
+      //     (summing invites abuse via deliberate re-aliasing).
+      //   - Quota counters: reset to the more generous cycle; don't carry "used".
+      //   - Never refund/cancel — Apple/Google own IAP billing. If BOTH are
+      //     genuinely active paid store subs, route to support, don't auto-cancel.
+      //   - Mark the from-side record superseded (pointer to survivor); don't delete.
+      // Build an automated, idempotent worker only once these alerts arrive often
+      // enough that manual handling is a burden (> a handful/week).
       await safeSend(
         () =>
           inngest.send({

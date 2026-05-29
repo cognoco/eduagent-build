@@ -1080,7 +1080,7 @@ async function seedRetentionDue(
     birthYear: LEARNER_BIRTH_YEAR,
   });
 
-  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
     'Biology',
@@ -1108,7 +1108,7 @@ async function seedRetentionDue(
     profileId,
     email,
     password,
-    ids: { subjectId, retentionCardId: firstCard.id },
+    ids: { subjectId, bookId, retentionCardId: firstCard.id },
   };
 }
 
