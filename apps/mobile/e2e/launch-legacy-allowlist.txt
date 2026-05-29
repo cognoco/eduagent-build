@@ -27,5 +27,9 @@ flows/billing/top-up.yaml
 # Tests animated splash on cold launch with clearState — cold-start is the test
 flows/edge/animated-splash.yaml
 
+# Foregrounds the app (stopApp:false) to read the device-local crash-recovery
+# marker after backgrounding — the relaunch IS the test mechanism, not setup.
+flows/learning/resume-crash-recovery.yaml
+
 # DEFERRED:M1-COMPREHENSIVE — full rewrite needed (theme picker removed, stale More-screen refs)
 flows/post-auth-comprehensive-devclient.yaml
