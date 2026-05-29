@@ -28,7 +28,8 @@ export function toInternalAppRedirectPath(
   value: string | undefined,
   fallback = '/(app)/home',
 ): string {
-  const normalized = normalizeRedirectPath(value, '/home');
+  const normalizedFallback = normalizeRedirectPath(fallback, '/home');
+  const normalized = normalizeRedirectPath(value, normalizedFallback);
   // [BUG-766] Separate suffix so the route-group prefix wraps the path only.
   const queryIndex = normalized.search(/[?#]/);
   const pathPart =
