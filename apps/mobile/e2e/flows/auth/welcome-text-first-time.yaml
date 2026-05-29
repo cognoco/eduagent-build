@@ -17,8 +17,12 @@ tags:
   - auth
   - regression
 ---
-# 1. Launch from clean state via dev-client setup
-- runFlow: ../_setup/launch-devclient.yaml
+# launch-devclient.yaml is DEPRECATED for WHPX/seed-and-run.sh environments
+# (see _setup/launch-devclient.yaml header). seed-and-run.sh handles all ADB
+# launch + Metro + bundle steps before Maestro starts; calling launchApp here
+# causes a re-launch and the Metro-URL assertion ("http://10.0.2.2:8081" visible)
+# to fail because the bundle is already loaded. All pre-auth flows now rely on
+# the app already being on or near the sign-in screen when Maestro starts.
 
 # Walk the pre-auth welcome flow to the sign-in screen (2026-05-27 refactor:
 # a pm-clear'd app lands on the audience chooser, not directly on sign-in).
