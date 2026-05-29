@@ -116,6 +116,48 @@ function createHttpStatusFailProvider(
   };
 }
 
+/** Mock provider whose chat() fails with provider JSON error details in Error.cause. */
+function createCauseStatusFailProvider(
+  id: string,
+  status: number,
+): LLMProvider & { callCount: number } {
+  const base = createMockProvider(id);
+  let calls = 0;
+  return {
+    ...base,
+    get callCount() {
+      return calls;
+    },
+    async chat(): Promise<ChatResult> {
+      calls++;
+      throw new Error(`Provider data.error ${status}`, {
+        cause: { code: status, message: 'Invalid API key' },
+      });
+    },
+  };
+}
+
+/** Mock provider whose chat() fails with provider JSON error type in Error.cause. */
+function createCauseTypeFailProvider(
+  id: string,
+  type: string,
+): LLMProvider & { callCount: number } {
+  const base = createMockProvider(id);
+  let calls = 0;
+  return {
+    ...base,
+    get callCount() {
+      return calls;
+    },
+    async chat(): Promise<ChatResult> {
+      calls++;
+      throw new Error(`Provider data.error ${type}`, {
+        cause: { type, message: 'Invalid request' },
+      });
+    },
+  };
+}
+
 /** Mock provider whose chat() always throws a provider safety block. */
 function createSafetyFailProvider(
   id: string,
@@ -1101,6 +1143,74 @@ describe('LLM Router', () => {
         );
 
         expect(recovered.provider).toBe('gemini');
+        expect(recoveredPrimary.chatCallCount).toBe(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('treats provider data.error cause 4xx as terminal: no retry, no fallback, no circuit failure', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createCauseStatusFailProvider('gemini', 403);
+      const fallback = createCountingProvider('openai');
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        await expect(
+          routeAndCall([{ role: 'user', content: 'test' }], 1),
+        ).rejects.toThrow('Provider data.error 403');
+
+        expect(primary.callCount).toBe(1);
+        expect(fallback.chatCallCount).toBe(0);
+
+        const recoveredPrimary = createCountingProvider('gemini');
+        registerProvider(recoveredPrimary);
+        const recovered = await routeAndCall(
+          [{ role: 'user', content: 'safe follow-up' }],
+          1,
+        );
+
+        expect(recovered.provider).toBe('gemini');
+        expect(recoveredPrimary.chatCallCount).toBe(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('treats provider validation data.error causes as terminal: no retry, no fallback, no circuit failure', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const primary = createCauseTypeFailProvider(
+        'openai',
+        'invalid_request_error',
+      );
+      const fallback = createCountingProvider('gemini');
+      registerProvider(primary);
+      registerProvider(fallback);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        await expect(
+          routeAndCall([{ role: 'user', content: 'test' }], 1, {
+            preferredProvider: 'openai',
+          }),
+        ).rejects.toThrow('Provider data.error invalid_request_error');
+
+        expect(primary.callCount).toBe(1);
+        expect(fallback.chatCallCount).toBe(0);
+
+        const recoveredPrimary = createCountingProvider('openai');
+        registerProvider(recoveredPrimary);
+        const recovered = await routeAndCall(
+          [{ role: 'user', content: 'safe follow-up' }],
+          1,
+          { preferredProvider: 'openai' },
+        );
+
+        expect(recovered.provider).toBe('openai');
         expect(recoveredPrimary.chatCallCount).toBe(1);
       } finally {
         warnSpy.mockRestore();
