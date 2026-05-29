@@ -6,6 +6,11 @@
  * start`, an unauthenticated actor could otherwise plant an arbitrary path
  * that the next sign-in would replay.
  *
+ * [CR-2026-05-21-113] Even for authenticated callers, the `path` param must
+ * be validated against an explicit allowlist. A malicious deep link with an
+ * out-of-allowlist path must be rejected; the safe default `/(app)/home` must
+ * be seeded instead.
+ *
  * `IS_E2E_BUILD` (NODE_ENV !== 'production' && EXPO_PUBLIC_E2E === 'true')
  * is evaluated at module load time, so we set `EXPO_PUBLIC_E2E=true` before
  * requiring the screen. Jest already pins NODE_ENV to 'test'.
@@ -86,5 +91,69 @@ describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
     // to sign-in so the next sign-in replays the seeded path.
     expect(peekPendingAuthRedirect()).toBe('/(app)/library');
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+  });
+});
+
+describe('SeedPendingRedirectScreen — path allowlist [CR-2026-05-21-113]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearPendingAuthRedirect();
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+  });
+
+  afterEach(() => {
+    clearPendingAuthRedirect();
+  });
+
+  it('accepts an allowlisted path (/(app)/library) and seeds it as-is', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      path: '/(app)/library',
+      staleMs: '0',
+    });
+
+    render(<SeedPendingRedirectScreen />);
+
+    // The allowlisted path must be seeded exactly as provided.
+    expect(peekPendingAuthRedirect()).toBe('/(app)/library');
+  });
+
+  it('accepts the safe default (/(app)/home) and seeds it as-is', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      path: '/(app)/home',
+      staleMs: '0',
+    });
+
+    render(<SeedPendingRedirectScreen />);
+
+    expect(peekPendingAuthRedirect()).toBe('/(app)/home');
+  });
+
+  it('rejects a non-allowlisted path and seeds the safe default instead — break test [CR-2026-05-21-113]', () => {
+    // Simulate a malicious deep link targeting a sensitive route.
+    mockUseLocalSearchParams.mockReturnValue({
+      path: '/(app)/account/billing',
+      staleMs: '0',
+    });
+
+    render(<SeedPendingRedirectScreen />);
+
+    // The attacker-controlled path must NOT be seeded; the safe default must
+    // be used instead.
+    expect(peekPendingAuthRedirect()).toBe('/(app)/home');
+    expect(peekPendingAuthRedirect()).not.toBe('/(app)/account/billing');
+  });
+
+  it('rejects an external-looking value and seeds the safe default instead — break test [CR-2026-05-21-113]', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      path: 'https://evil.example.com/steal',
+      staleMs: '0',
+    });
+
+    render(<SeedPendingRedirectScreen />);
+
+    expect(peekPendingAuthRedirect()).toBe('/(app)/home');
   });
 });

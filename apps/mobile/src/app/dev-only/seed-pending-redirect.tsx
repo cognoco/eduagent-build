@@ -19,6 +19,13 @@
  * a route of their choosing. We require a signed-in Clerk session — Maestro
  * flows already sign in before navigating here, so this is a no-op for the
  * sanctioned E2E path while closing the unauthenticated entry point.
+ *
+ * [CR-2026-05-21-113] Path allowlist: even with the auth guard above, a
+ * signed-in user on an E2E APK could be tricked by a malicious deep link into
+ * seeding an arbitrary redirect target. `toInternalAppRedirectPath` sanitises
+ * the structure but does not enforce an allowlist. We validate `path` against
+ * the small set of routes actually used by the Maestro E2E flows; anything
+ * outside the allowlist falls back to the safe default `/(app)/home`.
  */
 
 import { useAuth } from '@clerk/clerk-expo';
@@ -31,6 +38,20 @@ import { seedPendingAuthRedirectForTesting } from '../../lib/pending-auth-redire
 const IS_E2E_BUILD =
   process.env.NODE_ENV !== 'production' &&
   process.env.EXPO_PUBLIC_E2E === 'true';
+
+/**
+ * [CR-2026-05-21-113] Allowlist of `path` values that Maestro E2E flows are
+ * permitted to seed. Derived from every `openLink` call to this route in
+ * `apps/mobile/e2e/flows/`:
+ *   - `/(app)/library`  — deep-link-redirect-ttl-expired.yaml:48
+ *
+ * The safe default `/(app)/home` is always accepted because it is what the
+ * component uses when `path` is absent. Any path outside this set is rejected
+ * and the safe default is seeded instead.
+ */
+const SEED_PATH_ALLOWLIST = new Set(['/(app)/home', '/(app)/library']);
+
+const SAFE_DEFAULT_PATH = '/(app)/home';
 
 export default function SeedPendingRedirectScreen(): React.ReactElement | null {
   const router = useRouter();
@@ -53,7 +74,15 @@ export default function SeedPendingRedirectScreen(): React.ReactElement | null {
     }
 
     const staleMsNum = parseInt(staleMs ?? '0', 10);
-    seedPendingAuthRedirectForTesting(path ?? '/(app)/home', staleMsNum);
+    // [CR-2026-05-21-113] Validate path against the allowlist before seeding.
+    // An out-of-allowlist value (including any attacker-controlled path from a
+    // malicious deep link) falls back to the safe default rather than being
+    // passed to seedPendingAuthRedirectForTesting.
+    const requestedPath = path ?? SAFE_DEFAULT_PATH;
+    const seedPath = SEED_PATH_ALLOWLIST.has(requestedPath)
+      ? requestedPath
+      : SAFE_DEFAULT_PATH;
+    seedPendingAuthRedirectForTesting(seedPath, staleMsNum);
     router.replace('/(auth)/sign-in');
   }, [isLoaded, isSignedIn, path, staleMs, router]);
 
