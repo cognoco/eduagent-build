@@ -68,19 +68,11 @@
     "term": "mistake"
   },
   {
-    "path": "parentView.index.errorTitle",
-    "term": "wrong"
-  },
-  {
     "path": "parentView.mentorMemory.somethingElseIsWrong",
     "term": "wrong"
   },
   {
     "path": "parentView.mentorMemory.whatSeemsWrong",
-    "term": "wrong"
-  },
-  {
-    "path": "parentView.reports.somethingWentWrong",
     "term": "wrong"
   },
   {
